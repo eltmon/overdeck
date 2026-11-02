@@ -1,14 +1,19 @@
+import { createElement } from 'react';
+import { renderHook } from '@testing-library/react';
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   addCitation,
+  CitationTargetContext,
   consumeCitations,
   getConversationCitations,
   removeCitation,
   resetCitationStore,
   updateCitationComment,
+  useCitationTarget,
 } from '../composerCitations.js';
 
 const SOURCE = { kind: 'message' as const, messageId: 'msg-1', role: 'assistant' as const };
+const FILE_SOURCE = { kind: 'file' as const, path: '/repo/docs/a.md' };
 
 beforeEach(() => {
   localStorage.clear();
@@ -102,6 +107,44 @@ describe('persistence across reload', () => {
     );
     resetCitationStore();
     expect(getConversationCitations('conv-a').map((c) => c.id)).toEqual(['ok']);
+  });
+
+  it('round-trips a file citation unchanged across a reload', () => {
+    const citation = addCitation('conv-a', { source: FILE_SOURCE, quotedText: 'Some code', comment: '' });
+    resetCitationStore();
+    expect(getConversationCitations('conv-a')).toEqual([citation]);
+  });
+
+  it('drops file citations with an empty or missing path, keeping other valid entries', () => {
+    localStorage.setItem(
+      'conv-citations:conv-a',
+      JSON.stringify({
+        v: 1,
+        citations: [
+          { id: 'empty-path', source: { kind: 'file', path: '' }, quotedText: 'A', comment: '', createdAt: 'now' },
+          { id: 'no-path', source: { kind: 'file' }, quotedText: 'B', comment: '', createdAt: 'now' },
+          { id: 'bad-kind', source: { kind: 'note' }, quotedText: 'C', comment: '', createdAt: 'now' },
+          { id: 'ok', source: SOURCE, quotedText: 'Valid', comment: '', createdAt: 'now' },
+        ],
+      }),
+    );
+    resetCitationStore();
+    expect(getConversationCitations('conv-a').map((c) => c.id)).toEqual(['ok']);
+  });
+});
+
+describe('CitationTargetContext / useCitationTarget', () => {
+  it('defaults to null outside a provider', () => {
+    const { result } = renderHook(() => useCitationTarget());
+    expect(result.current).toBeNull();
+  });
+
+  it('reflects the nearest CitationTargetContext.Provider value', () => {
+    const { result } = renderHook(() => useCitationTarget(), {
+      wrapper: ({ children }) =>
+        createElement(CitationTargetContext.Provider, { value: 'conv-a' }, children),
+    });
+    expect(result.current).toBe('conv-a');
   });
 });
 

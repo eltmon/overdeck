@@ -1,0 +1,204 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T04:08:06Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4777: Fly remote: createRemoteWorkspace leaks the VM when an exec throws, and the clone troubleshooting doc is stale",
+    "updated": "2026-11-02T04:11:30.156Z"
+  },
+  "plan": {
+    "id": "pan-4777",
+    "title": "Fly remote: createRemoteWorkspace leaks the VM when an exec throws, and the clone troubleshooting doc is stale",
+    "status": "running",
+    "uid": "42afafc5-1040-4c10-9e88-cc98d8943a24",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-02T04:08:06Z",
+    "updated": "2026-11-02T04:11:30.156Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4777",
+        "label": "PAN-4777",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4777.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "fly",
+      "remote",
+      "bug",
+      "docs"
+    ],
+    "narratives": {
+      "Problem": "createRemoteWorkspace() in src/lib/remote-workspace.ts creates a Fly VM and then runs credential sync, the detached clone start exec, the clone-failure log tail, git config, branch checkout, configureClaudeCode, continue.json sync, copySkillsToVm, compose execs and saveWorkspaceMetadata with no try/catch. FlyProvider.sshImpl calls resolveVm outside its FlyApiError catch, and during creation resolveVm falls back to listMachines, so any Fly API failure (403 expired token, 5xx, network) rejects the exec. The rejection escapes createRemoteWorkspace before deleteVm runs, leaving a billing VM with no workspace metadata pointing at it. Separately, docs/fly-provider.md still says a large git clone may time out inside one exec, which has been false since #4713 moved the clone to a detached process polled every 5 s for 20 min.",
+      "Proposal": "Wrap every statement after createVm through `return metadata` in one try/catch. The catch calls a new module-private rollBackVm(fly, vmName, machineId, error) helper that deletes the VM with fly.deleteVm(vmName) and returns the original error; if deleteVm also rejects it returns a new Error naming the VM, machine id, app, the delete error and the command `fly machines destroy <machineId> -a <app> --force`, with cause = original error. Remove the inline deleteVm in the clone-failure branch so the VM is deleted exactly once. Add five tests with fail-able mocks. Rewrite the stale troubleshooting bullet in docs/fly-provider.md and document the rollback.",
+      "NonGoals": "- No fix for expired flyctl tokens (#4748).\n- No change to FlyProvider.sshImpl or resolveVm error handling.\n- No change to FlyProvider.deleteVm's signature and no machine-id-based delete path.\n- No change to FlyProvider.createVm's own failure paths (failures before createVm resolves).\n- No change to src/lib/anywhere/fly/provision.ts.\n- No change to the CLI callers in start.ts, workspace-create.ts, workspace-migrate.ts.\n- No local try/catch added inside cloneDetached."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Rollback scope starts on the line after createVm and ends after saveWorkspaceMetadata, covering syncAllCredentials and the git config exec too.",
+        "rationale": "The issue's fix direction says 'once createVm succeeds, any failure in creation deletes the VM'; the git config exec and saveWorkspaceMetadata can also reject and leak the VM."
+      },
+      {
+        "summary": "Use fly.deleteVm(vmName) for the rollback, not a direct destroyMachine(appName, machineId).",
+        "rationale": "The issue names deleteVm, deleteVm also removes the durable-tier volume, and a direct destroy would fail the same way under an expired token; the error message carries the manual fallback."
+      },
+      {
+        "summary": "The rollback-failure error message includes the copy-pasteable command `fly machines destroy <machineId> -a <app> --force`, built from vmInfo.machineId and fly.getAppName().",
+        "rationale": "The issue asks that the error name the VM so the operator can run fly machines destroy; flyctl destroys by machine id, which createVm already returned."
+      },
+      {
+        "summary": "Two independent items (code+tests, docs) with no edge between them.",
+        "rationale": "The doc text is fixed in the PRD, so the docs item does not consume the code item's output and touches a different file."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-02-PAN-4777-fly-remote-createremoteworkspace-leaks-the-vm-when-an-exec-throws-and-the-clone-troubleshooting-doc-is-stale.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "rollback-vm-on-create-failure",
+        "title": "Delete the Fly VM when any createRemoteWorkspace step after createVm rejects",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T04:08:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4777",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/remote-workspace.ts",
+            "tests/lib/remote-workspace.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/remote-workspace.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "tests/lib/remote-workspace.test.ts passes, including the five new tests named in the PRD Work item 1",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD Work item 1 and decision D-4 exactly. In src/lib/remote-workspace.ts: add the module-private async function rollBackVm(fly, vmName, machineId, error) after cloneDetached; it awaits Effect.runPromise(fly.deleteVm(vmName)) and returns the original error, or, if deleteVm rejects, returns new Error(`${reason}. The VM ${vmName} (machine ${machineId}, app ${appName}) could not be deleted: ${deleteReason}. Destroy it by hand: fly machines destroy ${machineId} -a ${appName} --force`, { cause: error }) where appName = fly.getAppName(). Wrap every statement after `const vmInfo = await Effect.runPromise(fly.createVm(vmName));` through `return metadata;` in try { ... } catch (error) { throw await rollBackVm(fly, vmName, vmInfo.machineId, error); }. Delete the inline `await Effect.runPromise(fly.deleteVm(vmName));` in the clone-failure branch so the branch only throws. Do not edit cloneDetached or FlyProvider. In tests/lib/remote-workspace.test.ts: add hoisted mocks sshFailures (string[]; ssh returns Effect.fail(new Error(`exec failed: ${substring}`)) when the command contains one, checked first), deleteVmError (Error | null; deleteVm still calls mocks.deleteVm() then returns Effect.fail), and configureClaudeCode (vi.fn wired into the provider factory); reset all three in beforeEach. Add the five tests named in the PRD: clone start exec rejects ('setsid nohup'), clone log tail rejects ('tail -5 /tmp/pan-clone.log' with cloneExits '128'), later step rejects (configureClaudeCode.mockRejectedValueOnce), branch checkout rejects ('git checkout'), and rollback delete fails (deleteVmError = new Error('403 Forbidden')). Keep fake timers (vi.useFakeTimers + advanceTimersByTimeAsync via the existing create() helper); no real waits, no skipIf/.only, no source-file reads in tests."
+        },
+        "items": [
+          {
+            "id": "rollback-vm-on-create-failure.ac1",
+            "title": "Given the clone start exec, the clone log tail, the branch checkout exec, or configureClaudeCode rejects, when createRemoteWorkspace('PAN-4295') runs, then it rejects with the original error message, calls deleteVm exactly once, and does not call saveWorkspaceMetadata (four named tests pass)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rollback-vm-on-create-failure.ac2",
+            "title": "Given the clone exits 128, when createRemoteWorkspace runs, then it rejects with 'Failed to clone: fatal: repository not found' and calls deleteVm exactly once (the existing test passes with the inline delete removed)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rollback-vm-on-create-failure.ac3",
+            "title": "Given a step rejects and deleteVm rejects with '403 Forbidden', when createRemoteWorkspace runs, then the thrown message contains the original message, 'pan-pan-4295-ws', 'm1', '403 Forbidden' and 'fly machines destroy m1 -a overdeck-test --force'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rollback-vm-on-create-failure.ac4",
+            "title": "Given the success-path tests, when createRemoteWorkspace completes, then deleteVm is not called and saveWorkspaceMetadata is called once; `npx vitest run tests/lib/remote-workspace.test.ts`, `npm run typecheck` and `npm run lint` exit 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fly-doc-clone-and-rollback",
+        "title": "Rewrite the stale Fly exec-timeout troubleshooting bullet in docs/fly-provider.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T04:08:06Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4777",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/fly-provider.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'pan-clone.exit' docs/fly-provider.md",
+            "grep -n 'fly machines destroy <machine-id> -a <app> --force' docs/fly-provider.md",
+            "! grep -n 'may time out' docs/fly-provider.md"
+          ],
+          "expected_outputs": [
+            "the first grep prints the new Fly API exec timeout bullet",
+            "the second grep prints the new 'Creation fails after the machine exists' bullet",
+            "the third command exits 0 because 'may time out' no longer appears"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD Work item 2. In docs/fly-provider.md under '### Exec / SSH commands fail', replace the '**Fly API exec timeout**' bullet (the one saying a git clone 'may time out') with the two bullets given verbatim in the PRD: the detached clone (setsid nohup, /tmp/pan-clone.log, /tmp/pan-clone.exit, polled every 5 s for up to 20 min, VM deleted on non-zero exit with the last 5 log lines, 'clone did not finish within 20 min' on the deadline, vm_memory advice kept) and 'Creation fails after the machine exists' (any failure after the machine exists deletes it; if the delete fails too, e.g. an expired token answering 403 (#4748), the error names the machine and prints `fly machines destroy <machine-id> -a <app> --force`). In the 'Overdeck will:' list of the pan workspace create --remote step, add a final bullet: 'If any step after the machine is created fails, delete the machine before reporting the error'. Change nothing else in the file."
+        },
+        "items": [
+          {
+            "id": "fly-doc-clone-and-rollback.ac1",
+            "title": "Given docs/fly-provider.md after the change, when grepped, then it contains '/tmp/pan-clone.exit' and 'every 5 s for up to 20 min' in the Fly API exec timeout bullet and no longer contains 'may time out'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fly-doc-clone-and-rollback.ac2",
+            "title": "Given docs/fly-provider.md after the change, when read under '### Exec / SSH commands fail', then a 'Creation fails after the machine exists' bullet states the machine is deleted on failure and shows the command 'fly machines destroy <machine-id> -a <app> --force' for when that delete fails",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fly-doc-clone-and-rollback.ac3",
+            "title": "Given the 'Overdeck will:' list for pan workspace create --remote, when read, then its last bullet says the machine is deleted if any step after creation fails",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  },
+  "status": "active"
+}

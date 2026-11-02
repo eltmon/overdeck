@@ -45,7 +45,6 @@ import { exec, execFile, spawn } from 'node:child_process';
 import { createConnection } from 'node:net';
 import { existsSync } from 'node:fs';
 import { access, chmod, mkdir, readdir, readFile, stat, symlink, unlink, writeFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { crc32 } from 'node:zlib';
@@ -54,14 +53,13 @@ import { Cause, Effect, Layer, Option } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
 import {
-  resolveProjectFromIssueSync,
   getProjectSync,
   listProjectsSync,
   findProjectByTeam,
   extractTeamPrefix,
 } from '../../../lib/projects.js';
 import { resolveGitHubIssue } from '../../../lib/tracker-utils.js';
-import { getGitHubConfig } from '../services/tracker-config.js';
+import { getProjectPath } from '../services/project-path.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { isInternalAgentRequest, resolveRequestedStartedBy } from './agents/shared.js';
 import {
@@ -288,31 +286,9 @@ export function clearPendingOperation(issueId: string): void {
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
 
-export function getProjectPath(linearProjectId?: string, issuePrefix?: string): string {
-  if (issuePrefix) {
-    const issueId = `${issuePrefix}-1`;
-    const resolved = resolveProjectFromIssueSync(issueId);
-    if (resolved) return resolved.projectPath;
-
-    const config = getGitHubConfig();
-    if (config) {
-      for (const { owner, repo, prefix } of config.repos) {
-        const repoPrefix = prefix || repo.toUpperCase().replace(/-CLI$/, '').replace(/-/g, '');
-        if (repoPrefix.toUpperCase() === issuePrefix.toUpperCase()) {
-          const possiblePaths = [
-            join(homedir(), 'Projects', repo),
-            join(homedir(), 'Projects', repo.replace(/-cli$/, '')),
-            join(homedir(), 'Projects', owner, repo),
-          ];
-          for (const path of possiblePaths) {
-            if (existsSync(path)) return path;
-          }
-        }
-      }
-    }
-  }
-  return join(homedir(), 'Projects');
-}
+// PAN-4750 review: the body lives in services/project-path.ts so the strike
+// merge builder resolves the same path without importing this route module.
+export { getProjectPath };
 
 export function requireTrustedMutationOrigin(request: HttpServerRequest.HttpServerRequest): HttpServerResponse.HttpServerResponse | null {
   const origin = (() => {

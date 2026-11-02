@@ -154,3 +154,47 @@ describe('useConversationMutations — triage (PAN-4639 WI-6)', () => {
     expect(lastRequestBody()).toEqual({ updates: [{ name: 'conv-d', settled: false, snoozedUntil: null }] });
   });
 });
+
+describe('useConversationMutations — setAutoSettleOverride (PAN-4653 WI-7)', () => {
+  it('posts an override-only update, updates the cached row before the response, and pushes no undo entry', async () => {
+    const { view, client } = setup([conv({ name: 'conv-o' })]);
+    let resolveFetch: (value: Response) => void = () => {};
+    fetchMock.mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+
+    act(() => {
+      view.result.current.setAutoSettleOverride({ name: 'conv-o', override: 'off' });
+    });
+
+    await waitFor(() => {
+      const cached = client.getQueryData<Conversation[]>(['conversations']);
+      expect(cached?.find((c) => c.name === 'conv-o')?.autoSettleOverride).toBe('off');
+    });
+    expect(fetchMock).toHaveBeenCalledWith('/api/conversations/triage', expect.objectContaining({ method: 'POST' }));
+    expect(lastRequestBody()).toEqual({ updates: [{ name: 'conv-o', autoSettleOverride: 'off' }] });
+
+    await act(async () => {
+      resolveFetch(new Response(JSON.stringify({ conversations: [], notFound: [], rejected: [] }), { status: 200 }));
+    });
+    await waitFor(() => expect(client.isMutating()).toBe(0));
+
+    let undone = true;
+    act(() => {
+      undone = view.result.current.undoLastTriage();
+    });
+    expect(undone).toBe(false);
+    expect(toastFn).not.toHaveBeenCalled();
+  });
+
+  it('restores the prior override and calls toast.error when the request fails', async () => {
+    const { view, client } = setup([conv({ name: 'conv-p', autoSettleOverride: 'on' })]);
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ error: 'boom' }), { status: 500 }));
+
+    act(() => {
+      view.result.current.setAutoSettleOverride({ name: 'conv-p', override: 'off' });
+    });
+
+    await waitFor(() => expect(toastErrorFn).toHaveBeenCalledWith('boom', expect.anything()));
+    const cached = client.getQueryData<Conversation[]>(['conversations']);
+    expect(cached?.find((c) => c.name === 'conv-p')?.autoSettleOverride).toBe('on');
+  });
+});

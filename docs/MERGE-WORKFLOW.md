@@ -35,6 +35,13 @@ The Flywheel page's UAT BATCHES card (`MergeTrainView`) is the merge control.
    lands exactly the tree you tested. The small "Merge one feature to main…"
    escape hatch stays below the rows for the rare case where one feature must
    go first.
+
+   The checklist is each member's xBRIEF acceptance criteria. Because a
+   member's spec is committed on its feature branch and reaches `main` only
+   when its PR merges, the lookup tries the batch worktree first (every
+   member merged in), then the member's own feature workspace, then the
+   project root, so an already-merged member still resolves there (PAN-4799).
+   A member with no spec anywhere shows "Plan not found for \<ID>".
 2. **No tested batch exists.** This covers a batch that is still assembling,
    a lone feature in a project that does not hold for UAT, and a failed
    assembly. Each ready row then shows its own **Merge** button. It posts
@@ -94,7 +101,9 @@ bypasses it.
    workspace (the PR was pushed from a handoff worktree), the webhook adopts
    the PR branch into one through
    [`src/lib/cloister/pr-adoption-review.ts`](../src/lib/cloister/pr-adoption-review.ts)
-   and then starts the pipeline. When adoption is refused (the branch is
+   and then starts the pipeline. Verification skips the plan checklist for an
+   adopted PR with no xBRIEF (PAN-4786); every other check still runs. When
+   adoption is refused (the branch is
    checked out in another worktree, the head moved, or the local branch
    diverged), the issue shows "Review never started" under Needs you with the
    exact fix. See

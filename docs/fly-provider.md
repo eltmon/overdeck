@@ -58,12 +58,17 @@ endpoint; port tunnelling uses `fly proxy`.
    ```
 
    Overdeck will:
+   - Push the local `feature/<id>` branch to origin when a local workspace exists, so the planned spec reaches the machine; creation stops with an error and creates no machine if that push is rejected
    - Create a Fly Machine in your configured app
-   - Wait up to 120 s for it to reach `started`
+   - Wait up to 300 s for it to reach `started`
    - Sync Claude Code and GitHub credentials from your local machine
    - Clone the repository over HTTPS into `/workspace` and check out the feature branch
    - Configure Claude Code and copy your local skills
    - Save workspace metadata to `~/.overdeck/workspaces/<id>.yaml`
+   - If a setup step after the create step fails (credential sync onward), delete the machine and try to delete its durable-tier volume before reporting the error. If the create step itself fails (for example the machine does not reach `started` within 300 s), the machine is left in place; find it with `fly machines list -a <app>`.
+
+   Only committed work reaches the machine: uncommitted changes in the local
+   workspace are not pushed.
 
    No SSH private key is copied to the VM. Git authenticates over HTTPS with the
    synced `gh` token.
@@ -253,7 +258,7 @@ Each workspace maps to exactly one Fly Machine inside the configured app.
 - `auto_destroy = false` — machines persist after the process that created them exits
 
 After creation the provider polls `GET /apps/:app/machines/:id/wait?state=started` for
-up to 120 seconds. Once the machine is running, Overdeck runs setup commands over the
+up to 300 seconds. Once the machine is running, Overdeck runs setup commands over the
 exec endpoint (clone repo, install beads, sync credentials).
 
 Machine identity is stored in `~/.overdeck/workspaces/<issue-id>.yaml`:
@@ -333,9 +338,12 @@ OpenAI replaces the refresh token on every refresh, so two copies of one sign-in
 both stay valid. The Codex sign-in is therefore not copied one way like Claude's: the
 `syncFlyCodexAuth` loop (below) keeps home and each VM in step by newest refresh wins.
 
-Claude Code is also configured for autonomous operation: `~/.claude/settings.json` is
-written from your resolved Overdeck permission mode and onboarding is marked complete
-in `~/.claude.json`.
+Claude Code is configured for autonomous operation: `~/.claude/settings.json` is written
+from your resolved Overdeck permission mode, and `~/.claude.json` marks onboarding
+complete, trusts `/workspace`, accepts the Bypass Permissions disclaimer, and dismisses
+the one-shot "Make auto mode your default permission mode?" dialog
+(`hasSeenAutoDefaultNudge`), which otherwise took focus on every fresh VM and swallowed
+the first message (PAN-4738).
 
 If Claude auth fails on the remote agent, re-authenticate locally (`claude`) then sync:
 
@@ -365,6 +373,10 @@ With no Fly machine record, none calls the Fly API.
 | `heartbeatFlyMachines` | every 60 s | Writes `/workspace/.pan/host-heartbeat` on every Fly machine, so its watchdog keeps it running while home is up. A failed exec is reported as a failure, never as refreshed. | keeps running |
 | `syncFlyCodexAuth` | every 60 s | For each linked Fly machine whose record has a `codexAuthPath`, reads the VM's Codex `auth.json` and decides by newest refresh wins: copies a newer same-account VM refresh home (atomic write), otherwise copies home's sign-in to the VM when the two differ. A VM that does not answer is skipped until the next tick. With no such record it makes no Fly API call. | keeps running |
 | `sweepFlyMachines` | every 60 s | Destroys the machine, removes its link and deletes its record when the Fly API reports it `stopped`, `destroyed` or `failed` or answers 404; when no unreleased linked conversation on it has been active for `[remote.fly] machine_idle_minutes` (default 30, 0 disables); or when provisioning never linked it within 30 min. Any other API error leaves it alone. | keeps running |
+
+A rejected Fly token (PAN-4748) shows as `Fly token rejected (<status>)` in each loop's
+line instead of a raw API error; `sweepFlyMachines` keeps the record rather than
+destroying it on one.
 
 The heartbeat and credential refresh run in `src/lib/cloister/hygiene-scheduler.ts`;
 the reap runs last in `runDeaconLite()` through `src/lib/cloister/remote-reap-routine.ts`.
@@ -417,8 +429,26 @@ throws `Fly API token not found`.
 **Fix:**
 1. Verify the token is exported: `echo $FLY_API_TOKEN`
 2. Check token validity: <https://fly.io/user/personal_access_tokens>
-3. Alternatively, authenticate via CLI: `fly auth login` — the provider falls back to
-   the CLI session when no `FLY_API_TOKEN` is set.
+3. Alternatively, authenticate via CLI: `fly auth login` — the provider reads flyctl's
+   stored login (`~/.fly/config.yml`) when no `FLY_API_TOKEN` (or the variable
+   `remote.fly.api_token_env` names) is set.
+
+**Fly token rejected (403)**
+
+Overdeck uses flyctl's stored login when no `FLY_API_TOKEN` is set. That token expires
+quickly, and flyctl refreshes it only when flyctl itself runs. Overdeck now runs `flyctl
+auth token` once after a 401/403 and retries the same request with the refreshed token
+(PAN-4748). If that refresh also fails — flyctl is not installed, or the stored login is
+older than 30 days — every operator-facing surface (the deacon loop lines, `pan machines
+add-fly`/`unlink` errors, and `pan doctor`) says `Fly token rejected`.
+
+**Fix:** run `fly auth login` to refresh the stored login. For a host where nobody runs
+`fly` interactively (a server, a CI runner), mint a long-lived token instead and export it
+as `FLY_API_TOKEN` (for example in `~/.overdeck.env`):
+
+```bash
+fly tokens create deploy -a <app> --expiry <duration>
+```
 
 ---
 
@@ -443,14 +473,26 @@ commands immediately fail.
 non-zero exit codes from the exec API.
 
 **Causes and fixes:**
-- **Machine not started** — the 120 s wait timed out; try `pan workspace start <issue>`
-  and retry.
+- **Machine not started** — the 300 s wait timed out (often a first boot still pulling the image). Creation fails and the machine is not deleted: find it with `fly machines list -a <app>`. Re-run `pan workspace create --remote <issue>` to adopt and start it, or destroy it with `fly machines destroy <machine-id> -a <app> --force` (on the durable tier, also destroy its `<vm-name>-workspace` volume as shown below).
 - **Image missing required tools** — ensure the Dockerfile installs git, python3, curl,
   and base64. Rebuild and push.
-- **Fly API exec timeout** — individual exec calls default to 60 s. Long-running
-  operations (e.g., `git clone` on a large repo) may time out. The clone step will
-  delete the machine and surface the error; re-run after increasing `vm_memory` if the
-  OOM killer is the cause.
+- **Fly API exec timeout** — each exec call has a 60 s deadline. The clone does not
+  run inside one exec: it starts detached (`setsid nohup`), writes its output to
+  `/tmp/pan-clone.log` and its exit code to `/tmp/pan-clone.exit`, and Overdeck polls
+  every 5 s for up to 20 min. If the clone exits non-zero, the machine is deleted and
+  the error shows the last 5 lines of the log. If it does not finish in 20 min, the
+  error is `clone did not finish within 20 min`. Re-run after increasing `vm_memory`
+  if the OOM killer is the cause.
+- **Creation fails during setup** — any failure in a setup step after the create step
+  returns (credential sync, clone, branch checkout, Claude Code setup, skills copy,
+  compose) deletes the machine, and on the durable tier also tries to delete its
+  `<vm-name>-workspace` volume, before the error is shown. If the machine delete also
+  fails (for example an expired Fly token answering 403, #4748), the error names the
+  machine and prints the command to remove it by hand:
+  `fly machines destroy <machine-id> -a <app> --force`. On the durable tier, run
+  `fly volumes list -a <app>` after any failed creation: rollback does not report a
+  failed volume delete. If a `<vm-name>-workspace` volume is still listed, destroy
+  it with `fly volumes destroy <volume-id> -a <app> --yes`.
 
 ---
 
@@ -544,17 +586,40 @@ deleted the record and left `fly machines list -a pan-workspaces` empty (O4).
 Recorded, not fixed here:
 
 - The first message of a new conversation was lost to Claude Code's "Make auto mode your
-  default permission mode?" startup dialog
+  default permission mode?" startup dialog — fixed by PAN-4738: the VM pre-answers the
+  dialog, and the readiness wait no longer takes the dialog for the composer
   ([#4738](https://github.com/eltmon/overdeck/issues/4738)).
-- The VM's conversation-lifecycle patrol marks the live conversation ended on every tick,
-  which can make the idle sweep see a working machine as idle
-  ([#4739](https://github.com/eltmon/overdeck/issues/4739)).
+- The VM's conversation-lifecycle patrol and the conversation list disagreed about a live
+  conversation, so its row flapped between `ended` and `active` and the idle sweep could
+  see a working machine as idle
+  ([#4739](https://github.com/eltmon/overdeck/issues/4739)). Fixed by PAN-4739: the
+  census now reads tmux as a UTF-8 client (see "Reproduction (PAN-4739)" below), and the
+  patrol confirms through `conversationHarnessAlive` before it ends a conversation, so
+  the patrol and the list route can no longer flap the row. A census verdict the door
+  contradicts logs one `WARNING (PAN-4739)` line in `fly-serve.log`.
 - The first linked request after an idle spell failed with `socket hang up`; an
   immediate retry succeeded ([#4740](https://github.com/eltmon/overdeck/issues/4740)).
 - The VM advertises its private Fly addresses as `lan` routes, which home tries before
   the public route ([#4741](https://github.com/eltmon/overdeck/issues/4741)).
 - A test that pulls a conversation must not register the workspace being tested as the
   project's checkout: **Pull here** restores the conversation's code into that checkout.
+
+**Reproduction (PAN-4739).** Cause found and fixed in `src/lib/tmux.ts` (the decision
+rule's first branch). Run 1's image (`registry.fly.io/pan-workspaces:pan-4652`, pan
+0.72.0, tmux 3.4) ran in a local container with `pan serve` started as provisioning
+starts it (`HOME=/`, `setsid nohup`, `OVERDECK_TERMINAL_BACKEND=tmux IS_SANDBOX=1`).
+The server process had no `LANG` or `LC_*` variable, and without a UTF-8 locale tmux
+prints every tab in `-F` output as `_`: the census's `list-panes -a` returned
+`conv-20261102-2889_565_0_` where it should return tab-separated fields. The parser
+read no pane id from that line and dropped it, so the census held no session, and the
+patrol logged `Session conv-20261102-2889 gone — marking ended` 30 s after the spawn
+while `tmux ls` listed the session. `list-sessions -F '#{session_name}'` has no tab,
+so the list route still saw the session and set the row back to `active` on the next
+`GET /api/conversations`. The pane readers that parse tab-separated records
+(`listAllPaneRecords`, `listPaneValues`, `listPaneValuesSync`) now pass `-u`, which
+makes tmux write UTF-8 output whatever the locale. With that change patched into the
+same container, a row marked ended under a live harness was set back to `active` by
+the patrol's own census on the next tick, and no `gone` line appeared.
 
 
 ## Live verification (PAN-4296)

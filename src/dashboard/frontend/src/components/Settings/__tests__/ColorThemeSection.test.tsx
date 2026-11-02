@@ -16,6 +16,12 @@ vi.mock('../../../lib/wsTransport', () => ({
   dashboardMutationJsonHeaders: vi.fn(async () => ({ 'Content-Type': 'application/json', 'x-overdeck-csrf-token': 'test' })),
 }));
 
+vi.mock('../../../lib/syntaxTheme', () => ({
+  ensureSyntaxTheme: vi.fn(async () => 'mock-theme'),
+  highlight: vi.fn(async () => '<pre><code>mock</code></pre>'),
+  syntaxThemeName: vi.fn(() => 'mock-theme'),
+}));
+
 function theme(overrides: Partial<ColorTheme> & { id: string; type: 'light' | 'dark' }): ColorTheme {
   return { builtin: false, name: overrides.id, ...overrides };
 }
@@ -84,5 +90,55 @@ describe('ColorThemeSection', () => {
       expect(toastMock.toast.error).toHaveBeenCalled();
     });
     expect(useColorTheme.getState().selection.dark).toBe('overdeck-dark');
+  });
+
+  it('renders a row per theme; Edit is absent for built-ins and present for a user theme', () => {
+    fetchControl = installStrictFetchMock(() => undefined);
+    render(<ColorThemeSection />);
+
+    expect(screen.getByTestId('color-theme-row-overdeck-dark')).toBeInTheDocument();
+    expect(screen.getByTestId('color-theme-row-ayu-dark')).toBeInTheDocument();
+    expect(screen.queryByTestId('color-theme-edit-overdeck-dark')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('color-theme-edit-overdeck-light')).not.toBeInTheDocument();
+    expect(screen.getByTestId('color-theme-edit-ayu-dark')).toBeInTheDocument();
+  });
+
+  it('clicking Duplicate and edit on overdeck-dark opens the editor seeded with "Overdeck Dark copy"', async () => {
+    fetchControl = installStrictFetchMock(() => undefined);
+    const user = userEvent.setup();
+    render(<ColorThemeSection />);
+
+    await user.click(screen.getByTestId('color-theme-duplicate-overdeck-dark'));
+
+    expect(screen.getByTestId('color-theme-editor')).toBeInTheDocument();
+    expect(screen.getByTestId('color-theme-editor-name')).toHaveValue('Overdeck Dark copy');
+  });
+
+  it('end-to-end: duplicating and saving adds the new theme to the dark select and closes the editor', async () => {
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'POST' && url === '/api/color-themes') {
+        return Response.json({ theme: { id: 'overdeck-dark-copy', builtin: false, name: 'Overdeck Dark copy', type: 'dark' } });
+      }
+      if (method === 'GET' && url === '/api/color-themes') {
+        return Response.json({
+          themes: [BUILTIN_COLOR_THEMES['overdeck-dark'], BUILTIN_COLOR_THEMES['overdeck-light'], ayuDark, ayuLight,
+            { id: 'overdeck-dark-copy', builtin: false, name: 'Overdeck Dark copy', type: 'dark' }],
+          selection: { light: 'overdeck-light', dark: 'overdeck-dark' },
+          warnings: [],
+        });
+      }
+      return undefined;
+    });
+    const user = userEvent.setup();
+    render(<ColorThemeSection />);
+
+    await user.click(screen.getByTestId('color-theme-duplicate-overdeck-dark'));
+    await user.click(screen.getByTestId('color-theme-editor-save'));
+
+    await vi.waitFor(() => {
+      const darkOptions = Array.from(screen.getByTestId('color-theme-dark').querySelectorAll('option')).map((o) => o.getAttribute('value'));
+      expect(darkOptions).toContain('overdeck-dark-copy');
+    });
+    expect(screen.queryByTestId('color-theme-editor')).not.toBeInTheDocument();
   });
 });

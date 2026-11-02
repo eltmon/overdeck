@@ -1,6 +1,7 @@
 # Concerns / hazards
 
-Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly bullet 2026-11-01).
+Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly bullets 2026-11-02).
+Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly and feature-branch-push bullets 2026-11-01).
 
 - **ToS policy gate** — `canUseHarness()` (`src/lib/harness-policy.ts`) blocks
   ohmypi/prime-agent + Anthropic + subscription auth (plus the model/harness pairing
@@ -131,6 +132,31 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly bulle
   or every ephemeral watchdog would stop its machine); the reap runs in
   `deacon-lite.ts` via `remote-reap-routine.ts` (behind the freeze). The reap acts
   only on positive evidence: a failed exec is `indeterminate`, never a crash.
+- **Fresh Claude Code state shows startup dialogs that eat the first message** — every
+  Fly VM starts with an empty `~/.claude.json` (exec shell `HOME=/`). Each dialog
+  Claude Code can show at launch must be pre-answered in
+  `FlyProvider.configureClaudeCode` (onboarding, `/workspace` trust,
+  `bypassPermissionsModeAccepted`, and since PAN-4738 `hasSeenAutoDefaultNudge`).
+  Verify a key in the image's `claude.exe` (`grep -a`), never in a host config. A
+  dialog's select cursor is the same `❯` the composer shows, and unnumbered selects
+  escape `paneHasBlockingChoiceMenu`, so `waitForClaudeReady` matches known
+  dialog titles instead.
+  With no `FLY_API_TOKEN` (or `remote.fly.api_token_env` variable), `createFlyApiClient()`
+  sends flyctl's stored `~/.fly/config.yml` token through a `FlyTokenSource`
+  (`src/lib/remote/fly-token.ts`, PAN-4748): `FlyApiClient.request()` re-reads the token
+  per call and, on a 401/403, runs `flyctl auth token` once (process-wide single-flight,
+  60s cooldown on failure) and retries. `pollUntil` rethrows a rejection that survives
+  the retry as `FlyMachineError('fly-token-rejected')` instead of counting it as "not
+  finished"; the heartbeat/sweep/Codex-sync loop lines, `pan machines unlink`/rollback,
+  and `pan doctor`'s `Fly token` row all report it as `Fly token rejected`.
+- **A workspace's `feature/<id>` branch tracks `origin/main`** (`branch.<b>.merge =
+  refs/heads/main`), so a bare `git push` from a workspace fails ("upstream branch
+  does not match") and `pushPlanArtifacts` (`overdeck/plan-artifact-commit.ts`)
+  would push to `main`. Push a feature branch with an explicit refspec
+  (`git push origin HEAD:refs/heads/feature/<id>`) and never `-u`: `@{u}` readers
+  (`workspaces/git-state.ts`, `xbrief/continue-state.ts`, `lanes/*`) assume it.
+  A planned issue's spec lives on that branch, not on the primary checkout, so
+  "is it planned?" must check the workspace or the branch ref (PAN-4683).
 - **Close-out ceremony lives in `lifecycle/workflows.ts closeOut()`** — `pan close` and
   `POST /api/issues/:id/close-out` both call it. `src/lib/close-out.ts` now holds only
   merge detection (`isBranchMerged`, squash-aware via the merged PR). `closeOut()` reads
@@ -385,11 +411,6 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly bulle
   Background work from a route uses `void work().catch((err) => console.error(...))`
   (`routes/hooks.ts`, `routes/resources/snapshot.ts`); use `Effect.forkDetach` only
   where the work must stay inside the Effect runtime.
-- PR sync auto-archive liveness is tmux-only: `listLiveConversationSessions` in
-  `services/pull-request-sync-service.ts` runs `tmux list-sessions`, but
-  conversations launch through the terminal-backend door (Herdr default,
-  PAN-3921). With `conversations.auto_archive_on_merge` on under Herdr, every
-  conversation reads as not live. Use `getBackendPanes()` + `paneAgentKey`.
 - TanStack `rowVirtualizer.measure()` (virtual-core 3.17.11) clears cached sizes
   but re-reads no element; a row whose height did not change gets no
   ResizeObserver callback, and `resizeItem` caches only a changed size. So in
@@ -532,4 +553,18 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly bulle
   `.mintignore` excludes. `npm run lint:docs` catches `$` in prose and `<` before a
   digit, not `<word>` in prose. Until PAN-4779 lands, scope a docs change's link check
   to its own pages and compare the rest against this baseline.
-<!-- last-verified: 2026-11-01 -->
+- **Merge-train AC lookup roots** (PAN-1696, PAN-3165, PAN-4799) — batch members
+  are unmerged, so their specs are never on `main`; `memberSpecRoots`
+  (`services/uat-member-spec-roots.ts`) orders batch worktree → feature
+  workspace → project root. Do not collapse it back to one root.
+- **Two tmux oracles answer conversation liveness.** The lifecycle patrol reads the
+  runtime census (`list-panes -a`, `src/lib/runtime-census.ts`); the conversation
+  list's repair reads `list-sessions` + `conversationHarnessAlive`
+  (`src/lib/overdeck/conversation-liveness.ts`), and home's
+  `GET /api/machines/conversations` sync runs that repair on a linked machine. When
+  they disagree a row flaps active/ended every tick (PAN-4739, Fly VM). Any new
+  writer of conversation status must decide through the conversation-liveness door;
+  the patrol now confirms through it before ending a row. On the Fly VM the census
+  disagreed because tmux without a UTF-8 locale prints `-F` tabs as `_`: any new
+  multi-field `-F` reader must pass `-u` (see `listAllPaneRecords` in `src/lib/tmux.ts`).
+<!-- last-verified: 2026-11-02 -->

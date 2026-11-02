@@ -12,6 +12,10 @@
  * UI as "Starting…" forever because `sessionAlive` has nothing to flow
  * through. The backfill makes the row population self-healing instead of
  * spawn-only.
+ *
+ * PAN-4739: before ending a row the patrol asks `conversationHarnessAlive`, the
+ * door the list route's repair uses; a census verdict the door contradicts is
+ * logged once and the row stays active.
  */
 
 import { readFile, readdir, stat, open } from 'fs/promises';
@@ -74,6 +78,10 @@ const NON_AGENT_PREFIXES = ['conv-', 'inspect-', 'planning-'];
 // thousand paths), and correct forever: the /clear sentinel is written in a
 // transcript's first lines at creation, so a definitive negative never flips.
 const notOrphanJsonlPaths = new Set<string>();
+
+// PAN-4739: sessions whose census verdict the conversation-liveness door
+// contradicted. Warn once per episode; cleared when the census agrees again.
+const censusDisagreementWarned = new Set<string>();
 
 function behaviorForHarness(harness: string | null | undefined) {
   return getHarnessBehavior(harness as HarnessName | null | undefined);
@@ -247,6 +255,31 @@ async function shouldResurrect(conv: Conversation, view: ConversationLivenessVie
 }
 
 /**
+ * PAN-4739: the census and the list route read different tmux oracles. The
+ * list route resurrects a row only when conversationHarnessAlive says alive,
+ * so the patrol ends a row only when the same door says dead — otherwise the
+ * two writers flap the row every tick (Fly machine 862102ae249718).
+ */
+async function doorContradictsCensus(
+  tmuxSession: string,
+  sessionGone: boolean,
+  census: RuntimeCensus,
+): Promise<boolean> {
+  if (!(await conversationHarnessAlive(tmuxSession))) return false;
+  if (!censusDisagreementWarned.has(tmuxSession)) {
+    censusDisagreementWarned.add(tmuxSession);
+    const names = [...census.sessionNames].slice(0, 20).join(',') || '(none)';
+    console.warn(
+      `[conversation-lifecycle] WARNING (PAN-4739): the runtime census reports ${tmuxSession} ` +
+        `${sessionGone ? 'gone' : 'without a harness process'}, but conversation-liveness reports its harness alive; ` +
+        `keeping the conversation active (census available=${census.available} stale=${census.stale} ` +
+        `error=${census.error ?? 'none'} panes=${census.panes.length} sessions=${names})`,
+    );
+  }
+  return true;
+}
+
+/**
  * Poll all active conversations and mark as ended any whose tmux session is gone.
  * Uses a single `tmux list-sessions` call instead of N individual `sessionExists`
  * subprocesses to avoid the N+1 spawn problem.
@@ -284,6 +317,7 @@ export async function pollConversations(): Promise<void> {
       // respawns it. PAN-1638.
       let harnessGone = !sessionGone && await view.harnessGone(conv.tmuxSession);
       if (!sessionGone && !harnessGone) {
+        censusDisagreementWarned.delete(conv.tmuxSession);
         // PAN-1972: the poller used to be one-directional — it only ever marked
         // conversations 'ended'. A transient blip (a dashboard restart that
         // recreated the tmux session, or a momentary harness-process gap during a
@@ -331,7 +365,11 @@ export async function pollConversations(): Promise<void> {
       if (!revalidationView) continue;
       sessionGone = revalidationView.sessionGone(conv.tmuxSession);
       harnessGone = !sessionGone && await revalidationView.harnessGone(conv.tmuxSession);
-      if (!sessionGone && !harnessGone) continue;
+      if (!sessionGone && !harnessGone) {
+        censusDisagreementWarned.delete(conv.tmuxSession);
+        continue;
+      }
+      if (await doorContradictsCensus(conv.tmuxSession, sessionGone, revalidationView.census)) continue;
 
       if (process.env.DEBUG?.includes('conversation-lifecycle')) {
         console.log(
@@ -356,6 +394,7 @@ export async function pollConversations(): Promise<void> {
       // lost for good. Best-effort: a failed close never blocks the mark.
       await closeCompanionTerminalForOwner(conv.tmuxSession).catch(() => undefined);
       markConversationEnded(conv.name);
+      censusDisagreementWarned.delete(conv.tmuxSession);
       endedConversations.push(conv);
       if (sessionGone) sessionGoneCount++;
       else keepAliveCorpseCount++;

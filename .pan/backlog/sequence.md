@@ -1,18 +1,17 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T04:19:26.563674Z · model: claude-opus-5-5 · open: 873_
+_Last sequenced: 2026-11-02T12:30:57.714099Z · model: claude-opus-5-5 · open: 856_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4702 | S | critical | ok |  |  | Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs. |
-| 1 | PAN-4767 | S | critical | ok |  |  | Main is red: styleguide-conformance e2e spec times out since the Skills page redesign changed index.css; blocks every merge. |
+| 2 | PAN-4801 | M | critical | ok |  |  | Merge train never rebases approved siblings after a merge (reconcile hook unwired), so each merge strands siblings conflicting. |
 | 3 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
-| 5 | PAN-4750 | M | critical | ok |  |  | Strike merge door requires head approval strikes never get; 5 green strike PRs unmergeable. needs-handoff (TENET-10). |
-| 6 | PAN-4755 | M | medium | ok |  |  | In-pipeline: overlay tokens + shared Modal primitive; rebuild New conversation dialog to the approved mockup. |
+| 4 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install aborts workspace creation (since #4163); reproduced 2026-11-02 on botland too, so every polyrepo start fails. |
+| 6 | PAN-4803 | M | high | ok |  | PAN-4801 | After PAN-4801, carry approval across clean sibling rebases when patch-id is unchanged; avoids N^2/2 re-reviews. |
 | 7 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
 | 8 | PAN-4690 | S | critical | ok |  |  | Review dispatch rewrites the tracked continue file uncommitted, so the dirty-tree gate blocks the review it dispatched |
-| 9 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json |
 | 10 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
 | 10 | PAN-4710 | S | high | ok |  |  | Deferred plan hand-off retries omit the guardrail ack, so they're refused at 'agent count high' and give up silently; needs handoff |
 | 11 | PAN-4666 | S | critical | ok |  |  | Flywheel status drops live agents whose Herdr pane says 'done'; loop may respawn them. Route via liveness.ts. Needs handoff. |
@@ -28,6 +27,7 @@ _Last sequenced: 2026-11-02T04:19:26.563674Z · model: claude-opus-5-5 · open: 
 | 19 | PAN-4673 | S | high | ok |  |  | Model Routing selects truncate model names (Opus 5.5 shows as Opus 5): narrow column plus repeated provider prefix in option text |
 | 20 | PAN-4675 | S | critical | ok |  |  | One transient gh label timeout aborts post-merge lifecycle; merge door replies Already merged, so the issue can never close. |
 | 21 | PAN-4705 | S | high | ok |  |  | quality-gate-admission test leaks a poller past afterEach rmSync; unhandled ENOENT fails unrelated PR CI shards. |
+| 21 | PAN-4785 | M | high | ok |  |  | pan review request says queued when PR adoption will refuse (branch checked out elsewhere); refusal hidden in dashboard log. Handoff. |
 | 22 | PAN-4746 | S | high | ok |  |  | CI test shard flakes on ENOTEMPTY: afterEach rmSync races an unawaited snapshot write; reds unrelated PRs (seen on #4745). |
 | 23 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
 | 24 | PAN-4625 | S | high | ok |  |  | CI relay debounces a later failed check on the same head, so agents never see a failing test shard; lands after PAN-4534 (same file) |
@@ -77,6 +77,7 @@ _Last sequenced: 2026-11-02T04:19:26.563674Z · model: claude-opus-5-5 · open: 
 | 68 | PAN-3708 | M | critical | ok |  |  | pan strike dies at git worktree list on a polyrepo wrapper — the urgent-strike escape hatch is unavailable for MYN-class projects. |
 | 69 | PAN-3605 | XS | high | ok |  |  | Supply chain: lint-effect-diagnostics npx fell back to the registry and ran a squatted unscoped package; pin the scoped local bin. |
 | 70 | PAN-4624 | S | high | ok |  |  | Polyrepo ci-mode test gate reads CI verdict for the wrapper HEAD, never the member repo PR head, so red CI is silently missed. |
+| 70 | PAN-4792 | S | high | ok |  |  | Paste guard only knows numbered menus; a failed paste presses Enter into unnumbered selects, silently setting defaultMode=auto. |
 | 71 | PAN-3557 | S | critical | ok |  |  | Post-merge label writes have no retry; a 403 hides a merged issue from the verify-on-main sweep while lifecycle reports success. |
 | 72 | PAN-3543 | S | critical | ok |  |  | Completed-handoff agents are unstartable: start, --fresh and reset-session all refuse while the refusal itself recommends --fresh. |
 | 73 | PAN-3522 | S | critical | ok |  |  | Supervisor watchdog restart-churns under CPU storm because the probe timeout budget ignores the boot warm phase. |
@@ -89,7 +90,7 @@ _Last sequenced: 2026-11-02T04:19:26.563674Z · model: claude-opus-5-5 · open: 
 | 80 | PAN-3106 | S | critical | ok |  |  | auto_merge_default: hold is consulted on one merge path only, so held issues merge individually and defeat the UAT train. |
 | 81 | PAN-3100 | S | critical | ok |  |  | The test role evaluates the dirty working tree, so a live work agent's uncommitted edits are recorded as the issue's test failure. |
 | 82 | PAN-4213 | M | high | ok |  |  | Merge-train follow-ups from #4066 (merged): stamp-vs-pin mismatch, reset --keep can strand agent commits, fetch retry, tests |
-| 82 | PAN-4753 | XL | high | needs-refinement | ✓ | PAN-4750 | Epic: restore merge trains (MergeTrain component, strike fast lane); needs PAN-4750; PRD being written, no children yet; handoff. |
+| 82 | PAN-4753 | XL | high | needs-refinement | ✓ |  | Epic: restore merge trains (MergeTrain component, strike fast lane); PAN-4750 merged; PRD being written, no children yet; handoff. |
 | 83 | PAN-3096 | S | critical | ok |  |  | pan done blocks on generated .devcontainer/ and dev, and agents resolve it by deleting workspace infrastructure or inventing gitignores. |
 | 84 | PAN-3084 | S | critical | needs-refinement |  |  | A review session spawned but never briefed sits at zero context forever, and restart 'preserves' the zombie that blocks its replacement. |
 | 85 | PAN-3043 | S | critical | needs-refinement |  |  | Provider health is probed only at spawn, so a mid-run 403 quota refusal leaves an agent 'running' for days holding a slot. |
@@ -182,11 +183,8 @@ _Last sequenced: 2026-11-02T04:19:26.563674Z · model: claude-opus-5-5 · open: 
 | 172 | PAN-3307 | XS | high | ok |  |  | commitlint scope-enum lists 11 scopes, 14 real ones are missing, and it still names the removed beads scope — trains everyone to ignore it. |
 | 173 | PAN-4634 | M | medium | needs-refinement |  |  | Terra unserved on claude-code route: no CLIProxy release (to v8.0.44) lists it; bump pin, add to GPT_56_MODELS. Aliases also broken. |
 | 174 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
-| 175 | PAN-4653 | S | medium | ok |  |  | Ranked for readiness when #4639 merges: auto-settle on PR merge replaces tmux-only auto-archive; default on, setting toggle. |
 | 176 | PAN-1868 | XS | high | ok |  |  | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
-| 177 | PAN-4655 | M | medium | ok |  |  | Ranked for readiness when #4639 merges: idle auto-settle after N days (default 3); supersedes the #1485 archive part. |
 | 178 | PAN-1042 | S | high | ok |  |  | cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions |
-| 179 | PAN-4657 | M | medium | ok |  |  | Schedule dialog, next-run row badge and inbox resurfacing for scheduled conversations; #4640 merged, waits on in-pipeline #4639. |
 | 180 | PAN-570 | XS | high | ok |  | PAN-2642 | Show PLAN badge on costs when under a subscription/plan |
 | 181 | PAN-2059 | XL | high | ok | ✓ |  | Backlog pickup gate |
 | 182 | PAN-2376 | XL | high | stale | ✓ |  | Epic: CI/CD reliability — all 21 named children are closed; needs an operator disposition (close or restate) |
@@ -208,7 +206,6 @@ _Last sequenced: 2026-11-02T04:19:26.563674Z · model: claude-opus-5-5 · open: 
 | 198 | PAN-3174 | S | high | ok |  |  | Polyrepo UAT stacks 504: Traefik labels carry the old myn- prefix, Traefik isn't on the overdeck-* devnet, and the fe port is wrong. |
 | 199 | PAN-3050 | XS | high | ok |  |  | Idle-stack reaper's regex only matches overdeck-feature-*-server|frontend, so MYN stacks run for hours after their agents are gone. |
 | 200 | PAN-4365 | S | medium | ok |  |  | Stale defaults: workhorses.expensive is Opus 4.8 and the flywheel role is a literal that ignores the slot; evals now unblocked |
-| 200 | PAN-4754 | S | medium | ok |  |  | pan ask decisions render as one run-on paragraph: markdown in AskUserQuestionDialog, separate context block, tighter work.md guidance. |
 | 201 | PAN-2980 | XS | high | ok |  |  | The pre-push file-size guard reads the shared working tree, so another session's uncommitted edits block an unrelated, guard-clean push. |
 | 202 | PAN-3769 | S | high | needs-refinement |  |  | Red main 707089c5→e4b280b3 blocked deploys ~14h: missing no-loss lock entry + stale OpenRouter expectation. Verify still reproducing. |
 | 203 | PAN-3760 | S | high | ok |  |  | permissionMode 'auto' undocumented as non-bypass, launcher can emit invalid --permission-mode, invalid values drop silently. |
@@ -232,10 +229,8 @@ _Last sequenced: 2026-11-02T04:19:26.563674Z · model: claude-opus-5-5 · open: 
 | 221 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
 | 222 | PAN-3778 | S | medium | ok |  |  | Server snapshot cap shipped in #4558 (closed). Resume-from-offset on resubscribe is the remaining open piece; now unblocked. |
 | 223 | PAN-4575 | S | high | ok |  |  | Kimi ACP cancel is sent with id:"" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed. Unblocked. |
-| 224 | PAN-4748 | M | high | ok |  |  | Fly API uses flyctl's stored token, which expires unrefreshed: loops, clone poll and rollback destroy 403; VMs leak and bill. |
 | 225 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 226 | PAN-4616 | S | medium | ok |  |  | After PAN-4614 lands, check whether GitHub mergeable honors merge=union; if not, plan a merge-gate fallback |
-| 227 | PAN-4776 | M | high | ok |  |  | In-pipeline: account/connect Workers merged but undeployed, so login, directory and relay fail; dry-run, runbook, smoke script. |
 | 228 | PAN-4747 | S | high | ok |  |  | Two pan reloads built into the same generation slot 12s apart; restart lock taken over early, first build died on TS6053. |
 | 229 | PAN-3355 | XS | high | ok |  |  | sessionExists collapses 'no such session' and 'could not ask' into false, so callers read not-running when liveness is unknown. |
 | 230 | PAN-3289 | S | high | ok |  |  | A sequencer pass ran against an empty manifest while the read model held 1120 issues — a transiently empty read at spawn. |
@@ -280,15 +275,12 @@ _Last sequenced: 2026-11-02T04:19:26.563674Z · model: claude-opus-5-5 · open: 
 | 269 | PAN-4696 | XS | medium | ok |  |  | Post-merge smoke for PAN-4295: one pan start --remote run proves auto-reap, remote-reap source, fresh heartbeat on deployed build. |
 | 270 | PAN-2243 | S | high | ok |  |  | pan plan finalize: CLI aborts complete-planning at 90s while the server handler legitimately finishes later (false ✖ Failed) |
 | 271 | PAN-2202 | S | high | ok |  |  | complete-planning silently skips spec promotion on a dead session's unanswered AskUserQuestion |
-| 272 | PAN-4739 | M | high | needs-refinement |  |  | Fly VM patrol marks a live conversation ended each tick; idle sweep may destroy a used VM. Root cause probe not yet found. |
 | 273 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
 | 274 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
 | 275 | PAN-4722 | S | medium | ok |  |  | Fleet Update all runs npm -g on pan connect machines; must update ~/.overdeck/runtime prefix. PAN-4654 and PAN-4656 closed. |
 | 276 | PAN-4743 | M | medium | ok |  |  | Wire --machine fly and Fly (new VM) Machine-field choice to the PAN-4652 door; PAN-4651 merged, so this is now unblocked. |
-| 277 | PAN-4682 | XS | medium | ok |  |  | Fly default image registry.fly.io/pan-workspace:latest does not exist; default to <app>:latest and fix docs/fly-provider.md. |
-| 278 | PAN-4756 | L | medium | ok |  | PAN-4755 | Move ~45 bespoke dialogs onto the shared Modal from PAN-4755; surface/structure only. Waits for PAN-4755 to land. |
+| 278 | PAN-4756 | L | medium | ok |  |  | Move ~45 bespoke dialogs onto the shared Modal from PAN-4755 (now landed); surface/structure only, unblocked. |
 | 278 | PAN-4778 | S | medium | ok |  |  | Workspace-image CI never published: wrong Fly app, fly not on PATH, no FLY_API_TOKEN (operator). Fly VMs run a June image. |
-| 279 | PAN-4777 | S | medium | ok |  |  | Fly createRemoteWorkspace leaks a billing VM when an exec throws before deleteVm; delete on any failure. Plus stale clone doc. |
 | 280 | PAN-2211 | M | high | ok |  |  | writeSwarmSlotCompletion has no production caller; pan done in a slot workspace must record it. Swarm is dormant (Cut D11). |
 | 280 | PAN-4774 | M | medium | ok |  |  | Run Anywhere release AC-1..15 on integrated main: two-server local test, fixes or filed issues, operator hardware checklist doc. |
 | 281 | PAN-2210 | M | high | ok |  |  | Rewritten pan done has no slot handling: a slot agent takes the issue-level PR/review path. Must record slot completion only. |
@@ -304,7 +296,6 @@ _Last sequenced: 2026-11-02T04:19:26.563674Z · model: claude-opus-5-5 · open: 
 | 291 | PAN-1710 | S | high | ok |  |  | 'Clean install + server smoke test' hangs (3 consecutive 20-min timeout kills) on feature/pan-1491 and feature/pan-1641 |
 | 292 | PAN-1558 | M | high | ok |  |  | Review/specialist agents should run in the workspace Docker container, not inherit host-override |
 | 293 | PAN-1766 | S | high | ok |  |  | work agents hang on Claude Code settings-file protection when editing .claude/** |
-| 294 | PAN-4738 | S | medium | ok |  |  | First message to a Fly-machine conversation is pasted into Claude Code's auto-mode dialog and lost; pre-answer it in configureClaudeCode. |
 | 295 | PAN-2266 | M | high | ok |  |  | feat: add zcode harness and make it the default for glm-5.2 |
 | 296 | PAN-1578 | M | high | ok |  |  | GitHub Copilot CLI as a first-class harness (pipeline peer to Claude Code, Pi, Codex) |
 | 297 | PAN-1538 | M | high | ok |  |  | Unblock Pi source forks |
@@ -317,7 +308,6 @@ _Last sequenced: 2026-11-02T04:19:26.563674Z · model: claude-opus-5-5 · open: 
 | 304 | PAN-1196 | M | high | needs-refinement |  |  | Workhorse routing by bead difficulty + subject-matter (single-agent and swarm) |
 | 305 | PAN-1311 | M | high | needs-refinement |  |  | Swarm: fast-track tier |
 | 306 | PAN-1313 | L | high | ok |  |  | Finish src/lib Effect migration: remove or justify legacy Promise/sync surfaces |
-| 307 | PAN-4683 | M | medium | ok |  |  | pan start --remote misses specs on feature branches and re-plans; planning never pushes branch; post-plan work starts local. |
 | 308 | PAN-1246 | M | high | ok |  |  | Perf: projection-cached VCS driver for diff/checkpoint reads (port of t3code #2586) |
 | 309 | PAN-1253 | M | high | needs-refinement |  |  | Flywheel: respect issue dependencies before autopicking work |
 | 310 | PAN-1357 | M | high | ok |  |  | Template conversations: load curated skill bundles into a single conversation |
@@ -467,7 +457,6 @@ _Last sequenced: 2026-11-02T04:19:26.563674Z · model: claude-opus-5-5 · open: 
 | 455 | PAN-3354 | XS | medium | ok |  |  | The archive write door accepts kind=main, hiding a project's singleton workspace with no unarchive affordance in the UI. |
 | 456 | PAN-3178 | XL | medium | ok |  |  | Make worktrees and diffs first class: +/- badge, dedicated Changes surface, conversation worktrees. PRD and mockup exist. |
 | 457 | PAN-3017 | S | medium | ok |  |  | The issue-page UAT panel renders only inline actions, so restart/rebuild/stop are unreachable outside the rail's context menu. |
-| 458 | PAN-4775 | S | medium | ok |  |  | In-pipeline: anywhere.mdx still labels shipped Anywhere features planned; rewrite shipped table/roadmap and apply OD-3 pricing. |
 | 459 | PAN-3873 | M | medium | ok |  |  | GitHub event delivery: support gh webhook forward alongside smee with guided setup, settings exposure, and docs |
 | 460 | PAN-1150 | S | medium | ok |  |  | Settings: "Anthropic is not configured" warning persists in Model Routing after claude /login (Provider tab disagrees) |
 | 461 | PAN-1149 | S | medium | ok |  |  | v0.9.3 upgraders: stale workhorses.mid: claude-sonnet-4-7 in config.yaml keeps breaking Model Routing saves |
@@ -575,7 +564,6 @@ _Last sequenced: 2026-11-02T04:19:26.563674Z · model: claude-opus-5-5 · open: 
 | 564 | PAN-4409 | M | medium | ok |  |  | Overdeck integration on OKF v0.2.0 (injector trust tiers, new verbs); blocked on external eltmon/okf#9 |
 | 565 | PAN-4410 | M | medium | ok |  | PAN-4409 | Migrate eltmon/overdeck-knowledge to OKF v0.2 and refresh stale concepts; last link in the OKF chain |
 | 566 | PAN-2978 | S | medium | ok |  | PAN-2976, PAN-2977 | Opt-in per-agent install recipes for ACP CLIs from the setup UI; deliberately separated for its supply-chain trust decision. |
-| 567 | PAN-4759 | M | medium | ok |  |  | In-pipeline: skill packs get their own docs page, a pan skills CLI page, a fork runbook and docs/SKILL-PACKS.md developer guide. |
 | 568 | PAN-1754 | M | medium | ok |  |  | surface + edit the host claude CLI default model (~/.claude/settings.json) from the Settings page |
 | 569 | PAN-1751 | M | medium | ok |  |  | harness picker on every Settings → Roles row (plan/work/review/test/ship/strike), not just Flywheel |
 | 570 | PAN-1750 | M | medium | ok |  |  | UAT assembly/conflict agent |
@@ -596,7 +584,7 @@ _Last sequenced: 2026-11-02T04:19:26.563674Z · model: claude-opus-5-5 · open: 
 | 585 | PAN-1542 | XS | medium | ok |  |  | Spawn-refusal modal: render the three-button workflow on dirty-workspace 409 |
 | 586 | PAN-1524 | M | medium | ok |  |  | Slash command aliases: /handoff → /pan-handoff (and similar short forms) |
 | 587 | PAN-1490 | M | medium | ok |  |  | show each conversation's current git branch (port t3code BranchToolbar pattern) |
-| 588 | PAN-1485 | M | medium | needs-refinement |  |  | Idle auto-archive (warn 7d, archive 10d); the archive-after-idle part is now split into #4655 as undoable idle auto-settle. |
+| 588 | PAN-1485 | S | medium | needs-refinement |  |  | Remaining scope after #4655 auto-settle: day-10 archive + favorite clearing; close-or-keep is an operator call. |
 | 589 | PAN-1473 | M | medium | ok |  |  | Dashboard conversation composer: refactor context indicator to mirror t3code (show cumulative + live separately) |
 | 590 | PAN-1443 | M | low | stale |  |  | Specs live directly under .pan/specs now; only check that no stale legacy files remain under docs/prds/ |
 | 591 | PAN-1442 | M | medium | ok |  |  | Follow-up to PAN-829: voice-sampler.html cleanup in pan-tts repo |
@@ -611,7 +599,6 @@ _Last sequenced: 2026-11-02T04:19:26.563674Z · model: claude-opus-5-5 · open: 
 | 600 | PAN-958 | M | medium | ok |  |  | Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
 | 601 | PAN-949 | M | medium | ok |  |  | feat: add conversation for project from sidebar |
 | 602 | PAN-3157 | XS | medium | ok |  |  | Rescoped: Awareness rail should show conv-flywheel as the Flywheel with its last tick (derive-status.ts) and link to /flywheel. |
-| 603 | PAN-4762 | S | medium | ok |  |  | In-pipeline: file-link right-click menu gains Open in browser and per-installed-browser items for html/svg/pdf/image files. |
 | 604 | PAN-947 | M | medium | ok |  |  | feat: project management actions in unified sidebar |
 | 605 | PAN-938 | M | medium | ok |  |  | Fizzy visual pipeline |
 | 606 | PAN-903 | M | medium | ok |  |  | Detect ~/.claude.json corruption on startup and surface it in the dashboard |
@@ -663,12 +650,11 @@ _Last sequenced: 2026-11-02T04:19:26.563674Z · model: claude-opus-5-5 · open: 
 | 652 | PAN-2505 | M | low | ok |  |  | lint:circular reports new frontend cycles + stale baseline in chat/conversations components |
 | 653 | PAN-2504 | M | low | ok |  |  | Auto-relaunch npx @overdeck/core under a compatible Node 22+ instead of failing on old Node |
 | 654 | PAN-2449 | M | low | ok |  |  | start-planning: GITHUB_REPOS env shadows projects.yaml github_repo; unknown IDs fall through to Linear and plan the wrong issue |
-| 655 | PAN-4769 | XS | low | ok |  | PAN-4759 | Two-sentence wording fix in features/skill-packs.mdx; file arrives with PAN-4759's PR, so land after it merges. |
+| 655 | PAN-4769 | XS | low | ok |  |  | Two-sentence wording fix in features/skill-packs.mdx; PAN-4759 created the page and closed, so this is unblocked. |
 | 656 | PAN-3940 | XL | low | ok | ✓ |  | Parked epic: event-driven plugin/hook system on pipeline-notifier + hygiene-scheduler; do not pick up until the journal has soaked |
 | 657 | PAN-2424 | L | low | ok | ✓ |  | Epic: the Order Book |
 | 658 | PAN-2406 | S | low | ok |  |  | Remaining scope: findAllWorkspacePaths must also enumerate -strike-wt and named-suffix worktrees; gaps 1 and 3 are moot. |
 | 659 | PAN-2394 | M | low | ok |  |  | Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts ("no saved history") |
-| 660 | PAN-4661 | S | low | ok |  |  | Phone PWA third tab: read-only phase-grouped pipeline list at /m/pipeline; waits on the PAN-2355 /m shell |
 | 661 | PAN-2353 | M | low | needs-refinement |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
 | 662 | PAN-4294 | L | low | ok |  |  | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
 | 663 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
@@ -832,10 +818,7 @@ _Last sequenced: 2026-11-02T04:19:26.563674Z · model: claude-opus-5-5 · open: 
 | 824 | PAN-3248 | XS | low | stale |  |  | Stale: targets the deploy patrol (pan reload is the new home) deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 825 | PAN-3244 | S | low | stale |  |  | Stale: targets the deploy-patrol deploy window deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 826 | PAN-2775 | S | low | needs-refinement |  |  | Stale: targets boot-correlated reaping (boot reconciliation) deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 827 | PAN-4658 | S | low | needs-refinement |  |  | Cite text from the EditorPane markdown preview; needs a decision on how the preview picks its target conversation. #4642 shipped. |
-| 828 | PAN-4659 | M | low | ok |  |  | Import VS Code themes from a .vsix package (ZIP read, caps, include resolution); cosmetic, #4644 base theme import merged, now unblocked. |
 | 829 | PAN-3505 | XS | low | needs-refinement |  |  | Stale: targets the flywheel state write door deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 831 | PAN-4660 | M | low | ok |  |  | Duplicate-and-edit theme editor with live preview in Settings > Appearance; cosmetic, #4644 base theme import merged, now unblocked. |
 | 832 | PAN-3321 | XS | low | stale |  |  | Stale: targets pan unstick deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 833 | PAN-736 | M | low | stale |  |  | Retired: work-types.ts, WorkTypeRouter and models.overrides are all gone (#4174); per-subagent routing needs a fresh roles.* design |
 | 834 | PAN-762 | M | low | stale |  |  | Premise gone: models.overrides is a retired, ignored key since #4174, so there are no overrides left to warn about |
@@ -885,21 +868,21 @@ _Last sequenced: 2026-11-02T04:19:26.563674Z · model: claude-opus-5-5 · open: 
 
 New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.
 
-### PAN-4767 (rank 1)
+### PAN-4801 (rank 2)
 
-New issue filed 2026-11-02 and already in the pipeline with a live workspace, so it is pinned at rank 1 beside PAN-4702 without moving any other node. Main CI fails unit shard 4 twice in a row on tests/e2e/styleguide-conformance.spec.ts after commit a443ff0619a changed the global stylesheet, and a red main empties the merge gate for every approved PR. The substrate-improvement label and the pipeline-blocking effect make it critical; the fix is scoped to one spec and one stylesheet change with a clear acceptance, so the condition is ok.
+New substrate bug in the merge path, PR in review: runMergeTrainReconcile is only reachable from firePostMergeLifecycle, which no merge door calls, so every merge leaves approved siblings conflicting until the Flywheel relays merge-main by hand (three times on 2026-11-02). It takes the free rank 2 because it throttles every multi-PR merge day. It carries needs-handoff (TENET-10), so it runs as a supervised strike.
 
 ### PAN-4636 (rank 3)
 
 New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.
 
-### PAN-4750 (rank 5)
+### PAN-4553 (rank 4)
 
-New substrate issue that blocks every strike PR from merging through Overdeck since #4066: the strike door reuses the feature merge gate with requireApprovalAtHead, and the operator cannot approve their own PR. Five green strike PRs are stuck today, so it ranks critical near the top; it is labeled needs-handoff, so pickup must be a supervised handoff rather than autonomous.
+Moved from rank 9 to the free rank 4: a 2026-11-02 comment shows the same abort on a second polyrepo project (botland), so the bug now blocks workspace creation for every polyrepo project, not only mind-your-now.
 
-### PAN-4755 (rank 6)
+### PAN-4803 (rank 6)
 
-New this pass and already in the pipeline, so it is pinned in the free rank 6 slot rather than ranked by impact. The issue is a fully specified UI fix (overlay tokens, a shared Modal primitive, and the New conversation dialog rebuilt to an approved mockup), so its condition is ok.
+New substrate follow-up to PAN-4801: once siblings are rebased after each merge, PAN-4772 re-requests review for every one, so review load grows quadratically. Carrying the approval when git patch-id is unchanged removes that cost. It takes the free rank 6, after its PAN-4801 dependency; needs-handoff (TENET-10) because it touches merge-gate trust.
 
 ### PAN-4733 (rank 7)
 
@@ -908,10 +891,6 @@ Rank held: parent PAN-4732 (move heavy e2e out of the default shards) closed as 
 ### PAN-4690 (rank 8)
 
 New issue: review dispatch clears feedback[] in the tracked .pan/continues file without committing, so the dirty-worktree gate refuses the review it was dispatching and deacon-lite re-requests fail forever. It stalled PAN-4626 and PAN-4643 after verification passed, hits every issue whose continue file carries feedback, and is substrate pipeline machinery, so it ranks at the top of the non-pinned tier (handoff per TENET-10).
-
-### PAN-4553 (rank 9)
-
-New issue, ranked into the open rank-6 slot. Since #4163 made workspace-setup failures fatal, the unconditional root npm install in workspace-manager/create.ts aborts every polyrepo workspace creation, so pan start fails for all MYN issues and the CLI misreports it as an unresponsive dashboard. The fix is small (skip the root install when the workspace root has no package.json, surface the real error) and it supersedes the non-fatal PAN-4390 report of the same root cause.
 
 ### PAN-4554 (rank 10)
 
@@ -972,6 +951,10 @@ New this pass. addLabel in merge-agent.ts uses Effect.promise, so one gh network
 ### PAN-4705 (rank 21)
 
 New since the prior pass. A latent race in the PAN-4546 admission test fails whole CI shards with an unhandled ENOENT on PRs that never touch it (seen on #4703), costing verification attempts pipeline-wide. It sits beside PAN-4680, the sibling flake fix, because both keep CI verification honest; the fix is small and scoped to one test file or publishExclusive.
+
+### PAN-4785 (rank 21)
+
+New substrate issue: review requests on handoff-opened PRs (#4780, #4783) sat unreviewed for 15-30 minutes because adoption refused silently and only the dashboard log said why. Running the adoption preflight in the route and journaling late refusals closes a silent pipeline stall, so it ranks high alongside the other review-dispatch fixes; needs-handoff (TENET-10) means supervised pickup.
 
 ### PAN-4746 (rank 22)
 
@@ -1169,6 +1152,10 @@ New this pass and the only supply-chain finding in the batch. A stale node_modul
 
 New issue: a silent verification-gate bypass for polyrepo projects in ci tests mode; scoped fix with clear AC, placed beside the other polyrepo pipeline bugs and after PAN-4527, which touches the same head-resolution code.
 
+### PAN-4792 (rank 70)
+
+New bug found while planning PAN-4738: the tmux paste guard misses Claude Code's unnumbered select dialogs, so a failed paste's fallback Enter can answer them, including a silent permission-mode change. PAN-4738 removes the one known trigger on Fly, so it ranks with the high-tier delivery bugs rather than the top tier.
+
 ### PAN-3557 (rank 71)
 
 New this pass. Post-merge label application has no retry, so a rate-limited 403 leaves a merged issue without its verifying-on-main label — and the verify-on-main phase enumerates by that label, which makes the issue invisible to the phase that owns it. Lifecycle reported 'completed' throughout, so nothing noticed for 45 minutes.
@@ -1197,10 +1184,6 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
 
 Triage: verify whether blocking-choice-menu detection is wired to the current liveness/health surface. Rank held.
 
-### PAN-3205 (rank 78)
-
-New this pass. The deployment gate's queue message is unusually good — it names the holders, the queue age, and warns against forcing — and it promises a 'next verification boundary' trigger that does not exist. Every holder cleared and the deploy never fired; the live build stayed stale for 35 minutes until a manual reload. A correct-sounding instruction that cannot happen is worse than no message.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1208,10 +1191,10 @@ New this pass. The deployment gate's queue message is unusually good — it name
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T04:19:26.563674Z",
+  "generatedAt": "2026-11-02T12:30:57.714099Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 873,
+  "openCount": 856,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -1227,15 +1210,15 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "auto"
     },
     {
-      "issue": "PAN-4767",
-      "rank": 1,
-      "size": "S",
+      "issue": "PAN-4801",
+      "rank": 2,
+      "size": "M",
       "importance": "critical",
-      "score": 88,
+      "score": 90,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Main is red: styleguide-conformance e2e spec times out since the Skills page redesign changed index.css; blocks every merge.",
-      "rationale": "New issue filed 2026-11-02 and already in the pipeline with a live workspace, so it is pinned at rank 1 beside PAN-4702 without moving any other node. Main CI fails unit shard 4 twice in a row on tests/e2e/styleguide-conformance.spec.ts after commit a443ff0619a changed the global stylesheet, and a red main empties the merge gate for every approved PR. The substrate-improvement label and the pipeline-blocking effect make it critical; the fix is scoped to one spec and one stylesheet change with a clear acceptance, so the condition is ok.",
+      "why": "Merge train never rebases approved siblings after a merge (reconcile hook unwired), so each merge strands siblings conflicting.",
+      "rationale": "New substrate bug in the merge path, PR in review: runMergeTrainReconcile is only reachable from firePostMergeLifecycle, which no merge door calls, so every merge leaves approved siblings conflicting until the Flywheel relays merge-main by hand (three times on 2026-11-02). It takes the free rank 2 because it throttles every multi-PR merge day. It carries needs-handoff (TENET-10), so it runs as a supervised strike.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1253,28 +1236,30 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "auto"
     },
     {
-      "issue": "PAN-4750",
-      "rank": 5,
-      "size": "M",
+      "issue": "PAN-4553",
+      "rank": 4,
+      "size": "S",
       "importance": "critical",
-      "score": 86,
+      "score": 90,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Strike merge door requires head approval strikes never get; 5 green strike PRs unmergeable. needs-handoff (TENET-10).",
-      "rationale": "New substrate issue that blocks every strike PR from merging through Overdeck since #4066: the strike door reuses the feature merge gate with requireApprovalAtHead, and the operator cannot approve their own PR. Five green strike PRs are stuck today, so it ranks critical near the top; it is labeled needs-handoff, so pickup must be a supervised handoff rather than autonomous.",
+      "why": "Polyrepo root npm install aborts workspace creation (since #4163); reproduced 2026-11-02 on botland too, so every polyrepo start fails.",
+      "rationale": "Moved from rank 9 to the free rank 4: a 2026-11-02 comment shows the same abort on a second polyrepo project (botland), so the bug now blocks workspace creation for every polyrepo project, not only mind-your-now.",
       "gate": "auto",
       "planning": "auto"
     },
     {
-      "issue": "PAN-4755",
+      "issue": "PAN-4803",
       "rank": 6,
       "size": "M",
-      "importance": "medium",
-      "score": 60,
+      "importance": "high",
+      "score": 78,
       "condition": "ok",
-      "dependsOn": [],
-      "why": "In-pipeline: overlay tokens + shared Modal primitive; rebuild New conversation dialog to the approved mockup.",
-      "rationale": "New this pass and already in the pipeline, so it is pinned in the free rank 6 slot rather than ranked by impact. The issue is a fully specified UI fix (overlay tokens, a shared Modal primitive, and the New conversation dialog rebuilt to an approved mockup), so its condition is ok.",
+      "dependsOn": [
+        "PAN-4801"
+      ],
+      "why": "After PAN-4801, carry approval across clean sibling rebases when patch-id is unchanged; avoids N^2/2 re-reviews.",
+      "rationale": "New substrate follow-up to PAN-4801: once siblings are rebased after each merge, PAN-4772 re-requests review for every one, so review load grows quadratically. Carrying the approval when git patch-id is unchanged removes that cost. It takes the free rank 6, after its PAN-4801 dependency; needs-handoff (TENET-10) because it touches merge-gate trust.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1301,19 +1286,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "dependsOn": [],
       "why": "Review dispatch rewrites the tracked continue file uncommitted, so the dirty-tree gate blocks the review it dispatched",
       "rationale": "New issue: review dispatch clears feedback[] in the tracked .pan/continues file without committing, so the dirty-worktree gate refuses the review it was dispatching and deacon-lite re-requests fail forever. It stalled PAN-4626 and PAN-4643 after verification passed, hits every issue whose continue file carries feedback, and is substrate pipeline machinery, so it ranks at the top of the non-pinned tier (handoff per TENET-10).",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4553",
-      "rank": 9,
-      "size": "S",
-      "importance": "critical",
-      "score": 88,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json",
-      "rationale": "New issue, ranked into the open rank-6 slot. Since #4163 made workspace-setup failures fatal, the unconditional root npm install in workspace-manager/create.ts aborts every polyrepo workspace creation, so pan start fails for all MYN issues and the CLI misreports it as an unresponsive dashboard. The fix is small (skip the root install when the workspace root has no package.json, surface the real error) and it supersedes the non-fatal PAN-4390 report of the same root cause.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1509,6 +1481,19 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "dependsOn": [],
       "why": "quality-gate-admission test leaks a poller past afterEach rmSync; unhandled ENOENT fails unrelated PR CI shards.",
       "rationale": "New since the prior pass. A latent race in the PAN-4546 admission test fails whole CI shards with an unhandled ENOENT on PRs that never touch it (seen on #4703), costing verification attempts pipeline-wide. It sits beside PAN-4680, the sibling flake fix, because both keep CI verification honest; the fix is small and scoped to one test file or publishExclusive.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4785",
+      "rank": 21,
+      "size": "M",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan review request says queued when PR adoption will refuse (branch checked out elsewhere); refusal hidden in dashboard log. Handoff.",
+      "rationale": "New substrate issue: review requests on handoff-opened PRs (#4780, #4783) sat unreviewed for 15-30 minutes because adoption refused silently and only the dashboard log said why. Running the adoption preflight in the route and journaling late refusals closes a silent pipeline stall, so it ranks high alongside the other review-dispatch fixes; needs-handoff (TENET-10) means supervised pickup.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2152,6 +2137,19 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "auto"
     },
     {
+      "issue": "PAN-4792",
+      "rank": 70,
+      "size": "S",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Paste guard only knows numbered menus; a failed paste presses Enter into unnumbered selects, silently setting defaultMode=auto.",
+      "rationale": "New bug found while planning PAN-4738: the tmux paste guard misses Claude Code's unnumbered select dialogs, so a failed paste's fallback Enter can answer them, including a silent permission-mode change. PAN-4738 removes the one known trigger on Fly, so it ranks with the high-tier delivery bugs rather than the top tier.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-3557",
       "rank": 71,
       "size": "S",
@@ -2314,11 +2312,9 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "importance": "high",
       "score": 78,
       "condition": "needs-refinement",
-      "dependsOn": [
-        "PAN-4750"
-      ],
-      "why": "Epic: restore merge trains (MergeTrain component, strike fast lane); needs PAN-4750; PRD being written, no children yet; handoff.",
-      "rationale": "New epic that restores the pre-Cut merge-train surfaces the operator approved on 2026-11-02. It is ranked beside the PAN-4213 merge-train follow-ups because voided UAT batches and invisible trains hit every hold-for-UAT project. Its strike lane depends on PAN-4750, and PAN-3657 must fix the polyrepo queue first. It stays needs-refinement because the PRD is still being written and no child issues exist yet.",
+      "dependsOn": [],
+      "why": "Epic: restore merge trains (MergeTrain component, strike fast lane); PAN-4750 merged; PRD being written, no children yet; handoff.",
+      "rationale": "Rank held: its strike-lane dependency PAN-4750 merged and is verifying on main, so that blocker is cleared; the epic still has no children.",
       "gate": "auto",
       "planning": "auto",
       "isEpic": true
@@ -3505,19 +3501,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "isEpic": true
     },
     {
-      "issue": "PAN-4653",
-      "rank": 175,
-      "size": "S",
-      "importance": "medium",
-      "score": 48,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Ranked for readiness when #4639 merges: auto-settle on PR merge replaces tmux-only auto-archive; default on, setting toggle.",
-      "rationale": "Rank held: dependency PAN-4639 closed as completed on 2026-11-01, so it no longer gates this issue; remaining order is unchanged.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1868",
       "rank": 176,
       "size": "XS",
@@ -3531,19 +3514,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "skip"
     },
     {
-      "issue": "PAN-4655",
-      "rank": 177,
-      "size": "M",
-      "importance": "medium",
-      "score": 46,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Ranked for readiness when #4639 merges: idle auto-settle after N days (default 3); supersedes the #1485 archive part.",
-      "rationale": "Rank held: dependency PAN-4639 closed as completed on 2026-11-01, so it no longer gates this issue; remaining order is unchanged.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1042",
       "rank": 178,
       "size": "S",
@@ -3553,19 +3523,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "dependsOn": [],
       "why": "cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions",
       "rationale": "cost_events retention — 14 months of granular rows accumulating with no policy; DB bloat.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4657",
-      "rank": 179,
-      "size": "M",
-      "importance": "medium",
-      "score": 45,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Schedule dialog, next-run row badge and inbox resurfacing for scheduled conversations; #4640 merged, waits on in-pipeline #4639.",
-      "rationale": "Rank held: dependency PAN-4639 closed as completed on 2026-11-01, so it no longer gates this issue; remaining order is unchanged.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3826,19 +3783,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "condition": "ok",
       "dependsOn": [],
       "why": "Stale defaults: workhorses.expensive is Opus 4.8 and the flywheel role is a literal that ignores the slot; evals now unblocked",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4754",
-      "rank": 200,
-      "size": "S",
-      "importance": "medium",
-      "score": 64,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan ask decisions render as one run-on paragraph: markdown in AskUserQuestionDialog, separate context block, tighter work.md guidance.",
-      "rationale": "New, well-specified operator-UX fix with exact files and acceptance criteria; ranked with other medium operator-surface fixes.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4127,19 +4071,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "auto"
     },
     {
-      "issue": "PAN-4748",
-      "rank": 224,
-      "size": "M",
-      "importance": "high",
-      "score": 66,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Fly API uses flyctl's stored token, which expires unrefreshed: loops, clone poll and rollback destroy 403; VMs leak and bill.",
-      "rationale": "New issue: a lapsed ~/.fly/config.yml token silently stops Fly heartbeats, sweeps and Codex sync and leaks billing VMs on rollback, so it ranks above the Fly-track cluster (272-312) whose live checks it breaks.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3510",
       "rank": 225,
       "size": "S",
@@ -4161,19 +4092,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "dependsOn": [],
       "why": "After PAN-4614 lands, check whether GitHub mergeable honors merge=union; if not, plan a merge-gate fallback",
       "rationale": "New issue: an observation follow-up to in-pipeline PAN-4614; ranked mid-tier because it only matters if GitHub ignores union, and any fallback touches the merge gate's trust boundary and needs its own plan.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4776",
-      "rank": 227,
-      "size": "M",
-      "importance": "high",
-      "score": 72,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In-pipeline: account/connect Workers merged but undeployed, so login, directory and relay fail; dry-run, runbook, smoke script.",
-      "rationale": "New this pass and already in the pipeline, so it is pinned in the free rank 227 slot. The hosted Workers are the default directory_url, so every Anywhere user hits failures until they deploy; the agent half (dry-run, runbook, smoke test) is well specified and stops at an explicit operator checkpoint.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4724,19 +4642,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "auto"
     },
     {
-      "issue": "PAN-4739",
-      "rank": 272,
-      "size": "M",
-      "importance": "high",
-      "score": 62,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Fly VM patrol marks a live conversation ended each tick; idle sweep may destroy a used VM. Root cause probe not yet found.",
-      "rationale": "New bug from the PAN-4652 live check: the VM's conversation-lifecycle patrol disagrees with the live tmux session, and sweepFlyMachines reads that status, so an active Fly machine can be reaped. Ranked beside the other Fly remote correctness bugs (PAN-4682, PAN-4685) because it can destroy live work.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2237",
       "rank": 273,
       "size": "S",
@@ -4787,30 +4692,15 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "auto"
     },
     {
-      "issue": "PAN-4682",
-      "rank": 277,
-      "size": "XS",
-      "importance": "medium",
-      "score": 50,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Fly default image registry.fly.io/pan-workspace:latest does not exist; default to <app>:latest and fix docs/fly-provider.md.",
-      "rationale": "New one-line config/doc fix found in the PAN-4295 Fly smoke test; every unconfigured createVm points at a missing image, so it sits just after PAN-4295.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4756",
       "rank": 278,
       "size": "L",
       "importance": "medium",
       "score": 50,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4755"
-      ],
-      "why": "Move ~45 bespoke dialogs onto the shared Modal from PAN-4755; surface/structure only. Waits for PAN-4755 to land.",
-      "rationale": "New this pass: a well-specified follow-up that depends on the in-pipeline PAN-4755 Modal primitive, so it sits in a free mid-tier slot behind it.",
+      "dependsOn": [],
+      "why": "Move ~45 bespoke dialogs onto the shared Modal from PAN-4755 (now landed); surface/structure only, unblocked.",
+      "rationale": "Rank held: dependency PAN-4755 (shared Modal primitive) closed as completed, so this follow-up is now unblocked.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4824,19 +4714,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "dependsOn": [],
       "why": "Workspace-image CI never published: wrong Fly app, fly not on PATH, no FLY_API_TOKEN (operator). Fly VMs run a June image.",
       "rationale": "New, found while planning PAN-4682; sits next to it because both fix the Fly image path, and until it ships Fly VMs miss the #4652/#4296 Dockerfile changes. Workflow edits need an SSH push and the secret needs an operator.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4777",
-      "rank": 279,
-      "size": "S",
-      "importance": "medium",
-      "score": 55,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Fly createRemoteWorkspace leaks a billing VM when an exec throws before deleteVm; delete on any failure. Plus stale clone doc.",
-      "rationale": "New leftover from PAN-4685 (closed, its clone fix shipped in #4713); takes PAN-4685's freed rank 279 because a leaked machine keeps billing with no metadata pointing at it, and PAN-4748's expired-token 403s make the throw likely.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4862,7 +4739,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "condition": "ok",
       "dependsOn": [],
       "why": "Run Anywhere release AC-1..15 on integrated main: two-server local test, fixes or filed issues, operator hardware checklist doc.",
-      "rationale": "New this pass. It is the end-to-end release check for the merged Anywhere work, so it ranks with the Fly/Anywhere cluster near PAN-4685; AC-11 also needs the hosted services that PAN-4776 prepares.",
+      "rationale": "Rank held: PAN-4776 (deploying the account/connect Workers) closed, so AC-11's hosted-services prerequisite is in place.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -5024,19 +4901,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "auto"
     },
     {
-      "issue": "PAN-4738",
-      "rank": 294,
-      "size": "S",
-      "importance": "medium",
-      "score": 55,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "First message to a Fly-machine conversation is pasted into Claude Code's auto-mode dialog and lost; pre-answer it in configureClaudeCode.",
-      "rationale": "New bug from the PAN-4652 live check with a located fix site (FlyProvider.configureClaudeCode); every conversation started with --message loses its opening turn, so it sits just behind PAN-4739.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2266",
       "rank": 295,
       "size": "M",
@@ -5180,19 +5044,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "why": "Finish src/lib Effect migration: remove or justify legacy Promise/sync surfaces",
       "gate": "auto",
       "planning": "interactive"
-    },
-    {
-      "issue": "PAN-4683",
-      "rank": 307,
-      "size": "M",
-      "importance": "medium",
-      "score": 48,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan start --remote misses specs on feature branches and re-plans; planning never pushes branch; post-plan work starts local.",
-      "rationale": "New remote-start bug from the PAN-4295 smoke test with three linked gaps (spec lookup, branch push, start location); ranked with the Fly remote cluster near PAN-4295.",
-      "gate": "auto",
-      "planning": "auto"
     },
     {
       "issue": "PAN-1246",
@@ -7046,19 +6897,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "auto"
     },
     {
-      "issue": "PAN-4775",
-      "rank": 458,
-      "size": "S",
-      "importance": "medium",
-      "score": 45,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In-pipeline: anywhere.mdx still labels shipped Anywhere features planned; rewrite shipped table/roadmap and apply OD-3 pricing.",
-      "rationale": "New this pass and already in the pipeline, so it is pinned in the free rank 458 slot; a docs-only correction with mechanically checkable criteria.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3873",
       "rank": 459,
       "size": "M",
@@ -7336,6 +7174,19 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "dependsOn": [],
       "why": "Model picker: gray out models whose provider has no API key or subscription login (per-provider readiness resolver)",
       "rationale": "New this run: medium/50 — Model picker: gray out models whose provider has no API key or subscription login (per-provider readiness resolver).",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4779",
+      "rank": 482,
+      "size": "S",
+      "importance": "medium",
+      "score": 48,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Docs on main: 2 MDX parse errors hide pages from Mintlify + 15 broken vision.mdx links; mint broken-links can't gate",
+      "rationale": "New issue: small, well-scoped docs fix with mechanical ACs; placed in a free medium-tier slot beside comparable XS/S doc hygiene work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -8355,19 +8206,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "auto"
     },
     {
-      "issue": "PAN-4759",
-      "rank": 567,
-      "size": "M",
-      "importance": "medium",
-      "score": 42,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In-pipeline: skill packs get their own docs page, a pan skills CLI page, a fork runbook and docs/SKILL-PACKS.md developer guide.",
-      "rationale": "New issue filed 2026-11-02 and already in the pipeline, so it is pinned at the free rank 567 slot and no other node moves. It is a fully specified documentation task with decided deliverables and mechanical acceptance criteria, so its condition is ok.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1754",
       "rank": 568,
       "size": "M",
@@ -8611,13 +8449,13 @@ New this pass. The deployment gate's queue message is unusually good — it name
     {
       "issue": "PAN-1485",
       "rank": 588,
-      "size": "M",
+      "size": "S",
       "importance": "medium",
-      "score": 36,
+      "score": 32,
       "condition": "needs-refinement",
       "dependsOn": [],
-      "why": "Idle auto-archive (warn 7d, archive 10d); the archive-after-idle part is now split into #4655 as undoable idle auto-settle.",
-      "rationale": "Rank unchanged; stays needs-refinement because new PAN-4655 supersedes its archive-after-idle part, so what remains of this issue must be rescoped or closed.",
+      "why": "Remaining scope after #4655 auto-settle: day-10 archive + favorite clearing; close-or-keep is an operator call.",
+      "rationale": "Rank unchanged; a 2026-11-02 comment confirms PAN-4655 delivers idle auto-settle, so only day-10 archive and favorite clearing remain (size M→S, score trimmed), still needs-refinement pending the operator close decision.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -8788,19 +8626,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "dependsOn": [],
       "why": "Rescoped: Awareness rail should show conv-flywheel as the Flywheel with its last tick (derive-status.ts) and link to /flywheel.",
       "rationale": "Rank held at 601: the rescope comment names the concrete data source (deriveFlywheelStatus/findLastTick) and target route, so condition moves from needs-refinement to ok.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4762",
-      "rank": 603,
-      "size": "S",
-      "importance": "medium",
-      "score": 40,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In-pipeline: file-link right-click menu gains Open in browser and per-installed-browser items for html/svg/pdf/image files.",
-      "rationale": "New in-pipeline issue with a fully specified body and ACs; pinned in the free rank 603 beside comparable dashboard UX features so no existing node moves.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -9427,11 +9252,9 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "importance": "low",
       "score": 26,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4759"
-      ],
-      "why": "Two-sentence wording fix in features/skill-packs.mdx; file arrives with PAN-4759's PR, so land after it merges.",
-      "rationale": "New issue since the prior run; placed in the free rank 655 among low-impact quick fixes, after PAN-4759 which creates the page.",
+      "dependsOn": [],
+      "why": "Two-sentence wording fix in features/skill-packs.mdx; PAN-4759 created the page and closed, so this is unblocked.",
+      "rationale": "Rank held: dependency PAN-4759 (the skill-packs page) closed as completed, so this wording fix is now unblocked.",
       "gate": "auto",
       "planning": "skip"
     },
@@ -9485,19 +9308,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "condition": "ok",
       "dependsOn": [],
       "why": "Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts (\"no saved history\")",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4661",
-      "rank": 660,
-      "size": "S",
-      "importance": "low",
-      "score": 22,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Phone PWA third tab: read-only phase-grouped pipeline list at /m/pipeline; waits on the PAN-2355 /m shell",
-      "rationale": "Rank held: dependency PAN-2355 closed as completed on 2026-11-01, so it no longer gates this issue; remaining order is unchanged.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11502,32 +11312,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "auto"
     },
     {
-      "issue": "PAN-4658",
-      "rank": 827,
-      "size": "S",
-      "importance": "low",
-      "score": 22,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Cite text from the EditorPane markdown preview; needs a decision on how the preview picks its target conversation. #4642 shipped.",
-      "rationale": "Dependency #4642 closed as completed, so its citation store now exists; rank holds because the preview-target design decision is still open.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4659",
-      "rank": 828,
-      "size": "M",
-      "importance": "low",
-      "score": 20,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Import VS Code themes from a .vsix package (ZIP read, caps, include resolution); cosmetic, #4644 base theme import merged, now unblocked.",
-      "rationale": "Rank held: dependency PAN-4644 closed as completed on 2026-11-01, so this is unblocked; still low-impact cosmetic work.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3505",
       "rank": 829,
       "size": "XS",
@@ -11537,19 +11321,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "dependsOn": [],
       "why": "Stale: targets the flywheel state write door deleted by the PAN-3917 cut (ca15def); re-triage or close",
       "rationale": "Triage: flywheelRunId and the main-push guard both still exist; verify the allowlist bug against current logic. Rank held.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4660",
-      "rank": 831,
-      "size": "M",
-      "importance": "low",
-      "score": 20,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Duplicate-and-edit theme editor with live preview in Settings > Appearance; cosmetic, #4644 base theme import merged, now unblocked.",
-      "rationale": "Rank held: dependency PAN-4644 closed as completed on 2026-11-01, so this is unblocked; still low-impact cosmetic work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12082,19 +11853,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
       ],
       "why": "Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work.",
       "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4779",
-      "rank": 482,
-      "size": "S",
-      "importance": "medium",
-      "score": 48,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Docs on main: 2 MDX parse errors hide pages from Mintlify + 15 broken vision.mdx links; mint broken-links can't gate",
-      "rationale": "New issue: small, well-scoped docs fix with mechanical ACs; placed in a free medium-tier slot beside comparable XS/S doc hygiene work.",
       "gate": "auto",
       "planning": "auto"
     }
@@ -13193,13 +12951,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "confidence": 1
     },
     {
-      "from": "PAN-4655",
-      "to": "PAN-1485",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4666",
       "to": "PAN-4669",
       "type": "informs",
@@ -13219,27 +12970,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
-    },
-    {
-      "from": "PAN-4682",
-      "to": "PAN-4683",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
-    },
-    {
-      "from": "PAN-4682",
-      "to": "PAN-4696",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4683",
-      "to": "PAN-4696",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
     },
     {
       "from": "PAN-4702",
@@ -13284,32 +13014,11 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "confidence": 0.5
     },
     {
-      "from": "PAN-4748",
-      "to": "PAN-4734",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
-    },
-    {
-      "from": "PAN-4748",
-      "to": "PAN-4739",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
-    },
-    {
       "from": "PAN-4747",
       "to": "PAN-3508",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
-    },
-    {
-      "from": "PAN-4750",
-      "to": "PAN-4753",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
     },
     {
       "from": "PAN-3657",
@@ -13326,32 +13035,11 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "confidence": 0.6
     },
     {
-      "from": "PAN-4755",
-      "to": "PAN-4756",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4638",
       "to": "PAN-4760",
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-4738",
-      "to": "PAN-4760",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-4739",
-      "to": "PAN-4760",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
     },
     {
       "from": "PAN-4740",
@@ -13366,20 +13054,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "type": "informs",
       "source": "github-ref",
       "confidence": 0.7
-    },
-    {
-      "from": "PAN-4759",
-      "to": "PAN-1357",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.5
-    },
-    {
-      "from": "PAN-4759",
-      "to": "PAN-4769",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.9
     },
     {
       "from": "PAN-4772",
@@ -13403,25 +13077,46 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "confidence": 0.5
     },
     {
-      "from": "PAN-4776",
-      "to": "PAN-4774",
+      "from": "PAN-4785",
+      "to": "PAN-4636",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
+    },
+    {
+      "from": "PAN-4801",
+      "to": "PAN-4803",
       "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4772",
+      "to": "PAN-4803",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4772",
+      "to": "PAN-4785",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4801",
+      "to": "PAN-4772",
+      "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
     },
     {
-      "from": "PAN-4748",
-      "to": "PAN-4777",
+      "from": "PAN-4702",
+      "to": "PAN-4803",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
-    },
-    {
-      "from": "PAN-4682",
-      "to": "PAN-4778",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
     }
   ]
 }

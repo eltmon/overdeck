@@ -106,14 +106,19 @@ function startOfLocalDay(date: Date): number {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
 }
 
-/** D13: "back today HH:MM" / "back tomorrow HH:MM" / "back <Ddd> HH:MM" within 7 days, else "back <Mmm> <D> HH:MM". 24-hour, local. */
-export function formatSnoozeWake(untilIso: string, now: Date): string {
-  const until = new Date(untilIso);
-  const time = `${pad2(until.getHours())}:${pad2(until.getMinutes())}`;
-  const dayDiff = Math.round((startOfLocalDay(until) - startOfLocalDay(now)) / 86_400_000);
+/** "today HH:MM" / "tomorrow HH:MM" / "<Ddd> HH:MM" within 7 days, else "<Mmm> <D> HH:MM". 24-hour, local. */
+export function formatLocalWhen(iso: string, now: Date): string {
+  const when = new Date(iso);
+  const time = `${pad2(when.getHours())}:${pad2(when.getMinutes())}`;
+  const dayDiff = Math.round((startOfLocalDay(when) - startOfLocalDay(now)) / 86_400_000);
 
-  if (dayDiff === 0) return `back today ${time}`;
-  if (dayDiff === 1) return `back tomorrow ${time}`;
-  if (dayDiff > 1 && dayDiff < 7) return `back ${WEEKDAY_NAMES[until.getDay()]} ${time}`;
-  return `back ${MONTH_NAMES[until.getMonth()]} ${until.getDate()} ${time}`;
+  if (dayDiff === 0) return `today ${time}`;
+  if (dayDiff === 1) return `tomorrow ${time}`;
+  if (dayDiff > 1 && dayDiff < 7) return `${WEEKDAY_NAMES[when.getDay()]} ${time}`;
+  return `${MONTH_NAMES[when.getMonth()]} ${when.getDate()} ${time}`;
+}
+
+/** D13: "back " + formatLocalWhen. */
+export function formatSnoozeWake(untilIso: string, now: Date): string {
+  return `back ${formatLocalWhen(untilIso, now)}`;
 }

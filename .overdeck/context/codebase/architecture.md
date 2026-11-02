@@ -267,6 +267,22 @@ Deacon child, because the delivery and resume doors live there (60 s, skips peer
 dashboards, a frozen Deacon and `OVERDECK_DISABLE_SCHEDULED_MESSAGES=1`). Reset
 times come from `conversation-usage-limit.ts` and `limit-reset-text.ts`.
 
+## Conversation triage: settle and snooze (PAN-4639)
+
+`conversations.settled_at` / `settle_reason` (`manual` | `merge` | `idle`) /
+`snoozed_until` (epoch ms) are read and written only through
+`src/lib/overdeck/conversation-triage-store.ts`; the write route is
+`POST /api/conversations/triage` (`routes/conversation-triage.ts`). Settling is
+display-only: the session keeps running. An expired snooze is not cleared
+server-side; the client derives Inbox from `snoozed_until <= now`. Sections
+(Needs you / Inbox / Snoozed / Settled) are a pure client rule decided on the
+tree root (`CommandDeck/conversation-triage.ts` `sectionOf`, nesting from
+`conversation-tree.ts` `displayParentId`). Automatic settling: on merge is
+PAN-4653; on idle is PAN-4655 (`src/lib/overdeck/conversation-idle-settle.ts`,
+run by `services/conversation-idle-settle-service.ts`; unsettle and unsnooze
+write `idle_reset_at` to restart the clock; setting
+`conversations.auto_settle_idle_days`, default 3).
+
 ## Dashboard auth (verified 2026-11-01)
 
 No per-route auth middleware; two global gates plus opt-in route checks (`rejectUnauthorizedDashboardRequest`, `rejectUnsafeDashboardMutationRequest` in `routes/dashboard-auth.ts`). `resolveDashboardCredential` is the one credential check: internal token, the root-derived `overdeck_session` cookie, or an `odk_` registry credential from `src/lib/access-tokens.ts` (`~/.overdeck/access-tokens.json`; PAN-3762 paired devices, `kind: 'device'`; PAN-4645 linked machines, `kind: 'machine'`, which resolve only inside a secure channel whose proved key matches the record: `resolveDashboardCredential(headers, channel)`, channel marker from `channel-peer.ts`). `remote-request-gate.ts` is a global middleware requiring a credential on `/api/*` and `/events/*` unless allowlisted or a loopback peer; `ws-auth.ts` `authorizeDashboardUpgrade` gates every `/ws/*` upgrade. The session mint alone trusts `isLoopbackPeer` (off under `dashboard.require_token_mint`, read by `src/lib/remote-access/config.ts`). The server binds `0.0.0.0`. PAN-2351 adds scoped `kind: 'token'` credentials enforced at both gates from one route-scope table (`route-scopes.ts`, default `admin`). PAN-4645 adds the secure channel: `channel-listener.ts` demuxes a `0x00` first byte on the dashboard port (and `/ws/link`) into a Noise channel handed to the HTTP server; `channel` requests are never loopback; `/ws/rpc` gets a scope-restricted RPC group for non-admin credentials (`ws-rpc-auth.ts`); `require_token_mint` is on whenever remote access exists (`remote-access/config.ts`). Machine identity is `src/lib/environment-identity.ts`. See `docs/DASHBOARD-AUTH.md`.
@@ -285,4 +301,8 @@ Owner side: `routes/machines-work.ts` (the `/api/machines/work/*` doors: convers
 
 Gauntlet lanes across machines (PAN-4638): home keeps the run rules in `src/lib/lanes/launch.ts` (`deps.remote` / `resolveMachine`) over `src/lib/lanes/lane-rows.ts` (`listAllLaneRows`: local lane rows plus stand-ins, cwd key `<environmentId>:<cwd>`) and `src/lib/lanes/remote-lanes.ts` (the stand-in store `~/.overdeck/remote-lanes/<name>/{lane,mirror,archived}.json` and the `lane-link.json` critic sidecar); `routes/lanes.ts` resolves `machine` and adds `POST /api/lanes/:name/stop` and the remote reap; `services/remote-lane-follower.ts` mirrors the owner's status and reports. Owner side: `routes/machines-work-lanes.ts` (`/api/machines/work/lanes`, `…/:name/status`, `…/:name/reap`) runs `src/lib/lanes/owner-launch.ts` (`launchOwnedLane`). Views, pairing (by name) and waits: `src/lib/lanes/views.ts`, `pairing.ts`, `wait.ts`; nesting: `src/lib/overdeck/linked-conversations-merge.ts` (`remoteLanes`). CLI: `cli/commands/lane.ts`. Docs: `reference/lanes.mdx` "Lanes on other machines", `docs/ANYWHERE-ARCHITECTURE.md` "Gauntlet lanes across machines".
 
-<!-- last-verified: 2026-11-02 (PAN-4728, PAN-4651, PAN-4730, PAN-4638, PAN-4759, PAN-4682) -->
+## Color themes (PAN-4644, PAN-4659, PAN-4660)
+
+Model and built-ins (`overdeck-dark`, `overdeck-light`; read-only, full terminal palette, no `ui`/`syntax`) live in `packages/contracts/src/color-theme.ts` (`normalizeColorTheme`, `effectiveTerminalPalette`, `slugifyThemeId`, `RESERVED_COLOR_THEME_IDS`). User themes are `~/.overdeck/themes/<id>.json` via `src/lib/color-themes/store.ts` (read fresh on every list; `saveColorTheme` is create-only — `claimThemeFile` uses `link()` and suffixes `-2`, never overwrites; `updateColorTheme` is the in-place counterpart — temp file + `rename()`, refuses built-in/reserved ids). Selection is `ui.color_theme.{light,dark}` in `config.yaml` (`selection.ts` read, `selection-write.ts` write door); `terminal-background.ts` feeds the tmux `window-style` stamp for new sessions only. VS Code import: `vscode-import.ts` maps one theme JSON(C); `.vsix` packages (PAN-4659) are read in memory by `zip-reader.ts` and every contributed theme is mapped by `vsix-import.ts`; the preview route returns a `themes[]` array and writes nothing. Routes: `src/dashboard/server/routes/color-themes.ts` (`GET /api/color-themes`, `PUT …/selection`, `POST …/import/preview`, `POST /api/color-themes`, `PUT /api/color-themes/:id`). Frontend: `hooks/useColorTheme.ts` (zustand; `applyUiTokens` writes the `ui` subset as inline styles on `<html>`, never signal/state tokens; `reconcileFromServer` refetches and re-applies; `updateTheme` PUTs then reconciles), `lib/uiTokenStyles.ts` (pure `uiTokenStyles(theme)`, shared by `applyUiTokens` and the editor preview), `lib/colorThemeEditor.ts` (pure draft model: `createDraft`/`setEdit`/`revertEdit`/`draftToFile`/`pickerValue`), `lib/syntaxTheme.ts` (content-hashed Shiki theme names), consumers `XTerminal.tsx`, `chat/ChatMarkdown.tsx`, `chat/MarkdownFileLink.tsx`; UI in `Settings/sections/ColorThemeSection.tsx` (theme list, Duplicate-and-edit/Edit entry points) + `ColorThemeImportPreview.tsx` + `ColorThemeEditor.tsx` + `ColorThemeEditorPreview.tsx`. Docs: `configuration/appearance.mdx` "Color themes".
+
+<!-- last-verified: 2026-11-02 (PAN-4728, PAN-4651, PAN-4730, PAN-4638, PAN-4759, PAN-4682, PAN-4655, PAN-4644, PAN-4659, PAN-4660) -->

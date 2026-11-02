@@ -64,4 +64,31 @@ describe('CitationChips', () => {
     render(<CitationChips conversationName="conv-a" />);
     expect(screen.getByTestId('composer-citation-chip')).toHaveTextContent('Survives reload');
   });
+
+  it('collapsed file citation chip shows the basename before the quote', () => {
+    addCitation('conv-a', { source: { kind: 'file', path: '/repo/docs/guide.md' }, quotedText: 'Use X', comment: '' });
+
+    render(<CitationChips conversationName="conv-a" />);
+    expect(screen.getByTestId('composer-citation-chip')).toHaveTextContent('guide.md');
+    expect(screen.queryByText('/repo/docs/guide.md')).not.toBeInTheDocument();
+  });
+
+  it('expanded file citation chip shows the full path above the quote', () => {
+    addCitation('conv-a', { source: { kind: 'file', path: '/repo/docs/guide.md' }, quotedText: 'Use X', comment: '' });
+
+    render(<CitationChips conversationName="conv-a" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Expand citation' }));
+
+    expect(screen.getByText('/repo/docs/guide.md')).toBeInTheDocument();
+  });
+
+  it('a message citation chip renders no file prefix or path line, collapsed or expanded', () => {
+    addCitation('conv-a', { source: SOURCE, quotedText: 'Use X', comment: '' });
+
+    render(<CitationChips conversationName="conv-a" />);
+    expect(screen.getByTestId('composer-citation-chip')).not.toHaveTextContent(' · Use X');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Expand citation' }));
+    expect(screen.queryByText(/^\/.*\.md$/)).not.toBeInTheDocument();
+  });
 });

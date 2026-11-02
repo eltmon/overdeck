@@ -198,18 +198,66 @@ export function setFlywheelAutoPickupBacklog(enabled: boolean): void {
 }
 
 /**
- * PAN-3822: archive an operator conversation when its linked pull requests
- * are all merged or closed (the PR sync sweep, on the transition). Default off;
- * never stops a session and never touches agent conversations.
+ * PAN-4653: settle an operator conversation when its linked pull requests
+ * are all merged or closed (the PR sync sweep, on the open → merged/closed
+ * transition). Default ON when unset. A per-conversation override
+ * (`conversations.auto_settle_override`) wins; agent conversations never settle.
  */
-export const CONVERSATIONS_AUTO_ARCHIVE_ON_MERGE_KEY = 'conversations.auto_archive_on_merge';
+export const CONVERSATIONS_AUTO_SETTLE_ON_MERGE_KEY = 'conversations.auto_settle_on_merge';
 
-export function isConversationsAutoArchiveOnMerge(): boolean {
-  return getSetting(CONVERSATIONS_AUTO_ARCHIVE_ON_MERGE_KEY) === 'true';
+export function isConversationsAutoSettleOnMerge(): boolean {
+  return getSetting(CONVERSATIONS_AUTO_SETTLE_ON_MERGE_KEY) !== 'false'; // defaults to true if unset
 }
 
-export function setConversationsAutoArchiveOnMerge(enabled: boolean): void {
-  setSetting(CONVERSATIONS_AUTO_ARCHIVE_ON_MERGE_KEY, enabled ? 'true' : 'false');
+export function setConversationsAutoSettleOnMerge(enabled: boolean): void {
+  setSetting(CONVERSATIONS_AUTO_SETTLE_ON_MERGE_KEY, enabled ? 'true' : 'false');
+}
+
+/**
+ * PAN-4655: settle an operator conversation after this many days without
+ * activity (the idle-settle sweep). Default 3; 0 turns it off.
+ */
+export const CONVERSATIONS_AUTO_SETTLE_IDLE_DAYS_KEY = 'conversations.auto_settle_idle_days';
+export const DEFAULT_AUTO_SETTLE_IDLE_DAYS = 3;
+export const MAX_AUTO_SETTLE_IDLE_DAYS = 365;
+
+/** An integer 0..365 (number, or a string of digits), else null. */
+export function parseAutoSettleIdleDays(value: unknown): number | null {
+  const n =
+    typeof value === 'number'
+      ? value
+      : typeof value === 'string' && /^\d+$/.test(value.trim())
+        ? Number(value.trim())
+        : NaN;
+  return Number.isInteger(n) && n >= 0 && n <= MAX_AUTO_SETTLE_IDLE_DAYS ? n : null;
+}
+
+/** Unset → 3; an invalid stored value → 3 (warns); a failed read → 0 (off). */
+export function getConversationsAutoSettleIdleDays(): number {
+  let stored: string | null;
+  try {
+    stored = getSetting(CONVERSATIONS_AUTO_SETTLE_IDLE_DAYS_KEY);
+  } catch (error) {
+    console.warn(`[idle-settle] could not read ${CONVERSATIONS_AUTO_SETTLE_IDLE_DAYS_KEY}; treating it as off:`, error);
+    return 0;
+  }
+  if (stored === null) return DEFAULT_AUTO_SETTLE_IDLE_DAYS;
+  const days = parseAutoSettleIdleDays(stored);
+  if (days === null) {
+    console.warn(
+      `[idle-settle] ${CONVERSATIONS_AUTO_SETTLE_IDLE_DAYS_KEY} has invalid value "${stored}"; using ${DEFAULT_AUTO_SETTLE_IDLE_DAYS}`,
+    );
+    return DEFAULT_AUTO_SETTLE_IDLE_DAYS;
+  }
+  return days;
+}
+
+/** Throws RangeError unless parseAutoSettleIdleDays(days) accepts it. */
+export function setConversationsAutoSettleIdleDays(days: number): void {
+  if (parseAutoSettleIdleDays(days) === null) {
+    throw new RangeError(`auto-settle idle days must be a whole number from 0 to ${MAX_AUTO_SETTLE_IDLE_DAYS}, got ${days}`);
+  }
+  setSetting(CONVERSATIONS_AUTO_SETTLE_IDLE_DAYS_KEY, String(days));
 }
 
 /** Drop-in for isFlywheelRequireUatBeforeMerge() from app-settings.ts. */

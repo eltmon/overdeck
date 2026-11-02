@@ -1,0 +1,13 @@
+plan-digest: fecf581039120074675778012599fb3bbec3783982685dff731414c3aaee305c
+
+## blocks-the-design: Cached fallback masks a newly available batch spec
+
+The PRD's D1 says the first root with a spec wins (line 66), but D4 and W2 reuse a cached lower-priority spec whenever the root list and that file's mtime are unchanged (lines 72, 151). If a live batch worktree already exists but its spec is added after a poll reads the feature workspace or project root, the root list stays the same and the cached fallback keeps winning indefinitely. The existing cache checks only the chosen file's mtime in [uat-train.ts](/home/eltmon/Projects/overdeck/workspaces/feature-pan-4799/src/dashboard/server/services/uat-train.ts), lines 626–636. Make the cache detect changes to higher-priority spec directories (or give fallback entries a bounded recheck), and test that a spec appearing in the batch worktree replaces a cached workspace or project-root result.
+
+## blocks-the-design: Deleted indexed spec prevents same-poll fallback
+
+W2 promises that deleting only the cached spec file, while its root remains, re-resolves from the next root on the same poll (PRD lines 149–153, 173). After the failed cache-entry stat, `findXBriefByIssue` can still return the deleted path from its five-second index: [xbrief-index.ts](/home/eltmon/Projects/overdeck/workspaces/feature-pan-4799/src/lib/xbrief/xbrief-index.ts), lines 129–136 and 158–169. The next `stat(found.path)` then throws into the outer catch in [uat-train.ts](/home/eltmon/Projects/overdeck/workspaces/feature-pan-4799/src/dashboard/server/services/uat-train.ts), lines 647–657, producing `planResolved: false` without trying the next root. The repository already exposes `invalidateXBriefIndex(root)` at [xbrief-index.ts](/home/eltmon/Projects/overdeck/workspaces/feature-pan-4799/src/lib/xbrief/xbrief-index.ts), line 139. Specify a per-root recovery on a missing indexed file: invalidate that root's index, retry or continue, then try the remaining roots. Test with the real index or a mock that returns the stale path after deletion.
+
+## sharpens-framing: UAT criterion excludes valid empty plans
+
+The PRD says a resolved spec may have zero acceptance criteria (line 16), and [MergeTrainView.tsx](/home/eltmon/Projects/overdeck/workspaces/feature-pan-4799/src/dashboard/frontend/src/components/merge-train/MergeTrainView.tsx), lines 877–884, explicitly renders that case. Yet AC-UAT (PRD line 205) requires non-empty `acceptanceCriteria` for every member with a spec. Change AC-UAT to require `planResolved: true` and criteria equal to the spec's extracted criteria, including an empty list.
