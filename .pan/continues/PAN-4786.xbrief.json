@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4786",
   "created": "2026-11-02T04:47:22.459Z",
-  "updated": "2026-11-02T05:03:30.918Z",
+  "updated": "2026-11-02T05:07:37.726Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-11-02T05:03:25.140Z"
     },
     "supervisor-live-join-options": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4786",
-      "claimedAt": "2026-11-02T05:03:30.917Z"
+      "claimedAt": "2026-11-02T05:03:30.917Z",
+      "doneAt": "2026-11-02T05:07:37.725Z"
     }
   }
 }
