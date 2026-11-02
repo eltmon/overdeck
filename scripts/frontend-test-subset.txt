@@ -43,6 +43,8 @@ src/components/GodView/confluence/__tests__/rail-link.test.tsx
 src/components/GodView/confluence/__tests__/useConfluenceData.test.ts
 src/components/HealthDashboard.test.tsx
 src/components/IssueActionMenu/__tests__/useIssueActions.render-count.test.tsx
+src/components/Settings/__tests__/ColorThemeEditor.test.tsx
+src/components/Settings/__tests__/ColorThemeEditorPreview.test.tsx
 src/components/Settings/__tests__/ColorThemeImportPreview.test.tsx
 src/components/Settings/__tests__/ColorThemeSection.test.tsx
 src/components/Settings/__tests__/ModelPresetsBar.test.tsx
@@ -92,6 +94,7 @@ src/components/chat/__tests__/ComposerFooter.streaming-render-count.test.tsx
 src/components/chat/__tests__/ConversationAboutDrawer.test.tsx
 src/components/chat/__tests__/ConversationMachineBanner.test.tsx
 src/components/chat/__tests__/ConversationPanel.test.tsx
+src/components/chat/__tests__/ConversationScheduleDialog.test.tsx
 src/components/chat/__tests__/EffortPicker.test.tsx
 src/components/chat/__tests__/HandoffNotice.test.tsx
 src/components/chat/__tests__/HeldHandoffView.test.tsx
@@ -169,6 +172,7 @@ src/components/workspace/new/__tests__/smartField.test.ts
 src/components/workspace/new/__tests__/useWorkspaceCreateIntent.test.ts
 src/hooks/__tests__/useColorTheme.test.ts
 src/lib/__tests__/citationFormat.test.ts
+src/lib/__tests__/colorThemeEditor.test.ts
 src/lib/__tests__/composerCitations.test.ts
 src/lib/__tests__/connectionState.test.ts
 src/lib/__tests__/flywheelNeedsYou.test.ts
@@ -184,6 +188,7 @@ src/lib/__tests__/simple-derive.test.ts
 src/lib/__tests__/simple-feed.test.ts
 src/lib/__tests__/syntaxTheme.test.ts
 src/lib/__tests__/telemetry.test.ts
+src/lib/__tests__/uiTokenStyles.test.ts
 src/lib/__tests__/useDecisions.fleet.test.tsx
 src/lib/__tests__/useDecisions.test.ts
 src/lib/__tests__/wsTransport-pairing.test.ts

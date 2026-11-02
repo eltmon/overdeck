@@ -593,6 +593,9 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/merge-train/assemble',                      kind: 'http', disposition: 'WRITE',       door: 'Forced UAT reconcile for one project or all — supersedes POST /api/flywheel/assemble-uat' },
   { surface: 'POST /api/merge-train/merge-next',                    kind: 'http', disposition: 'WRITE',       door: 'Escape-hatch batch merge from a named project ready set — supersedes POST /api/flywheel/merge-next' },
 
+  // ── merge-train-lanes.ts (PAN-4753) ──
+  { surface: 'POST /api/merge-train/strikes/:issueId/merge',        kind: 'http', disposition: 'WRITE',       door: 'Operator-started strike merge (buildStrikeMergeRequest + triggerMerge kind strike; head approval waived only here, PAN-4750)' },
+
   // ── merge-train.ts (PAN-3917 W6: the /api/flywheel auto-merge/config surface moved here, no flywheel run) ──
   { surface: 'GET /api/merge-train/auto-merge',                     kind: 'http', disposition: 'READ',        door: 'getAutoMergePolicyPayload — derived issue state (approvals + green checks + forge mergeability, FR-9/D3), no flywheel run' },
   { surface: 'GET /api/merge-train/merge-backend',                  kind: 'http', disposition: 'READ',        door: 'getMergeBackendStatus (github-app.js) — whether an autonomous merge can actually be performed' },
@@ -673,6 +676,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'PUT /api/color-themes/selection',                      kind: 'http', disposition: 'WRITE',       door: 'FILE-CONFIG via color theme selection path-scoped write (PAN-4644)' },
   { surface: 'POST /api/color-themes/import/preview',                kind: 'http', disposition: 'READ',        door: 'VS Code theme mapping preview; writes nothing (PAN-4644)' },
   { surface: 'POST /api/color-themes',                               kind: 'http', disposition: 'WRITE',       door: 'color theme store save, under OVERDECK_HOME/themes (PAN-4644)' },
+  { surface: 'PUT /api/color-themes/:id',                            kind: 'http', disposition: 'WRITE',       door: 'color theme store in-place overwrite of a user theme, under OVERDECK_HOME/themes; built-ins refused (PAN-4660)' },
 
   // ── vault.ts ──────────────────────────────────────────────────────────────
   { surface: 'GET /api/vault/status',                                kind: 'http', disposition: 'READ',        door: 'FILE-CONFIG via vault-service snapshot (PAN-4307)' },

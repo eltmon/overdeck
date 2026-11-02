@@ -1,0 +1,787 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T06:12:20Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4660: Duplicate-and-edit color theme editor in Settings > Appearance",
+    "updated": "2026-11-02T06:13:53.138Z"
+  },
+  "plan": {
+    "id": "pan-4660",
+    "title": "Duplicate-and-edit color theme editor in Settings > Appearance",
+    "status": "running",
+    "uid": "1230081f-5745-47e0-9a79-c4c02c1f7d97",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-02T06:12:20Z",
+    "updated": "2026-11-02T06:13:53.138Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4660",
+        "label": "PAN-4660",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4644",
+        "label": "PAN-4644 (parent, merged)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "settings",
+      "appearance",
+      "color-themes",
+      "frontend",
+      "api"
+    ],
+    "narratives": {
+      "Problem": "PAN-4644 shipped color themes, but the only way to change a theme's colors is to hand-edit ~/.overdeck/themes/<id>.json. The store cannot overwrite a user theme (saveColorTheme always claims a new id), and the UI-token derivation writes straight to <html>, so there is no way to preview edits.",
+      "Proposal": "Add updateColorTheme + PUT /api/color-themes/:id for in-place saves that refuse built-ins; extract uiTokenStyles from applyUiTokens; add a pure editor model (draft, duplicate naming, fixed seven-scope syntax editing, seeds); add an inline ColorThemeEditor with a ColorThemeEditorPreview (terminal sample, UI card, highlighted code) opened from a theme list in Settings > Appearance; duplicates save through POST /api/color-themes, user-theme edits through PUT, and both refresh via reconcileFromServer, which re-applies a selected theme without a reload. Full detail: .pan/drafts/PAN-4660.md.",
+      "NonGoals": "- Editing signal or state colors (--state-*, --success*, --warning*, --destructive*, --info*, --signal-*)\n- Editing arbitrary tokenColors rules, fontStyle, token backgrounds, or syntax.colors; only the foreground of the seven common scopes\n- Editing terminal.cursorAccent or alpha channels\n- Changing a theme's type (light/dark)\n- Deleting or renaming theme files; changing a user theme's id\n- Auto-selecting a newly saved duplicate\n- Restamping the tmux window-style background of existing sessions\n- Persisting an unsaved draft across a page reload\n- A routed editor page or a modal editor\n- .vsix import (#4659)\n- Any change to packages/contracts/src/color-theme.ts"
+    },
+    "autoDecisions": [
+      {
+        "summary": "In-place save uses a new PUT /api/color-themes/:id route backed by updateColorTheme, not an id field on POST",
+        "rationale": "POST is create-only by design (claimThemeFile never overwrites); overwrite has distinct 403/404 failure modes, and the issue's POST wording describes saving a new theme."
+      },
+      {
+        "summary": "The editor is an inline panel in the Appearance section, not a routed page or modal",
+        "rationale": "Matches the ColorThemeImportPreview inline precedent, the issue says the editor opens in Settings > Appearance, the 'pages not modals' rule targets modals, and it avoids touching app tab routing."
+      },
+      {
+        "summary": "Edit all seven ui keys, including overlay",
+        "rationale": "The issue's 'six keys' predates PAN-4755, which added ui.overlay to the contract and applyUiTokens."
+      },
+      {
+        "summary": "Entry points are a theme list under the pickers with Duplicate and edit on every row and Edit on user-theme rows",
+        "rationale": "The issue says 'on any theme'; the pickers only show the selected theme."
+      },
+      {
+        "summary": "Fixed scope strings: comment, string, keyword, entity.name.function, variable, constant.numeric, entity.name.type; edits update the last exact-scope entry or append one",
+        "rationale": "Keeps every other token rule unchanged as the issue requires and gives one deterministic diff."
+      },
+      {
+        "summary": "Not-set ui keys and syntax scopes show deterministic seeds from the effective terminal palette and are saved only when changed",
+        "rationale": "Built-ins carry no ui/syntax; writing seeds would silently change their look, and computed CSS values vary by design language and use non-hex formats."
+      },
+      {
+        "summary": "Duplicate names: '<name> copy', then 'copy 2', 'copy 3', capped at 80 chars; duplicates drop source provenance; new copies are not auto-selected",
+        "rationale": "Issue specifies '<name> copy'; deduping keeps picker labels distinct; selection stays an explicit operator action."
+      },
+      {
+        "summary": "Color pickers show toOpaqueHex values and write #rrggbb; untouched colors keep alpha",
+        "rationale": "<input type=color> accepts only #rrggbb."
+      },
+      {
+        "summary": "claimThemeFile never claims the id 'selection'",
+        "rationale": "PUT /api/color-themes/selection is a static route that shadows :id, so such a theme could never be edited in place."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-02-PAN-4660-duplicate-and-edit-color-theme-editor-in-settings-appearance.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "w1-store-update",
+        "title": "Store: updateColorTheme overwrites a user theme in place",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T06:12:20Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4660",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/color-themes/store.ts",
+            "src/lib/color-themes/__tests__/store.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/color-themes/__tests__/store.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "store.test.ts passes including the five new PAN-4660 tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-6",
+            "FR-7",
+            "NFR-1",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W1 in .pan/drafts/PAN-4660.md exactly. In src/lib/color-themes/store.ts add the exported UpdateColorThemeResult union and async updateColorTheme(id, file): refuse built-in/reserved ids with kind 'builtin', reject ids failing COLOR_THEME_ID_RE with 'invalid-id', return 'not-found' when <themes>/<id>.json does not exist (fs/promises access, ENOENT), return 'invalid' with normalizeColorTheme errors, otherwise write a temp file in the themes dir and rename() it over the target (atomic) and return 'saved'. Add ROUTE_SHADOWED_IDS = ['selection'] and make claimThemeFile skip that candidate like a reserved id. Use fs/promises only. Add the five store tests named in PRD W1 to store.test.ts."
+        },
+        "items": [
+          {
+            "id": "w1-store-update.ac1",
+            "title": "Given a saved user theme ayu-dark, when updateColorTheme('ayu-dark', theme with terminal.background '#000000') runs, then the themes directory still contains exactly one ayu-dark.json and listColorThemes returns it with background '#000000'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-store-update.ac2",
+            "title": "Given ids overdeck-dark and overdeck-light, updateColorTheme returns kind 'builtin' and creates no overdeck-dark.json or overdeck-light.json file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-store-update.ac3",
+            "title": "updateColorTheme returns kind 'not-found' for an id with no file and creates no file; it returns 'invalid-id' for '../evil' and 'invalid' for a body without name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-store-update.ac4",
+            "title": "saveColorTheme of a theme named 'Selection' stores it as selection-2.json, never selection.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w2-route-put",
+        "title": "Route: PUT /api/color-themes/:id saves a user theme in place",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T06:12:20Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4660",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/color-themes.ts",
+            "src/dashboard/server/__tests__/color-themes-routes.test.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/color-themes-routes.test.ts",
+            "npx vitest run tests/unit/lib/overdeck",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "color-themes-routes.test.ts passes including the PUT /api/color-themes/:id block",
+            "no-loss matrix tests pass with the new route row",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W2. In src/dashboard/server/routes/color-themes.ts add putColorThemeRoute for PUT '/api/color-themes/:id': call rejectUnsafeDashboardMutationRequest first, read the id with (yield* HttpRouter.params)['id'], read body { theme }, call updateColorTheme and map kinds to statuses exactly as PRD D1 (builtin 403, invalid-id 400, not-found 404, invalid 400 { errors }, saved 200 { theme }). Register it in colorThemesRouteLayer and add it to the header comment. Add the no-loss-matrix row from PRD W2 step 4 to tests/unit/lib/overdeck/no-loss-matrix.ts. Add the PUT describe block from PRD W2 to color-themes-routes.test.ts using the file's existing home/call/asInternal harness."
+        },
+        "items": [
+          {
+            "id": "w2-route-put.ac1",
+            "title": "PUT /api/color-themes/overdeck-dark returns 403 and creates no overdeck-dark.json under <OVERDECK_HOME>/themes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-route-put.ac2",
+            "title": "PUT /api/color-themes/nope returns 404 and creates no file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-route-put.ac3",
+            "title": "Given POST /api/color-themes saved 'Overdeck Dark copy' as overdeck-dark-copy, when PUT /api/color-themes/overdeck-dark-copy sends terminal.background '#000000', then a fresh GET /api/color-themes lists overdeck-dark-copy once with terminal.background '#000000'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-route-put.ac4",
+            "title": "A PUT without the internal-token header returns a 4xx rejection and leaves the existing theme file byte-for-byte unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-route-put.ac5",
+            "title": "PUT /api/color-themes/selection with { mode: 'dark', id: 'overdeck-dark' } still returns 200 with a selection body, and no-loss-matrix.ts contains one 'PUT /api/color-themes/:id' row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w3-ui-token-styles",
+        "title": "Extract uiTokenStyles(theme) from applyUiTokens",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T06:12:20Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-4660",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/uiTokenStyles.ts",
+            "src/dashboard/frontend/src/hooks/useColorTheme.ts",
+            "src/dashboard/frontend/src/lib/__tests__/uiTokenStyles.test.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/uiTokenStyles.test.ts src/hooks/__tests__/useColorTheme.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "uiTokenStyles.test.ts and the unchanged useColorTheme.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-3",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W3. Create src/dashboard/frontend/src/lib/uiTokenStyles.ts exporting ALL_UI_PROPS (moved from useColorTheme.ts) and a pure uiTokenStyles(theme): Record<string, string> that returns exactly the CSS custom properties and values applyUiTokens currently sets, under the same conditions. Rewrite applyUiTokens in useColorTheme.ts to remove ALL_UI_PROPS then setProperty each entry of uiTokenStyles(theme). Behavior must not change. Add lib/__tests__/uiTokenStyles.test.ts with the PRD W3 cases and add its path to scripts/frontend-test-subset.txt in sorted position."
+        },
+        "items": [
+          {
+            "id": "w3-ui-token-styles.ac1",
+            "title": "uiTokenStyles returns {} for a theme without ui, and for ui.accent '#ffcc00' returns --primary, --ring and --primary-ink '#ffcc00' plus --primary-foreground '#000000'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-ui-token-styles.ac2",
+            "title": "uiTokenStyles never returns a key starting with --state-, --signal-, --success, --warning, --destructive or --info",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-ui-token-styles.ac3",
+            "title": "The existing useColorTheme.test.ts passes unchanged, and applyUiTokens contains no setProperty call outside its loop over uiTokenStyles(theme)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-ui-token-styles.ac4",
+            "title": "scripts/frontend-test-subset.txt contains the line src/lib/__tests__/uiTokenStyles.test.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w4-update-theme-action",
+        "title": "Store action: updateTheme(id, file) re-applies a selected theme",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T06:12:20Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4660",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/hooks/useColorTheme.ts",
+            "src/dashboard/frontend/src/hooks/__tests__/useColorTheme.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/hooks/__tests__/useColorTheme.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "useColorTheme.test.ts passes including the two updateTheme tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W4. Add updateTheme(id, theme: ColorThemeFile) to the ColorThemeState interface and store in src/dashboard/frontend/src/hooks/useColorTheme.ts: PUT /api/color-themes/<encodeURIComponent(id)> with dashboardMutationJsonHeaders and body { theme }; on a non-ok response throw an Error carrying data.error or the joined data.errors; on success await get().reconcileFromServer(). Leave saveImported unchanged. Add the two PRD W4 tests to hooks/__tests__/useColorTheme.test.ts using installStrictFetchMock."
+        },
+        "items": [
+          {
+            "id": "w4-update-theme-action.ac1",
+            "title": "Given dark-x is selected and active, when updateTheme('dark-x', …) succeeds and the refetch returns ui.background '#222222' and terminal.background '#111111', then <html> --background equals '#222222' and terminalPalette('dark').background equals '#111111' with no page reload",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-update-theme-action.ac2",
+            "title": "When PUT answers 403, updateTheme throws an Error whose message contains 'built-in themes are read-only' and sends no GET /api/color-themes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-update-theme-action.ac3",
+            "title": "updateTheme sends exactly one PUT to /api/color-themes/<id> with body { theme }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w5-editor-model",
+        "title": "Editor model: draft, duplicate naming and syntax-scope edits",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T06:12:20Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4660",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/colorThemeEditor.ts",
+            "src/dashboard/frontend/src/lib/__tests__/colorThemeEditor.test.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/colorThemeEditor.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "colorThemeEditor.test.ts passes with the naming, read-only, scope-edit and alpha tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-5",
+            "FR-10"
+          ],
+          "foundationFor": [
+            "w7-editor-form",
+            "w8-section-entry-points"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W5 and decisions D3-D7. Create src/dashboard/frontend/src/lib/colorThemeEditor.ts with the exact exports listed in PRD W5: EDITABLE_TERMINAL_KEYS (20 keys, no cursorAccent), EDITABLE_UI_KEYS (7), SYNTAX_SCOPES (the D4 table with exact scope strings and seeds), UI_SEEDS (D5), ThemeEdits, ThemeDraft, duplicateThemeName, createDraft, syntaxForeground, applySyntaxEdits, draftToFile, draftPreviewTheme, pickerValue, setEdit, revertEdit. Pure functions only: no React, DOM, fetch or localStorage. Add lib/__tests__/colorThemeEditor.test.ts with every PRD W5 test and add its path to scripts/frontend-test-subset.txt in sorted position."
+        },
+        "items": [
+          {
+            "id": "w5-editor-model.ac1",
+            "title": "duplicateThemeName returns 'Overdeck Dark copy', then 'Overdeck Dark copy 2' when 'overdeck dark copy' exists, then 'Overdeck Dark copy 3', and never returns more than 80 characters",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-editor-model.ac2",
+            "title": "createDraft(BUILTIN_COLOR_THEMES['overdeck-dark'], 'edit', []) throws, and draftToFile of a duplicate of overdeck-dark produces type 'dark', the full built-in terminal palette, and no ui, syntax, source, id or builtin key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-editor-model.ac3",
+            "title": "applySyntaxEdits with no edits returns the same reference; editing comment updates the existing 'comment' entry's foreground and keeps its fontStyle; editing function appends { scope: 'entity.name.function' } at the end; all other entries keep reference identity and order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-editor-model.ac4",
+            "title": "pickerValue shows '#264f78' for an untouched '#264f78cc' selectionBackground while draftToFile still writes '#264f78cc'; a not-set ui.accent on a copy of overdeck-dark shows '#6272a4' with isSet false, and revertEdit after setEdit leaves draftToFile with no ui group",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-editor-model.ac5",
+            "title": "draftToFile preserves the source theme unmodified: a deep snapshot of the source is equal before and after setEdit plus draftToFile",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w6-editor-preview",
+        "title": "Editor preview component renders terminal, UI card and code samples",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T06:12:20Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4660",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/ColorThemeEditorPreview.tsx",
+            "src/dashboard/frontend/src/components/Settings/__tests__/ColorThemeEditorPreview.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Settings/__tests__/ColorThemeEditorPreview.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ColorThemeEditorPreview.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-3",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W6. Create src/dashboard/frontend/src/components/Settings/sections/ColorThemeEditorPreview.tsx exporting ColorThemeEditorPreview({ theme }). Render a static terminal sample from effectiveTerminalPalette(theme) (no xterm.js), a UI sample card whose wrapper div carries uiTokenStyles(theme) as inline style (never touching document.documentElement or localStorage), and a TypeScript code sample highlighted via ensureSyntaxTheme + highlight from lib/syntaxTheme 150 ms after the last theme change, with a per-effect cancelled flag and timer cleanup. Use the data-testids named in PRD W6. Add Settings/__tests__/ColorThemeEditorPreview.test.tsx (mock lib/syntaxTheme, fake timers via vi.useFakeTimers and vi.advanceTimersByTimeAsync) and add its path to scripts/frontend-test-subset.txt."
+        },
+        "items": [
+          {
+            "id": "w6-editor-preview.ac1",
+            "title": "Rendering a theme with terminal.background '#000000' renders color-theme-preview-terminal with a background equal to that palette background (assert with toHaveStyle, or accept both '#000000' and 'rgb(0, 0, 0)' under happy-dom), and the red ANSI span's color equals the effective palette red",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-editor-preview.ac2",
+            "title": "Rendering a theme with ui.background '#123456' applies --background '#123456' to color-theme-preview-ui and preserves an empty --background on document.documentElement",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-editor-preview.ac3",
+            "title": "When the theme's syntax changes, the mocked highlight is not called before 150 ms of fake time and is called after vi.advanceTimersByTimeAsync(150)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w7-editor-form",
+        "title": "Editor form: color pickers, live preview and Save/Cancel",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T06:12:20Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4660",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/ColorThemeEditor.tsx",
+            "src/dashboard/frontend/src/components/Settings/__tests__/ColorThemeEditor.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Settings/__tests__/ColorThemeEditor.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ColorThemeEditor.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W7. Create src/dashboard/frontend/src/components/Settings/sections/ColorThemeEditor.tsx exporting ColorThemeEditor({ source, mode, existingNames, onDone }). Hold the draft in useState(createDraft(...)); render the name input and the Terminal (20), Interface (7) and Syntax (7) picker rows with the data-testids in PRD W7, 'Not set' text and a Revert button per PRD; pass useMemo(draftPreviewTheme(draft)) to ColorThemeEditorPreview. Save calls saveImported(draftToFile(draft)) in duplicate mode or updateTheme(source.id, draftToFile(draft)) in edit mode, toasts success and calls onDone; on failure it toasts the error and stays open. Cancel calls onDone with no request. Add Settings/__tests__/ColorThemeEditor.test.tsx with the PRD W7 tests and add its path to scripts/frontend-test-subset.txt."
+        },
+        "items": [
+          {
+            "id": "w7-editor-form.ac1",
+            "title": "Given a duplicate of overdeck-dark, the editor renders the name 'Overdeck Dark copy' and the terminal background picker value '#1a1a2e'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w7-editor-form.ac2",
+            "title": "When the terminal background picker changes to '#000000', color-theme-preview-terminal renders the new background and the strict fetch mock records zero requests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w7-editor-form.ac3",
+            "title": "Save in duplicate mode sends one POST /api/color-themes whose theme has name 'Overdeck Dark copy', type 'dark', terminal.background '#000000' and no id or builtin key, then a GET /api/color-themes, then calls onDone",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w7-editor-form.ac4",
+            "title": "Save in edit mode on user theme ayu-dark sends PUT /api/color-themes/ayu-dark; a 403 response shows toast.error and keeps color-theme-editor rendered",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w8-section-entry-points",
+        "title": "Settings > Appearance: theme list with Duplicate and edit and Edit buttons",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T06:12:20Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4660",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/ColorThemeSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/__tests__/ColorThemeSection.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Settings/__tests__/ColorThemeSection.test.tsx",
+            "npm run typecheck",
+            "npm run lint",
+            "grep -c -E 'uiTokenStyles.test.ts|colorThemeEditor.test.ts|ColorThemeEditorPreview.test.tsx|ColorThemeEditor.test.tsx' scripts/frontend-test-subset.txt"
+          ],
+          "expected_outputs": [
+            "ColorThemeSection.test.tsx passes with the existing and new tests",
+            "typecheck and lint complete without errors",
+            "the grep prints 4"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-5",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W8. In src/dashboard/frontend/src/components/Settings/sections/ColorThemeSection.tsx change the help text to the PRD W8 sentence, add an editing state, render the color-theme-list with one row per theme (name, type, 'Built-in' muted text, a 'Duplicate and edit' button on every row, an 'Edit' button only on non-built-in rows; all disabled while an editor is open), and render ColorThemeEditor under the list when editing is set, keyed by mode and source id, with existingNames from all theme names and onDone clearing the state. Extend ColorThemeSection.test.tsx with the PRD W8 tests while keeping the three existing tests passing. Finally confirm scripts/frontend-test-subset.txt lists the four new frontend test files from w3, w5, w6 and w7 (add any missing line in sorted position)."
+        },
+        "items": [
+          {
+            "id": "w8-section-entry-points.ac1",
+            "title": "ColorThemeSection renders color-theme-row-<id> for every theme; color-theme-edit-overdeck-dark and color-theme-edit-overdeck-light are absent while color-theme-edit-ayu-dark is present",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w8-section-entry-points.ac2",
+            "title": "Clicking color-theme-duplicate-overdeck-dark opens color-theme-editor with the name field 'Overdeck Dark copy'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w8-section-entry-points.ac3",
+            "title": "Given the POST succeeds and the refetch lists overdeck-dark-copy, when the duplicate is saved, then the color-theme-dark select contains an option overdeck-dark-copy and color-theme-editor is no longer rendered",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w8-section-entry-points.ac4",
+            "title": "scripts/frontend-test-subset.txt contains all four lines src/lib/__tests__/uiTokenStyles.test.ts, src/lib/__tests__/colorThemeEditor.test.ts, src/components/Settings/__tests__/ColorThemeEditorPreview.test.tsx and src/components/Settings/__tests__/ColorThemeEditor.test.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w8-section-entry-points.ac5",
+            "title": "In an isolated Playwright browser profile against a dashboard with a throwaway OVERDECK_HOME, Duplicate and edit on Overdeck Dark, changing Terminal background, and Save creates <OVERDECK_HOME>/themes/overdeck-dark-copy.json, which survives a dashboard restart and is still selectable in the Dark mode picker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w9-docs",
+        "title": "Docs: appearance.mdx Editing a theme section and architecture route list",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T06:12:20Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4660",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/appearance.mdx",
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'until then, edit the JSON file by hand' configuration/appearance.mdx || true",
+            "grep -n '### Editing a theme' configuration/appearance.mdx",
+            "grep -n 'PUT /api/color-themes/:id' docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "the first grep prints 0",
+            "the second grep prints one line",
+            "the third grep prints one line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W9. In configuration/appearance.mdx replace the '#4660 … until then, edit the JSON file by hand' clause at line 97 with a pointer to a new '### Editing a theme' subsection, and add that subsection after 'Importing a VS Code theme' covering every point listed in PRD W9 step 2 (theme list, the editor being an inline panel in the Appearance section by design, Duplicate and edit naming, Edit on user themes only, read-only built-ins, the exact editable keys and scope strings, Not set semantics, live preview, re-apply on save, no auto-select, no alpha editing, existing tmux sessions). In docs/DASHBOARD-ARCHITECTURE.md change 'Four routes' to 'Five routes' and list PUT /api/color-themes/:id."
+        },
+        "items": [
+          {
+            "id": "w9-docs.ac1",
+            "title": "configuration/appearance.mdx contains no 'until then, edit the JSON file by hand' text and contains one '### Editing a theme' heading",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w9-docs.ac2",
+            "title": "The Editing a theme section states that built-in themes are read-only, that a copy is named '<name> copy', that Edit saves in place keeping the id, and lists the scope strings entity.name.function, constant.numeric and entity.name.type",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w9-docs.ac3",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md says 'Five routes' and contains 'PUT /api/color-themes/:id'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "w1-store-update",
+        "to": "w2-route-put",
+        "type": "blocks"
+      },
+      {
+        "from": "w3-ui-token-styles",
+        "to": "w4-update-theme-action",
+        "type": "blocks"
+      },
+      {
+        "from": "w3-ui-token-styles",
+        "to": "w6-editor-preview",
+        "type": "blocks"
+      },
+      {
+        "from": "w4-update-theme-action",
+        "to": "w7-editor-form",
+        "type": "blocks"
+      },
+      {
+        "from": "w5-editor-model",
+        "to": "w7-editor-form",
+        "type": "blocks"
+      },
+      {
+        "from": "w6-editor-preview",
+        "to": "w7-editor-form",
+        "type": "blocks"
+      },
+      {
+        "from": "w7-editor-form",
+        "to": "w8-section-entry-points",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

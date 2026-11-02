@@ -1384,6 +1384,18 @@ export const ConversationPullRequestsChangedEvent = Schema.Struct({
 })
 export type ConversationPullRequestsChangedEvent = typeof ConversationPullRequestsChangedEvent.Type
 
+/** Emitted (in-memory only) when a conversation's schedules change (PAN-4657), so the
+ * list and the schedule dialog refresh the next-run badge. */
+export const ConversationSchedulesChangedEvent = Schema.Struct({
+  type: Schema.Literal("conversation.schedules_changed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    conversationName: Schema.String,
+  }),
+})
+export type ConversationSchedulesChangedEvent = typeof ConversationSchedulesChangedEvent.Type
+
 /** Emitted (in-memory only) when a PermissionRequest hook fires or resolves for a conversation. */
 export const ConversationPermissionChangedEvent = Schema.Struct({
   type: Schema.Literal("conversation.permission_changed"),
@@ -1634,6 +1646,7 @@ export const DomainEvent = Schema.Union([
   ConversationMovedEvent,
   ConversationTitleChangedEvent,
   ConversationPullRequestsChangedEvent,
+  ConversationSchedulesChangedEvent,
   ConversationPermissionChangedEvent,
   ScanStartedEvent,
   ScanProgressEvent,

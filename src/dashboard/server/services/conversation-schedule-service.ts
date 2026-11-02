@@ -24,6 +24,7 @@
  */
 import {
   claimScheduleRun,
+  emitConversationSchedulesChanged,
   listDueSchedules,
   recordScheduleRunOutcome,
   type DueSchedule,
@@ -33,8 +34,10 @@ import { nextRunAfter } from '../../../lib/overdeck/conversation-schedule-recurr
 import { getConversationByName, type LegacyConversation } from '../../../lib/overdeck/conversations.js';
 import { isSupersededConversation, resolveClearChainHead } from '../../../lib/overdeck/conversation-clear-chain.js';
 import { conversationHarnessAlive } from '../../../lib/overdeck/conversation-liveness.js';
+import { invalidateConversationListEnrichmentCache } from '../../../lib/overdeck/conversation-list.js';
 import { handleConversationResume } from '../../../lib/overdeck/conversation-runtime.js';
 import { handleConversationMessage } from '../../../lib/overdeck/conversation-message.js';
+import { clearConversationTriage } from '../../../lib/overdeck/conversation-triage-store.js';
 import { isPiControlChannelHarness } from '../../../lib/overdeck/conversation-delivery.js';
 import { resolveSessionFile } from '../../../lib/overdeck/conversation-reads.js';
 
@@ -43,7 +46,7 @@ const LOG_PREFIX = '[schedules]';
 export const SCHEDULE_SWEEP_BOOT_DELAY_MS = 30_000;
 export const SCHEDULE_SWEEP_INTERVAL_MS = 60_000;
 
-export type FireOutcome = { ok: true } | { ok: false; error: string };
+export type FireOutcome = { ok: true; conversationName: string } | { ok: false; error: string };
 
 export interface ScheduleSweepDeps {
   now: () => number;
@@ -52,6 +55,10 @@ export interface ScheduleSweepDeps {
   record: (id: number, status: ScheduleRunStatus, error: string | null) => void;
   nextRunAfter: (cron: string, timeZone: string, after: Date) => Date | null;
   fire: (schedule: DueSchedule) => Promise<FireOutcome>;
+  /** PAN-4657: clears settle/snooze on the delivered-to conversation so it resurfaces in the inbox. */
+  clearTriage: (name: string) => boolean;
+  /** PAN-4657: tells the dashboard a conversation's schedule state (or its triage) changed. */
+  onChanged: (name: string) => void;
 }
 
 type HandlerResponse = { status: number; body: unknown };
@@ -77,6 +84,11 @@ const defaultSweepDeps: ScheduleSweepDeps = {
   record: recordScheduleRunOutcome,
   nextRunAfter,
   fire: (schedule) => fireScheduledPrompt(schedule),
+  clearTriage: clearConversationTriage,
+  onChanged: (name) => {
+    invalidateConversationListEnrichmentCache();
+    emitConversationSchedulesChanged(name);
+  },
 };
 
 function errorMessage(error: unknown): string {
@@ -119,7 +131,7 @@ export async function fireScheduledPrompt(schedule: DueSchedule, deps: FireDeps 
     message: scheduledPromptText(schedule),
     ...(isPiControlChannelHarness(conv.harness ?? 'claude-code') ? { deliverAs: 'follow_up' } : {}),
   });
-  if (isSuccess(delivered.status)) return { ok: true };
+  if (isSuccess(delivered.status)) return { ok: true, conversationName: conv.name };
   return { ok: false, error: responseError(delivered) ?? `HTTP ${delivered.status}` };
 }
 
@@ -128,10 +140,12 @@ export async function runScheduleSweepOnce(
   deps: ScheduleSweepDeps = defaultSweepDeps,
 ): Promise<{ fired: number; failed: number; skipped: number }> {
   const counts = { fired: 0, failed: 0, skipped: 0 };
+  const changedNames = new Set<string>();
   for (const schedule of deps.listDue(deps.now())) {
     const at = deps.now();
     const next = deps.nextRunAfter(schedule.cron, schedule.timeZone, new Date(at));
     if (!deps.claim(schedule.id, schedule.nextRunAt, next?.getTime() ?? null, at)) continue;
+    changedNames.add(schedule.conversationName);
     if (schedule.archived) {
       deps.record(schedule.id, 'skipped', 'conversation archived');
       counts.skipped++;
@@ -146,12 +160,19 @@ export async function runScheduleSweepOnce(
     if (outcome.ok) {
       deps.record(schedule.id, 'delivered', null);
       counts.fired++;
+      changedNames.add(outcome.conversationName);
+      try {
+        deps.clearTriage(outcome.conversationName);
+      } catch (error) {
+        console.warn(`${LOG_PREFIX} clearTriage failed for ${outcome.conversationName}: ${errorMessage(error)}`);
+      }
     } else {
       deps.record(schedule.id, 'failed', outcome.error);
       counts.failed++;
       console.warn(`${LOG_PREFIX} schedule ${schedule.id} on ${schedule.conversationName} failed: ${outcome.error}`);
     }
   }
+  for (const name of changedNames) deps.onChanged(name);
   return counts;
 }
 

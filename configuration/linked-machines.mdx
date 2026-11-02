@@ -148,7 +148,10 @@ Fly machines use the same `[remote]` and `[remote.fly]` settings as remote work 
 
 - `remote.enabled = true` in `~/.overdeck/config.toml`.
 - A Fly token: `fly auth login`, or `FLY_API_TOKEN` (or the variable that
-  `[remote.fly] api_token_env` names).
+  `[remote.fly] api_token_env` names). `fly auth login`'s stored login works, but Overdeck
+  only refreshes it through `flyctl` after a rejected request (PAN-4748), so a host where
+  nobody runs `fly` interactively should export a long-lived token instead:
+  `fly tokens create deploy -a <app>` into `FLY_API_TOKEN`.
 - Once per Fly app, give it public IPs, because `https://<app>.fly.dev` needs them and the
   Machines API cannot allocate them:
 
@@ -569,5 +572,9 @@ connections.
   Update the Codex CLI here to a published version, then try again.
 - **`add-fly --harness codex` fails with `credentials-failed`**: this machine has no
   Codex CLI or no valid Codex sign-in. Run `codex login` here, then try again.
+- **`Fly token rejected (403)`**: check `pan doctor`'s `Fly token` row for the origin and
+  status, then `fly auth login` to refresh the stored login, or set `FLY_API_TOKEN` (or
+  the variable `[remote.fly] api_token_env` names) to a long-lived token from
+  `fly tokens create deploy -a <app>` (PAN-4748).
 - The link exists but `require_token_mint` turned itself on: that is expected. Any remote
   access turns it on; see [Remote access](/configuration/remote-access#local-reverse-proxies-require_token_mint).

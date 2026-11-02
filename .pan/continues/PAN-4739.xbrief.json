@@ -1,0 +1,85 @@
+{
+  "version": "1",
+  "issueId": "PAN-4739",
+  "created": "2026-11-02T06:14:09.782Z",
+  "updated": "2026-11-02T06:44:08.008Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "patrol-door-confirm": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4739",
+      "claimedAt": "2026-11-02T06:14:09.782Z",
+      "doneAt": "2026-11-02T06:16:59.667Z"
+    },
+    "list-repair-door-test": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4739",
+      "claimedAt": "2026-11-02T06:17:05.510Z",
+      "doneAt": "2026-11-02T06:20:40.574Z"
+    },
+    "repro-checkpoint": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4739",
+      "claimedAt": "2026-11-02T06:20:47.662Z",
+      "doneAt": "2026-11-02T06:32:11.592Z"
+    },
+    "docs-liveness-confirm": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4739",
+      "claimedAt": "2026-11-02T06:32:28.059Z",
+      "doneAt": "2026-11-02T06:32:56.094Z"
+    },
+    "patrol-door-confirm.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:41:04.566Z"
+    },
+    "patrol-door-confirm.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:41:20.612Z"
+    },
+    "patrol-door-confirm.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:41:35.631Z"
+    },
+    "patrol-door-confirm.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:41:52.028Z"
+    },
+    "patrol-door-confirm.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:42:08.692Z"
+    },
+    "list-repair-door-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:42:25.585Z"
+    },
+    "list-repair-door-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:42:43.817Z"
+    },
+    "repro-checkpoint.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:43:01.068Z"
+    },
+    "repro-checkpoint.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:43:18.565Z"
+    },
+    "repro-checkpoint.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:43:35.497Z"
+    },
+    "docs-liveness-confirm.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:43:51.887Z"
+    },
+    "docs-liveness-confirm.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:44:08.008Z"
+    }
+  }
+}

@@ -338,9 +338,12 @@ OpenAI replaces the refresh token on every refresh, so two copies of one sign-in
 both stay valid. The Codex sign-in is therefore not copied one way like Claude's: the
 `syncFlyCodexAuth` loop (below) keeps home and each VM in step by newest refresh wins.
 
-Claude Code is also configured for autonomous operation: `~/.claude/settings.json` is
-written from your resolved Overdeck permission mode and onboarding is marked complete
-in `~/.claude.json`.
+Claude Code is configured for autonomous operation: `~/.claude/settings.json` is written
+from your resolved Overdeck permission mode, and `~/.claude.json` marks onboarding
+complete, trusts `/workspace`, accepts the Bypass Permissions disclaimer, and dismisses
+the one-shot "Make auto mode your default permission mode?" dialog
+(`hasSeenAutoDefaultNudge`), which otherwise took focus on every fresh VM and swallowed
+the first message (PAN-4738).
 
 If Claude auth fails on the remote agent, re-authenticate locally (`claude`) then sync:
 
@@ -370,6 +373,10 @@ With no Fly machine record, none calls the Fly API.
 | `heartbeatFlyMachines` | every 60 s | Writes `/workspace/.pan/host-heartbeat` on every Fly machine, so its watchdog keeps it running while home is up. A failed exec is reported as a failure, never as refreshed. | keeps running |
 | `syncFlyCodexAuth` | every 60 s | For each linked Fly machine whose record has a `codexAuthPath`, reads the VM's Codex `auth.json` and decides by newest refresh wins: copies a newer same-account VM refresh home (atomic write), otherwise copies home's sign-in to the VM when the two differ. A VM that does not answer is skipped until the next tick. With no such record it makes no Fly API call. | keeps running |
 | `sweepFlyMachines` | every 60 s | Destroys the machine, removes its link and deletes its record when the Fly API reports it `stopped`, `destroyed` or `failed` or answers 404; when no unreleased linked conversation on it has been active for `[remote.fly] machine_idle_minutes` (default 30, 0 disables); or when provisioning never linked it within 30 min. Any other API error leaves it alone. | keeps running |
+
+A rejected Fly token (PAN-4748) shows as `Fly token rejected (<status>)` in each loop's
+line instead of a raw API error; `sweepFlyMachines` keeps the record rather than
+destroying it on one.
 
 The heartbeat and credential refresh run in `src/lib/cloister/hygiene-scheduler.ts`;
 the reap runs last in `runDeaconLite()` through `src/lib/cloister/remote-reap-routine.ts`.
@@ -422,8 +429,26 @@ throws `Fly API token not found`.
 **Fix:**
 1. Verify the token is exported: `echo $FLY_API_TOKEN`
 2. Check token validity: <https://fly.io/user/personal_access_tokens>
-3. Alternatively, authenticate via CLI: `fly auth login` — the provider falls back to
-   the CLI session when no `FLY_API_TOKEN` is set.
+3. Alternatively, authenticate via CLI: `fly auth login` — the provider reads flyctl's
+   stored login (`~/.fly/config.yml`) when no `FLY_API_TOKEN` (or the variable
+   `remote.fly.api_token_env` names) is set.
+
+**Fly token rejected (403)**
+
+Overdeck uses flyctl's stored login when no `FLY_API_TOKEN` is set. That token expires
+quickly, and flyctl refreshes it only when flyctl itself runs. Overdeck now runs `flyctl
+auth token` once after a 401/403 and retries the same request with the refreshed token
+(PAN-4748). If that refresh also fails — flyctl is not installed, or the stored login is
+older than 30 days — every operator-facing surface (the deacon loop lines, `pan machines
+add-fly`/`unlink` errors, and `pan doctor`) says `Fly token rejected`.
+
+**Fix:** run `fly auth login` to refresh the stored login. For a host where nobody runs
+`fly` interactively (a server, a CI runner), mint a long-lived token instead and export it
+as `FLY_API_TOKEN` (for example in `~/.overdeck.env`):
+
+```bash
+fly tokens create deploy -a <app> --expiry <duration>
+```
 
 ---
 
@@ -561,17 +586,40 @@ deleted the record and left `fly machines list -a pan-workspaces` empty (O4).
 Recorded, not fixed here:
 
 - The first message of a new conversation was lost to Claude Code's "Make auto mode your
-  default permission mode?" startup dialog
+  default permission mode?" startup dialog — fixed by PAN-4738: the VM pre-answers the
+  dialog, and the readiness wait no longer takes the dialog for the composer
   ([#4738](https://github.com/eltmon/overdeck/issues/4738)).
-- The VM's conversation-lifecycle patrol marks the live conversation ended on every tick,
-  which can make the idle sweep see a working machine as idle
-  ([#4739](https://github.com/eltmon/overdeck/issues/4739)).
+- The VM's conversation-lifecycle patrol and the conversation list disagreed about a live
+  conversation, so its row flapped between `ended` and `active` and the idle sweep could
+  see a working machine as idle
+  ([#4739](https://github.com/eltmon/overdeck/issues/4739)). Fixed by PAN-4739: the
+  census now reads tmux as a UTF-8 client (see "Reproduction (PAN-4739)" below), and the
+  patrol confirms through `conversationHarnessAlive` before it ends a conversation, so
+  the patrol and the list route can no longer flap the row. A census verdict the door
+  contradicts logs one `WARNING (PAN-4739)` line in `fly-serve.log`.
 - The first linked request after an idle spell failed with `socket hang up`; an
   immediate retry succeeded ([#4740](https://github.com/eltmon/overdeck/issues/4740)).
 - The VM advertises its private Fly addresses as `lan` routes, which home tries before
   the public route ([#4741](https://github.com/eltmon/overdeck/issues/4741)).
 - A test that pulls a conversation must not register the workspace being tested as the
   project's checkout: **Pull here** restores the conversation's code into that checkout.
+
+**Reproduction (PAN-4739).** Cause found and fixed in `src/lib/tmux.ts` (the decision
+rule's first branch). Run 1's image (`registry.fly.io/pan-workspaces:pan-4652`, pan
+0.72.0, tmux 3.4) ran in a local container with `pan serve` started as provisioning
+starts it (`HOME=/`, `setsid nohup`, `OVERDECK_TERMINAL_BACKEND=tmux IS_SANDBOX=1`).
+The server process had no `LANG` or `LC_*` variable, and without a UTF-8 locale tmux
+prints every tab in `-F` output as `_`: the census's `list-panes -a` returned
+`conv-20261102-2889_565_0_` where it should return tab-separated fields. The parser
+read no pane id from that line and dropped it, so the census held no session, and the
+patrol logged `Session conv-20261102-2889 gone — marking ended` 30 s after the spawn
+while `tmux ls` listed the session. `list-sessions -F '#{session_name}'` has no tab,
+so the list route still saw the session and set the row back to `active` on the next
+`GET /api/conversations`. The pane readers that parse tab-separated records
+(`listAllPaneRecords`, `listPaneValues`, `listPaneValuesSync`) now pass `-u`, which
+makes tmux write UTF-8 output whatever the locale. With that change patched into the
+same container, a row marked ended under a live harness was set back to `active` by
+the patrol's own census on the next tick, and no `gone` line appeared.
 
 
 ## Live verification (PAN-4296)

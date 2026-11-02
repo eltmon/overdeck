@@ -76,7 +76,7 @@ Any color the theme omits falls back to the matching built-in of the same `type`
 
 ### Importing a VS Code theme
 
-Choose **Import VS Code theme** next to the pickers and pick a `.json` theme file (JSON-with-comments is fine — VS Code theme files commonly carry comments). Overdeck maps it onto the shape above and shows a preview — name, swatches, and a highlighted code sample — before anything is saved:
+Choose **Import VS Code theme** next to the pickers and pick a `.json` theme file or a `.vsix` extension package (JSON-with-comments is fine — VS Code theme files commonly carry comments). Overdeck maps it onto the shape above and shows a preview — name, swatches, and a highlighted code sample — before anything is saved:
 
 | VS Code key | Theme field |
 | --- | --- |
@@ -94,9 +94,33 @@ Choose **Import VS Code theme** next to the pickers and pick a `.json` theme fil
 | `descriptionForeground` | `ui.muted` |
 | `focusBorder` | `ui.accent` |
 
-A theme with no `type` field is classified by the luminance of `editor.background`; a theme with neither a `type` field nor an `editor.background` color defaults to `dark`, with a warning. Importing a `.vsix` extension package is tracked separately (#4659); a duplicate-and-edit color-picker editor for themes already in the store is tracked separately too (#4660) — until then, edit the JSON file by hand.
+A theme with no `type` field is classified by the luminance of `editor.background`; a theme with neither a `type` field nor an `editor.background` color defaults to `dark`, with a warning. To change a theme's colors, see *Editing a theme* below.
 
 A theme without `ui.overlay` but with `ui.background` still gets a dialog surface: Overdeck derives one by mixing `ui.background` toward white for a light theme, or toward the foreground for a dark theme.
+
+#### Importing a .vsix package
+
+A `.vsix` file is the package VS Code installs an extension from, and one package often holds several themes, such as a light and a dark variant. When you pick a `.vsix`, Overdeck reads it in memory and previews every theme listed under `contributes.themes` in the extension's `package.json`. **Save** saves all of them together, and each one appears in the picker that matches its type.
+
+Each theme's `uiTheme` sets its type: `vs` and `hc-light` become light themes, and `vs-dark` and `hc-black` become dark themes. A theme with no `uiTheme` keeps the classification described above, with a warning. Theme names come from the package's labels, including translated labels from `package.nls.json`, and fall back to the theme file's `name`.
+
+A theme file that uses `include` to build on a shared base file gets the base file's colors underneath its own, and the base file's token rules come before its own, as in VS Code. Overdeck follows up to 5 levels of `include` and refuses an include cycle. A `tokenColors` value that points to a `.tmTheme` file is skipped with a warning, so that theme imports without those syntax rules; a theme whose file is itself a `.tmTheme` is skipped with a warning.
+
+The limits are 10 MB for the archive, 2 MB for each theme file, and 20 themes per package. A theme that breaks a per-theme rule, such as a missing file or a file over 2 MB, is left out with a warning that names it, and the other themes still import. Overdeck refuses the whole package with a message, and saves nothing, when the archive is ZIP64, encrypted, or contains an absolute or `..` entry path, or when it has no `extension/package.json` or no themes.
+
+### Editing a theme
+
+The theme list under the pickers shows every theme, built-in and user. The editor is an inline panel in the Appearance section by design, matching how imports already preview inline — Overdeck is moving *new* creation flows to pages (see "Creation flows are pages, not modals" below), but an inline editor for an existing settings list doesn't contradict that.
+
+**Duplicate and edit**, on every theme, opens the editor seeded with that theme's colors and the name `"<name> copy"` (then `"<name> copy 2"`, …). Saving creates a new file with a new id; the original theme is never changed. **Edit** exists only on user themes — built-in themes are read-only, since they live in code, not on disk — and saves in place, keeping the same id and file.
+
+The editor has three groups of color pickers:
+
+- **Terminal** — 20 of the 21 terminal keys: `background`, `foreground`, `cursor`, `selectionBackground`, and the 16 ANSI colors (`black` … `brightWhite`). `cursorAccent` is not editable.
+- **Interface** — the seven `ui` keys: `background`, `surface`, `overlay`, `border`, `foreground`, `muted`, `accent`.
+- **Syntax** — the foreground of seven common scopes: Comment (`comment`), String (`string`), Keyword (`keyword`), Function (`entity.name.function`), Variable (`variable`), Number (`constant.numeric`), and Type (`entity.name.type`).
+
+A picker showing "Not set" means that key inherits the dashboard defaults and is written only once you change it. The preview updates as you pick colors, and nothing is saved until you press Save. Saving the currently selected theme re-applies its terminal, syntax, and UI colors immediately, with no reload. A newly saved duplicate is not selected automatically — pick it from the light/dark dropdown above. Alpha channels can't be edited: an untouched color (including one with an alpha channel) keeps its original value exactly. If you have the theme's terminal open in an existing tmux session, that session keeps its old background until it restarts.
 
 ### What color themes never change
 
