@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4774",
   "created": "2026-11-02T21:00:13.410Z",
-  "updated": "2026-11-02T21:04:02.866Z",
+  "updated": "2026-11-02T21:06:01.076Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-11-02T21:03:56.111Z"
     },
     "ac1-fake-claude": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4774",
-      "claimedAt": "2026-11-02T21:04:02.866Z"
+      "claimedAt": "2026-11-02T21:04:02.866Z",
+      "doneAt": "2026-11-02T21:06:01.076Z"
     }
   }
 }
