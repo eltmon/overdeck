@@ -75,10 +75,11 @@ export function settleConversation(name: string, reason: SettleReason = 'manual'
   return result.changes > 0;
 }
 
-export function unsettleConversation(name: string): boolean {
+/** Clears the settle and restarts the idle clock (PAN-4655 D3). */
+export function unsettleConversation(name: string, nowMs: number = Date.now()): boolean {
   const result = getOverdeckDatabase()
-    .prepare('UPDATE conversations SET settled_at = NULL, settle_reason = NULL WHERE name = ?')
-    .run(name);
+    .prepare('UPDATE conversations SET settled_at = NULL, settle_reason = NULL, idle_reset_at = ? WHERE name = ?')
+    .run(nowMs, name);
   return result.changes > 0;
 }
 
@@ -89,8 +90,47 @@ export function snoozeConversation(name: string, untilMs: number): boolean {
   return result.changes > 0;
 }
 
-export function unsnoozeConversation(name: string): boolean {
-  const result = getOverdeckDatabase().prepare('UPDATE conversations SET snoozed_until = NULL WHERE name = ?').run(name);
+/** Clears the snooze and restarts the idle clock (PAN-4655 D3). */
+export function unsnoozeConversation(name: string, nowMs: number = Date.now()): boolean {
+  const result = getOverdeckDatabase()
+    .prepare('UPDATE conversations SET snoozed_until = NULL, idle_reset_at = ? WHERE name = ?')
+    .run(nowMs, name);
+  return result.changes > 0;
+}
+
+export interface IdleClock {
+  settledAtMs: number | null;
+  snoozedUntilMs: number | null;
+  idleResetAtMs: number | null;
+}
+
+/** PAN-4655: idle-clock inputs for every unarchived conversation, one query. */
+export function listIdleClocks(): Map<string, IdleClock> {
+  const rows = getOverdeckDatabase()
+    .prepare('SELECT name, settled_at, snoozed_until, idle_reset_at FROM conversations WHERE archived_at IS NULL')
+    .all<{ name: string; settled_at: number | null; snoozed_until: number | null; idle_reset_at: number | null }>();
+  const byName = new Map<string, IdleClock>();
+  for (const row of rows) {
+    byName.set(row.name, {
+      settledAtMs: row.settled_at,
+      snoozedUntilMs: row.snoozed_until,
+      idleResetAtMs: row.idle_reset_at,
+    });
+  }
+  return byName;
+}
+
+/** PAN-4655 D7: settle as 'idle' only if nothing the operator did since cutoffMs says otherwise. */
+export function settleIdleConversation(name: string, cutoffMs: number, nowMs: number = Date.now()): boolean {
+  const result = getOverdeckDatabase()
+    .prepare(
+      `UPDATE conversations
+       SET settled_at = ?, settle_reason = 'idle', snoozed_until = NULL
+       WHERE name = ? AND archived_at IS NULL AND settled_at IS NULL
+         AND (snoozed_until IS NULL OR snoozed_until <= ?)
+         AND (idle_reset_at IS NULL OR idle_reset_at <= ?)`,
+    )
+    .run(nowMs, name, cutoffMs, cutoffMs);
   return result.changes > 0;
 }
 
@@ -150,7 +190,7 @@ export function applyTriageUpdate(update: TriageUpdate, nowMs: number = Date.now
   if (update.snoozedUntil !== undefined) {
     const result =
       update.snoozedUntil === null
-        ? unsnoozeConversation(update.name)
+        ? unsnoozeConversation(update.name, nowMs)
         : snoozeConversation(update.name, Date.parse(update.snoozedUntil));
     touched = touched || result;
   }
@@ -158,7 +198,7 @@ export function applyTriageUpdate(update: TriageUpdate, nowMs: number = Date.now
   if (update.settled !== undefined) {
     const result = update.settled
       ? settleConversation(update.name, update.settleReason ?? 'manual', nowMs)
-      : unsettleConversation(update.name);
+      : unsettleConversation(update.name, nowMs);
     touched = touched || result;
   }
 

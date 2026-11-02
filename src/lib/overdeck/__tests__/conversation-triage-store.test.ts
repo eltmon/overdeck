@@ -235,4 +235,138 @@ describe('conversation triage store', () => {
       expect(applyTriageUpdate({ name: 'does-not-exist', settled: true })).toBeNull();
     });
   });
+
+  describe('idle clock (PAN-4655)', () => {
+    const DAY = 86_400_000;
+    const NOW = 100 * DAY;
+    const CUTOFF = NOW - 3 * DAY;
+
+    async function create(name: string) {
+      const { createConversation } = await import('../conversations.js');
+      createConversation({ name, tmuxSession: name, cwd: testHome, harness: 'claude-code' });
+    }
+
+    async function idleResetAt(name: string): Promise<number | null> {
+      const { getOverdeckDatabase } = await import('../infra.js');
+      return (
+        getOverdeckDatabase()
+          .prepare('SELECT idle_reset_at FROM conversations WHERE name = ?')
+          .get<{ idle_reset_at: number | null }>(name)?.idle_reset_at ?? null
+      );
+    }
+
+    async function setColumn(name: string, column: string, value: number) {
+      const { getOverdeckDatabase } = await import('../infra.js');
+      getOverdeckDatabase().prepare(`UPDATE conversations SET ${column} = ? WHERE name = ?`).run(value, name);
+    }
+
+    it('PRAGMA table_info reports idle_reset_at', async () => {
+      const { getOverdeckDatabase } = await import('../infra.js');
+      const columns = getOverdeckDatabase()
+        .prepare('PRAGMA table_info(conversations)')
+        .all<{ name: string }>()
+        .map((c) => c.name);
+      expect(columns).toContain('idle_reset_at');
+    });
+
+    it('unsettle stores the request time as idle_reset_at', async () => {
+      const { unsettleConversation } = await import('../conversation-triage-store.js');
+      await create('idle-a');
+      expect(unsettleConversation('idle-a', 5_000)).toBe(true);
+      expect(await idleResetAt('idle-a')).toBe(5_000);
+    });
+
+    it('applyTriageUpdate unsnooze stores the request time as idle_reset_at', async () => {
+      const { applyTriageUpdate, snoozeConversation } = await import('../conversation-triage-store.js');
+      await create('idle-b');
+      snoozeConversation('idle-b', 1_000_000);
+      expect(applyTriageUpdate({ name: 'idle-b', snoozedUntil: null }, 7_000)?.snoozedUntil).toBeNull();
+      expect(await idleResetAt('idle-b')).toBe(7_000);
+    });
+
+    it('applyTriageUpdate unsettle stores the request time as idle_reset_at', async () => {
+      const { applyTriageUpdate, settleConversation } = await import('../conversation-triage-store.js');
+      await create('idle-c');
+      settleConversation('idle-c', 'manual', 1_000);
+      applyTriageUpdate({ name: 'idle-c', settled: false }, 9_000);
+      expect(await idleResetAt('idle-c')).toBe(9_000);
+    });
+
+    it('settleIdleConversation settles a clean row with reason idle', async () => {
+      const { settleIdleConversation, getConversationTriage } = await import('../conversation-triage-store.js');
+      await create('idle-d');
+      expect(settleIdleConversation('idle-d', CUTOFF, NOW)).toBe(true);
+      const triage = getConversationTriage('idle-d');
+      expect(triage?.settleReason).toBe('idle');
+      expect(triage?.settledAt).toBe(new Date(NOW).toISOString());
+    });
+
+    it('settleIdleConversation settles a row whose reset and snooze ended at or before the cutoff', async () => {
+      const { settleIdleConversation, getConversationTriage } = await import('../conversation-triage-store.js');
+      await create('idle-e');
+      await setColumn('idle-e', 'idle_reset_at', CUTOFF);
+      await setColumn('idle-e', 'snoozed_until', CUTOFF - DAY);
+      expect(settleIdleConversation('idle-e', CUTOFF, NOW)).toBe(true);
+      const triage = getConversationTriage('idle-e');
+      expect(triage?.settleReason).toBe('idle');
+      expect(triage?.snoozedUntil).toBeNull();
+    });
+
+    it('settleIdleConversation leaves an already settled row unchanged', async () => {
+      const { settleConversation, settleIdleConversation, getConversationTriage } = await import(
+        '../conversation-triage-store.js'
+      );
+      await create('idle-f');
+      settleConversation('idle-f', 'manual', 1_000);
+      expect(settleIdleConversation('idle-f', CUTOFF, NOW)).toBe(false);
+      const triage = getConversationTriage('idle-f');
+      expect(triage?.settleReason).toBe('manual');
+      expect(triage?.settledAt).toBe(new Date(1_000).toISOString());
+    });
+
+    it('settleIdleConversation skips a row reset after the cutoff', async () => {
+      const { settleIdleConversation, getConversationTriage, EMPTY_CONVERSATION_TRIAGE } = await import(
+        '../conversation-triage-store.js'
+      );
+      await create('idle-g');
+      await setColumn('idle-g', 'idle_reset_at', CUTOFF + 1);
+      expect(settleIdleConversation('idle-g', CUTOFF, NOW)).toBe(false);
+      expect(getConversationTriage('idle-g')).toEqual(EMPTY_CONVERSATION_TRIAGE);
+    });
+
+    it('settleIdleConversation skips a row snoozed past the cutoff', async () => {
+      const { settleIdleConversation, getConversationTriage } = await import('../conversation-triage-store.js');
+      await create('idle-h');
+      await setColumn('idle-h', 'snoozed_until', CUTOFF + 1);
+      expect(settleIdleConversation('idle-h', CUTOFF, NOW)).toBe(false);
+      const triage = getConversationTriage('idle-h');
+      expect(triage?.settledAt).toBeNull();
+      expect(triage?.snoozedUntil).toBe(new Date(CUTOFF + 1).toISOString());
+    });
+
+    it('settleIdleConversation skips an archived row', async () => {
+      const { settleIdleConversation, getConversationTriage, EMPTY_CONVERSATION_TRIAGE } = await import(
+        '../conversation-triage-store.js'
+      );
+      await create('idle-i');
+      await setColumn('idle-i', 'archived_at', NOW - DAY);
+      expect(settleIdleConversation('idle-i', CUTOFF, NOW)).toBe(false);
+      expect(getConversationTriage('idle-i')).toEqual(EMPTY_CONVERSATION_TRIAGE);
+    });
+
+    it('listIdleClocks returns unarchived rows with their clock columns and omits archived rows', async () => {
+      const { listIdleClocks, settleConversation } = await import('../conversation-triage-store.js');
+      await create('idle-j');
+      await create('idle-k');
+      await create('idle-l');
+      settleConversation('idle-j', 'manual', 1_000);
+      await setColumn('idle-k', 'snoozed_until', 2_000);
+      await setColumn('idle-k', 'idle_reset_at', 3_000);
+      await setColumn('idle-l', 'archived_at', NOW);
+      const clocks = listIdleClocks();
+      expect(clocks.get('idle-j')).toEqual({ settledAtMs: 1_000, snoozedUntilMs: null, idleResetAtMs: null });
+      expect(clocks.get('idle-k')).toEqual({ settledAtMs: null, snoozedUntilMs: 2_000, idleResetAtMs: 3_000 });
+      expect(clocks.has('idle-l')).toBe(false);
+    });
+  });
 });
