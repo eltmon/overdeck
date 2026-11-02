@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4743",
   "created": "2026-11-02T12:52:57.022Z",
-  "updated": "2026-11-02T13:22:24.972Z",
+  "updated": "2026-11-02T13:22:30.704Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-4743",
       "claimedAt": "2026-11-02T13:05:22.698Z",
       "doneAt": "2026-11-02T13:22:24.971Z"
+    },
+    "auto-fly-config": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4743",
+      "claimedAt": "2026-11-02T13:22:30.704Z"
     }
   }
 }
