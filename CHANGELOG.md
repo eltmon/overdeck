@@ -22,6 +22,12 @@ The public, per-release changelog is [`changelog.mdx`](changelog.mdx). Session V
 - `pan skills pack browser gstack` (or `pan skills pack add gstack … --browser`) builds gstack's browser, design and PDF runtime after a second consent that lists the exact command, each direct npm dependency, a summary line for their locked dependencies and one for the Playwright browsers, and every path the build writes; nine browser skills (qa, qa-only, browse, make-pdf and more) then mount with the pack toggle and nine more (ship, land-and-deploy, the design skills) with a per-skill `on`. The runtime itself stays under `~/.overdeck/packs/gstack/` and `pan skills pack browser gstack off` removes it; running browser skills also write project `.gstack/` files, `/tmp/browse-*` files and bun's transpiler cache under `~/.bun/install/cache/@t@`, which `off` and `remove` leave in place. `remove` and `off` report live browse daemons without stopping them (PAN-4730).
 - `pan skills pack remove gstack` also removes every mount, launch link and Codex plugin cache that holds gstack, and lists project `.gstack/` dirs without deleting them; `pan skills pack gc` removes stale renders and orphaned pack state.
 
+### Docs: skill packs
+
+- A dedicated Skill Packs page (`features/skill-packs.mdx`) with the quickstart, the pack catalog, the consolidated trust model, the fork sync runbook, and the per-pack sections moved out of `features/skills.mdx`.
+- A `pan skills` CLI reference page (`cli/skills-commands.mdx`) covering every `pan skills`, `pan skills pack`, and `pan skills deft` subcommand.
+- A `docs/SKILL-PACKS.md` developer guide to `src/lib/skill-packs/` and `src/lib/skill-overrides/`: the module map, data flow, adapter contract, and how to add a pack or write a new adapter.
+
 ### Breaking changes
 
 **Removed public exports.** `src/index.ts` (the `@overdeck/core` main entry) is an internal entry point, not a supported library API, so names can be removed in any release. These 38 names are gone with no bare-name replacement:
