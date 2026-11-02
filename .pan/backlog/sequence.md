@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T02:34:50.919200Z · model: claude-opus-5-5 · open: 872_
+_Last sequenced: 2026-11-02T02:39:35.361875Z · model: claude-opus-5-5 · open: 873_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -663,6 +663,7 @@ _Last sequenced: 2026-11-02T02:34:50.919200Z · model: claude-opus-5-5 · open: 
 | 652 | PAN-2505 | M | low | ok |  |  | lint:circular reports new frontend cycles + stale baseline in chat/conversations components |
 | 653 | PAN-2504 | M | low | ok |  |  | Auto-relaunch npx @overdeck/core under a compatible Node 22+ instead of failing on old Node |
 | 654 | PAN-2449 | M | low | ok |  |  | start-planning: GITHUB_REPOS env shadows projects.yaml github_repo; unknown IDs fall through to Linear and plan the wrong issue |
+| 655 | PAN-4769 | XS | low | ok |  | PAN-4759 | Two-sentence wording fix in features/skill-packs.mdx; file arrives with PAN-4759's PR, so land after it merges. |
 | 656 | PAN-3940 | XL | low | ok | ✓ |  | Parked epic: event-driven plugin/hook system on pipeline-notifier + hygiene-scheduler; do not pick up until the journal has soaked |
 | 657 | PAN-2424 | L | low | ok | ✓ |  | Epic: the Order Book |
 | 658 | PAN-2406 | S | low | ok |  |  | Remaining scope: findAllWorkspacePaths must also enumerate -strike-wt and named-suffix worktrees; gaps 1 and 3 are moot. |
@@ -1207,10 +1208,10 @@ New this pass. The deployment gate's queue message is unusually good — it name
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T02:34:50.919200Z",
+  "generatedAt": "2026-11-02T02:39:35.361875Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 872,
+  "openCount": 873,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -12080,6 +12081,21 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "rationale": "New issue filed 2026-11-02 and already in the pipeline with a live workspace, so it is pinned at rank 1 beside PAN-4702 without moving any other node. Main CI fails unit shard 4 twice in a row on tests/e2e/styleguide-conformance.spec.ts after commit a443ff0619a changed the global stylesheet, and a red main empties the merge gate for every approved PR. The substrate-improvement label and the pipeline-blocking effect make it critical; the fix is scoped to one spec and one stylesheet change with a clear acceptance, so the condition is ok.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4769",
+      "rank": 655,
+      "size": "XS",
+      "importance": "low",
+      "score": 26,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4759"
+      ],
+      "why": "Two-sentence wording fix in features/skill-packs.mdx; file arrives with PAN-4759's PR, so land after it merges.",
+      "rationale": "New issue since the prior run; placed in the free rank 655 among low-impact quick fixes, after PAN-4759 which creates the page.",
+      "gate": "auto",
+      "planning": "skip"
     }
   ],
   "edges": [
@@ -13398,6 +13414,13 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "type": "informs",
       "source": "github-ref",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-4759",
+      "to": "PAN-4769",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.9
     }
   ]
 }
