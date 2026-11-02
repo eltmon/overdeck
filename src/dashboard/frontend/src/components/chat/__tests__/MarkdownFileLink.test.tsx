@@ -32,6 +32,7 @@ vi.mock('@pierre/diffs', () => ({
 
 import { MarkdownFileLink, fileLinkIconForPath } from '../MarkdownFileLink';
 import { StageDeckProvider, type StageDeckContextValue } from '../../Stage/StageDeckContext';
+import { CitationTargetContext } from '../../../lib/composerCitations';
 
 const meta = {
   filePath: '/home/eltmon/project/src/App.tsx',
@@ -89,8 +90,14 @@ const positionedMarkdownMeta = {
   column: 5,
 };
 
-function renderWithDeck(ui: React.ReactElement, deck: StageDeckContextValue | null) {
-  return render(<StageDeckProvider value={deck}>{ui}</StageDeckProvider>);
+function renderWithDeck(
+  ui: React.ReactElement,
+  deck:
+    | (Omit<StageDeckContextValue, 'openOrFocusAgentPane'> & Partial<Pick<StageDeckContextValue, 'openOrFocusAgentPane'>>)
+    | null,
+) {
+  const value = deck ? { openOrFocusAgentPane: vi.fn(), ...deck } : null;
+  return render(<StageDeckProvider value={value}>{ui}</StageDeckProvider>);
 }
 
 describe('MarkdownFileLink', () => {
@@ -348,7 +355,7 @@ describe('MarkdownFileLink', () => {
 
       fireEvent.click(screen.getByRole('link'));
 
-      expect(openOrFocusEditorPane).toHaveBeenCalledWith(markdownMeta.filePath, markdownMeta.basename);
+      expect(openOrFocusEditorPane).toHaveBeenCalledWith(markdownMeta.filePath, markdownMeta.basename, null);
       expect(wsTransportMock.shellOpenInEditor).not.toHaveBeenCalled();
     });
 
@@ -358,7 +365,7 @@ describe('MarkdownFileLink', () => {
 
       fireEvent.click(screen.getByRole('link'));
 
-      expect(openOrFocusEditorPane).toHaveBeenCalledWith(flywheelBriefMeta.filePath, flywheelBriefMeta.basename);
+      expect(openOrFocusEditorPane).toHaveBeenCalledWith(flywheelBriefMeta.filePath, flywheelBriefMeta.basename, null);
       expect(wsTransportMock.shellOpenInEditor).not.toHaveBeenCalled();
     });
 
@@ -368,8 +375,8 @@ describe('MarkdownFileLink', () => {
 
       fireEvent.click(screen.getByRole('link'));
 
-      expect(openOrFocusEditorPane).toHaveBeenCalledWith(positionedMarkdownMeta.filePath, positionedMarkdownMeta.basename);
-      expect(openOrFocusEditorPane).not.toHaveBeenCalledWith(positionedMarkdownMeta.targetPath, expect.anything());
+      expect(openOrFocusEditorPane).toHaveBeenCalledWith(positionedMarkdownMeta.filePath, positionedMarkdownMeta.basename, null);
+      expect(openOrFocusEditorPane).not.toHaveBeenCalledWith(positionedMarkdownMeta.targetPath, expect.anything(), null);
       expect(wsTransportMock.shellOpenInEditor).not.toHaveBeenCalled();
     });
 
@@ -492,7 +499,7 @@ describe('MarkdownFileLink', () => {
       const internalItem = await screen.findByRole('menuitem', { name: 'Open in internal editor' });
       fireEvent.click(internalItem);
 
-      expect(openOrFocusEditorPane).toHaveBeenCalledWith(markdownMeta.filePath, markdownMeta.basename);
+      expect(openOrFocusEditorPane).toHaveBeenCalledWith(markdownMeta.filePath, markdownMeta.basename, null);
       expect(localStorage.getItem('overdeck:markdown-open-target')).toBe('internal');
       expect(wsTransportMock.shellOpenInEditor).not.toHaveBeenCalled();
     });
@@ -505,7 +512,7 @@ describe('MarkdownFileLink', () => {
       const internalItem = await screen.findByRole('menuitem', { name: 'Open in internal editor' });
       fireEvent.click(internalItem);
 
-      expect(openOrFocusEditorPane).toHaveBeenCalledWith(positionedMarkdownMeta.filePath, positionedMarkdownMeta.basename);
+      expect(openOrFocusEditorPane).toHaveBeenCalledWith(positionedMarkdownMeta.filePath, positionedMarkdownMeta.basename, null);
     });
 
     it('shows no browser items for an .mdx chip', async () => {
@@ -613,6 +620,47 @@ describe('MarkdownFileLink', () => {
         'Copy full path',
       ]);
       expect(wsTransportMock.getAvailableBrowsers).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('CitationTargetContext (PAN-4658)', () => {
+    it('passes the provided conversation name as the third argument on click', () => {
+      const openOrFocusEditorPane = vi.fn();
+      renderWithDeck(
+        <CitationTargetContext.Provider value="conv-a">
+          <MarkdownFileLink {...markdownMeta} />
+        </CitationTargetContext.Provider>,
+        { deckKey: 'overdeck', openOrFocusEditorPane },
+      );
+
+      fireEvent.click(screen.getByRole('link'));
+
+      expect(openOrFocusEditorPane).toHaveBeenCalledWith(markdownMeta.filePath, markdownMeta.basename, 'conv-a');
+    });
+
+    it('passes the provided conversation name from the right-click "Open in internal editor" item', async () => {
+      const openOrFocusEditorPane = vi.fn();
+      renderWithDeck(
+        <CitationTargetContext.Provider value="conv-a">
+          <MarkdownFileLink {...markdownMeta} />
+        </CitationTargetContext.Provider>,
+        { deckKey: 'overdeck', openOrFocusEditorPane },
+      );
+
+      fireEvent.contextMenu(screen.getByRole('link'));
+      const internalItem = await screen.findByRole('menuitem', { name: 'Open in internal editor' });
+      fireEvent.click(internalItem);
+
+      expect(openOrFocusEditorPane).toHaveBeenCalledWith(markdownMeta.filePath, markdownMeta.basename, 'conv-a');
+    });
+
+    it('passes null as the third argument without a provider', () => {
+      const openOrFocusEditorPane = vi.fn();
+      renderWithDeck(<MarkdownFileLink {...markdownMeta} />, { deckKey: 'overdeck', openOrFocusEditorPane });
+
+      fireEvent.click(screen.getByRole('link'));
+
+      expect(openOrFocusEditorPane).toHaveBeenCalledWith(markdownMeta.filePath, markdownMeta.basename, null);
     });
   });
 });

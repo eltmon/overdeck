@@ -21,6 +21,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useColorTheme } from '../../hooks/useColorTheme';
 import type { MarkdownFileLinkMeta } from '../../markdown-links';
 import { useStageDeck } from '../Stage/StageDeckContext';
+import { useCitationTarget } from '../../lib/composerCitations';
 import { usePickerPosition } from './usePickerPosition';
 
 type FileLinkIcon = ComponentType<SVGProps<SVGSVGElement>>;
@@ -205,6 +206,7 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
   const isMarkdown = isMarkdownPath(filePath);
   const canOpenInBrowser = isBrowserRenderablePath(filePath);
   const deck = useStageDeck();
+  const citeTarget = useCitationTarget();
   const containerRef = useRef<HTMLSpanElement>(null);
   const requestIdRef = useRef(0);
   const hoveredRef = useRef(false);
@@ -301,14 +303,14 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
         // real file path — targetPath may carry a trailing `:line[:column]`
         // suffix for external-editor goto syntax, which would make
         // extname() see e.g. ".md:12" and reject the file as unsupported.
-        deck.openOrFocusEditorPane(filePath, basename);
+        deck.openOrFocusEditorPane(filePath, basename, citeTarget);
         return;
       }
       handleOpen();
       return;
     }
     openWithExternalEditor(target);
-  }, [deck, filePath, basename, handleOpen, openWithExternalEditor]);
+  }, [deck, filePath, basename, citeTarget, handleOpen, openWithExternalEditor]);
 
   const closeQuickview = useCallback(() => {
     requestIdRef.current++;
@@ -388,7 +390,7 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
             setMarkdownOpenTarget('internal');
             // PAN-3260 review fix: use filePath, not targetPath — see the
             // matching note in handleMarkdownClick.
-            if (deck) deck.openOrFocusEditorPane(filePath, basename);
+            if (deck) deck.openOrFocusEditorPane(filePath, basename, citeTarget);
             else handleOpen();
           },
         },
@@ -406,7 +408,7 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
       ];
       showContextMenu({ x, y, items });
     });
-  }, [deck, filePath, targetPath, basename, handleOpen, openWithExternalEditor, revealInFileManager, displayPath, copyPath, canOpenInBrowser, browserMenuItems]);
+  }, [deck, filePath, targetPath, basename, citeTarget, handleOpen, openWithExternalEditor, revealInFileManager, displayPath, copyPath, canOpenInBrowser, browserMenuItems]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {

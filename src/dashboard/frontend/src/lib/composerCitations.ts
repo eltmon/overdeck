@@ -5,6 +5,7 @@
  *
  * PAN-4642 WI-3.
  */
+import { createContext, useContext } from 'react';
 import { create } from 'zustand';
 import type { CitationSource, PendingCitation } from './citationFormat';
 
@@ -17,11 +18,23 @@ function storageKey(conversationName: string): string {
 function isCitationSource(value: unknown): value is CitationSource {
   if (!value || typeof value !== 'object') return false;
   const source = value as Record<string, unknown>;
-  return (
-    source.kind === 'message' &&
-    typeof source.messageId === 'string' &&
-    (source.role === 'assistant' || source.role === 'user')
-  );
+  if (source.kind === 'message') {
+    return (
+      typeof source.messageId === 'string' &&
+      (source.role === 'assistant' || source.role === 'user')
+    );
+  }
+  if (source.kind === 'file') {
+    return typeof source.path === 'string' && source.path !== '';
+  }
+  return false;
+}
+
+/** The conversation whose composer should receive a citation made elsewhere (e.g. an editor pane). */
+export const CitationTargetContext = createContext<string | null>(null);
+
+export function useCitationTarget(): string | null {
+  return useContext(CitationTargetContext);
 }
 
 function isPendingCitation(value: unknown): value is PendingCitation {

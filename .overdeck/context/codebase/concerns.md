@@ -1,6 +1,6 @@
 # Concerns / hazards
 
-Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly bullet 2026-11-01).
+Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly and feature-branch-push bullets 2026-11-01).
 
 - **ToS policy gate** — `canUseHarness()` (`src/lib/harness-policy.ts`) blocks
   ohmypi/prime-agent + Anthropic + subscription auth (plus the model/harness pairing
@@ -139,6 +139,14 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly bulle
   the retry as `FlyMachineError('fly-token-rejected')` instead of counting it as "not
   finished"; the heartbeat/sweep/Codex-sync loop lines, `pan machines unlink`/rollback,
   and `pan doctor`'s `Fly token` row all report it as `Fly token rejected`.
+- **A workspace's `feature/<id>` branch tracks `origin/main`** (`branch.<b>.merge =
+  refs/heads/main`), so a bare `git push` from a workspace fails ("upstream branch
+  does not match") and `pushPlanArtifacts` (`overdeck/plan-artifact-commit.ts`)
+  would push to `main`. Push a feature branch with an explicit refspec
+  (`git push origin HEAD:refs/heads/feature/<id>`) and never `-u`: `@{u}` readers
+  (`workspaces/git-state.ts`, `xbrief/continue-state.ts`, `lanes/*`) assume it.
+  A planned issue's spec lives on that branch, not on the primary checkout, so
+  "is it planned?" must check the workspace or the branch ref (PAN-4683).
 - **Close-out ceremony lives in `lifecycle/workflows.ts closeOut()`** — `pan close` and
   `POST /api/issues/:id/close-out` both call it. `src/lib/close-out.ts` now holds only
   merge detection (`isBranchMerged`, squash-aware via the merged PR). `closeOut()` reads

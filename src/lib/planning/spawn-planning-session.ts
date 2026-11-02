@@ -404,7 +404,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
   };
 
   try {
-    await writeAutoSpawnOnFinalizeFlag(issue.identifier, autoSpawnOnFinalize === true, { workModel: workModel ?? null });
+    await writeAutoSpawnOnFinalizeFlag(issue.identifier, autoSpawnOnFinalize === true, { workModel: workModel ?? null, workspaceLocation });
     console.log(`[start-planning] Background setup starting for ${issue.identifier}`);
 
     // ── Step 1: Create workspace if needed ─────────────────────────────────
