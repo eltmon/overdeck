@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4696",
   "created": "2026-11-02T16:17:12.298Z",
-  "updated": "2026-11-02T16:50:58.378Z",
+  "updated": "2026-11-02T16:51:18.932Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -118,6 +118,10 @@
     "smoke-cleanup.ac3": {
       "status": "completed",
       "doneAt": "2026-11-02T16:50:58.377Z"
+    },
+    "docs-link-result.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:51:18.932Z"
     }
   }
 }
