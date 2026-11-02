@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4754",
   "created": "2026-11-02T00:55:26.468Z",
-  "updated": "2026-11-02T01:50:23.729Z",
+  "updated": "2026-11-02T01:50:39.629Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -184,6 +184,10 @@
     "dialog-keys.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T01:50:23.728Z"
+    },
+    "dialog-keys.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:50:39.629Z"
     }
   }
 }
