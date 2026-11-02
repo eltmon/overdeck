@@ -1,6 +1,6 @@
 # Concerns / hazards
 
-Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly bullet 2026-11-01).
+Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly and feature-branch-push bullets 2026-11-01).
 
 - **ToS policy gate** — `canUseHarness()` (`src/lib/harness-policy.ts`) blocks
   ohmypi/prime-agent + Anthropic + subscription auth (plus the model/harness pairing
@@ -131,6 +131,14 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly bulle
   or every ephemeral watchdog would stop its machine); the reap runs in
   `deacon-lite.ts` via `remote-reap-routine.ts` (behind the freeze). The reap acts
   only on positive evidence: a failed exec is `indeterminate`, never a crash.
+- **A workspace's `feature/<id>` branch tracks `origin/main`** (`branch.<b>.merge =
+  refs/heads/main`), so a bare `git push` from a workspace fails ("upstream branch
+  does not match") and `pushPlanArtifacts` (`overdeck/plan-artifact-commit.ts`)
+  would push to `main`. Push a feature branch with an explicit refspec
+  (`git push origin HEAD:refs/heads/feature/<id>`) and never `-u`: `@{u}` readers
+  (`workspaces/git-state.ts`, `xbrief/continue-state.ts`, `lanes/*`) assume it.
+  A planned issue's spec lives on that branch, not on the primary checkout, so
+  "is it planned?" must check the workspace or the branch ref (PAN-4683).
 - **Close-out ceremony lives in `lifecycle/workflows.ts closeOut()`** — `pan close` and
   `POST /api/issues/:id/close-out` both call it. `src/lib/close-out.ts` now holds only
   merge detection (`isBranchMerged`, squash-aware via the merged PR). `closeOut()` reads
@@ -385,11 +393,6 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly bulle
   Background work from a route uses `void work().catch((err) => console.error(...))`
   (`routes/hooks.ts`, `routes/resources/snapshot.ts`); use `Effect.forkDetach` only
   where the work must stay inside the Effect runtime.
-- PR sync auto-archive liveness is tmux-only: `listLiveConversationSessions` in
-  `services/pull-request-sync-service.ts` runs `tmux list-sessions`, but
-  conversations launch through the terminal-backend door (Herdr default,
-  PAN-3921). With `conversations.auto_archive_on_merge` on under Herdr, every
-  conversation reads as not live. Use `getBackendPanes()` + `paneAgentKey`.
 - TanStack `rowVirtualizer.measure()` (virtual-core 3.17.11) clears cached sizes
   but re-reads no element; a row whose height did not change gets no
   ResizeObserver callback, and `resizeItem` caches only a changed size. So in

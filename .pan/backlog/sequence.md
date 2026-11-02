@@ -1,12 +1,13 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T04:19:26.563674Z · model: claude-opus-5-5 · open: 873_
+_Last sequenced: 2026-11-02T04:55:01.641922Z · model: claude-opus-5-5 · open: 876_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4702 | S | critical | ok |  |  | Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs. |
 | 1 | PAN-4767 | S | critical | ok |  |  | Main is red: styleguide-conformance e2e spec times out since the Skills page redesign changed index.css; blocks every merge. |
+| 2 | PAN-4786 | S | critical | ok |  |  | Adopted PRs fail incomplete-plan-items (no xBRIEF); blocks handoff PRs #4780/#4783. Narrower overlap of PAN-4636. |
 | 3 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 5 | PAN-4750 | M | critical | ok |  |  | Strike merge door requires head approval strikes never get; 5 green strike PRs unmergeable. needs-handoff (TENET-10). |
 | 6 | PAN-4755 | M | medium | ok |  |  | In-pipeline: overlay tokens + shared Modal primitive; rebuild New conversation dialog to the approved mockup. |
@@ -28,6 +29,7 @@ _Last sequenced: 2026-11-02T04:19:26.563674Z · model: claude-opus-5-5 · open: 
 | 19 | PAN-4673 | S | high | ok |  |  | Model Routing selects truncate model names (Opus 5.5 shows as Opus 5): narrow column plus repeated provider prefix in option text |
 | 20 | PAN-4675 | S | critical | ok |  |  | One transient gh label timeout aborts post-merge lifecycle; merge door replies Already merged, so the issue can never close. |
 | 21 | PAN-4705 | S | high | ok |  |  | quality-gate-admission test leaks a poller past afterEach rmSync; unhandled ENOENT fails unrelated PR CI shards. |
+| 21 | PAN-4785 | M | high | ok |  |  | pan review request says queued when PR adoption will refuse (branch checked out elsewhere); refusal hidden in dashboard log. Handoff. |
 | 22 | PAN-4746 | S | high | ok |  |  | CI test shard flakes on ENOTEMPTY: afterEach rmSync races an unawaited snapshot write; reds unrelated PRs (seen on #4745). |
 | 23 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
 | 24 | PAN-4625 | S | high | ok |  |  | CI relay debounces a later failed check on the same head, so agents never see a failing test shard; lands after PAN-4534 (same file) |
@@ -289,6 +291,7 @@ _Last sequenced: 2026-11-02T04:19:26.563674Z · model: claude-opus-5-5 · open: 
 | 278 | PAN-4756 | L | medium | ok |  | PAN-4755 | Move ~45 bespoke dialogs onto the shared Modal from PAN-4755; surface/structure only. Waits for PAN-4755 to land. |
 | 278 | PAN-4778 | S | medium | ok |  |  | Workspace-image CI never published: wrong Fly app, fly not on PATH, no FLY_API_TOKEN (operator). Fly VMs run a June image. |
 | 279 | PAN-4777 | S | medium | ok |  |  | Fly createRemoteWorkspace leaks a billing VM when an exec throws before deleteVm; delete on any failure. Plus stale clone doc. |
+| 279 | PAN-4791 | XS | high | ok |  | PAN-4777 | Fix two unanswered CodeRabbit findings from #4789: scope the fly-provider.md cleanup promise; add Fly volume removal to recovery text. |
 | 280 | PAN-2211 | M | high | ok |  |  | writeSwarmSlotCompletion has no production caller; pan done in a slot workspace must record it. Swarm is dormant (Cut D11). |
 | 280 | PAN-4774 | M | medium | ok |  |  | Run Anywhere release AC-1..15 on integrated main: two-server local test, fixes or filed issues, operator hardware checklist doc. |
 | 281 | PAN-2210 | M | high | ok |  |  | Rewritten pan done has no slot handling: a slot agent takes the issue-level PR/review path. Must record slot completion only. |
@@ -596,7 +599,7 @@ _Last sequenced: 2026-11-02T04:19:26.563674Z · model: claude-opus-5-5 · open: 
 | 585 | PAN-1542 | XS | medium | ok |  |  | Spawn-refusal modal: render the three-button workflow on dirty-workspace 409 |
 | 586 | PAN-1524 | M | medium | ok |  |  | Slash command aliases: /handoff → /pan-handoff (and similar short forms) |
 | 587 | PAN-1490 | M | medium | ok |  |  | show each conversation's current git branch (port t3code BranchToolbar pattern) |
-| 588 | PAN-1485 | M | medium | needs-refinement |  |  | Idle auto-archive (warn 7d, archive 10d); the archive-after-idle part is now split into #4655 as undoable idle auto-settle. |
+| 588 | PAN-1485 | S | medium | needs-refinement |  |  | Remaining scope after #4655 auto-settle: day-10 archive + favorite clearing; close-or-keep is an operator call. |
 | 589 | PAN-1473 | M | medium | ok |  |  | Dashboard conversation composer: refactor context indicator to mirror t3code (show cumulative + live separately) |
 | 590 | PAN-1443 | M | low | stale |  |  | Specs live directly under .pan/specs now; only check that no stale legacy files remain under docs/prds/ |
 | 591 | PAN-1442 | M | medium | ok |  |  | Follow-up to PAN-829: voice-sampler.html cleanup in pan-tts repo |
@@ -889,6 +892,10 @@ New substrate bug in the merge door: on 2026-11-01 it refused three approved, gr
 
 New issue filed 2026-11-02 and already in the pipeline with a live workspace, so it is pinned at rank 1 beside PAN-4702 without moving any other node. Main CI fails unit shard 4 twice in a row on tests/e2e/styleguide-conformance.spec.ts after commit a443ff0619a changed the global stylesheet, and a red main empties the merge gate for every approved PR. The substrate-improvement label and the pipeline-blocking effect make it critical; the fix is scoped to one spec and one stylesheet change with a clear acceptance, so the condition is ok.
 
+### PAN-4786 (rank 2)
+
+New in-pipeline substrate bug: adoption starts review without skipPlanChecklist, so every adopted PR with no xBRIEF fails verification, and today that stalls the handoff PRs for critical PAN-4750 and PAN-4772. TENET-10 routes merge-machinery fixes through supervised handoffs, so until this lands no handoff PR can be reviewed; it takes the free rank-2 slot. It covers the checklist half of PAN-4636, which keeps the operator-signal half.
+
 ### PAN-4636 (rank 3)
 
 New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.
@@ -972,6 +979,10 @@ New this pass. addLabel in merge-agent.ts uses Effect.promise, so one gh network
 ### PAN-4705 (rank 21)
 
 New since the prior pass. A latent race in the PAN-4546 admission test fails whole CI shards with an unhandled ENOENT on PRs that never touch it (seen on #4703), costing verification attempts pipeline-wide. It sits beside PAN-4680, the sibling flake fix, because both keep CI verification honest; the fix is small and scoped to one test file or publishExclusive.
+
+### PAN-4785 (rank 21)
+
+New substrate issue: review requests on handoff-opened PRs (#4780, #4783) sat unreviewed for 15-30 minutes because adoption refused silently and only the dashboard log said why. Running the adoption preflight in the route and journaling late refusals closes a silent pipeline stall, so it ranks high alongside the other review-dispatch fixes; needs-handoff (TENET-10) means supervised pickup.
 
 ### PAN-4746 (rank 22)
 
@@ -1193,14 +1204,6 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
 
 New since the prior run (filed by the PAN-4532 plan critic). recoverStalledReviews falls back to getRequestReviewStarter(), which is only registered by the dashboard route module the forked deacon child never loads, so the fallback is a silent no-op in production and a journaled-but-undispatched review with no parent state stays stranded. The fix is a one-call swap to requestReviewThroughRoute, which undispatched-review-recovery already uses. Placed beside PAN-3278 (review never dispatched) because it closes the same throughput hole; it is review-recovery machinery, so it goes through a supervised handoff.
 
-### PAN-3234 (rank 77)
-
-Triage: verify whether blocking-choice-menu detection is wired to the current liveness/health surface. Rank held.
-
-### PAN-3205 (rank 78)
-
-New this pass. The deployment gate's queue message is unusually good — it names the holders, the queue age, and warns against forcing — and it promises a 'next verification boundary' trigger that does not exist. Every holder cleared and the deploy never fired; the live build stayed stale for 35 minutes until a manual reload. A correct-sounding instruction that cannot happen is worse than no message.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1208,10 +1211,10 @@ New this pass. The deployment gate's queue message is unusually good — it name
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T04:19:26.563674Z",
+  "generatedAt": "2026-11-02T04:55:01.641922Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 873,
+  "openCount": 876,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -1236,6 +1239,19 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "dependsOn": [],
       "why": "Main is red: styleguide-conformance e2e spec times out since the Skills page redesign changed index.css; blocks every merge.",
       "rationale": "New issue filed 2026-11-02 and already in the pipeline with a live workspace, so it is pinned at rank 1 beside PAN-4702 without moving any other node. Main CI fails unit shard 4 twice in a row on tests/e2e/styleguide-conformance.spec.ts after commit a443ff0619a changed the global stylesheet, and a red main empties the merge gate for every approved PR. The substrate-improvement label and the pipeline-blocking effect make it critical; the fix is scoped to one spec and one stylesheet change with a clear acceptance, so the condition is ok.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4786",
+      "rank": 2,
+      "size": "S",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Adopted PRs fail incomplete-plan-items (no xBRIEF); blocks handoff PRs #4780/#4783. Narrower overlap of PAN-4636.",
+      "rationale": "New in-pipeline substrate bug: adoption starts review without skipPlanChecklist, so every adopted PR with no xBRIEF fails verification, and today that stalls the handoff PRs for critical PAN-4750 and PAN-4772. TENET-10 routes merge-machinery fixes through supervised handoffs, so until this lands no handoff PR can be reviewed; it takes the free rank-2 slot. It covers the checklist half of PAN-4636, which keeps the operator-signal half.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1509,6 +1525,19 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "dependsOn": [],
       "why": "quality-gate-admission test leaks a poller past afterEach rmSync; unhandled ENOENT fails unrelated PR CI shards.",
       "rationale": "New since the prior pass. A latent race in the PAN-4546 admission test fails whole CI shards with an unhandled ENOENT on PRs that never touch it (seen on #4703), costing verification attempts pipeline-wide. It sits beside PAN-4680, the sibling flake fix, because both keep CI verification honest; the fix is small and scoped to one test file or publishExclusive.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4785",
+      "rank": 21,
+      "size": "M",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan review request says queued when PR adoption will refuse (branch checked out elsewhere); refusal hidden in dashboard log. Handoff.",
+      "rationale": "New substrate issue: review requests on handoff-opened PRs (#4780, #4783) sat unreviewed for 15-30 minutes because adoption refused silently and only the dashboard log said why. Running the adoption preflight in the route and journaling late refusals closes a silent pipeline stall, so it ranks high alongside the other review-dispatch fixes; needs-handoff (TENET-10) means supervised pickup.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4841,6 +4870,21 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "auto"
     },
     {
+      "issue": "PAN-4791",
+      "rank": 279,
+      "size": "XS",
+      "importance": "high",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4777"
+      ],
+      "why": "Fix two unanswered CodeRabbit findings from #4789: scope the fly-provider.md cleanup promise; add Fly volume removal to recovery text.",
+      "rationale": "New this pass and already in the pipeline, so it sits beside its parent PAN-4777 at rank 279; the recovery-text fix stops an orphaned Fly volume from billing silently.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2211",
       "rank": 280,
       "size": "M",
@@ -7340,6 +7384,19 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "auto"
     },
     {
+      "issue": "PAN-4779",
+      "rank": 482,
+      "size": "S",
+      "importance": "medium",
+      "score": 48,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Docs on main: 2 MDX parse errors hide pages from Mintlify + 15 broken vision.mdx links; mint broken-links can't gate",
+      "rationale": "New issue: small, well-scoped docs fix with mechanical ACs; placed in a free medium-tier slot beside comparable XS/S doc hygiene work.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-538",
       "rank": 483,
       "size": "S",
@@ -8611,13 +8668,13 @@ New this pass. The deployment gate's queue message is unusually good — it name
     {
       "issue": "PAN-1485",
       "rank": 588,
-      "size": "M",
+      "size": "S",
       "importance": "medium",
-      "score": 36,
+      "score": 32,
       "condition": "needs-refinement",
       "dependsOn": [],
-      "why": "Idle auto-archive (warn 7d, archive 10d); the archive-after-idle part is now split into #4655 as undoable idle auto-settle.",
-      "rationale": "Rank unchanged; stays needs-refinement because new PAN-4655 supersedes its archive-after-idle part, so what remains of this issue must be rescoped or closed.",
+      "why": "Remaining scope after #4655 auto-settle: day-10 archive + favorite clearing; close-or-keep is an operator call.",
+      "rationale": "Rank unchanged; a 2026-11-02 comment confirms PAN-4655 delivers idle auto-settle, so only day-10 archive and favorite clearing remain (size M→S, score trimmed), still needs-refinement pending the operator close decision.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12084,19 +12141,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-4779",
-      "rank": 482,
-      "size": "S",
-      "importance": "medium",
-      "score": 48,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Docs on main: 2 MDX parse errors hide pages from Mintlify + 15 broken vision.mdx links; mint broken-links can't gate",
-      "rationale": "New issue: small, well-scoped docs fix with mechanical ACs; placed in a free medium-tier slot beside comparable XS/S doc hygiene work.",
-      "gate": "auto",
-      "planning": "auto"
     }
   ],
   "edges": [
@@ -13422,6 +13466,41 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
+    },
+    {
+      "from": "PAN-4785",
+      "to": "PAN-4636",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
+    },
+    {
+      "from": "PAN-4786",
+      "to": "PAN-4750",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-4786",
+      "to": "PAN-4772",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-4786",
+      "to": "PAN-4636",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.9
+    },
+    {
+      "from": "PAN-4777",
+      "to": "PAN-4791",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
     }
   ]
 }

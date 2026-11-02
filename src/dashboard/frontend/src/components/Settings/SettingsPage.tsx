@@ -14,6 +14,7 @@ import { WorkhorsePanel } from './WorkhorsePanel';
 import { ModelPresetsBar } from './ModelPresetsBar';
 import { RolesPanel } from './RolesPanel';
 import { VoiceSettingsSection } from './sections/VoiceSettingsSection';
+import { AutoSettleOnMergeRow } from './sections/AutoSettleOnMergeRow';
 import { ConversationSearchSection } from './sections/ConversationSearchSection';
 import { ConversationSettingsSection } from './sections/ConversationSettingsSection';
 import { PROVIDER_ROW_ID_PREFIX, ProviderManagementSection, type ProviderFocusRequest } from './sections/ProviderManagementSection';
@@ -585,6 +586,7 @@ export function SettingsPage() {
         onSettingsChange={applySettings}
         openRouterFavoriteModels={openRouterFavoriteModels}
       >
+        <AutoSettleOnMergeRow />
         <ConversationSearchSection
           conversationSearch={conversationSearch}
           conversationSearchEnabled={conversationSearchEnabled}

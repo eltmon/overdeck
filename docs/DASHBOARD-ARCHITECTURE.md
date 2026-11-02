@@ -488,6 +488,27 @@ door that does not exist; a real record read door would be a separate change.
   deacon child would need two internal HTTP hops and could not pass a resume
   cause), and a scheduled prompt follows the operator-message rule, so the
   deacon pause toggle does not apply.
+- Idle auto-settle (PAN-4655). `src/lib/overdeck/conversation-idle-settle.ts` holds
+  the sweep: it groups the operator list by display root (the Command Deck D27 rule:
+  critic → builder, else parent), keeps only roots that are not settled, not
+  snoozed past the cutoff, not reset past the cutoff (`conversations.idle_reset_at`,
+  written by unsettle and unsnooze), not released, and with no fork in progress,
+  then drops any group with a member waiting on the operator (the pending-input
+  feed) or with a live member whose transcript cannot be resolved. A member's
+  activity is the newest of `created_at`, `last_attached_at`, and
+  `readTranscriptLastActivityMs` (the file's modified time when it is older than
+  the cutoff, else the last user/assistant record time in the tail, because Claude
+  Code touches a running transcript without writing a record). When liveness or
+  the feed is unknown the sweep settles nothing. It writes only roots, through
+  `settleIdleConversation`, whose `UPDATE` re-checks settle, archive, snooze and
+  `idle_reset_at` so an operator unsettle mid-sweep wins.
+  `services/conversation-idle-settle-service.ts` runs it in the primary dashboard,
+  boot +2 min then every 15 min, non-overlapping, skipped while the Deacon is
+  frozen and with `OVERDECK_DISABLE_IDLE_SETTLE=1`, and invalidates the
+  conversation-list cache after a settle. `services/conversation-sweeps.ts` is the
+  host for PR sync, schedules, and idle-settle. The days come from app_settings
+  `conversations.auto_settle_idle_days` (default 3, `0` = off), read and written by
+  `GET/PUT /api/conversations/triage/auto-settle` and `pan conv auto-settle-idle-days`.
 - `GET /api/conversations/:name/messages` and `/message-locator` resolve registered
   rows first. A name that is a bare Claude session UUID with no row (a Cmd-K hit on an
   indexed transcript Overdeck never registered) falls back to an exact `<uuid>.jsonl`
@@ -588,8 +609,14 @@ door that does not exist; a real record read door would be a separate change.
   (`formatCitationBlock`/`composePromptWithCitations`) — client-side only, identical
   for every harness, no server route changed. `lib/composerCitations.ts` persists
   each conversation's pending list to `localStorage` under `conv-citations:<name>`;
-  `PendingCitation.source` is a discriminated union (`{ kind: 'message'; messageId;
-  role }` today) shared with #2685's future preview-element kind. `components/chat/
+  `PendingCitation.source` is a discriminated union — `{ kind: 'message'; messageId;
+  role }` for a reply quote, or `{ kind: 'file'; path }` (an absolute path) for a
+  quote taken from the editor Preview (PAN-4658). File citations serialize as one
+  ``Notes on `<path>`:`` block per path, after the reply-notes block
+  (`fileCitationHeader`/`formatCitationBlock`). The editor Preview cites through
+  `CiteSelectionLayer`'s `resolve` prop (`fileSelectionResolver(path)`) instead of
+  the default message resolver — see `docs/MARKDOWN-EDITOR-PANE.md`'s "Citing from
+  the Preview" section. `components/chat/
   citations/` holds the selection toolbar (`CiteSelectionToolbar.tsx`), the chips
   strip (`CitationChips.tsx`), and the best-effort quote highlight
   (`citationHighlight.ts`, the CSS Custom Highlight API). Rows opt in via
@@ -1389,3 +1416,11 @@ URL. The payload contract is `{ title, body, url, tag }`, where `url` is a
 same-origin path: `/m?subject=<encodeURIComponent(id)>` for questions and
 approvals, `/m` for everything else. A click focuses an open window and
 navigates it to `url`, else opens one; a cross-origin `url` becomes `/m`.
+
+**The phone pipeline tab (PAN-4661).** The shell adds the routes
+`/m/pipeline` and `/m/pipeline?issue=<id>`; `App.tsx` matches those two paths
+exactly, never a `/m/` prefix. The tab reads `selectIssues`,
+`derivedIssueStateByIssueId` and `selectAgents` from the store `EventRouter`
+fills, and groups with `groupPipelineIssues` in `lib/pipeline-state.ts`,
+which the desktop `PipelineView` shares — one definition of "active issue",
+one phase order, one sort. It adds no API route and no HTTP request.

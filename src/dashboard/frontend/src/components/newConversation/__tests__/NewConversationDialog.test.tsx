@@ -1,6 +1,6 @@
 /** PAN-4486 WI-10: the new-conversation options dialog, its store and host. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 vi.mock('../../../lib/wsTransport', () => ({
@@ -94,6 +94,12 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  // Unmount before restoring fetch: afterEach hooks run in reverse order, so
+  // Testing Library's own cleanup runs after this one. A still-mounted dialog
+  // can start a skills query (e.g. ?project=myapp after the project preset)
+  // between the unstub and that cleanup, and the setup file's network guard
+  // records it as an unexpected request.
+  cleanup();
   vi.unstubAllGlobals();
 });
 

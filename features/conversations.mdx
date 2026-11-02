@@ -282,6 +282,36 @@ Cite is offered only when the conversation has a composer: it does not appear
 while the conversation shows the resume bar, is a read-only vault copy, was
 cleared into another conversation, or is still forking.
 
+### Citing a markdown file
+
+When you open a markdown file from a file chip in a conversation, the editor
+tab remembers that conversation as its origin. In the tab's **Preview**,
+select text and click **Cite** (or press `C`) exactly as you would on a
+reply. The citation becomes a chip in that origin conversation's composer,
+labeled with the file name, and a toast confirms **Citation added** with an
+**Open conversation** action that jumps back to it.
+
+Cite is not offered in **Edit** — only in **Preview** — and not while the
+file has unsaved changes (save first; the agent reads the file from disk, not
+your draft). It is also not offered for a tab opened from somewhere other
+than a conversation, since there is nowhere for the citation to go. Opening
+the same file from a different conversation moves the tab's citations to
+that conversation.
+
+On send, file citations go out in their own block per file, after any reply
+notes:
+
+```
+Notes on `/repo/docs/guide.md`:
+1. > Step two
+   > is wrong
+   Swap the order
+2. > Done.
+```
+
+The quote is the rendered Preview text, so markdown symbols (`**`, `#`, link
+URLs) are not included.
+
 ## Bookmarks
 
 Click the icon beside an assistant or user message to bookmark it, using its
@@ -678,19 +708,27 @@ issue's derived state rather than a conversation's link. It appears within
 seconds of `pan done` opening the PR. A PR that closed without merging is not
 shown there.
 
-Linking never archives or stops a conversation unless you turn on auto-archive:
+**Auto-settle on merge.** When a linked PR goes from open to merged or closed,
+and every PR still linked to the conversation is merged or closed, the
+conversation is settled: it moves to the Settled section with the reason
+`merge`. Its session keeps running, and nothing is archived or stopped. This is
+on by default. Turn it on or off for every conversation with Settings →
+Conversations → **Auto-settle on merge**, or with `pan conv auto-settle-on-merge`.
+Override it for one conversation from the row or tab menu → **Auto-settle on
+merge** (**Use global setting**, **Always**, or **Never**), or with
+`pan conv auto-settle`:
 
 ```bash
-pan conv auto-archive-on-merge        # prints on or off (default: off)
-pan conv auto-archive-on-merge on     # or off
+pan conv auto-settle-on-merge          # prints on or off (default: on)
+pan conv auto-settle-on-merge off      # or on
+pan conv auto-settle <query>           # prints on, off, or inherit (global: on|off)
+pan conv auto-settle <query> off       # on, off, or inherit
 ```
 
-When it's on, an operator conversation is archived when a linked PR goes from
-open to merged or closed and every PR still linked to it is merged or closed.
-It happens once, at that change, so a conversation you unarchive stays. A
-conversation whose terminal session is still alive is never archived, nothing is
-ever stopped, and agent conversations are never archived (the pipeline owns
-them).
+It happens once, at that change, so a conversation you unsettle stays in
+Inbox. A conversation that is already settled keeps its reason, and one snoozed
+until a later time keeps its snooze. Agent conversations are never
+auto-settled (the pipeline owns them).
 
 Not yet shipped (tracked in [#3822](https://github.com/eltmon/overdeck/issues/3822)):
 GitLab merge request status, the Pull requests page, and search by PR number.
@@ -812,10 +850,30 @@ Shift-click and `Cmd`/`Ctrl`-click select multiple rows; with a selection
 active, a bulk bar above the list offers Settle, Unsettle, and Snooze for
 every selected conversation in one action.
 
-Auto-settle — settling a conversation automatically when its pull request
-merges, or when it has been idle for a while — is tracked separately:
-on merge in [PAN-4653](https://github.com/eltmon/overdeck/issues/4653), and
-on idle in [PAN-4655](https://github.com/eltmon/overdeck/issues/4655).
+### Settling idle conversations automatically
+
+The primary dashboard settles an operator conversation that has had no
+activity for 3 days, the default. Activity is a new message in the
+conversation's transcript, from you or from the agent, or a resume. Opening
+or reading a conversation without resuming it does not count.
+
+Some conversations are never settled this way: agent conversations, snoozed
+conversations, conversations waiting on you (an open question, plan approval,
+or permission prompt), and conversations continued on another machine. A
+conversation with lanes or a successor is judged as one group, by the newest
+activity anywhere in it, and only the top-level row is settled.
+
+Unsettling or unsnoozing a conversation restarts the count, and so does the
+end of a snooze. The check runs about every 15 minutes and does nothing while
+the Deacon is frozen. After an upgrade, the first check settles every
+conversation that has already been idle that long; **Unsettle** brings any of
+them back.
+
+Change the number of days in **Settings → Conversations → Auto-settle idle
+conversations**, or with `pan conv auto-settle-idle-days <days>`. `0` turns
+it off. Conversations also settle themselves when their pull requests merge
+([PAN-4653](https://github.com/eltmon/overdeck/issues/4653)); see
+[Pull requests on conversations](#pull-requests-on-conversations).
 
 ## Stopping or archiving a conversation
 

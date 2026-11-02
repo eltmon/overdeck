@@ -69,5 +69,9 @@
   shards. A fresh-context `page.goto` costs ~5–7 s on a loaded CI runner, so give each route its
   own `it` and keep an `it` to ≤3 page loads within its 45 s budget (PAN-4767); the serial
   browser lane is PAN-4733.
+- Playwright specs under `src/dashboard/frontend/tests/` run in CI only when listed in the
+  `test:playwright` script of `src/dashboard/frontend/package.json`. To put issues/agents in the
+  store there, seed `localStorage['pan-snapshot-cache-v1']` with `addInitScript` and close
+  `/ws/rpc` (`pan-4523-river-bands.spec.ts`); never add a production store hook.
 
-<!-- last-verified: 2026-11-01 -->
+<!-- last-verified: 2026-11-02 -->

@@ -8,6 +8,19 @@ vi.mock('../../EventRouter', () => ({ EventRouter: () => null }));
 // The shell is under test here; the screens have their own suites.
 vi.mock('../MobileNeedsYou', () => ({ MobileNeedsYou: () => <h2>Needs you</h2> }));
 vi.mock('../MobileConversations', () => ({ MobileConversations: () => <h2>Conversations</h2> }));
+vi.mock('../MobilePipeline', () => ({
+  MobilePipeline: ({ onOpen }: { onOpen: (id: string) => void }) => (
+    <button type="button" onClick={() => onOpen('PAN-7')}>pipeline-row</button>
+  ),
+}));
+vi.mock('../MobileIssueSheet', () => ({
+  MobileIssueSheet: ({ issueId, onBack }: { issueId: string; onBack: () => void }) => (
+    <div>
+      <h2>{`sheet ${issueId}`}</h2>
+      <button type="button" onClick={onBack}>Back</button>
+    </div>
+  ),
+}));
 vi.mock('../../push/TurnOnNotificationsButton', () => ({ TurnOnNotificationsButton: () => null }));
 
 const decodeQr = vi.fn<(data: Uint8ClampedArray, width: number, height: number) => { data: string } | null>(() => null);
@@ -15,10 +28,16 @@ vi.mock('jsqr', () => ({ default: (data: Uint8ClampedArray, width: number, heigh
 
 describe('readMobileRoute', () => {
   it('reads each D-3 deep link', () => {
-    expect(readMobileRoute('')).toEqual({ tab: 'needs-you', subjectId: null, conversationId: null });
-    expect(readMobileRoute('?subject=conv.with.dots')).toEqual({ tab: 'needs-you', subjectId: 'conv.with.dots', conversationId: null });
-    expect(readMobileRoute('?tab=conversations')).toEqual({ tab: 'conversations', subjectId: null, conversationId: null });
-    expect(readMobileRoute('?conversation=42')).toEqual({ tab: 'conversations', subjectId: null, conversationId: '42' });
+    expect(readMobileRoute('')).toEqual({ tab: 'needs-you', subjectId: null, conversationId: null, issueId: null });
+    expect(readMobileRoute('?subject=conv.with.dots')).toEqual({ tab: 'needs-you', subjectId: 'conv.with.dots', conversationId: null, issueId: null });
+    expect(readMobileRoute('?tab=conversations')).toEqual({ tab: 'conversations', subjectId: null, conversationId: null, issueId: null });
+    expect(readMobileRoute('?conversation=42')).toEqual({ tab: 'conversations', subjectId: null, conversationId: '42', issueId: null });
+  });
+
+  it('reads the D-4661-3 pipeline path, with the pipeline tab taking precedence over every other query parameter', () => {
+    expect(readMobileRoute('', '/m/pipeline')).toEqual({ tab: 'pipeline', issueId: null, subjectId: null, conversationId: null });
+    expect(readMobileRoute('?issue=PAN.1', '/m/pipeline/')).toEqual({ tab: 'pipeline', issueId: 'PAN.1', subjectId: null, conversationId: null });
+    expect(readMobileRoute('?conversation=4', '/m/pipeline')).toEqual({ tab: 'pipeline', issueId: null, subjectId: null, conversationId: null });
   });
 });
 
@@ -86,6 +105,36 @@ describe('MobileApp', () => {
     });
     expect(window.location.search).toBe('?tab=conversations');
     expect(screen.getByRole('heading', { name: 'Conversations' })).toBeInTheDocument();
+  });
+
+  it('tapping the Pipeline tab pushes /m/pipeline and marks it current', () => {
+    setSecureContext(false);
+    render(<MobileApp />);
+    act(() => {
+      screen.getByRole('button', { name: 'Pipeline' }).click();
+    });
+    expect(window.location.pathname).toBe('/m/pipeline');
+    expect(screen.getByRole('button', { name: 'Pipeline' })).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('opening a pipeline row shows the full-screen sheet, and Back restores the list and navigation', () => {
+    setSecureContext(false);
+    window.history.replaceState(null, '', '/m/pipeline');
+    render(<MobileApp />);
+
+    act(() => {
+      screen.getByRole('button', { name: 'pipeline-row' }).click();
+    });
+    expect(window.location.search).toBe('?issue=PAN-7');
+    expect(screen.getByRole('heading', { name: 'sheet PAN-7' })).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Phone sections' })).not.toBeInTheDocument();
+
+    act(() => {
+      screen.getByRole('button', { name: 'Back' }).click();
+    });
+    expect(window.location.pathname).toBe('/m/pipeline');
+    expect(window.location.search).toBe('');
+    expect(screen.getByRole('navigation', { name: 'Phone sections' })).toBeInTheDocument();
   });
 });
 

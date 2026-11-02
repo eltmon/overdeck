@@ -1,0 +1,61 @@
+{
+  "version": "1",
+  "issueId": "PAN-4791",
+  "created": "2026-11-02T05:13:53.260Z",
+  "updated": "2026-11-02T05:38:23.360Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "wi1-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4791",
+      "claimedAt": "2026-11-02T05:13:53.260Z",
+      "doneAt": "2026-11-02T05:15:25.120Z"
+    },
+    "wi2-recovery-text": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4791",
+      "claimedAt": "2026-11-02T05:15:37.332Z",
+      "doneAt": "2026-11-02T05:35:01.402Z"
+    },
+    "wi1-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:36:15.718Z"
+    },
+    "wi1-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:36:31.471Z"
+    },
+    "wi1-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:36:47.270Z"
+    },
+    "wi1-docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:37:04.270Z"
+    },
+    "wi1-docs.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:37:19.864Z"
+    },
+    "wi2-recovery-text.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:37:34.680Z"
+    },
+    "wi2-recovery-text.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:37:49.922Z"
+    },
+    "wi2-recovery-text.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:38:06.724Z"
+    },
+    "wi2-recovery-text.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:38:23.360Z"
+    }
+  }
+}

@@ -58,12 +58,17 @@ endpoint; port tunnelling uses `fly proxy`.
    ```
 
    Overdeck will:
+   - Push the local `feature/<id>` branch to origin when a local workspace exists, so the planned spec reaches the machine; creation stops with an error and creates no machine if that push is rejected
    - Create a Fly Machine in your configured app
-   - Wait up to 120 s for it to reach `started`
+   - Wait up to 300 s for it to reach `started`
    - Sync Claude Code and GitHub credentials from your local machine
    - Clone the repository over HTTPS into `/workspace` and check out the feature branch
    - Configure Claude Code and copy your local skills
    - Save workspace metadata to `~/.overdeck/workspaces/<id>.yaml`
+   - If a setup step after the create step fails (credential sync onward), delete the machine and try to delete its durable-tier volume before reporting the error. If the create step itself fails (for example the machine does not reach `started` within 300 s), the machine is left in place; find it with `fly machines list -a <app>`.
+
+   Only committed work reaches the machine: uncommitted changes in the local
+   workspace are not pushed.
 
    No SSH private key is copied to the VM. Git authenticates over HTTPS with the
    synced `gh` token.
@@ -253,7 +258,7 @@ Each workspace maps to exactly one Fly Machine inside the configured app.
 - `auto_destroy = false` — machines persist after the process that created them exits
 
 After creation the provider polls `GET /apps/:app/machines/:id/wait?state=started` for
-up to 120 seconds. Once the machine is running, Overdeck runs setup commands over the
+up to 300 seconds. Once the machine is running, Overdeck runs setup commands over the
 exec endpoint (clone repo, install beads, sync credentials).
 
 Machine identity is stored in `~/.overdeck/workspaces/<issue-id>.yaml`:
@@ -443,14 +448,26 @@ commands immediately fail.
 non-zero exit codes from the exec API.
 
 **Causes and fixes:**
-- **Machine not started** — the 120 s wait timed out; try `pan workspace start <issue>`
-  and retry.
+- **Machine not started** — the 300 s wait timed out (often a first boot still pulling the image). Creation fails and the machine is not deleted: find it with `fly machines list -a <app>`. Re-run `pan workspace create --remote <issue>` to adopt and start it, or destroy it with `fly machines destroy <machine-id> -a <app> --force` (on the durable tier, also destroy its `<vm-name>-workspace` volume as shown below).
 - **Image missing required tools** — ensure the Dockerfile installs git, python3, curl,
   and base64. Rebuild and push.
-- **Fly API exec timeout** — individual exec calls default to 60 s. Long-running
-  operations (e.g., `git clone` on a large repo) may time out. The clone step will
-  delete the machine and surface the error; re-run after increasing `vm_memory` if the
-  OOM killer is the cause.
+- **Fly API exec timeout** — each exec call has a 60 s deadline. The clone does not
+  run inside one exec: it starts detached (`setsid nohup`), writes its output to
+  `/tmp/pan-clone.log` and its exit code to `/tmp/pan-clone.exit`, and Overdeck polls
+  every 5 s for up to 20 min. If the clone exits non-zero, the machine is deleted and
+  the error shows the last 5 lines of the log. If it does not finish in 20 min, the
+  error is `clone did not finish within 20 min`. Re-run after increasing `vm_memory`
+  if the OOM killer is the cause.
+- **Creation fails during setup** — any failure in a setup step after the create step
+  returns (credential sync, clone, branch checkout, Claude Code setup, skills copy,
+  compose) deletes the machine, and on the durable tier also tries to delete its
+  `<vm-name>-workspace` volume, before the error is shown. If the machine delete also
+  fails (for example an expired Fly token answering 403, #4748), the error names the
+  machine and prints the command to remove it by hand:
+  `fly machines destroy <machine-id> -a <app> --force`. On the durable tier, run
+  `fly volumes list -a <app>` after any failed creation: rollback does not report a
+  failed volume delete. If a `<vm-name>-workspace` volume is still listed, destroy
+  it with `fly volumes destroy <volume-id> -a <app> --yes`.
 
 ---
 

@@ -1,0 +1,373 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T04:36:10Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4786: Adopted PRs always fail verification on incomplete-plan-items (no xBRIEF); supervised handoff PRs can never be reviewed",
+    "updated": "2026-11-02T04:47:04.787Z"
+  },
+  "plan": {
+    "id": "pan-4786",
+    "title": "Adopted PRs always fail verification on incomplete-plan-items (no xBRIEF); supervised handoff PRs can never be reviewed",
+    "status": "running",
+    "uid": "7661d70b-ebac-43b3-bf86-7f4c4a621033",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-02T04:36:10Z",
+    "updated": "2026-11-02T04:47:04.787Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4786",
+        "label": "PAN-4786",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-4786.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "verification",
+      "pr-adoption",
+      "pipeline-gates",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "A PR adopted into a pipeline workspace (PAN-4605: a supervised pan handoff conversation, an operator conversation, a contributor) has no xBRIEF, so the plan checklist gate (verification-runner.ts lines 816-818, checkIncompletePlanItems) always fails with failedCheck 'incomplete-plan-items'. Only strike merges set skipPlanChecklist. On 2026-11-02 PR #4780 (PAN-4750) and #4783 (PAN-4772) were adopted and both failed this way, so no supervised-handoff PR can be reviewed.",
+      "Proposal": "Add src/lib/cloister/adopted-plan-checklist.ts with isAdoptedWorkspaceWithoutPlan (journal has any workspace.adopted entry AND findPlan resolves null) and withAdoptedPlanChecklistSkip (adds skipPlanChecklist: true to the caller's options in that case; keeps an explicit true; fails closed on plan-read errors). Call it inside runVerificationForIssue (verification-runner.ts line 984), the door every production verification uses (review request, /trigger, merge-verify), so the existing skipPlanChecklist option reaches the worker options on every run, not only the first run after adoption. Document the skip in docs/PIPELINE-GATES.md and docs/MERGE-WORKFLOW.md. See .pan/drafts/pan-4786.md for exact code. Also make the live-worker join in runSupervisedVerificationOnce require sameOptions, so a worker launched with other options is replaced rather than joined.",
+      "NonGoals": "- No change to pan done preflight (runPreflightChecks) or POST /api/agents/:id/runtime-events; both still call checkIncompletePlanItems.\n- No synthetic xBRIEF generation for adopted PRs.\n- No new option, flag, journal entry type, or second skip mechanism; skipPlanChecklist is the only skip.\n- No change to RequestReviewStarter, pr-adoption-review.ts, merge-strike.ts, done-preflight.ts, or the verification worker request shape.\n- A workspace created by hand with pan workspace create (no workspace.adopted entry) keeps the checklist.\n- Remote (Fly) workspaces are never treated as adopted.\n- Re-running verification for PR #4780 and #4783 after deploy is an operator step, not code.\n- No allowlist raise in scripts/file-size-allowlist.txt.\n- The in-process activeSupervisorRuns coalescing map in verification-worker-supervisor.ts is not made option-sensitive.\n- No async twin of readPipelineJournal."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Decide the skip from workspace state inside runVerificationForIssue, not only in the adoption review starter.",
+        "rationale": "Adoption runs once. A later pan review request, the /trigger route, or merge verification (merge-ops.ts line 1021) would run the checklist again and fail. The issue's own condition (journal has workspace.adopted and no xBRIEF) is workspace state, and resolving it at the one verification door still threads it through the existing skipPlanChecklist option into the worker options, as the issue asks."
+      },
+      {
+        "summary": "Place the resolution in the runVerificationForIssue wrapper only (no line-816 variant).",
+        "rationale": "The wrapper sets the option before runSupervisedVerification persists it and before the supervisor's option checks, so the effective option is visible in the worker state. verification-runner.ts is 994 lines and its allowlist cap (961) applies above 1000, so the edit adds at most 4 lines (998); if main grows, the seven-line JSDoc above the wrapper is shortened to one line instead of raising the allowlist."
+      },
+      {
+        "summary": "Count any workspace.adopted entry, not only the last journal entry.",
+        "rationale": "After adoption the journal gains review.requested, verification.failed and others; the workspace is still the adopted one, so later runs must get the same answer."
+      },
+      {
+        "summary": "Fail closed when findPlan errors: keep the checklist.",
+        "rationale": "An unreadable plan location is not proof that no xBRIEF exists; the checklist then reports the read error exactly as it does today."
+      },
+      {
+        "summary": "Make the cross-process live-worker join option-sensitive; leave the in-process activeSupervisorRuns map unchanged.",
+        "rationale": "Plan critique round 1: a live worker launched without skipPlanChecklist (e.g. re-attached on boot) would otherwise be joined by a post-fix request and fail the adopted PR again. adoptUnconsumedResult already uses sameOptions; the live join gets the same rule. The in-process map is only reached by a merge verification racing a review verification, because requestReviewPipeline coalesces review requests first."
+      },
+      {
+        "summary": "Accept synchronous readPipelineJournal in the async helper (NFR-2 revised).",
+        "rationale": "Small local file read once per verification, the same pattern every journal reader uses; an async twin would violate the one-variant-per-operation rule."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Four small items touching three source files, three tests and two docs.",
+      "canonicalFilename": "2026-11-02-PAN-4786-adopted-prs-always-fail-verification-on-incomplete-plan-items-no-xbrief-supervised-handoff-prs-can-never-be-reviewed.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "adopted-plan-helper",
+        "title": "Add the adopted-workspace plan checklist helper module",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T04:36:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4786",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/adopted-plan-checklist.ts",
+            "src/lib/cloister/verification-types.ts",
+            "tests/unit/lib/cloister/adopted-plan-checklist.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/adopted-plan-checklist.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "adopted-plan-checklist.test.ts reports 7 passed tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/adopted-plan-checklist.ts exactly as in PRD work item W1: export async isAdoptedWorkspaceWithoutPlan(workspacePath) = readPipelineJournal(workspacePath).some(e => e.type === 'workspace.adopted') && (await Effect.runPromise(findPlan(workspacePath).pipe(Effect.orElseSucceed(() => 'unreadable')))) === null; and export async withAdoptedPlanChecklistSkip(workspacePath, options) that returns options unchanged when options.skipPlanChecklist is already true (no reads), returns { ...options, skipPlanChecklist: true } plus one console.log line '[verification] <workspacePath>: adopted PR workspace with no xBRIEF — skipping the plan checklist (PAN-4786)' when isAdoptedWorkspaceWithoutPlan is true, and otherwise returns options unchanged. Update the skipPlanChecklist doc comment in src/lib/cloister/verification-types.ts line 24 to name both strike workspaces and adopted PR workspaces with no xBRIEF (PAN-4786). Write tests/unit/lib/cloister/adopted-plan-checklist.test.ts with the seven cases listed in PRD W1, using a mkdtemp tree <root>/workspaces/feature-pan-9001 and journal lines written directly to <ws>/.overdeck/pipeline.jsonl. Do not modify pipeline-journal.ts or xbrief/io.ts."
+        },
+        "items": [
+          {
+            "id": "adopted-plan-helper.ac1",
+            "title": "Given a temp workspace whose journal holds a workspace.adopted entry and no xBRIEF exists in the workspace, the main checkout, or a workspace draft, when withAdoptedPlanChecklistSkip(ws, {}) runs, then it returns { skipPlanChecklist: true }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "adopted-plan-helper.ac2",
+            "title": "Given an adopted temp workspace with a spec file .pan/specs/2026-11-01-PAN-9001-adopted.xbrief.json in either the workspace or the main checkout, when withAdoptedPlanChecklistSkip(ws, {}) runs, then it returns options without skipPlanChecklist",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "adopted-plan-helper.ac3",
+            "title": "Given a workspace whose journal is missing or holds no workspace.adopted entry, when withAdoptedPlanChecklistSkip(ws, {}) runs, then it returns options without skipPlanChecklist",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "adopted-plan-helper.ac4",
+            "title": "Given options { skipPlanChecklist: true, syncTargetBranch: false } and a nonexistent workspace path, when withAdoptedPlanChecklistSkip runs, then it returns the same object identity (toBe) without reading the journal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "adopted-plan-helper.ac5",
+            "title": "Given a journal where workspace.adopted is followed by review.requested and verification.failed entries and no xBRIEF exists, when withAdoptedPlanChecklistSkip(ws, {}) runs, then it returns { skipPlanChecklist: true }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "verify-door-wiring",
+        "title": "Resolve skipPlanChecklist for adopted workspaces in runVerificationForIssue",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T04:36:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4786",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/verification-runner.ts",
+            "tests/unit/lib/cloister/verification-runner-adopted-options.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/verification-runner-adopted-options.test.ts tests/unit/lib/cloister/verification-runner-gate-output.test.ts",
+            "wc -l src/lib/cloister/verification-runner.ts",
+            "bash scripts/lint-file-size.sh",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "verification-runner-adopted-options.test.ts reports 4 passed tests and verification-runner-gate-output.test.ts still passes",
+            "wc prints 1000 or fewer lines for verification-runner.ts",
+            "lint-file-size.sh prints the file-size guard passed line and exits 0",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/verification-runner.ts add `import { withAdoptedPlanChecklistSkip } from './adopted-plan-checklist.js';` beside the other ./ imports, and change the body of runVerificationForIssue (line ~984) to `return Effect.promise(async () => { const resolved = await withAdoptedPlanChecklistSkip(workspacePath, options); return process.env.OVERDECK_VERIFICATION_WORKER === '1' ? runVerificationForIssueInProcess(issueId, workspacePath, workspaceInfo, logPrefix, resolved) : runSupervisedVerification(issueId, workspacePath, workspaceInfo, logPrefix, resolved); });` formatted as in PRD W2. Do not change line 816, any caller, pr-adoption-review.ts, merge-strike.ts or done-preflight.ts. The file must stay at or under 1000 lines; never raise scripts/file-size-allowlist.txt. Implementation checkpoint: the wrapper edit is the only variant; do not change line 816. If origin/main grew so the edit would exceed 1000 lines, shorten the seven-line JSDoc above runVerificationForIssue to the one line given in PRD W2. Write tests/unit/lib/cloister/verification-runner-adopted-options.test.ts: mock ../../../../src/lib/cloister/verification-worker-supervisor.js so runSupervisedVerification is vi.fn(async () => ({ outcome: 'passed' })), copy the side-effect vi.mock set from verification-runner-gate-output.test.ts lines 14-80, do not mock adopted-plan-checklist.js, delete OVERDECK_VERIFICATION_WORKER from process.env in beforeEach, build the PRD W1 temp tree, and assert on the fifth argument of the supervisor mock for the four cases in PRD W2."
+        },
+        "items": [
+          {
+            "id": "verify-door-wiring.ac1",
+            "title": "Given an adopted temp workspace with no xBRIEF, when runVerificationForIssue('PAN-9001', ws, { isRemote: false }, 'request-review') runs, then runSupervisedVerification receives options with skipPlanChecklist: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verify-door-wiring.ac2",
+            "title": "Given an adopted temp workspace whose issue has an xBRIEF in <ws>/.pan/specs/, when runVerificationForIssue runs, then runSupervisedVerification receives options where skipPlanChecklist is not true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verify-door-wiring.ac3",
+            "title": "Given a normal workspace whose journal holds only review.requested, when runVerificationForIssue runs, then runSupervisedVerification receives options where skipPlanChecklist is not true; and given strike options { syncTargetBranch: false, skipPlanChecklist: true }, they reach the supervisor unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verify-door-wiring.ac4",
+            "title": "After the change, wc -l src/lib/cloister/verification-runner.ts prints 1000 or fewer, bash scripts/lint-file-size.sh exits 0, and git diff origin/main on pr-adoption-review.ts, merge-strike.ts and done-preflight.ts produces no output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "supervisor-live-join-options",
+        "title": "Join a live verification worker only when its options match",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T04:36:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4786",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/verification-worker-supervisor.ts",
+            "src/lib/cloister/__tests__/verification-worker-supervisor-join.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/verification-worker-supervisor-join.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "verification-worker-supervisor-join.test.ts passes, including the new 'running with other options' case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-4",
+            "FR-2",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In runSupervisedVerificationOnce (src/lib/cloister/verification-worker-supervisor.ts lines ~327-341) apply the PRD W2b before/after: compute `const sameRun = sameHead && sameOptions(existing.options, options);`, join the live worker only when sameRun and the deadline has not passed, and set `reason` to 'for a different workspace HEAD' when !sameHead, 'running with other options' when !sameRun, else 'past its deadline'. The kill-and-fresh-start path below stays as is. Do not change the activeSupervisorRuns map or adoptUnconsumedResult. Add one test to src/lib/cloister/__tests__/verification-worker-supervisor-join.test.ts in describe('review verification join rule (PAN-4527)'), modelled on 'kills a worker launched on head A...': registerLiveWorker(commit('a'), { logPrefix: 'request-review', options: {} }), then runSupervisedVerification('PAN-1', mocks.workspace, { isRemote: false }, 'request-review', { skipPlanChecklist: true })."
+        },
+        "items": [
+          {
+            "id": "supervisor-live-join-options.ac1",
+            "title": "Given a live request-review worker registered with options {} on the current head, when runSupervisedVerification runs with { skipPlanChecklist: true }, then it sends SIGTERM to the live worker's process group (signalled equals [{ pid: -LIVE_PID, signal: 'SIGTERM' }]) and launches exactly one fresh worker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-live-join-options.ac2",
+            "title": "Given that scenario, when the fresh worker is launched, then readVerificationWorkerState('PAN-1') returns options with skipPlanChecklist true and the call resolves { outcome: 'passed' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-live-join-options.ac3",
+            "title": "Given a live worker with the same head and same options, when a request arrives, then the existing join tests in verification-worker-supervisor-join.test.ts still pass with zero fresh launches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-adopted-checklist",
+        "title": "Document the adopted-PR plan checklist skip in PIPELINE-GATES and MERGE-WORKFLOW",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T04:36:10Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4786",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md",
+            "docs/MERGE-WORKFLOW.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'PAN-4786' docs/PIPELINE-GATES.md docs/MERGE-WORKFLOW.md"
+          ],
+          "expected_outputs": [
+            "grep prints at least four lines: step 12, the PAN-4605 section and the PAN-4532 section in PIPELINE-GATES.md, and item 2 in MERGE-WORKFLOW.md"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply the three doc edits in PRD work item W3: (1) docs/PIPELINE-GATES.md step 12 (lines 52-53) states the checklist is skipped via skipPlanChecklist for a strike merge and for an adopted PR workspace (journal has workspace.adopted) when no xBRIEF resolves, decided by runVerificationForIssue on every run, and that an adopted workspace with an xBRIEF still runs the check; (2) in the section 'A PR opened outside a pipeline workspace (PAN-4605)' (~line 1586) add a paragraph after '...then starts the review.' saying verification skips the plan checklist for an adopted PR with no xBRIEF, still runs typecheck, lint and tests, and the review judges the PR against the issue's acceptance criteria, linking to step 12; (3) docs/MERGE-WORKFLOW.md item 2, after '...and then starts the pipeline.', add the sentence 'Verification skips the plan checklist for an adopted PR with no xBRIEF (PAN-4786); every other check still runs.' (4) docs/PIPELINE-GATES.md section 'Verification survives a dashboard restart (PAN-4532)' (~line 496), in the 'Results are adopted, not re-run.' bullet after '...the options match, and the outcome is not `error`.', add: 'A live worker is joined under the same rule: same head and same options. A live worker running with other options (for example `skipPlanChecklist`, PAN-4786) is stopped and a fresh worker starts.'"
+        },
+        "items": [
+          {
+            "id": "docs-adopted-checklist.ac1",
+            "title": "Given docs/PIPELINE-GATES.md after the change, when a reader opens step 12, then it renders both skip cases (strike merge, and adopted PR workspace with no xBRIEF, PAN-4786) and states that an adopted workspace with an xBRIEF still runs the checklist",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-adopted-checklist.ac2",
+            "title": "The PIPELINE-GATES.md section 'A PR opened outside a pipeline workspace (PAN-4605)' contains a paragraph stating verification skips the plan checklist for an adopted PR with no xBRIEF while typecheck, lint and tests still run",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-adopted-checklist.ac3",
+            "title": "grep -n 'PAN-4786' docs/PIPELINE-GATES.md docs/MERGE-WORKFLOW.md returns at least four matching lines, one of them in MERGE-WORKFLOW.md item 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-adopted-checklist.ac4",
+            "title": "The PIPELINE-GATES.md 'Verification survives a dashboard restart (PAN-4532)' section states that a live worker running with other options is stopped and a fresh worker starts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "adopted-plan-helper",
+        "to": "verify-door-wiring",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}
