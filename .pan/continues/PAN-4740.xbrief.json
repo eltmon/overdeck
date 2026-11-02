@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4740",
   "created": "2026-11-02T12:44:07.052Z",
-  "updated": "2026-11-02T13:25:01.503Z",
+  "updated": "2026-11-02T13:35:30.931Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-11-02T13:24:56.988Z"
     },
     "stale-channel-retry": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4740",
-      "claimedAt": "2026-11-02T13:25:01.503Z"
+      "claimedAt": "2026-11-02T13:25:01.503Z",
+      "doneAt": "2026-11-02T13:35:30.931Z"
     }
   }
 }
