@@ -1,5 +1,5 @@
 import { randomBytes } from 'crypto';
-import { link, mkdir, readdir, readFile, rm, writeFile } from 'fs/promises';
+import { access, link, mkdir, readdir, readFile, rename, rm, writeFile } from 'fs/promises';
 import { join } from 'path';
 import {
   BUILTIN_COLOR_THEMES,
@@ -18,6 +18,9 @@ export function getColorThemesDir(): string {
 function themeFilePath(id: string): string {
   return join(getColorThemesDir(), `${id}.json`);
 }
+
+/** Ids a static route owns (e.g. `PUT /api/color-themes/selection`'s `:id` match); never claimed as a theme file name. */
+const ROUTE_SHADOWED_IDS: readonly string[] = ['selection'];
 
 /** Reads the themes directory fresh on every call — built-ins first, then user themes sorted by id. */
 export async function listColorThemes(): Promise<{ themes: ColorTheme[]; warnings: string[] }> {
@@ -104,7 +107,7 @@ async function claimThemeFile(baseId: string, text: string, mode: number): Promi
       // which a bare "-2" suffix would push past the limit.
       const suffixText = suffix === 1 ? '' : `-${suffix}`;
       const candidate = suffix === 1 ? baseId : `${baseId.slice(0, 64 - suffixText.length)}${suffixText}`;
-      if (!RESERVED_COLOR_THEME_IDS.includes(candidate)) {
+      if (!RESERVED_COLOR_THEME_IDS.includes(candidate) && !ROUTE_SHADOWED_IDS.includes(candidate)) {
         try {
           await link(tempPath, themeFilePath(candidate));
           return candidate;
@@ -138,4 +141,38 @@ export async function saveColorTheme(
   const id = await claimThemeFile(baseId, text, 0o644);
 
   return { theme: { ...probe.theme, id }, warnings: probe.warnings };
+}
+
+export type UpdateColorThemeResult =
+  | { kind: 'saved'; theme: ColorTheme; warnings: string[] }
+  | { kind: 'builtin' }
+  | { kind: 'invalid-id' }
+  | { kind: 'not-found' }
+  | { kind: 'invalid'; errors: string[] };
+
+/**
+ * Overwrites an existing user theme file in place (PAN-4660). Never creates
+ * a file and never touches a built-in/reserved id. Atomic: temp + rename.
+ */
+export async function updateColorTheme(id: string, file: unknown): Promise<UpdateColorThemeResult> {
+  if (Object.hasOwn(BUILTIN_COLOR_THEMES, id) || RESERVED_COLOR_THEME_IDS.includes(id)) return { kind: 'builtin' };
+  if (!COLOR_THEME_ID_RE.test(id)) return { kind: 'invalid-id' };
+  try {
+    await access(themeFilePath(id));
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return { kind: 'not-found' };
+    throw err;
+  }
+  const result = normalizeColorTheme(file, id);
+  if ('errors' in result) return { kind: 'invalid', errors: result.errors };
+  const { id: _id, builtin: _builtin, ...fileContents } = result.theme;
+  const tempPath = join(getColorThemesDir(), `.tmp-${process.pid}-${randomBytes(4).toString('hex')}`);
+  await writeFile(tempPath, `${JSON.stringify(fileContents, null, 2)}\n`, { mode: 0o644 });
+  try {
+    await rename(tempPath, themeFilePath(id));
+  } catch (err) {
+    await rm(tempPath, { force: true });
+    throw err;
+  }
+  return { kind: 'saved', theme: result.theme, warnings: result.warnings };
 }

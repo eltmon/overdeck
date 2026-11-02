@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -107,5 +107,81 @@ describe('color theme store', () => {
     expect(second.theme.id.length).toBeLessThanOrEqual(64);
     expect(second.theme.id).toMatch(/^a+-2$/);
     expect(second.theme.id).not.toBe(first.theme.id);
+  });
+
+  it('updateColorTheme overwrites an existing user theme in place', async () => {
+    const { saveColorTheme, updateColorTheme, listColorThemes } = await import('../store.js');
+    const saved = await saveColorTheme({ name: 'Ayu Dark', type: 'dark' });
+    if ('errors' in saved) throw new Error('expected a saved theme');
+    expect(saved.theme.id).toBe('ayu-dark');
+
+    const result = await updateColorTheme('ayu-dark', {
+      name: 'Ayu Dark',
+      type: 'dark',
+      terminal: { background: '#000000' },
+    });
+    if (result.kind !== 'saved') throw new Error(`expected saved, got ${result.kind}`);
+    expect(result.theme.terminal?.background).toBe('#000000');
+
+    const themesDir = join(testHome, 'themes');
+    const entries = readdirSync(themesDir).filter(name => name.includes('ayu-dark'));
+    expect(entries).toEqual(['ayu-dark.json']);
+
+    const { themes } = await listColorThemes();
+    const ayuDark = themes.find(t => t.id === 'ayu-dark');
+    expect(ayuDark?.terminal?.background).toBe('#000000');
+  });
+
+  it('updateColorTheme refuses built-in ids and writes nothing', async () => {
+    const { updateColorTheme } = await import('../store.js');
+    for (const id of ['overdeck-dark', 'overdeck-light']) {
+      const result = await updateColorTheme(id, { name: 'Custom', type: 'dark' });
+      expect(result.kind).toBe('builtin');
+    }
+
+    const themesDir = join(testHome, 'themes');
+    let entries: string[] = [];
+    try {
+      entries = readdirSync(themesDir);
+    } catch {
+      entries = [];
+    }
+    expect(entries).not.toContain('overdeck-dark.json');
+    expect(entries).not.toContain('overdeck-light.json');
+  });
+
+  it('updateColorTheme returns not-found for an id with no file and creates nothing', async () => {
+    const { updateColorTheme } = await import('../store.js');
+    const result = await updateColorTheme('does-not-exist', { name: 'Custom', type: 'dark' });
+    expect(result.kind).toBe('not-found');
+
+    const themesDir = join(testHome, 'themes');
+    let entries: string[] = [];
+    try {
+      entries = readdirSync(themesDir);
+    } catch {
+      entries = [];
+    }
+    expect(entries).toEqual([]);
+  });
+
+  it('updateColorTheme returns invalid-id for "../evil" and invalid for a body without name', async () => {
+    const { saveColorTheme, updateColorTheme } = await import('../store.js');
+
+    const invalidId = await updateColorTheme('../evil', { name: 'Custom', type: 'dark' });
+    expect(invalidId.kind).toBe('invalid-id');
+
+    const saved = await saveColorTheme({ name: 'Ayu Dark', type: 'dark' });
+    if ('errors' in saved) throw new Error('expected a saved theme');
+
+    const invalid = await updateColorTheme('ayu-dark', { type: 'dark' });
+    expect(invalid.kind).toBe('invalid');
+  });
+
+  it('saveColorTheme never claims the id "selection"', async () => {
+    const { saveColorTheme } = await import('../store.js');
+    const saved = await saveColorTheme({ name: 'Selection', type: 'dark' });
+    if ('errors' in saved) throw new Error('expected a saved theme');
+    expect(saved.theme.id).toBe('selection-2');
   });
 });
