@@ -4,17 +4,17 @@
     "created": "2026-11-02T03:22:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4775: Anywhere docs: mark shipped features as shipped in anywhere.mdx and apply the settled pricing",
-    "updated": "2026-11-02T03:23:48.662Z"
+    "updated": "2026-11-02T03:24:45.163Z"
   },
   "plan": {
     "id": "pan-4775",
     "title": "Anywhere docs: mark shipped features as shipped in anywhere.mdx and apply the settled pricing",
-    "status": "proposed",
+    "status": "running",
     "uid": "54aba28a-09ef-4b26-b376-1b3e605a8fa0",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-02T03:22:00Z",
-    "updated": "2026-11-02T03:23:48.662Z",
+    "updated": "2026-11-02T03:24:45.163Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4775",
@@ -437,5 +437,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
