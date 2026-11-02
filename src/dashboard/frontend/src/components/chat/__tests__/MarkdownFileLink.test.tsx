@@ -7,6 +7,8 @@ const wsTransportMock = vi.hoisted(() => ({
   getAvailableEditors: vi.fn(),
   shellOpenInEditor: vi.fn(),
   readWorkspaceFile: vi.fn(),
+  getAvailableBrowsers: vi.fn(),
+  shellOpenInBrowser: vi.fn(),
 }));
 
 const toastMock = vi.hoisted(() => ({
@@ -45,6 +47,15 @@ const markdownMeta = {
   targetPath: '/home/eltmon/project/docs/README.md',
   displayPath: 'project/docs/README.md',
   basename: 'README.md',
+};
+
+// PAN-4762 — a browser-renderable, non-markdown chip.
+const htmlMeta = {
+  filePath: '/home/eltmon/project/mockups/board.html',
+  targetPath: '/home/eltmon/project/mockups/board.html:4',
+  displayPath: 'project/mockups/board.html:4',
+  basename: 'board.html',
+  line: 4,
 };
 
 // PAN-3260 — the reported case: a repo-root markdown chip inside a
@@ -94,11 +105,17 @@ describe('MarkdownFileLink', () => {
       truncated: false,
       totalLines: 80,
     });
+    wsTransportMock.getAvailableBrowsers.mockReset();
+    wsTransportMock.getAvailableBrowsers.mockResolvedValue({ browsers: ['default-browser', 'chrome', 'firefox'] });
+    wsTransportMock.shellOpenInBrowser.mockReset();
+    wsTransportMock.shellOpenInBrowser.mockResolvedValue(undefined);
     wsTransportMock.request.mockReset();
     wsTransportMock.request.mockImplementation((connect: (client: Record<string, unknown>) => unknown) => connect({
       [WS_METHODS.getAvailableEditors]: wsTransportMock.getAvailableEditors,
       [WS_METHODS.shellOpenInEditor]: wsTransportMock.shellOpenInEditor,
       [WS_METHODS.readWorkspaceFile]: wsTransportMock.readWorkspaceFile,
+      [WS_METHODS.getAvailableBrowsers]: wsTransportMock.getAvailableBrowsers,
+      [WS_METHODS.shellOpenInBrowser]: wsTransportMock.shellOpenInBrowser,
     }));
   });
 
@@ -491,6 +508,71 @@ describe('MarkdownFileLink', () => {
         'Copy relative path',
         'Copy full path',
       ]);
+    });
+  });
+
+  describe('browser items in the generic right-click menu (PAN-4762)', () => {
+    it('lists browser items between Open in editor and Open containing folder for a browser-renderable chip', async () => {
+      render(<MarkdownFileLink {...htmlMeta} />);
+
+      fireEvent.contextMenu(screen.getByRole('link'));
+
+      await waitFor(() => {
+        expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual([
+          'Open in editor',
+          'Open in browser',
+          'Open in Google Chrome',
+          'Open in Firefox',
+          'Open containing folder',
+          'Copy relative path',
+          'Copy full path',
+        ]);
+      });
+
+      fireEvent.keyDown(document, { key: 'Escape' });
+    });
+
+    it('clicking Open in Firefox calls shellOpenInBrowser and shows a success toast', async () => {
+      render(<MarkdownFileLink {...htmlMeta} />);
+
+      fireEvent.contextMenu(screen.getByRole('link'));
+      const firefoxItem = await screen.findByRole('menuitem', { name: 'Open in Firefox' });
+      fireEvent.click(firefoxItem);
+
+      await waitFor(() => {
+        expect(wsTransportMock.shellOpenInBrowser).toHaveBeenCalledWith({
+          path: htmlMeta.filePath,
+          browser: 'firefox',
+        });
+        expect(toastMock.success).toHaveBeenCalledWith('Opened in Firefox');
+      });
+    });
+
+    it('shows a failure toast when shellOpenInBrowser rejects', async () => {
+      wsTransportMock.shellOpenInBrowser.mockRejectedValue(new Error('boom'));
+      render(<MarkdownFileLink {...htmlMeta} />);
+
+      fireEvent.contextMenu(screen.getByRole('link'));
+      const browserItem = await screen.findByRole('menuitem', { name: 'Open in browser' });
+      fireEvent.click(browserItem);
+
+      await waitFor(() => {
+        expect(toastMock.error).toHaveBeenCalledWith('Failed to open in browser: boom');
+      });
+    });
+
+    it('does not request available browsers for a non-browser-renderable chip', async () => {
+      render(<MarkdownFileLink {...meta} />);
+
+      fireEvent.contextMenu(screen.getByRole('link'));
+
+      expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual([
+        'Open in editor',
+        'Open containing folder',
+        'Copy relative path',
+        'Copy full path',
+      ]);
+      expect(wsTransportMock.getAvailableBrowsers).not.toHaveBeenCalled();
     });
   });
 });
