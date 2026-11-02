@@ -516,7 +516,11 @@ with a 90 s spawn grace (Herdr's 60 s detection window plus the 30 s tmux grace)
 tmux census only for a conversation Herdr does not hold. When Herdr does not answer it marks
 nothing. Readiness reads the pane through `readAgentPaneText` (Herdr `pane.read` with
 `source: visible`, or tmux `capture-pane`): `recent` is empty while a full-screen TUI (omp, kimi,
-muse, the codex TUI) draws on the alternate screen, so the agent TUI waiters read `visible` too. The numbered-menu capture in `conversation-pane-choice.ts` stays tmux-only.
+muse, the codex TUI) draws on the alternate screen, so the agent TUI waiters read `visible` too. The numbered-menu capture in `conversation-pane-choice.ts` stays tmux-only. Claude Code
+readiness (`waitForClaudeReady`) does not count a `❯` while a known blocking startup dialog
+title is on screen (today: "Make auto mode your default permission mode?"); if the dialog is
+still there at the 30 s deadline, the conversation start fails with a spawn error naming the
+dialog instead of sending the first message into it (PAN-4738).
 
 **On a tmux host the door still asks Herdr** when its socket answers, and only a Herdr `alive`
 counts there (an unreachable Herdr is the normal state of a tmux host). The poller does the same

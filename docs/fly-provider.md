@@ -334,9 +334,12 @@ OpenAI replaces the refresh token on every refresh, so two copies of one sign-in
 both stay valid. The Codex sign-in is therefore not copied one way like Claude's: the
 `syncFlyCodexAuth` loop (below) keeps home and each VM in step by newest refresh wins.
 
-Claude Code is also configured for autonomous operation: `~/.claude/settings.json` is
-written from your resolved Overdeck permission mode and onboarding is marked complete
-in `~/.claude.json`.
+Claude Code is configured for autonomous operation: `~/.claude/settings.json` is written
+from your resolved Overdeck permission mode, and `~/.claude.json` marks onboarding
+complete, trusts `/workspace`, accepts the Bypass Permissions disclaimer, and dismisses
+the one-shot "Make auto mode your default permission mode?" dialog
+(`hasSeenAutoDefaultNudge`), which otherwise took focus on every fresh VM and swallowed
+the first message (PAN-4738).
 
 If Claude auth fails on the remote agent, re-authenticate locally (`claude`) then sync:
 
@@ -554,7 +557,8 @@ deleted the record and left `fly machines list -a pan-workspaces` empty (O4).
 Recorded, not fixed here:
 
 - The first message of a new conversation was lost to Claude Code's "Make auto mode your
-  default permission mode?" startup dialog
+  default permission mode?" startup dialog — fixed by PAN-4738: the VM pre-answers the
+  dialog, and the readiness wait no longer takes the dialog for the composer
   ([#4738](https://github.com/eltmon/overdeck/issues/4738)).
 - The VM's conversation-lifecycle patrol marks the live conversation ended on every tick,
   which can make the idle sweep see a working machine as idle
