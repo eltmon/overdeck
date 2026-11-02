@@ -65,6 +65,8 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'POST', path: '/api/conversations/:name/stop', scope: 'operate' },
   { method: 'POST', path: '/api/conversations/:name/abort', scope: 'operate' },
   { method: 'POST', path: '/api/lanes', scope: 'operate' },
+  // PAN-4638 WI-8: stop a lane here, or on its owner through the link.
+  { method: 'POST', path: '/api/lanes/:name/stop', scope: 'operate' },
   // PAN-4645 WI-13: a linked machine revokes its own token (the route then
   // requires exactly a machine credential).
   { method: 'DELETE', path: '/api/machines/self', scope: 'read:state' },
@@ -93,6 +95,10 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   // PAN-4651 WI-19: Add this project there (operator actor on an operator-level link only, checked by the route).
   { method: 'POST', path: '/api/machines/work/projects', scope: 'operate' },
   { method: 'GET', path: '/api/machines/work/projects/:jobId', scope: 'read:state' },
+  // PAN-4638 WI-3: lane work doors — home runs a gauntlet lane here (machine credential only, checked by the routes).
+  { method: 'POST', path: '/api/machines/work/lanes', scope: 'operate' },
+  { method: 'GET', path: '/api/machines/work/lanes/:name/status', scope: 'read:state' },
+  { method: 'POST', path: '/api/machines/work/lanes/:name/reap', scope: 'operate' },
   // PAN-4651 WI-20: fleet Needs-You (owner feed for linked machines; the viewer's combined list).
   { method: 'GET', path: '/api/machines/needs-you', scope: 'read:conversations' },
   { method: 'GET', path: '/api/fleet/needs-you', scope: 'read:conversations' },

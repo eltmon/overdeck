@@ -40,6 +40,7 @@ import { createLinkedProjectsSync, setLinkedProjectsSync } from './linked-projec
 import { createLinkedNeedsYouSync, setLinkedNeedsYouSync } from './linked-needs-you-sync.js';
 import { needsYouHashForHeartbeat } from './needs-you-feed.js';
 import { currentMachineLoad, startMachineLoadSampler, stopMachineLoadSampler } from './machine-load.js';
+import { defaultRemoteLaneFollowerDeps, RemoteLaneFollower, setRemoteLaneFollower } from './remote-lane-follower.js';
 import { defaultRemoteWorkerFollowerDeps, RemoteWorkerFollower, setRemoteWorkerFollower } from './remote-worker-follower.js';
 import { stopForwardsWithoutLink } from './port-forwards.js';
 import { defaultSshForwardSupervisorDeps, SshForwardSupervisor } from './ssh-forward-supervisor.js';
@@ -55,6 +56,7 @@ let inbox: InboxClient | null = null;
 let reconcileTimer: NodeJS.Timeout | null = null;
 let stopTransferSweep: (() => void) | null = null;
 let workerFollower: RemoteWorkerFollower | null = null;
+let laneFollower: RemoteLaneFollower | null = null;
 
 /** The port this dashboard listens on, by the same rule as ServerConfig. */
 function dashboardPort(): number {
@@ -165,9 +167,14 @@ export async function startAnywhere(options: { primary: boolean }): Promise<void
   supervisor.start();
   // PAN-4651 WI-12: follow workers delegated to linked machines; resumes running stand-ins from disk.
   const linkSupervisor = supervisor;
-  workerFollower = new RemoteWorkerFollower(defaultRemoteWorkerFollowerDeps((environmentId) => linkSupervisor.routeFor(environmentId)?.state === 'online'));
+  const linkOnline = (environmentId: string): boolean => linkSupervisor.routeFor(environmentId)?.state === 'online';
+  workerFollower = new RemoteWorkerFollower(defaultRemoteWorkerFollowerDeps(linkOnline));
   setRemoteWorkerFollower(workerFollower);
   await workerFollower.start().catch((error: Error) => console.warn(`[anywhere] could not resume remote workers: ${error.message}`));
+  // PAN-4638 WI-7: follow gauntlet lanes running on linked machines; resumes stand-ins from disk.
+  laneFollower = new RemoteLaneFollower(defaultRemoteLaneFollowerDeps(linkOnline));
+  setRemoteLaneFollower(laneFollower);
+  await laneFollower.start().catch((error: Error) => console.warn(`[anywhere] could not resume remote lanes: ${error.message}`));
   setLinkStatusSource(supervisor);
   setLinkPresenceSource(supervisor);
   setLinkRouteSource(supervisor);
@@ -211,6 +218,9 @@ export function stopAnywhere(): void {
   workerFollower?.stop();
   workerFollower = null;
   setRemoteWorkerFollower(null);
+  laneFollower?.stop();
+  laneFollower = null;
+  setRemoteLaneFollower(null);
   supervisor?.stop();
   supervisor = null;
   inbox?.stop();

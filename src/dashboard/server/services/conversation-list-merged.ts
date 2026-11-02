@@ -11,7 +11,8 @@ import { linksSnapshot, type MachineLink } from '../../../lib/anywhere/link-stor
 import { readEnvironmentIdentity } from '../../../lib/environment-identity.js';
 import { getConversationListWithVaultCopies } from '../../../lib/overdeck/conversation-list.js';
 import { listLinkedConversations } from '../../../lib/overdeck/linked-conversations.js';
-import { type LinkPresence, mergeConversationRows } from '../../../lib/overdeck/linked-conversations-merge.js';
+import { listRemoteLanes } from '../../../lib/lanes/remote-lanes.js';
+import { type LinkPresence, mergeConversationRows, remoteLaneKey, type RemoteLaneEntry } from '../../../lib/overdeck/linked-conversations-merge.js';
 
 type ListRow = Record<string, unknown> & { name: string; origin?: string; claudeSessionId?: string | null };
 
@@ -38,6 +39,14 @@ export async function getMergedConversationList(limit: number, offset: number, p
   const linked = listLinkedConversations();
   if (linked.length === 0) return rows;
   const identity = await readEnvironmentIdentity();
+  // PAN-4638 FR-8: remote lanes nest under the orchestrator that launched them.
+  const remoteLanes = new Map<string, RemoteLaneEntry>();
+  for (const { facts, archivedAt } of await listRemoteLanes({}).catch(() => [])) {
+    if (archivedAt !== null) continue;
+    remoteLanes.set(remoteLaneKey(facts.environmentId, facts.name), {
+      parentName: facts.parentName, run: facts.run, key: facts.key, role: facts.role, criticOfName: facts.criticOfName, projectKey: facts.projectKey,
+    });
+  }
   return mergeConversationRows({
     local: rows.filter((row) => row.origin !== 'vault'),
     vaultCopies: rows.filter((row) => row.origin === 'vault'),
@@ -45,5 +54,6 @@ export async function getMergedConversationList(limit: number, offset: number, p
     links: linksSnapshot(),
     selfEnvironmentId: identity?.environmentId ?? null,
     presence: presenceOf,
+    remoteLanes,
   });
 }

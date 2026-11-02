@@ -74,7 +74,7 @@ describe('pan lane critic flags (PAN-4223 WI-21)', () => {
     fetchMock.mockImplementation(async () => json(200, { generatedAt: 'now', lanes }));
     expect(await laneListCommand({ run: 'hotel' }, deps)).toBe(0);
     expect(out[0]).toMatch(/REPORT\s+FOR\s+VERDICT\s+BRANCH@SHA/);
-    expect(out[1]).toMatch(/^1\s+hotel\/663\s+builder\s+1\s+stopped\s+-\s+NOT_YET 7\s+-/);
-    expect(out[2]).toMatch(/^2\s+hotel\/663\s+critic\s+1\s+stopped\s+-\s+663 i1\s+NOT_YET 7\s+-/);
+    expect(out[1]).toMatch(/^1\s+hotel\/663\s+builder\s+-\s+1\s+stopped\s+-\s+NOT_YET 7\s+-/);
+    expect(out[2]).toMatch(/^2\s+hotel\/663\s+critic\s+-\s+1\s+stopped\s+-\s+663 i1\s+NOT_YET 7\s+-/);
   });
 });

@@ -42,6 +42,10 @@ step, each named in the output:
 | `tell-once` | a repeated `pan tell … --message-id` replays the first answer; the same id with other text is refused (the seeded conversation has no live pane, so that answer is a failed delivery; `remote-reply` checks delivery) |
 | `released-409` | with `released_to` set on B, a message through A answers 409 `conversation-released` |
 | `forward` | `pan machines forward` reaches a dev server on B; B's dashboard port is refused |
+| `lane-remote` | (#4638) `pan lane start --role play --machine <B> --json` on A, under a root conversation on A, answers with B as the machine and a null id (B's `projects.yaml` puts the lanes root under B's fake `HOME`) |
+| `lane-report` | `pan lane report --status done` inside the lane on B; `pan lane wait <name>` on A exits 0 with the body within 20 s, and `pan lane list --json` on A lists the lane on B |
+| `lane-nest` | A's `GET /api/conversations` lists `@<B>/<name>` with A's root conversation id as `parentConversationId` and `gauntletRun` `smoke` |
+| `lane-reap` | `pan lane stop` then `pan lane reap` on A exit 0; B's row is archived and A's stand-in has `archived.json` |
 | `kill B` | after `SIGKILL`, A shows the link offline within 30 s |
 | `restart B` | A shows it online again within 60 s |
 | `no-http` | the proxy capture starts with the channel preamble byte `0x00` and contains no `HTTP/1.1` |
@@ -942,3 +946,93 @@ earlier machine already counted. `GET /api/fleet/settings-compare/:machine` comp
 `GET /api/settings/resolved` (`settings-resolved.ts`: explicitly set `config.yaml` keys,
 secrets only as set / not set) and prints `pan admin config set` lines; links never change
 settings.
+
+## Gauntlet lanes across machines (#4638)
+
+Decisions: `.pan/drafts/PAN-4638.md` (D-4638-1 … D-4638-16); epic W-WORK3. The machine
+that runs the orchestrator and `pan lane start` is **home**; the machine that runs a
+remote lane is its **owner**.
+
+### Validate at home, execute on the owner (D-4638-1/2/3/9/10/11)
+
+`launchLane` (`lanes/launch.ts`) keeps every rule that needs the run's rows: parent and
+launcher standing, run, critic link and default `--at`, iteration, idempotency, model,
+harness and effort. It reads lanes through `listAllLaneRows` (`lanes/lane-rows.ts`), which
+merges local lane conversations with the stand-ins. With a remote target it skips home's
+CPU check, refuses an orchestrator lane, refuses on a Fly machine a harness whose
+capabilities lack `runsOnFlyMachine` (Claude Code and Codex have it; #4296) and refuses `--machine` with `--reuse` (D-4638-8). It allocates a name
+free in `conversations` and claimed in the stand-in store (`reserveRemoteLane`, an empty
+directory), and calls the owner with a precomputed `OwnerLaneSpec`: name, iteration,
+branch, base, `at`, brief header, the verdict a builder answers. `name-taken` retries with
+a new name up to 3 times; any other refusal, or an unreached owner, removes the claim.
+On 201 home writes `lane.json` with the owner's cwd, which only the owner knows.
+
+`POST /api/lanes` (`routes/lanes.ts`) gives `launchLane` a `resolveMachine` dependency:
+`resolveTargetMachine` (`fly` answers 400 `fly-unavailable`, #4743), the project's git
+origin, a 403 `no-chained-hops` for a secure-channel caller (D-4638-12), `isFly` from the
+Fly machine store, and the owner calls through `postWorkDoor` as the caller's actor
+(`x-overdeck-sender`, 30 s, 503 `machine-unreachable`), with refusals through
+`ownerRefusal`. The same resolver serves a `--reuse` whose newest lane ran elsewhere and
+`--replace` of a live lane on another machine.
+
+The owner doors live in `routes/machines-work-lanes.ts`, machine credential only:
+`POST /api/machines/work/lanes`, `GET /api/machines/work/lanes/:name/status?after=<seq>` and
+`POST /api/machines/work/lanes/:name/reap`. The launch door resolves
+the owner's own project by git origin alone and runs `launchOwnedLane`
+(`lanes/owner-launch.ts`): its own CPU check (429 unless `force`), the harness check, the
+worktree under its own lanes root (a builder's base falls back to `origin/<base>`; a
+critic's commit must have arrived through `origin`, FR-9), the brief, a lane row with lane
+facts and **no parent** (`createConversation` with `remoteLaunch` and
+`refuseExistingName`), the `started_by_environment_id` stamp, and the runtime with the
+lane contract. The status and reap doors answer 404 `unknown-lane` unless the caller's
+environment started the lane; status returns at most 20 reports after `after`.
+
+### The stand-in (D-4638-4/5/7, NFR-1, NFR-3)
+
+Home never inserts a `conversations` row for a remote lane. `lanes/remote-lanes.ts` keeps
+`~/.overdeck/remote-lanes/<name>/`: `lane.json` (write-once launch facts), `mirror.json`
+(the follower's copy of the owner's state: activity, git facts, cost, last seen,
+`unreachableSince`, last assistant message, spawn error) and `archived.json` (written once
+by reap). All are 0600; `mirror.json` is replaced through a temp file and rename. Reports
+are mirrored to `agents/conv-<name>/reports/`, so every report reader works unchanged. A
+local critic of a remote builder keeps its link in `agents/conv-<critic>/lane-link.json`.
+D7 iteration groups on a cwd key, `<environmentId>:<cwd>` for a remote lane, because two
+machines with the same home layout produce the same path.
+
+### The follower (D-4638-14, NFR-4, NFR-5)
+
+`services/remote-lane-follower.ts`, started in `startAnywhere` next to the worker follower,
+resumes every stand-in that is not archived and not gone, polls the owner's status door
+every 5 s as the operator while the link is online (at most 20 reports per poll), and backs
+off 1 s doubling to 300 s (±20 %) while unreachable, never giving up. 404 `unknown-lane`
+marks the mirror `gone`. It never stops a remote lane when its parent ends, as local lanes
+do not stop. `POST /api/lanes` starts following a new launch at once (`followRemoteLane`).
+
+### Views, CLI, stop and reap (D-4638-6/13/15)
+
+`listLaneViews` builds on `listAllLaneRows`: a remote lane's view has `id: null` and
+`machine: { environmentId, label, reachable, lastSeenAt }`, and its activity, git facts,
+cost and last activity come from the mirror; nothing runs git or reads liveness at home
+for it. Pairing (`lanes/pairing.ts`) keys on conversation names. `GET /api/lanes/:name`
+answers a stand-in. `waitForLane` judges a stand-in from its mirror and counts an
+unreachable owner as alive. `POST /api/lanes/:name/stop` and `…/reap` forward a remote lane
+to the owner's conversation stop door and lane reap door; reap archives the stand-in after
+the owner's 200 (unless `keep`) or its 404 `unknown-lane` (with a warning), and archives
+nothing when the owner is unreachable. The agent fence refuses an agent actor on
+`POST /api/lanes/<name>/reap` here; the owner reap door checks provenance instead. A
+remote lane is messaged as `@<label>/<name>`.
+
+### Nesting (FR-8)
+
+`mergeConversationRows` (`overdeck/linked-conversations-merge.ts`) stamps a remote lane's
+linked row with the stand-in's parent, run, key, role, critic link and home's project key,
+so the Command Deck tree nests it under its orchestrator and the Awareness rail counts it
+in the run card, with no frontend change.
+
+Live check, 2026-11-01: the three-machine run (orchestrator and builders on the desktop,
+critics on a Fly machine and the laptop) did not run before merge: no laptop or Fly machine
+was linked to the desktop, and the desktop dashboard runs `main`, which has no lane doors
+until this lands. Fallback per the plan: the two-machine smoke on this branch (two local
+servers, A as home and B as the laptop) passed `lane-remote`, `lane-report`, `lane-nest`
+and `lane-reap`. The three-machine check (laptop rig and a Fly machine) runs after release
+and `pan reload`, tracked in #4760.
