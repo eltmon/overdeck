@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { PanRpcError, WS_METHODS } from '@overdeck/contracts'
 import { EditorPane } from './EditorPane'
 import { useStageDeck, type StageDeckContextValue } from '../StageDeckContext'
+import { getConversationCitations, resetCitationStore } from '../../../lib/composerCitations'
 import type { StageContext } from '../types'
 import type { WorkspacePane } from '../../../lib/panesStore'
 
@@ -45,6 +46,7 @@ const pane = (over: Partial<WorkspacePane> = {}): WorkspacePane => ({
 
 beforeEach(() => {
   localStorage.clear()
+  resetCitationStore()
   toastMock.error.mockReset()
   toastMock.success.mockReset()
   wsTransportMock.readFileAtPath.mockReset()
@@ -301,6 +303,79 @@ describe('EditorPane', () => {
 
     await waitFor(() => expect(screen.getByTestId('editor-pane-textarea')).toHaveValue('original'))
     expect(screen.queryByTestId('editor-pane-readonly-note')).not.toBeInTheDocument()
+  })
+})
+
+// PAN-4658 — Cite over the editor Preview.
+describe('EditorPane Preview cite', () => {
+  function selectTextIn(element: Element): void {
+    const range = document.createRange()
+    range.selectNodeContents(element)
+    const selection = window.getSelection()
+    selection?.removeAllRanges()
+    selection?.addRange(range)
+    document.dispatchEvent(new Event('selectionchange'))
+  }
+
+  it('selecting Preview text shows Cite; Save stores a file citation and shows a toast with an "Open conversation" action', async () => {
+    wsTransportMock.readFileAtPath.mockResolvedValue({ text: 'Step one\nStep two', lang: 'markdown', mtimeMs: 100, totalLines: 2, writable: true })
+
+    render(<EditorPane pane={pane({ citeConversationName: 'conv-a' })} ctx={ctx} />)
+    await waitFor(() => expect(screen.getByTestId('editor-pane-textarea')).toHaveValue('Step one\nStep two'))
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Preview' }))
+    const md = screen.getByTestId('md')
+
+    act(() => selectTextIn(md))
+    fireEvent.click(screen.getByRole('button', { name: 'Cite' }))
+    const commentBox = screen.getByLabelText('Citation comment')
+    fireEvent.change(commentBox, { target: { value: 'Wrong step' } })
+    const citeBox = commentBox.closest('div')!
+    fireEvent.click(within(citeBox).getByRole('button', { name: 'Save' }))
+
+    const citations = getConversationCitations('conv-a')
+    expect(citations).toHaveLength(1)
+    expect(citations[0]!.source).toEqual({ kind: 'file', path: '/repo/docs/flywheel-brief.md' })
+    expect(citations[0]!.comment).toBe('Wrong step')
+
+    expect(toastMock.success).toHaveBeenCalledWith(
+      'Citation added',
+      expect.objectContaining({ action: expect.objectContaining({ label: 'Open conversation' }) }),
+    )
+  })
+
+  it('renders no Cite button when the pane has no citeConversationName', async () => {
+    wsTransportMock.readFileAtPath.mockResolvedValue({ text: 'Step one', lang: 'markdown', mtimeMs: 100, totalLines: 1, writable: true })
+
+    render(<EditorPane pane={pane()} ctx={ctx} />)
+    await waitFor(() => expect(screen.getByTestId('editor-pane-textarea')).toHaveValue('Step one'))
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Preview' }))
+    act(() => selectTextIn(screen.getByTestId('md')))
+
+    expect(screen.queryByRole('button', { name: 'Cite' })).not.toBeInTheDocument()
+  })
+
+  it('renders no Cite button while the draft is dirty', async () => {
+    wsTransportMock.readFileAtPath.mockResolvedValue({ text: 'Step one', lang: 'markdown', mtimeMs: 100, totalLines: 1, writable: true })
+
+    render(<EditorPane pane={pane({ citeConversationName: 'conv-a' })} ctx={ctx} />)
+    await waitFor(() => expect(screen.getByTestId('editor-pane-textarea')).toHaveValue('Step one'))
+
+    fireEvent.change(screen.getByTestId('editor-pane-textarea'), { target: { value: 'edited' } })
+    fireEvent.click(screen.getByRole('tab', { name: 'Preview' }))
+    act(() => selectTextIn(screen.getByTestId('md')))
+
+    expect(screen.queryByRole('button', { name: 'Cite' })).not.toBeInTheDocument()
+  })
+
+  it('renders no Cite button on the Edit tab', async () => {
+    wsTransportMock.readFileAtPath.mockResolvedValue({ text: 'Step one', lang: 'markdown', mtimeMs: 100, totalLines: 1, writable: true })
+
+    render(<EditorPane pane={pane({ citeConversationName: 'conv-a' })} ctx={ctx} />)
+    await waitFor(() => expect(screen.getByTestId('editor-pane-textarea')).toHaveValue('Step one'))
+
+    expect(screen.queryByRole('button', { name: 'Cite' })).not.toBeInTheDocument()
   })
 })
 
