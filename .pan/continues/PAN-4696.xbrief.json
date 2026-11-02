@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4696",
   "created": "2026-11-02T16:17:12.298Z",
-  "updated": "2026-11-02T16:19:25.626Z",
+  "updated": "2026-11-02T16:23:21.660Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-4696",
       "claimedAt": "2026-11-02T16:17:12.298Z",
       "doneAt": "2026-11-02T16:19:25.626Z"
+    },
+    "smoke-launch-remote": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4696",
+      "claimedAt": "2026-11-02T16:23:21.660Z"
     }
   }
 }
