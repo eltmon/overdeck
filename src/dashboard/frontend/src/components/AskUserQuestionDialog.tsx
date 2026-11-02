@@ -74,13 +74,13 @@ export function AskUserQuestionDialog({
   const pending = agent?.pendingAskUserQuestion
   const questions = pending?.questions ?? []
   // PAN-1690 — Codex approval menus are answered by selecting a numbered
-  // option (delivered as a keystroke), not free text, so the custom-answer box
+  // option (delivered as a keystroke), not free text, so the note box
   // is hidden for them.
   const isCodexApproval = pending?.toolUseId?.startsWith('codex-approval:') ?? false
   // The chosen labels per question: at most one for single-choice questions,
   // any number for multiSelect ones. Empty until the operator picks.
   const [selections, setSelections] = useState<string[][]>(() => questions.map(() => []))
-  const [customText, setCustomText] = useState('')
+  const [noteText, setNoteText] = useState('')
   // App keeps this dialog mounted across questions, so reset the answer state
   // whenever a different question arrives. Stale selections from an earlier
   // multi-part question otherwise never match questions.length and Send stays
@@ -90,7 +90,7 @@ export function AskUserQuestionDialog({
   if (answeredKey !== questionKey) {
     setAnsweredKey(questionKey)
     setSelections(questions.map(() => []))
-    setCustomText('')
+    setNoteText('')
   }
 
   const panelRef = useRef<HTMLDivElement>(null)
@@ -137,22 +137,26 @@ export function AskUserQuestionDialog({
       }
       return next
     })
-    setCustomText('')
   }
-  const canSubmit = allSelected || customText.trim().length > 0
+  const canSubmit = allSelected || noteText.trim().length > 0
 
+  // PAN-4754 FR-11 — an answer is the chosen options, the chosen options
+  // with the note appended to the last answer, or the note alone.
   const handleSubmit = (): void => {
-    const isCustom = customText.trim().length > 0
+    const note = noteText.trim()
+    if (!allSelected && note.length === 0) return
     capture('agent_question_answered', {
       subject_kind: agent.kindLabel === 'Conversation' ? 'conversation' : 'agent',
-      answer_type: isCustom ? 'custom' : 'selection',
+      answer_type: allSelected ? (note ? 'selection+note' : 'selection') : 'note',
       question_count: bucketCount(questions.length),
     })
-    if (isCustom) {
-      onSubmit([customText.trim()])
-    } else if (allSelected) {
-      onSubmit(questions.map((_, qIdx) => answerFor(qIdx)))
+    if (!allSelected) {
+      onSubmit([note])
+      return
     }
+    const answers = questions.map((_, qIdx) => answerFor(qIdx))
+    if (note) answers[answers.length - 1] += `\n\nNote: ${note}`
+    onSubmit(answers)
   }
 
   // Tab and Shift+Tab wrap at the panel's last and first focusable elements.
@@ -285,20 +289,15 @@ export function AskUserQuestionDialog({
           {!isCodexApproval && (
             <div className="space-y-1">
               <label htmlFor={noteId} className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Or type a custom answer
+                Add a note (optional)
               </label>
               <textarea
                 id={noteId}
-                value={customText}
-                onChange={(e) => {
-                  setCustomText(e.target.value)
-                  if (e.target.value.length > 0) {
-                    setSelections(questions.map(() => []))
-                  }
-                }}
+                value={noteText}
+                onChange={(e) => setNoteText(e.target.value)}
                 disabled={isSubmitting}
                 rows={2}
-                placeholder="Free-form prose response — submitted instead of any clicked option."
+                placeholder="Anything the agent should know with your answer."
                 className={`w-full rounded-md border border-border bg-background/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground ${FOCUS_RING} disabled:cursor-not-allowed disabled:opacity-60`}
               />
             </div>

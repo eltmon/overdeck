@@ -258,9 +258,47 @@ describe('AskUserQuestionDialog option semantics', () => {
   it('the note box has an accessible label and every option has a focus ring', () => {
     renderWith({ question: 'Pick one?', options: [{ label: 'A' }, { label: 'B' }] });
 
-    expect(screen.getByLabelText(/custom answer/i).tagName).toBe('TEXTAREA');
+    expect(screen.getByLabelText('Add a note (optional)').tagName).toBe('TEXTAREA');
     for (const option of screen.getAllByRole('radio')) {
       expect(option).toHaveClass('focus-visible:ring-2');
     }
+  });
+});
+
+describe('AskUserQuestionDialog option plus note', () => {
+  function renderWithOptions() {
+    const onSubmit = vi.fn();
+    render(<AskUserQuestionDialog subject={{ id: 'agent-pan-1', pendingAskUserQuestion }} isOpen onSubmit={onSubmit} onDismiss={vi.fn()} />);
+    return onSubmit;
+  }
+
+  it('choosing an option keeps the typed note', () => {
+    renderWithOptions();
+    const note = screen.getByLabelText('Add a note (optional)');
+    fireEvent.change(note, { target: { value: 'also X' } });
+
+    fireEvent.click(screen.getByRole('radio', { name: /Option A/ }));
+
+    expect(note).toHaveValue('also X');
+    expect(screen.getByRole('radio', { name: /Option A/ })).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('sends option plus note as one answer', () => {
+    const onSubmit = renderWithOptions();
+    fireEvent.click(screen.getByRole('radio', { name: /Option A/ }));
+    fireEvent.change(screen.getByLabelText('Add a note (optional)'), { target: { value: 'also X' } });
+
+    fireEvent.click(screen.getByRole('button', { name: /Send Answer/ }));
+
+    expect(onSubmit).toHaveBeenCalledWith(['Option A\n\nNote: also X']);
+  });
+
+  it('sends a note alone', () => {
+    const onSubmit = renderWithOptions();
+    fireEvent.change(screen.getByLabelText('Add a note (optional)'), { target: { value: '  just this ' } });
+
+    fireEvent.click(screen.getByRole('button', { name: /Send Answer/ }));
+
+    expect(onSubmit).toHaveBeenCalledWith(['just this']);
   });
 });

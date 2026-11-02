@@ -106,7 +106,7 @@ the public contract and lists every allowed value.
 | Domain | Allowed values |
 | --- | --- |
 | `agent_spawn_mode` | `spawn-and-send`, `spawn-work-and-send` |
-| `answer_type` | `custom`, `selection` |
+| `answer_type` | `custom`, `selection`, `note`, `selection+note` |
 | `auto_merge_variant` | `segmented`, `badge` |
 | `boolean` | `false`, `true` |
 | `cli_verb` | `abort`, `approve`, `backlog`, `backup`, `clean`, `context`, `destroy`, `dev`, `diff`, `doctor`, `done`, `down`, `edit`, `finalize`, `fork`, `handoff`, `health`, `init`, `issues`, `kill`, `list`, `migrate`, `mode`, `open`, `pause`, `pending`, `plan`, `project`, `projects`, `recover`, `reload`, `reopen`, `request`, `reset`, `restart`, `restore`, `resume`, `review`, `scope`, `serve`, `show`, `skills`, `spawn-reviewer`, `staffing`, `start`, `status`, `strike`, `sync`, `sync-main`, `tell`, `unarchive-conversation`, `unpause`, `untroubled`, `up`, `update`, `validate`, `wipe`, `write-sequence`, `other` |
