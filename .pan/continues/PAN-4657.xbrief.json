@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4657",
   "created": "2026-11-02T03:48:30.667Z",
-  "updated": "2026-11-02T04:01:44.606Z",
+  "updated": "2026-11-02T04:20:52.887Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-11-02T04:01:35.935Z"
     },
     "badge-enrichment": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4657",
-      "claimedAt": "2026-11-02T04:01:44.606Z"
+      "claimedAt": "2026-11-02T04:01:44.606Z",
+      "doneAt": "2026-11-02T04:20:52.887Z"
     }
   }
 }
