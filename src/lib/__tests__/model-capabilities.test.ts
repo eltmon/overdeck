@@ -29,6 +29,24 @@ describe('model capabilities', () => {
     },
   );
 
+  // 2026-11-02 official OpenAI pricing: blend = (input + output) / 2.
+  it.each([
+    ['gpt-5.6-sol', 12],
+    ['gpt-5.6-sol[372k]', 12],
+    ['gpt-5.6-terra', 7],
+    ['gpt-5.6-luna', 0.7],
+    ['gpt-5.5', 17.5],
+    ['gpt-5.5-pro', 105],
+    ['gpt-5.2', 7.875],
+    ['gpt-5.4-mini', 2.625],
+  ] as const)('blends %s at %s $/1M', (model, blend) => {
+    expect(MODEL_CAPABILITIES[model].costPer1MTokens).toBe(blend);
+  });
+
+  it('records gpt-5.2 at its official 400K window', () => {
+    expect(MODEL_CAPABILITIES['gpt-5.2'].contextWindow).toBe(400_000);
+  });
+
   it.each(['gpt-5.6-sol[372k]', 'gpt-5.6-terra[372k]', 'gpt-5.6-luna[372k]'] as const)(
     'locks %s contextWindow to the long-context ceiling',
     (model) => {

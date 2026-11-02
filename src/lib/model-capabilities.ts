@@ -339,7 +339,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     model: 'gpt-5.4-mini',
     provider: 'openai',
     displayName: 'GPT-5.4 Mini',
-    costPer1MTokens: 1.0, // ~$0.40 in / $1.60 out
+    costPer1MTokens: 2.625, // $0.75 in / $4.50 out (official pricing, 2026-11-02)
     contextWindow: 400000,
     minTier: 'free', // Available in ChatGPT Free tier
     skills: {
@@ -455,7 +455,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     model: 'gpt-5.6-sol',
     provider: 'openai',
     displayName: 'GPT-5.6 Sol',
-    costPer1MTokens: 17.5, // $5.00 in / $30.00 out
+    costPer1MTokens: 12, // $4.00 in / $20.00 out (promo through ≥2026-11-21, no post-promo rate published; checked 2026-11-02)
     contextWindow: CLIPROXY_GPT56_CONTEXT_WINDOW,
     minTier: 'plus',
     effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
@@ -479,7 +479,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     model: 'gpt-5.6-sol[372k]',
     provider: 'openai',
     displayName: 'GPT-5.6 Sol 372K',
-    costPer1MTokens: 17.5, // $5.00 in / $30.00 out — 2x in / 1.5x out past 272K input
+    costPer1MTokens: 12, // $4.00 in / $20.00 out (promo) — 2x in / 1.5x out past 272K input
     contextWindow: CLIPROXY_GPT56_LONG_CONTEXT_WINDOW,
     minTier: 'plus',
     effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
@@ -599,7 +599,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     model: 'gpt-5.5',
     provider: 'openai',
     displayName: 'GPT-5.5',
-    costPer1MTokens: 10.5, // $3.00 in / $18.00 out
+    costPer1MTokens: 17.5, // $5.00 in / $30.00 out (official pricing, 2026-11-02)
     contextWindow: CLIPROXY_CODEX_CONTEXT_WINDOW,
     minTier: 'plus', // ChatGPT Plus/Pro only
     skills: {
@@ -622,7 +622,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     model: 'gpt-5.5-pro',
     provider: 'openai',
     displayName: 'GPT-5.5 Pro',
-    costPer1MTokens: 119.0, // $18 in / $220 out
+    costPer1MTokens: 105, // $30 in / $180 out (official pricing, 2026-11-02)
     contextWindow: 1050000,
     minTier: 'pro', // ChatGPT Pro only
     skills: {
@@ -667,8 +667,8 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     model: 'gpt-5.2',
     provider: 'openai',
     displayName: 'GPT-5.2',
-    costPer1MTokens: 5.625, // $1.25 in / $10 out (estimate)
-    contextWindow: 200000,
+    costPer1MTokens: 7.875, // $1.75 in / $14 out (official pricing, 2026-11-02)
+    contextWindow: 400000, // developers.openai.com/api/docs/models/gpt-5.2
     skills: {
       'code-generation': 88,
       'code-review': 86,
