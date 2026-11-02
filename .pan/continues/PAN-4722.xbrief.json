@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4722",
   "created": "2026-11-02T15:37:17.298Z",
-  "updated": "2026-11-02T16:02:34.355Z",
+  "updated": "2026-11-02T16:02:51.994Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -72,6 +72,10 @@
     "sync-via-cli.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T16:02:34.355Z"
+    },
+    "sync-via-cli.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:02:51.994Z"
     }
   }
 }
