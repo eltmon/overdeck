@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4734",
   "created": "2026-11-02T14:23:44.928Z",
-  "updated": "2026-11-02T16:54:45.659Z",
+  "updated": "2026-11-02T16:55:00.749Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -169,6 +169,10 @@
     "wi6-fly-conversation-cwd-and-workspace.ac4": {
       "status": "completed",
       "doneAt": "2026-11-02T16:54:45.658Z"
+    },
+    "wi7-fly-work-agent-service.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:55:00.749Z"
     }
   }
 }
