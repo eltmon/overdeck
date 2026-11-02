@@ -89,11 +89,13 @@ describe('SkillPacksSection', () => {
   it('shows the pack summary and expands to its skills', () => {
     renderSection({ level: 'global', packs: [pack()] });
     const row = packRow('mattpocock');
-    expect(within(row).getByText('https://github.com/mattpocock/skills @ v1.2.3 (c55ee46)')).toBeTruthy();
-    expect(within(row).getByText('MIT · 2 skills, 1 opt-in · Not applied: none')).toBeTruthy();
+    expect(within(row).getByText('MIT · 2 skills')).toBeTruthy();
+    expect(within(row).getByText('0 of 2 on')).toBeTruthy();
     expect(document.querySelector('[data-pack-skill]')).toBeNull();
 
     fireEvent.click(within(row).getByRole('button', { name: 'mattpocock' }));
+    expect(within(row).getByText('https://github.com/mattpocock/skills @ v1.2.3 (c55ee46)')).toBeTruthy();
+    expect(within(row).getByText('1 opt-in · Not applied: none')).toBeTruthy();
     expect(document.querySelector('[data-pack-skill="mattpocock/grilling"]')).toBeTruthy();
     expect(screen.getByText('Overdeck also bundles grilling')).toBeTruthy();
   });
@@ -144,6 +146,14 @@ describe('SkillPacksSection', () => {
     const row = packRow('mattpocock');
     expect(within(row).getByText('pan skills pack sync mattpocock')).toBeTruthy();
     expect(within(row).getByText('also installed as a Claude plugin — skills will appear twice')).toBeTruthy();
+  });
+
+  it('opens a pack whose skills match the panel search and hides packs without a match', () => {
+    renderSection({ level: 'global', packs: [pack(), pack({ id: 'sageox', skills: [] })], search: 'grill' });
+    expect(document.querySelector('[data-pack="sageox"]')).toBeNull();
+    expect(document.querySelector('[data-pack-skill="mattpocock/grilling"]')).toBeTruthy();
+    expect(document.querySelector('[data-pack-skill="mattpocock/setup-matt-pocock-skills"]')).toBeNull();
+    expect(within(packRow('mattpocock')).getByText('1 match')).toBeTruthy();
   });
 
   it('renders the add command when there are no packs', () => {

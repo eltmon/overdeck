@@ -1,0 +1,202 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T00:50:33Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4757: Flaky e2e: pan-2355-mobile spec finds two 'Yes' buttons (strict mode violation) on main",
+    "updated": "2026-11-02T00:53:55.300Z"
+  },
+  "plan": {
+    "id": "pan-4757",
+    "title": "Flaky e2e: pan-2355-mobile spec finds two 'Yes' buttons (strict mode violation) on main",
+    "status": "running",
+    "uid": "e5ae279c-ac07-4e22-803d-afd10891be74",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-02T00:50:33Z",
+    "updated": "2026-11-02T00:53:55.300Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4757",
+        "label": "PAN-4757",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4757.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "e2e",
+      "playwright",
+      "flaky-test",
+      "mobile",
+      "frontend-tests"
+    ],
+    "narratives": {
+      "Problem": "The pan-2355-mobile Playwright spec hard-codes the fixture question time to 2026-11-01T00:00Z. The Needs-you row header button renders formatRelativeTime(since), which reads 'yesterday' once the question is 24-47 hours old. Playwright's getByRole name match is a case-insensitive substring match, so first.getByRole('button', { name: 'Yes' }) at spec line 133 matched both the Yes option and the row header ('… yesterday'), a strict-mode violation. Every test-e2e run on main between 2026-11-02T00:00Z and 2026-11-03T00:00Z fails deterministically; the issue's duplicate-render and second-question hypotheses are ruled out.",
+      "Proposal": "In one commit, change the Yes tap to { name: 'Yes', exact: true } and compute the PENDING fixture askedAt values from Date.now(), pinning pan-2355-ship to 25 hours ago (docs row 5 minutes later) so the header always reads 'yesterday'. The former date bomb becomes a permanent regression guard. Document the Playwright substring rule and relative-fixture-time rule in docs/TESTING.md and the codebase conventions map. No component changes.",
+      "NonGoals": "- No change to MobileNeedsYou.tsx, formatRelativeTime.ts, useDecisions.ts, or any file under src/dashboard/frontend/src/\n- No .first(), .nth(), test retry, or retries config added to the spec\n- No change to the Send, Conversations, Back, or other locators in the spec\n- No sweep of other Playwright specs for missing exact: true\n- No change to the CONVERSATIONS fixture dates\n- No change to CI workflow files or playwright.config.ts"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Root cause is the 'yesterday' relative-time text in the row header matching name: 'Yes' as a substring, not a duplicate render or a second question.",
+        "rationale": "Green run #12495 started 23h52m after the fixture askedAt ('23h ago'); red run #12496 started 24h37m after ('yesterday'). QuestionCard renders each option once and the fixture has one Yes/No question."
+      },
+      {
+        "summary": "Use exact: true on the Yes locator instead of .first().",
+        "rationale": "The issue forbids a blind .first(); .first() would also tap the row header, which precedes the card in DOM order. exact: true targets the option by whole name."
+      },
+      {
+        "summary": "Pin the ship fixture to 25 hours before the run so the header always reads 'yesterday'.",
+        "rationale": "Turns a one-day date bomb into a permanent regression guard and makes the fix verifiable on any date; 25h sits mid-band in the 24-48h 'yesterday' window."
+      },
+      {
+        "summary": "Both spec edits land in a single item and commit.",
+        "rationale": "The fixture pin without exact: true makes the spec fail on every run, so the edits are not independently mergeable."
+      },
+      {
+        "summary": "Leave the Send locator unchanged and do not sweep other specs.",
+        "rationale": "Nothing else in the ship card contains 'send'; the docs rule covers future specs and the issue scopes the fix to this spec."
+      }
+    ],
+    "items": [
+      {
+        "id": "spec-exact-yes",
+        "title": "Match the Yes option exactly and pin pan-2355-mobile fixture times to 25h ago",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T00:50:33Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4757",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-2355-mobile.spec.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build",
+            "cd src/dashboard/frontend && npx playwright test tests/pan-2355-mobile.spec.ts",
+            "grep -n \"name: 'Yes', exact: true\" src/dashboard/frontend/tests/pan-2355-mobile.spec.ts",
+            "git diff origin/main --stat -- src/dashboard/frontend/src"
+          ],
+          "expected_outputs": [
+            "npm run build completes without errors",
+            "Playwright reports 1 passed for tests/pan-2355-mobile.spec.ts",
+            "grep prints exactly one line",
+            "git diff --stat prints nothing for src/dashboard/frontend/src"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Edit only src/dashboard/frontend/tests/pan-2355-mobile.spec.ts, following PRD WI-1 exactly. (1) Replace the PENDING array (search 'const PENDING = [', lines 48-51) with: a comment explaining the 'yesterday' collision (PAN-4757); `const SHIP_ASKED_AT = Date.now() - 25 * 60 * 60 * 1000;`; the ship row askedAt `new Date(SHIP_ASKED_AT).toISOString()`; the docs row askedAt `new Date(SHIP_ASKED_AT + 5 * 60 * 1000).toISOString()`. (2) Change line 133 to `await first.getByRole('button', { name: 'Yes', exact: true }).tap();`. Change no other line. Commit both edits in one commit with an `Item: spec-exact-yes` trailer. Verify with `npm run build` then `cd src/dashboard/frontend && npx playwright test tests/pan-2355-mobile.spec.ts`. Optional negative check (do not commit): with only edit (1) applied the spec fails with 'strict mode violation … resolved to 2 elements' at the Yes tap."
+        },
+        "items": [
+          {
+            "id": "spec-exact-yes.ac1",
+            "title": "Given the edited spec, when grepping it, then exactly one line contains `name: 'Yes', exact: true` and no line contains the hard-coded `2026-11-01T00:0` timestamps",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spec-exact-yes.ac2",
+            "title": "Given a fresh `npm run build`, when running `npx playwright test tests/pan-2355-mobile.spec.ts` from src/dashboard/frontend on any date, then it exits 0 and reports 1 passed while the ship row header renders 'yesterday'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spec-exact-yes.ac3",
+            "title": "Given the branch diff against origin/main, then it changes no file under src/dashboard/frontend/src/ and the spec diff adds no `.first()`, `.nth(`, or retries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-playwright-name-match",
+        "title": "Document Playwright substring name matching and relative e2e fixture times",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T00:50:33Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4757",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/TESTING.md",
+            ".overdeck/context/codebase/conventions.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"exact: true\" docs/TESTING.md",
+            "grep -c \"last-verified\" .overdeck/context/codebase/conventions.md",
+            "grep -n \"PAN-4757\" .overdeck/context/codebase/conventions.md"
+          ],
+          "expected_outputs": [
+            "docs/TESTING.md prints the new bullet naming exact: true and the yesterday example",
+            "conventions.md has exactly 1 last-verified line",
+            "conventions.md prints the new Testing bullet"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. In docs/TESTING.md, append the two bullets from the PRD to the **Rules:** list of the '`data-testid` Convention' section, right after the bullet '- Use `getByText` only for content verification, not for clicking'. In .overdeck/context/codebase/conventions.md, append the one Testing bullet from the PRD at the end of the '## Testing' section, before the `<!-- last-verified: … -->` line, and update that line's date to the commit date; keep exactly one last-verified line, at the end of the file. Commit with an `Item: docs-playwright-name-match` trailer."
+        },
+        "items": [
+          {
+            "id": "docs-playwright-name-match.ac1",
+            "title": "docs/TESTING.md renders a Rules bullet stating Playwright getByRole name matching is a case-insensitive substring match, that `{ name: 'Yes' }` also matches a 'yesterday' label, and that `exact: true` prevents it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-playwright-name-match.ac2",
+            "title": "docs/TESTING.md renders a Rules bullet stating e2e fixture timestamps shown as relative time are computed from Date.now(), never hard-coded dates",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-playwright-name-match.ac3",
+            "title": "conventions.md Testing section contains the PAN-4757 exact-match bullet and the file contains exactly one last-verified line, at its end",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "metadata": {
+      "canonicalFilename": "2026-11-02-PAN-4757-flaky-e2e-pan-2355-mobile-spec-finds-two-yes-buttons-strict-mode-violation-on-main.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

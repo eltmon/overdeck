@@ -70,18 +70,36 @@ afterEach(() => {
 });
 
 describe('SkillOverridesPanel — global', () => {
-  it('renders a core row with a disabled switch and a normal row, each with a source label', async () => {
+  it('groups skills by origin, with core collapsed behind a locked header', async () => {
     mockApi({ project: null, issue: null, skills: [GRILLING, PAN_DONE], overriddenBelow: {} });
     renderPanel({ level: 'global' });
 
     await waitFor(() => expect(row('grilling')).toBeTruthy());
-    expect(within(row('pan-done')).getByRole('switch')).toHaveProperty('disabled', true);
-    expect(within(row('pan-done')).getByText('Core — always on')).toBeTruthy();
-    expect(within(row('pan-done')).getByText('core')).toBeTruthy();
     expect(within(row('grilling')).getByRole('switch')).toHaveProperty('disabled', false);
-    expect(within(row('grilling')).getByText('default')).toBeTruthy();
+    expect(within(row('grilling')).queryByText('default')).toBeNull();
+    expect(document.querySelector('[data-skill="pan-done"]')).toBeNull();
+    expect(screen.getByText('Always on; the pipeline depends on them')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Core' }));
+    expect(within(row('pan-done')).getByRole('switch')).toHaveProperty('disabled', true);
+    expect(within(row('pan-done')).getByRole('switch').getAttribute('aria-label')).toBe('pan-done is a core skill, always on');
+    expect(screen.getByTestId('skills-summary').textContent).toBe('2 on·0 off·1 core');
     expect(screen.getByText(/Changes apply to Claude Code and Codex agents at their next launch\./)).toBeTruthy();
     expect(fetchImpl).toHaveBeenCalledWith('/api/skills/overrides');
+  });
+
+  it('collapses the Overdeck group until a search matches inside it', async () => {
+    const remotion = skill({ name: 'remotion', origin: 'overdeck', description: 'Render video' });
+    mockApi({ project: null, issue: null, skills: [GRILLING, remotion] });
+    renderPanel({ level: 'global' });
+    await waitFor(() => expect(row('grilling')).toBeTruthy());
+
+    expect(document.querySelector('[data-skill="remotion"]')).toBeNull();
+    expect(within(document.querySelector('[data-skill-group="overdeck"]') as HTMLElement).getByText('1 of 1 on')).toBeTruthy();
+
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Filter skills' }), { target: { value: 'video' } });
+    expect(row('remotion')).toBeTruthy();
+    expect(document.querySelector('[data-skill-group="personal"]')).toBeNull();
   });
 
   it('switches off with enabled false, then back on with enabled null', async () => {
