@@ -543,4 +543,8 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly and f
   `.mintignore` excludes. `npm run lint:docs` catches `$` in prose and `<` before a
   digit, not `<word>` in prose. Until PAN-4779 lands, scope a docs change's link check
   to its own pages and compare the rest against this baseline.
+- **Merge-train AC lookup roots** (PAN-1696, PAN-3165, PAN-4799) — batch members
+  are unmerged, so their specs are never on `main`; `memberSpecRoots`
+  (`services/uat-member-spec-roots.ts`) orders batch worktree → feature
+  workspace → project root. Do not collapse it back to one root.
 <!-- last-verified: 2026-11-02 -->
