@@ -589,15 +589,37 @@ Recorded, not fixed here:
   default permission mode?" startup dialog — fixed by PAN-4738: the VM pre-answers the
   dialog, and the readiness wait no longer takes the dialog for the composer
   ([#4738](https://github.com/eltmon/overdeck/issues/4738)).
-- The VM's conversation-lifecycle patrol marks the live conversation ended on every tick,
-  which can make the idle sweep see a working machine as idle
-  ([#4739](https://github.com/eltmon/overdeck/issues/4739)).
+- The VM's conversation-lifecycle patrol and the conversation list disagreed about a live
+  conversation, so its row flapped between `ended` and `active` and the idle sweep could
+  see a working machine as idle
+  ([#4739](https://github.com/eltmon/overdeck/issues/4739)). Fixed by PAN-4739: the
+  census now reads tmux as a UTF-8 client (see "Reproduction (PAN-4739)" below), and the
+  patrol confirms through `conversationHarnessAlive` before it ends a conversation, so
+  the patrol and the list route can no longer flap the row. A census verdict the door
+  contradicts logs one `WARNING (PAN-4739)` line in `fly-serve.log`.
 - The first linked request after an idle spell failed with `socket hang up`; an
   immediate retry succeeded ([#4740](https://github.com/eltmon/overdeck/issues/4740)).
 - The VM advertises its private Fly addresses as `lan` routes, which home tries before
   the public route ([#4741](https://github.com/eltmon/overdeck/issues/4741)).
 - A test that pulls a conversation must not register the workspace being tested as the
   project's checkout: **Pull here** restores the conversation's code into that checkout.
+
+**Reproduction (PAN-4739).** Cause found and fixed in `src/lib/tmux.ts` (the decision
+rule's first branch). Run 1's image (`registry.fly.io/pan-workspaces:pan-4652`, pan
+0.72.0, tmux 3.4) ran in a local container with `pan serve` started as provisioning
+starts it (`HOME=/`, `setsid nohup`, `OVERDECK_TERMINAL_BACKEND=tmux IS_SANDBOX=1`).
+The server process had no `LANG` or `LC_*` variable, and without a UTF-8 locale tmux
+prints every tab in `-F` output as `_`: the census's `list-panes -a` returned
+`conv-20261102-2889_565_0_` where it should return tab-separated fields. The parser
+read no pane id from that line and dropped it, so the census held no session, and the
+patrol logged `Session conv-20261102-2889 gone — marking ended` 30 s after the spawn
+while `tmux ls` listed the session. `list-sessions -F '#{session_name}'` has no tab,
+so the list route still saw the session and set the row back to `active` on the next
+`GET /api/conversations`. The pane readers that parse tab-separated records
+(`listAllPaneRecords`, `listPaneValues`, `listPaneValuesSync`) now pass `-u`, which
+makes tmux write UTF-8 output whatever the locale. With that change patched into the
+same container, a row marked ended under a live harness was set back to `active` by
+the patrol's own census on the next tick, and no `gone` line appeared.
 
 
 ## Live verification (PAN-4296)

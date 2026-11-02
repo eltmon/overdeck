@@ -557,4 +557,14 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly and f
   are unmerged, so their specs are never on `main`; `memberSpecRoots`
   (`services/uat-member-spec-roots.ts`) orders batch worktree → feature
   workspace → project root. Do not collapse it back to one root.
+- **Two tmux oracles answer conversation liveness.** The lifecycle patrol reads the
+  runtime census (`list-panes -a`, `src/lib/runtime-census.ts`); the conversation
+  list's repair reads `list-sessions` + `conversationHarnessAlive`
+  (`src/lib/overdeck/conversation-liveness.ts`), and home's
+  `GET /api/machines/conversations` sync runs that repair on a linked machine. When
+  they disagree a row flaps active/ended every tick (PAN-4739, Fly VM). Any new
+  writer of conversation status must decide through the conversation-liveness door;
+  the patrol now confirms through it before ending a row. On the Fly VM the census
+  disagreed because tmux without a UTF-8 locale prints `-F` tabs as `_`: any new
+  multi-field `-F` reader must pass `-u` (see `listAllPaneRecords` in `src/lib/tmux.ts`).
 <!-- last-verified: 2026-11-02 -->
