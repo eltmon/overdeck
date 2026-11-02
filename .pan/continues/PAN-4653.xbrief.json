@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4653",
   "created": "2026-11-02T03:31:51.838Z",
-  "updated": "2026-11-02T04:20:31.475Z",
+  "updated": "2026-11-02T04:20:51.287Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -60,6 +60,10 @@
     "override-store.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T04:20:31.474Z"
+    },
+    "override-store.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:20:51.287Z"
     }
   }
 }
