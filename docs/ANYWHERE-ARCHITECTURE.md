@@ -1034,4 +1034,5 @@ critics on a Fly machine and the laptop) did not run before merge: no laptop or 
 was linked to the desktop, and the desktop dashboard runs `main`, which has no lane doors
 until this lands. Fallback per the plan: the two-machine smoke on this branch (two local
 servers, A as home and B as the laptop) passed `lane-remote`, `lane-report`, `lane-nest`
-and `lane-reap`. The Fly half waits for the operator's sign-off after merge.
+and `lane-reap`. The three-machine check (laptop rig and a Fly machine) runs after release
+and `pan reload`, tracked in #4760.
