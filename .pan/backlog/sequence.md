@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T12:27:18.433717Z · model: claude-opus-5-5 · open: 862_
+_Last sequenced: 2026-11-02T12:28:08.712038Z · model: claude-opus-5-5 · open: 860_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -276,7 +276,6 @@ _Last sequenced: 2026-11-02T12:27:18.433717Z · model: claude-opus-5-5 · open: 
 | 269 | PAN-4696 | XS | medium | ok |  |  | Post-merge smoke for PAN-4295: one pan start --remote run proves auto-reap, remote-reap source, fresh heartbeat on deployed build. |
 | 270 | PAN-2243 | S | high | ok |  |  | pan plan finalize: CLI aborts complete-planning at 90s while the server handler legitimately finishes later (false ✖ Failed) |
 | 271 | PAN-2202 | S | high | ok |  |  | complete-planning silently skips spec promotion on a dead session's unanswered AskUserQuestion |
-| 272 | PAN-4739 | M | low | ok |  |  | Fly VM patrol marks a live conversation ended each tick; idle sweep may destroy a used VM. Root cause probe not yet found. |
 | 273 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
 | 274 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
 | 275 | PAN-4722 | S | medium | ok |  |  | Fleet Update all runs npm -g on pan connect machines; must update ~/.overdeck/runtime prefix. PAN-4654 and PAN-4656 closed. |
@@ -298,7 +297,6 @@ _Last sequenced: 2026-11-02T12:27:18.433717Z · model: claude-opus-5-5 · open: 
 | 291 | PAN-1710 | S | high | ok |  |  | 'Clean install + server smoke test' hangs (3 consecutive 20-min timeout kills) on feature/pan-1491 and feature/pan-1641 |
 | 292 | PAN-1558 | M | high | ok |  |  | Review/specialist agents should run in the workspace Docker container, not inherit host-override |
 | 293 | PAN-1766 | S | high | ok |  |  | work agents hang on Claude Code settings-file protection when editing .claude/** |
-| 294 | PAN-4738 | S | low | ok |  |  | First message to a Fly-machine conversation is pasted into Claude Code's auto-mode dialog and lost; pre-answer it in configureClaudeCode. |
 | 295 | PAN-2266 | M | high | ok |  |  | feat: add zcode harness and make it the default for glm-5.2 |
 | 296 | PAN-1578 | M | high | ok |  |  | GitHub Copilot CLI as a first-class harness (pipeline peer to Claude Code, Pi, Codex) |
 | 297 | PAN-1538 | M | high | ok |  |  | Unblock Pi source forks |
@@ -1197,10 +1195,10 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T12:27:18.433717Z",
+  "generatedAt": "2026-11-02T12:28:08.712038Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 862,
+  "openCount": 860,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -11876,32 +11874,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "planning": "auto"
     },
     {
-      "issue": "PAN-4739",
-      "rank": 272,
-      "size": "M",
-      "importance": "low",
-      "score": 5,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Fly VM patrol marks a live conversation ended each tick; idle sweep may destroy a used VM. Root cause probe not yet found.",
-      "rationale": "New bug from the PAN-4652 live check: the VM's conversation-lifecycle patrol disagrees with the live tmux session, and sweepFlyMachines reads that status, so an active Fly machine can be reaped. Ranked beside the other Fly remote correctness bugs (PAN-4682, PAN-4685) because it can destroy live work.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4738",
-      "rank": 294,
-      "size": "S",
-      "importance": "low",
-      "score": 5,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "First message to a Fly-machine conversation is pasted into Claude Code's auto-mode dialog and lost; pre-answer it in configureClaudeCode.",
-      "rationale": "New bug from the PAN-4652 live check with a located fix site (FlyProvider.configureClaudeCode); every conversation started with --message loses its opening turn, so it sits just behind PAN-4739.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4659",
       "rank": 828,
       "size": "M",
@@ -13105,13 +13077,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "confidence": 0.4
     },
     {
-      "from": "PAN-4748",
-      "to": "PAN-4739",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
-    },
-    {
       "from": "PAN-4747",
       "to": "PAN-3508",
       "type": "informs",
@@ -13138,20 +13103,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-4738",
-      "to": "PAN-4760",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-4739",
-      "to": "PAN-4760",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
     },
     {
       "from": "PAN-4740",
@@ -13205,13 +13156,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     {
       "from": "PAN-4772",
       "to": "PAN-4803",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4738",
-      "to": "PAN-4792",
       "type": "informs",
       "source": "github-ref",
       "confidence": 1
