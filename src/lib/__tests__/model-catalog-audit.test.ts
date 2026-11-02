@@ -152,4 +152,10 @@ describe('November 2026 Gemini, Qwen and GLM refresh (PAN-4827)', () => {
     expect(MODEL_CAPABILITIES['glm-4.7'].costPer1MTokens).toBe(1.4);
     expect(MODEL_CAPABILITIES['glm-4.7-flash'].costPer1MTokens).toBe(0);
   });
+
+  it.each(Object.entries(PROVIDERS))('%s tier ids and haikuModel name no retired model', (_name, provider) => {
+    const ids = [...Object.values(provider.tierModels ?? {}), provider.haikuModel]
+      .filter((id): id is string => typeof id === 'string');
+    for (const id of ids) expect(Object.hasOwn(MODEL_DEPRECATIONS, id), id).toBe(false);
+  });
 });
