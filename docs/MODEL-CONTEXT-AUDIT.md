@@ -85,7 +85,7 @@ Every fact below was re-read from the official source on 2026-11-02 before the c
 - [xAI models](https://docs.x.ai/docs/models): `grok-4.7` 500k context, $2.00 / $0.50 cached / $6.00 below 200k prompt tokens and $4.00 / $1.00 / $12.00 for every token once a prompt reaches 200k; `grok-4.3` 1M context, $1.25 / $0.20 / $2.50 and $2.50 / $0.40 / $5.00 at ≥200k; `grok-build-0.1` still listed.
 - [MiniMax pricing](https://platform.minimax.io/docs/guides/pricing) and [models](https://platform.minimax.io/docs/guides/models-intro): `MiniMax-M3.1-Flash` $0.15 in / $0.60 out / $0.015 cache read at every input length, 1M context, "tunable thinking depth"; `MiniMax-M3` Standard ≤512K input $0.30 / $1.20 / $0.06, >512K input $0.60 / $2.40 / $0.12.
 - [Meta reasoning](https://dev.meta.ai/docs/reasoning): `max` is "Supported by `muse-wonder-1.0` and `muse-spark-1.3`; not available with `muse-spark-1.3-contributor`."
-- Kimi CLI 2.0.2 (`kimi provider list --json`, 2026-11-02): `kimi-code/kimi-for-coding` is "K2.8 Preview", `maxContextSize` 1048576, `supportEfforts` low/high/max, default max; `kimi-code/kimi-for-coding-highspeed` is "K2.7 Code Highspeed", 262144, no `supportEfforts`.
+- [Kimi Code models](https://www.kimi.com/code/docs/en/kimi-code/models.html), matching Kimi CLI 2.0.2 `kimi provider list --json`: `kimi-for-coding` is "K2.8 Preview", up to 1,048,576 tokens, effort low/high/max (default max); `kimi-for-coding-highspeed` is "K2.7 Code Highspeed", up to 262,144 tokens, and "does not support adjustable thinking effort."
 
 **Changed**
 
@@ -102,6 +102,7 @@ Every fact below was re-read from the official source on 2026-11-02 before the c
 - What `mistral-large-latest` resolves to: no official page says, so the `-latest` ids and Mistral tier slots are unchanged.
 - MiniMax M2.7 and M2.7 Highspeed stay live. The official pricing and models pages, re-read 2026-11-02, do not mention M2.7 and show no retirement notice. Third-party sources report the models closed to new users on 2026-10-19 and retiring on 2026-11-18.
 - Image input (`supportsImages`) for MiMo V2.6 and the gpt-oss ids: no live probe was run, so the flag stays unset.
+- Whether Overdeck's MiMo Token-Plan endpoint (`token-plan-sgp.xiaomimimo.com`) serves the V2.6 ids: not testable without a key, so the base URL is unchanged.
 - Effort levels for Grok 4.7 / 4.3, Mistral Large 4, the gpt-oss ids and MiniMax M3.1 Flash: no official page lists them.
 - K2.8 Preview pricing: unpublished, so `kimi-for-coding` keeps the K2.7 rate. The claude-route ids `kimi-k2.7-code` and bare `kimi-for-coding` keep their 262,144 window and no adjustable effort.
 - Muse `minimal` effort: not an Overdeck effort level.
