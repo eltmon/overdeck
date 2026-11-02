@@ -496,3 +496,18 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
   approved 1d360ce2d, head 697a05f82). Check `overdeck=<state> <sha>` against the
   head, not just reviewDecision. When routing CodeRabbit findings, always tell the
   agent to finish with `pan review request <id>` after pushing.
+- 2026-11-02 03:15 UTC, operator launch queue (Anywhere finish + t3code parity; the
+  2026-08-08 order book is finished, so do not use it):
+  - Fly, in order, at most 3 at once (they touch the same files):
+    4682, 4748, 4685, 4683, 4738, 4739, 4740, 4741, 4743, 4734, 4722, then 4696
+    (verify reap and heartbeat after 1-10 merge).
+  - Non-Fly, any time: 4775, 4776 (it stops at an operator checkpoint, which is
+    expected), 4661.
+  - LAST, after the Fly items merge: 4774 (release acceptance AC-1..15).
+  - t3code parity, any time: 4653, 4655, 4657, 4658, 4659, 4660.
+  - Watch PAN-4710: a planned issue with no work agent needs `pan start` again.
+- 2026-11-02 03:20 UTC, queue change from the operator: do NOT start PAN-4776. The
+  operator is deploying services/account and services/connect themselves. Its
+  planner, started 03:12, was stopped and the workspace kept. HOLD PAN-4774 until
+  PAN-4682 AND PAN-4748 merge; its body is being rewritten to run the hardware
+  tests on Fly VMs.

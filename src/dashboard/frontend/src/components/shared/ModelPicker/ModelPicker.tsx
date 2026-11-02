@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useId, useRef } from 'react';
 import { ChevronDown } from 'lucide-react';
 import {
   getDefaultConversationModel,
@@ -240,14 +240,18 @@ export function ModelSelect({
   onChange,
   groups,
   label,
+  labelId,
 }: {
   value: string;
   onChange: (id: string) => void;
   groups: ModelGroup[];
   label: string;
+  /** When set, renders only the picker (no built-in label); the trigger is named by this id instead (PAN-4755 D11). */
+  labelId?: string;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const buttonId = useId();
   const allModels = groups.flatMap((g) => g.models);
   const selected = allModels.find((m) => m.id === value);
 
@@ -260,59 +264,67 @@ export function ModelSelect({
     return () => document.removeEventListener('mousedown', handleClick);
   }, [open]);
 
+  const picker = (
+    <div ref={ref} className={styles.pickerWrap}>
+      <button
+        type="button"
+        id={labelId ? buttonId : undefined}
+        aria-labelledby={labelId ? `${labelId} ${buttonId}` : undefined}
+        className={styles.pickerBtn}
+        onClick={() => setOpen((o) => !o)}
+      >
+        <span className={styles.pickerValue}>{selected?.label ?? value}</span>
+        {(() => {
+          const lvl = costWarningLevel(selected?.costPer1MTokens);
+          return lvl
+            ? <CostWarningBadge level={lvl} compact costPer1MTokens={selected?.costPer1MTokens} />
+            : null;
+        })()}
+        {selected?.costDisplay && (
+          <span className={styles.pickerCost}>{selected.costDisplay}</span>
+        )}
+        <ChevronDown size={12} className={styles.pickerChevron} />
+      </button>
+      {open && (
+        <div className={styles.pickerDropdown}>
+          {groups.map((group) => (
+            <div key={group.provider}>
+              {groups.length > 1 && (
+                <div className={styles.pickerGroupHeader}>
+                  <ProviderLogo provider={group.provider} label={group.label} className={styles.providerLogo} />
+                  <span>{group.label}</span>
+                </div>
+              )}
+              {group.models.map((model) => {
+                const lvl = costWarningLevel(model.costPer1MTokens);
+                return (
+                  <button
+                    key={model.id}
+                    type="button"
+                    className={`${styles.pickerOption} ${model.id === value ? styles.pickerOptionActive : ''}`}
+                    onClick={() => { onChange(model.id); setOpen(false); }}
+                  >
+                    <span className={styles.pickerOptionLabel}>{model.label}</span>
+                    {lvl && <CostWarningBadge level={lvl} compact costPer1MTokens={model.costPer1MTokens} />}
+                    {model.costDisplay && (
+                      <span className={styles.pickerOptionCost}>{model.costDisplay}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  if (labelId) return picker;
+
   return (
     <div className={styles.field}>
       <span className={styles.fieldLabel}>{label}</span>
-      <div ref={ref} className={styles.pickerWrap}>
-        <button
-          type="button"
-          className={styles.pickerBtn}
-          onClick={() => setOpen((o) => !o)}
-        >
-          <span className={styles.pickerValue}>{selected?.label ?? value}</span>
-          {(() => {
-            const lvl = costWarningLevel(selected?.costPer1MTokens);
-            return lvl
-              ? <CostWarningBadge level={lvl} compact costPer1MTokens={selected?.costPer1MTokens} />
-              : null;
-          })()}
-          {selected?.costDisplay && (
-            <span className={styles.pickerCost}>{selected.costDisplay}</span>
-          )}
-          <ChevronDown size={12} className={styles.pickerChevron} />
-        </button>
-        {open && (
-          <div className={styles.pickerDropdown}>
-            {groups.map((group) => (
-              <div key={group.provider}>
-                {groups.length > 1 && (
-                  <div className={styles.pickerGroupHeader}>
-                    <ProviderLogo provider={group.provider} label={group.label} className={styles.providerLogo} />
-                    <span>{group.label}</span>
-                  </div>
-                )}
-                {group.models.map((model) => {
-                  const lvl = costWarningLevel(model.costPer1MTokens);
-                  return (
-                    <button
-                      key={model.id}
-                      type="button"
-                      className={`${styles.pickerOption} ${model.id === value ? styles.pickerOptionActive : ''}`}
-                      onClick={() => { onChange(model.id); setOpen(false); }}
-                    >
-                      <span className={styles.pickerOptionLabel}>{model.label}</span>
-                      {lvl && <CostWarningBadge level={lvl} compact costPer1MTokens={model.costPer1MTokens} />}
-                      {model.costDisplay && (
-                        <span className={styles.pickerOptionCost}>{model.costDisplay}</span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      {picker}
     </div>
   );
 }
@@ -324,15 +336,19 @@ export function HarnessSelect({
   modelId,
   harnessPolicy,
   label = 'Harness',
+  labelId,
 }: {
   value: Harness;
   onChange: (harness: Harness) => void;
   modelId: string;
   harnessPolicy?: HarnessPolicyDecisions;
   label?: string;
+  /** When set, renders only the picker (no built-in label); the trigger is named by this id instead (PAN-4755 D11). */
+  labelId?: string;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const buttonId = useId();
   const selected = HARNESS_OPTIONS.find((h) => h.id === value) ?? HARNESS_OPTIONS[0];
 
   useEffect(() => {
@@ -363,44 +379,56 @@ export function HarnessSelect({
     setOpen(false);
   }
 
+  const picker = (
+    <div ref={ref} className={styles.pickerWrap}>
+      <button
+        type="button"
+        id={labelId ? buttonId : undefined}
+        aria-labelledby={labelId ? `${labelId} ${buttonId}` : undefined}
+        className={styles.pickerBtn}
+        onClick={() => setOpen((o) => !o)}
+      >
+        <span className={styles.pickerValue}>{selected.label}</span>
+        <HarnessLogo harness={selected.id} className={styles.harnessLogo} />
+        <ChevronDown size={12} className={styles.pickerChevron} />
+      </button>
+      {open && (
+        <div className={styles.pickerDropdown}>
+          {HARNESS_OPTIONS.map((harness) => {
+            const decision = canUsePickerHarness(harness.id, modelId, harnessPolicy);
+            const isBlocked = !decision.allowed;
+            const reasonText = decision.reason ?? PI_TOS_BLOCK_REASON;
+            const titleText = isBlocked ? reasonText : harness.description;
+            return (
+              <button
+                key={harness.id}
+                type="button"
+                className={`${styles.pickerOption} ${harness.id === value ? styles.pickerOptionActive : ''} ${isBlocked ? styles.pickerOptionBlocked : ''}`}
+                title={titleText}
+                onClick={() => handlePick(harness.id)}
+                disabled={isBlocked}
+              >
+                <span className={styles.pickerOptionLabelWithIcon}>
+                  <HarnessLogo harness={harness.id} className={styles.harnessLogo} />
+                  <span>{harness.label}</span>
+                </span>
+                {isBlocked && (
+                  <span className={styles.pickerOptionReason}>{reasonText}</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+
+  if (labelId) return picker;
+
   return (
     <div className={styles.field}>
       <span className={styles.fieldLabel}>{label}</span>
-      <div ref={ref} className={styles.pickerWrap}>
-        <button type="button" className={styles.pickerBtn} onClick={() => setOpen((o) => !o)}>
-          <span className={styles.pickerValue}>{selected.label}</span>
-          <HarnessLogo harness={selected.id} className={styles.harnessLogo} />
-          <ChevronDown size={12} className={styles.pickerChevron} />
-        </button>
-        {open && (
-          <div className={styles.pickerDropdown}>
-            {HARNESS_OPTIONS.map((harness) => {
-              const decision = canUsePickerHarness(harness.id, modelId, harnessPolicy);
-              const isBlocked = !decision.allowed;
-              const reasonText = decision.reason ?? PI_TOS_BLOCK_REASON;
-              const titleText = isBlocked ? reasonText : harness.description;
-              return (
-                <button
-                  key={harness.id}
-                  type="button"
-                  className={`${styles.pickerOption} ${harness.id === value ? styles.pickerOptionActive : ''} ${isBlocked ? styles.pickerOptionBlocked : ''}`}
-                  title={titleText}
-                  onClick={() => handlePick(harness.id)}
-                  disabled={isBlocked}
-                >
-                  <span className={styles.pickerOptionLabelWithIcon}>
-                    <HarnessLogo harness={harness.id} className={styles.harnessLogo} />
-                    <span>{harness.label}</span>
-                  </span>
-                  {isBlocked && (
-                    <span className={styles.pickerOptionReason}>{reasonText}</span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
+      {picker}
     </div>
   );
 }

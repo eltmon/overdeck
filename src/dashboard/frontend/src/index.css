@@ -773,6 +773,42 @@
   --shadow-overlay: 0 16px 48px rgba(0, 0, 0, 0.45), 0 4px 12px rgba(0, 0, 0, 0.25);
 }
 
+/* ─── PAN-4755: overlay surface tokens — the modal panel, its inset field
+     wells, its border and its scrim. --surface-overlay sits LIGHTER than
+     --background in both modes so a dialog rises off the page. Ledger
+     restates today's look (popover panel, background fields, border,
+     black scrim) by reference; Broadsheet gets new values. Read only by
+     components/shared/Modal and the dialogs built on it. ─── */
+[data-theme="ledger"] {
+  --surface-overlay: var(--popover);
+  --surface-overlay-field: var(--background);
+  --border-overlay: var(--border);
+  --overlay-scrim: rgb(0 0 0 / 0.4);
+}
+
+[data-theme="broadsheet"] {
+  --surface-overlay: hsl(40 18% 99.3%);
+  --surface-overlay-field: hsl(30 10% 96.8%);
+  --border-overlay: hsl(30 5% 82%);
+  --overlay-scrim: hsl(35 14% 9% / 0.44);
+}
+
+.dark[data-theme="ledger"],
+.dark [data-theme="ledger"] {
+  --surface-overlay: var(--popover);
+  --surface-overlay-field: var(--background);
+  --border-overlay: var(--border);
+  --overlay-scrim: rgb(0 0 0 / 0.56);
+}
+
+.dark[data-theme="broadsheet"],
+.dark [data-theme="broadsheet"] {
+  --surface-overlay: hsl(30 3% 18.5%);
+  --surface-overlay-field: hsl(0 0% 14.5%);
+  --border-overlay: hsl(30 3% 27%);
+  --overlay-scrim: hsl(0 0% 0% / 0.56);
+}
+
 /* ─── F-9: motion vocabulary — tokens only, no rewiring. Landing the
      easing/duration vocabulary so a follow-on task can adopt it
      site-by-site; the @keyframes and animation shorthand elsewhere in this

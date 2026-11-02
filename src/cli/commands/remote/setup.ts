@@ -98,7 +98,6 @@ export async function setupCommand(): Promise<void> {
         region: 'iad',
         vm_size: 'shared-cpu-2x',
         vm_memory: 1024,
-        image: 'registry.fly.io/pan-workspace:latest',
         auto_stop: true,
         auto_stop_timeout: 300,
       },
@@ -125,7 +124,7 @@ export async function setupCommand(): Promise<void> {
   console.log(`  ${chalk.cyan('pan remote status')}     Check connection and machines`);
   console.log(`  ${chalk.cyan('pan workspace create --remote <issue>')}   Create remote workspace`);
   console.log('');
-  console.log(chalk.dim('  Make sure your Fly app exists and the pan-workspace image is built.'));
+  console.log(chalk.dim('  Make sure your Fly app exists and its image is pushed to registry.fly.io/<app>:latest.'));
   console.log(chalk.dim('  See: docs/fly-provider.md'));
   console.log('');
 }

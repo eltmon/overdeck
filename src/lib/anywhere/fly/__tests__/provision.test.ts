@@ -129,6 +129,24 @@ describe('provisionFlyMachine (PAN-4652 WI-7)', () => {
     expect(h.destroyMachine).not.toHaveBeenCalled();
   });
 
+  it('defaults the image to registry.fly.io/<app>:latest', async () => {
+    const h = harness();
+    await provisionFlyMachine({}, h.deps);
+
+    expect(h.createConfig().image).toBe('registry.fly.io/overdeck-ws:latest');
+  });
+
+  it('prefers --image, then [remote.fly] image, over the derived default', async () => {
+    const explicit = harness();
+    await provisionFlyMachine({ image: 'registry.fly.io/x:1' }, explicit.deps);
+    expect(explicit.createConfig().image).toBe('registry.fly.io/x:1');
+
+    const configured = harness();
+    configured.deps.flyConfig = { ...configured.deps.flyConfig, image: 'registry.fly.io/y:2' };
+    await provisionFlyMachine({}, configured.deps);
+    expect(configured.createConfig().image).toBe('registry.fly.io/y:2');
+  });
+
   it('starts pan serve with the D-4 env after writing the fly-<machineId> identity', async () => {
     const h = harness();
     await provisionFlyMachine({}, h.deps);

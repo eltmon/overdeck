@@ -36,7 +36,7 @@ export interface FlyProviderConfig {
   vmSize?: string;
   /** Memory in MB (default: 1024) */
   vmMemory?: number;
-  /** Docker image for workspace machines */
+  /** Docker image for workspace machines (default: registry.fly.io/<app>:latest) */
   image?: string;
   /** API token (falls back to FLY_API_TOKEN env var) */
   apiToken?: string;
@@ -46,6 +46,17 @@ export interface FlyProviderConfig {
 
 const DURABLE_VOLUME_SIZE_GB = 10;
 const DURABLE_MAX_RETRIES = 3;
+
+/** Fly app that owns workspace machines when `[remote.fly] app` is unset. */
+export const DEFAULT_FLY_APP = 'pan-workspaces';
+
+/**
+ * Default workspace image for a Fly app. The Fly registry is app-scoped, so an
+ * image can only live at registry.fly.io/<app>; the default follows the app (PAN-4682).
+ */
+export function defaultFlyImage(app: string): string {
+  return `registry.fly.io/${app}:latest`;
+}
 
 function mapFlyStateToVmStatus(state: string): VmStatus {
   switch (state) {
@@ -88,13 +99,14 @@ export class FlyProvider implements RemoteProvider {
   private api: FlyApiClient | null = null;
 
   constructor(config: FlyProviderConfig = {}) {
+    const app = config.app ?? DEFAULT_FLY_APP;
     this.config = {
-      app: config.app ?? 'pan-workspaces',
+      app,
       org: config.org ?? 'personal',
       region: config.region ?? 'iad',
       vmSize: config.vmSize ?? 'shared-cpu-2x',
       vmMemory: config.vmMemory ?? 1024,
-      image: config.image ?? 'registry.fly.io/pan-workspace:latest',
+      image: config.image ?? defaultFlyImage(app),
       apiToken: config.apiToken ?? process.env.FLY_API_TOKEN ?? '',
       resiliencyTier: config.resiliencyTier ?? 'ephemeral',
     };

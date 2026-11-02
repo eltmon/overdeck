@@ -10,6 +10,7 @@ vi.mock('../../../lib/wsTransport', () => ({
 vi.mock('../../shared/ModelPicker', () => ({
   useAvailableModels: () => ({ groups: [], harnessPolicy: {} }),
   pickerEffortLevels: () => undefined,
+  HARNESS_OPTIONS: [{ id: 'claude-code', label: 'Claude Code', description: '' }],
   ModelSelect: ({ value }: { value: string }) => <select aria-label="Model" value={value} onChange={() => undefined}><option value="claude-opus-5-5">Opus</option></select>,
   HarnessSelect: ({ value }: { value: string }) => <select aria-label="Harness" value={value} onChange={() => undefined}><option value="claude-code">Claude Code</option></select>,
 }));

@@ -68,7 +68,7 @@ A theme other than the two built-ins lives as a file at `~/.overdeck/themes/<id>
   "type": "dark", // light | dark
   "terminal": { "background": "#0d1017", "red": "#f06b73" /* ...21 keys, each optional */ },
   "syntax": { "colors": { "editor.background": "#10141c" }, "tokenColors": [ /* VS Code-style scopes */ ] },
-  "ui": { "background": "#10141c", "accent": "#e6b450" /* ...6 keys, each optional */ }
+  "ui": { "background": "#10141c", "accent": "#e6b450" /* ...7 keys, each optional */ }
 }
 ```
 
@@ -88,6 +88,7 @@ Choose **Import VS Code theme** next to the pickers and pick a `.json` theme fil
 | `editor.background`, `editor.foreground` | `syntax.colors` |
 | `editor.background` | `ui.background` |
 | `sideBar.background` | `ui.surface` |
+| `quickInput.background`, else `editorWidget.background` | `ui.overlay` (alpha dropped) |
 | `panel.border` | `ui.border` |
 | `editor.foreground`, else `foreground` | `ui.foreground` |
 | `descriptionForeground` | `ui.muted` |
@@ -95,9 +96,11 @@ Choose **Import VS Code theme** next to the pickers and pick a `.json` theme fil
 
 A theme with no `type` field is classified by the luminance of `editor.background`; a theme with neither a `type` field nor an `editor.background` color defaults to `dark`, with a warning. Importing a `.vsix` extension package is tracked separately (#4659); a duplicate-and-edit color-picker editor for themes already in the store is tracked separately too (#4660) — until then, edit the JSON file by hand.
 
+A theme without `ui.overlay` but with `ui.background` still gets a dialog surface: Overdeck derives one by mixing `ui.background` toward white for a light theme, or toward the foreground for a dark theme.
+
 ### What color themes never change
 
-Signal and state colors — `--destructive*`, `--info*`, `--success*`, `--warning*`, and every `--signal-*`/`--state-*` token — are fixed by the pan-style-guide color law and are never set by a color theme's `ui` group, built-in or imported. A color theme changes terminal colors, chat syntax highlighting, and a small background/surface/border/foreground/muted/accent subset of the UI — never what a status color means.
+Signal and state colors — `--destructive*`, `--info*`, `--success*`, `--warning*`, and every `--signal-*`/`--state-*` token — are fixed by the pan-style-guide color law and are never set by a color theme's `ui` group, built-in or imported. A color theme changes terminal colors, chat syntax highlighting, and a small background/surface/overlay/border/foreground/muted/accent subset of the UI — never what a status color means.
 
 ## Creation flows are pages, not modals
 
