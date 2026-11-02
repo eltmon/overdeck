@@ -45,9 +45,14 @@ function auqRow(name: string, title: string, question: string, askedAt: string) 
   };
 }
 
+// PAN-4757: pin askedAt relative to now, not a hard-coded date. The Needs-you
+// header renders formatRelativeTime(since) as "yesterday" once the question is
+// 24-47h old, and getByRole name matching is a case-insensitive substring match,
+// so a stale fixture date can make { name: 'Yes' } also match the header text.
+const SHIP_ASKED_AT = Date.now() - 25 * 60 * 60 * 1000;
 const PENDING = [
-  auqRow('pan-2355-ship', 'Ship the phone shell', 'Ship it now?', '2026-11-01T00:00:00.000Z'),
-  auqRow('pan-2355-docs', 'Write the phone docs', 'Publish the docs?', '2026-11-01T00:05:00.000Z'),
+  auqRow('pan-2355-ship', 'Ship the phone shell', 'Ship it now?', new Date(SHIP_ASKED_AT).toISOString()),
+  auqRow('pan-2355-docs', 'Write the phone docs', 'Publish the docs?', new Date(SHIP_ASKED_AT + 5 * 60 * 1000).toISOString()),
 ];
 
 const CONVERSATIONS = [
@@ -130,7 +135,7 @@ test('the phone shell installs, answers a question in two taps and pairs', async
     await expect(first).toHaveAttribute('data-expanded', 'true', { timeout: 30_000 });
     await expectTapTargets(page);
     await page.screenshot({ path: `${SHOT_DIR}/needs-you.png` });
-    await first.getByRole('button', { name: 'Yes' }).tap();
+    await first.getByRole('button', { name: 'Yes', exact: true }).tap();
     await first.getByRole('button', { name: 'Send' }).tap();
     await expect.poll(() => posts.length).toBe(1);
     expect(posts[0]!.url).toBe(`${baseUrl}/api/conversations/pan-2355-ship/message`);

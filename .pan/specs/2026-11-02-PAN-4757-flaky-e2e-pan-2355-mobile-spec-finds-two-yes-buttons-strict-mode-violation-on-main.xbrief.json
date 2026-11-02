@@ -4,17 +4,17 @@
     "created": "2026-11-02T00:50:33Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4757: Flaky e2e: pan-2355-mobile spec finds two 'Yes' buttons (strict mode violation) on main",
-    "updated": "2026-11-02T00:53:06.595Z"
+    "updated": "2026-11-02T00:53:55.300Z"
   },
   "plan": {
     "id": "pan-4757",
     "title": "Flaky e2e: pan-2355-mobile spec finds two 'Yes' buttons (strict mode violation) on main",
-    "status": "proposed",
+    "status": "running",
     "uid": "e5ae279c-ac07-4e22-803d-afd10891be74",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-02T00:50:33Z",
-    "updated": "2026-11-02T00:53:06.595Z",
+    "updated": "2026-11-02T00:53:55.300Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4757",
@@ -198,5 +198,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
