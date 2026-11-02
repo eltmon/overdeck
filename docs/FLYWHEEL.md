@@ -13,7 +13,7 @@ PAN-3917 cut the Flywheel page and its `pause`/`resume`/`abort`/`report`/`stats`
 | What you see | Where it comes from | Code |
 | --- | --- | --- |
 | Run state: `running`, `paused`, `idle` | The `conv-flywheel` row in the `conversations` table and whether its tmux session is alive. `running` means the row is `active`, not mid-fork, and the session is up. `paused` means a row exists but is not running. `idle` means there is no row. | `readFlywheelRun()` |
-| Last tick, pick, phase, needs-you | The newest **assistant** message in the conversation's transcript that contains a tick marker. Its `createdAt` is the tick time. | `findLastTick()`, `parseTickMarker()` |
+| Last tick, pick, phase, needs-you | The newest **assistant** message in the conversation's transcript that contains a tick marker. Its `createdAt` is the tick time, and `lastTick.messageId` is that message's transcript id — absent when the message carries none. | `findLastTick()`, `parseTickMarker()` |
 | Freshness | The age of the last tick: 60 seconds or less is `live`, 20 minutes or less is `breathing`, and anything older is `stalled`. | `freshnessFor()` |
 | In-flight issues | The union of the project's `workspaces/feature-*` directories (slot workspaces excluded) and the ids the loop named in its newest tick, minus anything merged or closed. Their derived issue state comes from `loadIssueStatesForProject`, the journal line from the last entry of each `<workspace>/.overdeck/pipeline.jsonl`. **Closed issues drop because the deriver now passes real tracker rows in:** on the dashboard from the `IssueDataService` cache, in the CLI from `readIssueFromTracker`, four issues at a time. Without them every issue read as `open: null` — unknown — and a closed issue whose feature branch lingered derived `working` forever. | `deriveFlywheelStatus()` |
 | Title | The tracker row's title, from the same read. | `deriveFlywheelStatus()` |
@@ -25,6 +25,7 @@ PAN-3917 cut the Flywheel page and its `pause`/`resume`/`abort`/`report`/`stats`
 | UAT batches | The merge train's queues and generations, `GET /api/merge-train/queues` and `/generations`, as a rail card over `MergeTrainView`. | `FlywheelUatBatchesCard` |
 | Report tab | `<planHome>/.pan/flywheel/report.md`, the same file the CLI prints. | `FlywheelReportPane` |
 | Needs-you indicator | The app-header count: the loop's tick `needs-you` line plus every in-flight row with `attention: needs-you`. Hidden at zero. | `NeedsYouIndicator` |
+| Needs-you banner | Clicking the Status tab's NEEDS YOU banner reopens the AskUserQuestion dialog (`requestReopen('conv-flywheel')`) when `conv-flywheel` has an unanswered question in `GET /api/conversations/pending-input`; otherwise it switches the conversation pane to the Conversation view and scrolls to the tick message. | `resolveNeedsYouAction()`, `FlywheelPage` |
 | Elapsed | `running <duration>` in the page header, from the flywheel conversation's `createdAt`. | `formatDuration()` |
 | Policies | The control settings `auto_pickup_backlog`, `require_uat_before_merge`, and `merge_train_enabled`. | `control-settings.ts` |
 | Order book | The `running` book under the plan home's `.pan/orders/`, with landed/total from `computeBookProgress`. | `listBooks()` |
