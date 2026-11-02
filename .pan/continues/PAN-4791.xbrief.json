@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4791",
   "created": "2026-11-02T05:13:53.260Z",
-  "updated": "2026-11-02T05:35:01.403Z",
+  "updated": "2026-11-02T05:36:15.718Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,10 @@
       "claimedBy": "agent-pan-4791",
       "claimedAt": "2026-11-02T05:15:37.332Z",
       "doneAt": "2026-11-02T05:35:01.402Z"
+    },
+    "wi1-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:36:15.718Z"
     }
   }
 }
