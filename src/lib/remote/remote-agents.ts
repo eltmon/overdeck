@@ -52,6 +52,8 @@ export interface PushDaemonOptions {
   branch: string;
   intervalSeconds?: number;
   logFile?: string;
+  /** The repository the daemon commits and pushes (PAN-4734: a linked agent's VM worktree). */
+  workdir?: string;
 }
 
 /**
@@ -64,6 +66,7 @@ export function generatePushDaemonScript(options: PushDaemonOptions): string {
   const logFile = options.logFile ?? `${REMOTE_PAN_DIR}/push-daemon.log`;
   const issueIdLiteral = JSON.stringify(options.issueId);
   const branchLiteral = JSON.stringify(options.branch);
+  const workdirLiteral = JSON.stringify(options.workdir ?? '/workspace');
 
   return [
     "const { execFile } = require('child_process');",
@@ -77,7 +80,7 @@ export function generatePushDaemonScript(options: PushDaemonOptions): string {
     '}',
     '',
     'function runOnce() {',
-    "  const cwd = '/workspace';",
+    `  const cwd = ${workdirLiteral};`,
     '  try {',
     `    if (!fs.existsSync(path.join(cwd, '.git'))) {`,
     "      log('Not a git repository; skipping heartbeat');",
@@ -140,13 +143,14 @@ export async function installPushDaemon(
   provider: FlyProvider,
   vmName: string,
   issueId: string,
+  workdir = '/workspace',
 ): Promise<void> {
   const branch = `feature/${issueId.toLowerCase()}`;
   const baseName = `push-daemon-${issueId.toLowerCase()}`;
   const scriptPath = `${REMOTE_PAN_DIR}/${baseName}.js`;
   const logFile = `${REMOTE_PAN_DIR}/${baseName}.log`;
 
-  const script = generatePushDaemonScript({ issueId, branch, logFile });
+  const script = generatePushDaemonScript({ issueId, branch, logFile, workdir });
   await writeRemoteFile(provider, vmName, scriptPath, script);
 
   const envVars = [
@@ -163,7 +167,7 @@ export async function installPushDaemon(
     '-s',
     baseName,
     '-c',
-    '/workspace',
+    workdir,
     daemonCmd,
   ]);
   const result = await runSsh(provider, vmName, tmuxCmd);

@@ -76,6 +76,39 @@ describe('generatePushDaemonScript', () => {
 });
 
 describe('installPushDaemon', () => {
+  function recordingProvider(sshCommands: string[], scriptBytes: number) {
+    return {
+      ssh: vi.fn((_vm: string, command: string) => {
+        sshCommands.push(command);
+        const stdout = command.includes('wc -c') && command.includes('push-daemon-pan-1.js') ? `${scriptBytes}\n` : '';
+        return Effect.succeed({ stdout, stderr: '', exitCode: 0 });
+      }),
+    } as unknown as import('../../../src/lib/remote/fly-provider.js').FlyProvider;
+  }
+
+  it('runs in a linked agent\'s VM worktree (PAN-4734 FR-9)', async () => {
+    const workdir = '/workspace/overdeck/workspaces/feature-pan-1';
+    const script = generatePushDaemonScript({ issueId: 'PAN-1', branch: 'feature/pan-1', logFile: '/workspace/.pan/push-daemon-pan-1.log', workdir });
+    expect(script).toContain(`const cwd = "${workdir}";`);
+    const sshCommands: string[] = [];
+
+    await installPushDaemon(recordingProvider(sshCommands, Buffer.byteLength(script)), 'vm-1', 'PAN-1', workdir);
+
+    const heartbeatTmux = sshCommands.find((cmd) => cmd.includes('new-session') && cmd.includes('push-daemon-pan-1'));
+    expect(heartbeatTmux).toContain(`'-c' '${workdir}'`);
+  });
+
+  it('runs in /workspace when no workdir is given', async () => {
+    const script = generatePushDaemonScript({ issueId: 'PAN-1', branch: 'feature/pan-1', logFile: '/workspace/.pan/push-daemon-pan-1.log' });
+    expect(script).toContain('const cwd = "/workspace";');
+    const sshCommands: string[] = [];
+
+    await installPushDaemon(recordingProvider(sshCommands, Buffer.byteLength(script)), 'vm-1', 'PAN-1');
+
+    const heartbeatTmux = sshCommands.find((cmd) => cmd.includes('new-session') && cmd.includes('push-daemon-pan-1'));
+    expect(heartbeatTmux).toContain(`'-c' '/workspace'`);
+  });
+
   it('writes the daemon script and starts a detached tmux heartbeat session', async () => {
     const sshCommands: string[] = [];
     const logFile = '/workspace/.pan/push-daemon-pan-1845.log';
