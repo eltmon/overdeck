@@ -212,6 +212,22 @@ export function setConversationsAutoArchiveOnMerge(enabled: boolean): void {
   setSetting(CONVERSATIONS_AUTO_ARCHIVE_ON_MERGE_KEY, enabled ? 'true' : 'false');
 }
 
+/**
+ * PAN-4653: settle an operator conversation when its linked pull requests
+ * are all merged or closed (the PR sync sweep, on the open → merged/closed
+ * transition). Default ON when unset. A per-conversation override
+ * (`conversations.auto_settle_override`) wins; agent conversations never settle.
+ */
+export const CONVERSATIONS_AUTO_SETTLE_ON_MERGE_KEY = 'conversations.auto_settle_on_merge';
+
+export function isConversationsAutoSettleOnMerge(): boolean {
+  return getSetting(CONVERSATIONS_AUTO_SETTLE_ON_MERGE_KEY) !== 'false'; // defaults to true if unset
+}
+
+export function setConversationsAutoSettleOnMerge(enabled: boolean): void {
+  setSetting(CONVERSATIONS_AUTO_SETTLE_ON_MERGE_KEY, enabled ? 'true' : 'false');
+}
+
 /** Drop-in for isFlywheelRequireUatBeforeMerge() from app-settings.ts. */
 export function isFlywheelRequireUatBeforeMerge(): boolean {
   const val = getSetting(FLYWHEEL_REQUIRE_UAT_BEFORE_MERGE_KEY);
