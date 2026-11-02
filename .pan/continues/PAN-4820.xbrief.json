@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4820",
   "created": "2026-11-02T17:12:56.970Z",
-  "updated": "2026-11-02T18:07:40.301Z",
+  "updated": "2026-11-02T18:07:45.672Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -190,6 +190,11 @@
     "derived-ready.ac3": {
       "status": "completed",
       "doneAt": "2026-11-02T18:07:40.301Z"
+    },
+    "no-review-dispatch": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4820",
+      "claimedAt": "2026-11-02T18:07:45.672Z"
     }
   }
 }
