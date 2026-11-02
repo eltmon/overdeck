@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-02T13:14:02.499090Z · model: claude-opus-5-5 · open: 858_
+_Last sequenced: 2026-11-02T13:15:52.279703Z · model: claude-opus-5-5 · open: 858_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1193,7 +1193,7 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-02T13:14:02.499090Z",
+  "generatedAt": "2026-11-02T13:15:52.279703Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 858,
