@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4825",
   "created": "2026-11-02T16:35:14.732Z",
-  "updated": "2026-11-02T16:48:42.886Z",
+  "updated": "2026-11-02T16:48:44.556Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-4825",
       "claimedAt": "2026-11-02T16:44:36.656Z",
       "doneAt": "2026-11-02T16:48:42.886Z"
+    },
+    "cerebras-gpt-oss": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4825",
+      "claimedAt": "2026-11-02T16:48:44.556Z"
     }
   }
 }
