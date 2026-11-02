@@ -6,7 +6,7 @@
  *   pan skills set <skill> on|off|inherit [--project <key> | --issue <id>]
  *   pan skills set --pack <id> on|off|inherit [--project <key> | --issue <id>]   (PAN-4334; <skill> may be <pack>/<skill>)
  *   pan skills launch-settings --harness <h> --cwd <dir> [--issue <id>] [--conversation <tmuxSession>] [--codex-home <dir>] [--plugin-link <path>]   (hidden; launchers)
- *   pan skills pack add <id> [url] [--ref <ref>] [--adapter plain|claude-plugin|deft-readonly] [--browser] [--yes]      (PAN-4334; known packs default url/ref, PAN-4728)
+ *   pan skills pack add <id> [url] [--ref <ref>] [--adapter plain|claude-plugin|deft-readonly|gstack-runtime] [--browser] [--yes]      (PAN-4334; known packs default url/ref, PAN-4728)
  *   pan skills pack update <id> [--ref <ref>] [--yes]
  *   pan skills pack browser <id> [on|off] [--yes]   (PAN-4730; gstack's browser runtime, second consent; ./skills-pack-browser.ts)
  *   pan skills pack list [--json] [--offline] | remove <id> | sync [id] | gc [--max-age-days <n>]

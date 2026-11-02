@@ -88,7 +88,8 @@
               "cli/hygiene",
               "cli/agent-commands",
               "cli/workspace-commands",
-              "cli/review-commands"
+              "cli/review-commands",
+              "cli/skills-commands"
             ]
           }
         ]
@@ -104,6 +105,7 @@
               "features/specialists",
               "features/cloister",
               "features/skills",
+              "features/skill-packs",
               "features/workspaces",
               "features/convoys",
               "features/swarm",
