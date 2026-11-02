@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4748",
   "created": "2026-11-02T03:23:38.611Z",
-  "updated": "2026-11-02T05:24:08.845Z",
+  "updated": "2026-11-02T05:24:30.395Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -130,6 +130,10 @@
     "unlink-rollback-token-rejected.ac3": {
       "status": "completed",
       "doneAt": "2026-11-02T05:24:08.844Z"
+    },
+    "doctor-fly-token.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:24:30.394Z"
     }
   }
 }
