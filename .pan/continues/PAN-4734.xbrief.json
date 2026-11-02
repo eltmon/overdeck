@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4734",
   "created": "2026-11-02T14:23:44.928Z",
-  "updated": "2026-11-02T14:52:25.651Z",
+  "updated": "2026-11-02T14:52:29.817Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -68,6 +68,11 @@
       "claimedBy": "agent-pan-4734",
       "claimedAt": "2026-11-02T14:48:29.295Z",
       "doneAt": "2026-11-02T14:52:25.651Z"
+    },
+    "wi11-discovery-linked-conversations": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4734",
+      "claimedAt": "2026-11-02T14:52:29.817Z"
     }
   }
 }
