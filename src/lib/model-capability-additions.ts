@@ -123,7 +123,7 @@ export const AUDITED_MODEL_ADDITIONS = {
     model: 'gemini-3.8-flash',
     provider: 'google',
     displayName: 'Gemini 3.8 Flash',
-    costPer1MTokens: 5.25, // $1.50 in / $9 out
+    costPer1MTokens: 2.25, // $0.75 in / $3.75 out through 2026-12-31; $1.50/$7.50 from 2027-01-01
     contextWindow: 1048576,
     maxOutputTokens: 65536,
     skills: {

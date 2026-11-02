@@ -100,4 +100,11 @@ describe('November 2026 Gemini, Qwen and GLM refresh (PAN-4827)', () => {
   it('registers gemini-3.6-flash with its official price', () => {
     expect(getPricing('google', 'gemini-3.6-flash')).toMatchObject({ inputPer1k: 0.00075, outputPer1k: 0.00375 });
   });
+
+  it('reprices gemini-3.8-flash and gemini-3-flash-preview to the official rates', () => {
+    expect(getPricing('google', 'gemini-3.8-flash')).toMatchObject({ inputPer1k: 0.00075, outputPer1k: 0.00375 });
+    expect(getPricing('google', 'gemini-3-flash-preview')).toMatchObject({ inputPer1k: 0.0005, outputPer1k: 0.003 });
+    expect(MODEL_CAPABILITIES['gemini-3.8-flash'].costPer1MTokens).toBe(2.25);
+    expect(MODEL_CAPABILITIES['gemini-3-flash-preview'].costPer1MTokens).toBe(1.75);
+  });
 });

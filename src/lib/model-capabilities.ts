@@ -750,7 +750,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     model: 'gemini-3-flash-preview',
     provider: 'google',
     displayName: 'Gemini 3 Flash Preview',
-    costPer1MTokens: 0.4, // ~$0.15 in / $0.60 out
+    costPer1MTokens: 1.75, // $0.50 in / $3.00 out (text)
     contextWindow: 1000000,
     skills: {
       'code-generation': 80,
