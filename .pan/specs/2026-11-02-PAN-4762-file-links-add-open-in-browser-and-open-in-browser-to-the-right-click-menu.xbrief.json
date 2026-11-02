@@ -1,0 +1,582 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T01:17:07Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4762: File links: add Open in browser and Open in <Browser> to the right-click menu",
+    "updated": "2026-11-02T01:21:16.141Z"
+  },
+  "plan": {
+    "id": "pan-4762",
+    "title": "File links: add Open in browser and Open in <Browser> to the right-click menu",
+    "status": "running",
+    "uid": "8eace65f-137c-4f86-920b-e7f8f34b6b4c",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-02T01:17:07Z",
+    "updated": "2026-11-02T01:21:16.141Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4762",
+        "label": "PAN-4762",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4762.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "rpc",
+      "file-links",
+      "browser"
+    ],
+    "narratives": {
+      "Problem": "Right-clicking a file chip in a conversation offers editor, containing-folder and copy actions only. An HTML mockup, SVG, PDF or image cannot be opened in a web browser with one click; the operator copies the path into a browser by hand.",
+      "Proposal": "Add a BROWSERS list (separate from EDITORS) to packages/contracts/src/editor.ts. PanOpenLive detects browsers once at layer build (Linux: command on PATH; macOS: /Applications/<App>.app via async fs.access; Windows: default only) and caches a Map<BrowserId, launcher>. New PanOpen methods getAvailableBrowsers() and openInBrowser({ path, browser }) spawn only detected launchers with a pathToFileURL file:// URL. New RPCs pan.getAvailableBrowsers and pan.shellOpenInBrowser are wired in ws-rpc.ts with no-loss-matrix rows. MarkdownFileLink adds 'Open in browser' plus one 'Open in <Browser>' item per detected browser to both right-click menus, after the editor items and before 'Open containing folder', only for html/htm/xhtml/svg/pdf/png/jpg/jpeg/gif/webp/avif/md/txt chips, using filePath. docs/MARKDOWN-EDITOR-PANE.md documents the new items. Full detail, snippets and line references are in .pan/drafts/PAN-4762.md.",
+      "NonGoals": "- Resolving the OS's real default browser for default-browser (xdg-settings get default-web-browser, macOS LaunchServices); default-browser uses xdg-open/open/explorer as the issue specifies\n- Detecting named browsers on Windows (Windows offers only Open in browser)\n- Opening the browser on the viewer's machine when the dashboard is viewed remotely (Anywhere work)\n- Opening workspace dev-server http:// URLs in a browser\n- Adding browsers to EDITORS, PanOpenInPicker, EditorPane.tsx, keybindings.ts or the resolvePreferredEditor() fallback\n- Persisting a last-browser preference or letting a browser become the markdown left-click target (browser items never call setMarkdownOpenTarget)\n- Browser items for .mdx, .markdown, .json, .log or any extension outside the issue's 13-extension list\n- Changing launchDetached or adding an error handler to it\n- Raising any cap in scripts/file-size-allowlist.txt\n- Committing packages/contracts/dist/ (it is gitignored)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "default-browser hands the file:// URL to the platform opener exactly as the issue says (xdg-open on Linux, open on macOS, explorer on Windows).",
+        "rationale": "The issue names this mechanism explicitly. These openers choose the app by file type, so for non-HTML types (png, pdf, md, txt) the OS may open a non-browser app; that limitation is documented and resolving the real default browser is listed as a non-goal rather than built unasked."
+      },
+      {
+        "summary": "BROWSERS entries use linuxCommands: string[] and macApp: string | null instead of EDITORS' single command field.",
+        "rationale": "Chromium ships as chromium or chromium-browser and macOS launches by app name with open -a, so a single command string cannot express the issue's own requirements."
+      },
+      {
+        "summary": "Windows detects no named browsers; it offers only Open in browser.",
+        "rationale": "The issue specifies Linux commands and macOS app paths only; 'where google-chrome' does not find Chrome on Windows."
+      },
+      {
+        "summary": "default-browser's label is the lowercase word 'browser'.",
+        "rationale": "Menu text is uniformly `Open in ${label}` and toasts `Opened in ${label}`, which yields the issue's exact 'Open in browser' text with no special case."
+      },
+      {
+        "summary": "Browser labels are Google Chrome, Chromium, Firefox, Brave, Microsoft Edge, Vivaldi; macOS app names add 'Brave Browser'.",
+        "rationale": "These are the product names the issue lists and the real /Applications bundle names."
+      },
+      {
+        "summary": "The browser list is fetched only for browser-renderable chips; other chips keep the synchronous generic menu.",
+        "rationale": "Avoids an RPC round trip for menus that would show no browser items and keeps the existing synchronous menu test valid."
+      },
+      {
+        "summary": ".mdx and .markdown chips get no browser items even though they use the markdown menu.",
+        "rationale": "The issue's extension list includes md only."
+      },
+      {
+        "summary": "openInBrowser rejects a non-absolute path before building the file:// URL.",
+        "rationale": "pathToFileURL silently resolves a relative path against the server's cwd, which would open the wrong file."
+      },
+      {
+        "summary": "The new RPC methods keep the default admin scope and get OUT_OF_SCOPE no-loss-matrix rows.",
+        "rationale": "Matches shellOpenInEditor/getAvailableEditors; RPC_METHOD_SCOPES defaults every unlisted method to admin, and the matrix test fails without rows."
+      },
+      {
+        "summary": "Failure toast text is `Failed to open in ${label}: <message>`.",
+        "rationale": "The issue requires a failure toast without fixing its text; this mirrors the success toast and the existing 'Failed to open ...' pattern in the file."
+      },
+      {
+        "summary": "Documentation target is docs/MARKDOWN-EDITOR-PANE.md.",
+        "rationale": "grep -rn 'Open containing folder' docs configuration reference finds only that file, so the issue's fallback (conversation docs page) does not apply."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Seven small vertical items across contracts, one server service, RPC wiring, one frontend component and one doc; well under the 25-file / 6-subsystem limits.",
+      "canonicalFilename": "2026-11-02-PAN-4762-file-links-add-open-in-browser-and-open-in-browser-to-the-right-click-menu.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "browsers-contract",
+        "title": "Add the BROWSERS list, BrowserIdSchema and OpenInBrowserInput to contracts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T01:17:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4762",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "server-detect-browsers",
+            "server-launch-browser",
+            "rpc-browser-methods",
+            "frontend-generic-menu-browsers",
+            "frontend-markdown-menu-browsers"
+          ],
+          "files_scope": [
+            "packages/contracts/src/editor.ts",
+            "packages/contracts/src/__tests__/browsers.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run packages/contracts/src/__tests__/browsers.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "browsers.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1. Append to packages/contracts/src/editor.ts, after OpenInEditorInput, the BROWSERS const (ids in order: default-browser, chrome, chromium, firefox, brave, edge, vivaldi; fields id, label, linuxCommands, macApp exactly as the PRD snippet), BrowserEntry, BrowserId, the BROWSER_IDS tuple, BrowserIdSchema = Schema.Literals(BROWSER_IDS), and OpenInBrowserInput = Schema.Struct({ path: Schema.String, browser: BrowserIdSchema }) with its type. Do NOT touch EDITORS or EditorIdSchema. index.ts already re-exports ./editor. Create packages/contracts/src/__tests__/browsers.test.ts with the four tests listed in WI-1."
+        },
+        "items": [
+          {
+            "id": "browsers-contract.ac1",
+            "title": "Given packages/contracts, when the test reads BROWSERS ids, then it returns exactly ['default-browser','chrome','chromium','firefox','brave','edge','vivaldi'] and the chromium entry's linuxCommands equals ['chromium','chromium-browser']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "browsers-contract.ac2",
+            "title": "Given EDITORS and BROWSERS, when browsers.test.ts compares their ids, then no BROWSERS id appears in EDITORS and Schema.decodeUnknownSync(EditorIdSchema)('firefox') throws",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "browsers-contract.ac3",
+            "title": "Given OpenInBrowserInput, when decoding { path: '/tmp/a.html', browser: 'chrome' } it returns the value, and when decoding browser 'cursor' it rejects with a thrown error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "server-detect-browsers",
+        "title": "Detect installed browsers at PanOpenLive layer build and expose getAvailableBrowsers",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T01:17:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4762",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/open.ts",
+            "src/dashboard/server/services/__tests__/open.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/open.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "open.test.ts passes including the new resolveAvailableBrowsers tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. In open.ts import access from node:fs/promises and BROWSERS/BrowserEntry/BrowserId from @overdeck/contracts; add BrowserLauncher, detectBrowserLauncher (default-browser: getFileManagerCommand() + isCommandAvailable; linux: first linuxCommands entry found by isCommandAvailable; darwin: await access('/Applications/<macApp>.app') -> { command: 'open', args: ['-a', macApp] }; other platforms: null) and resolveAvailableBrowsers returning Map<BrowserId, BrowserLauncher> in BROWSERS order. Add getAvailableBrowsers to PanOpenShape; in PanOpenLive compute cachedBrowsers after cachedEditors, log '[pan/open] Detected browsers: ...', return [...cachedBrowsers.keys()]. No sync fs or child_process calls. In open.test.ts add a mockAccess + vi.mock('node:fs/promises') and the Linux / chromium-browser / macOS / Windows detection tests, restoring process.platform in afterEach. Remember the node:util mock makes promisify(exec) and promisify(execFile) the same mockExecAsync."
+        },
+        "items": [
+          {
+            "id": "server-detect-browsers.ac1",
+            "title": "Given Linux where only 'which google-chrome', 'which firefox' and 'which xdg-open' succeed, when getAvailableBrowsers() runs, then it returns ['default-browser','chrome','firefox']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-detect-browsers.ac2",
+            "title": "Given Linux where only 'which chromium-browser' succeeds, when getAvailableBrowsers() runs, then the result includes 'chromium' and excludes 'default-browser'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-detect-browsers.ac3",
+            "title": "Given macOS where mocked fs.access resolves only for '/Applications/Firefox.app', when getAvailableBrowsers() runs, then it returns ['default-browser','firefox']; given Windows with every lookup succeeding, it returns ['default-browser']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-detect-browsers.ac4",
+            "title": "Given open.ts after the change, when running grep -nE 'execSync|execFileSync|accessSync|existsSync' on it, then grep prints nothing and exits 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "server-launch-browser",
+        "title": "Launch a detected browser with a file:// URL via PanOpen.openInBrowser",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T01:17:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4762",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/open.ts",
+            "src/dashboard/server/services/__tests__/open.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/open.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "open.test.ts passes including the new openInBrowser tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. Import isAbsolute from node:path and type OpenInBrowserInput. Add openInBrowser to PanOpenShape and PanOpenLive exactly as the PRD snippet: reject non-absolute path, reject a browser absent from cachedBrowsers, then launchDetached({ command: launcher.command, args: [...launcher.args, pathToFileURL(input.path).href] }); map errors to PanRpcError code 'BROWSER_LAUNCH_FAILED'. Do not modify launchDetached. Add the openInBrowser tests listed in WI-3 to open.test.ts."
+        },
+        "items": [
+          {
+            "id": "server-launch-browser.ac1",
+            "title": "Given Linux with firefox detected, when openInBrowser({ path: '/tmp/mock up/index.html', browser: 'firefox' }) runs, then spawn is called with 'firefox', ['file:///tmp/mock%20up/index.html'], { detached: true, stdio: 'ignore' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-launch-browser.ac2",
+            "title": "Given macOS with /Applications/Google Chrome.app present, when openInBrowser({ path: '/tmp/a.html', browser: 'chrome' }) runs, then spawn is called with 'open', ['-a', 'Google Chrome', 'file:///tmp/a.html']; given Linux default-browser it spawns 'xdg-open' with the file URL; given chromium found as chromium-browser it spawns 'chromium-browser'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-launch-browser.ac3",
+            "title": "Given an undetected browser ('vivaldi') or a relative path ('docs/a.html'), when openInBrowser runs, then the Effect exits with Failure carrying code BROWSER_LAUNCH_FAILED and spawn is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rpc-browser-methods",
+        "title": "Add pan.getAvailableBrowsers and pan.shellOpenInBrowser RPCs with ws-rpc handlers and no-loss rows",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T01:17:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4762",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/rpc.ts",
+            "src/dashboard/server/ws-rpc.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/overdeck/no-loss-matrix.test.ts src/dashboard/server/__tests__/ws-rpc-auth.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "no-loss-matrix.test.ts and ws-rpc-auth.test.ts pass",
+            "lint-file-size.sh reports no over-cap file"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4. In rpc.ts extend the ./editor import with BrowserIdSchema and OpenInBrowserInput; add WS_METHODS shellOpenInBrowser: 'pan.shellOpenInBrowser' and getAvailableBrowsers: 'pan.getAvailableBrowsers' after getAvailableEditors; add ShellOpenInBrowserRpc (payload OpenInBrowserInput, error PanRpcError) and GetAvailableBrowsersRpc (success Schema.Struct({ browsers: Schema.Array(BrowserIdSchema) })) after GetAvailableEditorsRpc; add both to the PanRpcGroup list after GetAvailableEditorsRpc. In ws-rpc.ts add the two handlers after the getAvailableEditors handler (shellOpenInBrowser -> panOpen.openInBrowser(input); getAvailableBrowsers -> panOpen.getAvailableBrowsers().pipe(Effect.map((browsers) => ({ browsers })))). Add nothing else to ws-rpc.ts (1136 lines, cap 1221). Add the two OUT_OF_SCOPE rows to tests/unit/lib/overdeck/no-loss-matrix.ts after the pan.getAvailableEditors row. route-scopes.ts needs no change (default admin scope)."
+        },
+        "items": [
+          {
+            "id": "rpc-browser-methods.ac1",
+            "title": "Given packages/contracts, when reading WS_METHODS, then shellOpenInBrowser equals 'pan.shellOpenInBrowser', getAvailableBrowsers equals 'pan.getAvailableBrowsers', and PanRpcGroup.requests has both tags",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rpc-browser-methods.ac2",
+            "title": "Given the ws-rpc handler layer, when npm run typecheck runs, then it exits 0 with both new methods handled by panOpen.openInBrowser and panOpen.getAvailableBrowsers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rpc-browser-methods.ac3",
+            "title": "Given the no-loss matrix, when npx vitest run tests/unit/lib/overdeck/no-loss-matrix.test.ts runs, then it passes with OUT_OF_SCOPE rows for pan.shellOpenInBrowser and pan.getAvailableBrowsers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-generic-menu-browsers",
+        "title": "Show browser items in the generic file-link right-click menu for browser-renderable files",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T01:17:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4762",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/MarkdownFileLink.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/MarkdownFileLink.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/chat/__tests__/MarkdownFileLink.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "MarkdownFileLink.test.tsx passes including the new .html and .ts menu tests",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-8",
+            "FR-9",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5. In MarkdownFileLink.tsx: import BROWSERS, BrowserEntry, BrowserId; add fetchAvailableBrowsers with a module-level sharedAvailableBrowsersPromise (cleared on failure, returns [] on failure); add BROWSER_EXTENSIONS = avif, gif, htm, html, jpeg, jpg, md, pdf, png, svg, txt, webp, xhtml and isBrowserRenderablePath; compute canOpenInBrowser from filePath; add the openInBrowser callback (sends shellOpenInBrowser { path: filePath, browser: id }; toast.success `Opened in ${label}`; toast.error `Failed to open in ${label}: <message>`) and browserMenuItems; restructure the generic onContextMenu menu so browser items sit between 'Open in editor' and 'Open containing folder', fetching browsers only when canOpenInBrowser and staying synchronous otherwise. In the test file add getAvailableBrowsers/shellOpenInBrowser to the hoisted mock and the request client map, a stable beforeEach browsers list ['default-browser','chrome','firefox'], an htmlMeta fixture, and the four WI-5 tests. Leave the existing tests at lines 146 and 483 unchanged."
+        },
+        "items": [
+          {
+            "id": "frontend-generic-menu-browsers.ac1",
+            "title": "Given an .html chip and available browsers ['default-browser','chrome','firefox'], when it is right-clicked, then the menu renders exactly ['Open in editor','Open in browser','Open in Google Chrome','Open in Firefox','Open containing folder','Copy relative path','Copy full path']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-generic-menu-browsers.ac2",
+            "title": "Given an .html chip whose targetPath has a ':4' suffix, when 'Open in Firefox' is clicked, then shellOpenInBrowser is called with { path: filePath (no suffix), browser: 'firefox' } and toast.success emits 'Opened in Firefox'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-generic-menu-browsers.ac3",
+            "title": "Given shellOpenInBrowser rejects with Error('boom'), when 'Open in browser' is clicked, then toast.error emits 'Failed to open in browser: boom'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-generic-menu-browsers.ac4",
+            "title": "Given a .ts chip, when it is right-clicked, then the menu renders only the four original items synchronously and getAvailableBrowsers is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-markdown-menu-browsers",
+        "title": "Show browser items in openMarkdownContextMenu for .md chips",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T01:17:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4762",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/MarkdownFileLink.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/MarkdownFileLink.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/chat/__tests__/MarkdownFileLink.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "MarkdownFileLink.test.tsx passes including the updated markdown-menu order test and the .mdx test",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-6. Change openMarkdownContextMenu to await Promise.all([fetchAvailableEditors(), canOpenInBrowser ? fetchAvailableBrowsers() : Promise.resolve([])]) and insert ...browserMenuItems(availableBrowsers) after the external-editor items and before 'Open containing folder'; add canOpenInBrowser and browserMenuItems to its dependency list. Browser items must not call setMarkdownOpenTarget. Update the existing README.md menu-order test (around line 403) to the nine-item list in WI-6, add the .mdx no-browser-items test and the Chrome click test that checks overdeck:markdown-open-target stays null."
+        },
+        "items": [
+          {
+            "id": "frontend-markdown-menu-browsers.ac1",
+            "title": "Given a README.md chip with editors ['cursor','vscode'] and browsers ['default-browser','chrome','firefox'], when it is right-clicked, then the menu renders ['Open in internal editor','Open in Cursor','Open in VS Code','Open in browser','Open in Google Chrome','Open in Firefox','Open containing folder','Copy relative path','Copy full path']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-markdown-menu-browsers.ac2",
+            "title": "Given a page.mdx chip, when it is right-clicked, then the menu renders no 'Open in browser', 'Open in Google Chrome' or 'Open in Firefox' item",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-markdown-menu-browsers.ac3",
+            "title": "Given a README.md chip, when 'Open in Google Chrome' is clicked, then shellOpenInBrowser is called with { path: markdownMeta.filePath, browser: 'chrome' } and localStorage 'overdeck:markdown-open-target' preserves its prior value (null)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-browser-menu",
+        "title": "Document the browser items in docs/MARKDOWN-EDITOR-PANE.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T01:17:07Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4762",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/MARKDOWN-EDITOR-PANE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Open in browser' docs/MARKDOWN-EDITOR-PANE.md",
+            "grep -n 'pan.shellOpenInBrowser' docs/MARKDOWN-EDITOR-PANE.md",
+            "grep -n 'default-browser' docs/MARKDOWN-EDITOR-PANE.md"
+          ],
+          "expected_outputs": [
+            "each grep prints at least one matching line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-7. In docs/MARKDOWN-EDITOR-PANE.md insert the browser items into both right-click menu lists (paragraph around lines 168-176: after the editor items, before Open containing folder). After the Open containing folder paragraph (ends around line 186) add a paragraph stating: the 13 browser-renderable extensions and that .mdx/.markdown get none; Open in browser sends pan.shellOpenInBrowser with browser 'default-browser', handing the file:// URL to xdg-open/open/explorer, so for non-HTML types the OS may pick a non-browser app; one Open in <Browser> item per browser detected at server start (Google Chrome, Chromium, Firefox, Brave, Microsoft Edge, Vivaldi) by PATH on Linux and /Applications/<App>.app on macOS, Windows offering only Open in browser; requests use filePath, never targetPath; the browser opens on the dashboard server's machine; browser items do not change the markdown open target."
+        },
+        "items": [
+          {
+            "id": "docs-browser-menu.ac1",
+            "title": "Given docs/MARKDOWN-EDITOR-PANE.md, when grepped, then it contains 'Open in browser', 'pan.shellOpenInBrowser' and 'default-browser', and both menu lists place the browser items before 'Open containing folder'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-browser-menu.ac2",
+            "title": "Given docs/MARKDOWN-EDITOR-PANE.md, when read, then it lists all 13 extensions (html, htm, xhtml, svg, pdf, png, jpg, jpeg, gif, webp, avif, md, txt) and states that the browser opens on the machine running the dashboard server",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "browsers-contract",
+        "to": "server-detect-browsers",
+        "type": "blocks"
+      },
+      {
+        "from": "server-detect-browsers",
+        "to": "server-launch-browser",
+        "type": "blocks"
+      },
+      {
+        "from": "server-detect-browsers",
+        "to": "rpc-browser-methods",
+        "type": "blocks"
+      },
+      {
+        "from": "server-launch-browser",
+        "to": "rpc-browser-methods",
+        "type": "blocks"
+      },
+      {
+        "from": "rpc-browser-methods",
+        "to": "frontend-generic-menu-browsers",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-generic-menu-browsers",
+        "to": "frontend-markdown-menu-browsers",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

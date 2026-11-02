@@ -15,7 +15,7 @@ import {
   SessionsFeedFacetsSnapshot,
   SessionsFeedRowSnapshot,
 } from "./types"
-import { EditorIdSchema, OpenInEditorInput } from "./editor"
+import { BrowserIdSchema, EditorIdSchema, OpenInBrowserInput, OpenInEditorInput } from "./editor"
 import { EffortLevelSchema } from "./effort"
 
 // ─── RPC method names ─────────────────────────────────────────────────────────
@@ -74,6 +74,10 @@ export const WS_METHODS = {
   // Editor integration (PAN-966)
   shellOpenInEditor: "pan.shellOpenInEditor",
   getAvailableEditors: "pan.getAvailableEditors",
+
+  // Browser integration (PAN-4762)
+  shellOpenInBrowser: "pan.shellOpenInBrowser",
+  getAvailableBrowsers: "pan.getAvailableBrowsers",
 } as const
 
 // ─── Error types ──────────────────────────────────────────────────────────────
@@ -559,6 +563,18 @@ export const GetAvailableEditorsRpc = Rpc.make(WS_METHODS.getAvailableEditors, {
   error: PanRpcError,
 })
 
+/** Open a local file in a browser (PAN-4762) */
+export const ShellOpenInBrowserRpc = Rpc.make(WS_METHODS.shellOpenInBrowser, {
+  payload: OpenInBrowserInput,
+  error: PanRpcError,
+})
+
+/** Get available (installed) browsers (PAN-4762) */
+export const GetAvailableBrowsersRpc = Rpc.make(WS_METHODS.getAvailableBrowsers, {
+  success: Schema.Struct({ browsers: Schema.Array(BrowserIdSchema) }),
+  error: PanRpcError,
+})
+
 // ─── Conversation Discovery RPC procs (PAN-457) ───────────────────────────────
 
 const DiscoveredSessionListResult = Schema.Struct({
@@ -756,6 +772,8 @@ export const PanRpcGroup = RpcGroup.make(
   SubscribeProjectSessionTreeRpc,
   ShellOpenInEditorRpc,
   GetAvailableEditorsRpc,
+  ShellOpenInBrowserRpc,
+  GetAvailableBrowsersRpc,
   ScanConversationsRpc,
   SearchConversationsRpc,
   ListDiscoveredSessionsRpc,
