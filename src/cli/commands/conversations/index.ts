@@ -13,7 +13,7 @@ import { enrichAction } from './enrich.js';
 import { embedAction } from './embed.js';
 import { jsonlAction } from './jsonl.js';
 import { moveAction } from './move.js';
-import { autoArchiveOnMergeAction, linkPrAction, prsAction, unlinkPrAction } from './pull-requests.js';
+import { autoSettleOnMergeAction, autoSettleOverrideAction, linkPrAction, prsAction, unlinkPrAction } from './pull-requests.js';
 import {
   scheduleAddAction,
   scheduleListAction,
@@ -153,9 +153,13 @@ export function registerConversationsCommands(program: Command): void {
     .option('--json', 'Output { links, effective } as JSON')
     .action((query: string, opts: { json?: boolean }) => prsAction(query, opts));
   conversations
-    .command('auto-archive-on-merge [value]')
-    .description('Show or set (on|off) archiving operator conversations once all their linked PRs are merged or closed (default off)')
-    .action((value?: string) => autoArchiveOnMergeAction(value));
+    .command('auto-settle-on-merge [value]')
+    .description('Show or set (on|off) settling conversations once all their linked PRs are merged or closed (default on)')
+    .action((value?: string) => autoSettleOnMergeAction(value));
+  conversations
+    .command('auto-settle <query> [value]')
+    .description("Show or set (on|off|inherit) one conversation's auto-settle-on-merge override")
+    .action((query: string, value?: string) => autoSettleOverrideAction(query, value));
 
   // ── schedules (PAN-4640) ────────────────────────────────────────────────────
   const schedule = conversations

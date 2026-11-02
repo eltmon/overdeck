@@ -100,6 +100,8 @@ export interface Conversation extends LinkedRowFields {
   settledAt?: string | null;
   settleReason?: 'manual' | 'merge' | 'idle' | null;
   snoozedUntil?: string | null;
+  /** PAN-4653: per-conversation auto-settle-on-merge override. Absent = inherit. */
+  autoSettleOverride?: 'on' | 'off' | 'inherit';
   /** PAN-1520 — unified pending-input surfaces (same shape as AgentSnapshot). */
   pendingInputCount?: number;
   pendingInputKinds?: ReadonlyArray<string>;
