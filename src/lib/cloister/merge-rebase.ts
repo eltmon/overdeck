@@ -18,6 +18,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { Effect } from 'effect';
 import { GitError, MergeConflictError } from '../errors.js';
+import { withDeftInstallLifted } from '../deft/lift.js';
 import { commitPendingIssueArtifacts } from '../overdeck/plan-artifact-commit.js';
 
 const execAsync = promisify(exec);
@@ -309,7 +310,9 @@ export function rebaseFeatureBranch(
   options: RebaseOptions = {},
 ): Effect.Effect<RebaseResult, GitError | MergeConflictError> {
   const wrapped: Effect.Effect<RebaseResult, GitError> = Effect.tryPromise({
-    try: () => rebaseFeatureBranchBody(workspacePath, featureBranch, baseBranch, issueId, options),
+    // PAN-4820: a hidden Deft install is lifted so skip-worktree files do not abort the rebase.
+    try: () => withDeftInstallLifted(workspacePath, `origin/${baseBranch}`, () =>
+      rebaseFeatureBranchBody(workspacePath, featureBranch, baseBranch, issueId, options)),
     catch: (cause) =>
       new GitError({
         command: ['git', 'rebase', baseBranch],

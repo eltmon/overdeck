@@ -28,6 +28,11 @@ export interface DeftInstallSnapshot {
   sharedHooksPathBefore: string | null;
   /** Absolute path of the worktree exclude file. */
   excludeFile: string;
+  /**
+   * Hidden tracked files whose install change could not be merged onto a new
+   * base during a lifted rebase or sync (WI-4); they keep the install's bytes.
+   */
+  liftConflicts?: string[];
 }
 
 /**
