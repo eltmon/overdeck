@@ -137,7 +137,7 @@ export default function App() {
     return <StandaloneDiffPopoutRoute />;
   }
 
-  if (terminalPath === '/m' || terminalPath === '/m/') {
+  if (terminalPath === '/m' || terminalPath === '/m/' || terminalPath === '/m/pipeline' || terminalPath === '/m/pipeline/') {
     return <Suspense fallback={null}><MobileApp /></Suspense>;
   }
 

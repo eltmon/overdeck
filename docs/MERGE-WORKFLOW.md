@@ -94,7 +94,9 @@ bypasses it.
    workspace (the PR was pushed from a handoff worktree), the webhook adopts
    the PR branch into one through
    [`src/lib/cloister/pr-adoption-review.ts`](../src/lib/cloister/pr-adoption-review.ts)
-   and then starts the pipeline. When adoption is refused (the branch is
+   and then starts the pipeline. Verification skips the plan checklist for an
+   adopted PR with no xBRIEF (PAN-4786); every other check still runs. When
+   adoption is refused (the branch is
    checked out in another worktree, the head moved, or the local branch
    diverged), the issue shows "Review never started" under Needs you with the
    exact fix. See

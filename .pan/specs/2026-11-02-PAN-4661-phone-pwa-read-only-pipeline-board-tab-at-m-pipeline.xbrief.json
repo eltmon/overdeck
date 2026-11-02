@@ -1,0 +1,537 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T03:20:12Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4661: Phone PWA: read-only pipeline board tab at /m/pipeline",
+    "updated": "2026-11-02T03:25:19.140Z"
+  },
+  "plan": {
+    "id": "pan-4661",
+    "title": "Phone PWA: read-only pipeline board tab at /m/pipeline",
+    "status": "running",
+    "uid": "49bd21c2-0e0d-40aa-8565-ca55b71c3362",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-02T03:20:12Z",
+    "updated": "2026-11-02T03:25:19.140Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4661",
+        "label": "PAN-4661",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-4661.md",
+        "label": "PRD",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/pan-2355.md",
+        "label": "Parent PRD (phone shell)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "frontend",
+      "mobile",
+      "pwa",
+      "pipeline",
+      "phone"
+    ],
+    "narratives": {
+      "Problem": "The phone shell at /m (PAN-2355) has only Needs you and Conversations tabs, so an operator on a phone cannot see which issues are in which pipeline phase. /m/pipeline currently renders the desktop app because App.tsx matches only /m and /m/, and the desktop PipelineView keeps its grouping rules module-private, so the phone cannot reuse them.",
+      "Proposal": "Move the desktop grouping helpers into lib/pipeline-state.ts (plus groupPipelineIssues and firstAgentByIssueId), add a MobilePipeline list and a read-only MobileIssueSheet that read only the store EventRouter already fills, and wire a third Pipeline tab into MobileApp at the fixed path /m/pipeline with the issue sheet at /m/pipeline?issue=<id>. Prove it with Vitest component tests and a Playwright spec at 390x844 that seeds issues through the snapshot cache; document it in configuration/phone.mdx and docs/DASHBOARD-ARCHITECTURE.md.",
+      "NonGoals": "- No new API route, server change or HTTP request for the tab or the sheet\n- No drag and drop and no issue actions (no IssueActionMenu, AutoMergeToggle, start/stop/merge buttons) on the phone\n- No phase filter chips, project filters, metric strip, cost or runtime columns, keyboard shortcuts or backlog lane on the phone\n- No /m?tab=pipeline alias and no prefix match for /m/* in App.tsx\n- No behavior change to the desktop PipelineView beyond importing the moved helpers\n- No production test hook (window.__store or similar) for seeding the store\n- No change to sw.js, the web manifest or push payload URLs\n- No edit to Sidebar.tsx's own isClosedIssue"
+    },
+    "autoDecisions": [
+      {
+        "summary": "URL scheme: the tab is the fixed path /m/pipeline; the issue sheet is the query parameter ?issue=<id>.",
+        "rationale": "The issue title and done-when name /m/pipeline. PAN-2355 D-3 forbids ids in path segments because a dotted id 404s; 'pipeline' is a fixed segment without a dot, and the id stays in the query."
+      },
+      {
+        "summary": "App.tsx matches /m, /m/, /m/pipeline and /m/pipeline/ exactly, not a /m/ prefix.",
+        "rationale": "A prefix match would silently capture future desktop routes under /m/."
+      },
+      {
+        "summary": "The phone shows the desktop's five board phases (ship, review, work, plan, ready) and hides empty phases.",
+        "rationale": "One definition of 'active issue' shared with the desktop; a phone screen is short and the phone has no filters that would make empty headers meaningful."
+      },
+      {
+        "summary": "Needs-you mark = issueNeedsYou(derived) || hasActualPendingQuestion(first agent), rendered as an amber 8%/32% badge.",
+        "rationale": "Both are existing store predicates: derived attention covers blocked panes and pan ask decisions, and the agent check is what desktop uses for its INPUT badge. Amber means a human must act in the style guide."
+      },
+      {
+        "summary": "The issue sheet is full screen with a Back button and lists phase, state, PR, agent, project, labels, updated time and a tracker link; it renders no action controls.",
+        "rationale": "Mirrors the open-conversation pattern already in the shell; the issue says read-only with no actions, and a tracker link is navigation, not an action."
+      },
+      {
+        "summary": "Playwright seeds issues through the pan-snapshot-cache-v1 localStorage entry and closes /ws/rpc.",
+        "rationale": "The isolated dashboard has no tracker; this exact pattern already ships in pan-4523-river-bands.spec.ts and adds no production surface."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-02-PAN-4661-phone-pwa-read-only-pipeline-board-tab-at-m-pipeline.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "extract-pipeline-helpers",
+        "title": "Move pipeline grouping helpers from PipelineView into lib/pipeline-state.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T03:20:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-4661",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/pipeline-state.ts",
+            "src/dashboard/frontend/src/components/Pipeline/PipelineView.tsx",
+            "src/dashboard/frontend/src/lib/pipeline-state.test.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/lib/pipeline-state.test.ts src/components/Pipeline/PipelineView.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "pipeline-state.test.ts and PipelineView.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-7"
+          ],
+          "foundationFor": [
+            "mobile-pipeline-list",
+            "mobile-issue-sheet"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-1. Move PHASES (as exported PIPELINE_BOARD_PHASES), derivedForIssue, comparePipelineIssues (with private priorityRank), isClosedIssue and isOutsidePipeline verbatim from components/Pipeline/PipelineView.tsx into lib/pipeline-state.ts as exports; add firstAgentByIssueId(agents) (the body of PipelineView's agentByIssueId useMemo) and groupPipelineIssues(issues, derivedByIssueId) exactly as written in the PRD. PipelineView imports them and keeps its own filter loop; its behavior does not change. Do not touch Sidebar.tsx. Add the PRD's grouping/sort/lookup test cases to lib/pipeline-state.test.ts and list src/lib/pipeline-state.test.ts in scripts/frontend-test-subset.txt in sorted position."
+        },
+        "items": [
+          {
+            "id": "extract-pipeline-helpers.ac1",
+            "title": "Given an issue with pipelineMembership {available: true, inPipeline: false}, a closed issue and a backlog-phase issue, groupPipelineIssues returns none of them in any board phase",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-pipeline-helpers.ac2",
+            "title": "groupPipelineIssues returns working, in-review, ready and planned issues under work, review, ship and plan, sorted by priority then newest updatedAt first",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-pipeline-helpers.ac3",
+            "title": "PipelineView.tsx contains no local definition of isOutsidePipeline, comparePipelineIssues or derivedForIssue, and the unchanged PipelineView.test.tsx passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-pipeline-helpers.ac4",
+            "title": "scripts/frontend-test-subset.txt contains src/lib/pipeline-state.test.ts in sorted position",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mobile-pipeline-list",
+        "title": "Add MobilePipeline: the phase-grouped active-issue list for the phone",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T03:20:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4661",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/mobile/MobilePipeline.tsx",
+            "src/dashboard/frontend/src/components/mobile/__tests__/MobilePipeline.test.tsx",
+            "src/dashboard/frontend/src/components/primitives/PhaseHeader.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/mobile/__tests__/MobilePipeline.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "MobilePipeline.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-6",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-3. Create components/mobile/MobilePipeline.tsx exporting MobilePipeline({ onOpen }), NeedsYouMark and issueNeedsOperator(derived, agent) per D-4661-6, D-4661-7, D-4661-8, D-4661-12 and D-4661-13. It reads selectIssues, derivedIssueStateByIssueId, selectAgents and useConnectionState hasSnapshot, groups with groupPipelineIssues, renders a PhaseHeader plus a list per non-empty board phase, and each row is a min-h-11 full-width button calling onOpen(identifier). Add the export keyword to PHASE_LABELS in primitives/PhaseHeader.tsx. No fetch, useQuery or useCostStream. Write the PRD's four test cases in __tests__/MobilePipeline.test.tsx."
+        },
+        "items": [
+          {
+            "id": "mobile-pipeline-list.ac1",
+            "title": "When hasSnapshot is false the list renders 'Loading pipeline…', and when hasSnapshot is true with no active issues it renders 'No active issues.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mobile-pipeline-list.ac2",
+            "title": "Given working, in-review, ready and planned issues plus a closed one, the list renders data-phase sections in the order ship, review, work, plan and omits the closed issue and the empty ready section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mobile-pipeline-list.ac3",
+            "title": "The list renders 'Needs you' on a row whose derived attention is 'needs-you' and on a row whose agent has an actual pending question, and renders no mark on a plain working row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mobile-pipeline-list.ac4",
+            "title": "When a row is tapped, onOpen receives that issue's identifier",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mobile-issue-sheet",
+        "title": "Add MobileIssueSheet: the read-only full-screen issue sheet",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T03:20:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4661",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/mobile/MobileIssueSheet.tsx",
+            "src/dashboard/frontend/src/components/mobile/__tests__/MobileIssueSheet.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/mobile/__tests__/MobileIssueSheet.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "MobileIssueSheet.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-4. Create components/mobile/MobileIssueSheet.tsx exporting MobileIssueSheet({ issueId, onBack }) per D-4661-9, D-4661-10, D-4661-11 and D-4661-13: a Back button, the identifier, the title as h2, a dl with Phase, State, Needs you (only when issueNeedsOperator), Project, Pull request, Agent, Labels and Updated, and an Open in tracker link to issue.url. It finds the issue case-insensitively in issuesRaw, imports NeedsYouMark and issueNeedsOperator from ./MobilePipeline and PHASE_LABELS from ../primitives/PhaseHeader, and shows 'Loading issue…' or 'This issue is not in the pipeline.' per D-4661-8. No IssueActionMenu, AutoMergeToggle, IssuePeek, fetch or useQuery. Write the PRD's five test cases."
+        },
+        "items": [
+          {
+            "id": "mobile-issue-sheet.ac1",
+            "title": "Given an in-review issue with PR #12 (checks green, approved), a work agent (opus, running), project Overdeck and label frontend, the sheet renders the title heading and the texts Review, in-review, '#12 · checks green · approved', 'work · opus · running', Overdeck and frontend",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mobile-issue-sheet.ac2",
+            "title": "The sheet renders an 'Open in tracker' link whose href is the issue URL, and finds the issue when issueId differs in case",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mobile-issue-sheet.ac3",
+            "title": "The sheet renders 'This issue is not in the pipeline.' for an unknown id when hasSnapshot is true and 'Loading issue…' when hasSnapshot is false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mobile-issue-sheet.ac4",
+            "title": "The sheet renders exactly one button (Back), and tapping it calls onBack",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mobile-route-pipeline",
+        "title": "Route /m/pipeline to the phone shell and add the Pipeline tab and issue sheet",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T03:20:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4661",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/App.tsx",
+            "src/dashboard/frontend/src/components/mobile/MobileApp.tsx",
+            "src/dashboard/frontend/src/components/mobile/__tests__/MobileApp.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/mobile/__tests__/",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all mobile __tests__ files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-5",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "e2e-pipeline-tab"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-2. In App.tsx match /m, /m/, /m/pipeline and /m/pipeline/ exactly (D-4661-2). In MobileApp.tsx add the 'pipeline' tab and MobileRoute.issueId, make readMobileRoute(search, pathname = '/m') follow D-4661-3, replace mobileSearch with mobilePath so the pipeline tab pushes /m/pipeline and an open issue pushes /m/pipeline?issue=<id>, add the third TABS entry, compute fullScreen per D-4661-9, render MobilePipeline or MobileIssueSheet for the pipeline tab, and extend the header D-4661-3 table. Update MobileApp.test.tsx with the PRD's mocks, route cases and two navigation tests, and add the two new mobile test files to scripts/frontend-test-subset.txt in sorted position."
+        },
+        "items": [
+          {
+            "id": "mobile-route-pipeline.ac1",
+            "title": "readMobileRoute('?issue=PAN.1', '/m/pipeline/') returns { tab: 'pipeline', issueId: 'PAN.1', subjectId: null, conversationId: null }, and readMobileRoute('?conversation=4', '/m/pipeline') returns the pipeline tab",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mobile-route-pipeline.ac2",
+            "title": "When the operator taps the Pipeline tab from /m, the shell pushes /m/pipeline and marks that tab aria-current='page'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mobile-route-pipeline.ac3",
+            "title": "When a pipeline row is opened, the shell pushes ?issue=<id>, renders the sheet and hides the 'Phone sections' navigation; tapping Back restores /m/pipeline and the navigation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mobile-route-pipeline.ac4",
+            "title": "App.tsx routes /m/pipeline to MobileApp through the existing lazy import and still routes any other /m/<x> path to the desktop app",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "e2e-pipeline-tab",
+        "title": "Prove /m/pipeline at 390x844 with a Playwright spec on an isolated dashboard",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T03:20:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4661",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-4661-mobile-pipeline.spec.ts",
+            "src/dashboard/frontend/package.json"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run build",
+            "cd src/dashboard/frontend && npx playwright test tests/pan-4661-mobile-pipeline.spec.ts"
+          ],
+          "expected_outputs": [
+            "both tests in pan-4661-mobile-pipeline.spec.ts pass",
+            "screenshots land in test-results/pan-4661/"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-5. Create src/dashboard/frontend/tests/pan-4661-mobile-pipeline.spec.ts against startIsolatedDashboard with an isolated phone browser context (390x844, touch). Seed four issues and their derivedIssueStates through the pan-snapshot-cache-v1 localStorage entry and close /ws/rpc, as pan-4523-river-bands.spec.ts does (D-4661-14); fixture timestamps come from Date.now(). Test A checks the grouped list, the Needs you mark, tap targets, scrollX and the sheet round trip; Test B checks tab navigation from /m and an unknown issue id. Both assert no /api/ request beyond the shell's existing set (see the PRD checkpoint). Use exact: true for short role names. Append the spec to the test:playwright script."
+        },
+        "items": [
+          {
+            "id": "e2e-pipeline-tab.ac1",
+            "title": "Given seeded issues, /m/pipeline renders data-phase sections in the order ship, review, work, plan, with 'Needs you' only on PAN-90002, every visible button and link at least 44x44, and window.scrollX equal to 0 at width 390",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2e-pipeline-tab.ac2",
+            "title": "Tapping the PAN-90002 row opens /m/pipeline?issue=PAN-90002 showing its title and in-review with no tab bar, and Back returns to /m/pipeline",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2e-pipeline-tab.ac3",
+            "title": "Opening /m and tapping Pipeline routes to /m/pipeline, and /m/pipeline?issue=PAN-99999 shows 'This issue is not in the pipeline.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2e-pipeline-tab.ac4",
+            "title": "The spec records no /api/ request outside the allowed shell set, and the test:playwright script contains tests/pan-4661-mobile-pipeline.spec.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-phone-pipeline",
+        "title": "Document the phone pipeline tab in phone.mdx and DASHBOARD-ARCHITECTURE.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T03:20:12Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4661",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/phone.mdx",
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '/m/pipeline' configuration/phone.mdx docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "grep prints at least one matching line for each file"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-5",
+            "NFR-1"
+          ],
+          "acJustification": "A docs-only item has two observable outcomes, one per file."
+        },
+        "narrative": {
+          "Action": "PRD W-6. In configuration/phone.mdx change the opening sentence to include the pipeline, add the '## See the pipeline' section after '## Answer a question' with the PRD's text, and add the read-only sentence to '## What the phone can and cannot do'. In docs/DASHBOARD-ARCHITECTURE.md add the paragraph 'The phone pipeline tab (PAN-4661).' after the PAN-2355 seam paragraph, naming the two routes, the exact App.tsx match, the three store reads, groupPipelineIssues in lib/pipeline-state.ts shared with PipelineView, and that no API route or request is added."
+        },
+        "items": [
+          {
+            "id": "docs-phone-pipeline.ac1",
+            "title": "configuration/phone.mdx contains a '## See the pipeline' section that names /m/pipeline and states the phone pipeline is read-only",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-phone-pipeline.ac2",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains a 'phone pipeline tab (PAN-4661)' paragraph that names /m/pipeline?issue=<id> and groupPipelineIssues",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "extract-pipeline-helpers",
+        "to": "mobile-pipeline-list",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-pipeline-helpers",
+        "to": "mobile-issue-sheet",
+        "type": "blocks"
+      },
+      {
+        "from": "mobile-pipeline-list",
+        "to": "mobile-issue-sheet",
+        "type": "blocks"
+      },
+      {
+        "from": "mobile-pipeline-list",
+        "to": "mobile-route-pipeline",
+        "type": "blocks"
+      },
+      {
+        "from": "mobile-issue-sheet",
+        "to": "mobile-route-pipeline",
+        "type": "blocks"
+      },
+      {
+        "from": "mobile-route-pipeline",
+        "to": "e2e-pipeline-tab",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

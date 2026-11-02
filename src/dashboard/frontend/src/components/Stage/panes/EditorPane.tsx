@@ -1,10 +1,15 @@
-import { useCallback, useEffect, useState, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from 'react'
 import { EDITORS, PanRpcError, WS_METHODS, type EditorId } from '@overdeck/contracts'
 import { toast } from 'sonner'
 
 import { getTransport, type PanRpcProtocolClient } from '../../../lib/wsTransport'
 import { getPreferredEditor, setPreferredEditor } from '../../../editorPreferences'
 import { MarkdownTab } from '../../CommandDeck/ZoneCOverviewTabs/MarkdownTab'
+import { useStageDeck } from '../StageDeckContext'
+import { CiteSelectionLayer } from '../../chat/citations/CiteSelectionToolbar'
+import { fileSelectionResolver } from '../../chat/citations/resolveSelectionCitation'
+import { useFileCitationHighlight } from '../../chat/citations/citationHighlight'
+import { CitationTargetContext } from '../../../lib/composerCitations'
 import type { PaneWrapperProps } from '../types'
 import styles from '../stage.module.css'
 
@@ -45,6 +50,7 @@ export function EditorPane({ pane }: PaneWrapperProps) {
   const [activeTab, setActiveTab] = useState<'edit' | 'preview'>('edit')
   const [saving, setSaving] = useState(false)
   const [conflict, setConflict] = useState(false)
+  const previewRootRef = useRef<HTMLDivElement | null>(null)
 
   const loadFile = useCallback(() => {
     if (!filePath) return
@@ -215,7 +221,7 @@ export function EditorPane({ pane }: PaneWrapperProps) {
           </button>
         </div>
       )}
-      <div className={styles.subBody}>
+      <div className={styles.subBody} ref={previewRootRef}>
         {activeTab === 'edit' ? (
           <textarea
             data-testid="editor-pane-textarea"
@@ -226,9 +232,30 @@ export function EditorPane({ pane }: PaneWrapperProps) {
             spellCheck={false}
           />
         ) : (
-          <MarkdownTab body={draft} />
+          <CitationTargetContext.Provider value={pane.citeConversationName ?? null}>
+            <MarkdownTab body={draft} />
+          </CitationTargetContext.Provider>
         )}
       </div>
+      {activeTab === 'preview' && pane.citeConversationName && !dirty && (
+        <EditorPreviewCite conversationName={pane.citeConversationName} path={filePath} rootRef={previewRootRef} text={draft} />
+      )}
     </div>
   )
+}
+
+/** PAN-4658: Cite for the Preview — file citations into the pane's origin conversation. */
+function EditorPreviewCite({ conversationName, path, rootRef, text }: {
+  conversationName: string; path: string; rootRef: RefObject<HTMLDivElement | null>; text: string
+}) {
+  const deck = useStageDeck()
+  useFileCitationHighlight(rootRef, conversationName, path, text)
+  const resolve = useMemo(() => fileSelectionResolver(path), [path])
+  const onSaved = useCallback(() => {
+    toast.success('Citation added', {
+      description: 'It goes out with your next prompt in the conversation that opened this file.',
+      action: { label: 'Open conversation', onClick: () => deck?.openOrFocusAgentPane(conversationName, 'Agent') },
+    })
+  }, [deck, conversationName])
+  return <CiteSelectionLayer conversationName={conversationName} rootRef={rootRef} resolve={resolve} onSaved={onSaved} />
 }

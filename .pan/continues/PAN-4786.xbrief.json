@@ -1,0 +1,101 @@
+{
+  "version": "1",
+  "issueId": "PAN-4786",
+  "created": "2026-11-02T04:47:22.459Z",
+  "updated": "2026-11-02T05:18:07.373Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "adopted-plan-helper": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4786",
+      "claimedAt": "2026-11-02T04:47:22.459Z",
+      "doneAt": "2026-11-02T04:58:32.050Z"
+    },
+    "verify-door-wiring": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4786",
+      "claimedAt": "2026-11-02T04:58:39.770Z",
+      "doneAt": "2026-11-02T05:03:25.140Z"
+    },
+    "supervisor-live-join-options": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4786",
+      "claimedAt": "2026-11-02T05:03:30.917Z",
+      "doneAt": "2026-11-02T05:07:37.725Z"
+    },
+    "docs-adopted-checklist": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4786",
+      "claimedAt": "2026-11-02T05:07:44.018Z",
+      "doneAt": "2026-11-02T05:09:20.483Z"
+    },
+    "adopted-plan-helper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:13:00.983Z"
+    },
+    "adopted-plan-helper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:13:20.324Z"
+    },
+    "adopted-plan-helper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:13:37.711Z"
+    },
+    "adopted-plan-helper.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:13:57.998Z"
+    },
+    "adopted-plan-helper.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:14:35.042Z"
+    },
+    "verify-door-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:15:03.763Z"
+    },
+    "verify-door-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:15:23.280Z"
+    },
+    "verify-door-wiring.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:15:43.302Z"
+    },
+    "verify-door-wiring.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:15:59.754Z"
+    },
+    "supervisor-live-join-options.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:16:21.068Z"
+    },
+    "supervisor-live-join-options.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:16:38.344Z"
+    },
+    "supervisor-live-join-options.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:16:56.125Z"
+    },
+    "docs-adopted-checklist.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:17:16.421Z"
+    },
+    "docs-adopted-checklist.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:17:33.585Z"
+    },
+    "docs-adopted-checklist.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:17:50.479Z"
+    },
+    "docs-adopted-checklist.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:18:07.372Z"
+    }
+  }
+}

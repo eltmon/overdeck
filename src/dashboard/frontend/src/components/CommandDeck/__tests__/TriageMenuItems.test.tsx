@@ -2,7 +2,7 @@
  * PAN-4639 WI-7: Settle/Unsettle — the shared menu item, the row's settle
  * checkbox, and that both the row menu and the tab menu offer it.
  */
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -44,6 +44,7 @@ function baseMutations(overrides: Partial<ConversationMutations> = {}): Conversa
     unlinkPullRequest: vi.fn(),
     triage: vi.fn(),
     undoLastTriage: vi.fn(() => false),
+    setAutoSettleOverride: vi.fn(),
     openForkModal: vi.fn(),
     submitFork: vi.fn(),
     forkTarget: null,
@@ -283,5 +284,34 @@ describe('row and tab menus both offer Settle/Unsettle (settle-controls.ac2, ac3
     );
     expect(await screen.findByRole('menuitem', { name: 'Unsettle' })).toBeInTheDocument();
     vi.unstubAllGlobals();
+  });
+});
+
+describe('Auto-settle on merge submenu (PAN-4653 WI-7)', () => {
+  function openSubmenu(conv: Conversation, setAutoSettleOverride = vi.fn(), onClose = vi.fn()) {
+    render(<TriageMenuItems conversation={conv} mutations={{ triage: vi.fn(), setAutoSettleOverride }} onClose={onClose} />);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Auto-settle on merge' }));
+    return { setAutoSettleOverride, onClose };
+  }
+
+  it('lists three choices and marks Use global setting when no override is set', () => {
+    openSubmenu(conversation);
+    const menu = screen.getByRole('menu', { name: 'Auto-settle on merge' });
+    expect(within(menu).getAllByRole('menuitem').map((item) => item.textContent)).toEqual(['Use global setting', 'Always', 'Never']);
+    expect(within(menu).getByRole('menuitem', { name: 'Use global setting' })).toHaveAttribute('aria-current', 'true');
+    expect(within(menu).getByRole('menuitem', { name: 'Never' })).not.toHaveAttribute('aria-current');
+  });
+
+  it('choosing Never sets the override to off and closes the menu', () => {
+    const { setAutoSettleOverride, onClose } = openSubmenu(conversation);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Never' }));
+    expect(setAutoSettleOverride).toHaveBeenCalledWith({ name: 'test-conversation', override: 'off' });
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('marks Always for a conversation whose override is on', () => {
+    openSubmenu({ ...conversation, autoSettleOverride: 'on' });
+    expect(screen.getByRole('menuitem', { name: 'Always' })).toHaveAttribute('aria-current', 'true');
+    expect(screen.getByRole('menuitem', { name: 'Use global setting' })).not.toHaveAttribute('aria-current');
   });
 });

@@ -42,19 +42,20 @@ vi.mock('../../../../lib/overdeck/derived-issue-state.js', async (importOriginal
   };
 });
 
-const tmuxExecAsyncMock = vi.fn(async (_args: string[], _options?: unknown): Promise<{ stdout: string; stderr: string }> => ({ stdout: '', stderr: '' }));
-vi.mock('../../../../lib/tmux.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../lib/tmux.js')>()),
-  tmuxExecAsync: (args: string[], options?: unknown) => tmuxExecAsyncMock(args, options),
-}));
-
 vi.mock('../backend-inventory.js', () => ({
   getBackendPanes: async () => [],
   isBackendInventoryDegraded: () => false,
 }));
 
 const { createConversation, getConversationByName } = await import('../../../../lib/overdeck/conversations.js');
-const { setConversationsAutoArchiveOnMerge } = await import('../../../../lib/overdeck/control-settings.js');
+const { setConversationsAutoSettleOnMerge } = await import('../../../../lib/overdeck/control-settings.js');
+const {
+  getConversationTriage,
+  setAutoSettleOverride,
+  settleConversation,
+  snoozeConversation,
+  unsettleConversation,
+} = await import('../../../../lib/overdeck/conversation-triage-store.js');
 const { closeOverdeckDatabase, getOverdeckDatabase } = await import('../../../../lib/overdeck/infra.js');
 const {
   linkConversationPullRequest,
@@ -127,8 +128,6 @@ beforeEach(() => {
   prRows = [];
   listRepoPullRequestsMock.mockClear();
   emitOnlyMock.mockClear();
-  tmuxExecAsyncMock.mockReset();
-  tmuxExecAsyncMock.mockResolvedValue({ stdout: '', stderr: '' });
 });
 
 afterEach(() => {
@@ -182,7 +181,7 @@ describe('runPullRequestSyncOnce — branch detection', () => {
     const name = conversation('feature/pan-3822', { primaryCheckout: true });
     prRows = [pr(12, 'feature/pan-3822')];
 
-    await runPullRequestSyncOnce(Date.now(), undefined, undefined, async () => new Set([`conv-${name}`]));
+    await runPullRequestSyncOnce(Date.now(), undefined, async () => new Set([`conv-${name}`]));
 
     expect(listConversationPullRequests(name).map((link) => link.number)).toEqual([12]);
   });
@@ -191,7 +190,7 @@ describe('runPullRequestSyncOnce — branch detection', () => {
     const name = conversation('feature/pan-3823', { primaryCheckout: true });
     prRows = [pr(13, 'feature/pan-3823')];
 
-    await runPullRequestSyncOnce(Date.now(), undefined, undefined, async () => new Set());
+    await runPullRequestSyncOnce(Date.now(), undefined, async () => new Set());
 
     expect(listConversationPullRequests(name)).toEqual([]);
   });
@@ -200,7 +199,7 @@ describe('runPullRequestSyncOnce — branch detection', () => {
     const name = conversation('feature/pan-3824', { primaryCheckout: true });
     prRows = [pr(14, 'feature/pan-3824')];
 
-    await runPullRequestSyncOnce(Date.now(), undefined, undefined, async () => null);
+    await runPullRequestSyncOnce(Date.now(), undefined, async () => null);
 
     expect(listConversationPullRequests(name)).toEqual([]);
   });
@@ -209,7 +208,7 @@ describe('runPullRequestSyncOnce — branch detection', () => {
     const name = conversation('main', { primaryCheckout: true });
     prRows = [pr(15, 'main')];
 
-    await runPullRequestSyncOnce(Date.now(), undefined, undefined, async () => new Set([`conv-${name}`]));
+    await runPullRequestSyncOnce(Date.now(), undefined, async () => new Set([`conv-${name}`]));
 
     expect(listConversationPullRequests(name)).toEqual([]);
   });
@@ -443,17 +442,21 @@ describe('runPullRequestSyncOnce — slow lane, fallback, backoff (WI-4)', () =>
   });
 });
 
-describe('runPullRequestSyncOnce — auto-archive on merge (WI-11)', () => {
+describe('runPullRequestSyncOnce — auto-settle on merge (PAN-4653)', () => {
   const T0 = Date.parse('2026-09-24T00:00:00Z');
   const merged = (number: number, head: string) => pr(number, head, { state: 'MERGED', mergedAt: '2026-09-24T00:00:00Z' });
-  const noLiveSessions = async () => [] as string[];
+  type LivePanes = () => Promise<ReadonlySet<string> | null>;
 
-  async function openThenMerge(branch: string, opts: { name?: string; issueId?: string } = {}, live = noLiveSessions) {
+  async function openThenMerge(
+    branch: string,
+    opts: { name?: string; issueId?: string; beforeMerge?: (name: string) => void; livePanes?: LivePanes } = {},
+  ) {
     const name = conversation(branch, opts);
     prRows = [pr(20, branch)];
-    await runPullRequestSyncOnce(T0, async () => null, live);
+    await runPullRequestSyncOnce(T0, async () => null, opts.livePanes);
+    opts.beforeMerge?.(name);
     prRows = [merged(20, branch)];
-    await runPullRequestSyncOnce(T0 + 60_000, async () => null, live);
+    await runPullRequestSyncOnce(T0 + 60_000, async () => null, opts.livePanes);
     return name;
   }
 
@@ -461,66 +464,91 @@ describe('runPullRequestSyncOnce — auto-archive on merge (WI-11)', () => {
     return getConversationByName(name)?.archivedAt ?? null;
   }
 
+  function settledAt(name: string): string | null {
+    return getConversationTriage(name)?.settledAt ?? null;
+  }
+
   afterEach(() => {
-    setConversationsAutoArchiveOnMerge(false);
+    getOverdeckDatabase().prepare("DELETE FROM app_settings WHERE key = 'conversations.auto_settle_on_merge'").run();
   });
 
-  it('is off by default: a merged PR never archives the conversation', async () => {
-    const name = await openThenMerge('feature/off');
+  it('is on by default: a merged PR settles the conversation with reason merge and never archives it', async () => {
+    const name = await openThenMerge('feature/default-on');
     expect(listConversationPullRequests(name)[0]?.snapshot?.state).toBe('merged');
+    expect(getConversationTriage(name)).toMatchObject({ settledAt: new Date(T0 + 60_000).toISOString(), settleReason: 'merge' });
     expect(archivedAt(name)).toBeNull();
   });
 
-  it('when on, archives an operator conversation once its only PR merges and its session is gone', async () => {
-    setConversationsAutoArchiveOnMerge(true);
-    const name = await openThenMerge('feature/on');
-    expect(archivedAt(name)).not.toBeNull();
-    expect(emitOnlyMock).toHaveBeenCalledWith(expect.objectContaining({ payload: expect.objectContaining({ conversationName: name }) }));
-  });
-
-  it('never archives an agent conversation', async () => {
-    setConversationsAutoArchiveOnMerge(true);
-    const name = await openThenMerge('feature/agent', { name: 'agent-pan-77', issueId: 'PAN-77' });
-    expect(archivedAt(name)).toBeNull();
-  });
-
-  it('never archives a conversation whose terminal session is alive', async () => {
-    setConversationsAutoArchiveOnMerge(true);
-    const name = await openThenMerge('feature/live', { name: 'live-chat' }, async () => ['conv-live-chat']);
-    expect(archivedAt(name)).toBeNull();
-  });
-
-  it('skips auto-archive for the sweep when the terminal sessions cannot be listed', async () => {
-    setConversationsAutoArchiveOnMerge(true);
-    const name = await openThenMerge('feature/unknown-liveness', {}, async () => null);
-    expect(listConversationPullRequests(name)[0]?.snapshot?.state).toBe('merged');
-    expect(archivedAt(name)).toBeNull();
-  });
-
-  it('by default reads tmux, skipping on a failed read and treating "no server running" as none alive', async () => {
-    setConversationsAutoArchiveOnMerge(true);
-    tmuxExecAsyncMock.mockRejectedValue(Object.assign(new Error('tmux failed'), { stderr: 'server exited unexpectedly' }));
-    const failed = conversation('feature/tmux-failed');
-    prRows = [pr(30, 'feature/tmux-failed')];
+  it('settles with reason merge when the PR is closed without merging', async () => {
+    const name = conversation('feature/closed');
+    prRows = [pr(24, 'feature/closed')];
     await runPullRequestSyncOnce(T0, async () => null);
-    prRows = [merged(30, 'feature/tmux-failed')];
+    prRows = [pr(24, 'feature/closed', { state: 'CLOSED', closedAt: '2026-09-24T00:00:30Z' })];
     await runPullRequestSyncOnce(T0 + 60_000, async () => null);
-    expect(archivedAt(failed)).toBeNull();
+    expect(listConversationPullRequests(name)[0]?.snapshot?.state).toBe('closed');
+    expect(getConversationTriage(name)?.settleReason).toBe('merge');
+    expect(archivedAt(name)).toBeNull();
+  });
 
-    tmuxExecAsyncMock.mockRejectedValue(Object.assign(new Error('tmux failed'), { stderr: 'no server running on /tmp/tmux-1000/overdeck' }));
-    const noServer = conversation('feature/tmux-no-server');
-    prRows = [pr(31, 'feature/tmux-no-server')];
-    await runPullRequestSyncOnce(T0 + 120_000, async () => null);
-    prRows = [merged(31, 'feature/tmux-no-server')];
-    await runPullRequestSyncOnce(T0 + 180_000, async () => null);
-    expect(archivedAt(noServer)).not.toBeNull();
+  it('does not settle when the global setting is off', async () => {
+    setConversationsAutoSettleOnMerge(false);
+    const name = await openThenMerge('feature/global-off');
+    expect(settledAt(name)).toBeNull();
+  });
+
+  it('override off beats the global setting on', async () => {
+    const name = await openThenMerge('feature/override-off', { beforeMerge: (n) => setAutoSettleOverride(n, 'off') });
+    expect(settledAt(name)).toBeNull();
+  });
+
+  it('override on beats the global setting off', async () => {
+    setConversationsAutoSettleOnMerge(false);
+    const name = await openThenMerge('feature/override-on', { beforeMerge: (n) => setAutoSettleOverride(n, 'on') });
+    expect(getConversationTriage(name)?.settleReason).toBe('merge');
+    expect(archivedAt(name)).toBeNull();
+  });
+
+  it('never settles an agent conversation, whatever its override', async () => {
+    const name = await openThenMerge('feature/agent', {
+      name: 'agent-pan-77',
+      issueId: 'PAN-77',
+      beforeMerge: (n) => setAutoSettleOverride(n, 'on'),
+    });
+    expect(settledAt(name)).toBeNull();
+  });
+
+  it('settles a conversation whose pane is live (liveness is not read)', async () => {
+    const name = await openThenMerge('feature/live', { name: 'live-chat', livePanes: async () => new Set(['conv-live-chat']) });
+    expect(getConversationTriage(name)?.settleReason).toBe('merge');
+    expect(archivedAt(name)).toBeNull();
+  });
+
+  it('waits while another linked PR is still open', async () => {
+    const name = conversation('feature/two');
+    linkConversationPullRequest(name, {
+      host: 'github.com', repository: 'eltmon/overdeck', number: 21, url: 'https://github.com/eltmon/overdeck/pull/21',
+    }, 'manual', T0);
+    prRows = [pr(20, 'feature/two'), pr(21, 'feature/other')];
+    await runPullRequestSyncOnce(T0, async () => null);
+    prRows = [merged(20, 'feature/two'), pr(21, 'feature/other')];
+    await runPullRequestSyncOnce(T0 + 60_000, async () => null);
+    expect(settledAt(name)).toBeNull();
+  });
+
+  it('does not settle on the first read of a PR that was already merged', async () => {
+    const name = conversation('feature/late');
+    linkConversationPullRequest(name, {
+      host: 'github.com', repository: 'eltmon/overdeck', number: 22, url: 'https://github.com/eltmon/overdeck/pull/22',
+    }, 'manual', T0);
+    await runPullRequestSyncOnce(T0, async () => merged(22, 'feature/whatever') as never);
+    expect(listConversationPullRequests(name)[0]?.snapshot?.state).toBe('merged');
+    expect(settledAt(name)).toBeNull();
   });
 
   it('judges the open → merged transition per conversation when links share a PR', async () => {
-    setConversationsAutoArchiveOnMerge(true);
     const watched = conversation('feature/shared-merge');
     prRows = [pr(23, 'feature/shared-merge')];
-    await runPullRequestSyncOnce(T0, async () => null, noLiveSessions);
+    await runPullRequestSyncOnce(T0, async () => null);
     expect(listConversationPullRequests(watched)[0]?.snapshot?.state).toBe('open');
 
     // A second conversation links the same PR before it was ever synced for it,
@@ -532,34 +560,30 @@ describe('runPullRequestSyncOnce — auto-archive on merge (WI-11)', () => {
     getOverdeckDatabase().prepare("UPDATE conversation_pull_requests SET snapshot_json = NULL WHERE conversation_id = (SELECT id FROM conversations WHERE name = ?)").run(fresh);
 
     prRows = [merged(23, 'feature/shared-merge')];
-    await runPullRequestSyncOnce(T0 + 60_000, async () => null, noLiveSessions);
+    await runPullRequestSyncOnce(T0 + 60_000, async () => null);
 
-    expect(archivedAt(watched)).not.toBeNull();
-    expect(archivedAt(fresh)).toBeNull();
+    expect(settledAt(watched)).not.toBeNull();
+    expect(settledAt(fresh)).toBeNull();
   });
 
-  it('waits while another linked PR is still open', async () => {
-    setConversationsAutoArchiveOnMerge(true);
-    const name = conversation('feature/two');
-    linkConversationPullRequest(name, {
-      host: 'github.com', repository: 'eltmon/overdeck', number: 21, url: 'https://github.com/eltmon/overdeck/pull/21',
-    }, 'manual', T0);
-    prRows = [pr(20, 'feature/two'), pr(21, 'feature/other')];
-    await runPullRequestSyncOnce(T0, async () => null, noLiveSessions);
-    prRows = [merged(20, 'feature/two'), pr(21, 'feature/other')];
-    await runPullRequestSyncOnce(T0 + 60_000, async () => null, noLiveSessions);
-    expect(archivedAt(name)).toBeNull();
+  it('keeps an earlier manual settle and its reason', async () => {
+    const name = await openThenMerge('feature/manual', { beforeMerge: (n) => settleConversation(n, 'manual', T0 - 1_000) });
+    expect(getConversationTriage(name)).toMatchObject({ settledAt: new Date(T0 - 1_000).toISOString(), settleReason: 'manual' });
   });
 
-  it('does not archive on the first read of a PR that was already merged', async () => {
-    setConversationsAutoArchiveOnMerge(true);
-    const name = conversation('feature/late');
-    linkConversationPullRequest(name, {
-      host: 'github.com', repository: 'eltmon/overdeck', number: 22, url: 'https://github.com/eltmon/overdeck/pull/22',
-    }, 'manual', T0);
-    await runPullRequestSyncOnce(T0, async () => merged(22, 'feature/whatever') as never, noLiveSessions);
+  it('does not settle a conversation snoozed into the future and keeps its snooze', async () => {
+    const until = T0 + 3_600_000;
+    const name = await openThenMerge('feature/snoozed', { beforeMerge: (n) => snoozeConversation(n, until) });
+    expect(getConversationTriage(name)).toMatchObject({ settledAt: null, snoozedUntil: new Date(until).toISOString() });
+  });
+
+  it('leaves a conversation unsettled by the operator alone on later sweeps', async () => {
+    const name = await openThenMerge('feature/unsettled');
+    expect(settledAt(name)).not.toBeNull();
+    unsettleConversation(name);
+    await runPullRequestSyncOnce(T0 + 120_000, async () => null);
     expect(listConversationPullRequests(name)[0]?.snapshot?.state).toBe('merged');
-    expect(archivedAt(name)).toBeNull();
+    expect(settledAt(name)).toBeNull();
   });
 });
 

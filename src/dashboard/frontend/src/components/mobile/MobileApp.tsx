@@ -8,6 +8,10 @@
  *       /m?subject=<id>          → Needs-you list with that subject's card open
  *       /m?tab=conversations     → conversation list
  *       /m?conversation=<id>     → that conversation, full screen
+ *       /m/pipeline              → pipeline board (PAN-4661)
+ *       /m/pipeline?issue=<id>   → that issue's read-only sheet, full screen
+ *     `pipeline` is a fixed path segment (no dot, no extension), so PAN-2355
+ *     D-3 still holds: ids stay in the query.
  * D-4 A standalone branch, lazy-loaded from App.tsx, with no desktop chrome
  *     (no Sidebar, Stage, terminals or dialog host). The desktop bundle gains
  *     only the lazy import.
@@ -22,43 +26,54 @@ import { useConnectionState } from '../../lib/connectionState';
 import { TurnOnNotificationsButton } from '../push/TurnOnNotificationsButton';
 import { MobileNeedsYou } from './MobileNeedsYou';
 import { MobileConversations } from './MobileConversations';
+import { MobileIssueSheet } from './MobileIssueSheet';
 import { MobilePairScreen } from './MobilePairScreen';
+import { MobilePipeline } from './MobilePipeline';
 
-export type MobileTab = 'needs-you' | 'conversations';
+export type MobileTab = 'needs-you' | 'conversations' | 'pipeline';
 
 export interface MobileRoute {
   tab: MobileTab;
   subjectId: string | null;
   conversationId: string | null;
+  issueId: string | null;
 }
 
-export function readMobileRoute(search: string): MobileRoute {
+// D-4661-3: a pipeline pathname decides the tab and ignores every other query
+// parameter; otherwise the existing rules apply, with issueId always null.
+export function readMobileRoute(search: string, pathname = '/m'): MobileRoute {
   const params = new URLSearchParams(search);
+  if (pathname === '/m/pipeline' || pathname === '/m/pipeline/') {
+    return { tab: 'pipeline', issueId: params.get('issue') || null, subjectId: null, conversationId: null };
+  }
   const conversationId = params.get('conversation') || null;
-  if (conversationId) return { tab: 'conversations', subjectId: null, conversationId };
-  if (params.get('tab') === 'conversations') return { tab: 'conversations', subjectId: null, conversationId: null };
-  return { tab: 'needs-you', subjectId: params.get('subject') || null, conversationId: null };
+  if (conversationId) return { tab: 'conversations', subjectId: null, conversationId, issueId: null };
+  if (params.get('tab') === 'conversations') return { tab: 'conversations', subjectId: null, conversationId: null, issueId: null };
+  return { tab: 'needs-you', subjectId: params.get('subject') || null, conversationId: null, issueId: null };
 }
 
-function mobileSearch(route: MobileRoute): string {
+function mobilePath(route: MobileRoute): string {
+  if (route.tab === 'pipeline') {
+    return `/m/pipeline${route.issueId ? `?issue=${encodeURIComponent(route.issueId)}` : ''}`;
+  }
   const params = new URLSearchParams();
   if (route.conversationId) params.set('conversation', route.conversationId);
   else if (route.tab === 'conversations') params.set('tab', 'conversations');
   else if (route.subjectId) params.set('subject', route.subjectId);
   const search = params.toString();
-  return search ? `?${search}` : '';
+  return `/m${search ? `?${search}` : ''}`;
 }
 
 function navigateMobile(route: MobileRoute): void {
-  const path = `/m${mobileSearch(route)}`;
+  const path = mobilePath(route);
   if (`${window.location.pathname}${window.location.search}` !== path) window.history.pushState({}, '', path);
   window.dispatchEvent(new PopStateEvent('popstate'));
 }
 
 function useMobileRoute(): MobileRoute {
-  const [route, setRoute] = useState(() => readMobileRoute(window.location.search));
+  const [route, setRoute] = useState(() => readMobileRoute(window.location.search, window.location.pathname));
   useEffect(() => {
-    const onPopState = () => setRoute(readMobileRoute(window.location.search));
+    const onPopState = () => setRoute(readMobileRoute(window.location.search, window.location.pathname));
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
@@ -132,6 +147,7 @@ function InstallAffordance() {
 const TABS: ReadonlyArray<{ tab: MobileTab; label: string }> = [
   { tab: 'needs-you', label: 'Needs you' },
   { tab: 'conversations', label: 'Conversations' },
+  { tab: 'pipeline', label: 'Pipeline' },
 ];
 
 export default function MobileApp() {
@@ -140,13 +156,22 @@ export default function MobileApp() {
   useServiceWorkerRegistration();
 
   const openConversation = useCallback((id: string) => {
-    navigateMobile({ tab: 'conversations', subjectId: null, conversationId: id });
+    navigateMobile({ tab: 'conversations', subjectId: null, conversationId: id, issueId: null });
   }, []);
   const closeConversation = useCallback(() => {
-    navigateMobile({ tab: 'conversations', subjectId: null, conversationId: null });
+    navigateMobile({ tab: 'conversations', subjectId: null, conversationId: null, issueId: null });
+  }, []);
+  const openIssue = useCallback((id: string) => {
+    navigateMobile({ tab: 'pipeline', subjectId: null, conversationId: null, issueId: id });
+  }, []);
+  const closeIssue = useCallback(() => {
+    navigateMobile({ tab: 'pipeline', subjectId: null, conversationId: null, issueId: null });
   }, []);
 
-  const fullScreenConversation = route.tab === 'conversations' && route.conversationId !== null;
+  // D-4661-9: an open conversation or an open issue sheet is full screen, like
+  // the shell header and tab bar hide for either.
+  const fullScreen = (route.tab === 'conversations' && route.conversationId !== null)
+    || (route.tab === 'pipeline' && route.issueId !== null);
 
   return (
     // fixed: the shell never makes the document overflow, so a phone never pans or zooms the page.
@@ -156,7 +181,7 @@ export default function MobileApp() {
         <MobilePairScreen />
       ) : (
         <>
-          {!fullScreenConversation && (
+          {!fullScreen && (
             <header className="flex min-h-11 items-center justify-between gap-3 border-b border-border px-4 pt-[env(safe-area-inset-top)]">
               <h1 className="text-base font-medium">Overdeck</h1>
               {/* PAN-2354's control, sized up to the phone's 44 px tap target from here. */}
@@ -169,15 +194,19 @@ export default function MobileApp() {
           <main className="min-h-0 flex-1 overflow-y-auto">
             {route.tab === 'needs-you' ? (
               <MobileNeedsYou subjectId={route.subjectId} />
-            ) : (
+            ) : route.tab === 'conversations' ? (
               <MobileConversations
                 conversationId={route.conversationId}
                 onOpen={openConversation}
                 onBack={closeConversation}
               />
+            ) : route.issueId ? (
+              <MobileIssueSheet issueId={route.issueId} onBack={closeIssue} />
+            ) : (
+              <MobilePipeline onOpen={openIssue} />
             )}
           </main>
-          {!fullScreenConversation && (
+          {!fullScreen && (
             <nav
               aria-label="Phone sections"
               className="flex border-t border-border pb-[env(safe-area-inset-bottom)]"
@@ -187,7 +216,7 @@ export default function MobileApp() {
                   key={tab}
                   type="button"
                   aria-current={route.tab === tab ? 'page' : undefined}
-                  onClick={() => navigateMobile({ tab, subjectId: null, conversationId: null })}
+                  onClick={() => navigateMobile({ tab, subjectId: null, conversationId: null, issueId: null })}
                   className={`min-h-11 min-w-11 flex-1 text-sm ${
                     route.tab === tab ? 'font-medium text-foreground' : 'text-muted-foreground'
                   }`}

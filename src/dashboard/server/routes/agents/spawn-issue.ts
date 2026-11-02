@@ -21,7 +21,8 @@ import {
   clearAgentPaused,
   clearAgentTroubled,
 } from '../../../../lib/agents.js';
-import { readAutoSpawnConsentWorkModel } from '../../../../lib/planning/auto-spawn-consent.js';
+import { readAutoSpawnConsentWorkModel, readAutoSpawnConsentWorkspaceLocation } from '../../../../lib/planning/auto-spawn-consent.js';
+import { loadConfigSync } from '../../../../lib/config.js';
 import type { AgentState } from '../../../../lib/agents/agent-state.js';
 import { operatorInterventionEvent } from '../../../../lib/operator-interventions.js';
 import { assessCpuPressure, type CpuPressureVerdict } from '../../../../lib/cloister/cpu-pressure.js';
@@ -311,6 +312,12 @@ export const spawnIssueAgentForRoute = (input: { body: unknown; internalRequest:
 
     const workspaceMetadata = loadWorkspaceMetadataFn(issueId);
     const isRemote = workspaceMetadata?.location === 'remote';
+    // PAN-4683: a consent-bearing spawn carries the planning request's location.
+    const remoteRequested = !isRemote && autoSpawnConsentRequired
+      && (yield* Effect.promise(() => readAutoSpawnConsentWorkspaceLocation(issueId).catch(() => undefined))) === 'remote';
+    if (remoteRequested && loadConfigSync().remote?.enabled !== true) {
+      return jsonResponse({ error: `Remote workspaces are not enabled for ${issueId}: run pan admin remote setup, or start it locally with pan start ${issueId} --local` }, { status: 422 });
+    }
 
     const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const resolvedProject = resolveProjectFromIssueSync(String(issueId));
@@ -322,7 +329,7 @@ export const spawnIssueAgentForRoute = (input: { body: unknown; internalRequest:
 
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
     // PAN-4171: `pan workspace create` also resumes an unfinished setup.
-    if (workspaceNeedsSetup(workspacePath)) {
+    if (!remoteRequested && workspaceNeedsSetup(workspacePath)) {
       try {
         const nodeDir = dirname(process.execPath);
         yield* Effect.promise(() => execAsync(
@@ -479,7 +486,7 @@ export const spawnIssueAgentForRoute = (input: { body: unknown; internalRequest:
       }, { status: 429 });
     }
 
-    if (!isRemote) {
+    if (!isRemote && !remoteRequested) {
       emitStartAgentPhase(issueId, 'stackHealthGate', 'start', 'checking workspace docker stack health', { workspacePath });
       let stackHealth = yield* getWorkspaceStackHealth(issueId, { projectConfig, workspacePath });
       if (!stackHealth.healthy && !allowHost) {
@@ -658,7 +665,8 @@ export const spawnIssueAgentForRoute = (input: { body: unknown; internalRequest:
     // `acknowledgeDirtyWorkspace: true` to bypass this gate (typically after
     // the user clicked one of the three modal buttons).
     const acknowledgeDirtyWorkspace = (body as any).acknowledgeDirtyWorkspace === true;
-    if (!acknowledgeDirtyWorkspace) {
+    // PAN-4683: uncommitted changes never reach a remote VM, so the check stays when the local workspace exists.
+    if (!acknowledgeDirtyWorkspace && (!remoteRequested || existsSync(workspacePath))) {
       try {
         const { stdout: statusOut } = yield* Effect.promise(() => execAsync('git status --porcelain --untracked-files=all', {
           cwd: workspacePath,
@@ -770,7 +778,7 @@ export const spawnIssueAgentForRoute = (input: { body: unknown; internalRequest:
     // Orchestration takes the request into a background job (claim retained
     // there). If its Effect fails instead, no background job exists to
     // release the claim — release here and re-raise the original cause.
-    const containerExit = yield* Effect.exit(handleContainerOrchestration({
+    const containerExit = yield* Effect.exit(remoteRequested ? Effect.succeed(null) : handleContainerOrchestration({
       issueId,
       workspacePath,
       devScript,
@@ -807,7 +815,7 @@ export const spawnIssueAgentForRoute = (input: { body: unknown; internalRequest:
     // below would never render and the claim would leak. Capture the Exit so
     // both run on every outcome.
     const spawnExit = yield* Effect.exit(Effect.gen(function* () {
-      emitStartAgentPhase(issueId, 'spawn', 'start', 'starting local work agent', { workspacePath });
+      emitStartAgentPhase(issueId, 'spawn', 'start', remoteRequested ? 'starting remote work agent via pan start --remote' : 'starting local work agent', { workspacePath });
       const id = yield* Effect.promise(() => spawnPanCommand(
         buildPanStartArgs({
           issueId,
@@ -816,8 +824,9 @@ export const spawnIssueAgentForRoute = (input: { body: unknown; internalRequest:
           effort: bodyEffort,
           allowHost,
           offBook,
+          location: remoteRequested ? 'remote' : 'local',
         }),
-        workspacePath,
+        remoteRequested && !existsSync(workspacePath) ? projectPath : workspacePath,
       ));
       yield* Effect.promise(markWorkStartAccepted);
       emitStartAgentPhase(issueId, 'spawn', 'success', 'local work agent spawn requested', {
