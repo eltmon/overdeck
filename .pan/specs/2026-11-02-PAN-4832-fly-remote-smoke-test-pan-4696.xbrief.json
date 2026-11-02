@@ -1,0 +1,135 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T16:27:31Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4832: Fly remote smoke test (PAN-4696)",
+    "updated": "2026-11-02T16:28:49.221Z"
+  },
+  "plan": {
+    "id": "pan-4832",
+    "title": "Fly remote smoke test (PAN-4696)",
+    "status": "proposed",
+    "uid": "035d68e8-b4f4-4e91-849f-583bf380a9b3",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-02T16:27:31Z",
+    "updated": "2026-11-02T16:28:49.221Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4832",
+        "label": "PAN-4832",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4696",
+        "label": "PAN-4696",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "smoke-test",
+      "remote",
+      "fly",
+      "throwaway"
+    ],
+    "narratives": {
+      "Problem": "PAN-4696 needs one live remote (Fly) work-agent run on the deployed build to confirm the 60 s reap hands the agent off unaided, that review.requested carries source remote-reap, and that /workspace/.pan/host-heartbeat stays under 2 minutes old while the agent works. The agent needs a trivial, deterministic task that keeps it busy for about 150 s.",
+      "Proposal": "One item: append the line 'Fly remote smoke test for PAN-4696' to docs/fly-smoke.txt (new file), run two separate foreground 'sleep 75' commands, then commit with an 'Item: smoke-line' trailer and push feature/pan-4832. On a remote run, create /workspace/.pan/REMOTE_DONE only after the push. The order append -> sleep -> sleep -> commit -> push -> sentinel is load-bearing.",
+      "NonGoals": "- No tests of any kind.\n- No edits to any file other than docs/fly-smoke.txt.\n- The PR is never merged; the operator closes it unmerged.\n- The Flywheel must not start this issue.\n- No 'pan done' on a remote run; remote completion is push plus the REMOTE_DONE sentinel.\n- No single 'sleep 150' (it exceeds the 120 s Bash tool timeout)."
+    },
+    "metadata": {
+      "docsJustification": "The only touched file, docs/fly-smoke.txt, is itself under docs/ and is the docs item; the throwaway change alters no documented behavior.",
+      "canonicalFilename": "2026-11-02-PAN-4832-fly-remote-smoke-test-pan-4696.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Plan exactly one item instead of decomposing further.",
+        "rationale": "The issue body says 'One xBRIEF item, no tests, no other files'; the issue is authoritative over the generic decomposition guidance."
+      },
+      {
+        "summary": "Give the item kind 'docs' with files_scope ['docs/fly-smoke.txt'].",
+        "rationale": "The only touched file is under docs/, which satisfies the finalize docs gate without adding a second item the issue forbids."
+      },
+      {
+        "summary": "Specify a fallback if the harness blocks a foreground 'sleep 75'.",
+        "rationale": "Some Claude Code builds block foreground sleep; 'sleep 2' ran fine here on 2026-11-02, so sleep is primary and 'timeout 75 tail -f /dev/null || true' is the fallback."
+      }
+    ],
+    "items": [
+      {
+        "id": "smoke-line",
+        "title": "Append the PAN-4696 smoke line to docs/fly-smoke.txt, hold 150 s, then commit and push",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T16:27:31Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4832",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/fly-smoke.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "tail -n 1 docs/fly-smoke.txt",
+            "git diff --name-only origin/main...HEAD -- . ':!.pan' ':!.overdeck'"
+          ],
+          "expected_outputs": [
+            "tail prints exactly: Fly remote smoke test for PAN-4696",
+            "git diff prints only the single path docs/fly-smoke.txt"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Do these steps in this exact order. (1) pan task claim PAN-4832 smoke-line. (2) printf 'Fly remote smoke test for PAN-4696\\n' >> docs/fly-smoke.txt (the file does not exist on main; this creates it). (3) Run 'sleep 75' as one foreground shell command. (4) Run 'sleep 75' again as a second separate foreground command; never one 'sleep 150'. If the harness refuses foreground sleep, use 'timeout 75 tail -f /dev/null || true' twice instead. (5) git add docs/fly-smoke.txt && git commit -m 'chore(smoke): add fly remote smoke line (PAN-4832)' -m 'Item: smoke-line'. (6) git push origin feature/pan-4832. (7) pan task done PAN-4832 smoke-line, plus any .acN sub-items it asks for. (8) Remote run only: touch /workspace/.pan/REMOTE_DONE && echo 'PAN_REMOTE_DONE PAN-4832'; never run pan done on a remote run. Do not commit, push, or create the sentinel before both sleeps finish: the reap would hand the branch off before the heartbeat window exists."
+        },
+        "items": [
+          {
+            "id": "smoke-line.ac1",
+            "title": "Given the pushed branch, when tail -n 1 docs/fly-smoke.txt runs, then it prints exactly 'Fly remote smoke test for PAN-4696'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "smoke-line.ac2",
+            "title": "When git diff --name-only origin/main...origin/feature/pan-4832 excluding .pan and .overdeck runs, then it prints only docs/fly-smoke.txt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "smoke-line.ac3",
+            "title": "The agent transcript records two separate 'sleep 75' commands, both after the append and before the git commit that pushes the change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "smoke-line.ac4",
+            "title": "When the run is remote, then the agent creates /workspace/.pan/REMOTE_DONE only after the push succeeds and never runs pan done",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  },
+  "status": "proposed"
+}
