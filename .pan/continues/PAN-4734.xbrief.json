@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4734",
   "created": "2026-11-02T14:23:44.928Z",
-  "updated": "2026-11-02T16:58:51.968Z",
+  "updated": "2026-11-02T16:59:08.538Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -225,6 +225,10 @@
     "wi9-cli-start-remote.ac5": {
       "status": "completed",
       "doneAt": "2026-11-02T16:58:51.967Z"
+    },
+    "wi10-reap-linked-agents.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:59:08.537Z"
     }
   }
 }
