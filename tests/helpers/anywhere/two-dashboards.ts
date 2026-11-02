@@ -73,6 +73,11 @@ function tmuxSocketName(machine: MachineName, pid: number): string {
   return `odk-${machine}-${pid}`;
 }
 
+/** Where tmux puts a `-L` socket; kill-server can leave the file behind. */
+function tmuxSocketPath(socket: string): string {
+  return join(process.env['TMUX_TMPDIR'] || '/tmp', `tmux-${process.getuid?.() ?? 0}`, socket);
+}
+
 export function assertPreconditions(input: { serverPath: string; hasTmux: boolean }): void {
   if (!existsSync(input.serverPath)) throw new Error('dist/dashboard/server.js is missing; run npm run build');
   if (!input.hasTmux) throw new Error('tmux is not installed; install tmux');
@@ -254,6 +259,23 @@ async function stopServer(machine: Machine): Promise<void> {
   clearTimeout(timer);
 }
 
+/** Stop every conversation this machine owns through its stop route; a dead server is fine. */
+async function stopLocalConversations(machine: Machine): Promise<void> {
+  if (machine.child.exitCode !== null || machine.child.signalCode !== null) return;
+  try {
+    const listed = await fetch(`${machine.url}/api/conversations`, { signal: AbortSignal.timeout(5000) });
+    const rows = (await listed.json()) as Array<{ name?: unknown }>;
+    const names = rows.map((row) => row.name).filter((name): name is string => typeof name === 'string' && !name.startsWith('@'));
+    await Promise.all(names.map((name) => fetch(`${machine.url}/api/conversations/${encodeURIComponent(name)}/stop`, {
+      method: 'POST',
+      headers: { origin: machine.url },
+      signal: AbortSignal.timeout(10_000),
+    }).catch(() => undefined)));
+  } catch {
+    // the pkill backstop in stop() still ends any harness left behind
+  }
+}
+
 function hasTmux(): boolean {
   return spawnSync('tmux', ['-V'], { stdio: 'ignore' }).status === 0;
 }
@@ -268,8 +290,13 @@ export async function startPair(): Promise<Pair> {
   let proxy: Proxy | null = null;
 
   const stop = async () => {
+    // A conversation's launcher runs in its own session, so killing tmux does not end it.
+    await Promise.all([machines.a, machines.b].map(stopLocalConversations));
     await Promise.all([stopServer(machines.a), stopServer(machines.b)]);
     await Promise.all([machines.a, machines.b].map((m) => execFileAsync('tmux', ['-L', m.tmuxSocket, 'kill-server']).catch(() => undefined)));
+    for (const m of [machines.a, machines.b]) rmSync(tmuxSocketPath(m.tmuxSocket), { force: true });
+    // Backstop for a failed stop route: every harness process names its unique temp home.
+    await Promise.all([homes.a, homes.b].map((home) => execFileAsync('pkill', ['-KILL', '-f', home]).catch(() => undefined)));
     await proxy?.close();
     for (const path of [homes.a, homes.b, nodeDir.root]) removeTestHome(path);
   };
