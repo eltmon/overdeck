@@ -92,6 +92,25 @@ describe('POST /api/conversations/triage (PAN-4639 WI-2)', () => {
     expect(payload.conversations).toHaveLength(3);
   });
 
+  it('sets only the auto-settle override (PAN-4653) and leaves settle and snooze unchanged', async () => {
+    await seedConversation('conv-o');
+    const response = await request('/api/conversations/triage', { updates: [{ name: 'conv-o', autoSettleOverride: 'off' }] });
+    expect(response.status).toBe(200);
+    expect(decode(response)).toEqual({
+      conversations: [{ name: 'conv-o', settledAt: null, settleReason: null, snoozedUntil: null, autoSettleOverride: 'off' }],
+      notFound: [],
+      rejected: [],
+    });
+
+    const { getConversationTriage } = await import('../../../../lib/overdeck/conversation-triage-store.js');
+    expect(getConversationTriage('conv-o')).toEqual({
+      settledAt: null,
+      settleReason: null,
+      snoozedUntil: null,
+      autoSettleOverride: 'off',
+    });
+  });
+
   it('reports an unknown name in notFound', async () => {
     const response = await request('/api/conversations/triage', { updates: [{ name: 'no-such-conv', settled: true }] });
     expect(response.status).toBe(200);
