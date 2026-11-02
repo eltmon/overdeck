@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4774",
   "created": "2026-11-02T21:00:13.410Z",
-  "updated": "2026-11-02T22:25:59.037Z",
+  "updated": "2026-11-02T22:40:31.413Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -92,9 +92,10 @@
       "doneAt": "2026-11-02T22:25:56.644Z"
     },
     "ac06-ssh-host": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4774",
-      "claimedAt": "2026-11-02T22:25:59.037Z"
+      "claimedAt": "2026-11-02T22:25:59.037Z",
+      "doneAt": "2026-11-02T22:40:31.412Z"
     }
   }
 }
