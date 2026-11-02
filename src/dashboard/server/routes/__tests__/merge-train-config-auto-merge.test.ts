@@ -90,6 +90,7 @@ const baseDeps = {
   isIssueClosed: () => false,
   resolveProject: () => ({ projectKey: 'overdeck', projectName: 'Overdeck', projectPath: '/repos/overdeck' }),
   announce: vi.fn(),
+  deftHold: async () => null,
 };
 
 describe('POST /api/merge-train/auto-merge/schedule', () => {
@@ -119,6 +120,18 @@ describe('POST /api/merge-train/auto-merge/schedule', () => {
     });
     expect(result.status).toBe(422);
     expect(result.body).toEqual({ error: 'PAN-3917 is not ready to merge: latest review requested changes' });
+  });
+
+  it('refuses a Deft issue that requires a human merge with 412 (PAN-4820)', async () => {
+    const schedule = vi.fn();
+    const result = await postAutoMergeSchedulePayload({ issueId: 'PAN-3917' }, {
+      ...baseDeps,
+      deftHold: async (issueId: string) => `${issueId} runs on Deft and requires a human merge`,
+      mergeGate: async () => gate(),
+      schedule: schedule as never,
+    });
+    expect(result).toEqual({ status: 412, body: { error: 'PAN-3917 runs on Deft and requires a human merge' } });
+    expect(schedule).not.toHaveBeenCalled();
   });
 
   it('refuses while UAT is still required', async () => {
