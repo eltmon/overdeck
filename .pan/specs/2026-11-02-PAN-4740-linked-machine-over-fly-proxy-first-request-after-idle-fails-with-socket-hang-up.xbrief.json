@@ -4,17 +4,17 @@
     "created": "2026-11-02T12:39:28Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4740: Linked machine over Fly proxy: first request after idle fails with 'socket hang up'",
-    "updated": "2026-11-02T12:42:37.305Z"
+    "updated": "2026-11-02T12:43:47.402Z"
   },
   "plan": {
     "id": "pan-4740",
     "title": "Linked machine over Fly proxy: first request after idle fails with 'socket hang up'",
-    "status": "proposed",
+    "status": "running",
     "uid": "2a5412f5-7905-49be-9095-6a5b72c1e10a",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-02T12:39:28Z",
-    "updated": "2026-11-02T12:42:37.305Z",
+    "updated": "2026-11-02T12:43:47.402Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4740",
@@ -346,5 +346,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
