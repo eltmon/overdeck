@@ -4,17 +4,17 @@
     "created": "2026-11-02T04:57:55Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4791: PAN-4777 follow-up: CodeRabbit findings on #4789 (cleanup-promise scope in fly-provider.md, volume cleanup in recovery text)",
-    "updated": "2026-11-02T05:03:04.894Z"
+    "updated": "2026-11-02T05:13:21.389Z"
   },
   "plan": {
     "id": "pan-4791",
     "title": "PAN-4777 follow-up: CodeRabbit findings on #4789 (cleanup-promise scope in fly-provider.md, volume cleanup in recovery text)",
-    "status": "proposed",
+    "status": "running",
     "uid": "fa51d617-02ea-4bda-a1b7-e246d0525a4c",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-02T04:57:55Z",
-    "updated": "2026-11-02T05:03:04.894Z",
+    "updated": "2026-11-02T05:13:21.389Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4791",
@@ -235,5 +235,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
