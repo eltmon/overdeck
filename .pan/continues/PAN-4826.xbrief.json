@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4826",
   "created": "2026-11-02T16:31:08.878Z",
-  "updated": "2026-11-02T17:16:02.713Z",
+  "updated": "2026-11-02T17:18:08.706Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,9 +52,10 @@
       "doneAt": "2026-11-02T17:15:54.197Z"
     },
     "sonnet-4-5-retire": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4826",
-      "claimedAt": "2026-11-02T17:16:02.713Z"
+      "claimedAt": "2026-11-02T17:16:02.713Z",
+      "doneAt": "2026-11-02T17:18:08.706Z"
     }
   }
 }
