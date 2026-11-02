@@ -542,8 +542,8 @@ the app) and
 re-plans a planned issue, and the post-planning auto-start runs locally).
 
 The automatic 60 s tick, the `remote-reap` journal source and the heartbeat
-file are checked after deploy in
-[#4696](https://github.com/eltmon/overdeck/issues/4696).
+file were checked after deploy in [#4696](https://github.com/eltmon/overdeck/issues/4696);
+see "Post-deploy verification (PAN-4696)" below.
 
 ### Post-deploy verification (PAN-4696)
 
@@ -568,6 +568,10 @@ Cleanup: reviewers aborted (0 were running — no review had been requested),
 PR [#4846](https://github.com/eltmon/overdeck/pull/4846) closed unmerged with
 its branch deleted, PAN-4832 closed, `remote.enabled` restored to `false`, no
 smoke machine left (`fly machines list -a pan-workspaces --json` returns `[]`).
+
+Filed from this run:
+
+- [#4847](https://github.com/eltmon/overdeck/issues/4847) — automatic Fly reap skips requesting review when an unrelated background process leaves a tracked workspace file (`.overdeck/context/codebase/concerns.md`) dirty at hand-off time.
 
 ## Live verification (PAN-4652)
 
