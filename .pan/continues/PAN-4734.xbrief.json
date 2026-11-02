@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4734",
   "created": "2026-11-02T14:23:44.928Z",
-  "updated": "2026-11-02T17:01:44.962Z",
+  "updated": "2026-11-02T17:02:02.114Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -265,6 +265,10 @@
     "wi13-docs.ac1": {
       "status": "completed",
       "doneAt": "2026-11-02T17:01:44.962Z"
+    },
+    "wi13-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:02:02.114Z"
     }
   }
 }
