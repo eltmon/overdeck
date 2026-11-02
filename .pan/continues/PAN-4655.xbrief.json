@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4655",
   "created": "2026-11-02T03:52:43.700Z",
-  "updated": "2026-11-02T04:40:24.134Z",
+  "updated": "2026-11-02T04:40:42.532Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -90,6 +90,10 @@
     "auto-settle-setting.ac3": {
       "status": "completed",
       "doneAt": "2026-11-02T04:40:24.134Z"
+    },
+    "idle-sweep-core.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:40:42.532Z"
     }
   }
 }
