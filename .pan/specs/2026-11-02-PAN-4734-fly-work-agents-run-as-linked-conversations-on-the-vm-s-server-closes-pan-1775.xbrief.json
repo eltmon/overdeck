@@ -4,17 +4,17 @@
     "created": "2026-11-02T14:40:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4734: Fly work agents run as linked conversations on the VM's server (closes PAN-1775)",
-    "updated": "2026-11-02T14:22:44.174Z"
+    "updated": "2026-11-02T14:23:35.385Z"
   },
   "plan": {
     "id": "pan-4734",
     "title": "Fly work agents run as linked conversations on the VM's server (closes PAN-1775)",
-    "status": "proposed",
+    "status": "running",
     "uid": "3dc20483-6350-4c0d-9d01-24077f94658c",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-02T14:40:00Z",
-    "updated": "2026-11-02T14:22:44.174Z",
+    "updated": "2026-11-02T14:23:35.385Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4734",
@@ -1119,5 +1119,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
