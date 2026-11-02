@@ -94,6 +94,12 @@
 //   node scripts/anywhere/two-machine-smoke.mjs
 //   node scripts/anywhere/two-machine-smoke.mjs --inject-plain-http   # sends one plain HTTP
 //        request through the proxy so step no-http must fail (checks the detector; exit 1).
+//   node scripts/anywhere/two-machine-smoke.mjs --hold   # after no-http, keeps both servers
+//        and B's dev server running (B restarted if it is down), prints
+//        `HOLD a=<url> b=<url> dev=<port> conversation=@<B>/smoke-desk` for browser checks,
+//        and cleans up on SIGINT or SIGTERM (exit 0). Servers start through
+//        .tmp/anywhere-node/serve.js, a symlink to dist/dashboard/server.js, so the host's
+//        orphan reaper (it matches dist/dashboard/server.js) leaves a held server alone.
 //
 // Not in CI (D-4645-22): it binds two LAN-visible ports for about two minutes.
 import { execFile, spawn } from 'node:child_process';
@@ -115,6 +121,13 @@ const PORT_B = 3042;
 const HOMES = { a: resolve(repo, '.tmp', 'anywhere-a'), b: resolve(repo, '.tmp', 'anywhere-b') };
 const NODE_ROOT = resolve(repo, '.tmp', 'anywhere-node');
 const NODE = resolve(NODE_ROOT, 'bin', 'node');
+/**
+ * --hold (PAN-4774 WI-7): the servers start through this symlink to SERVER, because the
+ * host's orphan reaper matches `dist/dashboard/server.js` in a command line and would
+ * kill a held server after 120 s.
+ */
+const SERVE = resolve(NODE_ROOT, 'serve.js');
+const HOLD = process.argv.includes('--hold');
 const INJECT_PLAIN_HTTP = process.argv.includes('--inject-plain-http');
 const LIVE_CLAUDE = process.argv.includes('--live-claude');
 /** NFR-3: an open moves at most 1 MiB + 64 KiB. */
@@ -221,6 +234,7 @@ function isolatedNode() {
     copyFileSync(process.execPath, NODE);
     chmodSync(NODE, 0o755);
   }
+  symlinkSync(SERVER, SERVE);
 }
 
 function smokeTmuxSocket(home) {
@@ -269,7 +283,7 @@ function serverEnv(home, port, extra = {}) {
 
 function startServer(name, home, port, extra = {}) {
   const logFd = openSync(resolve(home, 'server.log'), 'a');
-  const child = spawn(NODE, [SERVER], { env: serverEnv(home, port, extra), stdio: ['ignore', logFd, logFd] });
+  const child = spawn(NODE, [SERVE], { env: serverEnv(home, port, extra), stdio: ['ignore', logFd, logFd] });
   running.servers.set(name, child);
   child.on('exit', (code, signal) => {
     if (running.servers.get(name) === child) running.servers.delete(name);
@@ -504,10 +518,7 @@ async function conversationSteps(selfB) {
   });
 
   await step('forward', async () => {
-    const dev = createHttpServer((_request, response) => response.end('hello from b'));
-    await new Promise((done) => dev.listen(0, '127.0.0.1', done));
-    running.dev = dev;
-    const devPort = dev.address().port;
+    const devPort = await startDevServer();
     const forward = await cli('a', ['machines', 'forward', selfB.environmentId, String(devPort), '--json']);
     const body = await (await fetch(forward.url)).text();
     if (body !== 'hello from b') throw new Error(`forward ${forward.url} answered ${JSON.stringify(body)}`);
@@ -519,6 +530,16 @@ async function conversationSteps(selfB) {
   });
 
   if (LIVE_CLAUDE) await liveClaudeSteps(selfB);
+}
+
+/** The tiny dev server on B that `forward` (and a held pair's Open preview) reaches; started once. */
+async function startDevServer() {
+  if (!running.dev) {
+    const dev = createHttpServer((_request, response) => response.end('hello from b'));
+    await new Promise((done) => dev.listen(0, '127.0.0.1', done));
+    running.dev = dev;
+  }
+  return running.dev.address().port;
 }
 
 /**
@@ -1044,6 +1065,22 @@ async function main() {
     if (bytes.length === 0) throw new Error('nothing crossed the proxy; the pairing route was not used');
     if (bytes[0] !== 0x00) throw new Error(`the first byte on the pairing route was 0x${bytes[0].toString(16)}, not the channel preamble 0x00`);
   });
+
+  if (HOLD) {
+    await step('hold', async () => {
+      if (!running.servers.has('b')) {
+        startServer('b', HOMES.b, PORT_B);
+        await waitListening('b', PORT_B, 90_000);
+      }
+      const devPort = await startDevServer();
+      console.log(`HOLD a=http://127.0.0.1:${PORT_A} b=http://127.0.0.1:${PORT_B} dev=${devPort} conversation=@${selfB.environmentId}/${SEED.name}`);
+      await new Promise((done) => {
+        process.once('SIGINT', done);
+        process.once('SIGTERM', done);
+      });
+      log('hold released by a signal');
+    });
+  }
 
   await step('stop', cleanup);
   const updated = LIVE_CLAUDE ? 'shared and pulled a live conversation' : 'updated both machines\' CLIs with Update all';

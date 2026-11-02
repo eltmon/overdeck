@@ -66,7 +66,14 @@ B then answers 409 `conversation-released`); its harnesses run on the smoke home
 tmux sockets. It keeps the real `HOME` and `PATH` (Claude Code needs its login and
 binary), so it skips `versions` and `update-all`.
 `--inject-plain-http` sends one plain request through the proxy so the detector's
-failure path can be checked (it then fails at `no-http`). The work agent runs the
+failure path can be checked (it then fails at `no-http`).
+`--hold` keeps the pair for browser checks (PAN-4774): after `no-http` it restarts B if
+it is down, keeps B's `forward` dev server (`hello from b`) running, prints
+`HOLD a=http://127.0.0.1:3041 b=http://127.0.0.1:3042 dev=<port> conversation=@<B>/smoke-desk`,
+and cleans up on `SIGINT` or `SIGTERM` (exit 0). The servers always start through
+`.tmp/anywhere-node/serve.js`, a symlink to `dist/dashboard/server.js`, because the host's
+orphan reaper matches `dist/dashboard/server.js` in a command line and would kill a held
+server after 120 s. The work agent runs the
 script before `pan done` and pastes the output into the PR description.
 
 ## Running the directory smoke
