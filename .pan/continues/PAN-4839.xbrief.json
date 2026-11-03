@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4839",
   "created": "2026-11-03T21:01:30.274Z",
-  "updated": "2026-11-03T22:12:12.599Z",
+  "updated": "2026-11-03T22:12:32.115Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -180,6 +180,10 @@
     "directory-activity.ac4": {
       "status": "completed",
       "doneAt": "2026-11-03T22:12:12.599Z"
+    },
+    "directory-activity.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:12:32.115Z"
     }
   }
 }
