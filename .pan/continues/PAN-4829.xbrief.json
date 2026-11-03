@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4829",
   "created": "2026-11-03T07:49:13.339Z",
-  "updated": "2026-11-03T08:15:00.363Z",
+  "updated": "2026-11-03T08:15:28.029Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -76,6 +76,10 @@
     "client-decoder.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T08:15:00.362Z"
+    },
+    "client-decoder.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:15:28.028Z"
     }
   }
 }
