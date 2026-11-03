@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4476",
   "created": "2026-11-03T15:05:40.423Z",
-  "updated": "2026-11-03T16:01:27.357Z",
+  "updated": "2026-11-03T16:03:00.624Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -104,6 +104,10 @@
       "claimedBy": "agent-pan-4476",
       "claimedAt": "2026-11-03T16:00:57.906Z",
       "doneAt": "2026-11-03T16:01:27.356Z"
+    },
+    "wire-types.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:03:00.623Z"
     }
   }
 }
