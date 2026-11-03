@@ -247,6 +247,12 @@ jobs:
       - name: Resource discovery benchmark
         run: VITEST_INCLUDE_BENCH=1 npx vitest run src/dashboard/server/services/resource-discovery.bench.ts
 
+      - name: Anywhere AC-1 two-machine test
+        run: |
+          sudo apt-get update && sudo apt-get install -y tmux
+          tmux -V
+          VITEST_INCLUDE_SLOW=1 npx vitest run tests/integration/anywhere/two-machine-ac1.slow.test.ts
+
       - name: Install Playwright browsers
         run: cd src/dashboard/frontend && npx playwright install --with-deps chromium
 

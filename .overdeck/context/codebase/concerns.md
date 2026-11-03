@@ -605,4 +605,10 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   stopped must stop the supervisor first, as `pan down` does (`stopSupervisorUnitIfActive()`,
   else `stopSupervisorProcess()`). The SSH helper's managed stop (`src/lib/anywhere/ssh/helper.ts`)
   follows this rule after PAN-4861.
+- **One-host two-dashboard tests: pull adopts into the owner's checkout** (PAN-4774) — `resolveTarget`
+  (`src/dashboard/server/services/vault-continue.ts`) prefers the record's saved `cwd` when it exists,
+  and on one host the owner's checkout exists for the puller too, so a WIP bundle is never applied
+  (`isWipPresent` is true). A test proving "pulled with uncommitted changes" must adopt elsewhere.
+  Also keep test `OVERDECK_HOME`s short: `${OVERDECK_HOME}/sockets/pty-conv-<name>.sock` over ~107
+  bytes makes the PTY supervisor exit and kills the harness.
 <!-- last-verified: 2026-11-02 -->

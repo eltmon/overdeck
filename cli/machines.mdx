@@ -217,6 +217,18 @@ a new VM never has. A new Fly machine for a *conversation* is the new-conversati
 **Fly (new VM)** choice, or `pan machines add-fly --project <key> --message <text>`. See
 [Linked machines](/configuration/linked-machines#start-work-on-another-machine).
 
+## Messaging a conversation on another machine: `pan tell @<label>/<conv>`
+
+```bash
+pan tell @desk/20261102-1a2b "Run the tests again"
+```
+
+`pan tell @<machine>/<conv>` sends a message to a conversation on a linked machine, through
+this machine's dashboard and the encrypted link. `<machine>` is the link's label or
+environment id. It prints `Delivered to <conv> on <machine>`, or the other machine's error
+and exits 1. Only conversations are accepted after `@<machine>/`. See
+[`pan tell`](/cli/agent-commands) for `--message-id` and `--steer`.
+
 ## who
 
 ```bash

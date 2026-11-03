@@ -1,0 +1,89 @@
+# node scripts/anywhere/two-machine-smoke.mjs --live-claude  (run 2: commit 6c5c664deca + this commit's killSmokeTmux fix; dist unchanged)
+[   0.0 s] step fake-clis
+(node:3450712) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+[   0.0 s] step start
+[   1.1 s] A listening on :3041 (home /home/eltmon/Projects/overdeck/workspaces/feature-pan-4774/.tmp/anywhere-a), B on :3042 (home /home/eltmon/Projects/overdeck/workspaces/feature-pan-4774/.tmp/anywhere-b)
+[   1.1 s] step proxy
+[   1.1 s] proxy 127.0.0.1:37599 -> 127.0.0.1:3042
+[   1.1 s] step pair+link
+[   1.7 s] B issued a pairing link expiring 2026-11-02T21:45:07.985Z
+[   2.3 s] A linked eltmon-z790 (ccd0-950b-185d-b9de-d515) over pairing:tcp://127.0.0.1:37599, advertised:tcp://192.168.1.64:3042, advertised:tcp://192.168.1.86:3042
+[   3.1 s] step online
+[   3.6 s] A->B online via tcp://127.0.0.1:37599; B->A online via tcp://192.168.1.64:3041
+[   3.6 s] step seed
+[   3.7 s] B transcript 5053880 bytes; A holds saved copy vault-6f1c4650-0000-4000-8000-0000000000aa
+[   3.7 s] step list
+[  17.9 s] @c9889dfb-e016-411c-a4aa-f79d652d574b/smoke-desk listed once (machine eltmon-z790, online, saved copy vault-6f1c4650-0000-4000-8000-0000000000aa)
+[  17.9 s] step open-budget
+[  17.9 s] open moved 618957 bytes B->A (budget 1114112; transcript 5053880)
+[  17.9 s] step image
+[  17.9 s] attachment matched B's 70 bytes (image/png)
+[  17.9 s] step tell-once
+[  20.6 s] repeat replayed the first answer (exit 1: Message NOT delivered to smoke-desk on c9889dfb-e016-411c-a4aa-f79d652d574b: Delivery could not be confirmed); other text refused by the receipt
+[  20.6 s] step released-409
+[  20.6 s] 409 conversation-released: Continued on env-else; this copy is read-only
+[  20.6 s] step forward
+[  21.1 s] forward b:45359 -> http://127.0.0.1:44467 relayed the page
+[  22.0 s] a forward to B's dashboard port :3042 was refused
+[  22.0 s] step remote-reply
+[  34.4 s] @c9889dfb-e016-411c-a4aa-f79d652d574b/20261102-5309 answered through A
+[  34.4 s] step pull
+[  37.2 s] pulled to A as 20261102-0b1f (cwd /home/eltmon/Projects/overdeck/workspaces/feature-pan-4774/.tmp/anywhere-b/live-project); B answers 409 conversation-released
+[  38.1 s] step kill B
+[  38.1 s] server b exited (code null, signal SIGKILL)
+[  38.6 s] A->B offline (tcp://127.0.0.1:37599: Responder closed the connection before proving the pinned machine key; tcp://192.168.1.64:3042: tcp://192.168.1.64:3042: connect ECONNREFUSED 192.168.1.64:3042; tcp://192.168.1.86:3042: tcp://192.168.1.86:3042: connect ECONNREFUSED 192.168.1.86:3042) after 0.5 s
+[  38.6 s] step restart B
+[  41.5 s] A->B online via tcp://127.0.0.1:37599 after 1.9 s
+[  41.5 s] step no-http
+[  41.5 s] proxy carried 729243 bytes across the pairing route
+[  41.5 s] step stop
+[  41.6 s] server a exited (code 0, signal null)
+[  41.6 s] server b exited (code 130, signal null)
+[  41.6 s] OK: two dashboards linked, shared and pulled a live conversation, survived a restart, and spoke only the secure channel on the pairing route
+# exit 0
+
+# run 1 (commit 6c5c664deca, before the fix; left two empty tmux servers)
+[   0.0 s] step fake-clis
+[   0.0 s] step start
+(node:3373826) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+[   1.0 s] A listening on :3041 (home /home/eltmon/Projects/overdeck/workspaces/feature-pan-4774/.tmp/anywhere-a), B on :3042 (home /home/eltmon/Projects/overdeck/workspaces/feature-pan-4774/.tmp/anywhere-b)
+[   1.0 s] step proxy
+[   1.0 s] proxy 127.0.0.1:39787 -> 127.0.0.1:3042
+[   1.0 s] step pair+link
+[   1.4 s] B issued a pairing link expiring 2026-11-02T21:43:55.113Z
+[   1.9 s] A linked eltmon-z790 (bc3d-18ba-1852-9c25-90b6) over pairing:tcp://127.0.0.1:39787, advertised:tcp://192.168.1.64:3042, advertised:tcp://192.168.1.86:3042
+[   2.6 s] step online
+[   3.0 s] A->B online via tcp://127.0.0.1:39787; B->A online via tcp://192.168.1.64:3041
+[   3.0 s] step seed
+[   3.0 s] B transcript 5053880 bytes; A holds saved copy vault-6f1c4650-0000-4000-8000-0000000000aa
+[   3.0 s] step list
+[  17.2 s] @56a8d77c-b47e-4c83-9364-d7e794559b5a/smoke-desk listed once (machine eltmon-z790, online, saved copy vault-6f1c4650-0000-4000-8000-0000000000aa)
+[  17.2 s] step open-budget
+[  17.2 s] open moved 618957 bytes B->A (budget 1114112; transcript 5053880)
+[  17.2 s] step image
+[  17.2 s] attachment matched B's 70 bytes (image/png)
+[  17.2 s] step tell-once
+[  19.2 s] repeat replayed the first answer (exit 1: Message NOT delivered to smoke-desk on 56a8d77c-b47e-4c83-9364-d7e794559b5a: Delivery could not be confirmed); other text refused by the receipt
+[  19.2 s] step released-409
+[  19.2 s] 409 conversation-released: Continued on env-else; this copy is read-only
+[  19.2 s] step forward
+[  19.8 s] forward b:44351 -> http://127.0.0.1:42363 relayed the page
+[  20.6 s] a forward to B's dashboard port :3042 was refused
+[  20.6 s] step remote-reply
+[  34.8 s] @56a8d77c-b47e-4c83-9364-d7e794559b5a/20261102-2627 answered through A
+[  34.8 s] step pull
+[  37.5 s] pulled to A as 20261102-05e2 (cwd /home/eltmon/Projects/overdeck/workspaces/feature-pan-4774/.tmp/anywhere-b/live-project); B answers 409 conversation-released
+[  38.3 s] step kill B
+[  38.3 s] server b exited (code null, signal SIGKILL)
+[  38.7 s] A->B offline (tcp://127.0.0.1:39787: Responder closed the connection before proving the pinned machine key; tcp://192.168.1.64:3042: tcp://192.168.1.64:3042: connect ECONNREFUSED 192.168.1.64:3042; tcp://192.168.1.86:3042: tcp://192.168.1.86:3042: connect ECONNREFUSED 192.168.1.86:3042) after 0.4 s
+[  38.7 s] step restart B
+[  42.7 s] A->B online via tcp://127.0.0.1:39787 after 3.1 s
+[  42.7 s] step no-http
+[  42.7 s] proxy carried 729265 bytes across the pairing route
+[  42.7 s] step stop
+[  42.7 s] server a exited (code 0, signal null)
+[  42.7 s] server b exited (code 130, signal null)
+[  42.7 s] OK: two dashboards linked, shared and pulled a live conversation, survived a restart, and spoke only the secure channel on the pairing route
+# exit 0

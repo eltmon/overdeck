@@ -53,6 +53,10 @@
 //      projects    B registers a project with github_repo smoke/repo (projects.yaml);
 //                  A's GET /api/fleet/projects lists it under github.com/smoke/repo.
 //      needs       POST /api/fleet/placement on A with needs [smoke-tag] picks B.
+//      needs-docker B's fake `docker` exits 1, so B has no docker tag: placement with
+//                  needs [docker] picks A, and `pan lane start --machine auto --needs docker`
+//                  launches the lane on A; it is then stopped and reaped. Skipped (logged)
+//                  when this host's own `docker info` fails (PAN-4774 WI-6).
 //      compare     A's and B's resources.quality_gate_slots differ (2 vs 4): Compare
 //                  settings lists that key with a copy line, and B's api_keys entry only
 //                  as "set" (its value never reaches A).
@@ -90,6 +94,12 @@
 //   node scripts/anywhere/two-machine-smoke.mjs
 //   node scripts/anywhere/two-machine-smoke.mjs --inject-plain-http   # sends one plain HTTP
 //        request through the proxy so step no-http must fail (checks the detector; exit 1).
+//   node scripts/anywhere/two-machine-smoke.mjs --hold   # after no-http, keeps both servers
+//        and B's dev server running (B restarted if it is down), prints
+//        `HOLD a=<url> b=<url> dev=<port> conversation=@<B>/smoke-desk` for browser checks,
+//        and cleans up on SIGINT or SIGTERM (exit 0). Servers start through
+//        .tmp/anywhere-node/serve.js, a symlink to dist/dashboard/server.js, so the host's
+//        orphan reaper (it matches dist/dashboard/server.js) leaves a held server alone.
 //
 // Not in CI (D-4645-22): it binds two LAN-visible ports for about two minutes.
 import { execFile, spawn } from 'node:child_process';
@@ -111,6 +121,13 @@ const PORT_B = 3042;
 const HOMES = { a: resolve(repo, '.tmp', 'anywhere-a'), b: resolve(repo, '.tmp', 'anywhere-b') };
 const NODE_ROOT = resolve(repo, '.tmp', 'anywhere-node');
 const NODE = resolve(NODE_ROOT, 'bin', 'node');
+/**
+ * --hold (PAN-4774 WI-7): the servers start through this symlink to SERVER, because the
+ * host's orphan reaper matches `dist/dashboard/server.js` in a command line and would
+ * kill a held server after 120 s.
+ */
+const SERVE = resolve(NODE_ROOT, 'serve.js');
+const HOLD = process.argv.includes('--hold');
 const INJECT_PLAIN_HTTP = process.argv.includes('--inject-plain-http');
 const LIVE_CLAUDE = process.argv.includes('--live-claude');
 /** NFR-3: an open moves at most 1 MiB + 64 KiB. */
@@ -198,6 +215,8 @@ function fakeClis(home) {
     'exit 1',
     '',
   ].join('\n'), { mode: 0o755 });
+  // PAN-4774 WI-6: B's `docker info` fails, so B carries no docker tag and needs-docker must pick A.
+  if (home === HOMES.b && !LIVE_CLAUDE) writeFileSync(resolve(prefix, 'bin', 'docker'), '#!/bin/sh\nexit 1\n', { mode: 0o755 });
 }
 
 /**
@@ -215,6 +234,7 @@ function isolatedNode() {
     copyFileSync(process.execPath, NODE);
     chmodSync(NODE, 0o755);
   }
+  symlinkSync(SERVER, SERVE);
 }
 
 function smokeTmuxSocket(home) {
@@ -223,7 +243,12 @@ function smokeTmuxSocket(home) {
 
 /** Kill the smoke-only tmux servers (they hold worker panes); absent servers are fine. */
 async function killSmokeTmux() {
-  if (LIVE_CLAUDE) return;
+  // --live-claude: the servers' tmux sockets are named from OVERDECK_HOME, so match the
+  // config file under the smoke's short home links instead of a socket name.
+  if (LIVE_CLAUDE) {
+    await execFileAsync('pkill', ['-f', '/tmp/pan4650-smoke-[ab]/tmux/overdeck.tmux.conf']).catch(() => undefined);
+    return;
+  }
   await Promise.all(['pan-smoke-a', 'pan-smoke-b'].map((socket) => execFileAsync('tmux', ['-L', socket, 'kill-server']).catch(() => undefined)));
 }
 
@@ -263,7 +288,7 @@ function serverEnv(home, port, extra = {}) {
 
 function startServer(name, home, port, extra = {}) {
   const logFd = openSync(resolve(home, 'server.log'), 'a');
-  const child = spawn(NODE, [SERVER], { env: serverEnv(home, port, extra), stdio: ['ignore', logFd, logFd] });
+  const child = spawn(NODE, [SERVE], { env: serverEnv(home, port, extra), stdio: ['ignore', logFd, logFd] });
   running.servers.set(name, child);
   child.on('exit', (code, signal) => {
     if (running.servers.get(name) === child) running.servers.delete(name);
@@ -498,10 +523,7 @@ async function conversationSteps(selfB) {
   });
 
   await step('forward', async () => {
-    const dev = createHttpServer((_request, response) => response.end('hello from b'));
-    await new Promise((done) => dev.listen(0, '127.0.0.1', done));
-    running.dev = dev;
-    const devPort = dev.address().port;
+    const devPort = await startDevServer();
     const forward = await cli('a', ['machines', 'forward', selfB.environmentId, String(devPort), '--json']);
     const body = await (await fetch(forward.url)).text();
     if (body !== 'hello from b') throw new Error(`forward ${forward.url} answered ${JSON.stringify(body)}`);
@@ -513,6 +535,16 @@ async function conversationSteps(selfB) {
   });
 
   if (LIVE_CLAUDE) await liveClaudeSteps(selfB);
+}
+
+/** The tiny dev server on B that `forward` (and a held pair's Open preview) reaches; started once. */
+async function startDevServer() {
+  if (!running.dev) {
+    const dev = createHttpServer((_request, response) => response.end('hello from b'));
+    await new Promise((done) => dev.listen(0, '127.0.0.1', done));
+    running.dev = dev;
+  }
+  return running.dev.address().port;
 }
 
 /**
@@ -596,7 +628,8 @@ function machineConfigs() {
   // A holds the same repository, so a worker for SMK-1 resolves its git origin here.
   const projectA = resolve(HOMES.a, 'project');
   mkdirSync(projectA, { recursive: true });
-  writeFileSync(resolve(HOMES.a, 'projects.yaml'), projectsYaml(projectA));
+  // A's lanes root sits under A's fake HOME, as the lane door requires (needs-docker runs a lane on A).
+  writeFileSync(resolve(HOMES.a, 'projects.yaml'), projectsYaml(projectA, resolve(HOMES.a, 'fakehome', 'lanes')));
 }
 
 function projectsYaml(path, lanesRoot = null) {
@@ -663,6 +696,39 @@ async function fleetWorkSteps(selfA, selfB) {
     const { status, json } = await apiA('POST', '/api/fleet/placement', { gitOrigin: null, needs: ['smoke-tag'] });
     if (status !== 200 || !json?.ok || json.environmentId !== selfB.environmentId) throw new Error(`placement answered ${status}: ${JSON.stringify(json)}`);
     log(`needs smoke-tag -> ${json.label}: ${json.reason}`);
+  });
+
+  await step('needs-docker', async () => {
+    const hostDocker = await execFileAsync('docker', ['info'], { timeout: 10_000 }).then(() => true, () => false);
+    if (!hostDocker) {
+      log('needs-docker skipped: `docker info` fails on this host, so A has no docker tag either');
+      return;
+    }
+    const bTags = linkTo(await cli('a', ['machines', 'list', '--json']), selfB.environmentId)?.tags ?? [];
+    if (bTags.includes('docker')) throw new Error(`B carries a docker tag although its docker is the failing fake: ${JSON.stringify(bTags)}`);
+    const { status, json } = await apiA('POST', '/api/fleet/placement', { gitOrigin: null, needs: ['docker'] });
+    if (status !== 200 || !json?.ok || json.environmentId !== selfA.environmentId) throw new Error(`placement answered ${status}: ${JSON.stringify(json)}`);
+    log(`needs docker -> ${json.label}: ${json.reason}`);
+    const a = openDb('a');
+    insertConversation(a, { name: DOCKER_LANE_ROOT, cwd: resolve(HOMES.a, 'project'), title: 'Smoke: docker orchestrator', status: 'active', origin: 'local', environmentId: null });
+    a.close();
+    const start = await cliRaw('a', ['lane', 'start', '--role', 'play', '--run', 'smoke-docker', '--key', 'docker', '--prompt', 'hi', '--parent', DOCKER_LANE_ROOT,
+      '--project', 'smoke', '--model', 'claude-opus-5-5', '--harness', 'claude-code', '--machine', 'auto', '--needs', 'docker', '--no-wait', '--json'], 90_000);
+    if (start.code !== 0) throw new Error(`pan lane start --machine auto --needs docker failed (${start.code}): ${start.stderr || start.stdout}`);
+    const result = JSON.parse(start.stdout);
+    // Auto that picks this machine launches a local lane: no machine in the answer, a cwd under A's lanes root.
+    if (result.machine !== null || !String(result.cwd).startsWith(resolve(HOMES.a, 'fakehome', 'lanes'))) {
+      throw new Error(`the docker lane did not run on A: ${start.stdout}`);
+    }
+    const lane = result.conversation.name;
+    log(`lane ${lane} on A (machine auto, needs docker) in ${result.cwd}`);
+    const stopped = await cliRaw('a', ['lane', 'stop', lane], 60_000);
+    if (stopped.code !== 0) throw new Error(`pan lane stop ${lane} failed (${stopped.code}): ${stopped.stderr}`);
+    await pollUntil(`pan lane reap ${lane} succeeds`, 30_000, async () => {
+      const answer = await cliRaw('a', ['lane', 'reap', lane], 60_000);
+      return answer.code === 0 ? { ok: true, value: answer } : { ok: false, detail: answer.stderr.trim() };
+    });
+    log(`stopped and reaped ${lane}`);
   });
 
   await step('compare', async () => {
@@ -754,6 +820,7 @@ async function reportOnB(remoteId, body) {
 // ─── PAN-4638: gauntlet lanes across machines ──────────────────────────────
 
 const LANE_ROOT = 'smoke-orch';
+const DOCKER_LANE_ROOT = 'smoke-orch-docker';
 
 async function laneSteps(selfB) {
   const lane = await step('lane-remote', async () => {
@@ -1003,6 +1070,22 @@ async function main() {
     if (bytes.length === 0) throw new Error('nothing crossed the proxy; the pairing route was not used');
     if (bytes[0] !== 0x00) throw new Error(`the first byte on the pairing route was 0x${bytes[0].toString(16)}, not the channel preamble 0x00`);
   });
+
+  if (HOLD) {
+    await step('hold', async () => {
+      if (!running.servers.has('b')) {
+        startServer('b', HOMES.b, PORT_B);
+        await waitListening('b', PORT_B, 90_000);
+      }
+      const devPort = await startDevServer();
+      console.log(`HOLD a=http://127.0.0.1:${PORT_A} b=http://127.0.0.1:${PORT_B} dev=${devPort} conversation=@${selfB.environmentId}/${SEED.name}`);
+      await new Promise((done) => {
+        process.once('SIGINT', done);
+        process.once('SIGTERM', done);
+      });
+      log('hold released by a signal');
+    });
+  }
 
   await step('stop', cleanup);
   const updated = LIVE_CLAUDE ? 'shared and pulled a live conversation' : 'updated both machines\' CLIs with Update all';
