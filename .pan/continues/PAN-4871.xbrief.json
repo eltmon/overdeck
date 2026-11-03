@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4871",
   "created": "2026-11-03T03:36:23.944Z",
-  "updated": "2026-11-03T03:57:53.208Z",
+  "updated": "2026-11-03T03:58:12.836Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,10 @@
     "open-linked-rows.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T03:57:53.208Z"
+    },
+    "linked-row-lookup.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T03:58:12.836Z"
     }
   }
 }
