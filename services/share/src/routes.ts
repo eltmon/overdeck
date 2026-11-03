@@ -7,13 +7,13 @@
  * `Cache-Control: no-store` and `X-Content-Type-Options: nosniff`.
  */
 import type { CreateRoomResponse, RoomSnapshot, ShareScope } from '../../../packages/contracts/src/sharing.ts';
-import { verifyIdentity } from './account.ts';
+import { verifyDeviceIdentity, verifyIdentity } from './account.ts';
 import { newHostToken, newShortCode, normalizeShortCode, sha256Hex } from './codes.ts';
 import type { Deps, Env, RoomInitBody, RoomStatusBody } from './env.ts';
-import { HDR_HOST_TOKEN_HASH, HDR_IDENTITY, INTERNAL, parseConfig, parseTurnConfig, parseWebConfig } from './env.ts';
+import { HDR_HOST_TOKEN_HASH, HDR_IDENTITY, INTERNAL, missingWebConfig, parseConfig, parseTurnConfig, parseWebConfig } from './env.ts';
 import { json, withSecurityHeaders, type Handler, type RequestContext } from './http.ts';
 import { endedPage, invitePage } from './pages.ts';
-import { webCallback, webSession, webSignIn, webSignOut } from './web-auth.ts';
+import { readWebSession, webCallback, webSession, webSignIn, webSignOut } from './web-auth.ts';
 
 export const MAX_BODY_BYTES = 16 * 1024;
 
@@ -157,6 +157,26 @@ const joinSocket: Handler = async (req, rc) => {
   return forwardUpgrade(rc.env, shortCode, INTERNAL.join, { [HDR_IDENTITY]: JSON.stringify(verified.identity) });
 };
 
+/**
+ * GET /v1/rooms/:code/web-join: the hosted viewer's signaling socket, authorized by the web session
+ * cookie and a same-origin `Origin` (cross-site WebSocket hijacking defence, PAN-4481 D-5). It never
+ * reads `Authorization`, so `/join` stays the only bearer path. The room sees the same identity
+ * header as for `/join`, so room rules are unchanged.
+ */
+const webJoinSocket: Handler = async (req, rc) => {
+  const refused = upgradeRefusal(req);
+  if (refused) return refused;
+  if (!rc.config.web) return json({ error: 'not_configured', missing: missingWebConfig(rc.env) }, 503);
+  if (req.headers.get('Origin') !== rc.config.publicBaseUrl) return json({ error: 'forbidden_origin' }, 403);
+  const token = await readWebSession(req, rc);
+  if (!token) return json({ error: 'invalid_token' }, 401);
+  const verified = await verifyDeviceIdentity(rc.env, token);
+  if (!verified.ok) return json({ error: verified.error }, verified.status);
+  const shortCode = normalizeShortCode(rc.params['code'] ?? '');
+  if (!shortCode) return json({ error: 'not_found' }, 404);
+  return forwardUpgrade(rc.env, shortCode, INTERNAL.join, { [HDR_IDENTITY]: JSON.stringify(verified.identity) });
+};
+
 /** GET /s/:code: the invite landing page. It never reveals room data. */
 const landingPage: Handler = async (_req, rc) => {
   const shortCode = normalizeShortCode(rc.params['code'] ?? '');
@@ -175,6 +195,7 @@ const ROUTES: Route[] = [
   { method: 'DELETE', pattern: '/v1/rooms/:code', handler: deleteRoom },
   { method: 'GET', pattern: '/v1/rooms/:code/host', handler: hostSocket },
   { method: 'GET', pattern: '/v1/rooms/:code/join', handler: joinSocket },
+  { method: 'GET', pattern: '/v1/rooms/:code/web-join', handler: webJoinSocket },
   { method: 'GET', pattern: '/s/:code', handler: landingPage },
   { method: 'GET', pattern: '/auth/signin', handler: webSignIn },
   { method: 'GET', pattern: '/auth/callback', handler: webCallback },
