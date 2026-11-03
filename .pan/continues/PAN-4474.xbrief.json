@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4474",
   "created": "2026-11-03T06:56:27.161Z",
-  "updated": "2026-11-03T07:54:38.374Z",
+  "updated": "2026-11-03T07:54:56.793Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -174,6 +174,10 @@
     "peer-hub-gate.ac5": {
       "status": "completed",
       "doneAt": "2026-11-03T07:54:38.373Z"
+    },
+    "peer-hub-content.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:54:56.793Z"
     }
   }
 }
