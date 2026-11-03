@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { MACHINE_TAG, PUT_CLIENT_SQL, roleOf, SCHEMA } from '../../../../services/connect/src/directory.ts';
+import { MACHINE_TAG, roleOf } from '../../../../services/connect/src/directory.ts';
+import { PUT_CLIENT_SQL, SCHEMA } from '../../../../services/connect/src/directory-store.ts';
 import type { ConnectIdentity } from '../../../../services/connect/src/env.ts';
 import { logFrame } from '../../../../services/connect/src/log.ts';
 
