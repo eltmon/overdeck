@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4904",
   "created": "2026-11-03T15:44:28.853Z",
-  "updated": "2026-11-03T16:10:35.875Z",
+  "updated": "2026-11-03T16:10:52.193Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,6 +50,10 @@
     "release-record-title.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T16:10:35.875Z"
+    },
+    "docs-pull-title.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:10:52.193Z"
     }
   }
 }
