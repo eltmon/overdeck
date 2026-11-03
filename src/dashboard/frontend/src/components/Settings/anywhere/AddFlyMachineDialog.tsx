@@ -20,7 +20,7 @@ import { toast } from 'sonner';
 
 import { fetchRegisteredProjects } from '../../CommandDeck/UnknownProjectState';
 import { ANYWHERE_STATUS_QUERY_KEY, apiError, isOk } from './anywhereApi';
-import { addFlyMachine, loadMachines, MACHINES_QUERY_KEY } from './machinesApi';
+import { addFlyMachine, enableRemote, loadMachines, MACHINES_QUERY_KEY } from './machinesApi';
 
 interface AddFlyMachineDialogProps {
   open: boolean;
@@ -38,10 +38,12 @@ function AddFlyMachineDialogBody({ onClose }: { onClose: () => void }) {
   const [region, setRegion] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [remoteDisabledRace, setRemoteDisabledRace] = useState(false);
+  const [enabling, setEnabling] = useState(false);
 
   const { data: projects } = useQuery({ queryKey: ['registered-projects'], queryFn: fetchRegisteredProjects });
   const { data: machines } = useQuery({ queryKey: MACHINES_QUERY_KEY, queryFn: loadMachines });
-  const remoteOff = machines?.self.remoteEnabled === false;
+  const remoteOff = machines?.self.remoteEnabled === false || remoteDisabledRace;
 
   const trimmedRegion = region.trim();
 
@@ -52,6 +54,7 @@ function AddFlyMachineDialogBody({ onClose }: { onClose: () => void }) {
       const result = await addFlyMachine({ ...(projectKey ? { projectKey } : {}), ...(trimmedRegion ? { region: trimmedRegion } : {}) });
       if (!isOk(result)) {
         const body = result.body as { message?: unknown; error?: unknown } | null;
+        if (body?.error === 'remote-disabled') setRemoteDisabledRace(true);
         setError(typeof body?.message === 'string' ? body.message : typeof body?.error === 'string' ? body.error : apiError(result));
         return;
       }
@@ -66,6 +69,26 @@ function AddFlyMachineDialogBody({ onClose }: { onClose: () => void }) {
       setError((err as Error).message);
     } finally {
       setBusy(false);
+    }
+  };
+
+  const handleEnableRemote = async () => {
+    setEnabling(true);
+    try {
+      const result = await enableRemote();
+      if (!isOk(result)) {
+        const body = result.body as { message?: unknown } | null;
+        setError(typeof body?.message === 'string' ? body.message : apiError(result));
+        return;
+      }
+      setError(null);
+      setRemoteDisabledRace(false);
+      toast.success(`Turned on remote in ${result.body.configFile}`);
+      await queryClient.invalidateQueries({ queryKey: MACHINES_QUERY_KEY });
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setEnabling(false);
     }
   };
 
@@ -96,8 +119,18 @@ function AddFlyMachineDialogBody({ onClose }: { onClose: () => void }) {
           }}
         >
           {remoteOff && (
-            <div role="status" data-testid="fly-remote-off" className="rounded-md border border-border px-3 py-2 text-xs text-foreground">
-              Remote is off. Fly machines need <code>enabled = true</code> under <code>[remote]</code> in {machines?.self.remoteConfigFile ?? '~/.overdeck/config.toml'}.
+            <div role="status" data-testid="fly-remote-off" className="rounded-md border border-border px-3 py-2 text-xs text-foreground space-y-2">
+              <p>
+                Remote is off. Fly machines need <code>enabled = true</code> under <code>[remote]</code> in {machines?.self.remoteConfigFile ?? '~/.overdeck/config.toml'}.
+              </p>
+              <button
+                type="button"
+                onClick={() => void handleEnableRemote()}
+                disabled={enabling}
+                className="rounded-md border border-border px-2.5 py-1 text-xs text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50"
+              >
+                {enabling ? 'Turning on…' : 'Turn on remote'}
+              </button>
             </div>
           )}
 

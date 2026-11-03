@@ -100,4 +100,37 @@ describe('AddFlyMachineDialog (PAN-4743 WI-9)', () => {
     expect(screen.queryByTestId('fly-remote-off')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Add' })).not.toBeDisabled();
   });
+
+  it('PAN-4905: Turn on remote POSTs the enable route and Add becomes enabled after the refetch', async () => {
+    let remoteEnabled = false;
+    routes['GET /api/machines'] = () => ({ status: 200, body: { self: { remoteEnabled, remoteConfigFile: '~/.overdeck/config.toml' }, links: [], inbound: [] } });
+    routes['POST /api/machines/fly/enable-remote'] = () => {
+      remoteEnabled = true;
+      return { status: 200, body: { ok: true, changed: true, configFile: '~/.overdeck/config.toml' } };
+    };
+    renderWithProviders(<AddFlyMachineDialog open onClose={vi.fn()} />);
+    const turnOn = await screen.findByRole('button', { name: 'Turn on remote' });
+    expect(screen.getByRole('button', { name: 'Add' })).toBeDisabled();
+    await userEvent.click(turnOn);
+    await waitFor(() => expect(callsTo('/api/machines/fly/enable-remote').length).toBe(1));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Add' })).not.toBeDisabled());
+    expect(toast.success).toHaveBeenCalledWith('Turned on remote in ~/.overdeck/config.toml');
+  });
+
+  it('PAN-4905: a 409 from the enable route renders its message in the alert', async () => {
+    routes['GET /api/machines'] = () => ({ status: 200, body: { self: { remoteEnabled: false, remoteConfigFile: '~/.overdeck/config.toml' }, links: [], inbound: [] } });
+    routes['POST /api/machines/fly/enable-remote'] = () => ({ status: 409, body: { error: 'remote-enable-failed', message: '~/.overdeck/config.toml does not parse, so nothing was changed: bad' } });
+    renderWithProviders(<AddFlyMachineDialog open onClose={vi.fn()} />);
+    const turnOn = await screen.findByRole('button', { name: 'Turn on remote' });
+    await userEvent.click(turnOn);
+    expect(await screen.findByRole('alert')).toHaveTextContent('does not parse, so nothing was changed: bad');
+  });
+
+  it('PAN-4905: a remote-disabled 409 from Add shows the Turn on remote button', async () => {
+    routes['POST /api/machines/fly'] = () => ({ status: 409, body: { error: 'remote-disabled', message: 'Fly machines need remote turned on: add `enabled = true` under `[remote]` in ~/.overdeck/config.toml.' } });
+    renderWithProviders(<AddFlyMachineDialog open onClose={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: 'Turn on remote' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+    expect(await screen.findByRole('button', { name: 'Turn on remote' })).toBeTruthy();
+  });
 });
