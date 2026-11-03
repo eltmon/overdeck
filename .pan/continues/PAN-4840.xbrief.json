@@ -1,0 +1,17 @@
+{
+  "version": "1",
+  "issueId": "PAN-4840",
+  "created": "2026-11-03T20:58:06.302Z",
+  "updated": "2026-11-03T20:58:06.303Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "fixture": {
+      "status": "completed",
+      "doneAt": "2026-11-03T20:58:06.302Z"
+    }
+  }
+}
