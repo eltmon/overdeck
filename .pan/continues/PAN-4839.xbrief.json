@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4839",
   "created": "2026-11-03T21:01:30.274Z",
-  "updated": "2026-11-03T22:02:55.159Z",
+  "updated": "2026-11-03T22:03:14.330Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -84,6 +84,10 @@
     "acceptance.ac2": {
       "status": "completed",
       "doneAt": "2026-11-03T22:02:55.159Z"
+    },
+    "acceptance.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:03:14.330Z"
     }
   }
 }
