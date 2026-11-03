@@ -131,6 +131,7 @@ src/components/chat/messagesTimeline/__tests__/attachmentRefs.test.ts
 src/components/chat/messagesTimeline/__tests__/workLogRows.test.tsx
 src/components/chat/messagesTimeline/messageRows.test.tsx
 src/components/costs/__tests__/FleetUsagePanel.test.tsx
+src/components/deft/ApprovedScopeCheck.test.tsx
 src/components/deft/DeftBadges.test.tsx
 src/components/deft/DeftDecisionsTab.test.tsx
 src/components/deft/DeftGatesPanel.test.tsx
