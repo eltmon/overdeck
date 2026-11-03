@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4837",
   "created": "2026-11-03T16:16:59.604Z",
-  "updated": "2026-11-03T18:48:40.158Z",
+  "updated": "2026-11-03T18:49:04.340Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -200,6 +200,10 @@
     "native-projects.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T18:48:40.157Z"
+    },
+    "native-projects.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:49:04.339Z"
     }
   }
 }
