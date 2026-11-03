@@ -491,7 +491,8 @@ describe('PeerHub hello and conversation content', () => {
     peer.channel('control').onMessage.emit(viewerHello({}, 2));
     await settle();
     expect(s.bridge.attach).toHaveBeenCalledTimes(1);
-    expect(peer.channel('control').sent).toHaveLength(1);
+    // The host hello and the identity (PAN-4478); a repeated hello sends nothing.
+    expect(peer.channel('control').sent).toHaveLength(2);
   });
 
   it('attaches when the conversation channel opens after the hello negotiated', async () => {
@@ -768,7 +769,12 @@ function viewerSubmit(clientId: string, text: string, seq = 2): string {
   return JSON.stringify({ v: 1, ch: 'control', streamId: 'conv-a', seq, t: 1, payload: { kind: 'submit', clientId, text } });
 }
 
-const controlPayloads = (peer: FakePeer) => envelopes(peer.channel('control')).map((e) => e.payload as Record<string, unknown>).slice(1);
+/** The control payloads after the host hello, without the identity (PAN-4478). */
+const controlPayloads = (peer: FakePeer) =>
+  envelopes(peer.channel('control'))
+    .map((e) => e.payload as Record<string, unknown>)
+    .slice(1)
+    .filter((payload) => payload['kind'] !== 'identity');
 
 describe('PeerHub prompts', () => {
   beforeEach(() => {
@@ -809,7 +815,7 @@ describe('PeerHub prompts', () => {
     expect(s.bridge.expectAuthor).toHaveBeenCalledWith('Do it', { login: 'user7', avatarUrl: 'https://a/7' });
     expect(s.bridge.expectAuthor.mock.invocationCallOrder[0]).toBeLessThan(s.queue.deliver.mock.invocationCallOrder[0] ?? 0);
     expect(controlPayloads(seven).at(-1)).toEqual({ kind: 'submit-ack', clientId: 'c1', status: 'sent' });
-    expect(envelopes(seven.channel('control')).map((e) => e.seq)).toEqual([1, 2, 3]);
+    expect(envelopes(seven.channel('control')).map((e) => e.seq)).toEqual([1, 2, 3, 4]);
   });
 
   it('rejects a non-contributor submit and never delivers it', async () => {
@@ -906,5 +912,220 @@ describe('PeerHub prompts', () => {
     const s = setup();
     expect(s.hub.sendFromController({ text: 'From the host' }, owner)).toEqual({ ok: true, position: 1 });
     expect(s.hub.queueView().items).toEqual([expect.objectContaining({ login: 'owner', source: 'controller' })]);
+  });
+});
+
+function viewerControl(payload: Record<string, unknown>, seq = 2): string {
+  return JSON.stringify({ v: 1, ch: 'control', streamId: 'conv-a', seq, t: 1, payload });
+}
+
+describe('PeerHub controller handoff (PAN-4478)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const B = 100;
+  const C = 200;
+
+  function withController(controllerGithubId: number, ...participants: RoomParticipant[]): RoomSnapshot {
+    return { ...snapshot(...participants), controllerGithubId };
+  }
+
+  /** Admits B, brings its peer up with control and presence open, and negotiates its hello. */
+  async function viewerB(s: ReturnType<typeof setup>): Promise<FakePeer> {
+    const peer = await connected(s, B);
+    peer.channel('control').open();
+    peer.channel('presence').open();
+    peer.channel('control').onMessage.emit(viewerHello());
+    await settle();
+    return peer;
+  }
+
+  /** Appoints B and delivers the snapshot that confirms it, with `others` listed after B. */
+  function handTo(s: ReturnType<typeof setup>, ...others: RoomParticipant[]): void {
+    s.hub.appoint(B);
+    s.hub.onSnapshot(withController(B, participant(B, 'admitted'), ...others));
+  }
+
+  let seq = 2;
+  beforeEach(() => {
+    seq = 2;
+  });
+  const send = (peer: FakePeer, payload: Record<string, unknown>) => peer.channel('control').onMessage.emit(viewerControl(payload, seq++));
+  const acks = (peer: FakePeer) => controlPayloads(peer).filter((p) => p['kind'] === 'command-ack');
+  const lastPresence = (peer: FakePeer) => envelopes(peer.channel('presence')).at(-1)?.payload as { controllerGithubId: number };
+
+  it("sends identity with the peer's own id right after the hello, before presence", async () => {
+    const s = setup();
+    const peer = await connected(s, B);
+    peer.channel('control').open();
+    peer.channel('presence').open();
+    expect(peer.channel('presence').sent).toEqual([]);
+    peer.channel('control').onMessage.emit(viewerHello());
+    await settle();
+    expect(envelopes(peer.channel('control')).map((e) => [e.seq, e.payload])).toEqual([
+      [1, { kind: 'hello', hello: { v: 1, scopeKinds: ['conversation'], scope } }],
+      [2, { kind: 'identity', githubId: B }],
+    ]);
+    expect(peer.channel('presence').sent).toHaveLength(1);
+  });
+
+  it('rejects a command from a viewer who is not the controller with not_controller and sends no frame', async () => {
+    const s = setup();
+    const peer = await viewerB(s);
+    const before = s.frames.length;
+    send(peer, { kind: 'command', clientId: 'k1', command: { type: 'kick', githubId: C } });
+    expect(acks(peer)).toEqual([{ kind: 'command-ack', clientId: 'k1', status: 'rejected', reason: 'not_controller' }]);
+    expect(s.frames).toHaveLength(before);
+  });
+
+  it('the handoff chain: appoint B, B admits C over control, C gets a peer, the data owner reclaims, B\'s next command is rejected', async () => {
+    const s = setup();
+    const b = await viewerB(s);
+    handTo(s, participant(C, 'lobby'));
+    expect(s.hub.controllerGithubId()).toBe(B);
+    expect(lastPresence(b).controllerGithubId).toBe(B);
+
+    send(b, { kind: 'command', clientId: 'a1', command: { type: 'admit', githubId: C } });
+    expect(s.frames.at(-1)).toEqual({ type: 'admit', githubId: C });
+    expect(acks(b)).toEqual([{ kind: 'command-ack', clientId: 'a1', status: 'accepted' }]);
+    expect(s.hub.isHostAdmitted(C)).toBe(true);
+
+    s.hub.onSnapshot(withController(B, participant(B, 'admitted'), participant(C, 'admitted')));
+    await settle();
+    if (s.ofType('ice-servers').length > 0 && s.peers.length === 1) s.hub.onIceServers([]);
+    await settle();
+    expect(s.hub.peerCount()).toBe(2);
+    expect(s.peers.length).toBe(2);
+
+    s.hub.appoint(1);
+    expect(lastPresence(b).controllerGithubId).toBe(1);
+    expect(s.hub.controllerGithubId()).toBe(1);
+
+    const before = s.frames.length;
+    send(b, { kind: 'command', clientId: 'k1', command: { type: 'kick', githubId: C } });
+    expect(acks(b).at(-1)).toEqual({ kind: 'command-ack', clientId: 'k1', status: 'rejected', reason: 'not_controller' });
+    expect(s.frames).toHaveLength(before);
+  });
+
+  it('treats a snapshot controller the host never appointed as the data owner (NFR-1)', async () => {
+    const s = setup();
+    const b = await viewerB(s);
+    s.hub.onSnapshot(withController(B, participant(B, 'admitted'), participant(C, 'lobby')));
+    expect(s.hub.controllerGithubId()).toBe(1);
+    expect(lastPresence(b).controllerGithubId).toBe(1);
+    const before = s.frames.length;
+    send(b, { kind: 'command', clientId: 'a1', command: { type: 'admit', githubId: C } });
+    expect(acks(b)).toEqual([{ kind: 'command-ack', clientId: 'a1', status: 'rejected', reason: 'not_controller' }]);
+    expect(s.frames).toHaveLength(before);
+  });
+
+  it('refuses a self target with invalid_target', async () => {
+    const s = setup();
+    const b = await viewerB(s);
+    handTo(s);
+    send(b, { kind: 'command', clientId: 'x1', command: { type: 'kick', githubId: B } });
+    expect(acks(b)).toEqual([{ kind: 'command-ack', clientId: 'x1', status: 'rejected', reason: 'invalid_target' }]);
+  });
+
+  it('refuses an unlisted target and a lobby set-controller target with unknown_participant', async () => {
+    const s = setup();
+    const b = await viewerB(s);
+    handTo(s, participant(C, 'lobby'));
+    send(b, { kind: 'command', clientId: 'x1', command: { type: 'kick', githubId: 999 } });
+    send(b, { kind: 'command', clientId: 'x2', command: { type: 'set-controller', githubId: C } });
+    expect(acks(b).map((a) => a['reason'])).toEqual(['unknown_participant', 'unknown_participant']);
+  });
+
+  it('refuses unrevoke and a malformed command with invalid_command', async () => {
+    const s = setup();
+    const b = await viewerB(s);
+    handTo(s, participant(C, 'admitted'));
+    const before = s.frames.length;
+    send(b, { kind: 'command', clientId: 'x1', command: { type: 'unrevoke', githubId: C } });
+    send(b, { kind: 'command', clientId: 'x2', command: { type: 'kick', githubId: 'two' } });
+    send(b, { kind: 'command', clientId: 'x3' });
+    expect(acks(b).map((a) => a['reason'])).toEqual(['invalid_command', 'invalid_command', 'invalid_command']);
+    expect(s.frames).toHaveLength(before);
+  });
+
+  it('refuses with not_connected when the host socket cannot send', async () => {
+    let canSend = true;
+    const s = setup({ sendFrame: () => canSend });
+    const b = await viewerB(s);
+    handTo(s, participant(C, 'lobby'));
+    canSend = false;
+    send(b, { kind: 'command', clientId: 'x1', command: { type: 'admit', githubId: C } });
+    expect(acks(b)).toEqual([{ kind: 'command-ack', clientId: 'x1', status: 'rejected', reason: 'not_connected' }]);
+    expect(s.hub.isHostAdmitted(C)).toBe(false);
+  });
+
+  it('ignores a command with a bad client id or before the hello', async () => {
+    const s = setup();
+    const peer = await connected(s, B);
+    peer.channel('control').open();
+    send(peer, { kind: 'command', clientId: 'early', command: { type: 'kick', githubId: C } });
+    peer.channel('control').onMessage.emit(viewerHello());
+    handTo(s, participant(C, 'admitted'));
+    send(peer, { kind: 'command', clientId: 'a b', command: { type: 'kick', githubId: C } });
+    expect(acks(peer)).toEqual([]);
+  });
+
+  it('rebuilds the relayed frame from known keys only (NFR-3)', async () => {
+    const s = setup();
+    const b = await viewerB(s);
+    handTo(s, participant(C, 'admitted'));
+    send(b, { kind: 'command', clientId: 'c1', command: { type: 'set-contributor', githubId: C, contributor: true, admin: true } });
+    expect(s.frames.at(-1)).toEqual({ type: 'set-contributor', githubId: C, contributor: true });
+  });
+
+  it('queues a controller-send credited to the viewer-controller and acks its position', async () => {
+    const s = setup({ queue: { activity: async () => ({ working: true, lastMessageId: null }) } });
+    const b = await viewerB(s);
+    handTo(s);
+    send(b, { kind: 'controller-send', clientId: 's1', text: 'Run the tests' });
+    expect(acks(b)).toEqual([{ kind: 'command-ack', clientId: 's1', status: 'accepted', position: 1 }]);
+    expect(s.hub.queueView().items).toEqual([
+      expect.objectContaining({ login: `user${B}`, source: 'controller', text: 'Run the tests' }),
+    ]);
+  });
+
+  it('rejects a controller-send from a non-controller, a bad prompt and a bad draft id', async () => {
+    const s = setup();
+    const b = await viewerB(s);
+    send(b, { kind: 'controller-send', clientId: 's1', text: 'Not yet' });
+    handTo(s);
+    send(b, { kind: 'controller-send', clientId: 's2', text: '/clear' });
+    send(b, { kind: 'controller-send', clientId: 's3', text: 5 });
+    send(b, { kind: 'controller-send', clientId: 's4', text: 'ok', draftGithubId: -1 });
+    expect(acks(b).map((a) => a['reason'])).toEqual(['not_controller', 'invalid_prompt', 'invalid_prompt', 'invalid_command']);
+    expect(s.hub.queueView().items).toEqual([]);
+  });
+
+  it('keeps showing the old controller until the snapshot confirms a handoff (D-9)', async () => {
+    const s = setup();
+    const b = await viewerB(s);
+    s.hub.admit(C);
+    s.hub.onSnapshot(snapshot(participant(B, 'admitted'), participant(C, 'admitted')));
+    expect(lastPresence(b).controllerGithubId).toBe(1);
+    const sentBefore = b.channel('presence').sent.length;
+    s.hub.appoint(B);
+    expect(b.channel('presence').sent).toHaveLength(sentBefore);
+    s.hub.onSnapshot(withController(B, participant(B, 'admitted'), participant(C, 'admitted')));
+    expect(lastPresence(b).controllerGithubId).toBe(B);
+  });
+
+  it('a snapshot that drops the appointed viewer from the admitted set clears the appointment', async () => {
+    const s = setup();
+    await viewerB(s);
+    handTo(s);
+    expect(s.hub.controllerGithubId()).toBe(B);
+    s.hub.onSnapshot(withController(B, participant(B, 'lobby')));
+    s.hub.onSnapshot(withController(B, participant(B, 'admitted')));
+    expect(s.hub.controllerGithubId()).toBe(1);
   });
 });
