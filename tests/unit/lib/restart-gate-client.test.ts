@@ -282,6 +282,18 @@ describe('restart-gate client (PAN-3729)', () => {
   });
 });
 
+describe('restart-gate wait lines name the build (PAN-4888)', () => {
+  it('names the build it will put live', () => {
+    const lines = restartGateWaitLines(request({ builtSha: '530ee175e8c1d2e3' }), 1);
+    expect(lines[1]).toContain('Approving it puts origin/main build 530ee175e8c1 live.');
+  });
+
+  it('says nothing about a build when the request has none', () => {
+    const lines = restartGateWaitLines(request(), 1);
+    expect(lines.join('\n')).not.toContain('origin/main build');
+  });
+});
+
 describe('restart-gate client step aside (PAN-4888)', () => {
   beforeEach(() => {
     vi.useFakeTimers();

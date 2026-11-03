@@ -204,9 +204,12 @@ export function restartGateWaitLines(request: RestartGateRequest, pendingCount: 
     : others > 1
       ? ` ${others} other restart requests are waiting too, and a single approval releases all of them.`
       : '';
+  const build = request.builtSha
+    ? ` Approving it puts origin/main build ${request.builtSha.slice(0, 12)} live.`
+    : '';
   return [
     'Waiting for operator approval before restarting the dashboard.',
-    `A dashboard restart asked for by a deploy or a CLI command now waits for you, so it cannot interrupt live work. This request is "${request.reason}".${company}`,
+    `A dashboard restart asked for by a deploy or a CLI command now waits for you, so it cannot interrupt live work. This request is "${request.reason}".${company}${build}`,
     'To let it run, either click "Restart now" in the banner at the top of any dashboard view, or run `pan restart --now` in a terminal. Nothing else is needed, and there is no timeout — this command waits until you do one of them.',
   ];
 }
