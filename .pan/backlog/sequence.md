@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T18:33:31.635740Z · model: claude-opus-5-5 · open: 865_
+_Last sequenced: 2026-11-03T18:34:26.310608Z · model: claude-opus-5-5 · open: 866_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -492,6 +492,7 @@ _Last sequenced: 2026-11-03T18:33:31.635740Z · model: claude-opus-5-5 · open: 
 | 493 | PAN-3061 | M | medium | ok |  |  | Deterministic start-vs-swarm recommendation at plan-finalize, derived from plan shape plus recorded outcomes. |
 | 494 | PAN-3057 | S | medium | needs-refinement |  |  | Compaction tracking is gone; remaining bug = GPT-5.6 context window declared twice (372K vs 150K); verify separately |
 | 495 | PAN-3892 | M | medium | needs-refinement |  |  | Substrate review follow-ups deferred from PAN-3845 (minor findings, config clear-sentinel); split into workable items |
+| 496 | PAN-4918 | M | medium | ok |  |  | Six Anywhere UI bugs seen while filming: Codex keeps Claude model, Zen models listed first, chip wrap, Pull-here state, no remote archive. |
 | 497 | PAN-863 | M | medium | ok |  |  | One-shot sweep of stale feature branches and worktrees predating the reaper |
 | 498 | PAN-817 | M | medium | ok |  |  | Improve planning dialog layout and content fit |
 | 499 | PAN-802 | M | medium | ok |  |  | Resume on conversation session forks instead of resuming |
@@ -1200,10 +1201,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T18:33:31.635740Z",
+  "generatedAt": "2026-11-03T18:34:26.310608Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 865,
+  "openCount": 866,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -1215,6 +1216,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "dependsOn": [],
       "why": "Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs.",
       "rationale": "New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4917",
+      "rank": 2,
+      "size": "S",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "CI trailer gate's full-history checkout times out at 5 min; cancelled check reads red, blocking merges, pan reload and conflict repair",
+      "rationale": "New in-pipeline substrate issue: a cancelled Prompt-change-trailer job counts as red, so main deploys are blocked and the conflict-repair gate declines approved PRs (#4911 for PAN-4479, #4915 for PAN-4480). Placed in the free rank-2 slot because it unblocks the merge pipeline itself; fix is small (blobless checkout, timeout headroom, cancelled-check handling in the repair gate).",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1271,19 +1285,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
-      "issue": "PAN-4554",
-      "rank": 8,
-      "size": "S",
-      "importance": "high",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues",
-      "rationale": "New issue, ranked into the open rank-7 slot beside PAN-4553. The paved road (pan start with auto-planning) promises the work agent starts after planning finalizes, but on mind-your-now seven issues reached planned with no work agent, so every auto-planned start silently stalls until an operator re-runs pan start. It ranks high rather than critical because a manual second pan start is a working fallback, and it may share a cause with the PAN-4553 workspace-setup abort that preceded it.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4710",
       "rank": 7,
       "size": "S",
@@ -1293,6 +1294,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "dependsOn": [],
       "why": "Deferred plan hand-off retries omit the guardrail ack, so they're refused at 'agent count high' and give up silently; needs handoff",
       "rationale": "New issue, ranked into the rank-10 slot beside PAN-4554. When pan start --plan auto finishes planning while the pipeline is busy, the deferred hand-off retries without the agent_count_high/memory_tight acknowledgement the first attempt sends, so it is refused below the ceiling until the attempt cap gives up with no operator signal; PAN-4663 and PAN-4670 sat three hours without work agents. It is substrate work with a precise root cause and testable ACs, but it carries needs-handoff (TENET-10), so it lands through a supervised handoff, and a manual second pan start is a working fallback, so it ranks high rather than critical.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4554",
+      "rank": 8,
+      "size": "S",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues",
+      "rationale": "New issue, ranked into the open rank-7 slot beside PAN-4553. The paved road (pan start with auto-planning) promises the work agent starts after planning finalizes, but on mind-your-now seven issues reached planned with no work agent, so every auto-planned start silently stalls until an operator re-runs pan start. It ranks high rather than critical because a manual second pan start is a working fallback, and it may share a cause with the PAN-4553 workspace-setup abort that preceded it.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4037,6 +4051,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
+      "issue": "PAN-4903",
+      "rank": 224,
+      "size": "S",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Codex conv on a Herdr host loses its first message: spawn pastes it via tmux, no target; silent. needs-handoff (TENET-10).",
+      "rationale": "New since the prior run. The first-message path for a Codex app-server conversation on a Herdr host still pastes through tmux, so the prompt is dropped with no dashboard error while pan tell works; it takes the free rank 224 so no other node moves, and its needs-handoff label means a supervised strike, never an autonomous pickup.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-3510",
       "rank": 225,
       "size": "S",
@@ -4058,6 +4085,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "dependsOn": [],
       "why": "After PAN-4614 lands, check whether GitHub mergeable honors merge=union; if not, plan a merge-gate fallback",
       "rationale": "New issue: an observation follow-up to in-pipeline PAN-4614; ranked mid-tier because it only matters if GitHub ignores union, and any fallback touches the merge gate's trust boundary and needs its own plan.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4909",
+      "rank": 227,
+      "size": "S",
+      "importance": "high",
+      "score": 68,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Mac set up with connect: Safari on localhost:3011 gets HTTP 401 from the loopback session mint, so the Mac's own dashboard won't load.",
+      "rationale": "New since the prior run. A connect-set-up Mac refuses its own loopback session mint (HTTP 401), so the local dashboard is unusable without the token bootstrap; it breaks the Anywhere setup path like PAN-4897 and takes the free rank 227 near the other Anywhere setup bugs so no other node moves.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4619,19 +4659,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
-      "issue": "PAN-4849",
-      "rank": 275,
-      "size": "XL",
-      "importance": "medium",
-      "score": 52,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Part B of PAN-4820 (now closed): Deft state surfaces, review-cycle view and Run on Deft switch in the dashboard; unblocked",
-      "rationale": "Rank kept: its blocker PAN-4820 closed as completed on 2026-11-03, so the dependency is dropped and the issue is now startable in its existing slot.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4811",
       "rank": 274,
       "size": "M",
@@ -4645,15 +4672,15 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
-      "issue": "PAN-4852",
-      "rank": 277,
-      "size": "L",
+      "issue": "PAN-4849",
+      "rank": 275,
+      "size": "XL",
       "importance": "medium",
-      "score": 54,
+      "score": 52,
       "condition": "ok",
       "dependsOn": [],
-      "why": "SageOx core: transient per-project binding, Overdeck-built ox, Codex launches, fork rebase; in pipeline, waits on PAN-4820 merge",
-      "rationale": "New in-pipeline issue, pinned in the free rank after the Deft part-B work: it reuses PAN-4820's worktree hide module and merge guard and states work starts after PAN-4820 merges, so it ranks just behind that cluster as decided feature work, not substrate.",
+      "why": "Part B of PAN-4820 (now closed): Deft state surfaces, review-cycle view and Run on Deft switch in the dashboard; unblocked",
+      "rationale": "Rank kept: its blocker PAN-4820 closed as completed on 2026-11-03, so the dependency is dropped and the issue is now startable in its existing slot.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4667,6 +4694,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "dependsOn": [],
       "why": "Move ~45 bespoke dialogs onto the shared Modal from PAN-4755 (now landed); surface/structure only, unblocked.",
       "rationale": "Rank held: dependency PAN-4755 (shared Modal primitive) closed as completed, so this follow-up is now unblocked.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4852",
+      "rank": 277,
+      "size": "L",
+      "importance": "medium",
+      "score": 54,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "SageOx core: transient per-project binding, Overdeck-built ox, Codex launches, fork rebase; in pipeline, waits on PAN-4820 merge",
+      "rationale": "New in-pipeline issue, pinned in the free rank after the Deft part-B work: it reuses PAN-4820's worktree hide module and merge guard and states work starts after PAN-4820 merges, so it ranks just behind that cluster as decided feature work, not substrate.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6813,6 +6853,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
+      "issue": "PAN-4906",
+      "rank": 458,
+      "size": "S",
+      "importance": "medium",
+      "score": 52,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Dark theme: fenced code blocks in assistant messages render at ~1.5:1 contrast, nearly unreadable; needs WCAG AA mono color.",
+      "rationale": "New issue with clear repro and expected result; a self-contained theme-token fix that every conversation reader hits, slotted into the free rank 458 among medium UI bugs.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-3873",
       "rank": 459,
       "size": "M",
@@ -7263,6 +7316,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "dependsOn": [],
       "why": "Substrate review follow-ups deferred from PAN-3845 (minor findings, config clear-sentinel); split into workable items",
       "rationale": "New this run: medium/48 — Substrate review follow-ups deferred from PAN-3845 (minor findings, config clear-sentinel); split into workable items.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4918",
+      "rank": 496,
+      "size": "M",
+      "importance": "medium",
+      "score": 47,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Six Anywhere UI bugs seen while filming: Codex keeps Claude model, Zen models listed first, chip wrap, Pull-here state, no remote archive.",
+      "rationale": "New issue filed 2026-11-03 with six concrete, evidenced UI defects; ranked beside other Anywhere polish (PAN-4906) since a handoff polish pass already covers part of it.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -8549,6 +8615,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
+      "issue": "PAN-4908",
+      "rank": 604,
+      "size": "S",
+      "importance": "low",
+      "score": 34,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Other remote-not-enabled messages name no file and the dead verb 'pan remote setup'; reuse PAN-4905's remoteEnabledHint().",
+      "rationale": "Its blocker PAN-4905 closed on 2026-11-03, so the remoteEnabledHint() helper exists; rank holds at 604 and the issue is now unblocked.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-947",
       "rank": 605,
       "size": "M",
@@ -9296,6 +9375,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
+      "issue": "PAN-4638",
+      "rank": 666,
+      "size": "L",
+      "importance": "medium",
+      "score": 38,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Anywhere: run gauntlet lanes on linked machines/Fly VMs; waits on unfiled machine-link plan items; Fly stack + creds open",
+      "rationale": "Rank held: dependency PAN-4652 closed as completed on 2026-11-01; PAN-4651 still gates this issue, so order is unchanged.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-3011",
       "rank": 667,
       "size": "M",
@@ -9307,19 +9399,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       ],
       "why": "Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU.",
       "rationale": "PAN-1641 (the Ollama path) closed as completed, so only the hosted-path dependency on PAN-465 remains; rank unchanged because the hardware limit still applies.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4638",
-      "rank": 666,
-      "size": "L",
-      "importance": "medium",
-      "score": 38,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Anywhere: run gauntlet lanes on linked machines/Fly VMs; waits on unfiled machine-link plan items; Fly stack + creds open",
-      "rationale": "Rank held: dependency PAN-4652 closed as completed on 2026-11-01; PAN-4651 still gates this issue, so order is unchanged.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11911,71 +11990,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "dependsOn": [],
       "why": "Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); PAN-4835 merged.",
       "rationale": "PAN-4835 merged in #4894, which clears its only dependency; rank held because the Anywhere phone epic is low-impact relative to substrate work above it.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4903",
-      "rank": 224,
-      "size": "S",
-      "importance": "high",
-      "score": 72,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Codex conv on a Herdr host loses its first message: spawn pastes it via tmux, no target; silent. needs-handoff (TENET-10).",
-      "rationale": "New since the prior run. The first-message path for a Codex app-server conversation on a Herdr host still pastes through tmux, so the prompt is dropped with no dashboard error while pan tell works; it takes the free rank 224 so no other node moves, and its needs-handoff label means a supervised strike, never an autonomous pickup.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4906",
-      "rank": 458,
-      "size": "S",
-      "importance": "medium",
-      "score": 52,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Dark theme: fenced code blocks in assistant messages render at ~1.5:1 contrast, nearly unreadable; needs WCAG AA mono color.",
-      "rationale": "New issue with clear repro and expected result; a self-contained theme-token fix that every conversation reader hits, slotted into the free rank 458 among medium UI bugs.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4908",
-      "rank": 604,
-      "size": "S",
-      "importance": "low",
-      "score": 34,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Other remote-not-enabled messages name no file and the dead verb 'pan remote setup'; reuse PAN-4905's remoteEnabledHint().",
-      "rationale": "Its blocker PAN-4905 closed on 2026-11-03, so the remoteEnabledHint() helper exists; rank holds at 604 and the issue is now unblocked.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4909",
-      "rank": 227,
-      "size": "S",
-      "importance": "high",
-      "score": 68,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Mac set up with connect: Safari on localhost:3011 gets HTTP 401 from the loopback session mint, so the Mac's own dashboard won't load.",
-      "rationale": "New since the prior run. A connect-set-up Mac refuses its own loopback session mint (HTTP 401), so the local dashboard is unusable without the token bootstrap; it breaks the Anywhere setup path like PAN-4897 and takes the free rank 227 near the other Anywhere setup bugs so no other node moves.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4917",
-      "rank": 2,
-      "size": "S",
-      "importance": "critical",
-      "score": 88,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "CI trailer gate's full-history checkout times out at 5 min; cancelled check reads red, blocking merges, pan reload and conflict repair",
-      "rationale": "New in-pipeline substrate issue: a cancelled Prompt-change-trailer job counts as red, so main deploys are blocked and the conflict-repair gate declines approved PRs (#4911 for PAN-4479, #4915 for PAN-4480). Placed in the free rank-2 slot because it unblocks the merge pipeline itself; fix is small (blobless checkout, timeout headroom, cancelled-check handling in the repair gate).",
       "gate": "auto",
       "planning": "auto"
     }
