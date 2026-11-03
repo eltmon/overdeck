@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4905",
   "created": "2026-11-03T15:51:11.476Z",
-  "updated": "2026-11-03T16:04:11.155Z",
+  "updated": "2026-11-03T16:10:00.188Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-11-03T16:03:49.086Z"
     },
     "fly-refusal-message": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4905",
-      "claimedAt": "2026-11-03T16:04:11.154Z"
+      "claimedAt": "2026-11-03T16:04:11.154Z",
+      "doneAt": "2026-11-03T16:10:00.188Z"
     }
   }
 }
