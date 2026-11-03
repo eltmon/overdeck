@@ -11,6 +11,10 @@
  * Claude JSONL transcripts only, resolved like `ws-rpc.ts`'s `subscribeConversationMessages`
  * without a harness comparison (D-11). The last detach stops the watcher; the next attach starts
  * again. Nothing here logs.
+ *
+ * Author attribution (PRD PAN-4476 D-10): `expectAuthor` records who sent a shared prompt; the first
+ * appended user message whose trimmed text equals it is stamped with that `author`, and every later
+ * `history` keeps the stamp. A transcript text that differs from the delivered text stays unattributed.
  */
 import { toSharedMessage, type ConversationPayload, type SharedMessage } from '@overdeck/contracts';
 
@@ -50,6 +54,16 @@ interface SinkEntry {
   readonly sink: ConversationSink;
 }
 
+type SharedAuthor = NonNullable<SharedMessage['author']>;
+
+interface ExpectedAuthor {
+  readonly text: string;
+  readonly author: SharedAuthor;
+}
+
+/** The most authors waiting for their user message; the oldest is dropped first. */
+export const MAX_PENDING_AUTHORS = 20;
+
 const NO_OP = (): void => undefined;
 
 export class ConversationBridge {
@@ -58,6 +72,8 @@ export class ConversationBridge {
   private state: BridgeState | null = null;
   private generation = 0;
   private closed = false;
+  private readonly pending: ExpectedAuthor[] = [];
+  private readonly authors = new Map<string, SharedAuthor>();
 
   constructor(
     private readonly conversationName: string,
@@ -88,11 +104,25 @@ export class ConversationBridge {
     return () => this.removeSink(entry);
   }
 
+  /** Stamps `author` on the next appended user message whose trimmed text equals `text`; returns a cancel. */
+  expectAuthor(text: string, author: SharedAuthor): () => void {
+    if (this.closed) return NO_OP;
+    const entry: ExpectedAuthor = { text: text.trim(), author: { login: author.login, avatarUrl: author.avatarUrl } };
+    this.pending.push(entry);
+    if (this.pending.length > MAX_PENDING_AUTHORS) this.pending.shift();
+    return () => {
+      const index = this.pending.indexOf(entry);
+      if (index >= 0) this.pending.splice(index, 1);
+    };
+  }
+
   /** Stops the watcher and forgets every sink. */
   close(): void {
     if (this.closed) return;
     this.closed = true;
     this.sinks.clear();
+    this.pending.length = 0;
+    this.authors.clear();
     this.reset();
   }
 
@@ -114,7 +144,7 @@ export class ConversationBridge {
       highWaterCount: initial.messages.length,
       watcher: null,
     };
-    replaceMessages(state, initial.messages);
+    replaceMessages(state, initial.messages, this.authors);
     this.state = state;
     state.watcher = this.deps.watch(sessionFile, (result) => this.onResult(state, result), {
       byteOffset: initial.byteOffset,
@@ -130,20 +160,30 @@ export class ConversationBridge {
     state.highWaterCount = gate.highWaterCount;
     state.byteOffset = result.byteOffset;
     if (gate.snapshot) {
-      replaceMessages(state, result.messages);
+      replaceMessages(state, result.messages, this.authors);
       this.broadcast({ kind: 'history', messages: [...state.messages.values()] });
       return;
     }
     for (const message of result.messages) {
       if (this.state !== state) return;
-      const shared = toSharedMessage(message);
+      const previous = state.sent.get(message.id);
+      if (previous === undefined && message.role === 'user') this.claimAuthor(message.id, message.text);
+      const shared = withAuthor(toSharedMessage(message), this.authors);
       const json = JSON.stringify(shared);
-      const previous = state.sent.get(shared.id);
       if (previous === json) continue;
       state.messages.set(shared.id, shared);
       state.sent.set(shared.id, json);
       this.broadcast({ kind: previous === undefined ? 'append' : 'update', message: shared });
     }
+  }
+
+  private claimAuthor(id: string, text: string): void {
+    if (this.authors.has(id)) return;
+    const trimmed = text.trim();
+    const index = this.pending.findIndex((entry) => entry.text === trimmed);
+    if (index < 0) return;
+    const [entry] = this.pending.splice(index, 1);
+    if (entry) this.authors.set(id, entry.author);
   }
 
   private broadcast(payload: ConversationPayload): void {
@@ -172,11 +212,16 @@ export class ConversationBridge {
   }
 }
 
-function replaceMessages(state: BridgeState, messages: ParseResult['messages']): void {
+function withAuthor(shared: SharedMessage, authors: ReadonlyMap<string, SharedAuthor>): SharedMessage {
+  const author = authors.get(shared.id);
+  return author ? { ...shared, author } : shared;
+}
+
+function replaceMessages(state: BridgeState, messages: ParseResult['messages'], authors: ReadonlyMap<string, SharedAuthor>): void {
   state.messages.clear();
   state.sent.clear();
   for (const message of messages) {
-    const shared = toSharedMessage(message);
+    const shared = withAuthor(toSharedMessage(message), authors);
     state.messages.set(shared.id, shared);
     state.sent.set(shared.id, JSON.stringify(shared));
   }
