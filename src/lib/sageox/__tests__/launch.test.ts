@@ -1,25 +1,30 @@
 /**
  * PAN-2444 O4: SageOx launch wiring with injected layers, git root, probe and
  * upload flag; the `.sageox/` check runs against a real temp dir.
+ * PAN-4852 WI-7: the probe and hooks use the built `ox` by absolute path.
  */
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { SkillOverrideLayers } from '../../skill-overrides/resolve.js';
+import type { OxBinary } from '../binary.js';
 import type { OxProbeResult } from '../probe.js';
-import { resolveSageoxLaunch, SAGEOX_CLAUDE_EVENTS, type SageoxLaunchDeps } from '../launch.js';
+import { oxHookCommand, resolveSageoxLaunch, SAGEOX_CLAUDE_EVENTS, type SageoxLaunchDeps } from '../launch.js';
 
 let root: string;
 const ctx = () => ({ cwd: join(root, 'src'), issueId: 'OSS-1' });
 
 const packOn: SkillOverrideLayers = { global: {}, packs: { global: {}, project: { sageox: true } } };
 const packOff: SkillOverrideLayers = { global: {}, packs: { global: { sageox: false } } };
+const BIN = '/home/u/.overdeck/packs/sageox/abc/bin/ox';
+const built: OxBinary = { ok: true, bin: BIN, binDir: '/home/u/.overdeck/packs/sageox/abc/bin', commit: 'abc' };
 
 function deps(overrides: Partial<SageoxLaunchDeps> & { layers?: SkillOverrideLayers; probeResult?: OxProbeResult; upload?: boolean } = {}): SageoxLaunchDeps {
   return {
     loadLayers: async () => ({ layers: overrides.layers ?? packOn, projectKey: 'oss' }),
     gitRoot: async () => root,
+    resolveBinary: async () => built,
     probe: async () => overrides.probeResult ?? { ok: true, version: '0.19.0', commit: 'abc' },
     readUpload: async () => overrides.upload ?? false,
     ...overrides,
@@ -85,10 +90,45 @@ describe('resolveSageoxLaunch', () => {
     expect(Object.keys(hooks)).toEqual([...SAGEOX_CLAUDE_EVENTS]);
     for (const event of SAGEOX_CLAUDE_EVENTS) {
       const command = (hooks[event] as Array<{ matcher: string; hooks: Array<{ type: string; command: string }> }>)[0]?.hooks[0]?.command ?? '';
-      expect(command.startsWith('if command -v ox >/dev/null 2>&1; then OX_HOST_MANAGED=1 ')).toBe(true);
+      expect(command.startsWith(`if [ -x ${BIN} ]; then OX_HOST_MANAGED=1 `)).toBe(true);
       expect(command).toContain(`OX_PROJECT_ROOT=${root} OX_HOST_NETWORK=off OX_SESSION_PUBLISHING=manual`);
-      expect(command).toContain(`AGENT_ENV=claude-code ox agent hook ${event} 2>&1 || true; fi`);
+      expect(command).toContain(`AGENT_ENV=claude-code ${BIN} agent hook ${event} 2>&1 || true; fi`);
+      expect(command).not.toContain('command -v ox');
     }
+  });
+
+  it('probes the built ox by its absolute path', async () => {
+    const probed: string[] = [];
+    const result = await resolveSageoxLaunch(ctx(), 'claude-code', deps({
+      probe: async bin => { probed.push(bin); return { ok: true, version: '0.25.0', commit: '' }; },
+    }));
+    expect(result.active).toBe(true);
+    expect(probed).toEqual([BIN]);
+  });
+
+  it('is inactive with one warning naming the sync command when ox is not built', async () => {
+    let probed = false;
+    const result = await resolveSageoxLaunch(ctx(), 'claude-code', deps({
+      resolveBinary: async () => ({
+        ok: false,
+        reason: 'not-built',
+        commit: 'abc1234def',
+        message: 'ox is not built for the sageox pack (abc1234); run pan skills pack sync sageox',
+      }),
+      probe: async () => { probed = true; return { ok: true, version: '', commit: '' }; },
+    }));
+    expect(result).toEqual({
+      active: false,
+      warnings: ['[launcher] WARNING: SageOx not applied: ox is not built for the sageox pack (abc1234); run pan skills pack sync sageox'],
+    });
+    expect(probed).toBe(false);
+  });
+
+  it('quotes a built ox path that needs shell quoting in the hook command', () => {
+    const command = oxHookCommand("/home/o'k/bin/ox", { OX_HOST_MANAGED: '1' }, 'codex', 'SessionStart');
+    expect(command).toBe(
+      `if [ -x '/home/o'\\''k/bin/ox' ]; then OX_HOST_MANAGED=1 AGENT_ENV=codex '/home/o'\\''k/bin/ox' agent hook SessionStart 2>&1 || true; fi`,
+    );
   });
 
   it('turns the network and publishing on when the project upload flag is enabled', async () => {

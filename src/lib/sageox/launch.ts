@@ -3,9 +3,11 @@
  *
  * The `sageox` skill pack toggle is the opt-in (D1). When it is on for a
  * Claude Code launch, the launch's git root holds `.sageox/` (D11), and the
- * `ox` on PATH answers the fork's host contract (D7), the launch gets the
+ * Overdeck-built `ox` (PAN-4852 WI-7: `<packdir>/<commit>/bin/ox`, never one on
+ * PATH) answers the fork's host contract (D7), the launch gets the
  * host-managed env and six `ox agent hook` entries in its `--settings` JSON
- * (D13). Uploads stay off unless the project's upload flag is enabled (D6).
+ * (D13). Each hook calls the built `ox` by absolute path. Uploads stay off
+ * unless the project's upload flag is enabled (D6).
  *
  * Fail open for the launch, fail closed for SageOx (NFR-3): any failed
  * condition or error returns `active: false` with one warning line, and the
@@ -18,6 +20,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import type { SkillOverrideLayers } from '../skill-overrides/resolve.js';
 import type { LaunchSkillContext } from '../skill-overrides/launch.js';
+import type { OxBinary } from './binary.js';
 import type { OxProbeResult } from './probe.js';
 
 const execFileAsync = promisify(execFile);
@@ -42,7 +45,8 @@ export interface SageoxLaunch {
 export interface SageoxLaunchDeps {
   loadLayers: (ctx: LaunchSkillContext) => Promise<{ layers: SkillOverrideLayers; projectKey?: string }>;
   gitRoot: (cwd: string) => Promise<string | null>;
-  probe: () => Promise<OxProbeResult>;
+  resolveBinary: () => Promise<OxBinary>;
+  probe: (bin: string) => Promise<OxProbeResult>;
   readUpload: (projectKey: string) => Promise<boolean>;
 }
 
@@ -67,7 +71,8 @@ const defaultDeps: SageoxLaunchDeps = {
       return null;
     }
   },
-  probe: async () => (await import('./probe.js')).probeOxHostContract(),
+  resolveBinary: async () => (await import('./binary.js')).resolveOxBinary(),
+  probe: async bin => (await import('./probe.js')).probeOxHostContract({ bin }),
   readUpload: async projectKey => (await import('./config.js')).readSageoxUpload(projectKey),
 };
 
@@ -110,15 +115,22 @@ export function sageoxEnv(projectRoot: string, upload: boolean): Record<string, 
   };
 }
 
-/** One hook entry per event; each command carries the env inline (D13). */
-export function sageoxClaudeHooks(env: Record<string, string>): Record<string, unknown[]> {
+/**
+ * One `ox agent hook` command (PAN-4852 AD-25), shared by Claude Code and
+ * Codex hooks: it runs the built `ox` by absolute path with the env inline,
+ * and stays fail-open when the binary is gone.
+ */
+export function oxHookCommand(bin: string, env: Record<string, string>, agentEnv: 'claude-code' | 'codex', event: string): string {
   const assignments = Object.entries(env).map(([key, value]) => `${key}=${shellQuote(value)}`).join(' ');
+  const quotedBin = shellQuote(bin);
+  return `if [ -x ${quotedBin} ]; then ${assignments} AGENT_ENV=${agentEnv} ${quotedBin} agent hook ${event} 2>&1 || true; fi`;
+}
+
+/** One hook entry per event; each command carries the env inline (D13). */
+export function sageoxClaudeHooks(env: Record<string, string>, bin: string): Record<string, unknown[]> {
   return Object.fromEntries(SAGEOX_CLAUDE_EVENTS.map(event => [event, [{
     matcher: '',
-    hooks: [{
-      type: 'command',
-      command: `if command -v ox >/dev/null 2>&1; then ${assignments} AGENT_ENV=claude-code ox agent hook ${event} 2>&1 || true; fi`,
-    }],
+    hooks: [{ type: 'command', command: oxHookCommand(bin, env, 'claude-code', event) }],
   }]]));
 }
 
@@ -133,13 +145,15 @@ async function resolve(ctx: LaunchSkillContext, harness: 'claude-code' | 'codex'
   if (!(await isDirectory(join(root, '.sageox')))) {
     return { active: false, warnings: [`${WARN} SageOx not applied: no .sageox/ at ${root}; run OX_HOST_MANAGED=1 OX_HOST_NETWORK=on ox init there once`] };
   }
-  const probe = await deps.probe();
+  const binary = await deps.resolveBinary();
+  if (!binary.ok) return { active: false, warnings: [`${WARN} SageOx not applied: ${binary.message}`] };
+  const probe = await deps.probe(binary.bin);
   if (!probe.ok) {
     return { active: false, warnings: [`${WARN} SageOx not applied: ox host contract probe failed (${probe.reason}); see pan doctor`] };
   }
   const upload = projectKey ? await deps.readUpload(projectKey) : false;
   const env = sageoxEnv(root, upload);
-  return { active: true, settings: { env, hooks: sageoxClaudeHooks(env) }, warnings: [] };
+  return { active: true, settings: { env, hooks: sageoxClaudeHooks(env, binary.bin) }, warnings: [] };
 }
 
 /** SageOx wiring for one launch. Never throws: an error drops SageOx, not the launch. */
