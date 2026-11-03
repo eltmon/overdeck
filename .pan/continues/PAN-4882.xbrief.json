@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4882",
   "created": "2026-11-03T06:27:51.535Z",
-  "updated": "2026-11-03T06:32:46.264Z",
+  "updated": "2026-11-03T06:34:07.297Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -24,6 +24,11 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-4882",
       "claimedAt": "2026-11-03T06:32:46.264Z"
+    },
+    "ac04-fly-setup": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4882",
+      "claimedAt": "2026-11-03T06:34:07.297Z"
     }
   }
 }
