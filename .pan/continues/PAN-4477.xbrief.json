@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4477",
   "created": "2026-11-03T15:02:33.095Z",
-  "updated": "2026-11-03T16:38:08.054Z",
+  "updated": "2026-11-03T16:38:23.215Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -242,6 +242,10 @@
     "docs.ac2": {
       "status": "completed",
       "doneAt": "2026-11-03T16:38:08.054Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:38:23.214Z"
     }
   }
 }
