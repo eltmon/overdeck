@@ -68,13 +68,11 @@ Click **Leave** at any time to leave the shared conversation.
 
 - **Host**: the person who shared the conversation. The conversation runs on the host's
   machine, and the host admits, kicks and revokes people.
-- **Controller**: the person who drives the conversation. In this release this is always
-  the host.
+- **Controller**: the person who drives the conversation and runs the lobby. The host
+  starts as controller and can hand control to a viewer.
 - **Viewer**: a person the host admitted. Viewers watch the conversation live and can
   suggest prompts.
 - **Contributor**: a viewer who can also send prompts straight to the conversation.
-
-Handing control to another person comes in a later release.
 
 ## Suggestions and contributor prompts
 
@@ -92,6 +90,21 @@ Handing control to another person comes in a later release.
 - The conversation shows who sent each shared prompt.
 
 **Only make someone a contributor if you trust them to prompt your agent as you.** Their
+prompts run on your machine, with your agent's permissions.
+
+## Hand over control
+
+1. In the share dialog, click **Hand control to @name** next to a person in the room.
+2. That person's page shows **You have control**. They can now admit, kick and revoke
+   people, grant or remove contributor, send prompts with **Send prompt**, pick and send
+   suggestions, and hand control to someone else or back to you.
+3. While someone else has control, your share dialog says "@name has control." and shows
+   only **Reclaim control**. Click it to take control back at once. It always works.
+
+Only the host can un-revoke a blocked person or end the share. Reclaim control first to
+un-revoke; **End share** works whoever has control.
+
+**Only hand control to someone you trust to prompt your agent as you.** The controller's
 prompts run on your machine, with your agent's permissions.
 
 ## What viewers see
