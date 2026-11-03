@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4839",
   "created": "2026-11-03T21:01:30.274Z",
-  "updated": "2026-11-03T21:22:25.486Z",
+  "updated": "2026-11-03T21:25:58.577Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,9 +52,10 @@
       "doneAt": "2026-11-03T21:22:19.719Z"
     },
     "app-wiring": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4839",
-      "claimedAt": "2026-11-03T21:22:25.486Z"
+      "claimedAt": "2026-11-03T21:22:25.486Z",
+      "doneAt": "2026-11-03T21:25:58.577Z"
     }
   }
 }
