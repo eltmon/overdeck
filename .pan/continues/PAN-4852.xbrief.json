@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4852",
   "created": "2026-11-03T02:45:30.764Z",
-  "updated": "2026-11-03T02:46:50.698Z",
+  "updated": "2026-11-03T02:46:51.723Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -18,6 +18,11 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-4852",
       "claimedAt": "2026-11-03T02:46:50.698Z"
+    },
+    "worktree-exclude": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4852",
+      "claimedAt": "2026-11-03T02:46:51.722Z"
     }
   }
 }
