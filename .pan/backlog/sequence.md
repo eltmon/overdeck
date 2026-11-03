@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T07:52:18.795850Z · model: claude-opus-5-5 · open: 876_
+_Last sequenced: 2026-11-03T07:59:59.700019Z · model: claude-opus-5-5 · open: 877_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -10,6 +10,7 @@ _Last sequenced: 2026-11-03T07:52:18.795850Z · model: claude-opus-5-5 · open: 
 | 3 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 4 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install aborts workspace creation (since #4163); reproduced 2026-11-02 on botland too, so every polyrepo start fails. |
 | 5 | PAN-4882 | M | high | ok |  |  | Re-run the five v0.73 Anywhere checks fixed after the release run (TURN relay on Fly, AC-4, AC-6, AC-15) on deployed main. |
+| 6 | PAN-4888 | M | high | ok |  |  | pan reload: a held reload blocks newer ones and ships a stale build, so the operator approves restarts twice. |
 | 7 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
 | 8 | PAN-4690 | S | critical | ok |  |  | Review dispatch rewrites the tracked continue file uncommitted, so the dirty-tree gate blocks the review it dispatched |
 | 10 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
@@ -904,6 +905,10 @@ Moved from rank 9 to the free rank 4: a 2026-11-02 comment shows the same abort 
 
 New in-pipeline verification issue: the v0.73.0 acceptance run failed AC-2/3/4/6/15, and the fixes (PAN-4862, PAN-4861, PAN-4859, #4864) are closed, so nothing blocks the re-run. It is already picked up, so it takes the free rank 5 without moving any other node; it shares the release checklist with PAN-4863, recorded as an advisory informs edge.
 
+### PAN-4888 (rank 6)
+
+New in-pipeline substrate bug in the deploy path: reload.ts drops a newer reload while an older one holds the restart lock, and the holder deploys the build frozen at request time, which happened twice on 2026-11-03. It takes the free rank 6 so no pinned or ranked node moves; the body names no blocking cross-references.
+
 ### PAN-4733 (rank 7)
 
 Rank held: parent PAN-4732 (move heavy e2e out of the default shards) closed as completed on 2026-11-01, so this follow-up is now unblocked and next in line.
@@ -1200,10 +1205,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
 
 New this pass. The deployment gate's queue message is unusually good — it names the holders, the queue age, and warns against forcing — and it promises a 'next verification boundary' trigger that does not exist. Every holder cleared and the deploy never fired; the live build stayed stale for 35 minutes until a manual reload. A correct-sounding instruction that cannot happen is worse than no message.
 
-### PAN-3118 (rank 79)
-
-Triage: verify "running at $0.00 with no capacity fallback" against the current liveness definition. Rank held.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1211,10 +1212,10 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T07:52:18.795850Z",
+  "generatedAt": "2026-11-03T07:59:59.700019Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 876,
+  "openCount": 877,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -12169,6 +12170,19 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       ],
       "why": "Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); machines stay refused.",
       "rationale": "New child of the phone-app epic PAN-4823, split from PAN-4835 and explicitly sequenced after it; placed at the tail of the phone-app chain so no existing rank moves.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4888",
+      "rank": 6,
+      "size": "M",
+      "importance": "high",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan reload: a held reload blocks newer ones and ships a stale build, so the operator approves restarts twice.",
+      "rationale": "New in-pipeline substrate bug in the deploy path: reload.ts drops a newer reload while an older one holds the restart lock, and the holder deploys the build frozen at request time, which happened twice on 2026-11-03. It takes the free rank 6 so no pinned or ranked node moves; the body names no blocking cross-references.",
       "gate": "auto",
       "planning": "auto"
     }
