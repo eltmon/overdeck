@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4852",
   "created": "2026-11-03T02:45:30.764Z",
-  "updated": "2026-11-03T05:43:35.161Z",
+  "updated": "2026-11-03T05:45:16.361Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -150,6 +150,10 @@
       "claimedBy": "agent-pan-4852",
       "claimedAt": "2026-11-03T05:21:01.150Z",
       "doneAt": "2026-11-03T05:43:35.161Z"
+    },
+    "ox-build.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:45:16.361Z"
     }
   }
 }
