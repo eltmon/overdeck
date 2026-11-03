@@ -59,6 +59,7 @@ function fakes(overrides: Partial<FlyMachineServiceDeps> = {}) {
     log: () => undefined,
     checkCodexPolicy: vi.fn(async () => ({ allowed: true })),
     homeCodex: vi.fn(async () => HOME_CODEX),
+    yamlSetsRemoteEnabled: vi.fn(async () => false),
     ...overrides,
   };
   return deps;
@@ -111,6 +112,31 @@ describe('addFlyMachine (PAN-4652 WI-8)', () => {
     await expect(addFlyMachine(input, deps)).rejects.toMatchObject({ code });
     expect(deps.provision).not.toHaveBeenCalled();
     expect(await listFlyMachines()).toEqual([]);
+  });
+
+  it('remote-disabled names config.toml and the key (PAN-4905)', async () => {
+    const deps = fakes({ loadConfig: vi.fn(async () => ({ remote: { enabled: false } })) });
+    await expect(addFlyMachine({}, deps)).rejects.toMatchObject({
+      code: 'remote-disabled',
+      message: expect.stringContaining('enabled = true'),
+    });
+    await expect(addFlyMachine({}, deps)).rejects.toMatchObject({
+      message: expect.stringContaining('[remote]'),
+    });
+    await expect(addFlyMachine({}, deps)).rejects.toMatchObject({
+      message: expect.stringContaining('config.toml'),
+    });
+  });
+
+  it('remote-disabled names the config.yaml trap when it sets remote.enabled (PAN-4905)', async () => {
+    const deps = fakes({
+      loadConfig: vi.fn(async () => ({ remote: { enabled: false } })),
+      yamlSetsRemoteEnabled: vi.fn(async () => true),
+    });
+    await expect(addFlyMachine({}, deps)).rejects.toMatchObject({
+      code: 'remote-disabled',
+      message: expect.stringContaining('config.yaml sets remote.enabled'),
+    });
   });
 
   it('destroys the machine and deletes the record when the link fails, naming the public-IP fix', async () => {

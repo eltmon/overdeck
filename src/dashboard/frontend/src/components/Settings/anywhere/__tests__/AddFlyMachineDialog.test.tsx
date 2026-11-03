@@ -69,11 +69,11 @@ describe('AddFlyMachineDialog (PAN-4743 WI-9)', () => {
   });
 
   it('ac2: a 409 remote-disabled shows the server message and stays open', async () => {
-    routes['POST /api/machines/fly'] = () => ({ status: 409, body: { error: 'remote-disabled', message: 'Fly machines need remote.enabled: true in the Overdeck config.' } });
+    routes['POST /api/machines/fly'] = () => ({ status: 409, body: { error: 'remote-disabled', message: 'Fly machines need remote turned on: add `enabled = true` under `[remote]` in ~/.overdeck/config.toml.' } });
     const onClose = vi.fn();
     renderWithProviders(<AddFlyMachineDialog open onClose={onClose} />);
     await userEvent.click(screen.getByRole('button', { name: 'Add' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Fly machines need remote.enabled: true in the Overdeck config.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Fly machines need remote turned on: add `enabled = true` under `[remote]` in ~/.overdeck/config.toml.');
     expect(onClose).not.toHaveBeenCalled();
   });
 
