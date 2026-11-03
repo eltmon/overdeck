@@ -34,6 +34,7 @@ import {
   capturePane,
 } from '../tmux.js';
 import { FsError, TmuxError } from '../errors.js';
+import { revokeAgentMcpTokens } from '../mcp/agent-token.js';
 import type { CloseAgentPaneResult } from '../terminal-backends/launch.js';
 
 const execAsync = promisify(exec);
@@ -209,6 +210,7 @@ export function stopAgentSync(agentId: string, cause: AgentStopCause = 'system')
     state: 'stopped',
     lastActivity: new Date().toISOString(),
   });
+  void revokeAgentMcpTokens(normalizedId).catch(() => undefined); // PAN-4927: fire and forget; the sweep is the backstop
 }
 
 /**
@@ -299,6 +301,8 @@ export const stopAgent = (
       markAgentStoppedState(state, cause);
       yield* saveAgentState(state);
     }
+    // PAN-4927: a stopped agent keeps no MCP token, with or without a state file.
+    yield* Effect.promise(() => revokeAgentMcpTokens(normalizedId));
 
     const tmuxActive = yield* sessionExists(normalizedId);
     console.log(`[agents] Stopping ${normalizedId} (async): tmux=${tmuxActive} stateStatus=${state?.status ?? 'none'}`);
