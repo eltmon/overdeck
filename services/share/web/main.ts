@@ -95,6 +95,9 @@ function start(): void {
         onNotice: (notice) => {
           if (viewer === created && !model.notices.some((n) => sameNotice(n, notice))) update({ notices: [...model.notices, notice] });
         },
+        // The browser viewer has no terminal (PRD PAN-4481 NonGoals): it never calls setTerminalWatch,
+        // so the host sends no terminal stream, and anything that arrives anyway is dropped.
+        onTerminal: () => {},
       },
     );
     viewer = created;
