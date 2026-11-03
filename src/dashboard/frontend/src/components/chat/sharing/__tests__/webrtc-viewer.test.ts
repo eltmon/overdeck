@@ -1,10 +1,11 @@
 /** PAN-4475 WI-8: the viewer browser's WebRTC answerer, hello handshake and content decoding. */
 import { describe, expect, it, vi } from 'vitest';
-import type { IceServer, SharedEnvelope, SharedMessage, SignalData } from '@overdeck/contracts';
+import type { IceServer, SharedEnvelope, SharedMessage, SignalData, TerminalPayload } from '@overdeck/contracts';
 
 import {
   readPresence,
   readSharedMessage,
+  readTerminalPayload,
   WebRtcViewer,
   type SubmitAck,
   type ViewerNotice,
@@ -113,6 +114,7 @@ interface Harness {
   drafts: unknown[];
   acks: SubmitAck[];
   events: string[];
+  terminal: TerminalPayload[];
   callbacks: WebRtcViewerCallbacks;
 }
 
@@ -125,6 +127,7 @@ function harness(ice: () => Promise<readonly IceServer[]> = async () => ICE): Ha
   const drafts: unknown[] = [];
   const acks: SubmitAck[] = [];
   const events: string[] = [];
+  const terminal: TerminalPayload[] = [];
   const fetchIceServers = vi.fn(ice);
   const callbacks: WebRtcViewerCallbacks = {
     onMessages: (list) => messages.push(list),
@@ -135,6 +138,7 @@ function harness(ice: () => Promise<readonly IceServer[]> = async () => ICE): Ha
     onSubmitAck: (ack) => acks.push(ack),
     onDraftSent: () => events.push('draft-sent'),
     onReady: () => events.push('ready'),
+    onTerminal: (payload) => terminal.push(payload),
   };
   const viewer = new WebRtcViewer({
     RTCPeerConnection: FakePeer as unknown as typeof RTCPeerConnection,
@@ -142,7 +146,7 @@ function harness(ice: () => Promise<readonly IceServer[]> = async () => ICE): Ha
     fetchIceServers,
     now: () => 42,
   }, callbacks);
-  return { viewer, signals, fetchIceServers, messages, phases, notices, drafts, acks, events, callbacks };
+  return { viewer, signals, fetchIceServers, messages, phases, notices, drafts, acks, events, terminal, callbacks };
 }
 
 async function offered(h: Harness): Promise<FakePeer> {
@@ -278,11 +282,11 @@ describe('WebRtcViewer (PAN-4475 WI-8)', () => {
     expect(h.notices).toEqual([{ kind: 'updates_missed' }]);
   });
 
-  it('gives the terminal channel no message listener', async () => {
+  it('gives drafts and terminal a message listener', async () => {
     const h = harness();
     const peer = await offered(h);
     expect(peer.fireDataChannel('drafts').listenerCount('message')).toBe(1);
-    expect(peer.fireDataChannel('terminal').listenerCount('message')).toBe(0);
+    expect(peer.fireDataChannel('terminal').listenerCount('message')).toBe(1);
     expect(peer.fireDataChannel('presence').listenerCount('message')).toBe(1);
   });
 
@@ -342,6 +346,104 @@ describe('WebRtcViewer (PAN-4475 WI-8)', () => {
     await settle();
     expect({ messages: h.messages.length, phases: h.phases.length, notices: h.notices.length }).toEqual(before);
     expect(FakePeer.instances).toHaveLength(1);
+  });
+});
+
+describe('WebRtcViewer terminal (PAN-4477 WI-7)', () => {
+  const HELLO = { kind: 'hello', hello: { v: 1, scopeKinds: ['conversation'], scope: SCOPE } };
+  const sentPayloads = (channel: FakeChannel) => channel.sent.map((part) => JSON.parse(part) as SharedEnvelope);
+
+  it('forwards a terminal snapshot after the hello with only the known fields', async () => {
+    const h = harness();
+    const { peer } = await helloDone(h);
+    const terminal = peer.fireDataChannel('terminal');
+    terminal.receive(envelope('terminal', 1, { kind: 'snapshot', cols: 100, rows: 30, data: 'SCREEN', extra: 'x' }));
+    expect(h.terminal).toEqual([{ kind: 'snapshot', cols: 100, rows: 30, data: 'SCREEN' }]);
+  });
+
+  it('ignores terminal envelopes before the hello reply', async () => {
+    const h = harness();
+    const peer = await offered(h);
+    peer.fireDataChannel('terminal').receive(envelope('terminal', 1, { kind: 'output', data: 'x' }));
+    expect(h.terminal).toEqual([]);
+  });
+
+  it('drops malformed terminal payloads', async () => {
+    const h = harness();
+    const { peer } = await helloDone(h);
+    const terminal = peer.fireDataChannel('terminal');
+    terminal.receive(envelope('terminal', 1, { kind: 'snapshot', cols: 0, rows: 30, data: '' }));
+    terminal.receive(envelope('terminal', 2, { kind: 'size', cols: 1.5, rows: 30 }));
+    terminal.receive(envelope('terminal', 3, { kind: 'unavailable', reason: 'x' }));
+    expect(h.terminal).toEqual([]);
+  });
+
+  it('rebuilds each payload kind and rejects bad dimensions and data', () => {
+    expect(readTerminalPayload({ kind: 'output', data: 'a' })).toEqual({ kind: 'output', data: 'a' });
+    expect(readTerminalPayload({ kind: 'size', cols: 1000, rows: 1 })).toEqual({ kind: 'size', cols: 1000, rows: 1 });
+    expect(readTerminalPayload({ kind: 'unavailable', reason: 'terminal_ended' })).toEqual({ kind: 'unavailable', reason: 'terminal_ended' });
+    expect(readTerminalPayload({ kind: 'size', cols: 1001, rows: 1 })).toBeNull();
+    expect(readTerminalPayload({ kind: 'output', data: 7 })).toBeNull();
+    expect(readTerminalPayload({ kind: 'exit' })).toBeNull();
+    expect(readTerminalPayload(null)).toBeNull();
+  });
+
+  it('sends the watch on control as seq 2 after the hello', async () => {
+    const h = harness();
+    const { control } = await helloDone(h);
+    h.viewer.setTerminalWatch(true);
+    expect(sentPayloads(control).map((e) => [e.seq, e.payload])).toEqual([
+      [1, HELLO],
+      [2, { kind: 'terminal-watch', watch: true }],
+    ]);
+  });
+
+  it('holds a watch set before the hello until the hello reply is out', async () => {
+    const h = harness();
+    const peer = await offered(h);
+    const control = peer.fireDataChannel('control');
+    h.viewer.setTerminalWatch(true);
+    expect(control.sent).toEqual([]);
+    control.receive(envelope('control', 1, HELLO));
+    expect(sentPayloads(control).map((e) => e.payload)).toEqual([HELLO, { kind: 'terminal-watch', watch: true }]);
+  });
+
+  it('re-sends the watch after the hello of a new peer', async () => {
+    const h = harness();
+    await helloDone(h);
+    h.viewer.setTerminalWatch(true);
+    const { control } = await helloDone(h);
+    expect(sentPayloads(control).map((e) => [e.seq, e.payload])).toEqual([
+      [1, HELLO],
+      [2, { kind: 'terminal-watch', watch: true }],
+    ]);
+  });
+
+  it('sends watch false and never sends on the terminal channel', async () => {
+    const h = harness();
+    const { peer, control } = await helloDone(h);
+    const terminal = peer.fireDataChannel('terminal');
+    h.viewer.setTerminalWatch(true);
+    terminal.receive(envelope('terminal', 1, { kind: 'output', data: 'x' }));
+    h.viewer.setTerminalWatch(false);
+    expect(sentPayloads(control).map((e) => [e.seq, e.payload])).toEqual([
+      [1, HELLO],
+      [2, { kind: 'terminal-watch', watch: true }],
+      [3, { kind: 'terminal-watch', watch: false }],
+    ]);
+    expect(terminal.sent).toEqual([]);
+  });
+
+  it('shares the control seq with submits', async () => {
+    const h = harness();
+    const { control } = await helloDone(h);
+    expect(h.viewer.submit('c1', 'Do it')).toBe(true);
+    h.viewer.setTerminalWatch(true);
+    expect(sentPayloads(control).map((e) => [e.seq, e.payload])).toEqual([
+      [1, HELLO],
+      [2, { kind: 'submit', clientId: 'c1', text: 'Do it' }],
+      [3, { kind: 'terminal-watch', watch: true }],
+    ]);
   });
 });
 
