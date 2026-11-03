@@ -4,17 +4,17 @@
     "created": "2026-11-03T21:41:48Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4929: Workspace creation runs npm install at a polyrepo root that has no package.json, so pan start fails for Mind Your Now",
-    "updated": "2026-11-03T21:42:04.087Z"
+    "updated": "2026-11-03T21:43:26.663Z"
   },
   "plan": {
     "id": "pan-4929",
     "title": "Workspace creation runs npm install at a polyrepo root that has no package.json, so pan start fails for Mind Your Now",
-    "status": "proposed",
+    "status": "running",
     "uid": "1eb5c5b3-e416-4e48-98ae-164fbd116d58",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-03T21:41:48Z",
-    "updated": "2026-11-03T21:42:04.087Z",
+    "updated": "2026-11-03T21:43:26.663Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4929",
@@ -331,5 +331,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
