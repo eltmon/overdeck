@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4852",
   "created": "2026-11-03T02:45:30.764Z",
-  "updated": "2026-11-03T06:09:25.745Z",
+  "updated": "2026-11-03T06:09:50.644Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -354,6 +354,10 @@
     "merge-guard.ac4": {
       "status": "completed",
       "doneAt": "2026-11-03T06:09:25.744Z"
+    },
+    "merge-gate-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:09:50.643Z"
     }
   }
 }
