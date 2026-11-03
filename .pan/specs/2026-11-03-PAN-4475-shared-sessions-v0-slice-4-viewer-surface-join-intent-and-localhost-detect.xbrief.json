@@ -4,17 +4,17 @@
     "created": "2026-11-03T09:04:53Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4475: Shared Sessions v0 (slice 4): viewer surface, join intent and localhost-detect",
-    "updated": "2026-11-03T09:09:00.297Z"
+    "updated": "2026-11-03T09:11:31.930Z"
   },
   "plan": {
     "id": "pan-4475",
     "title": "Shared Sessions v0 (slice 4): viewer surface, join intent and localhost-detect",
-    "status": "proposed",
+    "status": "running",
     "uid": "219f5bac-6f7f-4b92-af81-853a35d732bb",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-03T09:04:53Z",
-    "updated": "2026-11-03T09:09:00.297Z",
+    "updated": "2026-11-03T09:11:31.930Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4475",
@@ -1117,5 +1117,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
