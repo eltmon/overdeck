@@ -6,7 +6,7 @@
  * and wrong field types are all `bad_frame`. Each frame is rebuilt from its known keys only, so an
  * unlisted field is never stored or forwarded.
  */
-import { CONNECT_PROTOCOL_VERSION } from '../../../packages/contracts/src/connect.ts';
+import { CONNECT_PROTOCOL_VERSION, PUSH_SEALED_MAX_CHARS } from '../../../packages/contracts/src/connect.ts';
 import type { ClientToDirectoryFrame, DirectoryEndpoint, MachineToDirectoryFrame } from '../../../packages/contracts/src/connect.ts';
 import type { SignalData } from '../../../packages/contracts/src/sharing.ts';
 
@@ -31,6 +31,8 @@ const INBOX_ID_RE = /^ib_[0-9a-f]{16}$/;
 /** Inbox event ids are `crypto.randomUUID()` values. */
 const EVENT_ID_RE = UUID_RE;
 const ENDPOINT_URL_RE = /^(tcp|wss):\/\/[^\s]+$/;
+/** Standard base64 with optional padding; a push's `sealed` blob (PAN-4830 D-6). */
+const BASE64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
 /** C0 and C1 control characters, plus DEL. */
 const CONTROL_CHARS = /[\u0000-\u001f\u007f-\u009f]/;
 
@@ -203,6 +205,20 @@ function build(obj: Obj): MachineToDirectoryFrame {
     }
     case 'relay-usage':
       return relayUsageOf(obj);
+    case 'push': {
+      const sealed = str(obj, 'sealed', PUSH_SEALED_MAX_CHARS, BASE64_RE);
+      if (sealed.length < 4 || sealed.length % 4 !== 0) fail();
+      const urgency = obj['urgency'];
+      if (urgency !== 'high' && urgency !== 'normal') fail();
+      return {
+        type,
+        requestId: str(obj, 'requestId', 32, ID_HEX_RE),
+        to: environmentIdOf(obj, 'to'),
+        sealed,
+        urgency,
+        collapseId: str(obj, 'collapseId', 32, ID_HEX_RE),
+      };
+    }
     default:
       return fail();
   }

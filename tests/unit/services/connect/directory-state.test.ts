@@ -348,17 +348,15 @@ describe('directory reducer: push before PAN-4830 (PAN-4828)', () => {
     expect(result.effects).toContainEqual({ kind: 'log', type: 'push', environmentId: env(1), outcome: 'bad_frame' });
   });
 
-  it('decoder still refuses push until PAN-4830', () => {
-    const decoded = decodeMachineFrame(
-      JSON.stringify({
-        type: 'push',
-        requestId: '0'.repeat(32),
-        to: env(2),
-        sealed: 'AAAA',
-        urgency: 'high',
-        collapseId: '1'.repeat(32),
-      }),
-    );
-    expect(decoded).toEqual({ ok: false, reason: 'bad_frame' });
+  it('decodes a valid push', () => {
+    const frame = {
+      type: 'push',
+      requestId: '0'.repeat(32),
+      to: env(2),
+      sealed: 'AAAA',
+      urgency: 'high',
+      collapseId: '1'.repeat(32),
+    } as const;
+    expect(decodeMachineFrame(JSON.stringify(frame))).toEqual({ ok: true, frame });
   });
 });
