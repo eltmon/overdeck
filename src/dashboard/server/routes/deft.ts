@@ -29,7 +29,8 @@ import { DEFT_ESCALATION_DECISIONS, notifyEscalationResolved, resolveDeftEscalat
 import { isDeftPipelineIssue } from '../../../lib/deft/issue-pipeline.js';
 import { defaultDeftReviewCycleLoadDeps, type DeftReviewCycleLoadDeps, loadDeftReviewCycle } from '../../../lib/deft/review-cycle-load.js';
 import { signOffDisposition } from '../../../lib/deft/signoff.js';
-import { readDeftIssueState, summarizeDeftIssueState } from '../../../lib/deft/state-reader.js';
+import { clearDeftPendingCache } from '../../../lib/deft/pending.js';
+import { clearDeftModeCache, readDeftIssueState, summarizeDeftIssueState } from '../../../lib/deft/state-reader.js';
 import { parseIssueId } from '../../../lib/issue-id.js';
 import { getIssueWorkspacePath } from '../../../lib/overdeck/issue-projects.js';
 import { PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
@@ -170,6 +171,10 @@ function startPipelineSwitch(issueId: string, pipeline: 'deft' | 'overdeck', sta
     if (finished) return;
     finished = true;
     runningSwitches.delete(issueId);
+    // The switch installed or removed Deft: drop the memoized mode and pending questions.
+    const worktree = getIssueWorkspacePath(issueId);
+    clearDeftModeCache(worktree ?? undefined);
+    clearDeftPendingCache(worktree ?? undefined);
     const tail = stderr.trim().split('\n').slice(-STDERR_TAIL_LINES).join('\n');
     emitActivityEntry({
       source: 'dashboard',

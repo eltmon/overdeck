@@ -23,11 +23,15 @@ import { execFile } from 'node:child_process';
 import { copyFile, mkdir, readdir, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
-import { resolveDefaultBranchForRepo } from '../project-repos.js';
+import { Effect } from 'effect';
+import { defaultBranchForRepo } from '../project-repos.js';
+import { loadProjectsConfig } from '../projects.js';
+import { findContainingProjectAsync } from '../projects/path-containment.js';
 import { isDirectiveProjectAtRef } from './detect.js';
 
 const execFileAsync = promisify(execFile);
 const MAX_BUFFER = 64 * 1024 * 1024;
+const GIT_TIMEOUT_MS = 10_000;
 
 export interface DeftArchiveEntry {
   /** Relative to the worktree, under `.pan/deft/<ISSUE>/`. */
@@ -46,7 +50,11 @@ export function deftArchiveDir(issueId: string): string {
  * when the remote ref is absent.
  */
 export async function directiveBaseRef(worktree: string): Promise<string> {
-  const branch = resolveDefaultBranchForRepo(worktree);
+  // Async, mtime-cached project config: this runs on dashboard poll paths (PAN-4849).
+  const project = await Effect.runPromise(loadProjectsConfig())
+    .then(config => findContainingProjectAsync(config.projects, worktree))
+    .catch(() => null);
+  const branch = defaultBranchForRepo(project?.[1] ?? null, worktree);
   return (await gitExitCode(worktree, ['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${branch}`])) === 0
     ? `origin/${branch}`
     : branch;
@@ -98,7 +106,7 @@ async function git(worktree: string, args: string[]): Promise<string> {
 
 async function gitExitCode(worktree: string, args: string[]): Promise<number> {
   try {
-    await execFileAsync('git', args, { cwd: worktree });
+    await execFileAsync('git', args, { cwd: worktree, timeout: GIT_TIMEOUT_MS });
     return 0;
   } catch (error) {
     const code = (error as { code?: unknown }).code;

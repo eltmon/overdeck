@@ -6,8 +6,12 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterAll, describe, expect, it } from 'vitest';
-import { readDeftIssueState, summarizeDeftIssueState } from '../state-reader.js';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const isNativeDirectiveProject = vi.hoisted(() => vi.fn(async () => false));
+vi.mock('../archive.js', () => ({ isNativeDirectiveProject }));
+
+const { clearDeftModeCache, readDeftIssueState, summarizeDeftIssueState } = await import('../state-reader.js');
 
 const FIXTURE_DIR = fileURLToPath(new URL('./fixtures/directive', import.meta.url));
 const GOLDEN = JSON.parse(readFileSync(fileURLToPath(new URL('./fixtures/deft-issue-state.golden.json', import.meta.url)), 'utf8'));
@@ -66,6 +70,29 @@ describe('readDeftIssueState', () => {
       },
     });
     expect(failing.mode).toBe('not-installed');
+  });
+});
+
+describe('memoized native-project check (PAN-4849 review)', () => {
+  beforeEach(() => {
+    clearDeftModeCache();
+    isNativeDirectiveProject.mockReset();
+    isNativeDirectiveProject.mockResolvedValue(true);
+  });
+
+  it('runs the git-backed check once per worktree until the memo is cleared', async () => {
+    expect((await readDeftIssueState(FIXTURE_DIR, 'PAN-1', FIXED_NOW)).mode).toBe('directive-project');
+    await readDeftIssueState(FIXTURE_DIR, 'PAN-1', FIXED_NOW);
+    expect(isNativeDirectiveProject).toHaveBeenCalledTimes(1);
+    clearDeftModeCache(FIXTURE_DIR);
+    await readDeftIssueState(FIXTURE_DIR, 'PAN-1', FIXED_NOW);
+    expect(isNativeDirectiveProject).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not memoize a failed check', async () => {
+    isNativeDirectiveProject.mockRejectedValueOnce(new Error('git timed out'));
+    expect((await readDeftIssueState(FIXTURE_DIR, 'PAN-1', FIXED_NOW)).mode).toBe('not-installed');
+    expect((await readDeftIssueState(FIXTURE_DIR, 'PAN-1', FIXED_NOW)).mode).toBe('directive-project');
   });
 });
 

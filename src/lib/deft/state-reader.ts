@@ -10,10 +10,16 @@
  * empty, and a malformed file is skipped with a `<path>: <message>` entry in
  * `errors`.
  *
- * The one input that needs git is whether the project is natively a
- * Directive project (read from its default branch, `archive.ts`). It is an
- * injectable dependency, consulted only when the worktree has no install
- * snapshot, and a failure counts as "not native".
+ * The reader itself spawns nothing. The one input that needs git is whether
+ * the project is natively a Directive project, which PAN-4820 reads from the
+ * default branch's committed tree, never from worktree files
+ * (`isNativeDirectiveProject` in `archive.ts`: one `git rev-parse` and three
+ * `git show`, each with a timeout, and the async project config). It is
+ * consulted only when the worktree has no install snapshot, and its answer is
+ * memoized per worktree for 10 minutes, because it changes only when the
+ * default branch gains or loses a deposit; `clearDeftModeCache` drops it
+ * after a pipeline switch. A failed check counts as "not native" and is not
+ * memoized. Tests inject the check.
  */
 import { access, readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -46,7 +52,7 @@ const TAIL_LINES = 50;
 const HOUR_MS = 3_600_000;
 
 export interface DeftStateReaderDeps {
-  /** Defaults to `isNativeDirectiveProject` from `archive.ts`, which runs git. */
+  /** Defaults to the memoized `isNativeDirectiveProject` from `archive.ts`, which runs git. */
   isNativeDirectiveProject?: (worktree: string) => Promise<boolean>;
 }
 
@@ -355,9 +361,29 @@ async function readSpecDrift(worktree: string, errors: string[]): Promise<DeftSp
   };
 }
 
-async function safeNative(native: (worktree: string) => Promise<boolean>, worktree: string): Promise<boolean> {
+const NATIVE_CACHE_MS = 10 * 60_000;
+const nativeCache = new Map<string, { at: number; native: boolean }>();
+
+/** Forget the memoized native-project answer (one worktree, or all). */
+export function clearDeftModeCache(worktree?: string): void {
+  if (worktree) nativeCache.delete(worktree);
+  else nativeCache.clear();
+}
+
+async function nativeFor(worktree: string, deps: DeftStateReaderDeps): Promise<boolean> {
+  if (deps.isNativeDirectiveProject) {
+    try {
+      return await deps.isNativeDirectiveProject(worktree);
+    } catch {
+      return false;
+    }
+  }
+  const hit = nativeCache.get(worktree);
+  if (hit && Date.now() - hit.at < NATIVE_CACHE_MS) return hit.native;
   try {
-    return await native(worktree);
+    const native = await isNativeDirectiveProject(worktree);
+    nativeCache.set(worktree, { at: Date.now(), native });
+    return native;
   } catch {
     return false;
   }
@@ -398,7 +424,7 @@ export async function readDeftIssueState(
   ] = await Promise.all([
     snapshot
       ? Promise.resolve<DeftIssueState['mode']>('temporary-install')
-      : safeNative(deps.isNativeDirectiveProject ?? isNativeDirectiveProject, worktree).then(native =>
+      : nativeFor(worktree, deps).then(native =>
           native ? ('directive-project' as const) : ('not-installed' as const),
         ),
     Promise.all(
