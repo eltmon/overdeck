@@ -4,7 +4,7 @@ import { PHONE_PAIR_LINK_PREFIX, parsePhonePairLink } from '@overdeck/contracts'
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 
 import { type DeviceIdentity, loadIdentity } from '../native/keys';
-import { startPushRegistration, unregisterPush } from '../native/push';
+import { type PushState, pushState, requestPush, startPushRegistration, unregisterPush } from '../native/push';
 import { type Connection, createConnection } from './connection';
 import { createDirectory, type ShellDirectory } from './directory';
 import { resetTransport } from '../../../../src/dashboard/frontend/src/lib/wsTransport';
@@ -64,8 +64,9 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
   const [signInError, setSignInError] = useState<string | null>(null);
   const [view, setView] = useState<View>({ kind: 'machines' });
   const [services, setServices] = useState<Services | null>(null);
-  // Bumped to restart push registration (PAN-4840 WI-7).
-  const [pushEpoch] = useState(0);
+  // Bumped by the Settings row's "Turn on" to restart push registration (PAN-4840 WI-7).
+  const [pushEpoch, setPushEpoch] = useState(0);
+  const [notifications, setNotifications] = useState<PushState | null>(null);
   /** A pair link that arrived before sign-in; it opens the pair screen once signed in. */
   const [pendingPairLink, setPendingPairLink] = useState<string | null>(null);
   /** A notification tap (PAN-4840 FR-6); it opens its machine once signed in. */
@@ -178,6 +179,24 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
       stop?.();
     };
   }, [services, pushEpoch]);
+
+  useEffect(() => {
+    if (view.kind !== 'settings') return;
+    let cancelled = false;
+    void pushState().then((s) => {
+      if (!cancelled) setNotifications(s);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [view.kind]);
+
+  const onTurnOnNotifications = useCallback(() => {
+    void requestPush().then((s) => {
+      setNotifications(s);
+      setPushEpoch((n) => n + 1);
+    });
+  }, []);
 
   const labelFor = useCallback(
     (link: string) => {
@@ -313,6 +332,8 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
         <SettingsScreen
           account={account}
           machines={paired}
+          notifications={notifications}
+          onTurnOnNotifications={onTurnOnNotifications}
           onForget={(environmentId) => void forget(environmentId, { kind: 'settings' })}
           onSignOut={runSignOut}
           onBack={() => setView({ kind: 'machines' })}
