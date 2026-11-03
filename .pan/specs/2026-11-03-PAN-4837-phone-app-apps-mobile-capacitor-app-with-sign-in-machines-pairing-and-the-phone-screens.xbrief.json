@@ -1,0 +1,2194 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-03T16:14:54Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4837: Phone app: apps/mobile Capacitor app with sign-in, machines, pairing and the phone screens",
+    "updated": "2026-11-03T16:15:15.300Z"
+  },
+  "plan": {
+    "id": "pan-4837",
+    "title": "Phone app: apps/mobile Capacitor app with sign-in, machines, pairing and the phone screens",
+    "status": "proposed",
+    "uid": "014714b5-89d4-4081-8de8-b34db1149c6e",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-03T16:14:54Z",
+    "updated": "2026-11-03T16:15:15.300Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4837",
+        "label": "PAN-4837",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4823",
+        "label": "PAN-4823 epic",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4837.md",
+        "label": "PRD",
+        "type": "document"
+      },
+      {
+        "uri": ".pan/drafts/pan-4823.md",
+        "label": "Epic PRD (W-APP1)",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "phone-app",
+      "capacitor",
+      "mobile",
+      "anywhere",
+      "frontend"
+    ],
+    "narratives": {
+      "Problem": "The PWA phone screens reach a machine only over Tailscale. Epic PAN-4823 adds a native iOS and Android app that reaches machines through the overdeck.ai directory and an end-to-end encrypted channel. Its prerequisites (contracts, directory client role, native sign-in redirect, the channel package with HTTP/WebSocket shims, the phone credential and the Settings QR) are merged; the app itself does not exist.",
+      "Proposal": "Create apps/mobile: a Vite build of a small React shell plus the existing /m phone screens, wrapped by Capacitor 8 (ai.overdeck.app). The shell signs in with PKCE through the system browser and native HTTP, lists the directory machines, pairs by QR or ai.overdeck.app:/pair link through a pairing-mode channel with a fresh per-machine link key, and renders MobileApp for the current machine with every /api and /ws request routed through installChannelShims. A Java and a Swift OverdeckKeys plugin hold the client id, the push key pair and the secrets. The frontend gains a native shell mode that skips the session/CSRF bootstrap and PWA chrome and hides admin-only controls. CI builds the Android debug APK. Acceptance is the epic AC-10 run on the Android emulator, plus CP-1 (iOS Simulator), CP-3 and CP-4 measurements. Full detail: .pan/drafts/PAN-4837.md.",
+      "NonGoals": "- Push registration, the iOS Notification Service Extension, Keychain Sharing and App Groups (PAN-4838).\n- The iOS Live Activity (PAN-4839) and the Android FCM messaging service (PAN-4840).\n- Store listings, signing, release builds, Firebase and APNs setup (PAN-4841).\n- User-facing docs pages such as configuration/phone-app.mdx (PAN-4842).\n- The machine-side native push provider (PAN-4843).\n- Reaching linked machines through the paired machine, including /api/fleet/needs-you for phones (PAN-4887).\n- Any new route-scopes.ts row or machine-side route change.\n- Over-the-air updates of the app code.\n- A Content-Security-Policy meta tag.\n- Notification and Live Activity switches in Settings.\n- iOS camera verification (the Simulator has no camera).\n- App icons, splash artwork and store branding (PAN-4841).\n- Any behavior change to the desktop dashboard or the PWA outside isNativeShell() branches."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Link keys are generated per paired machine in JavaScript (generateStaticKeyPair), not returned by the native plugin.",
+        "rationale": "PAN-4835 D-2 requires a fresh link key per pairing (the exchange answers 409 for a reused key), which contradicts the epic single linkSecretKeyHex; the link secret enters JavaScript in both designs because the Noise handshake runs there."
+      },
+      {
+        "summary": "hello-client publicKeyHex carries the push public key.",
+        "rationale": "With per-machine link keys the push key is the only install-level X25519 key; the directory stores the field and uses it for nothing else today."
+      },
+      {
+        "summary": "iOS key generation uses CryptoKit Curve25519; Android uses lazysodium with a BouncyCastle fallback; the Android plugin is Java.",
+        "rationale": "swift-sodium needs a Swift package reference hand-edited into project.pbxproj on Linux; CryptoKit keys are byte-compatible with libsodium. The Capacitor 8 Android template has no Kotlin toolchain and MYN app-local plugins are Java."
+      },
+      {
+        "summary": "iOS secrets stay in the default Keychain access group; Keychain Sharing moves to PAN-4838.",
+        "rationale": "The epic assigns the Keychain Sharing capability to W-IOS1, and an unsigned Simulator build cannot use a shared access group."
+      },
+      {
+        "summary": "Scaffold dependencies trimmed to core, cli, ios, android, app and browser.",
+        "rationale": "push-notifications arrives with PAN-4838/4840; status-bar, splash-screen and haptics have no caller in this issue (Karpathy simplicity)."
+      },
+      {
+        "summary": "Switching machines stores the choice and reloads the page.",
+        "rationale": "A reload gives the RPC transport, React Query cache and Zustand stores a clean start with no reset code added to the frontend."
+      },
+      {
+        "summary": "Settings has no notification or Live Activity switch in this issue.",
+        "rationale": "Those switches have no behavior until PAN-4838/4839/4840."
+      },
+      {
+        "summary": "Account and directory base URLs are build-time configurable via VITE_OVERDECK_ACCOUNT_URL and VITE_OVERDECK_DIRECTORY_URL.",
+        "rationale": "Matches the CLI OVERDECK_ACCOUNT_URL and directory_url and lets the app run against a staging stack while production lacks PAN-4831."
+      },
+      {
+        "summary": "The account service is called through CapacitorHttp (native HTTP).",
+        "rationale": "services/account sends no CORS headers, so a WebView fetch from capacitor://localhost to /oauth/token is blocked."
+      },
+      {
+        "summary": "The mobile-android CI job is added to the test aggregator (blocking).",
+        "rationale": "Frontend changes can break the app bundle and only CI would catch it; the gradle cache bounds flake risk."
+      },
+      {
+        "summary": "No Content-Security-Policy meta in this issue; deferred to the release issue PAN-4841.",
+        "rationale": "The app loads only bundled code and markdown is sanitized; a CSP must list build-time base URLs and belongs with release hardening."
+      },
+      {
+        "summary": "apps/mobile/README.md is created here; PAN-4842 adds release and user documentation.",
+        "rationale": "The developer README documents the build this issue creates; the user pages are PAN-4842 scope."
+      },
+      {
+        "summary": "Admin-only controls are hidden (or their reads skipped) behind isNativeShell() in three items, not tolerated as 403s.",
+        "rationale": "PAN-4835 D-7 lets W-APP1 hide or tolerate; hiding avoids 60 s and 5 s 403 polls and dead buttons, and the trace found every site."
+      },
+      {
+        "summary": "MIN_PAN_VERSION is the first tag containing the PAN-4835 merge, else the next minor after the root package version (0.74.0 today).",
+        "rationale": "No release contains PAN-4835 yet; NFR-6 needs a concrete minimum version in the outdated message."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "W-APP1 is one child issue of the PAN-4823 epic whose acceptance (AC-10) is a single end-to-end run: sign in, pair, Needs you, answer, send. The surface spans the new apps/mobile workspace (web shell plus generated native projects), two small package additions, native-shell branches in the frontend, one CI job and one server test. Splitting further would ship an app that cannot sign in or cannot render the screens, which no reviewer or UAT run could verify on its own. The 28 items keep each diff small and the DAG lets independent items run in parallel.",
+      "canonicalFilename": "2026-11-03-PAN-4837-phone-app-apps-mobile-capacitor-app-with-sign-in-machines-pairing-and-the-phone-screens.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "mobile-workspace",
+        "title": "Create the apps/mobile web workspace (Vite, Tailwind, Vitest, typecheck lane)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T16:14:54Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-4837",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/package.json",
+            "apps/mobile/tsconfig.json",
+            "apps/mobile/vite.config.ts",
+            "apps/mobile/vitest.config.ts",
+            "apps/mobile/tailwind.config.js",
+            "apps/mobile/postcss.config.js",
+            "apps/mobile/index.html",
+            "apps/mobile/.gitignore",
+            "apps/mobile/src/main.tsx",
+            "apps/mobile/src/__tests__/build-config.test.ts",
+            "package.json",
+            "bun.lock"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:mobile",
+            "npm --prefix apps/mobile run build",
+            "npx vitest run --config apps/mobile/vitest.config.ts src/__tests__/build-config.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:mobile exits 0",
+            "apps/mobile/dist/index.html exists and dist/assets contains a CSS file larger than 20 KB",
+            "build-config.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-5"
+          ],
+          "foundationFor": [
+            "native-projects",
+            "keys-contract",
+            "connection",
+            "sign-in",
+            "machine-view"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 exactly: create the @overdeck/mobile bun workspace with package.json, tsconfig.json, vite.config.ts (dedupe react/react-dom/@tanstack/react-query; aliases for @overdeck/contracts source, events->bare-events and sodium-native->sodium-javascript resolved from packages/anywhere-channel), vitest.config.ts (happy-dom, with the same resolve aliases and dedupe as vite.config.ts, including sodium-native->sodium-javascript), tailwind.config.js and postcss.config.js per D-2, index.html, .gitignore and a placeholder src/main.tsx that sets __OVERDECK_NATIVE__ and imports the frontend index.css. Add apps/mobile to root workspaces, add typecheck:mobile and chain it into typecheck, run bun install and commit bun.lock."
+        },
+        "items": [
+          {
+            "id": "mobile-workspace.ac1",
+            "title": "npm run typecheck:mobile exits 0 and the root typecheck script runs typecheck:mobile",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mobile-workspace.ac2",
+            "title": "npm --prefix apps/mobile run build produces apps/mobile/dist/index.html and a CSS asset over 20 KB, which shows Tailwind scanned the frontend source",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mobile-workspace.ac3",
+            "title": "build-config.test.ts asserts the dedupe list contains react, react-dom and @tanstack/react-query and that every alias replacement path exists on disk",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mobile-workspace.ac4",
+            "title": "root package.json workspaces contains apps/mobile and bun.lock contains the @overdeck/mobile workspace entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "native-projects",
+        "title": "Generate the Capacitor Android and iOS projects with the ai.overdeck.app scheme",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T16:14:54Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-4837",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/capacitor.config.ts",
+            "apps/mobile/android/app/src/main/AndroidManifest.xml",
+            "apps/mobile/android/app/src/main/java/ai/overdeck/app/MainActivity.java",
+            "apps/mobile/android/app/build.gradle",
+            "apps/mobile/android/variables.gradle",
+            "apps/mobile/ios/App/App/Info.plist",
+            "apps/mobile/ios/App/App/SceneDelegate.swift",
+            "apps/mobile/ios/App/App/MainViewController.swift",
+            "apps/mobile/ios/App/App.xcodeproj/project.pbxproj",
+            "apps/mobile/ios/App/CapApp-SPM/Package.swift",
+            "apps/mobile/src/__tests__/native-config.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "cd apps/mobile/android && JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ANDROID_HOME=$HOME/Android/Sdk ./gradlew assembleDebug",
+            "npx vitest run --config apps/mobile/vitest.config.ts src/__tests__/native-config.test.ts"
+          ],
+          "expected_outputs": [
+            "gradlew assembleDebug prints BUILD SUCCESSFUL and writes app-debug.apk",
+            "native-config.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2: add capacitor.config.ts (appId ai.overdeck.app, appName Overdeck, webDir dist, androidScheme https), run npx cap add android and npx cap add ios, commit the generated projects, then edit AndroidManifest.xml (allowBackup false, VIEW/BROWSABLE intent-filter for scheme ai.overdeck.app, CAMERA permission), Info.plist (CFBundleURLTypes with ai.overdeck.app, NSCameraUsageDescription), add MainViewController.swift (CAPBridgeViewController subclass) to the App target in project.pbxproj and make SceneDelegate.swift use it."
+        },
+        "items": [
+          {
+            "id": "native-projects.ac1",
+            "title": "./gradlew assembleDebug in apps/mobile/android exits 0 with JDK 21 and produces app/build/outputs/apk/debug/app-debug.apk",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "native-projects.ac2",
+            "title": "native-config.test.ts passes and finds android:scheme=\"ai.overdeck.app\" in AndroidManifest.xml and ai.overdeck.app under CFBundleURLSchemes in Info.plist",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "native-projects.ac3",
+            "title": "AndroidManifest.xml contains android:allowBackup=\"false\" and the android.permission.CAMERA permission, and Info.plist contains NSCameraUsageDescription",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "native-projects.ac4",
+            "title": "SceneDelegate.swift contains window?.rootViewController = MainViewController() and project.pbxproj contains MainViewController.swift in the App target Sources phase",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "channel-keygen",
+        "title": "Export generateStaticKeyPair() from @overdeck/anywhere-channel",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T16:14:54Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4837",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/anywhere-channel/src/noise.ts",
+            "packages/anywhere-channel/src/types/noise-handshake.d.ts",
+            "packages/anywhere-channel/src/__tests__/keygen.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run packages/anywhere-channel/src/__tests__/keygen.test.ts",
+            "npm run typecheck:anywhere-channel"
+          ],
+          "expected_outputs": [
+            "keygen.test.ts passes",
+            "typecheck:anywhere-channel exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3: add generateStaticKeyPair() to packages/anywhere-channel/src/noise.ts using noise-handshake/dh generateKeyPair, declare the noise-handshake/dh module in src/types/noise-handshake.d.ts, and add keygen.test.ts proving fresh 32-byte keys and a cross-port link handshake. Do not edit README.md here; the docs item owns it."
+        },
+        "items": [
+          {
+            "id": "channel-keygen.ac1",
+            "title": "generateStaticKeyPair() returns a publicKey and secretKey of 32 bytes each, and two calls return different keys",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "channel-keygen.ac2",
+            "title": "keygen.test.ts passes when a key pair from generateStaticKeyPair() completes an IK link handshake with webCrypto on the initiator and nodeCrypto on the responder",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "directory-state-events",
+        "title": "Add DirectoryWebClient.onStateChange for directory state and machine-list changes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T16:14:54Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4837",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/anywhere-channel/src/directory-web.ts",
+            "packages/anywhere-channel/src/__tests__/directory-web.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run packages/anywhere-channel/src/__tests__/directory-web.test.ts",
+            "npm run typecheck:anywhere-channel"
+          ],
+          "expected_outputs": [
+            "directory-web.test.ts passes",
+            "typecheck:anywhere-channel exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4: add onStateChange(listener) returning an unsubscribe function to packages/anywhere-channel/src/directory-web.ts; route every _state assignment through a private setState that notifies listeners on change, and also notify after welcome-client and directory frames update machines. Extend directory-web.test.ts with fake-timer cases. Do not edit README.md here; the docs item owns it."
+        },
+        "items": [
+          {
+            "id": "directory-state-events.ac1",
+            "title": "an onStateChange listener receives connecting then online when a welcome-client frame arrives",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "directory-state-events.ac2",
+            "title": "the listener receives refused when the socket closes with 4013, and receives a call when a directory frame arrives",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "directory-state-events.ac3",
+            "title": "when the returned unsubscribe function is called, the listener receives no further calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pair-link-parser",
+        "title": "Add parsePhonePairLink to packages/contracts/src/phone-pairing.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T16:14:54Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4837",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/phone-pairing.ts",
+            "packages/contracts/src/__tests__/phone-pairing.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run packages/contracts/src/__tests__/phone-pairing.test.ts",
+            "npm run typecheck:contracts"
+          ],
+          "expected_outputs": [
+            "phone-pairing.test.ts passes",
+            "typecheck:contracts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5: add parsePhonePairLink(text) to packages/contracts/src/phone-pairing.ts as the inverse of buildPhonePairLink, using the exported prefix and regexes, returning PhonePairLinkInput or null, and extend phone-pairing.test.ts with round-trip and rejection cases."
+        },
+        "items": [
+          {
+            "id": "pair-link-parser.ac1",
+            "title": "parsePhonePairLink(buildPhonePairLink(x)) returns an object deep-equal to x for the PAN-4836 fixtures",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pair-link-parser.ac2",
+            "title": "parsePhonePairLink returns null for ai.overdeck.app://pair#..., v=2, an uppercase key, a missing c parameter and an https URL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pair-link-parser.ac3",
+            "title": "parsePhonePairLink accepts a valid link with surrounding whitespace",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "keys-contract",
+        "title": "Define the OverdeckKeys plugin bridge and its browser stand-in",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T16:14:54Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4837",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/src/native/keys.ts",
+            "apps/mobile/src/native/keys-web.ts",
+            "apps/mobile/src/native/__tests__/keys.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --config apps/mobile/vitest.config.ts src/native/__tests__/keys.test.ts",
+            "npm run typecheck:mobile"
+          ],
+          "expected_outputs": [
+            "keys.test.ts passes",
+            "typecheck:mobile exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "keys-android",
+            "keys-ios",
+            "sign-in",
+            "connection"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-6: create apps/mobile/src/native/keys.ts with the SecretName, DeviceIdentity and OverdeckKeysPlugin types, registerPlugin with a lazily imported web implementation, and loadIdentity() that validates a lowercase UUID v4 client id and a 64-hex push public key; create keys-web.ts (localStorage-backed, development only, push pair from generateStaticKeyPair keeping only the public half); add keys.test.ts."
+        },
+        "items": [
+          {
+            "id": "keys-contract.ac1",
+            "title": "loadIdentity() rejects an identity whose clientId is an uppercase UUID and one whose pushPublicKeyHex has 63 characters, with Error(\"Key storage returned an invalid identity\")",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "keys-contract.ac2",
+            "title": "the web stand-in returns the same identity on two ensureKeys() calls and round-trips a secret through setSecret and getSecret",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "keys-contract.ac3",
+            "title": "after reset() the web stand-in returns a different clientId and getSecret returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "keys-android",
+        "title": "Implement OverdeckKeysPlugin.java with AndroidKeyStore-encrypted storage",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T16:14:54Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4837",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/android/app/src/main/java/ai/overdeck/app/OverdeckKeysPlugin.java",
+            "apps/mobile/android/app/src/main/java/ai/overdeck/app/SecureStore.java",
+            "apps/mobile/android/app/src/main/java/ai/overdeck/app/MainActivity.java",
+            "apps/mobile/android/app/build.gradle",
+            "apps/mobile/android/app/src/test/java/ai/overdeck/app/HexTest.java"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "cd apps/mobile/android && JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ANDROID_HOME=$HOME/Android/Sdk ./gradlew testDebugUnitTest assembleDebug"
+          ],
+          "expected_outputs": [
+            "gradlew prints BUILD SUCCESSFUL, HexTest passes and app-debug.apk is written"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-2",
+            "NFR-3"
+          ],
+          "parallelSafeReason": "Touches only files under apps/mobile/android/app (plugin, store, MainActivity, build.gradle, a JVM test); no other item edits them after native-projects."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-7: add OverdeckKeysPlugin.java and SecureStore.java (SharedPreferences overdeck_secure, AES-GCM with AndroidKeyStore alias overdeck_secure_v1), generate a lowercase UUID client id and a lazysodium crypto_box key pair on first ensureKeys, restrict secrets to account and machines, implement reset, register the plugin in MainActivity before super.onCreate, add lazysodium-android and jna aar dependencies (BouncyCastle fallback per the checkpoint), and add a JVM HexTest."
+        },
+        "items": [
+          {
+            "id": "keys-android.ac1",
+            "title": "./gradlew testDebugUnitTest assembleDebug exits 0 with JDK 21",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "keys-android.ac2",
+            "title": "MainActivity.java contains registerPlugin(OverdeckKeysPlugin.class) before super.onCreate(savedInstanceState)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "keys-android.ac3",
+            "title": "the plugin rejects getSecret and setSecret for a name other than account or machines with call.reject(\"unknown secret\")",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "keys-android.ac4",
+            "title": "HexTest passes and shows that 32 bytes encode to 64 lowercase hex characters",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "keys-ios",
+        "title": "Implement OverdeckKeysPlugin.swift with Keychain storage and verify a Simulator build on the rig",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T16:14:54Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4837",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/ios/App/App/OverdeckKeysPlugin.swift",
+            "apps/mobile/ios/App/App/KeychainStore.swift",
+            "apps/mobile/ios/App/App/MainViewController.swift",
+            "apps/mobile/ios/App/App.xcodeproj/project.pbxproj"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "ssh -o BatchMode=yes -i ~/.ssh/gauntlet_air eltmon@<rig-ip> 'export PATH=/opt/homebrew/bin:$PATH; cd ~/overdeck-mobile/apps/mobile && xcodebuild -project ios/App/App.xcodeproj -scheme App -sdk iphonesimulator -destination \"platform=iOS Simulator,name=iPhone 16\" CODE_SIGNING_ALLOWED=NO build'"
+          ],
+          "expected_outputs": [
+            "xcodebuild prints ** BUILD SUCCEEDED ** and xcrun simctl launch prints ai.overdeck.app with a pid"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-2",
+            "NFR-3"
+          ],
+          "parallelSafeReason": "Touches only apps/mobile/ios/App/App Swift files and project.pbxproj; no other item edits them after native-projects."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-8: add KeychainStore.swift (service ai.overdeck.app, AfterFirstUnlockThisDeviceOnly, not synchronizable, no access group) and OverdeckKeysPlugin.swift (CAPBridgedPlugin, jsName OverdeckKeys, CryptoKit Curve25519 push key pair, lowercased UUID client id, reinstall wipe keyed by UserDefaults ai.overdeck.keychainInitialized), register it in MainViewController.capacitorDidLoad, add both files to project.pbxproj, run the web build and npx cap sync ios on this host, rsync -aL apps/mobile/ios and apps/mobile/node_modules/@capacitor to ~/overdeck-mobile/apps/mobile on the Mac rig, then build and launch the app in the iOS Simulator there over SSH. If the rig does not answer, signal with pan tell and an issue comment and leave this item open."
+        },
+        "items": [
+          {
+            "id": "keys-ios.ac1",
+            "title": "the rig Simulator xcodebuild for scheme App prints ** BUILD SUCCEEDED **",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "keys-ios.ac2",
+            "title": "xcrun simctl launch booted ai.overdeck.app opens the app and a simctl screenshot shows the Overdeck screen",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "keys-ios.ac3",
+            "title": "OverdeckKeysPlugin.swift stores client ids with uuidString.lowercased() and deletes every Keychain item of service ai.overdeck.app on the first ensureKeys after install",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "connection",
+        "title": "Build the shell connection layer: directory client, dial policy, link channels and relay metering",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T16:14:54Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4837",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "apps/mobile/src/shell/types.ts",
+            "apps/mobile/src/shell/config.ts",
+            "apps/mobile/src/shell/directory.ts",
+            "apps/mobile/src/shell/connection.ts",
+            "apps/mobile/src/shell/relayMeter.ts",
+            "apps/mobile/src/shell/__tests__/connection.test.ts",
+            "apps/mobile/src/shell/__tests__/relayMeter.test.ts",
+            "packages/contracts/src/connect.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --config apps/mobile/vitest.config.ts src/shell/__tests__/connection.test.ts src/shell/__tests__/relayMeter.test.ts",
+            "npm run typecheck:mobile",
+            "npm run typecheck:contracts"
+          ],
+          "expected_outputs": [
+            "connection.test.ts and relayMeter.test.ts pass",
+            "typecheck:mobile and typecheck:contracts exit 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-10",
+            "NFR-1",
+            "NFR-2",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "machines-screen",
+            "pairing-flow",
+            "machine-view",
+            "settings-signout",
+            "foreground-reconnect"
+          ],
+          "parallelSafeReason": "Creates new files under apps/mobile/src/shell plus one comment line in packages/contracts/src/connect.ts that no other item edits."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-9: create apps/mobile/src/shell/types.ts (AccountRecord and PairedMachine per D-6), apps/mobile/src/shell/config.ts, directory.ts (DirectoryWebClient with hello-client publicKeyHex = push public key, machine dialer, useSyncExternalStore hooks over onStateChange, last relay-status), connection.ts (ConnectionError kinds and the exact D-8 texts, direct then relay per D-7, link and pairing channel openers, ChannelOpenError code mapping, forgetRoutes) and relayMeter.ts (relay-usage every 60 s and on close); update the publicKeyHex comment in packages/contracts/src/connect.ts; add fake-timer tests."
+        },
+        "items": [
+          {
+            "id": "connection.ac1",
+            "title": "given a direct dial that succeeds, the connection layer never requests relay ICE servers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connection.ac2",
+            "title": "given a failed direct dial and relayAllowed true, it dials with relay true; given relayAllowed false, it throws kind no-path with the text \"No direct path to <label>. Install Tailscale on it or use the relay plan.\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connection.ac3",
+            "title": "the connection layer returns kind removed for ChannelOpenError unknown-peer, pairing-refused for pairing-refused, identity for identity-refused and outdated for unsupported",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connection.ac4",
+            "title": "the relay meter sends relay-usage with the byte delta after 60 s of fake time and the remainder when the raw channel closes, and sends nothing for direct dials",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sign-in",
+        "title": "Add PKCE sign-in to overdeck.ai and the ShellApp entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T16:14:54Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4837",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/src/shell/store.ts",
+            "apps/mobile/src/shell/signIn.ts",
+            "apps/mobile/src/shell/SignInScreen.tsx",
+            "apps/mobile/src/shell/ShellApp.tsx",
+            "apps/mobile/src/main.tsx",
+            "apps/mobile/src/shell/__tests__/signIn.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --config apps/mobile/vitest.config.ts src/shell/__tests__/signIn.test.ts",
+            "npm run typecheck:mobile"
+          ],
+          "expected_outputs": [
+            "signIn.test.ts passes",
+            "typecheck:mobile exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-10: create store.ts (account and machines secrets, current machine, UI state), signIn.ts (verifier, S256 challenge with @noble/hashes, state, Browser.open of /auth/start with all fact-4 parameters, callback validation, CapacitorHttp form POST to /oauth/token, account secret), SignInScreen.tsx and ShellApp.tsx (identity load, appUrlOpen and getLaunchUrl routing of /oauth/callback), and switch main.tsx to the D-3 boot order rendering ShellApp; add signIn.test.ts."
+        },
+        "items": [
+          {
+            "id": "sign-in.ac1",
+            "title": "startSignIn opens an /auth/start URL whose redirect_uri is ai.overdeck.app:/oauth/callback, platform is android-arm64 or ios-arm64, environment_id is the client id, and code_challenge equals base64url(sha256(verifier))",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sign-in.ac2",
+            "title": "completeSignIn rejects a callback whose state differs from the stored state, and surfaces error_description for an error=access_denied callback",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sign-in.ac3",
+            "title": "completeSignIn posts grant_type, code, code_verifier and redirect_uri through CapacitorHttp and stores the account secret {token, deviceId, label}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "machines-screen",
+        "title": "Show the directory machine list with paired, online and outdated states",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T16:14:54Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4837",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/src/shell/MachinesScreen.tsx",
+            "apps/mobile/src/shell/version.ts",
+            "apps/mobile/src/shell/ShellApp.tsx",
+            "apps/mobile/src/shell/__tests__/MachinesScreen.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --config apps/mobile/vitest.config.ts src/shell/__tests__/MachinesScreen.test.tsx",
+            "npm run typecheck:mobile"
+          ],
+          "expected_outputs": [
+            "MachinesScreen.test.tsx passes",
+            "typecheck:mobile exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-10",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-11: create MachinesScreen.tsx and version.ts (compareVersions), start the directory after sign-in in ShellApp, list machines paired-first then by label with online dot, label, monospace fingerprint, Paired badge, the FR-10 outdated text against MIN_PAN_VERSION and the directory state or refusal line with a Sign in again button for the 4001 unauthorized refusal that removes the account secret; tapping a paired online machine stores overdeck.currentMachine and navigates to /m, tapping an unpaired one opens pairing."
+        },
+        "items": [
+          {
+            "id": "machines-screen.ac1",
+            "title": "MachinesScreen renders paired machines before unpaired ones, each group sorted by label",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "machines-screen.ac2",
+            "title": "a machine with serverVersion 0.73.1 shows \"Update Overdeck on <label> to use the app (pan 0.74.0 or later).\" when MIN_PAN_VERSION is 0.74.0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "machines-screen.ac3",
+            "title": "when the directory state is refused the screen shows the directory refusal text, and for the unauthorized refusal a Sign in again button removes the account secret and renders the sign-in screen",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "machines-screen.ac4",
+            "title": "tapping a paired online machine stores its environment id in localStorage overdeck.currentMachine",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "qr-scanner-extract",
+        "title": "Move useQrScanner out of MobilePairScreen.tsx into its own module",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T16:14:54Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-4837",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/mobile/useQrScanner.ts",
+            "src/dashboard/frontend/src/components/mobile/MobilePairScreen.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/mobile/__tests__/MobileApp.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "MobileApp.test.tsx passes unchanged",
+            "typecheck:frontend reports no new errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-12: move useQrScanner with its Decode type and constants verbatim from src/dashboard/frontend/src/components/mobile/MobilePairScreen.tsx into a new exported module components/mobile/useQrScanner.ts and import it back, with no behavior change."
+        },
+        "items": [
+          {
+            "id": "qr-scanner-extract.ac1",
+            "title": "useQrScanner.ts contains the exported useQrScanner and MobilePairScreen.tsx contains an import from ./useQrScanner",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "qr-scanner-extract.ac2",
+            "title": "the unchanged MobileApp.test.tsx scanner cases passes against the moved hook",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pairing-flow",
+        "title": "Implement the pairing flow: verify the link, pairing channel, descriptor check and phone exchange",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T16:14:54Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-4837",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/src/shell/pairing.ts",
+            "apps/mobile/src/shell/__tests__/pairing.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --config apps/mobile/vitest.config.ts src/shell/__tests__/pairing.test.ts"
+          ],
+          "expected_outputs": [
+            "pairing.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-2"
+          ],
+          "parallelSafeReason": "Creates only pairing.ts and its test; it reads the store and connection modules without editing them."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-13: create apps/mobile/src/shell/pairing.ts with pairMachine(linkText, deps): parse the link, check it against the directory entry (presence, publicKeyHex equals k, online), generate a fresh link key, open a pairing channel, GET /api/environment and require phoneApp and machineKey k, POST /api/phones/exchange on the same pairing channel with exactly v, clientId, label and pushKeyHex (the code is single use, so nothing is retried; a 409 shows the already-paired text), verify the returned descriptor key and store the PairedMachine; add pairing.test.ts."
+        },
+        "items": [
+          {
+            "id": "pairing-flow.ac1",
+            "title": "pairMachine refuses a link whose k differs from the directory publicKeyHex before any dial, with \"This code does not match <label> in your account.\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pairing-flow.ac2",
+            "title": "two successful pairings store PairedMachine records with different linkPublicKeyHex values",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pairing-flow.ac3",
+            "title": "pairMachine refuses a descriptor without capabilities.phoneApp with the outdated text and sends no exchange request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pairing-flow.ac4",
+            "title": "GET /api/environment and POST /api/phones/exchange travel on one pairing channel, a 409 answer shows \"This phone is already paired with <label>. Remove it on the machine, then pair again.\" without opening a second channel, and the exchange body contains exactly v, clientId, label and pushKeyHex",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pair-screen",
+        "title": "Add the pair screen: camera scan, paste, and ai.overdeck.app:/pair links",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T16:14:54Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4837",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/src/shell/PairScreen.tsx",
+            "apps/mobile/src/shell/ShellApp.tsx",
+            "apps/mobile/src/shell/__tests__/PairScreen.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --config apps/mobile/vitest.config.ts src/shell/__tests__/PairScreen.test.tsx",
+            "npm run typecheck:mobile"
+          ],
+          "expected_outputs": [
+            "PairScreen.test.tsx passes",
+            "typecheck:mobile exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-14: create PairScreen.tsx using useQrScanner and parsePhonePairLink, a paste field, progress and error texts from pairing.ts; in ShellApp route /pair URLs from appUrlOpen and getLaunchUrl to this screen prefilled, and on success make the machine current and navigate to /m; keep a pair link received while signed out and open it after sign-in; add PairScreen.test.tsx."
+        },
+        "items": [
+          {
+            "id": "pair-screen.ac1",
+            "title": "when a valid pair link is pasted, the screen calls pairMachine with that link and shows \"Pairing with <label>…\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pair-screen.ac2",
+            "title": "an invalid paste shows \"That is not an Overdeck pairing code.\" and calls nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pair-screen.ac3",
+            "title": "an appUrlOpen event with an ai.overdeck.app:/pair# link opens the pair screen with the link filled in",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pair-screen.ac4",
+            "title": "given a pair link received while signed out, the pair screen opens with that link right after sign-in completes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-native-transport",
+        "title": "Skip the dashboard session and CSRF in native shell mode",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T16:14:54Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4837",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/wsTransport.ts",
+            "src/dashboard/frontend/src/lib/__tests__/wsTransport-native.test.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/lib/__tests__/wsTransport-native.test.ts src/lib/__tests__/wsTransport.test.ts src/lib/__tests__/wsTransport-pairing.test.ts",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "the three wsTransport test files pass",
+            "typecheck:frontend reports no new errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-15: in src/dashboard/frontend/src/lib/wsTransport.ts make ensureDashboardSession resolve immediately and dashboardMutationJsonHeaders return only Content-Type when isNativeShell() is true; add wsTransport-native.test.ts and list it in scripts/frontend-test-subset.txt in sorted position."
+        },
+        "items": [
+          {
+            "id": "frontend-native-transport.ac1",
+            "title": "given __OVERDECK_NATIVE__ true, ensureDashboardSession() resolves without any fetch call to /api/dashboard/session",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-native-transport.ac2",
+            "title": "given __OVERDECK_NATIVE__ true, dashboardMutationJsonHeaders() returns {\"Content-Type\":\"application/json\"} with no x-overdeck-csrf-token header",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-native-transport.ac3",
+            "title": "with the flag unset, ensureDashboardSession() still sends one POST /api/dashboard/session (existing tests pass unchanged)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-native-mobileapp",
+        "title": "Give MobileApp a native shell mode and a headerSlot prop",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T16:14:54Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4837",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/mobile/MobileApp.tsx",
+            "src/dashboard/frontend/src/components/mobile/__tests__/MobileApp.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/mobile/__tests__/MobileApp.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "MobileApp.test.tsx passes",
+            "typecheck:frontend reports no new errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-16: make MobileApp accept an optional headerSlot prop; in native shell mode skip service-worker registration, never render MobilePairScreen, and render headerSlot in place of InstallAffordance and TurnOnNotificationsButton; extend MobileApp.test.tsx with native-mode cases."
+        },
+        "items": [
+          {
+            "id": "frontend-native-mobileapp.ac1",
+            "title": "given native shell mode and sessionAuthFailed true, MobileApp renders the tabs and does not render MobilePairScreen",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-native-mobileapp.ac2",
+            "title": "in native shell mode MobileApp renders the headerSlot node and no \"Install app\" button, and navigator.serviceWorker.register is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-native-mobileapp.ac3",
+            "title": "with the flag unset the existing MobileApp test suite passes unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "hide-conversation-actions",
+        "title": "Hide admin-only conversation header and menu actions in native shell mode",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T16:14:54Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4837",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+            "src/dashboard/frontend/src/components/chat/HeldHandoffView.tsx",
+            "src/dashboard/frontend/src/components/chat/Held*.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.native.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/ConversationPanel.native.test.tsx",
+            "npm run typecheck:frontend",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "ConversationPanel.native.test.tsx passes",
+            "lint:file-size prints file-size guard passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-5",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-17a: in ConversationPanel.tsx add const native = isNativeShell(); wrap the menu items from Favorite through Open handoff target in one !native fragment, keep Stop agent, add !native to the archive item, the rename pencil, PanOpenInPicker, the resume ModelPicker and the empty-state Archive buttons; hide Archive and Open handoff doc in HeldHandoffView.tsx and Archive in the held-kickoff lookup-failed view; keep ConversationPanel.tsx at or under 1531 lines; add ConversationPanel.native.test.tsx to the frontend test subset."
+        },
+        "items": [
+          {
+            "id": "hide-conversation-actions.ac1",
+            "title": "in native shell mode the menu of a live conversation shows \"Stop agent\" and contains none of Favorite, Regenerate title, Share, Export transcript or Archive conversation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hide-conversation-actions.ac2",
+            "title": "when native shell mode is on, ConversationPanel renders neither the rename pencil nor the open-in picker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hide-conversation-actions.ac3",
+            "title": "with the flag unset every hidden control still renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hide-conversation-actions.ac4",
+            "title": "ConversationPanel.tsx stays at or under 1531 lines and npm run lint:file-size passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "hide-composer-admin",
+        "title": "Hide the composer model picker and mic, and skip admin reads, in native shell mode",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T16:14:54Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4837",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
+            "src/dashboard/frontend/src/components/chat/useComposerEffort.ts",
+            "src/dashboard/frontend/src/components/chat/SubagentComposer.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.native.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/ComposerFooter.native.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "ComposerFooter.native.test.tsx passes",
+            "typecheck:frontend reports no new errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-17b: in ComposerFooter.tsx render ModelPicker and the mic button only outside native shell mode; in useComposerEffort.ts skip the GET /api/effort/default fetch in native shell mode; in SubagentComposer.tsx skip the 5 s poll and show \"Sending to a subagent needs the dashboard on a computer.\" in native shell mode; add ComposerFooter.native.test.tsx to the frontend test subset."
+        },
+        "items": [
+          {
+            "id": "hide-composer-admin.ac1",
+            "title": "in native shell mode the composer renders no model picker and no mic button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hide-composer-admin.ac2",
+            "title": "when native shell mode is on, the composer sends no fetch to /api/effort/default or /api/settings/available-models, and the send button still sends POST /api/conversations/:name/message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hide-composer-admin.ac3",
+            "title": "in native shell mode SubagentComposer shows \"Sending to a subagent needs the dashboard on a computer.\" and sends no poll request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "native-quiet-reads",
+        "title": "Skip admin-only transcript reads and hide per-message admin controls in native shell mode",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T16:14:54Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4837",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ChatMarkdown.tsx",
+            "src/dashboard/frontend/src/hooks/useFilePathExists.ts",
+            "src/dashboard/frontend/src/components/DiffPanel.tsx",
+            "src/dashboard/frontend/src/components/chat/TranscriptPullRequestLink.tsx",
+            "src/dashboard/frontend/src/components/chat/bookmarks/MessageRoleIcon.tsx",
+            "src/dashboard/frontend/src/components/chat/bookmarks/BookmarksDrawer.tsx",
+            "src/dashboard/frontend/src/lib/__tests__/nativeQuietReads.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/lib/__tests__/nativeQuietReads.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "nativeQuietReads.test.tsx passes",
+            "typecheck:frontend reports no new errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-17c: disable the ChatMarkdown settings query, return does-not-exist from useFilePathExists without the RPC, hide the DiffPanel Compare chip, drop the TranscriptPullRequestLink long-press menu, and hide the bookmark controls in MessageRoleIcon and BookmarksDrawer, all only when isNativeShell() is true; add nativeQuietReads.test.tsx to the frontend test subset."
+        },
+        "items": [
+          {
+            "id": "native-quiet-reads.ac1",
+            "title": "in native shell mode rendering a markdown message sends no /api/settings request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "native-quiet-reads.ac2",
+            "title": "in native shell mode useFilePathExists returns false and sends no pan.resolveFilePathExists RPC",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "native-quiet-reads.ac3",
+            "title": "when native shell mode is on, neither the bookmark control nor the Compare chip renders; outside native mode both render",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "machine-view",
+        "title": "Render the phone screens for the current machine through the channel shims",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T16:14:54Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-4837",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/src/shell/session.ts",
+            "apps/mobile/src/shell/MachineView.tsx",
+            "apps/mobile/src/shell/RemovedScreen.tsx",
+            "apps/mobile/src/shell/requestLog.ts",
+            "apps/mobile/src/main.tsx",
+            "apps/mobile/src/shell/ShellApp.tsx",
+            "apps/mobile/src/shell/__tests__/session.test.ts",
+            "apps/mobile/src/shell/__tests__/requestLog.test.ts",
+            "apps/mobile/src/__tests__/boot.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --config apps/mobile/vitest.config.ts src/shell/__tests__/session.test.ts src/shell/__tests__/requestLog.test.ts src/__tests__/boot.test.ts",
+            "npm run typecheck:mobile",
+            "npm --prefix apps/mobile run build"
+          ],
+          "expected_outputs": [
+            "session.test.ts and requestLog.test.ts pass",
+            "typecheck:mobile exits 0 and the vite build writes apps/mobile/dist"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-10",
+            "FR-11",
+            "FR-14",
+            "NFR-2"
+          ],
+          "parallelSafeReason": "Edits main.tsx and ShellApp.tsx only after its blockers (sign-in, pair-screen) land; every other file is new."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-18: create session.ts (currentMachine for the shims with the phone token and openLink dial), MachineView.tsx (QueryClientProvider, DialogProvider, ImageLightboxHost, MobileApp with a headerSlot button that clears overdeck.currentMachine and returns to /, installQueryRecovery on its QueryClient), RemovedScreen.tsx and requestLog.ts (VITE_OVERDECK_REQUEST_LOG=1 wraps the shimmed fetch and /ws/rpc WebSocket into globalThis.__overdeckRequestLog); install the shims in main.tsx before importing ShellApp; route ShellApp to MachineView or RemovedScreen; never call the frontend telemetry or theme reconcile."
+        },
+        "items": [
+          {
+            "id": "machine-view.ac1",
+            "title": "currentMachine() returns null with no current machine and returns the stored environmentId and phone token when one is set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "machine-view.ac2",
+            "title": "the request log records METHOD /path and status for a routed /api fetch and the tag of an outgoing RPC Request, and records nothing for the directory URL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "machine-view.ac3",
+            "title": "when the session dial rejects with kind removed, ShellApp renders \"This phone was removed from <label>. Pair again.\" with Pair again and Forget buttons",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "machine-view.ac4",
+            "title": "boot.test.ts mocks installChannelShims and ./shell/ShellApp, imports main.tsx, and shows the shim mock was called before the ShellApp module body ran (behavior test, no source reading)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-signout",
+        "title": "Add Settings and the ordered sign-out",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T16:14:54Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4837",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/src/shell/SettingsScreen.tsx",
+            "apps/mobile/src/shell/signOut.ts",
+            "apps/mobile/src/shell/ShellApp.tsx",
+            "apps/mobile/src/shell/__tests__/signOut.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --config apps/mobile/vitest.config.ts src/shell/__tests__/signOut.test.ts",
+            "npm run typecheck:mobile"
+          ],
+          "expected_outputs": [
+            "signOut.test.ts passes",
+            "typecheck:mobile exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-19: create SettingsScreen.tsx (account label and device id, paired machines with Forget, app version, Sign out) and signOut.ts running FR-12 in order with 5 s AbortController timeouts, treating a dropped DELETE /api/phones/self as success, logging and continuing past each failed step; route Settings from ShellApp; add signOut.test.ts with fake timers."
+        },
+        "items": [
+          {
+            "id": "settings-signout.ac1",
+            "title": "signOut calls DELETE /api/phones/self per paired machine, then push-unregister, forget-client, DELETE /v1/devices/<deviceId>, OverdeckKeys.reset() and localStorage.clear(), in that order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-signout.ac2",
+            "title": "given a machine that never answers, signOut abandons it after 5 s of fake time and still runs every later step",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-signout.ac3",
+            "title": "given an offline directory, signOut skips push-unregister and forget-client and still revokes the account device",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "foreground-reconnect",
+        "title": "Reconnect on foreground and show an Updating banner (CP-3 path)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T16:14:54Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4837",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/src/shell/lifecycle.ts",
+            "apps/mobile/src/shell/UpdatingBanner.tsx",
+            "apps/mobile/src/shell/MachineView.tsx",
+            "apps/mobile/src/shell/ShellApp.tsx",
+            "apps/mobile/src/shell/__tests__/lifecycle.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --config apps/mobile/vitest.config.ts src/shell/__tests__/lifecycle.test.ts",
+            "npm run typecheck:mobile"
+          ],
+          "expected_outputs": [
+            "lifecycle.test.ts passes",
+            "typecheck:mobile exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-20: create lifecycle.ts registering App appStateChange from ShellApp; on isActive restart the directory, call connection.forgetRoutes() and resetTransport() once and record resumedAt; create UpdatingBanner.tsx shown in MachineView while the connection phase is not live within 30 s of a resume; add lifecycle.test.ts with fake timers."
+        },
+        "items": [
+          {
+            "id": "foreground-reconnect.ac1",
+            "title": "an appStateChange event with isActive true calls directory stop and start, forgetRoutes and resetTransport exactly once each",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "foreground-reconnect.ac2",
+            "title": "after a resume the banner renders \"Updating…\" while the connection phase is unreachable and disappears when the phase becomes live",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ac10-emulator-run",
+        "title": "Run epic AC-10 on the Android emulator and record the evidence",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T16:14:54Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-4837",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/ACCEPTANCE.md",
+            "apps/mobile/request-log.json",
+            "apps/mobile/acceptance/*.png"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "test -s apps/mobile/ACCEPTANCE.md && test -s apps/mobile/request-log.json"
+          ],
+          "expected_outputs": [
+            "ACCEPTANCE.md lists sign-in, pairing, Needs you, answer and send as passed with screenshot paths, and request-log.json is non-empty JSON"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-14",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-21: check the production account service accepts the native redirect (else signal the operator with pan tell and an issue comment and wait), build with VITE_OVERDECK_REQUEST_LOG=1, install on the galaxyA16 emulator, confirm GET /api/directory reports signedIn true, announce and stop Tailscale for the run only (restore with tailscale up right after), raise the AskUserQuestion from a throwaway conversation in a scratch directory, sign in (operator completes GitHub once), pair via the adb pair link, open Needs you, answer an AskUserQuestion, send a conversation message, drive the WebView over CDP in an isolated Playwright instance, save the request log to apps/mobile/request-log.json and write apps/mobile/ACCEPTANCE.md with screenshots."
+        },
+        "items": [
+          {
+            "id": "ac10-emulator-run.ac1",
+            "title": "given Tailscale stopped on this machine, the app on the Android emulator signs in, pairs with this machine and renders the Needs you screen",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac10-emulator-run.ac2",
+            "title": "the app sends the answer to an AskUserQuestion raised on this machine and the desktop transcript shows that answer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac10-emulator-run.ac3",
+            "title": "the app sends a conversation message that appears in the desktop dashboard transcript",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac10-emulator-run.ac4",
+            "title": "ACCEPTANCE.md records date, commit, emulator image, each step with a screenshot, and tailscale status showing it stopped",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cp3-cp4-checkpoints",
+        "title": "Measure CP-3 background reconnect and CP-4 WebView camera on the emulator",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T16:14:54Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4837",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/ACCEPTANCE.md",
+            "apps/mobile/package.json",
+            "apps/mobile/src/shell/PairScreen.tsx",
+            "bun.lock"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "grep -n 'CP-3' apps/mobile/ACCEPTANCE.md",
+            "grep -n 'CP-4' apps/mobile/ACCEPTANCE.md"
+          ],
+          "expected_outputs": [
+            "ACCEPTANCE.md contains a CP-3 section with a measured resume time and a CP-4 section with the camera result"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-13",
+            "FR-6"
+          ],
+          "acJustification": "Two checkpoints, each with one measured outcome; a third criterion would restate the fallback."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-22: with the machine view open, background the app for 5 minutes, reopen it and time until a Needs-you change made meanwhile is visible (pass at 5 s or less, banner fallback otherwise); start the scanner with the emulator virtual camera and record whether getUserMedia opened, adding the @capacitor/camera photo fallback if it did not; record both in ACCEPTANCE.md, and record the iOS camera as not testable in the Simulator."
+        },
+        "items": [
+          {
+            "id": "cp3-cp4-checkpoints.ac1",
+            "title": "ACCEPTANCE.md records the measured time from reopening the app to the fresh Needs-you item, and passes CP-3 when it is 5 s or less",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cp3-cp4-checkpoints.ac2",
+            "title": "ACCEPTANCE.md records whether getUserMedia opened the emulator camera in the WebView; when it did not, PairScreen falls back to an @capacitor/camera photo decoded with jsqr",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "phone-request-inventory",
+        "title": "Assert every logged phone request against the phone scopes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T16:14:54Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4837",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/__tests__/route-scopes-phone.test.ts",
+            "apps/mobile/request-log.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/route-scopes-phone.test.ts"
+          ],
+          "expected_outputs": [
+            "route-scopes-phone.test.ts passes including the request-log case"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-23: add a test to src/dashboard/server/__tests__/route-scopes-phone.test.ts that reads apps/mobile/request-log.json (shape {http:[{method,path,status}], rpc:[tag]}) through a helper assertPhoneRequests(log) and asserts each HTTP entry satisfies PHONE_TOKEN_SCOPES via requiredScopeFor and each RPC tag is in allowedRpcTags(PHONE_TOKEN_SCOPES); a failing entry is hidden in the WI-17 files or reported with pan tell, never fixed by adding scope rows."
+        },
+        "items": [
+          {
+            "id": "phone-request-inventory.ac1",
+            "title": "the new test reads apps/mobile/request-log.json and passes when every logged HTTP request resolves to a scope in PHONE_TOKEN_SCOPES",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phone-request-inventory.ac2",
+            "title": "assertPhoneRequests throws, naming the entry, for a synthetic log containing GET /api/settings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cp1-ios-simulator",
+        "title": "Run the CP-1 iOS Simulator leg on the Mac rig and record it",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T16:14:54Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4837",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/anywhere-channel/CP-1.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'iOS Simulator' packages/anywhere-channel/CP-1.md"
+          ],
+          "expected_outputs": [
+            "CP-1.md iOS Simulator row shows measured handshakeMs and transferMs and pass or fail"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-24: serve packages/anywhere-channel/cp1/serve.ts on 127.0.0.1 on this host, open an ssh -R reverse tunnel so the rig localhost reaches it, boot an iPhone Simulator on the rig and open http://localhost:<port> with xcrun simctl openurl, capture the JSON result, and replace the iOS Simulator row of packages/anywhere-channel/CP-1.md with engine, handshakeMs, transferMs and pass or fail against the 2 s bar. If the rig does not answer, signal with pan tell and an issue comment and leave this item open."
+        },
+        "items": [
+          {
+            "id": "cp1-ios-simulator.ac1",
+            "title": "CP-1.md records an iOS Simulator row with the Simulator user agent, a measured handshakeMs and transferMs for 1 MiB, and pass when the transfer takes under 2 s",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cp1-ios-simulator.ac2",
+            "title": "CP-1.md How to reproduce section contains the xcrun simctl openurl command used",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-android",
+        "title": "Add the mobile-android CI job and gate merges on it",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T16:14:54Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-4837",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".github/workflows/ci.yml"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'mobile-android' .github/workflows/ci.yml"
+          ],
+          "expected_outputs": [
+            "ci.yml defines job mobile-android and the test job needs list contains mobile-android"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-15"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-25 and D-10: add job mobile-android to .github/workflows/ci.yml (Node 22, bun, temurin 21 with gradle cache, bun install --frozen-lockfile, apps/mobile tests and build, cap sync android, gradlew assembleDebug --no-daemon, upload app-debug.apk with 7-day retention), add it to the test aggregator needs and assertions, and push the workflow change over SSH."
+        },
+        "items": [
+          {
+            "id": "ci-android.ac1",
+            "title": "ci.yml contains a mobile-android job that runs npm --prefix apps/mobile test, the vite build, npx cap sync android and ./gradlew assembleDebug",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-android.ac2",
+            "title": "the test aggregator job needs mobile-android and fails when its result is not success",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-android.ac3",
+            "title": "the PR check mobile-android passes and uploads the app-debug artifact",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mobile-docs",
+        "title": "Write apps/mobile/README.md and the developer doc updates for the app",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T16:14:54Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4837",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/README.md",
+            "packages/anywhere-channel/README.md",
+            "docs/CONNECT-SERVICE.md",
+            ".overdeck/context/codebase/architecture.md",
+            ".overdeck/context/codebase/stack.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n 'VITE_OVERDECK_ACCOUNT_URL' apps/mobile/README.md"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "apps/mobile/README.md names VITE_OVERDECK_ACCOUNT_URL, VITE_OVERDECK_DIRECTORY_URL and VITE_OVERDECK_REQUEST_LOG"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-26: create apps/mobile/README.md with the listed sections (what it is, layout, build, Android emulator, iOS Simulator, environment variables, keys and secrets, tests, what it cannot do yet); add generateStaticKeyPair, onStateChange and a used-by-the-phone-app paragraph to packages/anywhere-channel/README.md; add the hello-client publicKeyHex sentence to docs/CONNECT-SERVICE.md; add apps/mobile rows to .overdeck/context/codebase/architecture.md and stack.md."
+        },
+        "items": [
+          {
+            "id": "mobile-docs.ac1",
+            "title": "apps/mobile/README.md contains sections for build, Android emulator run with JAVA_HOME for JDK 21, iOS Simulator run on the rig, the three VITE_OVERDECK_ variables, and what OverdeckKeys stores where",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mobile-docs.ac2",
+            "title": "docs/CONNECT-SERVICE.md states that a phone sends its push public key as hello-client publicKeyHex and keeps one link key per machine",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mobile-docs.ac3",
+            "title": "packages/anywhere-channel/README.md contains generateStaticKeyPair and DirectoryWebClient.onStateChange",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mobile-docs.ac4",
+            "title": ".overdeck/context/codebase/architecture.md contains a top-level layout row for apps/mobile/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "mobile-workspace",
+        "to": "native-projects",
+        "type": "blocks"
+      },
+      {
+        "from": "mobile-workspace",
+        "to": "keys-contract",
+        "type": "blocks"
+      },
+      {
+        "from": "mobile-workspace",
+        "to": "connection",
+        "type": "blocks"
+      },
+      {
+        "from": "mobile-workspace",
+        "to": "sign-in",
+        "type": "blocks"
+      },
+      {
+        "from": "channel-keygen",
+        "to": "keys-contract",
+        "type": "blocks"
+      },
+      {
+        "from": "channel-keygen",
+        "to": "pairing-flow",
+        "type": "blocks"
+      },
+      {
+        "from": "directory-state-events",
+        "to": "connection",
+        "type": "blocks"
+      },
+      {
+        "from": "pair-link-parser",
+        "to": "pairing-flow",
+        "type": "blocks"
+      },
+      {
+        "from": "pair-link-parser",
+        "to": "pair-screen",
+        "type": "blocks"
+      },
+      {
+        "from": "keys-contract",
+        "to": "keys-android",
+        "type": "blocks"
+      },
+      {
+        "from": "keys-contract",
+        "to": "keys-ios",
+        "type": "blocks"
+      },
+      {
+        "from": "keys-contract",
+        "to": "sign-in",
+        "type": "blocks"
+      },
+      {
+        "from": "keys-contract",
+        "to": "connection",
+        "type": "blocks"
+      },
+      {
+        "from": "native-projects",
+        "to": "keys-android",
+        "type": "blocks"
+      },
+      {
+        "from": "native-projects",
+        "to": "keys-ios",
+        "type": "blocks"
+      },
+      {
+        "from": "native-projects",
+        "to": "ci-android",
+        "type": "blocks"
+      },
+      {
+        "from": "connection",
+        "to": "machines-screen",
+        "type": "blocks"
+      },
+      {
+        "from": "connection",
+        "to": "pairing-flow",
+        "type": "blocks"
+      },
+      {
+        "from": "connection",
+        "to": "machine-view",
+        "type": "blocks"
+      },
+      {
+        "from": "connection",
+        "to": "settings-signout",
+        "type": "blocks"
+      },
+      {
+        "from": "connection",
+        "to": "foreground-reconnect",
+        "type": "blocks"
+      },
+      {
+        "from": "sign-in",
+        "to": "machines-screen",
+        "type": "blocks"
+      },
+      {
+        "from": "connection",
+        "to": "sign-in",
+        "type": "blocks"
+      },
+      {
+        "from": "sign-in",
+        "to": "pairing-flow",
+        "type": "blocks"
+      },
+      {
+        "from": "machines-screen",
+        "to": "pair-screen",
+        "type": "blocks"
+      },
+      {
+        "from": "qr-scanner-extract",
+        "to": "pair-screen",
+        "type": "blocks"
+      },
+      {
+        "from": "pairing-flow",
+        "to": "pair-screen",
+        "type": "blocks"
+      },
+      {
+        "from": "pair-screen",
+        "to": "machine-view",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-native-mobileapp",
+        "to": "machine-view",
+        "type": "blocks"
+      },
+      {
+        "from": "machine-view",
+        "to": "settings-signout",
+        "type": "blocks"
+      },
+      {
+        "from": "machine-view",
+        "to": "foreground-reconnect",
+        "type": "blocks"
+      },
+      {
+        "from": "settings-signout",
+        "to": "foreground-reconnect",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-native-transport",
+        "to": "ac10-emulator-run",
+        "type": "blocks"
+      },
+      {
+        "from": "hide-conversation-actions",
+        "to": "ac10-emulator-run",
+        "type": "blocks"
+      },
+      {
+        "from": "hide-composer-admin",
+        "to": "ac10-emulator-run",
+        "type": "blocks"
+      },
+      {
+        "from": "native-quiet-reads",
+        "to": "ac10-emulator-run",
+        "type": "blocks"
+      },
+      {
+        "from": "keys-android",
+        "to": "ac10-emulator-run",
+        "type": "blocks"
+      },
+      {
+        "from": "foreground-reconnect",
+        "to": "ac10-emulator-run",
+        "type": "blocks"
+      },
+      {
+        "from": "ac10-emulator-run",
+        "to": "cp3-cp4-checkpoints",
+        "type": "blocks"
+      },
+      {
+        "from": "ac10-emulator-run",
+        "to": "phone-request-inventory",
+        "type": "blocks"
+      },
+      {
+        "from": "ac10-emulator-run",
+        "to": "mobile-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "keys-ios",
+        "to": "mobile-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "cp1-ios-simulator",
+        "to": "mobile-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "channel-keygen",
+        "to": "mobile-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "directory-state-events",
+        "to": "mobile-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "pair-screen",
+        "to": "cp3-cp4-checkpoints",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
