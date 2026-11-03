@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4839",
   "created": "2026-11-03T21:01:30.274Z",
-  "updated": "2026-11-03T22:16:37.997Z",
+  "updated": "2026-11-03T22:16:53.044Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -240,6 +240,10 @@
     "machine-sender.ac2": {
       "status": "completed",
       "doneAt": "2026-11-03T22:16:37.997Z"
+    },
+    "machine-sender.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:16:53.043Z"
     }
   }
 }
