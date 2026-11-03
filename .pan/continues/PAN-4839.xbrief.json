@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4839",
   "created": "2026-11-03T21:01:30.274Z",
-  "updated": "2026-11-03T22:16:00.367Z",
+  "updated": "2026-11-03T22:16:18.487Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -232,6 +232,10 @@
     "ios-widget-target.ac4": {
       "status": "completed",
       "doneAt": "2026-11-03T22:16:00.367Z"
+    },
+    "machine-sender.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:16:18.487Z"
     }
   }
 }
