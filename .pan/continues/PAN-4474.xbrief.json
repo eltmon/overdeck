@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4474",
   "created": "2026-11-03T06:56:27.161Z",
-  "updated": "2026-11-03T07:13:44.045Z",
+  "updated": "2026-11-03T07:18:17.359Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -40,9 +40,10 @@
       "doneAt": "2026-11-03T07:13:07.178Z"
     },
     "peer-hub-gate": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4474",
-      "claimedAt": "2026-11-03T07:13:44.045Z"
+      "claimedAt": "2026-11-03T07:13:44.045Z",
+      "doneAt": "2026-11-03T07:18:17.359Z"
     }
   }
 }
