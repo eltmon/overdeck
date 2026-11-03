@@ -19,6 +19,10 @@
  * channel carries the bridge's `history`, then `append` and `update`. The hub reads inbound messages
  * on `control` only; `drafts` and `terminal` carry nothing in this slice (NFR-4).
  *
+ * Presence (FR-9, D-17, D-18): a negotiated peer's `presence` channel carries the roster (data owner
+ * first), the controller and the stream when it opens, and again after every snapshot that changes
+ * them. The block list and `connected` never cross the wire.
+ *
  * Plain async class with injected seams (slice 2's D-8). Nothing here logs signaling data, ICE
  * credentials or content.
  */
@@ -32,6 +36,7 @@ import {
   type ConversationPayload,
   type HostFrame,
   type IceServer,
+  type PresencePayload,
   type RoomSnapshot,
   type ShareScope,
   type SharedChannel,
@@ -123,6 +128,8 @@ interface PeerEntry {
   helloState: 'waiting' | 'negotiated' | 'failed';
   detachConversation: (() => void) | null;
   conversationAttached: boolean;
+  /** The presence JSON last sent to this peer; an unchanged roster is not sent again. */
+  presenceSent: string | null;
   closed: boolean;
 }
 
@@ -140,6 +147,8 @@ export class PeerHub implements HostHub {
   private iceCache: { servers: readonly IceServer[]; fetchedAt: number } | null = null;
   private pendingIce: PendingIce | null = null;
   private readonly label: Promise<string>;
+  /** The resolved label; every peer awaits it before its channels exist. */
+  private labelValue: string | null = null;
   private readonly hostHello: SharedHello;
 
   constructor(
@@ -176,6 +185,7 @@ export class PeerHub implements HostHub {
       if (!listed.has(githubId)) this.hostAdmitted.delete(githubId);
     }
     this.reconcile();
+    for (const entry of [...this.peers.values()]) this.maybeSendPresence(entry);
   }
 
   onSignal(githubId: number, data: SignalData): void {
@@ -236,6 +246,7 @@ export class PeerHub implements HostHub {
       helloState: 'waiting',
       detachConversation: null,
       conversationAttached: false,
+      presenceSent: null,
       closed: false,
     };
     this.peers.set(githubId, entry);
@@ -244,7 +255,8 @@ export class PeerHub implements HostHub {
 
   private async connect(entry: PeerEntry): Promise<void> {
     try {
-      const [iceServers] = await Promise.all([this.iceServers(), this.label]);
+      const [iceServers, label] = await Promise.all([this.iceServers(), this.label]);
+      this.labelValue ??= label;
       if (entry.closed) return;
       const pc = this.deps.createPeerConnection({
         iceServers: iceServers.map((server) => ({
@@ -366,6 +378,7 @@ export class PeerHub implements HostHub {
     entry.writers.set(label, new ChannelWriter(channel, () => this.closePeer(entry)));
     if (label === 'control') this.sendEnvelope(entry, 'control', { kind: 'hello', hello: this.hostHello });
     else if (label === 'conversation') this.maybeAttachConversation(entry);
+    else if (label === 'presence') this.maybeSendPresence(entry);
   }
 
   private onControlMessage(entry: PeerEntry, data: string | Buffer): void {
@@ -379,6 +392,7 @@ export class PeerHub implements HostHub {
     if (negotiated.ok) {
       entry.helloState = 'negotiated';
       this.maybeAttachConversation(entry);
+      this.maybeSendPresence(entry);
     } else {
       entry.helloState = 'failed';
       this.sendEnvelope(entry, 'control', { kind: 'error', code: negotiated.code });
@@ -396,6 +410,16 @@ export class PeerHub implements HostHub {
     });
   }
 
+  private maybeSendPresence(entry: PeerEntry): void {
+    if (entry.closed || entry.helloState !== 'negotiated' || !entry.open.has('presence')) return;
+    if (this.snapshot === null || this.labelValue === null) return;
+    const presence = presenceOf(this.snapshot, this.ctx.scope, this.labelValue);
+    const json = JSON.stringify(presence);
+    if (json === entry.presenceSent) return;
+    entry.presenceSent = json;
+    this.sendEnvelope(entry, 'presence', presence);
+  }
+
   private sendConversation(entry: PeerEntry, payload: ConversationPayload): void {
     try {
       this.sendEnvelope(entry, 'conversation', payload);
@@ -405,7 +429,11 @@ export class PeerHub implements HostHub {
     }
   }
 
-  private sendEnvelope(entry: PeerEntry, ch: SharedChannel, payload: ControlPayload | ConversationPayload): void {
+  private sendEnvelope(
+    entry: PeerEntry,
+    ch: SharedChannel,
+    payload: ControlPayload | ConversationPayload | PresencePayload,
+  ): void {
     if (entry.closed) return;
     const writer = entry.writers.get(ch);
     if (!writer) return;
@@ -435,6 +463,33 @@ export class PeerHub implements HostHub {
       // Already closed.
     }
   }
+}
+
+/** The roster a viewer sees: the data owner first, then every snapshot participant; built field by field. */
+export function presenceOf(snapshot: RoomSnapshot, scope: ShareScope, label: string): PresencePayload {
+  const owner = snapshot.dataOwner;
+  return {
+    controllerGithubId: snapshot.controllerGithubId,
+    participants: [
+      {
+        githubId: owner.githubId,
+        login: owner.login,
+        avatarUrl: owner.avatarUrl,
+        state: 'admitted',
+        contributor: false,
+        isHost: true,
+      },
+      ...snapshot.participants.map((participant) => ({
+        githubId: participant.githubId,
+        login: participant.login,
+        avatarUrl: participant.avatarUrl,
+        state: participant.state,
+        contributor: participant.contributor,
+        isHost: false,
+      })),
+    ],
+    streams: [{ streamId: scope.conversationId, label, kind: 'conversation' }],
+  };
 }
 
 export function productionPeerHubDeps(conversationName: string): PeerHubDeps {

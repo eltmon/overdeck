@@ -567,3 +567,69 @@ describe('PeerHub hello and conversation content', () => {
     ]);
   });
 });
+
+describe('PeerHub presence', () => {
+  async function negotiatedWithPresence(s: ReturnType<typeof setup>): Promise<FakePeer> {
+    const peer = await connected(s);
+    peer.channel('control').open();
+    peer.channel('control').onMessage.emit(viewerHello());
+    peer.channel('presence').open();
+    return peer;
+  }
+
+  it('sends the roster with the data owner first and no connected or blocked fields', async () => {
+    const s = setup();
+    const peer = await negotiatedWithPresence(s);
+    const sent = envelopes(peer.channel('presence'));
+    expect(sent).toEqual([
+      {
+        v: 1,
+        ch: 'presence',
+        streamId: 'conv-a',
+        seq: 1,
+        t: expect.any(Number),
+        payload: {
+          controllerGithubId: 1,
+          participants: [
+            { githubId: 1, login: 'owner', avatarUrl: 'https://a/1', state: 'admitted', contributor: false, isHost: true },
+            { githubId: 7, login: 'user7', avatarUrl: 'https://a/7', state: 'admitted', contributor: false, isHost: false },
+          ],
+          streams: [{ streamId: 'conv-a', label: 'Fixture conversation', kind: 'conversation' }],
+        },
+      },
+    ]);
+    expect(peer.channel('presence').sent[0]).not.toMatch(/"connected"|"blocked"/);
+  });
+
+  it('sends nothing for an unchanged roster and a new envelope when someone joins the lobby', async () => {
+    const s = setup();
+    const peer = await negotiatedWithPresence(s);
+    s.hub.onSnapshot(snapshot(participant(7, 'admitted')));
+    s.hub.onSnapshot(snapshot(participant(7, 'admitted'), participant(8, 'lobby', false)));
+    s.hub.onSnapshot(snapshot(participant(7, 'admitted'), participant(8, 'lobby', true)));
+    const sent = envelopes(peer.channel('presence'));
+    expect(sent.map((e) => e.seq)).toEqual([1, 2]);
+    const roster = (sent[1]?.payload as { participants: Array<{ githubId: number; state: string }> }).participants;
+    expect(roster.map((p) => [p.githubId, p.state])).toEqual([
+      [1, 'admitted'],
+      [7, 'admitted'],
+      [8, 'lobby'],
+    ]);
+  });
+
+  it('sends no presence to a peer whose hello has not negotiated', async () => {
+    const s = setup();
+    const peer = await connected(s);
+    peer.channel('control').open();
+    peer.channel('presence').open();
+    s.hub.onSnapshot(snapshot(participant(7, 'admitted'), participant(8, 'lobby')));
+    expect(peer.channel('presence').sent).toEqual([]);
+  });
+
+  it('labels the stream with the conversation name when the label lookup fails', async () => {
+    const s = setup({ streamLabel: async () => Promise.reject(new Error('db down')) });
+    const peer = await negotiatedWithPresence(s);
+    const payload = envelopes(peer.channel('presence'))[0]?.payload as { streams: unknown };
+    expect(payload.streams).toEqual([{ streamId: 'conv-a', label: 'conv-a', kind: 'conversation' }]);
+  });
+});
