@@ -92,7 +92,11 @@ Origin, then session cookie or internal token — see [DASHBOARD-AUTH.md](DASHBO
   wired into `ShareManager`. PAN-4475 adds the viewer side: `routes/joins.ts` (`/api/joins*`,
   `/api/share-probe`) over `services/share-join.ts` (`JoinManager`, one join socket per short
   code), and the frontend route `/#/shared/<code>` (`components/chat/sharing/SharedConversationView.tsx`,
-  `webrtc-viewer.ts`).
+  `webrtc-viewer.ts`). PAN-4477 adds the read-only terminal: `sharing/terminal-bridge.ts` streams
+  a watching viewer's terminal from a Herdr observe stream or the tmux PTY hub, through the
+  hub-listener seam in `pty-hub.ts` (`addHubListener`, `removeHubListener`) and
+  `pty-hub-attach.ts` (`attachHubPty`, `subscribeToTmuxHub`, moved out of `ws-terminal.ts`); the
+  viewer renders it in `SharedTerminalView.tsx`.
 - Companion terminals (PAN-3974, PAN-3835): an OpenCode or Codex conversation's TERMINAL
   streams a separate `companion-<ownerSession>` tmux session running `opencode attach` or
   `codex resume --remote` against the conversation's own runtime, opened through

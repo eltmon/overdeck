@@ -651,6 +651,14 @@ full frame repaints the grid but carries no DEC private modes, and Herdr exposes
 Herdr's attach input re-wraps a complete bracketed paste to the pane's live mode. Mouse and focus
 modes are not forced (drag-select, `5d2dafcf16d`).
 
+Shared Sessions (PAN-4477) reads the same two sources for a viewer's read-only terminal, through
+`src/dashboard/server/sharing/terminal-bridge.ts`. On Herdr it opens one `observe` stream per
+watching viewer, without dimensions and without the bracketed-paste prefix, because a viewer never
+writes. On tmux it consumes the session's PTY hub as a listener (`addHubListener` in `pty-hub.ts`,
+`subscribeToTmuxHub` in `pty-hub-attach.ts`); a listener never writes, and a hub the bridge starts
+spawns its PTY at the window's client size so the host window keeps its size. See "Read-only
+terminal" in [SHARED-SESSIONS.md](SHARED-SESSIONS.md).
+
 A prompt whose `wait` stalls or times out is reported **delivered**, not failed: Herdr writes the
 text and Enter before it starts watching for activity, so a stalled wait is no proof the prompt never
 landed, and its own guide says never to re-send on one. `agent_blocked` stays an error — Herdr
