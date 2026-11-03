@@ -4,17 +4,17 @@
     "created": "2026-11-03T04:06:04Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4473: Shared Sessions v0 (slice 2): host share action, share record and lobby panel",
-    "updated": "2026-11-03T04:10:27.327Z"
+    "updated": "2026-11-03T04:12:39.473Z"
   },
   "plan": {
     "id": "pan-4473",
     "title": "Shared Sessions v0 (slice 2): host share action, share record and lobby panel",
-    "status": "proposed",
+    "status": "running",
     "uid": "aa1d4d28-5b00-4aa3-b081-122b76bf7186",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-03T04:06:04Z",
-    "updated": "2026-11-03T04:10:27.327Z",
+    "updated": "2026-11-03T04:12:39.473Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4473",
@@ -927,5 +927,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
