@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4473",
   "created": "2026-11-03T04:12:49.385Z",
-  "updated": "2026-11-03T04:25:25.871Z",
+  "updated": "2026-11-03T04:25:31.552Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-4473",
       "claimedAt": "2026-11-03T04:23:08.093Z",
       "doneAt": "2026-11-03T04:25:25.870Z"
+    },
+    "share-host-manager": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4473",
+      "claimedAt": "2026-11-03T04:25:31.552Z"
     }
   }
 }
