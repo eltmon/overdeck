@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4835",
   "created": "2026-11-03T07:59:34.235Z",
-  "updated": "2026-11-03T09:59:02.471Z",
+  "updated": "2026-11-03T09:59:23.840Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -104,6 +104,10 @@
     "phone-credential-resolve.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T09:59:02.470Z"
+    },
+    "phone-credential-resolve.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:59:23.840Z"
     }
   }
 }
