@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4829",
   "created": "2026-11-03T07:49:13.339Z",
-  "updated": "2026-11-03T07:57:50.581Z",
+  "updated": "2026-11-03T08:00:43.541Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -28,9 +28,10 @@
       "doneAt": "2026-11-03T07:57:20.588Z"
     },
     "client-signal-routing": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4829",
-      "claimedAt": "2026-11-03T07:57:50.581Z"
+      "claimedAt": "2026-11-03T07:57:50.581Z",
+      "doneAt": "2026-11-03T08:00:43.540Z"
     }
   }
 }
