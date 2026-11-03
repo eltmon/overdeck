@@ -3,9 +3,13 @@
  * **Join** (D-1), subscribes to the join's event stream, and feeds `signal` events to one
  * `WebRtcViewer`. A join that leaves the live states closes the peer and the stream (D-10). A join
  * the server closed as `away` resumes without a second click (D-7).
+ *
+ * `watchTerminal` (PAN-4477) registers the one terminal listener and turns the peer's terminal watch
+ * on; terminal payloads go straight to that listener, never through React state (D-12). A peer
+ * created while a listener is registered starts with the watch on.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { JoinEvent, JoinState, JoinView, PresencePayload, SharedMessage } from '@overdeck/contracts';
+import type { JoinEvent, JoinState, JoinView, PresencePayload, SharedMessage, TerminalPayload } from '@overdeck/contracts';
 
 import * as joinApi from './joinApi';
 import { JoinApiError } from './joinApi';
@@ -32,10 +36,12 @@ export interface SharedJoin {
   join(): void;
   leave(): void;
   reconnect(): void;
+  /** Starts the host terminal stream for this listener; returns the function that stops it. */
+  watchTerminal(listener: (payload: TerminalPayload) => void): () => void;
 }
 
 export type JoinApi = Pick<typeof joinApi, 'getJoin' | 'createJoin' | 'postSignal' | 'fetchJoinIceServers' | 'leaveJoin' | 'openJoinEvents'>;
-export type ViewerPeer = Pick<WebRtcViewer, 'onSignal' | 'close'>;
+export type ViewerPeer = Pick<WebRtcViewer, 'onSignal' | 'close' | 'setTerminalWatch'>;
 export type ViewerFactory = (deps: WebRtcViewerDeps, callbacks: WebRtcViewerCallbacks) => ViewerPeer;
 
 export const LIVE_JOIN_STATES: ReadonlySet<JoinState> = new Set(['connecting', 'lobby', 'admitted', 'host-disconnected']);
@@ -70,6 +76,7 @@ export function useSharedJoin(code: string, deps: { api?: JoinApi; viewer?: View
 
   const viewerRef = useRef<ViewerPeer | null>(null);
   const streamRef = useRef<{ close(): void } | null>(null);
+  const terminalListenerRef = useRef<((payload: TerminalPayload) => void) | null>(null);
   const aliveRef = useRef(true);
 
   const closeViewer = useCallback(() => {
@@ -114,11 +121,13 @@ export function useSharedJoin(code: string, deps: { api?: JoinApi; viewer?: View
           if (viewerRef.current !== created || !aliveRef.current) return;
           setNotices((prev) => (prev.some((n) => sameNotice(n, notice)) ? prev : [...prev, notice]));
         },
-        // No terminal view yet: nothing watches, so nothing arrives.
-        onTerminal: () => undefined,
+        onTerminal: (payload) => {
+          if (viewerRef.current === created && aliveRef.current) terminalListenerRef.current?.(payload);
+        },
       },
     );
     viewerRef.current = created;
+    if (terminalListenerRef.current) created.setTerminalWatch(true);
     return created;
   }, [code]);
 
@@ -192,6 +201,17 @@ export function useSharedJoin(code: string, deps: { api?: JoinApi; viewer?: View
     subscribe();
   }, [resetContent, subscribe]);
 
+  const watchTerminal = useCallback((listener: (payload: TerminalPayload) => void) => {
+    terminalListenerRef.current = listener;
+    viewerRef.current?.setTerminalWatch(true);
+    return () => {
+      // A newer listener owns the watch now; leave it on.
+      if (terminalListenerRef.current !== listener) return;
+      terminalListenerRef.current = null;
+      viewerRef.current?.setTerminalWatch(false);
+    };
+  }, []);
+
   useEffect(() => {
     aliveRef.current = true;
     let cancelled = false;
@@ -218,5 +238,5 @@ export function useSharedJoin(code: string, deps: { api?: JoinApi; viewer?: View
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code]);
 
-  return { phase, view, apiError, peerPhase, messages, hasHistory, presence, notices, join, leave, reconnect };
+  return { phase, view, apiError, peerPhase, messages, hasHistory, presence, notices, join, leave, reconnect, watchTerminal };
 }
