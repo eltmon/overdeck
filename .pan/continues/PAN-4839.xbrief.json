@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4839",
   "created": "2026-11-03T21:01:30.274Z",
-  "updated": "2026-11-03T22:08:44.718Z",
+  "updated": "2026-11-03T22:09:15.572Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -148,6 +148,10 @@
     "contracts.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T22:08:44.718Z"
+    },
+    "decoder.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:09:15.570Z"
     }
   }
 }
