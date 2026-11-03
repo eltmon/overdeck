@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4839",
   "created": "2026-11-03T21:01:30.274Z",
-  "updated": "2026-11-03T21:14:20.497Z",
+  "updated": "2026-11-03T21:17:15.377Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-11-03T21:14:14.983Z"
     },
     "machine-sender": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4839",
-      "claimedAt": "2026-11-03T21:14:20.497Z"
+      "claimedAt": "2026-11-03T21:14:20.497Z",
+      "doneAt": "2026-11-03T21:17:15.376Z"
     }
   }
 }
