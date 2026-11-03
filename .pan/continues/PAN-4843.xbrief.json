@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4843",
+  "created": "2026-11-03T14:22:31.106Z",
+  "updated": "2026-11-03T14:22:31.106Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "seal-helper": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4843",
+      "claimedAt": "2026-11-03T14:22:31.106Z"
+    }
+  }
+}
