@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4882",
   "created": "2026-11-03T06:27:51.535Z",
-  "updated": "2026-11-03T07:45:58.165Z",
+  "updated": "2026-11-03T07:46:18.536Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -116,6 +116,10 @@
     "preflight.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T07:45:58.165Z"
+    },
+    "relay-vm-signin.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:46:18.536Z"
     }
   }
 }
