@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4881",
   "created": "2026-11-03T06:05:06.618Z",
-  "updated": "2026-11-03T06:35:55.448Z",
+  "updated": "2026-11-03T06:36:20.366Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -62,6 +62,10 @@
     "setup-clears-worker-token.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T06:35:55.447Z"
+    },
+    "serve-test-token-cleanup.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:36:20.366Z"
     }
   }
 }
