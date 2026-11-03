@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4882",
   "created": "2026-11-03T06:27:51.535Z",
-  "updated": "2026-11-03T07:52:20.565Z",
+  "updated": "2026-11-03T07:52:38.876Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -184,6 +184,10 @@
     "ac04-gauntlet.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T07:52:20.565Z"
+    },
+    "ssh-vm-setup.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:52:38.876Z"
     }
   }
 }
