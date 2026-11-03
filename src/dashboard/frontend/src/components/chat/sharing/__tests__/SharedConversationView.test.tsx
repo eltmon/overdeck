@@ -1,5 +1,5 @@
 /** PAN-4475 WI-9: every viewer screen's exact text and controls, and no host content in the lobby. */
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import type { JoinState, JoinView, PresencePayload, SharedMessage } from '@overdeck/contracts';
@@ -71,6 +71,10 @@ function props(overrides: Partial<SharedJoin> = {}): SharedJoin & { code: string
     submitPrompt: vi.fn(),
     submitStatus: null,
     draftSentNotice: false,
+    selfGithubId: null,
+    isController: false,
+    sendCommand: vi.fn(async () => undefined),
+    sendControllerPrompt: vi.fn(async () => 1),
     join: vi.fn(),
     leave: vi.fn(),
     reconnect: vi.fn(),
@@ -325,5 +329,77 @@ describe('SharedConversationView composer (PAN-4476 WI-13)', () => {
     const author = { login: 'alice', avatarUrl: 'https://avatars.githubusercontent.com/u/100' };
     expect(toChatMessage({ ...MESSAGES[0]!, author }).author).toEqual(author);
     expect(toChatMessage(MESSAGES[0]!)).not.toHaveProperty('author');
+  });
+});
+
+describe('SharedConversationView controller (PAN-4478 WI-9)', () => {
+  const ALICE_CONTROLS: PresencePayload = { ...PRESENCE, controllerGithubId: 100 };
+  const controller = (overrides: Partial<SharedJoin> = {}) =>
+    props({
+      view: view('admitted'),
+      peerPhase: 'connected',
+      presence: ALICE_CONTROLS,
+      messages: MESSAGES,
+      hasHistory: true,
+      selfGithubId: 100,
+      isController: true,
+      ...overrides,
+    });
+  const panel = () => document.querySelector('[data-component="shared-controller"]');
+
+  it('shows the controller panel only for the controller and sends Admit @bob as a command', () => {
+    const sendCommand = vi.fn(async () => undefined);
+    const { rerender } = render(<SharedConversationView {...controller({ isController: false, selfGithubId: 200 })} />);
+    expect(panel()).toBeNull();
+    rerender(<SharedConversationView {...controller({ sendCommand })} />);
+    expect(panel()).not.toBeNull();
+    expect(screen.getByRole('heading', { name: 'You have control' })).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: /Blocked/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /@alice/ })).toBeNull();
+    fireEvent.click(button('Admit @bob'));
+    expect(sendCommand).toHaveBeenCalledWith({ type: 'admit', githubId: 200 });
+  });
+
+  it('Hand control back sends set-controller with the host\'s id', () => {
+    const sendCommand = vi.fn(async () => undefined);
+    render(<SharedConversationView {...controller({ sendCommand })} />);
+    fireEvent.click(button('Hand control back to @owner'));
+    expect(sendCommand).toHaveBeenCalledWith({ type: 'set-controller', githubId: 1 });
+  });
+
+  it('the controller\'s Send uses sendControllerPrompt and clears the box', async () => {
+    const sendControllerPrompt = vi.fn(async () => 2);
+    const setMyDraft = vi.fn();
+    render(<SharedConversationView {...controller({ myDraft: 'Run the tests', sendControllerPrompt, setMyDraft })} />);
+    expect(screen.getByRole('textbox', { name: 'Write a prompt' })).toBeTruthy();
+    await act(async () => { fireEvent.click(button('Send prompt')); });
+    expect(sendControllerPrompt).toHaveBeenCalledWith('Run the tests');
+    expect(setMyDraft).toHaveBeenCalledWith('');
+    expect(screen.getByText('Queued (#2)')).toBeTruthy();
+  });
+
+  it('the controller can pick a suggestion and send it for its author', async () => {
+    const sendControllerPrompt = vi.fn(async () => 1);
+    render(<SharedConversationView {...controller({
+      drafts: [{ authorGithubId: 200, authorLogin: 'bob', text: 'Lint it', updatedAt: 1 }],
+      sendControllerPrompt,
+    })} />);
+    fireEvent.click(button('Use suggestion from @bob'));
+    await act(async () => { fireEvent.click(button('Send suggestion from @bob')); });
+    expect(sendControllerPrompt).toHaveBeenCalledWith('Lint it', 200);
+  });
+
+  it('a rejected command shows its message', async () => {
+    const sendCommand = vi.fn(async () => { throw new Error('That person is no longer in the room.'); });
+    render(<SharedConversationView {...controller({ sendCommand })} />);
+    await act(async () => { fireEvent.click(button('Revoke @bob')); });
+    expect((await screen.findByRole('alert')).textContent).toBe('That person is no longer in the room.');
+  });
+
+  it('every viewer sees "@alice has control" while a viewer controls', () => {
+    const { rerender } = render(<SharedConversationView {...controller({ isController: false, selfGithubId: 200 })} />);
+    expect(screen.getByText('@alice has control')).toBeTruthy();
+    rerender(<SharedConversationView {...controller({ isController: false, selfGithubId: 200, presence: PRESENCE })} />);
+    expect(screen.queryByText(/has control/)).toBeNull();
   });
 });
