@@ -130,3 +130,61 @@ follower kept following until the report (`lastSeq: 1`, `state: running`), `pan 
 report, and the follower was still following 86 s after creation.
 
 Result: passed.
+
+## Gauntlet
+
+```
+$ pan lane start --role play --run pan4882 --key <home|fly1|fly2> --parent 20261103-6766 --project pan4882-anywhere-smoke \
+    --harness claude-code --model claude-sonnet-5-5 [--machine fly-87477d7a911d28 | --machine fly-185770e4f99e38] --no-wait --json \
+    --prompt "Write the single line 'lane <key> ok' to a file named report.md in your current directory, then run: pan lane report --file report.md --status done. Then stop."
+home  20261103-8325  home                /home/eltmon/Projects/pan4882-anywhere-smoke-lanes/pan4882-home-play-i1   (06:55:34)
+fly1  20261103-2283  fly-87477d7a911d28  /workspace/pan4882-anywhere-smoke-lanes/pan4882-fly1-play-i1              (06:55:40)
+fly2  20261103-2177  fly-185770e4f99e38  /workspace/pan4882-anywhere-smoke-lanes/pan4882-fly2-play-i1              (06:55:43)
+
+$ pan lane wait <name> --timeout 600          # all three in parallel from 06:56:01
+== 20261103-2283 exit=0 06:56:19   lane fly1 ok — lane 20261103-2283 report 1: done
+== 20261103-2177 exit=0 06:56:19   lane fly2 ok — lane 20261103-2177 report 1: done
+== 20261103-8325 exit=0 06:56:33   lane home ok — lane 20261103-8325 report 1: done
+
+$ pan lane list --run pan4882 --json | jq -r '.[] | "\(.name) \(.role) \(.key) \(.machine.label // "home") report=\(.report.status)"'
+20261103-8325 play home home report=done
+20261103-2283 play fly1 fly-87477d7a911d28 report=done      (machine.reachable: true)
+20261103-2177 play fly2 fly-185770e4f99e38 report=done      (machine.reachable: true)
+
+$ pan lane stop <name>
+Stopped lane pan4882/home (conv 3532) · Stopped lane pan4882/fly1 (20261103-2283) · Stopped lane pan4882/fly2 (20261103-2177)
+$ pan lane reap <name>
+Reaped lane pan4882/<key> (…): directory removed, conversation archived        (all three)
+```
+
+All three secure-channel lane starts succeeded on the first attempt. Each lane was a real Claude Code (Sonnet 5.5)
+session that wrote its report and ran `pan lane report` itself.
+
+## Cleanup
+
+```
+$ curl -s -X POST -H "Origin: http://localhost:3011" -H "x-overdeck-internal-token: <redacted>" localhost:3011/api/conversations/20261103-6766/stop
+{"success":true}
+$ pan machines unlink fly-87477d7a911d28
+Unlinked "fly-87477d7a911d28"; its token here was revoked. …
+Destroyed the Fly machine behind fly-87477d7a911d28.
+$ pan machines unlink fly-185770e4f99e38
+Unlinked "fly-185770e4f99e38"; its token here was revoked. …
+Destroyed the Fly machine behind fly-185770e4f99e38.
+$ pan project remove pan4882-anywhere-smoke
+✓ Removed project: pan4882-anywhere-smoke
+$ rm -rf /home/eltmon/Projects/pan4882-anywhere-smoke /home/eltmon/Projects/pan4882-anywhere-smoke-lanes
+$ sed -i '27s/^enabled = true$/enabled = false/' ~/.overdeck/config.toml; grep -n -A1 '^\[remote\]' ~/.overdeck/config.toml
+26:[remote]
+27-enabled = false
+$ grep -c pan4882 ~/.overdeck/projects.yaml
+0
+$ pan machines list --json | jq -c '[.links[].label]'
+[]
+$ fly machines list -a pan-workspaces
+ 874235c0e259e8 │ pan4882-relay │ started │ … │ shared-cpu-1x:2048MB        # the relay VM only (AC-2/AC-3, still running)
+```
+
+Neither AC-4 VM is in `fly machines list`.
+
+Status: passed — remote worker report returned by pan worker wait with the stand-in following; three lanes reported
