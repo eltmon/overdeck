@@ -120,6 +120,29 @@ describe('installChannelShims', () => {
     expect(originalFetch).not.toHaveBeenCalled();
   });
 
+  it('sends a relative POST with the bearer token and returns the server status and body', async () => {
+    const m = machine('env-a', (seen) => ({ status: 201, body: `got ${seen.body.toString()}` }));
+    const { target } = page(() => m.machine);
+    const response = await target.fetch('/api/echo', { method: 'POST', body: 'payload' });
+    expect(response.status).toBe(201);
+    expect(await response.text()).toBe('got payload');
+    const [seen] = m.seen;
+    expect(seen.method).toBe('POST');
+    expect(seen.headers.authorization).toBe('Bearer env-a-token');
+    expect(seen.headers.host).toBe('link.invalid');
+    expect(seen.headers.origin).toBeUndefined();
+  });
+
+  it('closes every pool on uninstall', async () => {
+    const m = machine('env-a');
+    const { target, uninstall } = page(() => m.machine);
+    await target.fetch('/api/x');
+    const channel = (await m.dial.mock.results[0].value) as Duplex;
+    expect(channel.destroyed).toBe(false);
+    uninstall();
+    expect(channel.destroyed).toBe(true);
+  });
+
   it('passes an external fetch to the original unchanged', async () => {
     const m = machine('env-a');
     const { target, originalFetch } = page(() => m.machine);

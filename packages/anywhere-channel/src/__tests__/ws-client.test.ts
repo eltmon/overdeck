@@ -243,6 +243,7 @@ describe('ChannelWebSocket', () => {
     server().send(OPCODES.ping, 'beat');
     await until(() => server().frames.length === 1);
     expect(server().frames[0].opcode).toBe(OPCODES.pong);
+    expect(server().frames[0].masked).toBe(true);
     expect(decoder.decode(server().frames[0].payload)).toBe('beat');
   });
 

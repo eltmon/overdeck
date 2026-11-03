@@ -78,6 +78,7 @@ describe('channel pool against a real Node HTTP server', () => {
     const responses = await Promise.all(
       [0, 1, 2, 3, 4].map((i) => pool.request({ method: 'GET', path: `/api/c/${i}` })),
     );
+    expect(responses.map((response) => response.status)).toEqual([200, 200, 200, 200, 200]);
     expect(responses.map((response) => text(response.body))).toEqual([0, 1, 2, 3, 4].map((i) => `/api/c/${i}`));
     expect(dial).toHaveBeenCalledTimes(4);
     expect(pool.size).toBe(4);
@@ -239,6 +240,22 @@ describe('channel pool against scripted channels', () => {
     expect((failure as DOMException).name).toBe('AbortError');
     expect(clientEnds[0].destroyed).toBe(true);
     expect(pool.size).toBe(0);
+  });
+
+  it('hands the slot an aborted in-flight request frees to the queued request', async () => {
+    const { dial, clientEnds } = scriptedDial(silent, replyOk);
+    const pool = track(createChannelPool({ dial, max: 1 }));
+    const controller = new AbortController();
+    const first = pool.request({ method: 'GET', path: '/api/slow' }, { signal: controller.signal });
+    const queued = pool.request({ method: 'GET', path: '/api/next' });
+    await settle();
+    expect(dial).toHaveBeenCalledTimes(1);
+    controller.abort();
+    expect(((await first.catch((error: unknown) => error)) as DOMException).name).toBe('AbortError');
+    expect(clientEnds[0].destroyed).toBe(true);
+    const response = await queued;
+    expect(response.status).toBe(200);
+    expect(dial).toHaveBeenCalledTimes(2);
   });
 
   it('removes an aborted request from the queue', async () => {
