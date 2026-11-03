@@ -26,9 +26,11 @@ commands, the expected output, the cleanup and that run's status. The evidence f
   reaper kills a `dist/dashboard/server.js` command line after 120 s), with
   `OVERDECK_DISABLE_DEACON=1` and `OVERDECK_ANYWHERE_SUPERVISOR=1` (without it the directory
   client stays `off`). Stop a peer by the pid that listens on its port, not by the `setsid` pid.
-- Until a release ships the code under test, a Fly VM's `pan` is the published version of the
-  same number. Build a branch image and pass it per call (AC-5 below); never change
-  `[remote.fly] image` in home's config.
+- A Fly VM or SSH host must run home's exact `pan` version. `add-fly` installs
+  `@overdeck/core@<home version>` from npm, and a hand-made VM does the same with
+  `npm install -g`, which works whenever home's version is published (npm `latest` may be newer).
+  A branch image is needed only when home's version is not on npm: build it and pass it per
+  call (AC-5 below); never change `[remote.fly] image` in home's config.
 
 ## AC-1 — two machines: link, list, remote control, pull, refuse
 
@@ -66,6 +68,10 @@ the relay packets only (`-i any` also captures loopback health checks).
 **2026-11-02:** failed — local half passed; the relay never connected, so the relay half was
 not shown ([#4862](https://github.com/eltmon/overdeck/issues/4862); `ac-03-direct-relay.md`).
 
+**2026-11-03 re-run (PAN-4882, build b1d9d9dc554):** not-run — the relay VM never signed in: three
+device codes expired unapproved over 57 min, so no relay channel opened to capture
+([#4886](https://github.com/eltmon/overdeck/issues/4886); `.pan/uat/pan-4882/ac-02-03-relay.md`).
+
 ## AC-3 — Tailscale, direct, relay with UDP blocked
 
 **Commands.**
@@ -96,6 +102,10 @@ blocked the relay never connected: werift keeps only the first TURN URL (UDP) an
 TCP/TLS ones ([#4862](https://github.com/eltmon/overdeck/issues/4862)). Tailscale not run:
 blocked on an operator decision (`ac-03-tailscale.md`).
 
+**2026-11-03 re-run (PAN-4882, build b1d9d9dc554):** not-run — UDP blocked and TCP 443 only both
+need the relay VM signed in, and three device codes expired unapproved over 57 min
+([#4886](https://github.com/eltmon/overdeck/issues/4886); `.pan/uat/pan-4882/ac-02-03-relay.md`).
+
 ## AC-4 — remote worker and a three-machine gauntlet
 
 **Commands.** Two VMs: `pan machines add-fly --project <throwaway> --image <branch image> --json`.
@@ -122,6 +132,11 @@ The throwaway project's issue prefix must be letters only
 reported on the VM but home's stand-in was marked `exited` 0.3 s after start. Fixed in
 `4f2c07a2e9d` (the follower keeps a startup grace); re-check after deploy
 (`ac-04-fly-worker-lanes.md`).
+
+**2026-11-03 re-run (PAN-4882, build b1d9d9dc554):** passed — `pan worker wait` returned the fly1
+worker's report with the stand-in still following, and three lanes (home, fly1, fly2) reported;
+two of three worker starts first missed the 2.5 s secure-channel budget
+([#4885](https://github.com/eltmon/overdeck/issues/4885); `.pan/uat/pan-4882/ac-04-fly-worker-lanes.md`).
 
 ## AC-5 — a conversation on a Fly VM, streamed home, pulled home
 
@@ -168,6 +183,10 @@ throwaway identity.
 **2026-11-02:** failed — case two passed; in case one the `pan up` supervisor restarted the
 dashboard after the helper stopped it ([#4861](https://github.com/eltmon/overdeck/issues/4861);
 `ac-06-ssh-host.md`).
+
+**2026-11-03 re-run (PAN-4882, build b1d9d9dc554):** passed — case one: after **Remove** the
+VM ran no dashboard or supervisor and `/api/health` answered `000` at 30, 90 and 180 s
+(`.pan/uat/pan-4882/ac-06-ssh-host.md`). Case two was not re-run.
 
 ## AC-7 — push within 10 s, unreadable at the push service
 
@@ -276,3 +295,7 @@ needs a `tailnet` or `ssh` route; with only `pairing`/`lan` routes it answers `4
 **2026-11-02:** failed — the smoke steps passed; W-CONV9 could not produce an
 `ssh-remote+<host>` launch here, and an SSH-host machine targets `ssh-remote+127.0.0.1`
 ([#4859](https://github.com/eltmon/overdeck/issues/4859); `ac-15-open-in-editor.md`).
+
+**2026-11-03 re-run (PAN-4882, build b1d9d9dc554):** passed — W-CONV9 on an SSH-host machine
+returned `code --remote ssh-remote+<hex> /root/ac15`, whose authority decodes to
+`{"hostName":"127.0.0.1","user":"root","port":10022}` (`.pan/uat/pan-4882/ac-15-open-in-editor.md`).
