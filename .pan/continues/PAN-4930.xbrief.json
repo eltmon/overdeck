@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4930",
   "created": "2026-11-03T21:47:50.354Z",
-  "updated": "2026-11-03T23:24:41.659Z",
+  "updated": "2026-11-03T23:25:01.659Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -148,6 +148,10 @@
     "revoke-closeout.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T23:24:41.658Z"
+    },
+    "revoke-closeout.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:25:01.659Z"
     }
   }
 }
