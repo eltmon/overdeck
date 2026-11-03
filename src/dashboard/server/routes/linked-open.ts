@@ -12,6 +12,7 @@ import { parseLinkedConversationName } from '@overdeck/contracts';
 
 import { getLink, type MachineLink } from '../../../lib/anywhere/link-store.js';
 import { getLinkedConversation, type LinkedConversationRecord } from '../../../lib/overdeck/linked-conversations.js';
+import { getSshMachineByLinkId, type SshMachineRecord } from '../../../lib/anywhere/ssh/machine-store.js';
 import { jsonResponse } from '../http-helpers.js';
 import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { REMOTE_EDITOR_UNSUPPORTED_HINT, resolveRemoteEditorLaunch } from '../services/open-remote.js';
@@ -19,12 +20,14 @@ import { REMOTE_EDITOR_UNSUPPORTED_HINT, resolveRemoteEditorLaunch } from '../se
 export interface LinkedOpenDeps {
   getLink: (idOrEnvOrLabel: string) => Promise<MachineLink | null>;
   getLinked: (environmentId: string, name: string) => LinkedConversationRecord | null;
+  getSshMachine: (linkId: string) => Promise<SshMachineRecord | null>;
   launch: (command: string, args: string[]) => void;
 }
 
 const defaultDeps: LinkedOpenDeps = {
   getLink,
   getLinked: getLinkedConversation,
+  getSshMachine: getSshMachineByLinkId,
   launch: (command, args) => {
     const child = spawn(command, args, { detached: true, stdio: 'ignore' });
     child.on('error', (error) => console.warn(`[open-in-editor] ${command} failed: ${error.message}`));
@@ -43,11 +46,12 @@ export async function handleLinkedOpenInEditor(body: Record<string, unknown>, ov
   if (!link || !record) return jsonResponse({ error: 'No such linked conversation', code: 'not-found' }, { status: 404 });
   // An absolute path only: the cwd is a positional editor argument, so a shared value starting with `-` must never become a flag.
   if (!record.row.cwd?.startsWith('/')) return jsonResponse({ error: 'The owner did not share an absolute working directory', code: 'no-cwd' }, { status: 409 });
-  const launch = resolveRemoteEditorLaunch({ editor: body['editor'], link, cwd: record.row.cwd });
+  const sshMachine = await deps.getSshMachine(link.id);
+  const launch = resolveRemoteEditorLaunch({ editor: body['editor'], link, cwd: record.row.cwd, sshDestination: sshMachine?.destination ?? null });
   if ('error' in launch) {
     return launch.error === 'editor-unsupported'
       ? jsonResponse({ error: REMOTE_EDITOR_UNSUPPORTED_HINT, code: 'editor-unsupported' }, { status: 400 })
-      : jsonResponse({ error: `${link.label} has no SSH host (no tailnet or ssh route)`, code: 'no-ssh-host' }, { status: 409 });
+      : jsonResponse({ error: `${link.label} has no SSH host (not an SSH machine and no tailnet route)`, code: 'no-ssh-host' }, { status: 409 });
   }
   deps.launch(launch.command, launch.args);
   return jsonResponse({ ok: true, commandLine: [launch.command, ...launch.args].join(' ') });

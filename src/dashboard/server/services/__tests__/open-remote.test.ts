@@ -71,7 +71,7 @@ describe('remote editor launch (PAN-4650 WI-20)', () => {
     const row = { cwd: '/home/desk/overdeck' } as SharedConversationRow;
     const response = await handleLinkedOpenInEditor(
       { conversation: '@desk/conv-x', editor: 'vscode', cwd: '/etc' },
-      { getLink: async () => TAILNET, getLinked: () => ({ id: 1, environmentId: 'env-desk', name: 'conv-x', row, nativeSessionId: null, cachedAt: '', listHash: '' }), launch },
+      { getLink: async () => TAILNET, getLinked: () => ({ id: 1, environmentId: 'env-desk', name: 'conv-x', row, nativeSessionId: null, cachedAt: '', listHash: '' }), getSshMachine: async () => null, launch },
     );
     expect(response.status).toBe(200);
     expect(launch).toHaveBeenCalledWith('code', ['--remote', 'ssh-remote+desk.tail1234.ts.net', '/home/desk/overdeck']);
@@ -84,10 +84,53 @@ describe('remote editor launch (PAN-4650 WI-20)', () => {
       const row = { cwd } as SharedConversationRow;
       const response = await handleLinkedOpenInEditor(
         { conversation: '@desk/conv-x', editor: 'vscode' },
-        { getLink: async () => TAILNET, getLinked: () => ({ id: 1, environmentId: 'env-desk', name: 'conv-x', row, nativeSessionId: null, cachedAt: '', listHash: '' }), launch },
+        { getLink: async () => TAILNET, getLinked: () => ({ id: 1, environmentId: 'env-desk', name: 'conv-x', row, nativeSessionId: null, cachedAt: '', listHash: '' }), getSshMachine: async () => null, launch },
       );
       expect(response.status).toBe(409);
     }
+    expect(launch).not.toHaveBeenCalled();
+  });
+
+  it('an SSH-linked machine launches with the destination authority, never 127.0.0.1 (PAN-4859)', async () => {
+    const launch = vi.fn();
+    const sshLink = link([route('tcp://127.0.0.1:40123', 'ssh')]);
+    const row = { cwd: '/home/desk/overdeck' } as SharedConversationRow;
+    const getSshMachine = vi.fn(async () => ({
+      id: 'ssh-1',
+      destination: 'ssh://root@build-box:2222',
+      linkId: 'link-desk',
+      environmentId: 'env-desk',
+      localPort: 40123,
+      remotePort: 22,
+      launch: 'managed' as const,
+      panPath: null,
+      forwardPid: null,
+      addedAt: '2026-11-01T00:00:00.000Z',
+    }));
+    const response = await handleLinkedOpenInEditor(
+      { conversation: '@desk/conv-x', editor: 'vscode' },
+      { getLink: async () => sshLink, getLinked: () => ({ id: 1, environmentId: 'env-desk', name: 'conv-x', row, nativeSessionId: null, cachedAt: '', listHash: '' }), getSshMachine, launch },
+    );
+    expect(response.status).toBe(200);
+    expect(getSshMachine).toHaveBeenCalledWith('link-desk');
+    const authority = '7b22686f73744e616d65223a226275696c642d626f78222c2275736572223a22726f6f74222c22706f7274223a323232327d';
+    expect(launch).toHaveBeenCalledWith('code', ['--remote', `ssh-remote+${authority}`, '/home/desk/overdeck']);
+    const text = await HttpServerResponse.toWeb(response).text();
+    expect(text).not.toContain('127.0.0.1');
+  });
+
+  it('answers no-ssh-host with the SSH-machine-aware message when there is no record and no tailnet route (PAN-4859)', async () => {
+    const launch = vi.fn();
+    const sshLink = link([route('tcp://127.0.0.1:40123', 'ssh')]);
+    const row = { cwd: '/home/desk/overdeck' } as SharedConversationRow;
+    const response = await handleLinkedOpenInEditor(
+      { conversation: '@desk/conv-x', editor: 'vscode' },
+      { getLink: async () => sshLink, getLinked: () => ({ id: 1, environmentId: 'env-desk', name: 'conv-x', row, nativeSessionId: null, cachedAt: '', listHash: '' }), getSshMachine: async () => null, launch },
+    );
+    expect(response.status).toBe(409);
+    const body = JSON.parse(await HttpServerResponse.toWeb(response).text()) as { error: string; code: string };
+    expect(body.code).toBe('no-ssh-host');
+    expect(body.error).toBe('desk has no SSH host (not an SSH machine and no tailnet route)');
     expect(launch).not.toHaveBeenCalled();
   });
 });
