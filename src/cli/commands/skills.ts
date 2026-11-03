@@ -11,6 +11,7 @@
  *   pan skills pack browser <id> [on|off] [--yes]   (PAN-4730; gstack's browser runtime, second consent; ./skills-pack-browser.ts)
  *   pan skills pack list [--json] [--offline] | remove <id> | sync [id] | gc [--max-age-days <n>]
  *   pan skills pack sageox status [--project <key>] [--json] | upload on|off --project <key>   (PAN-2444)
+ *   pan skills pack sageox link --project <key> [--team <team>] | commit --project <key>   (PAN-4852; ./skills-sageox.ts)
  *   pan skills deft status|enable|disable …   (PAN-3943; ./skills-deft.ts)
  *
  * `src/cli/index.ts` imports this module at startup to register the verbs, so
@@ -21,6 +22,7 @@ import chalk from 'chalk';
 import type { Command } from 'commander';
 import type { DeftLaunchResult } from '../../lib/skill-overrides/launch.js';
 import { registerSkillsDeftCommands } from './skills-deft.js';
+import { registerSkillsSageoxCommands } from './skills-sageox.js';
 
 interface ListOptions { project?: string; issue?: string; json?: boolean }
 interface SetOptions { project?: string; issue?: string; pack?: string }
@@ -189,6 +191,14 @@ export async function skillsLaunchSettingsCommand(options: LaunchSettingsOptions
     const { writeCodexPackBlock } = await import('../../lib/skill-packs/mount.js');
     await writeCodexPackBlock(codexHome, null);
   });
+  // PAN-4852 AD-23/AD-24: pre-trusted SageOx hooks, written last so the trust block ends config.toml. Fail open.
+  try {
+    const hooks = await import('../../lib/sageox/codex-hooks.js');
+    if (sageox.active && sageox.settings && sageox.bin) await hooks.writeSageoxCodexHooks(codexHome, sageox.settings.env, sageox.bin);
+    else await hooks.removeSageoxCodexHooks(codexHome);
+  } catch (error) {
+    console.error(`[launcher] WARNING: SageOx hooks not applied: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 function mergeSkillNames(disabled: readonly string[], hidden: readonly string[]): string[] {
@@ -269,6 +279,14 @@ function printPackPreview(preview: PackPreview, notAppliedLabels: NotAppliedLabe
       ['Changed', listOrNone(preview.diff.changed)],
       ['New', listOrNone(preview.diff.newCapabilities)],
     );
+  }
+  if (preview.oxBuild) {
+    // PAN-4852 AD-8: the sageox build's commands, the paths it writes and what it downloads, one per line.
+    const section = (label: string, lines: string[]): void =>
+      (lines.length > 0 ? lines : ['none']).forEach((line, i) => rows.push([i === 0 ? label : '', line]));
+    section('Builds', preview.oxBuild.commands.map(command => command.join(' ')));
+    section('Writes', preview.oxBuild.writes);
+    section('Downloads', preview.oxBuild.downloads);
   }
   console.log(chalk.bold(`Pack ${preview.id}`));
   for (const [label, value] of rows) console.log(`  ${label.padEnd(12)} ${value}`);
@@ -492,6 +510,9 @@ export async function skillsPackRemoveCommand(id: string): Promise<void> {
   console.log(
     `Removed pack ${id}, its cache, ${swept.removedMounts.length} mount(s) and ${swept.removedCodexCaches.length} Codex cache(s).`,
   );
+  if (result.keptBindings) {
+    console.log(`kept SageOx link files in ${result.keptBindings}/ (delete them by hand to forget every project's SageOx link)`);
+  }
   if (runtimePack) {
     for (const dir of await projectGstackDirs()) {
       console.log(`Project files gstack skills wrote (not removed): ${dir}  — remove with: rm -rf ${dir}`);
@@ -567,8 +588,9 @@ export async function skillsPackGcCommand(options: PackGcOptions): Promise<void>
 // ── pan skills pack sageox (PAN-2444) ───────────────────────────────────
 
 export async function skillsPackSageoxStatusCommand(options: SageoxStatusOptions): Promise<void> {
-  const [{ listSageoxUploads }, { loadSkillOverrideLayers }, { resolvePackToggle }, { getPack }] = await Promise.all([
+  const [{ listSageoxUploads }, { readSageoxLinkState }, { loadSkillOverrideLayers }, { resolvePackToggle }, { getPack }] = await Promise.all([
     import('../../lib/sageox/config.js'),
+    import('../../lib/sageox/binding.js'),
     import('../../lib/skill-overrides/store.js'),
     import('../../lib/skill-overrides/resolve.js'),
     import('../../lib/skill-packs/sources.js'),
@@ -582,17 +604,18 @@ export async function skillsPackSageoxStatusCommand(options: SageoxStatusOptions
   const registered = (await getPack('sageox')) !== null;
   const projects = await Promise.all(selected.map(async ({ projectKey, upload }) => {
     const pack = resolvePackToggle('sageox', await loadSkillOverrideLayers({ projectKey }));
-    return { project: projectKey, pack: pack.enabled ? 'on' : 'off', packSource: pack.source, upload };
+    const link = await readSageoxLinkState(projectKey);
+    return { project: projectKey, pack: pack.enabled ? 'on' : 'off', packSource: pack.source, upload, link };
   }));
   if (options.json) {
     console.log(JSON.stringify({ registered, projects }, null, 2));
     return;
   }
-  if (!registered) console.log(chalk.yellow('The sageox pack is not registered. Add it with: pan skills pack add sageox https://github.com/eltmon/ox --ref <ref>'));
+  if (!registered) console.log(chalk.yellow('The sageox pack is not registered. Add it with: pan skills pack add sageox'));
   const width = Math.max(7, ...projects.map(row => row.project.length));
-  console.log(chalk.dim(`${'PROJECT'.padEnd(width)}  PACK  ${'SOURCE'.padEnd(7)}  UPLOAD`));
+  console.log(chalk.dim(`${'PROJECT'.padEnd(width)}  PACK  ${'SOURCE'.padEnd(7)}  ${'UPLOAD'.padEnd(8)}  LINK`));
   for (const row of projects) {
-    console.log(`${row.project.padEnd(width)}  ${row.pack.padEnd(4)}  ${row.packSource.padEnd(7)}  ${row.upload ? 'enabled' : 'disabled'}`);
+    console.log(`${row.project.padEnd(width)}  ${row.pack.padEnd(4)}  ${row.packSource.padEnd(7)}  ${(row.upload ? 'enabled' : 'disabled').padEnd(8)}  ${row.link}`);
   }
 }
 
@@ -659,11 +682,12 @@ export function registerSkillsCommands(program: Command): void {
     .option('--max-age-days <n>', 'Keep unused mounts younger than this', '7').action(skillsPackGcCommand);
 
   const sageox = pack.command('sageox').description('SageOx pack state and per-project upload opt-in (PAN-2444)');
-  sageox.command('status').description('Show, per project, the sageox pack state and the upload state')
+  sageox.command('status').description('Show, per project, the sageox pack state, the upload state and the link state')
     .option('--project <key>', 'Only this project').option('--json', 'Output as JSON')
     .action(skillsPackSageoxStatusCommand);
   sageox.command('upload <state>').description('Turn SageOx uploads on or off for a project (off by default)')
     .requiredOption('--project <key>', 'Project key').action(skillsPackSageoxUploadCommand);
+  registerSkillsSageoxCommands(sageox);
 
   registerSkillsDeftCommands(skills);
 }

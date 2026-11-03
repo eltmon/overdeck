@@ -23,8 +23,8 @@ import { MainDivergedError, gitPush } from '../../../../lib/git/operations.js';
 import { listGitOperations } from '../../../../lib/git-activity.js';
 import { extractPrefix, parseIssueId } from '../../../../lib/issue-id.js';
 import { enqueueMerge, getCurrentMerge, markMergeProcessing, dequeueMerge, getAllActiveQueues } from '../../../../lib/overdeck/merge.js';
-import { isDeftPipelineIssue } from '../../../../lib/deft/issue-pipeline.js';
-import { deftMergeGuardForIssue } from '../../../../lib/deft/merge-guard.js';
+import { getPrFacts } from '../../../../lib/cloister/pr-facts.js';
+import { evaluateRepoMergeGuards } from '../../../../lib/cloister/repo-merge-guards.js';
 import { findProjectByTeam } from '../../../../lib/projects.js';
 import { isOverdeckOwnedOnlyStatus } from '../../../../lib/state-plane.js';
 import { isIntegrationPermissionError, verifyAppCanMerge, type GitHubPullRequestState } from '../../../../lib/github-app.js';
@@ -1350,11 +1350,11 @@ const postForgeMergeRoute = HttpRouter.add(
         return jsonResponse({ error: `No merge set found for ${issueId}` }, { status: 404 });
       }
 
-      // PAN-4820: this door bypasses the merge gate, so a Deft PR must pass the Deft merge guard here.
-      if (await isDeftPipelineIssue(issueId)) {
-        const verdict = await deftMergeGuardForIssue(issueId, null);
-        if (!verdict.ok) return jsonResponse({ error: `Cannot merge: ${verdict.reason}`, refused: true }, { status: 409 });
-      }
+      // PAN-4820, PAN-4852 (AD-21): this door bypasses the merge gate, so the PR
+      // must pass the repository merge guards (Deft, SageOx) here.
+      const prFacts = await getPrFacts(issueId);
+      const guard = await evaluateRepoMergeGuards(issueId, { headSha: prFacts.headSha, headBranch: prFacts.headBranch });
+      if (!guard.ok) return jsonResponse({ error: `Cannot merge: ${guard.reason}`, refused: true }, { status: 409 });
 
       const results: Array<{ repoKey: string; merged: boolean; error?: string }> = [];
       for (const repo of mergeSet.repos) {

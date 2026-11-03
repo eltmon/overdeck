@@ -3,10 +3,10 @@
  *
  * The install runs Directive's own installer, then hides everything it
  * deposited from git so the feature branch never carries it:
- * - created paths go into a per-worktree exclude file
- *   (`<gitdir>/info/overdeck-deft-exclude`, set as the worktree's
- *   `core.excludesFile`), seeded with the effective global excludes because a
- *   worktree value replaces them;
+ * - created paths go into the `deft` block of the worktree exclude file
+ *   (`src/lib/git/worktree-exclude.ts`: `<gitdir>/info/overdeck-exclude`, set
+ *   as the worktree's `core.excludesFile`, seeded with the effective global
+ *   excludes because a worktree value replaces them);
  * - tracked files the install changed get `--skip-worktree`;
  * - `core.hooksPath` is `.githooks` for this worktree only
  *   (`extensions.worktreeConfig`), and the shared value is restored.
@@ -23,22 +23,19 @@
  */
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { access, lstat, mkdir, readFile, readlink, realpath, writeFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { access, lstat, readFile, readlink, realpath } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
+import { setExcludeBlock } from '../git/worktree-exclude.js';
 import { installPreRebaseHook } from '../workspace-manager/worktree-ops.js';
 import { isNativeDirectiveProject } from './archive.js';
 import {
   type DeftInstallSnapshot,
-  deftExcludeFilePath,
   readDeftSnapshot,
   touchedDeftDir,
   writeDeftSnapshot,
 } from './install-snapshot.js';
 import { undoDeftChanges, type DeftUndoPlan } from './uninstall.js';
-
-export { deftExcludeFilePath } from './install-snapshot.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -256,24 +253,6 @@ function excludeLine(path: string): string {
   return `/${escaped}`;
 }
 
-function expandHome(path: string): string {
-  return path === '~' || path.startsWith('~/') ? join(homedir(), path.slice(1)) : path;
-}
-
-/** The excludes file git reads now, which a worktree `core.excludesFile` would replace. */
-async function effectiveGlobalExcludes(worktree: string): Promise<string> {
-  const configured = (await git(worktree, ['config', '--get', 'core.excludesFile'])).stdout.trim();
-  const xdg = process.env.XDG_CONFIG_HOME;
-  const path = configured
-    ? expandHome(configured)
-    : join(xdg ? xdg : join(homedir(), '.config'), 'git', 'ignore');
-  try {
-    return await readFile(path, 'utf8');
-  } catch {
-    return '';
-  }
-}
-
 function tail(text: string, lines: number): string {
   return text.trimEnd().split('\n').slice(-lines).join('\n');
 }
@@ -452,18 +431,7 @@ export async function installDeftIntoWorktree(
     const { createdPaths, modifiedTracked, modifiedUntracked, touchedPreexisting } = changes;
 
     // 7. Hide.
-    const excludeFile = await deftExcludeFilePath(worktree);
-    const globalExcludes = await effectiveGlobalExcludes(worktree);
-    const excludeText = [
-      ...(globalExcludes ? [globalExcludes.trimEnd()] : []),
-      `# overdeck:deft ${issueId}`,
-      ...RUNTIME_EXCLUDES,
-      ...createdPaths.map(excludeLine),
-      '',
-    ].join('\n');
-    await mkdir(dirname(excludeFile), { recursive: true });
-    await writeFile(excludeFile, excludeText, 'utf8');
-    await gitOut(worktree, ['config', '--worktree', 'core.excludesFile', excludeFile]);
+    const { file: excludeFile } = await setExcludeBlock(worktree, 'deft', [...RUNTIME_EXCLUDES, ...createdPaths.map(excludeLine)]);
     if (modifiedTracked.length > 0) {
       await gitOut(worktree, ['update-index', '--skip-worktree', '--', ...modifiedTracked.map(entry => entry.path)]);
     }

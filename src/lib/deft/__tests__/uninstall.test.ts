@@ -10,8 +10,9 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { type DeftInstallRun, deftExcludeFilePath, installDeftIntoWorktree } from '../install.js';
-import { deftSnapshotPath, readDeftSnapshot, writeDeftSnapshot } from '../install-snapshot.js';
+import { excludeTarget, readExcludeBlock, setExcludeBlock } from '../../git/worktree-exclude.js';
+import { type DeftInstallRun, installDeftIntoWorktree } from '../install.js';
+import { deftSnapshotPath, legacyDeftExcludeFilePath, readDeftSnapshot, writeDeftSnapshot } from '../install-snapshot.js';
 import { removeDeftInstall } from '../uninstall.js';
 
 let scratch: string;
@@ -101,7 +102,7 @@ describe('removeDeftInstall', () => {
   });
 
   it('clears skip-worktree flags and the worktree hooks path and exclude file', async () => {
-    const excludeFile = await deftExcludeFilePath(wt);
+    const { file: excludeFile } = await excludeTarget(wt);
     expect(existsSync(excludeFile)).toBe(true);
 
     await removeDeftInstall(wt);
@@ -181,5 +182,26 @@ describe('removeDeftInstall', () => {
 
     expect(result.refused).toContain('.claude/settings.json');
     expect(readFileSync(join(root, 'outside', 'target.txt'), 'utf8')).toBe('outside\n');
+  });
+
+  it('keeps another owner\'s exclude block and the worktree excludes file', async () => {
+    const { file: excludeFile } = await setExcludeBlock(wt, 'sageox', ['/.sageox/']);
+
+    await removeDeftInstall(wt);
+
+    expect(await readExcludeBlock(wt, 'deft')).toBeNull();
+    expect(await readExcludeBlock(wt, 'sageox')).toEqual(['/.sageox/']);
+    expect(git(wt, 'config', '--worktree', '--get', 'core.excludesFile').trim()).toBe(excludeFile);
+  });
+
+  it('clears the pre-PAN-4852 Deft exclude file and the excludesFile that points at it', async () => {
+    const legacy = await legacyDeftExcludeFilePath(wt);
+    writeFileSync(legacy, '# overdeck:deft TST-1\n/AGENTS.md\n');
+    git(wt, 'config', '--worktree', 'core.excludesFile', legacy);
+
+    await removeDeftInstall(wt);
+
+    expect(existsSync(legacy)).toBe(false);
+    expect(gitCode(wt, 'config', '--worktree', '--get', 'core.excludesFile')).toBe(1);
   });
 });

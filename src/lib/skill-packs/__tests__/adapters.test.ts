@@ -346,6 +346,7 @@ describe('KNOWN_PACKS', () => {
       url: 'https://github.com/eltmon/ox',
       adapter: 'plain',
       skillsRoot: 'extensions/skills',
+      ref: '0e6c7e2df8fd89638a2d40db08cc45d4cff05fdc',
       optIn: [
         'ox-cli-init',
         'ox-cli-attest',
@@ -359,6 +360,7 @@ describe('KNOWN_PACKS', () => {
       ],
       disclosure: SAGEOX_DISCLOSURE,
     });
+    expect(KNOWN_PACKS['sageox']?.ref).toMatch(/^[0-9a-f]{40}$/);
   });
 
   it('points pstack at the eltmon/plugins fork, pinned, with the Claude Code build as plugin root', () => {

@@ -30,7 +30,11 @@ export interface DeftInstallSnapshot {
   touchedPreexisting: string[];
   /** Value of `git config --local --get core.hooksPath` before install. */
   sharedHooksPathBefore: string | null;
-  /** Absolute path of the worktree exclude file. */
+  /**
+   * Absolute path of the worktree exclude file holding the `deft` block
+   * (`<gitdir>/info/overdeck-exclude`); `<gitdir>/info/overdeck-deft-exclude`
+   * for installs made before PAN-4852.
+   */
   excludeFile: string;
   /**
    * Hidden tracked files whose install change could not be merged onto a new
@@ -51,8 +55,12 @@ export function touchedDeftDir(entry: string): string {
     : join(entry, 'node_modules', '@deftai');
 }
 
-/** `<gitdir>/info/overdeck-deft-exclude`; the git dir is per worktree. */
-export async function deftExcludeFilePath(worktree: string): Promise<string> {
+/**
+ * `<gitdir>/info/overdeck-deft-exclude`, the Deft-only exclude file installs
+ * wrote before PAN-4852 moved the hide into `src/lib/git/worktree-exclude.ts`.
+ * Uninstall still clears it; the git dir is per worktree.
+ */
+export async function legacyDeftExcludeFilePath(worktree: string): Promise<string> {
   const { stdout } = await execFileAsync('git', ['rev-parse', '--git-dir'], { cwd: worktree });
   return join(resolve(worktree, stdout.trim()), 'info', 'overdeck-deft-exclude');
 }

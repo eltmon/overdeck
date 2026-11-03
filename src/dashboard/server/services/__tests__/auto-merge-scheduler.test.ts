@@ -24,6 +24,8 @@ vi.mock('../../../../lib/cloister/merge-eligibility.js', () => ({
   isMergeEligible: vi.fn(() => false),
 }));
 vi.mock('../../../../lib/cloister/merge-blockers.js', () => ({ getMergeBlockersPayload: vi.fn(() => []) }));
+// PAN-4852: the SageOx merge guard reads git and projects.yaml; these tests judge forge facts only.
+vi.mock('../../../../lib/sageox/merge-guard.js', () => ({ sageoxMergeGuardForIssue: vi.fn(async () => ({ ok: true })) }));
 
 const {
   issueIdFromGateBranch,
