@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T23:49:15.225706Z · model: claude-opus-5-5 · open: 892_
+_Last sequenced: 2026-11-03T23:50:04.541813Z · model: claude-opus-5-5 · open: 892_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1227,7 +1227,7 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T23:49:15.225706Z",
+  "generatedAt": "2026-11-03T23:50:04.541813Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 892,
