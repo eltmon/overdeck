@@ -10,8 +10,10 @@
  * This module uses Web APIs only; src/index.ts owns the `cloudflare:workers` import.
  */
 import type { ConnectPlan, DirectoryEndpoint, DirectoryToClientFrame, DirectoryToMachineFrame } from '../../../packages/contracts/src/connect.ts';
+import { reduceClient } from './client-state.ts';
+import type { ClientEvent } from './client-state.ts';
 import { EMPTY_DIRECTORY, reduce } from './directory-state.ts';
-import type { ApprovalRow, DirectoryEffect, DirectoryEvent, DirectoryState, MachineRow, Target } from './directory-state.ts';
+import type { ApprovalRow, ClientRow, DirectoryEffect, DirectoryEvent, DirectoryState, MachineRow, ReduceContext, Target } from './directory-state.ts';
 import type { ConnectIdentity, Deps, Env } from './env.ts';
 import { HDR_IDENTITY, HDR_INBOX_HEADERS, HDR_INBOX_SECRET_HASH, INTERNAL, parseConfig, parseTurnConfig } from './env.ts';
 import { keyFingerprint } from './fingerprint.ts';
@@ -19,20 +21,36 @@ import { isWebSocketUpgrade, json } from './http.ts';
 import { bytesToBase64, InboxStore, NOT_FOUND } from './inbox.ts';
 import type { PendingEvent } from './inbox.ts';
 import { logFrame } from './log.ts';
-import { decodeMachineFrame } from './protocol.ts';
+import { decodeFrame } from './protocol.ts';
+import type { SocketRole } from './protocol.ts';
 import { relayCapBytes } from './relay-meter.ts';
 import type { RelayUsage } from './relay-meter.ts';
 import { fetchIceServers } from './turn.ts';
 
-const MACHINE_TAG = 'machine';
+/**
+ * Every socket keeps this tag, phones included (PAN-4829 D-1): tags are fixed at accept time, before
+ * the first hello says which role the socket has, and renaming the tag would orphan sockets that
+ * hibernated before the client role shipped. The role lives in the attachment instead.
+ */
+export const MACHINE_TAG = 'machine';
 
-/** Per-socket state that survives hibernation. `environmentId` is set by a valid `hello`. */
+/**
+ * Per-socket state that survives hibernation. `environmentId` is set by a valid `hello`, `clientId`
+ * by a valid `hello-client` (PAN-4829). Attachments written before PAN-4829 have no `clientId` key.
+ */
 interface Attachment {
   identity: ConnectIdentity;
   environmentId: string | null;
+  clientId?: string | null;
 }
 
-const SCHEMA = [
+/** A socket's role: client once `hello-client` bound it, machine once `hello` did, else none yet. */
+export function roleOf(a: Attachment): SocketRole | null {
+  if (a.clientId) return 'client';
+  return a.environmentId ? 'machine' : null;
+}
+
+export const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS machines (
     environment_id TEXT PRIMARY KEY,
     label TEXT NOT NULL,
@@ -53,7 +71,41 @@ const SCHEMA = [
     expires_at INTEGER NOT NULL
   )`,
   `CREATE TABLE IF NOT EXISTS relay_usage (month TEXT PRIMARY KEY, bytes INTEGER NOT NULL)`,
+  // Phones (PAN-4829). The push columns are for PAN-4830: `CREATE TABLE IF NOT EXISTS` cannot add
+  // columns to a table that already exists, so they are created now and never written here.
+  `CREATE TABLE IF NOT EXISTS clients (
+    client_id TEXT PRIMARY KEY,
+    label TEXT NOT NULL,
+    public_key_hex TEXT NOT NULL,
+    platform TEXT NOT NULL,
+    app_version TEXT NOT NULL,
+    device_id TEXT NOT NULL,
+    registered_at INTEGER NOT NULL,
+    last_seen_at INTEGER NOT NULL,
+    push_platform TEXT,
+    push_token TEXT,
+    aps_environment TEXT
+  )`,
 ];
+
+/** The `clients` upsert. It never writes the push columns, so a re-registering phone keeps them (D-13). */
+export const PUT_CLIENT_SQL = `INSERT INTO clients (client_id, label, public_key_hex, platform, app_version, device_id, registered_at, last_seen_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  ON CONFLICT(client_id) DO UPDATE SET label = excluded.label, public_key_hex = excluded.public_key_hex,
+    platform = excluded.platform, app_version = excluded.app_version, device_id = excluded.device_id,
+    last_seen_at = excluded.last_seen_at`;
+
+interface ClientSqlRow {
+  client_id: string;
+  label: string;
+  public_key_hex: string;
+  platform: string;
+  app_version: string;
+  device_id: string;
+  registered_at: number;
+  last_seen_at: number;
+  [key: string]: SqlStorageValue;
+}
 
 interface ApprovalSqlRow {
   request_id: string;
@@ -180,8 +232,23 @@ export class DirectoryHost {
       }));
     const relayRow = sql.exec<{ month: string; bytes: number }>('SELECT month, bytes FROM relay_usage ORDER BY month DESC LIMIT 1').toArray()[0];
     const relay: RelayUsage | null = relayRow ? { month: relayRow.month, bytes: relayRow.bytes } : null;
-    // The clients table arrives with the role-aware glue (PAN-4829 WI-6).
-    return { plan, machines, clients: [], approvals, relay };
+    const clients = sql
+      .exec<ClientSqlRow>('SELECT * FROM clients ORDER BY registered_at, client_id')
+      .toArray()
+      .flatMap((r): ClientRow[] =>
+        r.platform === 'ios' || r.platform === 'android'
+          ? [{
+            clientId: r.client_id,
+            label: r.label,
+            publicKeyHex: r.public_key_hex,
+            platform: r.platform,
+            appVersion: r.app_version,
+            deviceId: r.device_id,
+            registeredAt: r.registered_at,
+            lastSeenAt: r.last_seen_at,
+          }]
+          : []);
+    return { plan, machines, clients, approvals, relay };
   }
 
   async fetch(req: Request): Promise<Response> {
@@ -200,14 +267,26 @@ export class DirectoryHost {
     const attachment = attachmentOf(ws);
     if (!attachment) return;
     const registeredAs = attachment.environmentId;
-    const decoded = decodeMachineFrame(message);
+    const clientId = attachment.clientId ?? null;
+    const decoded = decodeFrame(message, roleOf(attachment));
+    const { deviceId, plan, maxDevices } = attachment.identity;
     if (!decoded.ok) {
-      await this.apply(ws, { kind: 'bad-frame', registeredAs, reason: decoded.reason });
+      if (clientId !== null) await this.applyClient(ws, { kind: 'client-bad-frame', clientId, reason: decoded.reason });
+      else await this.apply(ws, { kind: 'bad-frame', registeredAs, reason: decoded.reason });
+      return;
+    }
+    if (decoded.role === 'client') {
+      const frame = decoded.frame;
+      if (frame.type === 'hello-client') {
+        await this.applyClient(ws, { kind: 'hello-client', registeredAs: clientId, identity: { deviceId, plan, maxDevices }, frame });
+      } else if (clientId !== null) {
+        // Only a client socket decodes later client frames (D-4), so clientId is set here.
+        await this.applyClient(ws, { kind: 'client-frame', clientId, frame });
+      }
       return;
     }
     const frame = decoded.frame;
     if (frame.type === 'hello') {
-      const { deviceId, plan, maxDevices } = attachment.identity;
       const fingerprint = await keyFingerprint(frame.publicKeyHex);
       await this.apply(ws, { kind: 'hello', registeredAs, identity: { deviceId, plan, maxDevices }, frame, fingerprint });
       return;
@@ -275,47 +354,84 @@ export class DirectoryHost {
     else await this.ctx.storage.setAlarm(at);
   }
 
-  /** Open sockets bound to a machine, optionally excluding one. */
-  private registered(except: WebSocket | null = null): Array<{ ws: WebSocket; environmentId: string }> {
-    const out: Array<{ ws: WebSocket; environmentId: string }> = [];
+  /** Open sockets with a role, optionally excluding one. Every socket carries MACHINE_TAG (D-1). */
+  private openOf(role: SocketRole, except: WebSocket | null): Array<{ ws: WebSocket; id: string }> {
+    const out: Array<{ ws: WebSocket; id: string }> = [];
     for (const ws of this.ctx.getWebSockets(MACHINE_TAG)) {
       if (ws === except || ws.readyState !== WebSocket.OPEN) continue;
-      const environmentId = attachmentOf(ws)?.environmentId;
-      if (environmentId) out.push({ ws, environmentId });
+      const attachment = attachmentOf(ws);
+      if (!attachment || roleOf(attachment) !== role) continue;
+      const id = role === 'client' ? attachment.clientId : attachment.environmentId;
+      if (id) out.push({ ws, id });
     }
     return out;
   }
 
-  /** A machine goes offline only when no other open socket is bound to it (a replaced socket must not). */
+  /** Open sockets bound to a machine, optionally excluding one. Phone sockets are never listed (H-2). */
+  private registered(except: WebSocket | null = null): Array<{ ws: WebSocket; environmentId: string }> {
+    return this.openOf('machine', except).map(({ ws, id }) => ({ ws, environmentId: id }));
+  }
+
+  /** Open sockets bound to a phone, optionally excluding one (PAN-4829). */
+  private registeredClients(except: WebSocket | null = null): Array<{ ws: WebSocket; clientId: string }> {
+    return this.openOf('client', except).map(({ ws, id }) => ({ ws, clientId: id }));
+  }
+
+  /**
+   * A machine or phone goes offline only when no other open socket is bound to it (a replaced
+   * socket must not).
+   */
   private async onSocketGone(ws: WebSocket): Promise<void> {
-    const environmentId = attachmentOf(ws)?.environmentId;
-    if (!environmentId) return;
+    const attachment = attachmentOf(ws);
+    if (!attachment) return;
+    const role = roleOf(attachment);
+    if (role === 'client') {
+      const clientId = attachment.clientId as string;
+      if (this.registeredClients(ws).some((r) => r.clientId === clientId)) return;
+      await this.applyClient(ws, { kind: 'client-gone', clientId });
+      return;
+    }
+    const environmentId = attachment.environmentId;
+    if (role !== 'machine' || !environmentId) return;
     if (this.registered(ws).some((r) => r.environmentId === environmentId)) return;
     await this.apply(ws, { kind: 'socket-gone', registeredAs: environmentId });
   }
 
-  private async apply(ws: WebSocket, event: DirectoryEvent): Promise<void> {
-    const online = new Set(this.registered(ws).map((r) => r.environmentId));
+  /** The reducer context for an event on `ws`: who else is online, excluding `ws` itself. */
+  private context(ws: WebSocket): ReduceContext {
     const config = parseConfig(this.env);
-    const stunUrls = config.ok ? config.config.stunUrls : [];
-    const { state, effects } = reduce(this.state, event, {
+    return {
       now: this.deps.now(),
-      online,
-      stunUrls,
+      online: new Set(this.registered(ws).map((r) => r.environmentId)),
+      onlineClients: new Set(this.registeredClients(ws).map((r) => r.clientId)),
+      stunUrls: config.ok ? config.config.stunUrls : [],
       relayCapBytes: relayCapBytes(this.env.RELAY_CAP_BYTES),
       turnConfigured: parseTurnConfig(this.env) !== null,
-    });
+    };
+  }
+
+  private async apply(ws: WebSocket, event: DirectoryEvent): Promise<void> {
+    const { state, effects } = reduce(this.state, event, this.context(ws));
+    this.state = state;
+    await this.execute(ws, effects);
+  }
+
+  /** Phone events go to the client reducer (PAN-4829 D-5); effects run through the same executor. */
+  private async applyClient(ws: WebSocket, event: ClientEvent): Promise<void> {
+    const { state, effects } = reduceClient(this.state, event, this.context(ws));
     this.state = state;
     await this.execute(ws, effects);
   }
 
   private resolve(self: WebSocket, to: Target): WebSocket[] {
     if (to === 'self') return [self];
+    if (to === 'clients') return this.registeredClients(self).map((r) => r.ws);
+    if (typeof to === 'object' && 'clientId' in to) {
+      return this.registeredClients(self).filter((r) => r.clientId === to.clientId).map((r) => r.ws);
+    }
     const others = this.registered(self);
     if (to === 'others') return others.map((r) => r.ws);
     if (to === 'all') return [self, ...others.map((r) => r.ws)];
-    // Client sockets are resolved by the role-aware glue (PAN-4829 WI-6).
-    if (to === 'clients' || 'clientId' in to) return [];
     return others.filter((r) => r.environmentId === to.environmentId).map((r) => r.ws);
   }
 
@@ -438,11 +554,19 @@ export class DirectoryHost {
           );
           break;
         }
-        case 'put-client':
-        case 'delete-client':
-        case 'register-client':
-          // Wired to the clients table and the socket attachment in PAN-4829 WI-6.
+        case 'put-client': {
+          const r = e.row;
+          sql.exec(PUT_CLIENT_SQL, r.clientId, r.label, r.publicKeyHex, r.platform, r.appVersion, r.deviceId, r.registeredAt, r.lastSeenAt);
           break;
+        }
+        case 'delete-client':
+          sql.exec('DELETE FROM clients WHERE client_id = ?', e.clientId);
+          break;
+        case 'register-client': {
+          const attachment = attachmentOf(self);
+          if (attachment) self.serializeAttachment({ ...attachment, clientId: e.clientId } satisfies Attachment);
+          break;
+        }
         case 'register': {
           const attachment = attachmentOf(self);
           if (attachment) self.serializeAttachment({ ...attachment, environmentId: e.environmentId } satisfies Attachment);
@@ -455,7 +579,7 @@ export class DirectoryHost {
           for (const ws of this.resolve(self, e.to)) safeClose(ws, e.code, e.reason);
           break;
         case 'log':
-          logFrame(e.type, e.environmentId, e.outcome);
+          logFrame(e.type, e.environmentId, e.outcome, e.clientId);
           break;
       }
     }
