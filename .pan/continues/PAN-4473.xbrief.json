@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4473",
   "created": "2026-11-03T04:12:49.385Z",
-  "updated": "2026-11-03T05:33:20.810Z",
+  "updated": "2026-11-03T05:33:36.171Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -176,6 +176,10 @@
     "host-manager-miniflare-test.ac4": {
       "status": "completed",
       "doneAt": "2026-11-03T05:33:20.810Z"
+    },
+    "host-manager-miniflare-test.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:33:36.171Z"
     }
   }
 }
