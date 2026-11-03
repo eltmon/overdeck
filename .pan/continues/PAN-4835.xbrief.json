@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4835",
   "created": "2026-11-03T07:59:34.235Z",
-  "updated": "2026-11-03T08:57:15.334Z",
+  "updated": "2026-11-03T09:00:46.210Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -28,9 +28,10 @@
       "doneAt": "2026-11-03T08:56:46.640Z"
     },
     "phone-revocation-closes": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4835",
-      "claimedAt": "2026-11-03T08:57:15.334Z"
+      "claimedAt": "2026-11-03T08:57:15.334Z",
+      "doneAt": "2026-11-03T09:00:46.210Z"
     }
   }
 }
