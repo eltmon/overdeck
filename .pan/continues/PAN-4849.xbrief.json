@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4849",
   "created": "2026-11-03T03:09:47.454Z",
-  "updated": "2026-11-03T05:11:50.321Z",
+  "updated": "2026-11-03T05:12:12.235Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -356,6 +356,10 @@
     "approved-scope-check.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T05:11:50.320Z"
+    },
+    "approved-scope-check.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:12:12.235Z"
     }
   }
 }
