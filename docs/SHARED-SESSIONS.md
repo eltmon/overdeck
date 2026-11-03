@@ -178,7 +178,39 @@ A stale record (no host socket, for example after a dashboard restart) is still 
 | **Kick** | in the room | `{ "type": "kick", "githubId": N }` |
 | **Un-revoke** | blocked | `{ "type": "unrevoke", "githubId": N }` |
 
-**Not done yet.** No content flows: WebRTC, the content wire format and the conversation bridge are slice 3 ([PAN-4474](https://github.com/eltmon/overdeck/issues/4474)), and `signal` and `ice-servers` frames from the service are ignored. The host socket is not reconnected after a network drop and not re-parked after a dashboard restart: that is slice 8 ([PAN-4479](https://github.com/eltmon/overdeck/issues/4479)), which reads the same record file.
+**Not done yet.** The host socket is not reconnected after a network drop and not re-parked after a dashboard restart: that is slice 8 ([PAN-4479](https://github.com/eltmon/overdeck/issues/4479)), which reads the same record file. Content (WebRTC) is described in the next section.
+
+## Host WebRTC hub and content wire format (slice 3, PAN-4474)
+
+Content travels peer-to-peer over WebRTC data channels between the host's dashboard server and each viewer. The share service only relays signaling (SDP and ICE) and never sees content.
+
+**WebRTC stack.** The host uses werift 0.25.1, the pure-TypeScript stack Overdeck Anywhere already ships, so no native addon is added. The slice 3 spike (`src/dashboard/server/sharing/__tests__/werift-spike.slow.test.ts`, opt-in with `VITEST_INCLUDE_SLOW=1`) measured 5.4 to 6.9 MB/s on loopback, delivered 1000 messages in order, and interoperated with headless Chromium on all five channels; the full result is in `.pan/drafts/pan-658.md` under *WebRTC dependency*.
+
+**Peer hub.** `src/dashboard/server/sharing/peer-hub.ts` (`PeerHub`), one per live share, holds one `RTCPeerConnection` per eligible viewer. The host always offers: it creates the five channels below, ordered and reliable, before its offer, and sends the offer and its ICE candidates as `signal` host frames. An inbound offer is ignored. ICE servers come from the share service's `ice-servers` frame; `error turn_unavailable`, or no answer within 5 s, falls back to an empty list (host candidates only). A successful list is cached for 50 minutes and shared by every viewer that starts while the request is in flight.
+
+**Content gate.** The hub keeps its own **host-admitted set**: GitHub ids this host process admitted by sending an `admit` frame. Only the host's own `admit` adds an id; `kick` and `revoke` remove one, and so does a snapshot that no longer lists the id at all. A room snapshot never adds an id. An **eligible viewer** is in the host-admitted set and listed in the latest snapshot as `admitted` and `connected`. Only eligible viewers get a peer connection, a `signal` frame or any content, whatever a snapshot claims.
+
+**Peer lifetime.** Every snapshot reconciles: an eligible viewer without a peer gets a new offer, and a peer whose viewer is no longer eligible is closed. Kick and revoke close the viewer's peer connection at once. A peer whose connection fails is removed, and the next snapshot that still shows the viewer eligible offers a new one with a fresh history. To ask for a fresh offer (for example after a browser reload), a viewer closes its join socket, waits for that socket's `close` event, and only then opens a new one, so the snapshot flips `connected` false then true. Opening the new socket first does not work: the service replaces the old socket with close 4008 and never marks the viewer disconnected. A dropped host socket keeps established peers; the hub closes only when the share's host entry is dropped (end, close 4004, a 404/401 upgrade, a replaced stale record, or shutdown).
+
+**Channels.** Every peer connection carries the same five labels:
+
+| Channel | Carries in slice 3 |
+| --- | --- |
+| `control` | The hello exchange and hello errors. The only channel the host reads. |
+| `conversation` | `history` (the stream's full message list, which replaces what the viewer has), then `append` for a new message, `update` for a changed one, or `unavailable` (`transcript_not_found`, `history_too_large`) |
+| `presence` | The roster: the data owner first (`isHost: true`), then every lobby and admitted participant, the controller and the stream list. Sent when the channel opens and again when a snapshot changes it. The block list and `connected` are never sent. |
+| `drafts` | Nothing yet (slice 5) |
+| `terminal` | Nothing yet (slice 6) |
+
+**Envelopes.** Every data-channel message is one encoded `SharedEnvelope` `{ v, ch, streamId, seq, t, payload }` or one fragment of one. `v` is 1. `streamId` is the shared conversation's name. `seq` counts per peer connection, per channel and per stream from 1; fragments do not consume one. An encoded envelope longer than `SHARE_MAX_MESSAGE_CHARS` (32,768 characters) is sent as `SharedChunk` fragments `{ v, chunk: { id, index, count }, data }` in order on the same channel. An envelope longer than `SHARE_MAX_ENVELOPE_CHARS` (32 Mi characters) is never sent; a history that large becomes `unavailable history_too_large`. A channel writer waits while the channel's `bufferedAmount` is above 1 MiB, and a peer whose queued content passes 64 Mi characters is closed.
+
+**Hello exchange.** The host sends its hello `{ v: 1, scopeKinds: ['conversation'], scope }` as the first `control` envelope when the channel opens. The viewer answers with its own hello, copying `scope` from the host's. The host sends no conversation or presence content until the viewer's hello negotiates: both sides agree on the lower `v`, each must support the other's scope kind, and the scopes must match. A failed negotiation gets a `control` envelope `{ kind: 'error', code }` (`invalid_hello`, `version_unsupported`, `scope_kind_unsupported`) and nothing else.
+
+**What crosses the wire.** Messages are mapped through `toSharedMessage`, an allow-list of `id`, `role`, `text`, `turnId`, `createdAt`, `completedAt`, `streaming` and `sequence`. The work log, tool calls, thinking, plans, cost and context usage are not shared. `src/dashboard/server/sharing/conversation-bridge.ts` parses the conversation's Claude JSONL once (the full file) and watches it for appends. Only Claude Code conversations stream: a conversation with no Claude session id gets `unavailable transcript_not_found`, and one whose stored session id belongs to another harness gets an empty history that never grows.
+
+**Host socket loss.** A host whose host socket dropped keeps streaming to its established peers, even after the share service ends the room on its 5-minute alarm. A viewer must therefore tear down its peer connection when its own join socket closes with 4004.
+
+**For slice 4.** `@overdeck/contracts` exports the wire format types from `sharing.ts` and the runtime helpers from `sharing-wire.ts` (`toSharedMessage`, `decodeEnvelope`, `encodeSharedMessage`, `SharedChannelReader`, `SeqTracker`, `negotiateHello`). The share Worker imports only `sharing.ts`, which stays type-only. `src/dashboard/server/sharing/__tests__/loopback-viewer.ts` is a werift viewer that tests use as a stand-in for the browser.
 
 ## Local development
 
