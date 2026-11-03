@@ -24,10 +24,11 @@ In this release:
 
 ## Before you start
 
-- Both people run Overdeck on their own computer.
-- Both people are signed in to overdeck.ai with [`pan account login`](/cli/account). The
-  host needs it to create the link, and each viewer needs it so the host can see who is
-  asking to join.
+- The host runs Overdeck on their own computer and is signed in to overdeck.ai with
+  [`pan account login`](/cli/account), which the host needs to create the link.
+- A viewer can join in two ways: from their own Overdeck (signed in with
+  `pan account login`), or from a browser with no install (see
+  [Join in a browser](#join-in-a-browser)). Either way the host sees who is asking to join.
 - overdeck.ai accounts are invite-only. A viewer must be on the allowlist before they can
   sign in.
 
@@ -51,6 +52,9 @@ person you can:
 
 ## Join a shared conversation
 
+These steps join from your own Overdeck. To join with only a browser, see
+[Join in a browser](#join-in-a-browser).
+
 1. Open the link in a browser on the computer that runs your Overdeck.
 2. The page looks for Overdeck on this computer, on port 3011, and opens it for you.
    Chrome may ask whether the page may reach apps on this device. Choose **Allow**.
@@ -62,6 +66,26 @@ person you can:
 5. Wait in the lobby until the host admits you.
 
 Click **Leave** at any time to leave the shared conversation.
+
+## Join in a browser
+
+You do not need Overdeck installed to join. You need a browser and a GitHub account that is
+on the overdeck.ai allowlist.
+
+1. Open the link. Below the Overdeck instructions, the page shows **Join in this browser**.
+2. Click **Sign in with GitHub** and approve the sign-in on GitHub. You come back to the
+   same page.
+3. Check the name shown under **Signed in as**, then click **Join**. The host sees your
+   GitHub name and avatar before letting you in.
+4. Wait in the lobby until the host admits you. The conversation then appears on the page.
+
+overdeck.ai is invite-only. If your GitHub account is not on the allowlist yet, the sign-in
+page tells you so; ask the person who shared the link to get you added, then sign in again.
+
+A browser viewer is read-only: it shows the messages and the people in the room, with no
+prompt box. If the connection to the host drops, click **Reconnect**. Reloading the page
+rejoins without another click. Click **Leave** to leave, and **Sign out** on the page to
+sign this browser out of overdeck.ai.
 
 ## Roles
 
