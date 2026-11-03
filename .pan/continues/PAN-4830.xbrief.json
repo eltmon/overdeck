@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4830",
   "created": "2026-11-03T14:25:43.002Z",
-  "updated": "2026-11-03T14:43:50.380Z",
+  "updated": "2026-11-03T14:44:05.437Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -132,6 +132,11 @@
     "deliver.ac4": {
       "status": "completed",
       "doneAt": "2026-11-03T14:43:50.380Z"
+    },
+    "decode-push": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4830",
+      "claimedAt": "2026-11-03T14:44:05.437Z"
     }
   }
 }
