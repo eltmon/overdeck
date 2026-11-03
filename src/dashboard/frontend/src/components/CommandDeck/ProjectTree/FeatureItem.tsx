@@ -39,6 +39,7 @@ import { ExpandableSessionNode } from './ExpandableSessionNode';
 import { SessionNode } from './SessionNode';
 import { useDashboardStore } from '../../../lib/store';
 import { computeDominantStatus, sessionsNeedAttention } from './sessionAggregates';
+import { DeftDriftBadges } from '../../deft/DeftBadges';
 import styles from '../styles/command-deck.module.css';
 export type TreeSessionFilter = 'all' | 'alive' | 'failed';
 interface FeatureItemProps {
@@ -764,6 +765,9 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
                 </span>
               ))}
             </span>
+          )}
+          {!feature.isRally && (
+            <DeftDriftBadges issueId={feature.issueId} groupClassName={styles.featureBadgeGroup} badgeClassName={`${styles.featureBadge} ${styles.featureBadge_stopped}`} />
           )}
           {feature.isRally && feature.childCount != null && feature.childCount > 0 ? (
             <span className={`${styles.featureStateBadge} ${styles.featureStateBadge_rest}`} title={`${feature.completedCount || 0}/${feature.childCount} stories done${feature.inProgressCount ? `, ${feature.inProgressCount} active` : ''}${progressPct !== null ? ` (${progressPct}% complete)` : ''}`}>

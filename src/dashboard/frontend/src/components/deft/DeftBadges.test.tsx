@@ -18,7 +18,7 @@ vi.mock('./queries', () => ({
   useDeftIssueSummary: () => ({ isDeft: summary.value !== null, summary: summary.value, isLoading: false }),
 }));
 
-import { DeftDeliveryChip } from './DeftBadges';
+import { DeftDeliveryChip, DeftDriftBadges } from './DeftBadges';
 
 const BASE = summary.value;
 afterEach(() => {
@@ -38,5 +38,21 @@ describe('DeftDeliveryChip', () => {
     cleanup();
     summary.value = null;
     expect(render(<DeftDeliveryChip issueId="PAN-2" />).container.innerHTML).toBe('');
+  });
+});
+
+describe('DeftDriftBadges', () => {
+  const renderBadges = () => render(<DeftDriftBadges issueId="PAN-1" groupClassName="group" badgeClassName="badge stopped" />);
+
+  it('renders spec drift and install drift as separate neutral badges', () => {
+    summary.value = { ...BASE, specDriftUnresolved: 1, installDrift: 2 };
+    const badges = Array.from(renderBadges().container.querySelectorAll('.badge'));
+    expect(badges.map((badge) => badge.textContent)).toEqual(['spec drift 1', 'install drift 2']);
+    expect(badges.every((badge) => badge.className === 'badge stopped')).toBe(true);
+  });
+
+  it('renders nothing when both counts are zero', () => {
+    summary.value = { ...BASE, specDriftUnresolved: 0, installDrift: 0 };
+    expect(renderBadges().container.innerHTML).toBe('');
   });
 });
