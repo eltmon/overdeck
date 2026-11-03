@@ -2,9 +2,15 @@
   "version": "1",
   "issueId": "PAN-4882",
   "created": "2026-11-03T06:27:51.535Z",
-  "updated": "2026-11-03T08:06:27.712Z",
+  "updated": "2026-11-03T08:07:43.804Z",
   "gitState": {},
-  "decisions": [],
+  "decisions": [
+    {
+      "id": "D-test-waived",
+      "summary": "Test gate waived: Evidence-only live UAT issue: no source code changed (diff is .pan/uat evidence, docs/ANYWHERE-RELEASE-CHECKLIST.md, .pan/uat/pan-4862/live-relay.md, concerns.md, spec lifecycle fields). The gate matched 'test' in 'test identities'. The fixes under test carry their own unit tests: 6ca4ae19e6e (remote-worker-follower.test.ts), af764fb9907 (PAN-4861), 054aea3e486 (PAN-4859), 04f8bccc9df (PAN-4862).",
+      "recordedAt": "2026-11-03T08:07:43.804Z"
+    }
+  ],
   "hazards": [],
   "resumePoint": null,
   "sessionHistory": [],
