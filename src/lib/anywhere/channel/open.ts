@@ -13,12 +13,12 @@
 import { connect as netConnect, type Socket } from 'node:net';
 import type { Duplex } from 'node:stream';
 
+import { APPROVAL_NONCE_BYTES, approvalCommitment, approvalNonce, approvalSas, type ChannelMode, encodeFrame, encodePreamble, FrameReader, type Handshake, ikInitiator, NOISE_LINK_PROTOCOL, pairingSecrets, prologueFor, type Refusal, REFUSAL_CODES, WireError, xxInitiator, xxPskInitiator } from '@overdeck/anywhere-channel';
+import { nodeCrypto } from '@overdeck/anywhere-channel/node';
 import { createWebSocketStream, WebSocket as WsClient } from 'ws';
 
 import type { MachineKeyPair } from '../machine-key.js';
 import { type ChannelMarker, type ChannelSocket, createChannelSocket } from './channel-socket.js';
-import { APPROVAL_NONCE_BYTES, approvalCommitment, approvalNonce, approvalSas, type Handshake, ikInitiator, NOISE_LINK_PROTOCOL, pairingSecrets, prologueFor, xxInitiator, xxPskInitiator } from './noise.js';
-import { type ChannelMode, encodeFrame, encodePreamble, FrameReader, type Refusal, REFUSAL_CODES, WireError } from './wire.js';
 
 export const DEFAULT_OPEN_TIMEOUT_MS = 10_000;
 
@@ -187,20 +187,20 @@ async function handshakeAsInitiator(
       throw new ChannelOpenError('protocol', `${label} sent an approval handshake message that did not verify`);
     }
     raw.write(encodeFrame(handshake.send()));
-    const remoteKeyHex = handshake.remoteKey().toString('hex');
+    const remoteKeyHex = Buffer.from(handshake.remoteKey()).toString('hex');
     // Commit-then-reveal (D-2356-10 amended): commit to our nonce, take the responder's, reveal ours.
     const hash = handshake.result().hash;
-    const nonce = approvalNonce();
-    raw.write(encodeFrame(approvalCommitment(hash, nonce)));
+    const nonce = approvalNonce(nodeCrypto);
+    raw.write(encodeFrame(approvalCommitment(nodeCrypto, hash, nonce)));
     const responderNonce = await readMessage(reader, 'approval');
     if (responderNonce.length !== APPROVAL_NONCE_BYTES) {
       throw new ChannelOpenError('protocol', `${label} sent an approval nonce of ${responderNonce.length} bytes`);
     }
-    const sas = approvalSas(hash, nonce, responderNonce);
+    const sas = approvalSas(nodeCrypto, hash, nonce, responderNonce);
     return finish(raw, reader, handshake, nonce, { mode: 'approval', remoteKeyHex, pairingId: null, requestId: opts.requestId, approvalSas: sas });
   }
 
-  const { psk, pairingId } = pairingSecrets(opts.pairingCode);
+  const { psk, pairingId } = pairingSecrets(nodeCrypto, opts.pairingCode);
   raw.write(encodePreamble({ linkProtocol: NOISE_LINK_PROTOCOL, mode: 'pairing', pairingId }));
   const handshake = xxPskInitiator(opts.localKey, psk, prologueFor('pairing', pairingId));
   raw.write(encodeFrame(handshake.send()));
@@ -211,7 +211,7 @@ async function handshakeAsInitiator(
     throw new ChannelOpenError('pairing-refused', `${label} did not accept the pairing code`);
   }
   const message3 = handshake.send();
-  const remoteKeyHex = handshake.remoteKey().toString('hex');
+  const remoteKeyHex = Buffer.from(handshake.remoteKey()).toString('hex');
   return finish(raw, reader, handshake, message3, { mode: 'pairing', remoteKeyHex, pairingId });
 }
 
@@ -219,7 +219,7 @@ function finish(
   raw: Duplex,
   reader: FrameReader,
   handshake: Handshake,
-  finalMessage: Buffer | null,
+  finalMessage: Uint8Array | null,
   channel: ChannelMarker,
 ): ChannelSocket {
   const leftover = reader.detach();
@@ -227,7 +227,7 @@ function finish(
   return createChannelSocket({ raw, initiator: true, handshake: handshake.result(), channel, leftover });
 }
 
-async function readMessage(reader: FrameReader, mode: ChannelMode): Promise<Buffer> {
+async function readMessage(reader: FrameReader, mode: ChannelMode): Promise<Uint8Array> {
   let frame;
   try {
     frame = await reader.readFrame();

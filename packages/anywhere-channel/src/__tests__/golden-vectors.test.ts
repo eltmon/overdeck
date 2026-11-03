@@ -7,8 +7,17 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { approvalCommitment, approvalSas, pairingSecrets, prologueFor } from '../noise.js';
-import { encodeFrame, encodePreamble, encodeRefusal, REFUSAL_CODES } from '../wire.js';
+import {
+  approvalCommitment,
+  approvalSas,
+  encodeFrame,
+  encodePreamble,
+  encodeRefusal,
+  pairingSecrets,
+  prologueFor,
+  REFUSAL_CODES,
+} from '@overdeck/anywhere-channel';
+import { nodeCrypto } from '@overdeck/anywhere-channel/node';
 
 const CODE = 'odp_' + '0123456789abcdef'.repeat(4);
 const ID = '00112233445566778899aabbccddeeff';
@@ -20,7 +29,7 @@ const hex = (bytes: Uint8Array): string => Buffer.from(bytes).toString('hex');
 
 describe('channel golden vectors', () => {
   it('pairingSecrets derives the pinned psk and pairing id', () => {
-    const secrets = pairingSecrets(CODE);
+    const secrets = pairingSecrets(nodeCrypto, CODE);
     expect(hex(secrets.psk)).toBe('fa159b7cec33c9ba81b087f2b4df399f1f8010f621c729668ce0888feeab9eab');
     expect(secrets.pairingId).toBe('459da3680c207caad2eabda9f4f1f320');
   });
@@ -59,7 +68,7 @@ describe('channel golden vectors', () => {
   });
 
   it('approvalCommitment and approvalSas derive the pinned values', () => {
-    expect(hex(approvalCommitment(H, N1))).toBe('df77002e0a3d334790fd3b7890ce65bd06dbfaf3e3b36a7048cd4a09cee7d40e');
-    expect(approvalSas(H, N1, N2)).toBe('553 891');
+    expect(hex(approvalCommitment(nodeCrypto, H, N1))).toBe('df77002e0a3d334790fd3b7890ce65bd06dbfaf3e3b36a7048cd4a09cee7d40e');
+    expect(approvalSas(nodeCrypto, H, N1, N2)).toBe('553 891');
   });
 });

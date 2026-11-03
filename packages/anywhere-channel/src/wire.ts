@@ -19,11 +19,11 @@
  * After the handshake, bytes belong to `@hyperswarm/secret-stream`. Nothing
  * here carries application data.
  */
-import type { Duplex } from 'node:stream';
+import b4a from 'b4a';
 
 export type ChannelMode = 'link' | 'pairing' | 'approval';
 
-export const PREAMBLE_MAGIC = Buffer.from([0x00, 0x4f, 0x56, 0x44, 0x4c]);
+export const PREAMBLE_MAGIC = b4a.from([0x00, 0x4f, 0x56, 0x44, 0x4c]);
 /** Magic (5) + link protocol (1) + mode (1). */
 export const PREAMBLE_LENGTH = 7;
 export const PAIRING_ID_LENGTH = 16;
@@ -61,7 +61,19 @@ export interface Preamble {
   pairingId: string | null;
 }
 
-export type Frame = { kind: 'message'; payload: Buffer } | { kind: 'refusal'; refusal: Refusal };
+export type Frame = { kind: 'message'; payload: Uint8Array } | { kind: 'refusal'; refusal: Refusal };
+
+/**
+ * The transport byte stream under a secure channel, typed structurally so a
+ * Node `Duplex` and a `streamx` `Duplex` both satisfy it.
+ */
+export interface RawDuplex {
+  write(chunk: Uint8Array): boolean;
+  on(event: string, listener: (...args: any[]) => void): unknown;
+  off(event: string, listener: (...args: any[]) => void): unknown;
+  destroy(error?: Error): void;
+  readonly destroyed: boolean;
+}
 
 export type WireErrorCode = 'bad-preamble' | 'bad-frame' | 'frame-too-large' | 'closed';
 
@@ -75,24 +87,24 @@ export class WireError extends Error {
   }
 }
 
-export function encodePreamble(preamble: Preamble): Buffer {
-  const head = Buffer.alloc(PREAMBLE_LENGTH);
-  PREAMBLE_MAGIC.copy(head, 0);
+export function encodePreamble(preamble: Preamble): Uint8Array {
+  const head = b4a.alloc(PREAMBLE_LENGTH);
+  head.set(PREAMBLE_MAGIC, 0);
   head[5] = preamble.linkProtocol & 0xff;
   head[6] = MODE_BYTES[preamble.mode];
   if (preamble.mode === 'link') return head;
   if (preamble.pairingId === null || !/^[0-9a-f]{32}$/.test(preamble.pairingId)) {
     throw new WireError('bad-preamble', `${preamble.mode === 'pairing' ? 'Pairing' : 'Approval'} preamble needs a 16-byte id`);
   }
-  return Buffer.concat([head, Buffer.from(preamble.pairingId, 'hex')]);
+  return b4a.concat([head, b4a.from(preamble.pairingId, 'hex')]);
 }
 
 /**
  * Parse the fixed 7-byte head of a preamble. The caller reads the 16-byte
  * pairing id (or approval request id) afterwards when `mode !== 'link'`.
  */
-export function parsePreambleHead(head: Buffer): Omit<Preamble, 'pairingId'> {
-  if (head.length !== PREAMBLE_LENGTH || !head.subarray(0, 5).equals(PREAMBLE_MAGIC)) {
+export function parsePreambleHead(head: Uint8Array): Omit<Preamble, 'pairingId'> {
+  if (head.length !== PREAMBLE_LENGTH || !b4a.equals(head.subarray(0, 5), PREAMBLE_MAGIC)) {
     throw new WireError('bad-preamble', 'Not an Overdeck secure-channel preamble');
   }
   const linkProtocol = head[5]!;
@@ -103,37 +115,37 @@ export function parsePreambleHead(head: Buffer): Omit<Preamble, 'pairingId'> {
   return { linkProtocol, mode };
 }
 
-function writeUint24le(value: number, into: Buffer): void {
+function writeUint24le(value: number, into: Uint8Array): void {
   into[0] = value & 0xff;
   into[1] = (value >>> 8) & 0xff;
   into[2] = (value >>> 16) & 0xff;
 }
 
-function readUint24le(from: Buffer): number {
+function readUint24le(from: Uint8Array): number {
   return from[0]! | (from[1]! << 8) | (from[2]! << 16);
 }
 
 /** `uint24le length` + handshake message. */
-export function encodeFrame(message: Uint8Array): Buffer {
+export function encodeFrame(message: Uint8Array): Uint8Array {
   if (message.byteLength === 0 || message.byteLength > MAX_HANDSHAKE_FRAME) {
     throw new WireError('frame-too-large', `Handshake frame of ${message.byteLength} bytes is out of range`);
   }
-  const frame = Buffer.alloc(FRAME_HEADER_LENGTH + message.byteLength);
+  const frame = b4a.alloc(FRAME_HEADER_LENGTH + message.byteLength);
   writeUint24le(message.byteLength, frame);
   frame.set(message, FRAME_HEADER_LENGTH);
   return frame;
 }
 
-export function encodeRefusal(refusal: Refusal): Buffer {
-  const head = Buffer.from([0, 0, 0, refusal.code]);
+export function encodeRefusal(refusal: Refusal): Uint8Array {
+  const head = b4a.from([0, 0, 0, refusal.code]);
   if (refusal.code !== REFUSAL_CODES.unsupported) return head;
-  const version = Buffer.from(refusal.serverVersion ?? '', 'utf8').subarray(0, 255);
-  return Buffer.concat([head, Buffer.from([(refusal.linkProtocol ?? 0) & 0xff, version.length]), version]);
+  const version = b4a.from(refusal.serverVersion ?? '', 'utf8').subarray(0, 255);
+  return b4a.concat([head, b4a.from([(refusal.linkProtocol ?? 0) & 0xff, version.length]), version]);
 }
 
 interface Pending<T> {
   /** Returns the parsed value and the bytes consumed, or `null` when more bytes are needed. */
-  parse: (buffered: Buffer) => { value: T; consumed: number } | null;
+  parse: (buffered: Uint8Array) => { value: T; consumed: number } | null;
   resolve: (value: T) => void;
   reject: (error: Error) => void;
 }
@@ -146,14 +158,14 @@ interface Pending<T> {
  * TCP segment with its last handshake message).
  */
 export class FrameReader {
-  private buffered: Buffer = Buffer.alloc(0);
+  private buffered: Uint8Array = b4a.alloc(0);
   private pending: Pending<unknown> | null = null;
   private failure: Error | null = null;
   private detached = false;
 
-  private readonly onData = (chunk: Buffer | string): void => {
-    const bytes = typeof chunk === 'string' ? Buffer.from(chunk) : chunk;
-    this.buffered = this.buffered.length === 0 ? Buffer.from(bytes) : Buffer.concat([this.buffered, bytes]);
+  private readonly onData = (chunk: Uint8Array | string): void => {
+    const bytes = typeof chunk === 'string' ? b4a.from(chunk) : chunk;
+    this.buffered = this.buffered.length === 0 ? b4a.from(bytes) : b4a.concat([this.buffered, bytes]);
     if (this.buffered.length > MAX_BUFFERED) {
       this.fail(new WireError('frame-too-large', 'Peer sent too many bytes during the handshake'));
       return;
@@ -169,7 +181,7 @@ export class FrameReader {
     this.fail(error);
   };
 
-  constructor(private readonly raw: Duplex) {
+  constructor(private readonly raw: RawDuplex) {
     raw.on('data', this.onData);
     raw.on('end', this.onClose);
     raw.on('close', this.onClose);
@@ -184,9 +196,9 @@ export class FrameReader {
     pending?.reject(this.failure);
   }
 
-  readBytes(count: number): Promise<Buffer> {
+  readBytes(count: number): Promise<Uint8Array> {
     return this.read((buffered) =>
-      buffered.length >= count ? { value: Buffer.from(buffered.subarray(0, count)), consumed: count } : null,
+      buffered.length >= count ? { value: b4a.from(buffered.subarray(0, count)), consumed: count } : null,
     );
   }
 
@@ -195,8 +207,8 @@ export class FrameReader {
   }
 
   /** Stop reading. Returns the unconsumed bytes; the raw stream keeps flowing. */
-  detach(): Buffer {
-    if (this.detached) return Buffer.alloc(0);
+  detach(): Uint8Array {
+    if (this.detached) return b4a.alloc(0);
     this.detached = true;
     this.raw.off('data', this.onData);
     this.raw.off('end', this.onClose);
@@ -204,7 +216,7 @@ export class FrameReader {
     this.raw.off('error', this.onError);
     if (this.pending) this.fail(new WireError('closed', 'Frame reader detached'));
     const leftover = this.buffered;
-    this.buffered = Buffer.alloc(0);
+    this.buffered = b4a.alloc(0);
     return leftover;
   }
 
@@ -235,7 +247,7 @@ export class FrameReader {
   }
 }
 
-function parseFrame(buffered: Buffer): { value: Frame; consumed: number } | null {
+function parseFrame(buffered: Uint8Array): { value: Frame; consumed: number } | null {
   if (buffered.length < FRAME_HEADER_LENGTH) return null;
   const length = readUint24le(buffered);
   if (length > MAX_HANDSHAKE_FRAME) {
@@ -244,7 +256,7 @@ function parseFrame(buffered: Buffer): { value: Frame; consumed: number } | null
   if (length > 0) {
     const end = FRAME_HEADER_LENGTH + length;
     if (buffered.length < end) return null;
-    return { value: { kind: 'message', payload: Buffer.from(buffered.subarray(FRAME_HEADER_LENGTH, end)) }, consumed: end };
+    return { value: { kind: 'message', payload: b4a.from(buffered.subarray(FRAME_HEADER_LENGTH, end)) }, consumed: end };
   }
   if (buffered.length < 4) return null;
   const code = buffered[3]!;
@@ -262,7 +274,7 @@ function parseFrame(buffered: Buffer): { value: Frame; consumed: number } | null
   return {
     value: {
       kind: 'refusal',
-      refusal: { code, linkProtocol: buffered[4]!, serverVersion: buffered.subarray(6, end).toString('utf8') },
+      refusal: { code, linkProtocol: buffered[4]!, serverVersion: b4a.toString(buffered.subarray(6, end), 'utf8') },
     },
     consumed: end,
   };

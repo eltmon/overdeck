@@ -18,7 +18,8 @@
  */
 import { createHash, randomBytes } from 'node:crypto';
 
-import { pairingSecrets } from '../../lib/anywhere/channel/noise.js';
+import { pairingSecrets } from '@overdeck/anywhere-channel';
+import { nodeCrypto } from '@overdeck/anywhere-channel/node';
 
 export const PAIRING_CREDENTIAL_PREFIX = 'odp_';
 export const PAIRING_CREDENTIAL_TTL_MS = 10 * 60_000;
@@ -31,7 +32,7 @@ interface PendingCredential {
   /** Epoch ms. Expired entries are kept one extra TTL so they answer `expired`. */
   expiresAt: number;
   /** Noise XXpsk0 pre-shared key (D-4645-17). */
-  psk: Buffer;
+  psk: Uint8Array;
   /** 32 hex characters; the initiator sends it in the channel preamble. */
   pairingId: string;
 }
@@ -67,7 +68,7 @@ export function issuePairingCredential(): { credential: string; expiresAt: strin
   prune(now);
   const credential = `${PAIRING_CREDENTIAL_PREFIX}${randomBytes(32).toString('hex')}`;
   const expiresAt = now + PAIRING_CREDENTIAL_TTL_MS;
-  const { psk, pairingId } = pairingSecrets(credential);
+  const { psk, pairingId } = pairingSecrets(nodeCrypto, credential);
   const hash = hashCredential(credential);
   pending.set(hash, { expiresAt, psk, pairingId });
   byPairingId.set(pairingId, hash);
@@ -87,7 +88,7 @@ export function consumePairingCredential(credential: string): PairingConsumeResu
  * Hand the PSK behind a pairing id to the secure-channel listener and consume
  * the credential (PAN-4645 D-4645-17). Any outcome removes it.
  */
-export function takePairingById(pairingId: string): { psk: Buffer } | 'expired' | 'unknown' {
+export function takePairingById(pairingId: string): { psk: Uint8Array } | 'expired' | 'unknown' {
   const now = Date.now();
   const hash = byPairingId.get(pairingId);
   const entry = hash === undefined ? undefined : remove(hash);

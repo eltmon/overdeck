@@ -19,10 +19,9 @@
 import { createRequire } from 'node:module';
 import { Duplex } from 'node:stream';
 
-import type { HandshakeResult } from './noise.js';
-import type { ChannelMode } from './wire.js';
+import type { ChannelMode, HandshakeResult } from '@overdeck/anywhere-channel';
 
-export type { ChannelMode } from './wire.js';
+export type { ChannelMode } from '@overdeck/anywhere-channel';
 
 export interface ChannelMarker {
   mode: ChannelMode;
@@ -56,8 +55,8 @@ interface SecretStreamConstructor {
     isInitiator: boolean,
     rawStream: Duplex,
     opts: {
-      handshake: { tx: Buffer; rx: Buffer; hash: Buffer; publicKey: Buffer; remotePublicKey: Buffer };
-      data?: Buffer;
+      handshake: { tx: Uint8Array; rx: Uint8Array; hash: Uint8Array; publicKey: Uint8Array; remotePublicKey: Uint8Array };
+      data?: Uint8Array;
     },
   ): SecretStreamLike;
 }
@@ -74,7 +73,7 @@ export interface CreateChannelSocketOptions {
   handshake: HandshakeResult;
   channel: ChannelMarker;
   /** Bytes already read from `raw` behind the last handshake frame. */
-  leftover?: Buffer;
+  leftover?: Uint8Array;
 }
 
 interface RawTransport extends Duplex {
