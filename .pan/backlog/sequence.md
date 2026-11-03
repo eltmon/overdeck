@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T20:16:21.800825Z · model: claude-opus-5-5 · open: 865_
+_Last sequenced: 2026-11-03T20:18:03.275094Z · model: claude-opus-5-5 · open: 866_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -273,6 +273,7 @@ _Last sequenced: 2026-11-03T20:16:21.800825Z · model: claude-opus-5-5 · open: 
 | 266 | PAN-2241 | S | high | ok |  |  | complete-planning is not serialized or idempotent per issue (spec tmp-rename 500s, bead delete-recreate thrash) |
 | 267 | PAN-2242 | S | high | ok |  |  | Unidentified duplicate caller fires complete-planning in pairs every ~2 minutes (perpetual loop while session survives) |
 | 268 | PAN-2240 | S | high | ok |  |  | pan tell contradicts itself on dead ohmypi sessions |
+| 269 | PAN-4926 | XS | medium | ok |  |  | pan down SIGTERMs the smee pidfile PID without verifying it is smee; a reused PID kills an unrelated process. XS guard + test. |
 | 270 | PAN-2243 | S | high | ok |  |  | pan plan finalize: CLI aborts complete-planning at 90s while the server handler legitimately finishes later (false ✖ Failed) |
 | 271 | PAN-2202 | S | high | ok |  |  | complete-planning silently skips spec promotion on a dead session's unanswered AskUserQuestion |
 | 272 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
@@ -1200,10 +1201,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T20:16:21.800825Z",
+  "generatedAt": "2026-11-03T20:18:03.275094Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 865,
+  "openCount": 866,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -11977,6 +11978,19 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "rationale": "PAN-4835 merged in #4894, which clears its only dependency; rank held because the Anywhere phone epic is low-impact relative to substrate work above it.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4926",
+      "rank": 269,
+      "size": "XS",
+      "importance": "medium",
+      "score": 64,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan down SIGTERMs the smee pidfile PID without verifying it is smee; a reused PID kills an unrelated process. XS guard + test.",
+      "rationale": "New since prior run: a small safety fix with an exact recipe (reuse the isSmeeCommand cmdline guard), placed in the free rank 269 slot.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13204,6 +13218,13 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
+    },
+    {
+      "from": "PAN-4925",
+      "to": "PAN-4926",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     }
   ]
 }
