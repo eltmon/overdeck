@@ -214,10 +214,23 @@ export class ShareManager {
     const records = await this.deps.records.read();
     const record = records[shortCode];
     if (!record) return { status: 404, body: { error: 'share_not_found' } };
+    // A share that is not connected is forgotten locally when the service cannot be reached; the
+    // room, if it still exists, ends on the service's 5-minute alarm (D-12).
+    const offline = this.hosts.get(shortCode)?.connection !== 'connected';
     const base = await this.deps.readShareUrl();
-    if ('error' in base) return { status: 500, body: { error: 'share_url_invalid', message: base.error } };
+    if ('error' in base) {
+      if (offline) return this.forget(shortCode);
+      return { status: 500, body: { error: 'share_url_invalid', message: base.error } };
+    }
     const deleted = await this.deps.deleteRoom(base.url, shortCode, record.hostToken);
-    if (!deleted.ok) return { status: 502, body: { error: 'share_service_error', message: deleted.error } };
+    if (!deleted.ok) {
+      if (offline) return this.forget(shortCode);
+      return { status: 502, body: { error: 'share_service_error', message: deleted.error } };
+    }
+    return this.forget(shortCode);
+  }
+
+  private async forget(shortCode: string): Promise<{ status: 204 }> {
     this.dropHost(shortCode, 'close');
     await this.deps.records.remove(shortCode);
     return { status: 204 };

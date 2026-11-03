@@ -445,6 +445,25 @@ describe('ShareManager', () => {
     expect(Object.keys(h.store)).toEqual(['BCDFGHJK']);
   });
 
+  it('end forgets a reconnecting share locally when the share service fails', async () => {
+    const h = harness();
+    (await createConnected(h)).drop(1006);
+    h.deleteRoom.mockResolvedValueOnce({ ok: false, status: 503, error: 'internal_error' } as never);
+    expect(await h.manager.end('BCDFGHJK')).toEqual({ status: 204 });
+    expect(h.store).toEqual({});
+    expect(await h.manager.list()).toEqual([]);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(h.sockets).toHaveLength(1);
+  });
+
+  it('end forgets a stale record locally when the share URL is invalid', async () => {
+    const h = harness({ readShareUrl: async () => ({ error: 'bad' }) });
+    h.store.VWXZ2345 = storedRecord('VWXZ2345', 9, 'conv-z');
+    expect(await h.manager.end('VWXZ2345')).toEqual({ status: 204 });
+    expect(h.store).toEqual({});
+    expect(h.deleteRoom).not.toHaveBeenCalled();
+  });
+
   it('end works on a stale record with no host socket', async () => {
     const h = harness();
     h.store.VWXZ2345 = { scopeKind: 'conversation', scopeId: 'conv-z', hostToken: hostToken(9), joinUrl: `${BASE}/s/VWXZ2345`, createdAt: '2026-11-01T00:00:00.000Z' };
