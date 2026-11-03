@@ -13,7 +13,7 @@
     }
   ],
   "triggers": { "crons": ["0 * * * *"] },
-  "vars": { "PUBLIC_BASE_URL": "https://account.overdeck.ai" }
+  "vars": { "PUBLIC_BASE_URL": "https://account.overdeck.ai", "SHARE_BASE_URL": "https://share.overdeck.ai" }
   // GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, OWNER_GITHUB_ID: Worker secrets set by the operator (docs/ACCOUNT-SERVICE.md "Deploy").
   // "services": [{ "binding": "VAULT", "service": "overdeck-vault", "entrypoint": "VaultRpc" }] — added by PAN-4297.
 }

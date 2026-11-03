@@ -70,6 +70,10 @@ describe('device flow (PAN-4293 account-device-flow, RFC 8628)', () => {
     const bad = await call('POST', '/oauth/device/code', { env, deps, ...form({ platform: 'plan9-x64', environment_id: ENV_ID }) });
     expect(bad.status).toBe(400);
     expect(await bad.json()).toEqual({ error: 'invalid_request' });
+    // A web device signs in only through the share Worker's PKCE redirect (PAN-4481 FR-2).
+    const web = await call('POST', '/oauth/device/code', { env, deps, ...form({ platform: 'web', environment_id: ENV_ID }) });
+    expect(web.status).toBe(400);
+    expect(await web.json()).toEqual({ error: 'invalid_request' });
   });
 
   it('a pending poll is authorization_pending; polling faster than the interval is slow_down with interval 10', async () => {

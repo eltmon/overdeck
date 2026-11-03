@@ -1,7 +1,7 @@
 /**
  * Env, Deps and configuration for the account service (PRD PAN-4293 §7.4, D-23).
  *
- * Every secret is a Worker secret set by the operator (docs/ACCOUNT-SERVICE.md "Deploy"); only PUBLIC_BASE_URL is a committed var.
+ * Every secret is a Worker secret set by the operator (docs/ACCOUNT-SERVICE.md "Deploy"); PUBLIC_BASE_URL and SHARE_BASE_URL are committed vars.
  * No value has a hardcoded default: missing required values make every route except /healthz return 503.
  */
 
@@ -13,6 +13,8 @@ export interface AccountDataHolder {
 export interface Env {
   DB: D1Database;
   PUBLIC_BASE_URL?: string;
+  /** Optional: the share Worker's origin whose `/auth/callback` is a PKCE redirect (PAN-4481). */
+  SHARE_BASE_URL?: string;
   GITHUB_CLIENT_ID?: string;
   GITHUB_CLIENT_SECRET?: string;
   OWNER_GITHUB_ID?: string;
@@ -41,6 +43,8 @@ export interface Config {
   githubClientSecret: string;
   /** null when unset or non-numeric: the admin screen is disabled and the owner bypass is off. */
   ownerGithubId: number | null;
+  /** No trailing slash; null when unset: the share redirect is refused. */
+  shareBaseUrl: string | null;
 }
 
 export type ConfigResult = { ok: true; config: Config } | { ok: false; missing: string[] };
@@ -56,6 +60,7 @@ export function parseConfig(env: Env): ConfigResult {
   if (missing.length > 0) return { ok: false, missing: [...missing] };
   const owner = env.OWNER_GITHUB_ID?.trim() ?? '';
   const ownerGithubId = /^[0-9]+$/.test(owner) ? Number(owner) : null;
+  const shareBaseUrl = present(env.SHARE_BASE_URL) ? env.SHARE_BASE_URL.trim().replace(/\/+$/, '') : null;
   return {
     ok: true,
     config: {
@@ -63,6 +68,7 @@ export function parseConfig(env: Env): ConfigResult {
       githubClientId: (env.GITHUB_CLIENT_ID as string).trim(),
       githubClientSecret: env.GITHUB_CLIENT_SECRET as string,
       ownerGithubId,
+      shareBaseUrl,
     },
   };
 }

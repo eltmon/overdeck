@@ -1,6 +1,7 @@
 /**
  * PKCE loopback flow for the local dashboard (PRD PAN-4293 §7.6; D-7, D-11, D-13; RFC 7636, RFC 8252 §7.3)
- * and the phone app's private-use scheme redirect (PRD PAN-4823 D-6; RFC 8252 §7.1).
+ * the phone app's private-use scheme redirect (PRD PAN-4823 D-6; RFC 8252 §7.1) and the hosted share page's
+ * callback (PRD PAN-4481 FR-1, FR-2), which pairs with platform=web.
  *
  * GET /auth/start validates everything before any redirect; the GitHub leg continuation issues a single-use
  * 5-minute authorization code only after resolveSignIn() allowed the identity; POST /oauth/token exchanges it
@@ -8,7 +9,7 @@
  */
 import { randomHex, s256Challenge, sha256Hex } from './crypto.ts';
 import { isValidEnvironmentId, isValidPlatform, mintDevice } from './devices.ts';
-import type { Handler, RequestContext } from './env.ts';
+import type { Config, Handler, RequestContext } from './env.ts';
 import type { GitHubIdentity } from './github.ts';
 import { isAllowed } from './grants.ts';
 import { json, redirect } from './http.ts';
@@ -39,9 +40,19 @@ export function validateLoopbackRedirect(raw: string | null): string | null {
 /** The phone app's private-use scheme redirect (RFC 8252 §7.1), allowed exactly. */
 export const NATIVE_APP_REDIRECT = 'ai.overdeck.app:/oauth/callback';
 
-export function validateClientRedirect(raw: string | null): string | null {
+/** The hosted share page's callback (PAN-4481), allowed exactly; null when SHARE_BASE_URL is unset. */
+export function shareRedirectUri(config: Config): string | null {
+  return config.shareBaseUrl === null ? null : `${config.shareBaseUrl}/auth/callback`;
+}
+
+export function validateShareRedirect(raw: string | null, config: Config): string | null {
+  const expected = shareRedirectUri(config);
+  return expected !== null && raw === expected ? raw : null;
+}
+
+export function validateClientRedirect(raw: string | null, config: Config): string | null {
   if (raw === NATIVE_APP_REDIRECT) return raw;
-  return validateLoopbackRedirect(raw);
+  return validateShareRedirect(raw, config) ?? validateLoopbackRedirect(raw);
 }
 
 interface StartParams {
@@ -52,8 +63,8 @@ interface StartParams {
   environmentId: string;
 }
 
-function parseStart(url: URL): { ok: true; params: StartParams } | { ok: false; param: string } {
-  const redirectUri = validateClientRedirect(url.searchParams.get('redirect_uri'));
+function parseStart(url: URL, config: Config): { ok: true; params: StartParams } | { ok: false; param: string } {
+  const redirectUri = validateClientRedirect(url.searchParams.get('redirect_uri'), config);
   if (!redirectUri) return { ok: false, param: 'redirect_uri' };
   const clientState = url.searchParams.get('state') ?? '';
   if (clientState.length < 1 || clientState.length > 256) return { ok: false, param: 'state' };
@@ -62,6 +73,9 @@ function parseStart(url: URL): { ok: true; params: StartParams } | { ok: false; 
   if (url.searchParams.get('code_challenge_method') !== 'S256') return { ok: false, param: 'code_challenge_method' };
   const platform = url.searchParams.get('platform') ?? '';
   if (!isValidPlatform(platform)) return { ok: false, param: 'platform' };
+  // The share redirect and platform=web come only as a pair (FR-2).
+  const isShare = validateShareRedirect(redirectUri, config) !== null;
+  if (isShare !== (platform === 'web')) return { ok: false, param: 'platform' };
   const environmentId = url.searchParams.get('environment_id') ?? '';
   if (!isValidEnvironmentId(environmentId)) return { ok: false, param: 'environment_id' };
   return { ok: true, params: { redirectUri, clientState, codeChallenge, platform, environmentId } };
@@ -69,17 +83,17 @@ function parseStart(url: URL): { ok: true; params: StartParams } | { ok: false; 
 
 /** GET /auth/start */
 export const start: Handler = async (req, rc) => {
-  const parsed = parseStart(new URL(req.url));
+  const parsed = parseStart(new URL(req.url), rc.config);
   if (!parsed.ok) {
     return errorPage(400, `The sign-in request has an invalid or missing ${parsed.param} parameter. Start again from Overdeck.`, 'Invalid sign-in request');
   }
   return startGitHubLeg(rc, 'pkce', { ...parsed.params });
 };
 
-function readPayload(payload: Payload): StartParams | null {
+function readPayload(payload: Payload, config: Config): StartParams | null {
   const { redirectUri, clientState, codeChallenge, platform, environmentId } = payload;
   if ([redirectUri, clientState, codeChallenge, platform, environmentId].some((v) => typeof v !== 'string')) return null;
-  if (!validateClientRedirect(redirectUri as string)) return null;
+  if (!validateClientRedirect(redirectUri as string, config)) return null;
   return { redirectUri, clientState, codeChallenge, platform, environmentId } as StartParams;
 }
 
@@ -91,7 +105,7 @@ function redirectToClient(redirectUri: string, params: Record<string, string>): 
 
 /** GitHub leg continuation for purpose 'pkce' (§7.6 step 2). */
 export async function onGitHubIdentity(rc: RequestContext, payload: Payload, identity: GitHubIdentity): Promise<Response> {
-  const params = readPayload(payload);
+  const params = readPayload(payload, rc.config);
   if (!params) return errorPage(400, 'This sign-in link is malformed. Start again from Overdeck.', 'Invalid sign-in request');
 
   const resolution = await resolveSignIn(rc, identity, 'pkce');
@@ -109,8 +123,8 @@ export async function onGitHubIdentity(rc: RequestContext, payload: Payload, ide
 }
 
 /** The user cancelled on github.com. */
-export async function onGitHubDenied(_rc: RequestContext, payload: Payload): Promise<Response> {
-  const params = readPayload(payload);
+export async function onGitHubDenied(rc: RequestContext, payload: Payload): Promise<Response> {
+  const params = readPayload(payload, rc.config);
   if (!params) return errorPage(400, 'This sign-in link is malformed. Start again from Overdeck.', 'Invalid sign-in request');
   return redirectToClient(params.redirectUri, { error: 'access_denied', error_description: 'github_denied', state: params.clientState });
 }
