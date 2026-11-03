@@ -4,17 +4,17 @@
     "created": "2026-11-03T15:48:25Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4480: Shared Sessions v0 (slice 9): pan share and pan join CLI",
-    "updated": "2026-11-03T15:54:47.347Z"
+    "updated": "2026-11-03T15:56:04.189Z"
   },
   "plan": {
     "id": "pan-4480",
     "title": "Shared Sessions v0 (slice 9): pan share and pan join CLI",
-    "status": "proposed",
+    "status": "running",
     "uid": "42276a3c-9b84-4c93-b99c-30ce5088ed06",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-03T15:48:25Z",
-    "updated": "2026-11-03T15:54:47.347Z",
+    "updated": "2026-11-03T15:56:04.189Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4480",
@@ -774,5 +774,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
