@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4917",
   "created": "2026-11-03T18:32:48.231Z",
-  "updated": "2026-11-03T18:34:15.759Z",
+  "updated": "2026-11-03T18:34:23.849Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-4917",
       "claimedAt": "2026-11-03T18:32:48.231Z",
       "doneAt": "2026-11-03T18:34:15.759Z"
+    },
+    "ci-prompt-gate-fetch": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4917",
+      "claimedAt": "2026-11-03T18:34:23.849Z"
     }
   }
 }
