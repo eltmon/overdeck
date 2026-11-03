@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4835",
   "created": "2026-11-03T07:59:34.235Z",
-  "updated": "2026-11-03T09:27:04.920Z",
+  "updated": "2026-11-03T09:27:34.246Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,6 +50,11 @@
       "claimedBy": "agent-pan-4835",
       "claimedAt": "2026-11-03T09:19:17.244Z",
       "doneAt": "2026-11-03T09:24:38.329Z"
+    },
+    "phone-app-capability": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4835",
+      "claimedAt": "2026-11-03T09:27:34.246Z"
     }
   }
 }
