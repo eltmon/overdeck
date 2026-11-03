@@ -4,17 +4,17 @@
     "created": "2026-11-02T23:39:44Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4860: pan project add proposes an issue prefix with digits, which parseIssueId rejects",
-    "updated": "2026-11-02T23:42:48.085Z"
+    "updated": "2026-11-02T23:43:50.154Z"
   },
   "plan": {
     "id": "pan-4860",
     "title": "pan project add proposes an issue prefix with digits, which parseIssueId rejects",
-    "status": "proposed",
+    "status": "running",
     "uid": "22afe30e-da78-4d08-9771-32e2bee668b3",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-02T23:39:44Z",
-    "updated": "2026-11-02T23:42:48.085Z",
+    "updated": "2026-11-02T23:43:50.154Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4860",
@@ -193,5 +193,5 @@
     ],
     "edges": []
   },
-  "status": "proposed"
+  "status": "active"
 }
