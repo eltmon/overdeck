@@ -926,6 +926,12 @@ dashboard's own fetches). The viewer's own writes (`POST /api/linked-conversatio
 use `rejectUnsafeDashboardMutationRequest`: JSON only, plus a trusted Origin and the CSRF
 token unless a header-borne credential is present.
 
+The phone app (`/m`) opens a linked row by its linked name and takes the row from the
+merged `GET /api/conversations` list, never from `GET /api/conversations/@<machine>/<name>`.
+The proxy above returns the owner's own row (positive id, local name), which would make
+the panel subscribe on this machine's `/ws/rpc` and stay on "Discovering conversation…"
+(PAN-4871).
+
 ### The agent fence (D-4650-7)
 
 On the owner, a `machine` credential whose actor is an agent (an `agent-fenced` link's
