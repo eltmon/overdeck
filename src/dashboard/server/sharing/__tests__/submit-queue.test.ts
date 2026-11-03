@@ -216,6 +216,22 @@ describe('SubmitQueue', () => {
     expect(h.statuses).toEqual([{ agentWorking: false, queued: 1 }, { agentWorking: true, queued: 1 }]);
   });
 
+  it('reads an activity that throws synchronously as idle and reports a sync deliver throw as unknown', async () => {
+    const outcomes: string[] = [];
+    const queue = new SubmitQueue(
+      {
+        deliver: () => { throw new Error('sync deliver'); },
+        activity: () => { throw new Error('sync activity'); },
+        now: () => Date.now(),
+      },
+      { onDelivering: () => () => undefined, onOutcome: (_item, outcome) => outcomes.push(outcome), onStatus: () => undefined },
+    );
+    queue.enqueue(controller('A'));
+    await vi.advanceTimersByTimeAsync(QUEUE_TICK_MS);
+    expect(outcomes).toEqual(['delivery_unknown']);
+    queue.close();
+  });
+
   it('reads a throwing activity as idle', async () => {
     const h = setup();
     h.activity.throws = true;

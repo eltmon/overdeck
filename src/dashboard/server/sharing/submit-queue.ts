@@ -146,7 +146,8 @@ export class SubmitQueue {
     this.timer = setTimeout(() => {
       this.timer = null;
       this.ticking = true;
-      void this.tick().finally(() => {
+      // A tick never rejects: a dependency that throws reads as idle or as an unknown delivery.
+      void this.tick().catch(() => undefined).finally(() => {
         this.ticking = false;
         this.schedule();
       });
@@ -154,7 +155,9 @@ export class SubmitQueue {
   }
 
   private async tick(): Promise<void> {
-    const activity = await this.deps.activity().catch(() => ({ working: false, lastMessageId: null }));
+    const activity = await Promise.resolve()
+      .then(() => this.deps.activity())
+      .catch(() => ({ working: false, lastMessageId: null }));
     if (this.closed) return;
     this.agentWorking = activity.working;
     this.emitStatus();
@@ -174,7 +177,9 @@ export class SubmitQueue {
     if (!head) return;
     this.delivering = head;
     const undo = this.events.onDelivering(head);
-    const answer = await this.deps.deliver(head.text).catch(() => null);
+    const answer = await Promise.resolve()
+      .then(() => this.deps.deliver(head.text))
+      .catch(() => null);
     if (this.closed) return;
     this.delivering = null;
     const status = answer?.status ?? 500;
