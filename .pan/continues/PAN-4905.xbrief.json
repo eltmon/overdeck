@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4905",
   "created": "2026-11-03T15:51:11.476Z",
-  "updated": "2026-11-03T16:45:37.592Z",
+  "updated": "2026-11-03T16:45:54.475Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -114,6 +114,10 @@
     "machines-response-remote-enabled.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T16:45:37.591Z"
+    },
+    "enable-remote-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:45:54.474Z"
     }
   }
 }
