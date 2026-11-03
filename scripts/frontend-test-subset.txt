@@ -53,6 +53,7 @@ src/components/Settings/__tests__/gemini-qwen-glm-catalog.test.ts
 src/components/Settings/anywhere/__tests__/AddSshMachineDialog.test.tsx
 src/components/Settings/anywhere/__tests__/AddTriggerDialog.test.tsx
 src/components/Settings/anywhere/__tests__/AccessTokensPanel.test.tsx
+src/components/Settings/anywhere/__tests__/AnywhereDialogHost.test.tsx
 src/components/Settings/anywhere/__tests__/AnywhereStatusCard.test.tsx
 src/components/Settings/anywhere/__tests__/CompareSettingsDialog.test.tsx
 src/components/Settings/anywhere/__tests__/DevicesPanel.test.tsx
@@ -87,6 +88,7 @@ src/components/__tests__/GitHubQuotaPill.test.tsx
 src/components/__tests__/GitHubRateLimitBanner.test.tsx
 src/components/__tests__/PanOpenInPicker.remote.test.tsx
 src/components/__tests__/Sidebar.workspacePullRequest.test.tsx
+src/components/__tests__/palette-anywhere-actions.test.ts
 src/components/__tests__/palette-fleet-hits.test.tsx
 src/components/chat/__tests__/ChatMarkdown.issue-links.test.tsx
 src/components/chat/__tests__/ChatMarkdown.pull-request-links.test.tsx
@@ -131,6 +133,7 @@ src/components/chat/messagesTimeline/messageRows.test.tsx
 src/components/costs/__tests__/FleetUsagePanel.test.tsx
 src/components/drawer/IssueDrawer.tracker-fallback.test.tsx
 src/components/drawer/useDrawerData.absent-issue.test.tsx
+src/components/home/__tests__/AnywhereSetUpRow.test.tsx
 src/components/home/__tests__/HomeComposer.test.tsx
 src/components/home/__tests__/HomeComposerProjectChip.test.tsx
 src/components/home/__tests__/homeComposerIntents.test.ts
@@ -168,6 +171,7 @@ src/components/shared/ModelPicker/ModelPicker.render.test.tsx
 src/components/shared/ModelPicker/__tests__/harnessRows.test.ts
 src/components/shared/__tests__/Modal.test.tsx
 src/components/sidebar/__tests__/AddProjectToMachineDialog.test.tsx
+src/components/sidebar/__tests__/MachinesNavItem.test.tsx
 src/components/simple/SimpleQuestionCard.test.tsx
 src/components/terminal/TerminalDrawer.pending.test.tsx
 src/components/terminal/terminalControlFrames.test.ts
@@ -187,6 +191,7 @@ src/lib/__tests__/linkedConversation.test.ts
 src/lib/__tests__/pendingInput.test.ts
 src/lib/__tests__/pendingInputAnswer.test.ts
 src/lib/__tests__/selectBackendPanes.render-count.test.tsx
+src/lib/__tests__/settingsSection.test.ts
 src/lib/__tests__/simple-derive.test.ts
 src/lib/__tests__/simple-feed.test.ts
 src/lib/__tests__/syntaxTheme.test.ts
