@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4930",
   "created": "2026-11-03T21:47:50.354Z",
-  "updated": "2026-11-03T22:07:31.417Z",
+  "updated": "2026-11-03T22:07:34.174Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,11 @@
       "claimedBy": "agent-pan-4930",
       "claimedAt": "2026-11-03T22:04:32.812Z",
       "doneAt": "2026-11-03T22:07:31.417Z"
+    },
+    "revoke-exited-event": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4930",
+      "claimedAt": "2026-11-03T22:07:34.174Z"
     }
   }
 }
