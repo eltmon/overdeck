@@ -6,6 +6,8 @@
  * the `admit`, `kick` and `revoke` frames this host process sent. A room snapshot can remove an id
  * (the viewer is no longer listed) but never add one. An eligible viewer is in that set and listed
  * as `admitted` and `connected` in the latest snapshot; only eligible viewers get a peer connection.
+ * One exception (PAN-4479 D-4): after a dashboard restart, `ShareManager.resume()` seeds the set once
+ * from the first snapshot's admitted participants.
  *
  * Signaling (D-13, D-14, D-16): the host always offers. Each peer connection carries the five
  * labeled channels, ordered and reliable, created before the offer. ICE servers come from the share

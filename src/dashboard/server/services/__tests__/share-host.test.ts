@@ -4,6 +4,7 @@ import { WebSocket } from 'ws';
 import type {
   CreateRoomResponse,
   IceServer,
+  RoomParticipant,
   RoomSnapshot,
   ServiceToHostFrame,
   ShareScope,
@@ -153,6 +154,14 @@ function harness(overrides: Partial<ShareManagerDeps> = {}): Harness {
     ...overrides,
   };
   return { manager: new ShareManager(deps), deps, store, sockets, events, createRoom, deleteRoom };
+}
+
+function storedRecord(code: string, n: number, conversationId: string): ShareRecord {
+  return { scopeKind: 'conversation', scopeId: conversationId, hostToken: hostToken(n), joinUrl: `${BASE}/s/${code}`, createdAt: `2026-11-01T00:00:0${n}.000Z` };
+}
+
+function participant(githubId: number, state: RoomParticipant['state']): RoomParticipant {
+  return { githubId, login: `u${githubId}`, avatarUrl: `https://avatars.githubusercontent.com/u/${githubId}`, state, contributor: false, connected: true };
 }
 
 async function createConnected(h: Harness): Promise<FakeSocket> {
@@ -446,6 +455,50 @@ describe('ShareManager', () => {
     expect(h.store).toEqual({});
   });
 
+  it('resume opens one host socket per record with that record\'s host token and answers their codes', async () => {
+    const readAccount = vi.fn(async () => ACCOUNT);
+    const h = harness({ readAccount });
+    h.store.VWXZ2345 = storedRecord('VWXZ2345', 7, 'conv-z');
+    h.store.LMNPQRST = storedRecord('LMNPQRST', 8, 'conv-y');
+
+    expect((await h.manager.resume()).sort()).toEqual(['LMNPQRST', 'VWXZ2345']);
+    expect(h.sockets.map((socket) => [socket.url, socket.headers.Authorization]).sort()).toEqual([
+      ['wss://share.overdeck.ai/v1/rooms/LMNPQRST/host?v=1', `Bearer ${hostToken(8)}`],
+      ['wss://share.overdeck.ai/v1/rooms/VWXZ2345/host?v=1', `Bearer ${hostToken(7)}`],
+    ]);
+    expect(readAccount).not.toHaveBeenCalled();
+  });
+
+  it('resume skips codes this process already hosts', async () => {
+    const h = harness();
+    await createConnected(h);
+    expect(await h.manager.resume()).toEqual([]);
+    expect(h.sockets).toHaveLength(1);
+  });
+
+  it('resume answers [] and opens nothing for an invalid share URL or an unreadable record file', async () => {
+    const badUrl = harness({ readShareUrl: async () => ({ error: 'anywhere.share_url is not a URL' }) });
+    badUrl.store.VWXZ2345 = storedRecord('VWXZ2345', 7, 'conv-z');
+    expect(await badUrl.manager.resume()).toEqual([]);
+    expect(badUrl.sockets).toHaveLength(0);
+
+    const unreadable = harness();
+    unreadable.deps.records.read = async () => { throw new Error('EACCES'); };
+    expect(await unreadable.manager.resume()).toEqual([]);
+    expect(unreadable.sockets).toHaveLength(0);
+  });
+
+  it('a re-parked share is connecting, then connected after its room frame', async () => {
+    const h = harness();
+    h.store.VWXZ2345 = storedRecord('VWXZ2345', 7, 'conv-z');
+    await h.manager.resume();
+    expect(await h.manager.list()).toMatchObject([{ shortCode: 'VWXZ2345', connection: 'connecting' }]);
+    const socket = h.sockets[0] as FakeSocket;
+    socket.open();
+    socket.deliver({ type: 'room', snapshot: snapshot('VWXZ2345') });
+    expect(await h.manager.list()).toMatchObject([{ shortCode: 'VWXZ2345', connection: 'connected', snapshot: snapshot('VWXZ2345') }]);
+  });
+
   it('list never contains a host token (ac5)', async () => {
     const h = harness();
     await createConnected(h);
@@ -604,6 +657,39 @@ describe('ShareManager WebRTC hub wiring (PAN-4474)', () => {
     expect(hub().ctx.sendFrame({ type: 'ice-servers' })).toBe(true);
     expect(fresh.sent).toEqual([JSON.stringify({ type: 'ice-servers' })]);
     expect(old.sent).toEqual([]);
+  });
+
+  it('the first room frame after resume admits every admitted participant once before onSnapshot', async () => {
+    const { h, hub } = hubHarness();
+    h.store.VWXZ2345 = storedRecord('VWXZ2345', 7, 'conv-z');
+    await h.manager.resume();
+    const socket = h.sockets[0] as FakeSocket;
+    socket.open();
+    const room = snapshot('VWXZ2345', { participants: [participant(100, 'admitted'), participant(101, 'admitted'), participant(102, 'lobby')] });
+    socket.deliver({ type: 'room', snapshot: room });
+    socket.deliver({ type: 'room', snapshot: room });
+    expect(hub().calls.map(([name, id]) => (name === 'admit' ? `admit:${String(id)}` : name))).toEqual([
+      'admit:100',
+      'admit:101',
+      'onSnapshot',
+      'onSnapshot',
+    ]);
+  });
+
+  it('a created share and a same-process reconnect never seed the hub', async () => {
+    const { h, hub } = hubHarness();
+    await h.manager.create(SCOPE);
+    const first = h.sockets[0] as FakeSocket;
+    first.open();
+    const room = snapshot('BCDFGHJK', { participants: [participant(100, 'admitted')] });
+    first.deliver({ type: 'room', snapshot: room });
+    first.drop(1006);
+    await vi.advanceTimersByTimeAsync(1000);
+    const second = h.sockets[1] as FakeSocket;
+    second.open();
+    second.deliver({ type: 'room', snapshot: room });
+    expect(hub().count('admit')).toBe(0);
+    expect(hub().count('onSnapshot')).toBe(2);
   });
 
   it('closes the hub once on end and on stop', async () => {

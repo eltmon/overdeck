@@ -7,8 +7,8 @@
  * keeps the latest `room` snapshot in memory, and relays the browser's share commands as host
  * frames. The browser only ever sees `ShareView`s, which have no host token by construction.
  *
- * Lifecycle: the host socket opens right after the room is created and its record written. An
- * unexpected loss reconnects on `SHARE_RECONNECT_DELAYS_MS` and keeps the hub (PAN-4479); close
+ * Lifecycle: the host socket opens right after the room is created and its record written, and
+ * `resume()` re-parks every record on boot (PAN-4479). An unexpected loss reconnects on `SHARE_RECONNECT_DELAYS_MS` and keeps the hub (PAN-4479); close
  * 4004 or a 404/401 upgrade removes the record; close 4008 stops (another host socket holds the room).
  *
  * Keepalive (D-11): a WebSocket protocol ping every 30 s; 75 s without a pong terminates the
@@ -223,6 +223,39 @@ export class ShareManager {
     return { status: 204 };
   }
 
+  /**
+   * Re-parks every recorded share this process does not host yet (D-3). Reads the record file and
+   * anywhere.share_url only; never throws. Returns the short codes it opened.
+   */
+  async resume(): Promise<string[]> {
+    let records: Record<string, ShareRecord>;
+    try {
+      records = await this.deps.records.read();
+    } catch {
+      return [];
+    }
+    const codes = Object.keys(records).filter((code) => !this.hosts.has(code));
+    if (codes.length === 0) return [];
+    let base: ShareUrlResult;
+    try {
+      base = await this.deps.readShareUrl();
+    } catch {
+      return [];
+    }
+    if ('error' in base) return [];
+    const opened: string[] = [];
+    for (const code of codes) {
+      try {
+        this.openHost(base.url, code, records[code] as ShareRecord, true);
+        opened.push(code);
+      } catch {
+        // openSocket threw synchronously (for example a malformed URL): forget this entry, keep the record.
+        this.dropHost(code, 'none');
+      }
+    }
+    return opened;
+  }
+
   /** Closes every host socket (tests and shutdown). Records stay on disk. */
   stop(): void {
     for (const code of [...this.hosts.keys()]) this.dropHost(code, 'close');
@@ -382,6 +415,14 @@ export class ShareManager {
       host.snapshot = frame.snapshot;
       host.connection = 'connected';
       host.attempt = 0;
+      if (host.restoring) {
+        // First snapshot after a re-park: the service's admitted list is this host's own earlier
+        // admissions, so it seeds the hub's content gate exactly once (D-4).
+        host.restoring = false;
+        for (const p of frame.snapshot.participants) {
+          if (p.state === 'admitted') host.hub?.admit(p.githubId);
+        }
+      }
       host.hub?.onSnapshot(frame.snapshot);
     } else if (frame.type === 'signal' && typeof frame.githubId === 'number' && typeof frame.data === 'object' && frame.data !== null) {
       host.hub?.onSignal(frame.githubId, frame.data);
