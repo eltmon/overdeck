@@ -4,17 +4,17 @@
     "created": "2026-11-02T23:42:44.939Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4859: Open in editor on an SSH-host machine targets ssh-remote+127.0.0.1 (the local forward)",
-    "updated": "2026-11-02T23:45:13.539Z"
+    "updated": "2026-11-02T23:46:19.131Z"
   },
   "plan": {
     "id": "pan-4859",
     "title": "Open in editor on an SSH-host machine targets ssh-remote+127.0.0.1 (the local forward)",
-    "status": "proposed",
+    "status": "running",
     "uid": "fe21cfbc-6e9d-41bd-ae2b-7c0db8a10a68",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-02T23:42:44.939Z",
-    "updated": "2026-11-02T23:45:13.539Z",
+    "updated": "2026-11-02T23:46:19.131Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4859",
@@ -386,5 +386,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
