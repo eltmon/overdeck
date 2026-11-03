@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4904",
   "created": "2026-11-03T15:44:28.853Z",
-  "updated": "2026-11-03T16:06:27.443Z",
+  "updated": "2026-11-03T16:08:51.867Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,10 @@
       "claimedBy": "agent-pan-4904",
       "claimedAt": "2026-11-03T16:04:43.436Z",
       "doneAt": "2026-11-03T16:06:27.443Z"
+    },
+    "codex-injected-prefixes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:08:51.867Z"
     }
   }
 }
