@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4882",
   "created": "2026-11-03T06:27:51.535Z",
-  "updated": "2026-11-03T08:01:13.992Z",
+  "updated": "2026-11-03T08:01:38.254Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -280,6 +280,9 @@
     "closing-comment.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T08:01:13.991Z"
+    },
+    "relay-vm-signin.ac1": {
+      "status": "cancelled"
     }
   }
 }
