@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4948",
   "created": "2026-11-03T21:39:04.258Z",
-  "updated": "2026-11-03T22:17:15.290Z",
+  "updated": "2026-11-03T23:04:57.910Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -96,6 +96,10 @@
     "store-reload-node.ac2": {
       "status": "completed",
       "doneAt": "2026-11-03T22:17:15.289Z"
+    },
+    "web-client-connector-refusal.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:04:57.910Z"
     }
   }
 }
