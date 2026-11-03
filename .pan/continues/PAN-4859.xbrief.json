@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4859",
   "created": "2026-11-02T23:46:32.176Z",
-  "updated": "2026-11-03T00:12:57.873Z",
+  "updated": "2026-11-03T00:13:11.173Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -66,6 +66,10 @@
     "resolver-uses-destination.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T00:12:57.872Z"
+    },
+    "resolver-uses-destination.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:13:11.172Z"
     }
   }
 }
