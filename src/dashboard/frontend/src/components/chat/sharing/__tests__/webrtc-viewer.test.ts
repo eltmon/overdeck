@@ -2,12 +2,21 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { IceServer, SharedEnvelope, SharedMessage, SignalData } from '@overdeck/contracts';
 
-import { readPresence, WebRtcViewer, type ViewerNotice, type ViewerPeerPhase, type WebRtcViewerCallbacks } from '../webrtc-viewer';
+import {
+  readPresence,
+  readSharedMessage,
+  WebRtcViewer,
+  type SubmitAck,
+  type ViewerNotice,
+  type ViewerPeerPhase,
+  type WebRtcViewerCallbacks,
+} from '../webrtc-viewer';
 
 type Listener = (event: never) => void;
 
 class FakeChannel {
   readonly sent: string[] = [];
+  readyState: RTCDataChannelState = 'open';
   closed = false;
   private readonly listeners = new Map<string, Listener[]>();
   constructor(readonly label: string) {}
@@ -101,6 +110,9 @@ interface Harness {
   messages: (readonly SharedMessage[])[];
   phases: ViewerPeerPhase[];
   notices: ViewerNotice[];
+  drafts: unknown[];
+  acks: SubmitAck[];
+  events: string[];
   callbacks: WebRtcViewerCallbacks;
 }
 
@@ -110,12 +122,19 @@ function harness(ice: () => Promise<readonly IceServer[]> = async () => ICE): Ha
   const messages: (readonly SharedMessage[])[] = [];
   const phases: ViewerPeerPhase[] = [];
   const notices: ViewerNotice[] = [];
+  const drafts: unknown[] = [];
+  const acks: SubmitAck[] = [];
+  const events: string[] = [];
   const fetchIceServers = vi.fn(ice);
   const callbacks: WebRtcViewerCallbacks = {
     onMessages: (list) => messages.push(list),
     onPresence: vi.fn(),
     onPhase: (phase) => phases.push(phase),
     onNotice: (notice) => notices.push(notice),
+    onDraft: (draft) => drafts.push(draft),
+    onSubmitAck: (ack) => acks.push(ack),
+    onDraftSent: () => events.push('draft-sent'),
+    onReady: () => events.push('ready'),
   };
   const viewer = new WebRtcViewer({
     RTCPeerConnection: FakePeer as unknown as typeof RTCPeerConnection,
@@ -123,7 +142,7 @@ function harness(ice: () => Promise<readonly IceServer[]> = async () => ICE): Ha
     fetchIceServers,
     now: () => 42,
   }, callbacks);
-  return { viewer, signals, fetchIceServers, messages, phases, notices, callbacks };
+  return { viewer, signals, fetchIceServers, messages, phases, notices, drafts, acks, events, callbacks };
 }
 
 async function offered(h: Harness): Promise<FakePeer> {
@@ -222,7 +241,7 @@ describe('WebRtcViewer (PAN-4475 WI-8)', () => {
     expect(h.messages.at(-1)?.map((m) => m.text)).toEqual(['first', 'second, edited', 'third']);
   });
 
-  it('drops unknown keys and author from received messages', async () => {
+  it('drops unknown keys and an author without an https avatar from received messages', async () => {
     const h = harness();
     const { conversation } = await helloDone(h);
     conversation.receive(envelope('conversation', 1, {
@@ -259,10 +278,10 @@ describe('WebRtcViewer (PAN-4475 WI-8)', () => {
     expect(h.notices).toEqual([{ kind: 'updates_missed' }]);
   });
 
-  it('gives drafts and terminal channels no message listener', async () => {
+  it('gives the terminal channel no message listener', async () => {
     const h = harness();
     const peer = await offered(h);
-    expect(peer.fireDataChannel('drafts').listenerCount('message')).toBe(0);
+    expect(peer.fireDataChannel('drafts').listenerCount('message')).toBe(1);
     expect(peer.fireDataChannel('terminal').listenerCount('message')).toBe(0);
     expect(peer.fireDataChannel('presence').listenerCount('message')).toBe(1);
   });
@@ -323,5 +342,82 @@ describe('WebRtcViewer (PAN-4475 WI-8)', () => {
     await settle();
     expect({ messages: h.messages.length, phases: h.phases.length, notices: h.notices.length }).toEqual(before);
     expect(FakePeer.instances).toHaveLength(1);
+  });
+});
+
+describe('WebRtcViewer drafts and submits (PAN-4476 WI-10)', () => {
+  const sentEnvelopes = (channel: FakeChannel) => channel.sent.map((part) => JSON.parse(part) as SharedEnvelope);
+
+  it('forwards a host draft rebuilt from known keys and ignores a malformed one', async () => {
+    const h = harness();
+    const { peer } = await helloDone(h);
+    const drafts = peer.fireDataChannel('drafts');
+    drafts.receive(envelope('drafts', 1, { authorGithubId: 7, authorLogin: 'alice', text: 'hi', updatedAt: 5, avatarUrl: 'javascript:x' }));
+    drafts.receive(envelope('drafts', 2, { authorGithubId: 0, authorLogin: 'alice', text: 'hi', updatedAt: 5 }));
+    expect(h.drafts).toEqual([{ authorGithubId: 7, authorLogin: 'alice', text: 'hi', updatedAt: 5 }]);
+  });
+
+  it('sends drafts and submits with per-channel seq after the hello, and nothing before it', async () => {
+    const h = harness();
+    const peer = await offered(h);
+    const control = peer.fireDataChannel('control');
+    const drafts = peer.fireDataChannel('drafts');
+    expect(h.viewer.sendDraft('early')).toBe(false);
+    expect(h.viewer.submit('c0', 'early')).toBe(false);
+    expect(drafts.sent).toEqual([]);
+    control.receive(envelope('control', 1, { kind: 'hello', hello: { v: 1, scopeKinds: ['conversation'], scope: SCOPE } }));
+    expect(h.events).toEqual(['ready']);
+    expect(h.viewer.sendDraft('x')).toBe(true);
+    expect(h.viewer.sendDraft('xy')).toBe(true);
+    expect(sentEnvelopes(drafts)).toEqual([
+      { v: 1, ch: 'drafts', streamId: 'conv-a', seq: 1, t: 42, payload: { text: 'x' } },
+      { v: 1, ch: 'drafts', streamId: 'conv-a', seq: 2, t: 42, payload: { text: 'xy' } },
+    ]);
+    expect(h.viewer.submit('c1', 'Do it')).toBe(true);
+    expect(sentEnvelopes(control).at(-1)).toEqual({ v: 1, ch: 'control', streamId: 'conv-a', seq: 2, t: 42, payload: { kind: 'submit', clientId: 'c1', text: 'Do it' } });
+  });
+
+  it('returns false when the channel is not open', async () => {
+    const h = harness();
+    const { peer } = await helloDone(h);
+    const drafts = peer.fireDataChannel('drafts');
+    drafts.readyState = 'closing';
+    expect(h.viewer.sendDraft('x')).toBe(false);
+    expect(drafts.sent).toEqual([]);
+  });
+
+  it('fires onReady once per negotiation', async () => {
+    const h = harness();
+    const { control } = await helloDone(h);
+    control.receive(envelope('control', 2, { kind: 'hello', hello: { v: 1, scopeKinds: ['conversation'], scope: SCOPE } }));
+    expect(h.events).toEqual(['ready']);
+  });
+
+  it('calls onSubmitAck and onDraftSent', async () => {
+    const h = harness();
+    const { control } = await helloDone(h);
+    control.receive(envelope('control', 2, { kind: 'submit-ack', clientId: 'c1', status: 'queued', position: 2, extra: 'x' }));
+    control.receive(envelope('control', 3, { kind: 'submit-ack', clientId: 'c1', status: 'rejected', reason: 'grant_revoked' }));
+    control.receive(envelope('control', 4, { kind: 'submit-ack', clientId: 'c1', status: 'maybe' }));
+    control.receive(envelope('control', 5, { kind: 'draft-sent' }));
+    expect(h.acks).toEqual([
+      { clientId: 'c1', status: 'queued', position: 2 },
+      { clientId: 'c1', status: 'rejected', reason: 'grant_revoked' },
+    ]);
+    expect(h.events).toEqual(['ready', 'draft-sent']);
+  });
+
+  it('keeps an author with an https avatar and drops a javascript: one', () => {
+    const alice = { login: 'alice', avatarUrl: 'https://avatars.githubusercontent.com/u/1' };
+    expect(readSharedMessage(message('m1', 'hi', { role: 'user', author: { ...alice, extra: 1 } }))?.author).toEqual(alice);
+    expect(readSharedMessage(message('m1', 'hi', { role: 'user', author: { login: 'alice', avatarUrl: 'javascript:x' } }))).not.toHaveProperty('author');
+  });
+
+  it('keeps agentWorking and queued on a presence stream', () => {
+    const stream = { streamId: 'conv-a', label: 'Fix it', kind: 'conversation', agentWorking: true, queued: 2 };
+    expect(readPresence({ controllerGithubId: 1, participants: [], streams: [stream] })?.streams).toEqual([stream]);
+    expect(readPresence({ controllerGithubId: 1, participants: [], streams: [{ ...stream, agentWorking: 'yes', queued: -1 }] })?.streams).toEqual([
+      { streamId: 'conv-a', label: 'Fix it', kind: 'conversation' },
+    ]);
   });
 });
