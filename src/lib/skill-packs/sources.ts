@@ -10,7 +10,7 @@
  */
 import { execFile } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { lstat, mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { chmod, lstat, mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { isMap, isScalar, parse as parseYaml, parseDocument, type Document } from 'yaml';
@@ -687,6 +687,26 @@ export async function disablePackBrowser(id: string): Promise<{ changed: boolean
  * PAN-4852 AD-10: the sageox cache keeps its `bindings/` (SageOx link files need `ox login` and the
  * network to recreate); everything else in it is derived and goes.
  */
+/**
+ * Give the owner write access to every directory under `path` (never following
+ * symlinks), so a recursive rm can unlink their entries. The Go toolchain that
+ * GOTOOLCHAIN=auto unpacks into the sageox pack's module cache has read-only
+ * directories even with -modcacherw.
+ */
+async function makeDirsWritable(path: string): Promise<void> {
+  const stats = await lstat(path).catch(() => null);
+  if (!stats?.isDirectory()) return;
+  if ((stats.mode & 0o700) !== 0o700) await chmod(path, stats.mode | 0o700);
+  for (const entry of await readdir(path, { withFileTypes: true })) {
+    if (entry.isDirectory()) await makeDirsWritable(join(path, entry.name));
+  }
+}
+
+async function rmPackTree(path: string): Promise<void> {
+  await makeDirsWritable(path);
+  await rm(path, { recursive: true, force: true });
+}
+
 export async function removePack(id: string): Promise<{ removed: boolean; keptBindings?: string }> {
   if (!PACK_ID_PATTERN.test(id)) throw new PackSourceError('bad-id', `invalid pack id: ${JSON.stringify(id)}`);
   const removed = (await getPack(id)) !== null;
@@ -695,11 +715,11 @@ export async function removePack(id: string): Promise<{ removed: boolean; keptBi
   const bindings = join(cacheDir, 'bindings');
   if (id === 'sageox' && (await lstat(bindings).then((s) => s.isDirectory(), () => false))) {
     for (const child of await readdir(cacheDir)) {
-      if (child !== 'bindings') await rm(join(cacheDir, child), { recursive: true, force: true });
+      if (child !== 'bindings') await rmPackTree(join(cacheDir, child));
     }
     return { removed, keptBindings: bindings };
   }
-  await rm(cacheDir, { recursive: true, force: true });
+  await rmPackTree(cacheDir);
   return { removed };
 }
 

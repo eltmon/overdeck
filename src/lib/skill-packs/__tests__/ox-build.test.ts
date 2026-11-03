@@ -127,6 +127,16 @@ describe('buildOx', () => {
     expect(Number.isNaN(Date.parse(marker.builtAt))).toBe(false);
   });
 
+  it('records the go version the build ran with, read in the extraction with the build env', async () => {
+    const f = fixture();
+    const { run, calls } = fakeRunner();
+    await buildOx({ ...f, commit: COMMIT, run });
+    const last = calls.at(-1)!;
+    expect(last.args).toEqual(['version']);
+    expect(last.cwd).toBe(f.extractDir);
+    expect(last.env['GOMODCACHE']).toBe(join(f.goDir, 'mod'));
+  });
+
   it('replaces an earlier partial bin dir', async () => {
     const f = fixture();
     mkdirSync(join(f.extractDir, 'bin'));
@@ -210,6 +220,20 @@ describe('oxBuildDownloads', () => {
       'Go modules listed in go.sum (proxy.golang.org)',
     ]);
     expect(await oxBuildDownloads(f.extractDir, fakeRunner({ goVersion: 'go1.27.1' }).run)).toEqual([
+      'Go modules listed in go.sum (proxy.golang.org)',
+    ]);
+  });
+
+  it('names the toolchain line when go.mod asks for a newer toolchain than its go line', async () => {
+    const f = withGoFiles('go 1.26.0\n\ntoolchain go1.27.3');
+    expect(await oxBuildDownloads(f.extractDir, fakeRunner({ goVersion: 'go1.24.1' }).run)).toEqual([
+      'Go modules listed in go.sum (proxy.golang.org)',
+      'Go toolchain go1.27.3 (GOTOOLCHAIN=auto)',
+    ]);
+    expect(await oxBuildDownloads(f.extractDir, fakeRunner({ goVersion: 'go1.26.2' }).run)).toContain(
+      'Go toolchain go1.27.3 (GOTOOLCHAIN=auto)',
+    );
+    expect(await oxBuildDownloads(f.extractDir, fakeRunner({ goVersion: 'go1.27.3' }).run)).toEqual([
       'Go modules listed in go.sum (proxy.golang.org)',
     ]);
   });

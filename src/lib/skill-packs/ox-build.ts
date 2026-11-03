@@ -120,14 +120,19 @@ function isOlder(host: string, required: string): boolean {
 /**
  * AD-8: what the build downloads. The module line appears when the extraction
  * has a `go.sum`; the toolchain line when `go env GOVERSION` is older than the
- * `go` line in `go.mod` (or cannot be read: the preview errs on disclosing).
+ * toolchain `go.mod` asks for (or cannot be read: the preview errs on
+ * disclosing). That is the newer of its `go` and `toolchain` lines, the one
+ * `GOTOOLCHAIN=auto` actually downloads.
  */
 export async function oxBuildDownloads(extractDir: string, run: OxBuildRunner = defaultRunner, goDir?: string): Promise<string[]> {
   const downloads: string[] = [];
   if ((await readOptional(join(extractDir, 'go.sum'))) !== undefined) {
     downloads.push('Go modules listed in go.sum (proxy.golang.org)');
   }
-  const required = (await readOptional(join(extractDir, 'go.mod')))?.match(/^go\s+(\S+)\s*$/m)?.[1];
+  const goMod = await readOptional(join(extractDir, 'go.mod'));
+  const goLine = goMod?.match(/^go\s+(\S+)\s*$/m)?.[1];
+  const toolchainLine = goMod?.match(/^toolchain\s+go(\S+)\s*$/m)?.[1];
+  const required = goLine && toolchainLine ? (isOlder(goLine, toolchainLine) ? toolchainLine : goLine) : (toolchainLine ?? goLine);
   if (!required) return downloads;
   let host = '';
   try {
@@ -184,11 +189,18 @@ export async function buildOx(opts: { extractDir: string; commit: string; goDir:
     await rm(binDir, { recursive: true, force: true });
     throw new OxBuildError(`pack sageox: go build failed: ${stderrTail(error)}`);
   }
+  // The toolchain the build ran with (GOTOOLCHAIN=auto may have switched from the host go).
+  let builtWith = goVersion;
+  try {
+    builtWith = (await run('go', ['version'], { cwd: opts.extractDir, env, timeout: GO_PROBE_TIMEOUT_MS })).stdout.trim() || goVersion;
+  } catch {
+    // Keep the host version; the build itself succeeded.
+  }
   const marker = {
     version: OX_BUILD_MARKER_VERSION,
     commit: opts.commit,
     binaries: [...OX_BINARIES],
-    goVersion,
+    goVersion: builtWith,
     builtAt: new Date().toISOString(),
   };
   await writeFile(join(binDir, OX_BUILD_MARKER), `${JSON.stringify(marker, null, 2)}\n`);

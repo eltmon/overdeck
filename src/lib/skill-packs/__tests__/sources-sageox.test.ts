@@ -128,7 +128,7 @@ describe('addPack sageox', () => {
         ['go', 'build', '-o', `${bin}/ox-adapter-codex`, './cmd/ox-adapter-codex'],
       ],
       writes: [`${bin}/`, `${packGoDir('sageox')}/`],
-      downloads: ['Go modules listed in go.sum (proxy.golang.org)', 'Go toolchain go1.26.0 (GOTOOLCHAIN=auto)'],
+      downloads: ['Go modules listed in go.sum (proxy.golang.org)', 'Go toolchain go1.27.3 (GOTOOLCHAIN=auto)'],
     });
     expect(runner.builds()).toEqual([]);
     expect(await getPack('sageox')).toBeNull();
@@ -228,6 +228,20 @@ describe('removePack sageox (WI-4)', () => {
     expect(existsSync(packGoDir('sageox'))).toBe(false);
     expect(existsSync(packRepoDir('sageox'))).toBe(false);
     expect(await getPack('sageox')).toBeNull();
+  });
+
+  it('deletes a read-only Go toolchain tree in the module cache', async () => {
+    __setOxBuildRunnerForTests(fakeRunner().run);
+    await addPack({ id: 'sageox', url: up.url, ref: first }, accept);
+    const toolchain = join(packGoDir('sageox'), 'mod', 'golang.org', 'toolchain@v0.0.1-go1.27.3.linux-amd64');
+    mkdirSync(join(toolchain, 'src'), { recursive: true });
+    writeFileSync(join(toolchain, 'LICENSE'), 'x');
+    writeFileSync(join(toolchain, 'src', 'a.go'), 'x');
+    chmodSync(join(toolchain, 'src'), 0o555);
+    chmodSync(toolchain, 0o555);
+
+    expect(await removePack('sageox')).toEqual({ removed: true });
+    expect(existsSync(packCacheDir('sageox'))).toBe(false);
   });
 
   it('deletes the whole cache when there is no binding store', async () => {
