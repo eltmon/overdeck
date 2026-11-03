@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4925",
   "created": "2026-11-03T20:26:03.235Z",
-  "updated": "2026-11-03T20:45:58.266Z",
+  "updated": "2026-11-03T20:47:32.772Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -31,6 +31,10 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-4925",
       "claimedAt": "2026-11-03T20:45:58.266Z"
+    },
+    "fix-smee-stop-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T20:47:32.771Z"
     }
   }
 }
