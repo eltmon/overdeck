@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T14:20:21Z · model: claude-opus-5-5 · open: 867_
+_Last sequenced: 2026-11-03T14:21:18Z · model: claude-opus-5-5 · open: 868_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -821,6 +821,7 @@ _Last sequenced: 2026-11-03T14:20:21Z · model: claude-opus-5-5 · open: 867_
 | 826 | PAN-2775 | S | low | needs-refinement |  |  | Stale: targets boot-correlated reaping (boot reconciliation) deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 827 | PAN-4834 | M | medium | ok |  |  | Phone app W-WEB2: HTTP/1.1 and WebSocket clients inside the channel plus fetch/WS shims; PAN-4833 done, now unblocked. |
 | 829 | PAN-3505 | XS | low | needs-refinement |  |  | Stale: targets the flywheel state write door deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 831 | PAN-4836 | S | medium | ok |  |  | Phone app W-MAC2: "Overdeck app" pairing QR tab in Settings > Anywhere with paired-phone list; PAN-4835 merged, in pipeline. |
 | 832 | PAN-3321 | XS | low | stale |  |  | Stale: targets pan unstick deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 833 | PAN-736 | M | low | stale |  |  | Retired: work-types.ts, WorkTypeRouter and models.overrides are all gone (#4174); per-subagent routing needs a fresh roles.* design |
 | 834 | PAN-762 | M | low | stale |  |  | Premise gone: models.overrides is a retired, ignored key since #4174, so there are no overrides left to warn about |
@@ -1202,10 +1203,10 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T14:20:21Z",
+  "generatedAt": "2026-11-03T14:21:18Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 867,
+  "openCount": 868,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -3441,6 +3442,19 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "gate": "blocked",
       "planning": "skip",
       "isEpic": true
+    },
+    {
+      "issue": "PAN-4897",
+      "rank": 175,
+      "size": "S",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "macOS Local Network privacy blocks the launchd server, so a connect-set-up Mac stays half linked; detect and explain the denial",
+      "rationale": "New in-pipeline issue with a verified cause: launchd-started Node gets EHOSTUNREACH for LAN addresses on macOS 15+, leaving Anywhere links half online. Slotted beside the fresh-npx-machine setup bug (PAN-4629) because it breaks first-run Anywhere setup on Macs.",
+      "gate": "auto",
+      "planning": "auto"
     },
     {
       "issue": "PAN-1868",
@@ -11349,6 +11363,19 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
+      "issue": "PAN-4836",
+      "rank": 831,
+      "size": "S",
+      "importance": "medium",
+      "score": 30,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Phone app W-MAC2: \"Overdeck app\" pairing QR tab in Settings > Anywhere with paired-phone list; PAN-4835 merged, in pipeline.",
+      "rationale": "Restored at its earlier free rank 831 after the prior run dropped it; it is now in the pipeline and PAN-4835 has closed, so it has no open dependency.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-3321",
       "rank": 832,
       "size": "XS",
@@ -12008,19 +12035,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "dependsOn": [],
       "why": "Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); PAN-4835 merged.",
       "rationale": "PAN-4835 merged in #4894, which clears its only dependency; rank held because the Anywhere phone epic is low-impact relative to substrate work above it.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4897",
-      "rank": 175,
-      "size": "S",
-      "importance": "high",
-      "score": 70,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "macOS Local Network privacy blocks the launchd server, so a connect-set-up Mac stays half linked; detect and explain the denial",
-      "rationale": "New in-pipeline issue with a verified cause: launchd-started Node gets EHOSTUNREACH for LAN addresses on macOS 15+, leaving Anywhere links half online. Slotted beside the fresh-npx-machine setup bug (PAN-4629) because it breaks first-run Anywhere setup on Macs.",
       "gate": "auto",
       "planning": "auto"
     }
@@ -13369,6 +13383,13 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-4823",
+      "to": "PAN-4836",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
     }
   ]
 }
