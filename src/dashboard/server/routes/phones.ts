@@ -1,11 +1,15 @@
 /**
- * Phone app routes (PAN-4835 WI-7).
+ * Phone app routes (PAN-4835 WI-7, WI-8).
  *
  * `POST /api/phones/exchange` is reachable only through a pairing-mode secure
  * channel: the remote request gate admits it from nothing else, and the route
  * checks the marker again. The handshake already proved the caller's link
  * key, so the route mints the `phone` token bound to that key and revokes any
  * earlier active phone record with the same `clientId` (D-2).
+ *
+ * `DELETE /api/phones/self` and `PUT /api/phones/self/push-key` are the
+ * phone's own self-service routes: the scope table admits them with `tell`,
+ * and the handler then requires a `phone` credential (D-9).
  */
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest, type HttpServerResponse } from 'effect/unstable/http';
@@ -16,10 +20,14 @@ import {
   listActiveRecordsOfKind,
   PHONE_TOKEN_SCOPES,
   revokeAccessToken,
+  setPhonePushKey,
 } from '../../../lib/access-tokens.js';
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
+import { closeChannelsForPeer } from '../channel-listener.js';
 import { type ChannelMarker, channelOfRequest } from '../channel-peer.js';
+import { closeDeviceConnections } from '../device-connections.js';
 import { jsonResponse } from '../http-helpers.js';
+import { type DashboardCredential, rejectUnsafeDashboardMutationRequest, resolveRequestCredential } from './dashboard-auth.js';
 import { buildEnvironmentDescriptor } from './environment.js';
 
 const MAX_LABEL_LENGTH = 64;
@@ -106,5 +114,64 @@ const exchangeRoute = HttpRouter.add(
   }),
 );
 
-// WI-8 (phones-self-routes) adds DELETE /api/phones/self and PUT /api/phones/self/push-key here.
-export const phonesRouteLayer = Layer.mergeAll(exchangeRoute);
+/** The calling phone revokes its own record. Exactly a phone credential may call this (D-12). */
+export async function handlePhonesSelfRevoke(credential: DashboardCredential | null): Promise<HttpServerResponse.HttpServerResponse> {
+  if (credential?.kind !== 'phone') {
+    return jsonResponse({ error: 'only a paired phone may revoke itself' }, { status: 403 });
+  }
+  const revoked = await revokeAccessToken(credential.tokenId);
+  closeDeviceConnections(credential.tokenId);
+  if (revoked?.phoneKey) closeChannelsForPeer(revoked.phoneKey);
+  emitActivityEntry({
+    source: 'dashboard',
+    level: 'info',
+    message: `Phone "${revoked?.name ?? credential.clientId}" removed itself`,
+    details: JSON.stringify({ tokenId: credential.tokenId, clientId: credential.clientId }),
+  });
+  return jsonResponse({ ok: true });
+}
+
+const selfRevokeRoute = HttpRouter.add(
+  'DELETE',
+  '/api/phones/self',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    return yield* Effect.promise(() => handlePhonesSelfRevoke(resolveRequestCredential(request)));
+  }),
+);
+
+/** The calling phone replaces its own push key. Exactly a phone credential may call this. */
+export async function handlePhonesPushKey(
+  credential: DashboardCredential | null,
+  bodyText: string,
+): Promise<HttpServerResponse.HttpServerResponse> {
+  if (credential?.kind !== 'phone') {
+    return jsonResponse({ error: 'only a paired phone may rotate its push key' }, { status: 403 });
+  }
+  let pushKeyHex: unknown;
+  try {
+    pushKeyHex = (bodyText ? JSON.parse(bodyText) : {}).pushKeyHex;
+  } catch {
+    return jsonResponse({ error: 'body is not JSON' }, { status: 400 });
+  }
+  if (typeof pushKeyHex !== 'string' || !KEY_HEX.test(pushKeyHex)) {
+    return jsonResponse({ error: 'pushKeyHex must be 64 lowercase hex characters' }, { status: 400 });
+  }
+  const updated = await setPhonePushKey(credential.tokenId, pushKeyHex);
+  if (!updated) return jsonResponse({ error: 'phone record not found' }, { status: 404 });
+  return jsonResponse({ ok: true });
+}
+
+const pushKeyRoute = HttpRouter.add(
+  'PUT',
+  '/api/phones/self/push-key',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+    const text = yield* request.text;
+    return yield* Effect.promise(() => handlePhonesPushKey(resolveRequestCredential(request), text));
+  }),
+);
+
+export const phonesRouteLayer = Layer.mergeAll(exchangeRoute, selfRevokeRoute, pushKeyRoute);

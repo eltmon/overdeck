@@ -455,6 +455,8 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/anywhere/trusted-origins',        kind: 'http', disposition: 'WRITE',       door: 'remote-access/trusted-origins.addSavedTrustedOrigin (PAN-4445)' },
   { surface: 'POST /api/machines/exchange',                kind: 'http', disposition: 'WRITE',       door: 'access-tokens.createAccessToken (machine) + link-store.upsertLink (PAN-4645, pairing channel only)' },
   { surface: 'POST /api/phones/exchange',                  kind: 'http', disposition: 'WRITE',       door: 'access-tokens.createAccessToken (phone) (PAN-4835, pairing channel only)' },
+  { surface: 'DELETE /api/phones/self',                    kind: 'http', disposition: 'WRITE',       door: 'access-tokens.revokeAccessToken (own phone token) (PAN-4835)' },
+  { surface: 'PUT /api/phones/self/push-key',               kind: 'http', disposition: 'WRITE',       door: 'access-tokens.setPhonePushKey (own phone token) (PAN-4835)' },
   { surface: 'POST /api/machines/link',                    kind: 'http', disposition: 'WRITE',       door: 'machine-link-service.createMachineLink -> link-store.upsertLink (PAN-4645)' },
   { surface: 'GET /api/machines',                          kind: 'http', disposition: 'AGGREGATE',   door: 'link-store.listLinks + access-tokens.listActiveRecordsOfKind (machine) (PAN-4645)' },
   { surface: 'DELETE /api/machines/self',                  kind: 'http', disposition: 'WRITE',       door: 'access-tokens.revokeAccessToken (own machine token) (PAN-4645)' },

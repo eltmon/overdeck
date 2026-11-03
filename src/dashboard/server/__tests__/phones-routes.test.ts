@@ -1,9 +1,13 @@
 /**
- * PAN-4835 WI-7: POST /api/phones/exchange mints the phone token bound to the
- * pairing channel's remote key, refuses plain sockets and link channels, and
- * revokes a previous active phone record with the same clientId; a key
- * already held by an active phone record gets 409.
+ * PAN-4835 WI-7, WI-8: POST /api/phones/exchange mints the phone token bound
+ * to the pairing channel's remote key, refuses plain sockets and link
+ * channels, and revokes a previous active phone record with the same
+ * clientId; a key already held by an active phone record gets 409.
+ * DELETE /api/phones/self and PUT /api/phones/self/push-key take exactly a
+ * phone credential.
  */
+import { createRequire } from 'node:module';
+import { createServer } from 'node:http';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -20,9 +24,16 @@ const {
   PHONE_TOKEN_SCOPES,
   verifyAccessToken,
 } = await import('../../../lib/access-tokens.js');
+const { openChannel } = await import('../../../lib/anywhere/channel/open.js');
+const { _resetChannelListenerForTests, installChannelListener, liveChannelCount } = await import('../channel-listener.js');
 const { remoteGateRejection } = await import('../remote-request-gate.js');
-const { handlePhonesExchange } = await import('../routes/phones.js');
+const { resolveDashboardCredential } = await import('../routes/dashboard-auth.js');
+const { handlePhonesExchange, handlePhonesPushKey, handlePhonesSelfRevoke } = await import('../routes/phones.js');
 type ChannelMarker = import('../channel-peer.js').ChannelMarker;
+type MachineKeyPair = import('../../../lib/anywhere/machine-key.js').MachineKeyPair;
+
+const _require = createRequire(import.meta.url);
+const dh = _require('noise-handshake/dh') as { generateKeyPair(): MachineKeyPair };
 
 const KEY_A = 'a1'.repeat(32);
 const PAIRING: ChannelMarker = { mode: 'pairing', remoteKeyHex: KEY_A, pairingId: 'cd'.repeat(16) };
@@ -30,6 +41,7 @@ const LINK: ChannelMarker = { mode: 'link', remoteKeyHex: KEY_A, pairingId: null
 const CLIENT_ID = '11111111-1111-4111-8111-111111111111';
 const originalHome = process.env.OVERDECK_HOME;
 let home: string;
+const cleanups: Array<() => Promise<void> | void> = [];
 
 async function read(response: HttpServerResponse.HttpServerResponse): Promise<{ status: number; json: Record<string, unknown> }> {
   return { status: response.status, json: JSON.parse(await HttpServerResponse.toWeb(response).text()) as Record<string, unknown> };
@@ -43,11 +55,14 @@ beforeEach(async () => {
   home = await mkdtemp(join(tmpdir(), 'pan-4835-phones-routes-'));
   process.env.OVERDECK_HOME = home;
   _resetAccessTokensForTests();
+  _resetChannelListenerForTests();
 });
 
 afterEach(async () => {
+  for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
   await _settleAccessTokenWritesForTests();
   _resetAccessTokensForTests();
+  _resetChannelListenerForTests();
   if (originalHome === undefined) delete process.env.OVERDECK_HOME;
   else process.env.OVERDECK_HOME = originalHome;
   await rm(home, { recursive: true, force: true });
@@ -116,5 +131,66 @@ describe('POST /api/phones/exchange (PAN-4835 WI-7)', () => {
       .modify({ remoteAddress: peer ? Option.some(peer) : Option.none() });
     expect(remoteGateRejection(request(undefined), PAIRING)).toBeNull();
     expect(remoteGateRejection(request('127.0.0.1'), null)).toEqual({ status: 401 });
+  });
+});
+
+describe('DELETE /api/phones/self and PUT /api/phones/self/push-key (PAN-4835 WI-8)', () => {
+  it('ac8: self-revoke takes exactly a phone credential; others get 403 and nothing is revoked', async () => {
+    const { json: exchanged } = await read(await handlePhonesExchange(body(), PAIRING));
+    const asDevice = { kind: 'device', deviceId: 'd', scopes: ['admin'] } as const;
+    expect((await read(await handlePhonesSelfRevoke(asDevice))).status).toBe(403);
+    expect((await read(await handlePhonesSelfRevoke({ kind: 'machine', tokenId: 'm', environmentId: 'e', scopes: ['admin'], actor: { agentId: 'unknown' }, access: 'operator' }))).status).toBe(403);
+    expect((await read(await handlePhonesSelfRevoke(null))).status).toBe(403);
+    expect(verifyAccessToken(exchanged.token as string).ok).toBe(true);
+
+    const asPhone = resolveDashboardCredential({ authorization: `Bearer ${exchanged.token}` }, LINK);
+    expect(asPhone?.kind).toBe('phone');
+    expect((await read(await handlePhonesSelfRevoke(asPhone))).json).toEqual({ ok: true });
+    expect(verifyAccessToken(exchanged.token as string)).toEqual({ ok: false });
+    expect(listActiveRecordsOfKind('phone')).toEqual([]);
+  });
+
+  it('ac8: self-revoke closes every channel bound to the phone key', async () => {
+    const serverKey = dh.generateKeyPair();
+    const phoneKey = dh.generateKeyPair();
+    const phoneHex = phoneKey.publicKey.toString('hex');
+    const { json: exchanged } = await read(await handlePhonesExchange(body(), { mode: 'pairing', remoteKeyHex: phoneHex, pairingId: 'ab'.repeat(16) }));
+
+    const http = createServer((_req, res) => res.end('ok'));
+    installChannelListener(http, {
+      primary: true,
+      localKey: async () => serverKey,
+      isPinnedPeer: (key) => key === phoneHex,
+      takePairing: () => 'unknown',
+      onPairingFailure: () => undefined,
+      log: () => undefined,
+    });
+    await new Promise<void>((resolve) => http.listen(0, '127.0.0.1', resolve));
+    cleanups.push(() => new Promise<void>((resolve) => http.close(() => resolve())));
+    const channelPort = (http.address() as { port: number }).port;
+    const channel = await openChannel(`tcp://127.0.0.1:${channelPort}`, { mode: 'link', localKey: phoneKey, remoteKeyHex: serverKey.publicKey.toString('hex') });
+    cleanups.push(() => channel.destroy());
+    expect(liveChannelCount()).toBe(1);
+    const channelClosed = new Promise<void>((resolve) => channel.once('close', resolve));
+
+    const asPhone = resolveDashboardCredential({ authorization: `Bearer ${exchanged.token}` }, { mode: 'link', remoteKeyHex: phoneHex, pairingId: null });
+    await handlePhonesSelfRevoke(asPhone);
+    await channelClosed;
+    expect(liveChannelCount()).toBe(0);
+  });
+
+  it('ac8: push-key rotation takes exactly a phone credential and replaces pushKey; a bad key is 400', async () => {
+    const { json: exchanged } = await read(await handlePhonesExchange(body(), PAIRING));
+    const asPhone = resolveDashboardCredential({ authorization: `Bearer ${exchanged.token}` }, LINK);
+    expect(asPhone?.kind).toBe('phone');
+
+    const asMachine = { kind: 'machine', tokenId: 'm', environmentId: 'e', scopes: ['admin'], actor: { agentId: 'unknown' }, access: 'operator' } as const;
+    expect((await read(await handlePhonesPushKey(asMachine, JSON.stringify({ pushKeyHex: 'd4'.repeat(32) })))).status).toBe(403);
+
+    const newKey = 'd4'.repeat(32);
+    expect((await read(await handlePhonesPushKey(asPhone, JSON.stringify({ pushKeyHex: newKey })))).json).toEqual({ ok: true });
+    expect(listActiveRecordsOfKind('phone')[0]?.pushKey).toBe(newKey);
+
+    expect((await read(await handlePhonesPushKey(asPhone, JSON.stringify({ pushKeyHex: 'not-hex' })))).status).toBe(400);
   });
 });
