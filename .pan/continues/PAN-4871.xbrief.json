@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4871",
   "created": "2026-11-03T03:36:23.944Z",
-  "updated": "2026-11-03T04:00:41.340Z",
+  "updated": "2026-11-03T04:01:05.069Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -76,6 +76,10 @@
     "mobile-view-linked.ac5": {
       "status": "completed",
       "doneAt": "2026-11-03T04:00:41.340Z"
+    },
+    "docs-phone-linked.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:01:05.069Z"
     }
   }
 }
