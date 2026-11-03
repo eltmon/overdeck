@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4930",
   "created": "2026-11-03T21:47:50.354Z",
-  "updated": "2026-11-03T23:23:11.427Z",
+  "updated": "2026-11-03T23:23:48.317Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -132,6 +132,10 @@
     "revoke-stop-agent.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T23:23:11.427Z"
+    },
+    "revoke-exited-event.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:23:48.316Z"
     }
   }
 }
