@@ -4,17 +4,17 @@
     "created": "2026-11-03T15:44:06Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4905: Add a Fly machine error says remote.enabled must be set 'in the Overdeck config' but only config.toml works",
-    "updated": "2026-11-03T15:49:15.949Z"
+    "updated": "2026-11-03T15:50:18.470Z"
   },
   "plan": {
     "id": "pan-4905",
     "title": "Add a Fly machine error says remote.enabled must be set 'in the Overdeck config' but only config.toml works",
-    "status": "proposed",
+    "status": "running",
     "uid": "3b66af81-e0a3-480b-a738-a35265923d13",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-03T15:44:06Z",
-    "updated": "2026-11-03T15:49:15.949Z",
+    "updated": "2026-11-03T15:50:18.470Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4905",
@@ -723,5 +723,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
