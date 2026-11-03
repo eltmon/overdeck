@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4917",
+  "created": "2026-11-03T18:32:48.231Z",
+  "updated": "2026-11-03T18:32:48.231Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "trailer-fetch-mode": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4917",
+      "claimedAt": "2026-11-03T18:32:48.231Z"
+    }
+  }
+}
