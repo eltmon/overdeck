@@ -246,7 +246,7 @@ function buildClient(obj: Obj): ClientToDirectoryFrame {
         publicKeyHex: str(obj, 'publicKeyHex', 64, KEY_HEX_RE),
         appVersion: str(obj, 'appVersion', 32),
       } as const;
-      if (platform !== 'ios' && platform !== 'android') fail();
+      if (platform !== 'ios' && platform !== 'android' && platform !== 'node') fail();
       return { ...frame, platform };
     }
     case 'signal': {
