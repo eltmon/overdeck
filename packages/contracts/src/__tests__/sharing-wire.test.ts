@@ -4,12 +4,16 @@ import type { ChatMessage } from "../rpc"
 import type { SharedEnvelope, SharedHello } from "../sharing"
 import {
   SHARE_MAX_ENVELOPE_CHARS,
+  SHARE_MAX_INBOUND_ENVELOPE_CHARS,
   SHARE_MAX_MESSAGE_CHARS,
+  SHARED_PROMPT_MAX_CHARS,
   SeqTracker,
   SharedChannelReader,
   decodeEnvelope,
   encodeSharedMessage,
   negotiateHello,
+  readDraftPayload,
+  sharedPromptRefusal,
   toSharedMessage,
 } from "../sharing-wire"
 
@@ -200,5 +204,78 @@ describe("negotiateHello", () => {
 
   it("rejects null as invalid", () => {
     expect(negotiateHello(local, null)).toEqual({ ok: false, code: "invalid_hello" })
+  })
+})
+
+describe("sharedPromptRefusal", () => {
+  it.each(["", "   ", "/pan status", "  !ls", "# notes"])("refuses %j as invalid_prompt", (text) => {
+    expect(sharedPromptRefusal(text)).toBe("invalid_prompt")
+  })
+
+  it("refuses a prompt longer than the cap as too_long", () => {
+    expect(sharedPromptRefusal("a".repeat(SHARED_PROMPT_MAX_CHARS + 1))).toBe("too_long")
+    expect(sharedPromptRefusal("a".repeat(SHARED_PROMPT_MAX_CHARS))).toBeNull()
+  })
+
+  it.each(["Fix the bug", "see /tmp/x"])("accepts %j", (text) => {
+    expect(sharedPromptRefusal(text)).toBeNull()
+  })
+})
+
+describe("readDraftPayload", () => {
+  const draft = { authorGithubId: 7, authorLogin: "alice", text: "hi", updatedAt: 1_700_000_000_000 }
+
+  it("rebuilds a draft from its known keys and drops extra keys", () => {
+    expect(readDraftPayload({ ...draft, avatarUrl: "javascript:x" })).toEqual(draft)
+  })
+
+  it("rejects a non-positive author id, a missing text and an over-long text", () => {
+    expect(readDraftPayload({ ...draft, authorGithubId: 0 })).toBeNull()
+    const { text: _text, ...withoutText } = draft
+    expect(readDraftPayload(withoutText)).toBeNull()
+    expect(readDraftPayload({ ...draft, text: "a".repeat(SHARED_PROMPT_MAX_CHARS + 1) })).toBeNull()
+  })
+
+  it("rejects a non-finite updatedAt and a non-object", () => {
+    expect(readDraftPayload({ ...draft, updatedAt: Number.NaN })).toBeNull()
+    expect(readDraftPayload("hi")).toBeNull()
+  })
+})
+
+describe("SharedChannelReader inbound cap", () => {
+  it("returns too_large for an unfragmented message longer than the cap", () => {
+    const reader = new SharedChannelReader(100)
+    const text = JSON.stringify(envelope({ text: "a".repeat(200) }))
+    expect(text.length).toBeGreaterThan(100)
+    expect(reader.read(text)).toEqual({ kind: "invalid", reason: "too_large" })
+    const exact = JSON.stringify(envelope({ text: "" }))
+    expect(new SharedChannelReader(exact.length).read(exact)).toEqual({ kind: "envelope", envelope: envelope({ text: "" }) })
+    expect(new SharedChannelReader(exact.length - 1).read(exact)).toEqual({ kind: "invalid", reason: "too_large" })
+  })
+
+  it("refuses a message too long to be an envelope or a fragment before parsing it", () => {
+    const reader = new SharedChannelReader(SHARE_MAX_INBOUND_ENVELOPE_CHARS)
+    // Not JSON: a parse would report not_json, so too_large proves the length check came first.
+    expect(reader.read("{".repeat(SHARE_MAX_MESSAGE_CHARS * 6 + 1_000))).toEqual({ kind: "invalid", reason: "too_large" })
+    expect(reader.read("{".repeat(1_000))).toEqual({ kind: "invalid", reason: "not_json" })
+  })
+
+  it("still reads a fragment whose escaped data is longer than the inbound cap", () => {
+    // A quote is `\"` in the envelope and `\\\"` in the fragment, so each fragment roughly doubles.
+    const value = envelope({ text: '"'.repeat(40_000) })
+    const parts = encodeSharedMessage(value, 9)
+    expect(parts.some((part) => part.length > SHARE_MAX_INBOUND_ENVELOPE_CHARS)).toBe(true)
+    expect(readAll(parts).at(-1)).toEqual({ kind: "envelope", envelope: value })
+  })
+
+  it("returns too_large for fragments whose count passes the cap", () => {
+    const parts = encodeSharedMessage(envelope({ text: "a".repeat(100_000) }), 4)
+    expect(new SharedChannelReader(100).read(parts[0] ?? "")).toEqual({ kind: "invalid", reason: "too_large" })
+    expect(new SharedChannelReader(SHARE_MAX_INBOUND_ENVELOPE_CHARS).read(parts[0] ?? "")).toEqual({ kind: "invalid", reason: "too_large" })
+  })
+
+  it("still reassembles a 100,000-character envelope with the default cap", () => {
+    const value = envelope({ text: "a".repeat(100_000) })
+    expect(readAll(encodeSharedMessage(value, 5)).at(-1)).toEqual({ kind: "envelope", envelope: value })
   })
 })

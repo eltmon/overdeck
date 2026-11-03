@@ -1,0 +1,262 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-03T15:40:42Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4904: Pull here on a Codex conversation replaces its title with injected <recommended_plugins> text",
+    "updated": "2026-11-03T15:43:49.777Z"
+  },
+  "plan": {
+    "id": "pan-4904",
+    "title": "Pull here on a Codex conversation replaces its title with injected <recommended_plugins> text",
+    "status": "running",
+    "uid": "e31412b0-3950-4b8f-a3fe-5745e3ebe633",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-03T15:40:42Z",
+    "updated": "2026-11-03T15:43:49.777Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4904",
+        "label": "PAN-4904",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4904.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "session-vault",
+      "pull-here",
+      "codex",
+      "anywhere",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "After Pull here brings a Codex conversation from a linked machine, the adopted conversation is titled with injected Codex context ('<recommended_plugins> Here is a list of plugins…') instead of the owner's title. Two causes: buildTransfer in src/dashboard/server/services/conversation-release-service.ts settles the transfer store without recordTitle, so the minted record takes facts.title; and facts.title (firstHumanText in src/lib/vault/settle.ts) accepts the Codex <recommended_plugins> user message because CODEX_INJECTED_PREFIXES in src/lib/vault/turns.ts does not list it. vault-continue.ts copies record.title to the adopted row with titleSource 'manual', so the bad title is permanent.",
+      "Proposal": "Two layers, both required. (A) buildTransfer passes the owner's conversation title as recordTitle via the conditional spread used at vault-service.ts:274, which fixes the online pull. (B) Add '<recommended_plugins>', '# AGENTS.md instructions', '<turn_aborted>' and '<subagent_notification>' to CODEX_INJECTED_PREFIXES, which fixes the offline pull (it adopts a saved-copy record minted with facts.title), vault browse-copy titles and seed digests. Document the title rule and the prefix list in docs/ANYWHERE-ARCHITECTURE.md, configuration/linked-machines.mdx and docs/SESSION-VAULT.md.",
+      "NonGoals": "- Renaming conversation 3550 or any existing conversation row\n- Renaming or backfilling existing vault records whose title came from an injected line\n- Changing conversation-pull.ts, vault-continue.ts, adopt.ts or settle.ts\n- Changing how the regular vault poller titles non-agent conversations (it keeps using facts.title)\n- Treating <task> as an injected prefix\n- Any frontend change\n- Fixing pulls from an owner that runs a pre-fix Overdeck version (the owner computes the record title; the fix applies once the owner runs this release)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "The owner's conversation title is the authority for a Pull here transfer record title.",
+        "rationale": "The issue's expected behavior is that the adopted conversation keeps the owner's title; the owner row is what the linked-conversation list already shows."
+      },
+      {
+        "summary": "Fix both layers (owner sends recordTitle, and the Codex injected-prefix list) rather than only one.",
+        "rationale": "recordTitle alone leaves the offline pull (saved-copy record minted with facts.title) broken; the prefix list alone keeps a derived title instead of the owner's real one."
+      },
+      {
+        "summary": "Add the bare prefix '# AGENTS.md instructions' and leave '<task>' as a human turn.",
+        "rationale": "A scan of 2,474 local Codex rollouts found AGENTS.md lines both with ' for <path>' and ending at a newline; <task> lines are Overdeck worker briefs that are the real first instruction."
+      },
+      {
+        "summary": "Accept lower Settlement.turn counts for future Codex settlements.",
+        "rationale": "Settlement.turn is display-only (read only by src/cli/commands/vault/show.ts); continuity uses line hashes, so nothing compares turn counts across versions."
+      },
+      {
+        "summary": "No repair of the already-mistitled conversation 3550 or existing vault records.",
+        "rationale": "Record titles are immutable after mint by design (settle.test.ts 'recordTitle never renames an existing record'); the operator can rename one row by hand."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Three small leaf items in disjoint files; no decomposition into sibling issues needed.",
+      "canonicalFilename": "2026-11-03-PAN-4904-pull-here-on-a-codex-conversation-replaces-its-title-with-injected-recommended-plugins-text.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "codex-injected-prefixes",
+        "title": "Add the four missing Codex injected prefixes to CODEX_INJECTED_PREFIXES",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T15:40:42Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4904",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/vault/turns.ts",
+            "tests/unit/lib/vault/turns.test.ts",
+            "tests/unit/lib/vault/settle.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/turns.test.ts tests/unit/lib/vault/settle.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "turns.test.ts and settle.test.ts pass, including the two new tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In src/lib/vault/turns.ts append '<recommended_plugins>', '# AGENTS.md instructions', '<turn_aborted>' and '<subagent_notification>' to CODEX_INJECTED_PREFIXES (after '# Files mentioned by the user:'), and update the module header comment (lines 6-7, \"Codex's `<environment_context>` and friends\") to name the Codex prefixes. In tests/unit/lib/vault/turns.test.ts add a Codex test that builds lines with the existing codexUser([{ type: 'input_text', text }]) helper: one line per new prefix (the AGENTS.md one as '# AGENTS.md instructions\\n\\n<INSTRUCTIONS>x'), a typed prompt starting with '<task>' and a plain typed prompt; assert countHumanTurns(lines, 'codex') === 2. In tests/unit/lib/vault/settle.test.ts next to the 'transcriptFacts reads Codex session_meta…' test add a test whose lines are a session_meta line, a response_item user message '<recommended_plugins>\\nHere is a list of plugins that are available but not installed.' and a response_item user message 'Add a --json flag'; assert transcriptFacts(lines, 'codex').title === 'Add a --json flag'. Do not add '<task>'. Do not touch settle.ts."
+        },
+        "items": [
+          {
+            "id": "codex-injected-prefixes.ac1",
+            "title": "Given a Codex response_item user message starting with any of <recommended_plugins>, # AGENTS.md instructions, <turn_aborted> or <subagent_notification>, isHumanTurn(line, 'codex') returns false (covered by the existing CODEX_INJECTED_PREFIXES loop in turns.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-injected-prefixes.ac2",
+            "title": "Given a Codex transcript with the four new injected lines plus a '<task>…' prompt and a plain prompt, countHumanTurns returns 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-injected-prefixes.ac3",
+            "title": "Given a <recommended_plugins> user message before the typed prompt 'Add a --json flag', transcriptFacts(lines, 'codex').title returns 'Add a --json flag'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "release-record-title",
+        "title": "Pass the owner's conversation title as recordTitle in buildTransfer",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T15:40:42Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4904",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/conversation-release-service.ts",
+            "src/dashboard/server/services/__tests__/conversation-release-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/conversation-release-service.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-release-service.test.ts passes, including the two new recordTitle tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. In buildTransfer (src/dashboard/server/services/conversation-release-service.ts, grep 'const result = await deps.settle({') add `...(conv.title ? { recordTitle: conv.title } : {}),` after `index: memoryIndex(),` with the comment '// The adopted conversation takes the record title; keep the owner's (PAN-4904).' Add one sentence to the module header after the 'empty in-memory vault index' sentence: \"It is titled with the owner's conversation title, so the adopted conversation keeps it.\" The empty memoryIndex() guarantees settle() takes its mint branch, where recordTitle is read; no settle.ts change. In the test file add two tests in the 'owner release (PAN-4650 WI-9)' describe: (1) updateConversationTitle(NAME, 'Add a --json flag that prints the counts as JSON, and a test for it.') (exported from src/lib/overdeck/conversations.ts), run handleRelease(machine(), NAME, { to: VIEWER }, deps), expect status 200 and settleCalls[0]!.recordTitle to equal the title; (2) with the fixture's untitled row, run the release and expect('recordTitle' in settleCalls[0]!).toBe(false)."
+        },
+        "items": [
+          {
+            "id": "release-record-title.ac1",
+            "title": "Given an owner conversation titled 'Add a --json flag that prints the counts as JSON, and a test for it.', a release calls settle with recordTitle equal to that title",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "release-record-title.ac2",
+            "title": "Given an owner conversation with a null title, a release calls settle without a recordTitle key, so the record falls back to the transcript's first human text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "release-record-title.ac3",
+            "title": "Given the existing release tests (ac2 through the reclaim cases), the test file run exits 0 with every existing test still passing unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-pull-title",
+        "title": "Document that a pulled conversation keeps its title, and list the Codex injected prefixes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T15:40:42Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4904",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ANYWHERE-ARCHITECTURE.md",
+            "configuration/linked-machines.mdx",
+            "docs/SESSION-VAULT.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"keeps its title\\|keeps the title\" docs/ANYWHERE-ARCHITECTURE.md configuration/linked-machines.mdx",
+            "grep -n \"recommended_plugins\" docs/SESSION-VAULT.md"
+          ],
+          "expected_outputs": [
+            "one matching line in each of docs/ANYWHERE-ARCHITECTURE.md and configuration/linked-machines.mdx",
+            "the src/lib/vault/turns.ts row in docs/SESSION-VAULT.md lists <recommended_plugins>"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. docs/ANYWHERE-ARCHITECTURE.md, section '### Release before adopt': after the sentence ending \"never moves the owner's real vault tail;\" add \"The transfer record is titled with the owner's conversation title (`recordTitle`), and Continue here copies that title to the adopted row, so a pulled conversation keeps its title (PAN-4904).\" configuration/linked-machines.mdx, section '## Pull here', step 3 Adopt: add \"It keeps the title it had on the owner.\" docs/SESSION-VAULT.md: after the sentence about pipeline agents and `recordTitle` (around line 365) add \"A Pull here transfer also passes `recordTitle`: the owner's conversation title.\"; extend the module-map row 'src/lib/vault/turns.ts            human-turn filter (FR-18)' (around line 539) to name the Codex injected prefixes <environment_context>, <recommended_plugins>, # AGENTS.md instructions, <turn_aborted>, <subagent_notification>."
+        },
+        "items": [
+          {
+            "id": "docs-pull-title.ac1",
+            "title": "Given docs/ANYWHERE-ARCHITECTURE.md, grep 'keeps its title' returns the 'Release before adopt' sentence stating the transfer record carries the owner's title via recordTitle",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-pull-title.ac2",
+            "title": "configuration/linked-machines.mdx 'Pull here' step 3 renders the sentence 'It keeps the title it had on the owner.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-pull-title.ac3",
+            "title": "Given docs/SESSION-VAULT.md, grep 'recommended_plugins' returns the turns.ts row listing <recommended_plugins>, # AGENTS.md instructions, <turn_aborted> and <subagent_notification>, and the poller paragraph names the Pull here recordTitle source",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  },
+  "status": "active"
+}
