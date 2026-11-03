@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4836",
   "created": "2026-11-03T14:20:05.683Z",
-  "updated": "2026-11-03T14:44:44.784Z",
+  "updated": "2026-11-03T14:45:01.047Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -94,6 +94,10 @@
     "app-pairing-panel.ac5": {
       "status": "completed",
       "doneAt": "2026-11-03T14:44:44.784Z"
+    },
+    "dialog-tabs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:45:01.047Z"
     }
   }
 }
