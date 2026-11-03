@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4482",
   "created": "2026-11-03T23:55:28.272Z",
-  "updated": "2026-11-03T23:57:48.254Z",
+  "updated": "2026-11-03T23:59:48.533Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-11-03T23:57:38.545Z"
     },
     "signaling-capture": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4482",
-      "claimedAt": "2026-11-03T23:57:48.253Z"
+      "claimedAt": "2026-11-03T23:57:48.253Z",
+      "doneAt": "2026-11-03T23:59:48.533Z"
     }
   }
 }
