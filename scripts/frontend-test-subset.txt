@@ -133,6 +133,17 @@ src/components/chat/messagesTimeline/messageRows.test.tsx
 src/components/chat/sharing/__tests__/ShareDialog.test.tsx
 src/components/chat/sharing/__tests__/SharingLobbyPanel.test.tsx
 src/components/costs/__tests__/FleetUsagePanel.test.tsx
+src/components/deft/ApprovedScopeCheck.test.tsx
+src/components/deft/DeftBadges.test.tsx
+src/components/deft/DeftDecisionsTab.test.tsx
+src/components/deft/DeftFinishLoopFeed.test.tsx
+src/components/deft/DeftGatesPanel.test.tsx
+src/components/deft/DeftReviewCyclePanel.test.tsx
+src/components/deft/DeftScopeDag.test.tsx
+src/components/deft/DeftScopeSummary.test.tsx
+src/components/deft/DeftScopeView.test.tsx
+src/components/deft/DeftSubagentRows.test.tsx
+src/components/deft/queries.test.ts
 src/components/drawer/IssueDrawer.tracker-fallback.test.tsx
 src/components/drawer/useDrawerData.absent-issue.test.tsx
 src/components/home/__tests__/AnywhereSetUpRow.test.tsx

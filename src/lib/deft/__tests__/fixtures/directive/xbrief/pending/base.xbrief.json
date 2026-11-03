@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "0.8",
+  "plan": {
+    "id": "scope-base",
+    "title": "Base scope",
+    "status": "pending",
+    "items": [
+      {
+        "id": "b1",
+        "title": "Base item",
+        "status": "pending"
+      }
+    ]
+  }
+}

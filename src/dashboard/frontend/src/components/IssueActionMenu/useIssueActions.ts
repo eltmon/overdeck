@@ -21,6 +21,7 @@ import { pauseOutcomeNotice, toastPauseOutcome, unpauseOutcomeNotice } from '../
 import { isWriteBlockedPhase, OFFLINE_ACTION_REASON, useConnectionPhase } from '../../lib/connectionState';
 import { selectAgents, selectBackendPanes, selectDerivedIssueState, useDashboardStore } from '../../lib/store';
 import type { WorkspaceInfo } from '../../lib/workspace-types';
+import { DEFT_ISSUES_QUERY_KEY, useDeftIssueSummary } from '../deft/queries';
 import { STATUS_LABELS, type Agent, type Issue, type WorkAgentLifecycle } from '../../types';
 
 export type IssueActionDialogState = {
@@ -123,6 +124,10 @@ function bodyForAction(action: IssueActionEntry, issueId: string, issue: Issue |
       return { deleteWorkspace: true };
     case 'cancel':
       return { wipeWorkspace: true };
+    case 'runOnDeft':
+      return { pipeline: 'deft' };
+    case 'backToOverdeck':
+      return { pipeline: 'overdeck' };
     case 'doneWork':
       return { message: `If implementation is complete, run: pan done ${issueId} -c "Implementation complete". If work remains, continue the current task.` };
     default:
@@ -170,6 +175,10 @@ function disabledReasonForAction(action: IssueActionEntry) {
       return 'Reopen is available only for done or canceled issues.';
     case 'unpause':
       return 'This agent is not paused.';
+    case 'runOnDeft':
+      return 'Run on Deft is available for an issue on Overdeck’s pipeline that is not merged.';
+    case 'backToOverdeck':
+      return 'Back to Overdeck is available only for an issue running on Deft.';
     default:
       return `${action.label} is unavailable in the current issue state.`;
   }
@@ -261,6 +270,8 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
     return { exists: true, issueId, path: issue.workspacePath };
   }, [issue?.workspacePath, issueId]);
 
+  const { isDeft } = useDeftIssueSummary(issueId);
+
   const state: IssueActionState = useMemo(() => {
     const workspaceInfo = workspace ?? { exists: false, issueId, path: undefined };
     return {
@@ -281,8 +292,9 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
       hasPendingInput: agent?.hasPendingQuestion === true,
       orderBooksLoaded: orderBooksQuery.isSuccess,
       isInActiveOrderBook,
+      isDeftPipeline: isDeft,
     };
-  }, [agent, derived, isInActiveOrderBook, issue, issueId, lifecycle, orderBooksQuery.isSuccess, panes, workspace]);
+  }, [agent, derived, isDeft, isInActiveOrderBook, issue, issueId, lifecycle, orderBooksQuery.isSuccess, panes, workspace]);
 
   const phase = useMemo(() => deriveIssueActionPhase(state), [state]);
 
@@ -341,6 +353,10 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
       if (action.key === 'unpause') {
         // PAN-3911: says whether the review the pause stopped was re-requested.
         toastPauseOutcome(unpauseOutcomeNotice(issueId, _data as Parameters<typeof unpauseOutcomeNotice>[1]));
+      }
+      if (action.key === 'runOnDeft' || action.key === 'backToOverdeck') {
+        toast.success(`Switching ${issueId} to ${action.key === 'runOnDeft' ? 'deft' : 'overdeck'}…`);
+        await queryClient.invalidateQueries({ queryKey: DEFT_ISSUES_QUERY_KEY });
       }
       if (action.key === 'resumeSession' && agent?.id) {
         // PAN-2975: every resume affordance reports the actual outcome.

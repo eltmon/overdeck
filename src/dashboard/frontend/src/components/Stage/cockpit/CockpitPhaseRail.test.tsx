@@ -3,6 +3,10 @@ import { describe, expect, it, vi } from 'vitest';
 import type { AgentRowModel, IssueShipModel } from '../../issue-view/types';
 import { CockpitPhaseRail } from './CockpitPhaseRail';
 
+vi.mock('../../deft/queries', () => ({
+  useDeftIssueSummary: () => ({ isDeft: true, summary: { issueId: 'PAN-1', handoffState: 'pr_open' }, isLoading: false }),
+}));
+
 vi.mock('../../../lib/useSharedTick', () => ({
   useSharedTick: () => new Date('2026-07-31T12:05:00Z'),
 }));
@@ -79,5 +83,13 @@ describe('CockpitPhaseRail', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Plan/ }));
     expect(onSelectPhase).toHaveBeenCalledWith('plan', undefined);
+  });
+
+  it('shows the Deft delivery chip only when given an issue id (PAN-4849)', () => {
+    const { unmount } = render(<CockpitPhaseRail pipelineState="in_review_reviewers_running" agents={[]} ship={ship} onSelectPhase={vi.fn()} />);
+    expect(screen.queryByText('Deft: pr_open')).toBeNull();
+    unmount();
+    render(<CockpitPhaseRail pipelineState="in_review_reviewers_running" agents={[]} ship={ship} onSelectPhase={vi.fn()} issueId="PAN-1" />);
+    expect(screen.getByText('Deft: pr_open')).toBeInTheDocument();
   });
 });

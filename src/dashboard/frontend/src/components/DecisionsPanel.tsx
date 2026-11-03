@@ -20,7 +20,36 @@ import { formatRelativeTime } from '../lib/formatRelativeTime';
 import { formatIssueRef } from '../lib/issueLabel';
 import { useNow } from '../hooks/useNow';
 import { navigateToDecisionSubject } from '../lib/navigateToDecision';
+import { selectAgents, useDashboardStore } from '../lib/store';
 import styles from './styles/decisions.module.css';
+
+/**
+ * PAN-4849 — Deft's `external` escalations are "dashboard indicator, no
+ * interrupt": a quiet line per agent, never a decision, never in the count.
+ */
+function DeftExternalNotes() {
+  const agents = useDashboardStore(selectAgents);
+  const waiting = agents.filter((agent) => (agent.deftExternalEscalations ?? 0) > 0);
+  if (waiting.length === 0) return null;
+  return (
+    <ul className={styles.meta} data-testid="deft-external-notes">
+      {waiting.map((agent) => (
+        <li key={agent.id}>
+          {agent.issueId ?? agent.id} · Deft: waiting on external ({agent.deftExternalEscalations})
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** PAN-4849 — SLA and dangerous chips for a Deft escalation, read from the context the server wrote. */
+function deftEscalationChips(decision: Decision): string[] {
+  const question = decision.pendingAskUserQuestion;
+  if (!question?.toolUseId?.startsWith('deft-escalation:')) return [];
+  const context = question.questions?.[0]?.context ?? '';
+  const sla = /SLA (\d+)h/.exec(context)?.[1];
+  return [...(sla ? [`SLA ${sla}h`] : []), ...(context.split('\n').includes('DANGEROUS') ? ['dangerous'] : [])];
+}
 
 function DecisionRow({ decision, onOpenSubject }: { decision: Decision; onOpenSubject?: (d: Decision) => void }) {
   const requestReopen = useAskUserQuestionUiStore((s) => s.requestReopen);
@@ -40,6 +69,7 @@ function DecisionRow({ decision, onOpenSubject }: { decision: Decision; onOpenSu
     decision.pendingAskUserQuestion?.questions?.[0]?.question ??
     (decision.pendingProposedPlan ? 'A plan is ready for your review.' : enrichmentTitle ?? decision.permissionSummary ?? heldPrompt ?? describePendingInput(decision.kinds, decision.turnEndAssessment));
   const issueRef = formatIssueRef(decision.issueId, decision.issueTitle);
+  const deftChips = deftEscalationChips(decision);
 
   return (
     <div
@@ -57,6 +87,7 @@ function DecisionRow({ decision, onOpenSubject }: { decision: Decision; onOpenSu
             <span className={styles.subject}>{issueRef}</span>
           )}
           {decision.source === 'conversation' && <span className={styles.chip}>Conversation</span>}
+          {deftChips.map((chip) => <span key={chip} className={styles.chip}>{chip}</span>)}
         </div>
         <p className={styles.prompt}>{prompt}</p>
         <div className={styles.meta}>
@@ -123,9 +154,12 @@ export function DecisionsPanel({ onOpenSubject }: { onOpenSubject?: (d: Decision
 
   if (decisions.length === 0) {
     return (
-      <div className={styles.empty} data-testid="decisions-empty">
-        Nothing needs you right now.
-      </div>
+      <>
+        <div className={styles.empty} data-testid="decisions-empty">
+          Nothing needs you right now.
+        </div>
+        <DeftExternalNotes />
+      </>
     );
   }
 
@@ -133,6 +167,7 @@ export function DecisionsPanel({ onOpenSubject }: { onOpenSubject?: (d: Decision
     <div className={styles.panel} data-testid="decisions-panel">
       <Group title="Blocking work" hint="An agent has stopped until you answer" decisions={blocking} onOpenSubject={onOpenSubject} />
       <Group title="Waiting" hint="Work continues; these can wait" decisions={waiting} onOpenSubject={onOpenSubject} />
+      <DeftExternalNotes />
     </div>
   );
 }
