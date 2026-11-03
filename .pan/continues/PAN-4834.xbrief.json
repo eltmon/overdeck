@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4834",
   "created": "2026-11-03T14:27:37.940Z",
-  "updated": "2026-11-03T15:13:20.894Z",
+  "updated": "2026-11-03T15:13:38.565Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -140,6 +140,10 @@
     "shims.ac4": {
       "status": "completed",
       "doneAt": "2026-11-03T15:13:20.894Z"
+    },
+    "shims.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:13:38.564Z"
     }
   }
 }
