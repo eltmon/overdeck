@@ -68,9 +68,14 @@ The test conversation (`20261103-3247`) was archived after the run.
 The fallback banner (WI-20) showed as designed. Two earlier attempts did not produce a valid
 measurement. In the first, the agent picked an answer itself instead of asking. In the second,
 the question was raised and answered on the desktop while the app was in the background, so the
-phone never had a card to change. The run above changed Needs you by removing a card. A card added
-during the wait was not measured, because the operator answers questions on the desktop within
-seconds.
+phone never had a card to change. The run above changed Needs you by removing a card.
+
+**Not measured: a card added during the wait.** The operator answers questions on the desktop
+within seconds, so a question raised early in the wait was gone before the app returned. A
+re-run planned to raise the question about 10 s before reopening could not start. After the
+AC-10 run, the `galaxyA16` AVD boots into a locked user (`RUNNING_LOCKED`) that neither
+`wm dismiss-keyguard` nor a swipe unlocks, so the app cannot launch. The spec criterion that asks
+for this measurement (`cp3-cp4-checkpoints.ac1`) was cancelled, not marked done.
 
 ## CP-4: camera in the WebView
 
