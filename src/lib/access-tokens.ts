@@ -29,6 +29,13 @@
  * `phoneKey`. A `phone` record missing `phoneKey` or `clientId` makes the file
  * corrupt, exactly like an incomplete `machine` record.
  *
+ * An agent token (PAN-4927) is a `token` record that carries `agentId` (an
+ * agent id or a conversation name), `agentKind` and `role`. Those fields are
+ * valid only on `kind: 'token'` and only all together; on any other kind they
+ * make the file corrupt. An agent token never carries `admin` or `forward`.
+ * A CLI process has an empty snapshot, so `readActiveAccessTokenRecord`,
+ * `revokeAccessTokensMatching` and `pruneEndedAccessTokens` read the file fresh.
+ *
  * `onAccessTokensRevoked` tells the dashboard when a record was revoked or
  * vanished, whether by this process or by another one seen at the next refresh
  * (D-4645-16), so live sockets of that record can be closed.
@@ -53,6 +60,7 @@ import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypt
 import { mkdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
+  agentFieldsValid,
   type AccessTokenKind,
   type AccessTokenRecord,
   type AccessTokenScope,
@@ -236,12 +244,12 @@ async function writeRegistry(path: string, records: AccessTokenRecord[]): Promis
   snapshot = { records, fingerprint: await fingerprintOf(path), error: null };
 }
 
-/** Serialize read-modify-write cycles within this process. */
-function mutate<T>(change: (records: AccessTokenRecord[]) => { records: AccessTokenRecord[]; result: T }): Promise<T> {
+/** Serialize read-modify-write cycles within this process. `write: false` skips the write. */
+function mutate<T>(change: (records: AccessTokenRecord[]) => { records: AccessTokenRecord[]; result: T; write?: false }): Promise<T> {
   const run = writeQueue.then(async () => {
     const path = accessTokensPath();
-    const { records, result } = change(await readRegistry(path));
-    await writeRegistry(path, records);
+    const { records, result, write } = change(await readRegistry(path));
+    if (write !== false) await writeRegistry(path, records);
     return result;
   });
   writeQueue = run.catch(() => undefined);
@@ -308,6 +316,12 @@ export interface CreateAccessTokenInput {
   clientId?: string;
   /** Optional for `kind: 'phone'`: the phone's push public key, 64 lowercase hex. */
   pushKey?: string;
+  /** `token` only (PAN-4927 D-6): the managed agent this token belongs to — an agent id or a conversation name. */
+  agentId?: string;
+  /** `token` only: what `agentId` names. */
+  agentKind?: 'agent' | 'conversation';
+  /** `token` only: the agent's role, or 'conversation'. */
+  role?: string;
 }
 
 export async function createAccessToken(input: CreateAccessTokenInput): Promise<{ token: string; record: PublicAccessTokenRecord }> {
@@ -361,6 +375,19 @@ export async function createAccessToken(input: CreateAccessTokenInput): Promise<
   } else if (input.phoneKey !== undefined || input.clientId !== undefined || input.pushKey !== undefined) {
     throw new Error('phoneKey, clientId and pushKey belong to kind: phone only');
   }
+  let agent: Pick<AccessTokenRecord, 'agentId' | 'agentKind' | 'role'> = {};
+  if (input.agentId !== undefined || input.agentKind !== undefined || input.role !== undefined) {
+    if (input.kind !== 'token') {
+      throw new Error('agentId, agentKind and role belong to kind: token only');
+    }
+    if (!agentFieldsValid(input)) {
+      throw new Error('An agent token needs agentId, agentKind and role');
+    }
+    if (scopes.includes('admin') || scopes.includes('forward')) {
+      throw new Error('An agent token never carries admin or forward (PAN-4927 D-8)');
+    }
+    agent = { agentId: input.agentId, agentKind: input.agentKind, role: input.role };
+  }
   const token = `${ACCESS_TOKEN_PREFIX}${randomBytes(32).toString('hex')}`;
   const record: AccessTokenRecord = {
     id: randomUUID(),
@@ -371,6 +398,7 @@ export async function createAccessToken(input: CreateAccessTokenInput): Promise<
     lastUsedAt: null,
     ...(input.kind ? { kind: input.kind } : {}),
     ...binding,
+    ...agent,
   };
   await mutate((records) => ({ records: [...records, record], result: undefined }));
   return { token, record: toPublic(record) };
@@ -419,6 +447,48 @@ export async function revokeAccessToken(id: string): Promise<PublicAccessTokenRe
   });
   if (fire) fireRevoked([fire]);
   return result;
+}
+
+/** The active record whose hash matches `token`, read fresh from the file. Never touches the snapshot or lastUsedAt. Null when absent, revoked, or the file is missing. Throws when the file is corrupt. */
+export async function readActiveAccessTokenRecord(token: string): Promise<PublicAccessTokenRecord | null> {
+  if (!token.startsWith(ACCESS_TOKEN_PREFIX)) return null;
+  const presentedHash = Buffer.from(hashToken(token), 'hex');
+  let match: AccessTokenRecord | null = null;
+  for (const record of await readRegistry(accessTokensPath())) {
+    const stored = Buffer.from(record.tokenHash, 'hex');
+    if (stored.length === presentedHash.length && timingSafeEqual(stored, presentedHash) && !record.revokedAt) {
+      match = record;
+    }
+  }
+  return match ? toPublic(match) : null;
+}
+
+/** Revoke every active record `match` accepts, in one write. Returns the records it revoked; fires onAccessTokensRevoked for each. */
+export async function revokeAccessTokensMatching(match: (record: PublicAccessTokenRecord) => boolean): Promise<PublicAccessTokenRecord[]> {
+  const revoked: AccessTokenRecord[] = [];
+  await mutate((records) => {
+    const at = new Date().toISOString();
+    const next = records.map((record) => {
+      if (record.revokedAt || !match(toPublic(record))) return record;
+      const updated = { ...record, revokedAt: at };
+      revoked.push(updated);
+      return updated;
+    });
+    return revoked.length === 0 ? { records, result: undefined, write: false } : { records: next, result: undefined };
+  });
+  fireRevoked(revoked);
+  return revoked.map(toPublic);
+}
+
+/** Remove records with `agentId` whose `revokedAt` is older than `olderThanMs` before `now`. Never removes a record without `agentId`. Returns the count removed. */
+export async function pruneEndedAccessTokens(olderThanMs: number, now = Date.now()): Promise<number> {
+  return mutate((records) => {
+    const kept = records.filter(
+      (record) => !(record.agentId !== undefined && record.revokedAt !== undefined && now - Date.parse(record.revokedAt) > olderThanMs),
+    );
+    const removed = records.length - kept.length;
+    return removed === 0 ? { records, result: 0, write: false } : { records: kept, result: removed };
+  });
 }
 
 /** Replace an active phone record's `pushKey`. Returns the updated record, or null when no active phone record has that id. */

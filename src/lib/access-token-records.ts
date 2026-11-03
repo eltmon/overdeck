@@ -23,6 +23,10 @@ export const MACHINE_ACCESS_LEVELS: readonly MachineAccess[] = ['operator', 'age
 
 export const MACHINE_KEY_HEX = /^[0-9a-f]{64}$/;
 export const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+/** An agent token's `agentId`: an agent id or a conversation name (PAN-4927 D-6). */
+export const AGENT_ID = /^[A-Za-z0-9._:/-]{1,200}$/;
+/** An agent token's `role`: a role name, or 'conversation'. */
+export const AGENT_ROLE = /^[a-z][a-z0-9-]{0,63}$/;
 
 export interface AccessTokenRecord {
   id: string;
@@ -46,10 +50,27 @@ export interface AccessTokenRecord {
   clientId?: string;
   /** `phone` only: the phone's push public key, 64 lowercase hex; absent until the app sends one. */
   pushKey?: string;
+  /** `token` only (PAN-4927 D-6): the managed agent this token belongs to — an agent id or a conversation name. */
+  agentId?: string;
+  /** `token` only: what `agentId` names. */
+  agentKind?: 'agent' | 'conversation';
+  /** `token` only: the agent's role, or 'conversation'. */
+  role?: string;
 }
 
 export function isMachineAccess(value: unknown): value is MachineAccess {
   return (MACHINE_ACCESS_LEVELS as readonly unknown[]).includes(value);
+}
+
+/** True when `agentId`, `agentKind` and `role` are all present and well-formed. */
+export function agentFieldsValid(r: { agentId?: unknown; agentKind?: unknown; role?: unknown }): boolean {
+  return (
+    typeof r.agentId === 'string' &&
+    AGENT_ID.test(r.agentId) &&
+    (r.agentKind === 'agent' || r.agentKind === 'conversation') &&
+    typeof r.role === 'string' &&
+    AGENT_ROLE.test(r.role)
+  );
 }
 
 export function isRecord(value: unknown): value is AccessTokenRecord {
@@ -73,17 +94,20 @@ export function isRecord(value: unknown): value is AccessTokenRecord {
   const phoneKeyOk = typeof r.phoneKey === 'string' && MACHINE_KEY_HEX.test(r.phoneKey);
   const clientIdOk = typeof r.clientId === 'string' && UUID_V4.test(r.clientId);
   const pushKeyOk = r.pushKey === undefined || (typeof r.pushKey === 'string' && MACHINE_KEY_HEX.test(r.pushKey));
+  const agentFieldsAbsent = r.agentId === undefined && r.agentKind === undefined && r.role === undefined;
   // A machine record needs all three binding fields; a phone record needs its
   // own two plus an optional push key; other kinds may carry none of either
-  // set, and any field present must still be well-formed.
-  if (r.kind === 'machine') return machineKeyOk && environmentOk && accessOk && r.phoneKey === undefined && r.clientId === undefined && r.pushKey === undefined;
-  if (r.kind === 'phone') return phoneKeyOk && clientIdOk && pushKeyOk && r.machineKey === undefined && r.environmentId === undefined && r.access === undefined;
+  // set, and any field present must still be well-formed. Only a `token`
+  // record may carry the agent fields, and then all three (PAN-4927).
+  if (r.kind === 'machine') return machineKeyOk && environmentOk && accessOk && r.phoneKey === undefined && r.clientId === undefined && r.pushKey === undefined && agentFieldsAbsent;
+  if (r.kind === 'phone') return phoneKeyOk && clientIdOk && pushKeyOk && r.machineKey === undefined && r.environmentId === undefined && r.access === undefined && agentFieldsAbsent;
   return (
     (r.machineKey === undefined || machineKeyOk) &&
     (r.environmentId === undefined || environmentOk) &&
     (r.access === undefined || accessOk) &&
     r.phoneKey === undefined &&
     r.clientId === undefined &&
-    r.pushKey === undefined
+    r.pushKey === undefined &&
+    (agentFieldsAbsent || (r.kind === 'token' && agentFieldsValid(r)))
   );
 }
