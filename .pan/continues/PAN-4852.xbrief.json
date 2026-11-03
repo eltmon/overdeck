@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4852",
   "created": "2026-11-03T02:45:30.764Z",
-  "updated": "2026-11-03T05:57:32.059Z",
+  "updated": "2026-11-03T05:57:55.936Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -254,6 +254,10 @@
     "worktree-exclude.ac4": {
       "status": "completed",
       "doneAt": "2026-11-03T05:57:32.058Z"
+    },
+    "worktree-exclude.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:57:55.935Z"
     }
   }
 }
