@@ -9,6 +9,8 @@
  *   shells `pan skills deft use|back <ID>` (the one write door, PAN-4820
  *   AD-2) with async `spawn`, answers 202 at once, and records the outcome
  *   in the activity feed when the child exits.
+ * - `POST /api/issues/:id/deft/escalations/:escId/resolve` — answer a Deft
+ *   escalation file (`resolveDeftEscalation`) and tell the work agent.
  */
 import { spawn as nodeSpawn, type ChildProcess } from 'node:child_process';
 import { readdir } from 'node:fs/promises';
@@ -19,6 +21,7 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
 import { buildChildEnvWithoutTmux } from '../../../lib/child-env.js';
+import { DEFT_ESCALATION_DECISIONS, notifyEscalationResolved, resolveDeftEscalation } from '../../../lib/deft/escalations.js';
 import { isDeftPipelineIssue } from '../../../lib/deft/issue-pipeline.js';
 import { readDeftIssueState, summarizeDeftIssueState } from '../../../lib/deft/state-reader.js';
 import { parseIssueId } from '../../../lib/issue-id.js';
@@ -43,6 +46,16 @@ const runningSwitches = new Set<string>();
 /** Replace the `pan` spawner; pass null to restore the real one. */
 export function setDeftPipelineSpawnerForTests(fn: DeftPipelineSpawner | null): void {
   spawner = fn ?? defaultSpawner;
+}
+
+/** The JSON object body, or the 400 message. */
+function parseBody(text: string): Record<string, unknown> | string {
+  try {
+    const parsed: unknown = text ? JSON.parse(text) : {};
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : 'body must be a JSON object';
+  } catch {
+    return 'body must be JSON';
+  }
 }
 
 function zeroSummary(issueId: string): DeftIssueSummary {
@@ -167,17 +180,8 @@ const postPipelineRoute = HttpRouter.add(
     if (!parseIssueId(id)) return jsonResponse({ error: 'Invalid issue ID' }, { status: 400 });
     const issueId = id.toUpperCase();
 
-    const text = yield* request.text;
-    let body: Record<string, unknown>;
-    try {
-      const parsed: unknown = text ? JSON.parse(text) : {};
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-        return jsonResponse({ error: 'body must be a JSON object' }, { status: 400 });
-      }
-      body = parsed as Record<string, unknown>;
-    } catch {
-      return jsonResponse({ error: 'body must be JSON' }, { status: 400 });
-    }
+    const body = parseBody(yield* request.text);
+    if (typeof body === 'string') return jsonResponse({ error: body }, { status: 400 });
     const pipeline = body['pipeline'];
     if (pipeline !== 'deft' && pipeline !== 'overdeck') {
       return jsonResponse({ error: "pipeline must be 'deft' or 'overdeck'" }, { status: 400 });
@@ -193,4 +197,44 @@ const postPipelineRoute = HttpRouter.add(
   }),
 );
 
-export const deftRouteLayer = Layer.mergeAll(getDeftIssueRoute, getDeftIssuesRoute, postPipelineRoute);
+const postResolveEscalationRoute = HttpRouter.add(
+  'POST',
+  '/api/issues/:id/deft/escalations/:escId/resolve',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) return jsonResponse({ error: originCheck.error }, { status: 403 });
+
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    if (!parseIssueId(id)) return jsonResponse({ error: 'Invalid issue ID' }, { status: 400 });
+    const issueId = id.toUpperCase();
+    const escId = params['escId'] ?? '';
+
+    const body = parseBody(yield* request.text);
+    if (typeof body === 'string') return jsonResponse({ error: body }, { status: 400 });
+    const decision = DEFT_ESCALATION_DECISIONS.find(d => d === body['decision']);
+    if (!decision) return jsonResponse({ error: `decision must be one of ${DEFT_ESCALATION_DECISIONS.join(', ')}` }, { status: 400 });
+    const answer = typeof body['answer'] === 'string' && body['answer'] ? body['answer'] : undefined;
+    const note = typeof body['note'] === 'string' && body['note'] ? body['note'] : undefined;
+
+    return yield* Effect.promise(async () => {
+      if (!(await isDeftPipelineIssue(issueId))) {
+        return jsonResponse({ error: `${issueId} does not run on Deft` }, { status: 404 });
+      }
+      const worktree = getIssueWorkspacePath(issueId);
+      if (!worktree) return jsonResponse({ error: 'no workspace' }, { status: 404 });
+      const outcome = await resolveDeftEscalation(worktree, escId, { decision, answer, note, actor: 'operator:dashboard' });
+      if (outcome === 'not-found') return jsonResponse({ error: `no escalation ${escId}` }, { status: 404 });
+      if (outcome === 'already-resolved') return jsonResponse({ error: `escalation ${escId} is already resolved` }, { status: 409 });
+      const delivery = await notifyEscalationResolved(issueId, escId, decision, answer);
+      return jsonResponse({
+        resolved: true,
+        delivered: delivery.delivered,
+        ...(delivery.failure ? { deliveryError: delivery.failure } : {}),
+      });
+    });
+  }),
+);
+
+export const deftRouteLayer = Layer.mergeAll(getDeftIssueRoute, getDeftIssuesRoute, postPipelineRoute, postResolveEscalationRoute);

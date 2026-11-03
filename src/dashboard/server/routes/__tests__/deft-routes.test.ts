@@ -4,8 +4,7 @@
  * spawner are mocked; the state reader runs against the fixture tree.
  */
 import { EventEmitter } from 'node:events';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { readFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import type { ChildProcess } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -22,12 +21,14 @@ const mocks = vi.hoisted(() => ({
   getIssueWorkspacePath: vi.fn(),
   listProjectsAsync: vi.fn(),
   emitActivityEntry: vi.fn(),
+  deliverAgentMessage: vi.fn(),
 }));
 
 vi.mock('../../../../lib/deft/issue-pipeline.js', () => ({ isDeftPipelineIssue: mocks.isDeftPipelineIssue }));
 vi.mock('../../../../lib/overdeck/issue-projects.js', () => ({ getIssueWorkspacePath: mocks.getIssueWorkspacePath }));
 vi.mock('../../../../lib/deft/archive.js', () => ({ isNativeDirectiveProject: async () => false }));
 vi.mock('../../../../lib/activity-logger.js', () => ({ emitActivityEntry: mocks.emitActivityEntry }));
+vi.mock('../../../../lib/agents/delivery.js', () => ({ deliverAgentMessage: mocks.deliverAgentMessage }));
 vi.mock('../../../../lib/projects.js', async importOriginal => ({
   ...(await importOriginal<typeof import('../../../../lib/projects.js')>()),
   listProjectsAsync: mocks.listProjectsAsync,
@@ -199,5 +200,49 @@ describe('POST /api/issues/:id/pipeline', () => {
       message: 'Pipeline switch for PAN-1 failed: line 2\nline 3\nline 4\nline 5\nline 6',
       issueId: 'PAN-1',
     });
+  });
+});
+
+describe('POST /api/issues/:id/deft/escalations/:escId/resolve', () => {
+  const ESC = 'esc-20261102120100-bbbbbb';
+  const resolvePath = (escId = ESC) => `/api/issues/PAN-1/deft/escalations/${escId}/resolve`;
+
+  beforeEach(() => {
+    const copy = mkdtempSync(join(scratch, 'wt-'));
+    cpSync(FIXTURE_DIR, copy, { recursive: true });
+    mocks.getIssueWorkspacePath.mockReturnValue(copy);
+    mocks.deliverAgentMessage.mockResolvedValue({ ok: true, path: 'herdr' });
+  });
+
+  it('refuses a missing Origin and a bad decision', async () => {
+    expect((await call('POST', resolvePath(), { body: { decision: 'approved' }, origin: null })).status).toBe(403);
+    expect((await call('POST', resolvePath(), { body: { decision: 'maybe' } })).status).toBe(400);
+  });
+
+  it('returns 404 for a non-Deft issue or an unknown escalation', async () => {
+    expect((await call('POST', resolvePath('..%2Fx'), { body: { decision: 'approved' } })).status).toBe(404);
+    expect((await call('POST', resolvePath('esc-20990101000000-ffffff'), { body: { decision: 'approved' } })).status).toBe(404);
+    mocks.isDeftPipelineIssue.mockResolvedValue(false);
+    expect((await call('POST', resolvePath(), { body: { decision: 'approved' } })).status).toBe(404);
+  });
+
+  it('resolves once, tells the agent, and returns 409 the second time', async () => {
+    const first = await call('POST', resolvePath(), { body: { decision: 'answered', answer: 'Dense rows' } });
+    expect(first.status).toBe(200);
+    expect(first.json).toEqual({ resolved: true, delivered: true });
+    expect(mocks.deliverAgentMessage).toHaveBeenCalledWith(
+      'agent-pan-1',
+      `Operator resolved Deft escalation ${ESC}: answered — Dense rows`,
+      'deft-escalation-answer',
+    );
+
+    const second = await call('POST', resolvePath(), { body: { decision: 'answered', answer: 'Roomy rows' } });
+    expect(second.status).toBe(409);
+  });
+
+  it('reports a failed delivery after resolving', async () => {
+    mocks.deliverAgentMessage.mockResolvedValue({ ok: false, path: 'herdr', failure: 'no pane' });
+    const res = await call('POST', resolvePath(), { body: { decision: 'dismissed' } });
+    expect(res.json).toEqual({ resolved: true, delivered: false, deliveryError: 'no pane' });
   });
 });
