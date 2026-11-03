@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4837",
   "created": "2026-11-03T16:16:59.604Z",
-  "updated": "2026-11-03T19:14:19.661Z",
+  "updated": "2026-11-03T19:14:47.858Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -416,6 +416,10 @@
     "hide-composer-admin.ac2": {
       "status": "completed",
       "doneAt": "2026-11-03T19:14:19.661Z"
+    },
+    "hide-composer-admin.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T19:14:47.858Z"
     }
   }
 }
