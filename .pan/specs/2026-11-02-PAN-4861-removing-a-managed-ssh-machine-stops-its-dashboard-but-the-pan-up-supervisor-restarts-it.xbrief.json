@@ -4,17 +4,17 @@
     "created": "2026-11-02T23:44:32Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4861: Removing a managed SSH machine stops its dashboard, but the pan up supervisor restarts it",
-    "updated": "2026-11-02T23:48:04.611Z"
+    "updated": "2026-11-02T23:49:11.030Z"
   },
   "plan": {
     "id": "pan-4861",
     "title": "Removing a managed SSH machine stops its dashboard, but the pan up supervisor restarts it",
-    "status": "proposed",
+    "status": "running",
     "uid": "99b582cb-1b85-4d91-8a9b-b73391183b76",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-02T23:44:32Z",
-    "updated": "2026-11-02T23:48:04.611Z",
+    "updated": "2026-11-02T23:49:11.030Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4861",
@@ -266,5 +266,5 @@
     ],
     "edges": []
   },
-  "status": "proposed"
+  "status": "active"
 }
