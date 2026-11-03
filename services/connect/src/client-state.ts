@@ -15,6 +15,7 @@ import {
 import type { ClientToDirectoryFrame } from '../../../packages/contracts/src/connect.ts';
 import { errorFrame, onlineClientsOf, toDirectoryMachines } from './directory-state.ts';
 import type { ClientRow, DirectoryEffect, DirectoryState, ReduceContext, ReduceResult, SocketIdentity } from './directory-state.ts';
+import { activityRegistrationAnswer, withoutClientReports } from './activity-state.ts';
 import { iceServersAnswer, relayUsageAnswer } from './ice-relay.ts';
 import { pushRegistrationAnswer } from './push-state.ts';
 
@@ -78,6 +79,7 @@ function helloClient(state: DirectoryState, event: Extract<ClientEvent, { kind: 
     lastSeenAt: ctx.now,
     // A re-hello keeps the push registration; only push-register and push-unregister change it.
     push: existing?.push ?? null,
+    activity: existing?.activity ?? null,
   };
   const next: DirectoryState = { ...planned, clients: replaceClient(planned.clients, row) };
   effects.push({ kind: 'put-client', row });
@@ -111,7 +113,7 @@ function clientFrame(state: DirectoryState, event: Extract<ClientEvent, { kind: 
         return { state, effects: [forgotten, log(f.type, clientId, 'unknown_client')] };
       }
       return {
-        state: { ...state, clients: state.clients.filter((c) => c.clientId !== clientId) },
+        state: { ...state, clients: state.clients.filter((c) => c.clientId !== clientId), activityReports: withoutClientReports(state, clientId) },
         effects: [{ kind: 'delete-client', clientId }, forgotten, log(f.type, clientId, 'ok')],
       };
     }
@@ -155,6 +157,9 @@ function clientFrame(state: DirectoryState, event: Extract<ClientEvent, { kind: 
     case 'push-register':
     case 'push-unregister':
       return pushRegistrationAnswer(state, clientId, f);
+    case 'activity-register':
+    case 'activity-unregister':
+      return activityRegistrationAnswer(state, clientId, f, ctx);
   }
 }
 

@@ -1,7 +1,20 @@
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MACHINE_TAG, roleOf } from '../../../../services/connect/src/directory.ts';
-import { loadDirectory, PUT_CLIENT_PUSH_SQL, PUT_CLIENT_SQL, PUT_PUSH_WINDOW_SQL, SCHEMA } from '../../../../services/connect/src/directory-store.ts';
+import { RELAY_MONTHLY_CAP_BYTES } from '../../../../packages/contracts/src/connect.ts';
+import type { MachineToDirectoryFrame } from '../../../../packages/contracts/src/connect.ts';
+import { reduceClient } from '../../../../services/connect/src/client-state.ts';
+import { EMPTY_DIRECTORY, reduce } from '../../../../services/connect/src/directory-state.ts';
+import type { DirectoryEffect, DirectoryState, ReduceContext } from '../../../../services/connect/src/directory-state.ts';
+import {
+  DELETE_CLIENT_ACTIVITY_ROWS_SQL,
+  loadDirectory,
+  PUT_CLIENT_PUSH_SQL,
+  PUT_CLIENT_SQL,
+  PUT_PUSH_WINDOW_SQL,
+  SCHEMA,
+  writeActivityEffect,
+} from '../../../../services/connect/src/directory-store.ts';
 import type { ConnectIdentity } from '../../../../services/connect/src/env.ts';
 import { logFrame } from '../../../../services/connect/src/log.ts';
 
@@ -101,5 +114,80 @@ describe('directory storage round trip (PAN-4830)', () => {
     expect(loadDirectory(sql).pushWindow).toBeNull();
     sql.exec(PUT_PUSH_WINDOW_SQL, JSON.stringify({ minute: 1, count: -1 }));
     expect(loadDirectory(sql).pushWindow).toBeNull();
+  });
+});
+
+describe('Live Activity storage round trip (PAN-4839 WI-4)', () => {
+  const NOW = Date.UTC(2026, 10, 3, 12, 0, 0);
+  const ENV_B = '00000000-0000-4000-8000-000000000002';
+  const context: ReduceContext = { now: NOW, online: new Set(), stunUrls: [], relayCapBytes: RELAY_MONTHLY_CAP_BYTES, turnConfigured: false };
+  const identity = { deviceId: 'd-1', plan: 'free', maxDevices: 3 } as const;
+
+  /** The storage half of directory.ts's executor for the effects these frames produce. */
+  function persist(sql: SqlStorage, effects: DirectoryEffect[]): void {
+    for (const e of effects) {
+      switch (e.kind) {
+        case 'put-client': {
+          const r = e.row;
+          sql.exec(PUT_CLIENT_SQL, r.clientId, r.label, r.publicKeyHex, r.platform, r.appVersion, r.deviceId, r.registeredAt, r.lastSeenAt);
+          break;
+        }
+        case 'delete-client':
+          sql.exec('DELETE FROM clients WHERE client_id = ?', e.clientId);
+          for (const statement of DELETE_CLIENT_ACTIVITY_ROWS_SQL) sql.exec(statement, e.clientId);
+          break;
+        case 'put-client-activity':
+        case 'put-activity-report':
+        case 'put-activity-window':
+          writeActivityEffect(sql, e);
+          break;
+        default:
+          break;
+      }
+    }
+  }
+
+  function run(sql: SqlStorage, result: { state: DirectoryState; effects: DirectoryEffect[] }): DirectoryState {
+    persist(sql, result.effects);
+    return result.state;
+  }
+
+  const count = (sql: SqlStorage, table: string) => (sql.exec<{ n: number }>(`SELECT COUNT(*) AS n FROM ${table}`).toArray()[0]?.n ?? -1);
+
+  it('rebuilds the registration, reports and window, and forget-client deletes both tables’ rows', () => {
+    const sql = sqlShim();
+    for (const statement of SCHEMA) sql.exec(statement);
+    const hello = { type: 'hello-client', protocol: 1, clientId: CLIENT, label: 'phone', publicKeyHex: 'ab'.repeat(32), appVersion: '1.0.0', platform: 'ios' } as const;
+    let state = run(sql, reduceClient(EMPTY_DIRECTORY, { kind: 'hello-client', registeredAs: null, identity, frame: hello }, context));
+    const register = { type: 'activity-register', token: 'a1'.repeat(32), apsEnvironment: 'sandbox' } as const;
+    state = run(sql, reduceClient(state, { kind: 'client-frame', clientId: CLIENT, frame: register }, context));
+    for (const [env, needsYou, running] of [[ENV, 2, 1], [ENV_B, 1, 0]] as const) {
+      const frame: MachineToDirectoryFrame = { type: 'push-activity', to: CLIENT, needsYou, running };
+      state = run(sql, reduce(state, { kind: 'frame', registeredAs: env, frame }, context));
+    }
+
+    const loaded = loadDirectory(sql);
+    expect(loaded.clients.map((c) => c.activity)).toEqual(state.clients.map((c) => c.activity));
+    expect(loaded.clients[0]?.activity).toEqual({ token: 'a1'.repeat(32), apsEnvironment: 'sandbox', lastPushed: { needsYou: 3, running: 1, at: NOW } });
+    expect(loaded.activityReports).toEqual(state.activityReports);
+    expect(loaded.activityReports).toHaveLength(2);
+    expect(loaded.activityWindow).toEqual(state.activityWindow);
+    expect(loaded.activityWindow).toEqual({ minute: Math.floor(NOW / 60_000), count: 2 });
+
+    run(sql, reduceClient(state, { kind: 'client-frame', clientId: CLIENT, frame: { type: 'forget-client' } }, context));
+    expect(count(sql, 'client_activities')).toBe(0);
+    expect(count(sql, 'activity_reports')).toBe(0);
+  });
+
+  it('deletes the activity row on unregister and reads a missing activity window as null', () => {
+    const sql = sqlShim();
+    for (const statement of SCHEMA) sql.exec(statement);
+    sql.exec(PUT_CLIENT_SQL, CLIENT, 'phone', 'ab'.repeat(32), 'ios', '1.0.0', 'd-1', 1, 1);
+    writeActivityEffect(sql, { kind: 'put-client-activity', clientId: CLIENT, registration: { token: 'tok', apsEnvironment: 'production', lastPushed: null } });
+    expect(loadDirectory(sql).clients[0]?.activity).toEqual({ token: 'tok', apsEnvironment: 'production', lastPushed: null });
+    expect(loadDirectory(sql).activityWindow).toBeNull();
+    writeActivityEffect(sql, { kind: 'put-client-activity', clientId: CLIENT, registration: null });
+    expect(loadDirectory(sql).clients[0]?.activity).toBeNull();
+    expect(count(sql, 'client_activities')).toBe(0);
   });
 });
