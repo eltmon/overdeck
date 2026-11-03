@@ -63,6 +63,7 @@ src/components/Settings/anywhere/__tests__/MachinesPanel.load.test.tsx
 src/components/Settings/anywhere/__tests__/MachinesPanel.test.tsx
 src/components/Settings/anywhere/__tests__/McpUrlDialog.test.tsx
 src/components/Settings/anywhere/__tests__/PairDeviceDialog.test.tsx
+src/components/Settings/anywhere/__tests__/PairedPhonesList.test.tsx
 src/components/Settings/anywhere/__tests__/PushPanel.test.tsx
 src/components/Settings/anywhere/__tests__/SetUpPhoneDialog.test.tsx
 src/components/Settings/anywhere/__tests__/TriggersPanel.test.tsx
