@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T10:49:52.017254Z · model: claude-opus-5-5 · open: 871_
+_Last sequenced: 2026-11-03T10:50:27.796907Z · model: claude-opus-5-5 · open: 871_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1206,7 +1206,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T10:49:52.017254Z",
+  "generatedAt": "2026-11-03T10:50:27.796907Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 871,
