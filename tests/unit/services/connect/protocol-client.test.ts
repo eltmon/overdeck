@@ -161,6 +161,12 @@ describe('Live Activity registration frames (PAN-4839 WI-2)', () => {
       frame: { type: 'activity-register', token, apsEnvironment: 'sandbox' },
     });
     expect(asClient({ type: 'activity-register', token, apsEnvironment: 'production' })).toMatchObject({ ok: true });
+    const apnsActivityToken = 'ab'.repeat(80);
+    expect(asClient({ type: 'activity-register', token: apnsActivityToken, apsEnvironment: 'sandbox' })).toEqual({
+      ok: true,
+      role: 'client',
+      frame: { type: 'activity-register', token: apnsActivityToken, apsEnvironment: 'sandbox' },
+    });
   });
 
   it('decodes activity-unregister', () => {

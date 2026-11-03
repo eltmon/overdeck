@@ -112,10 +112,11 @@ the counts. The device run (AC-12) needs the production APNs secrets and is hand
 | Step | Evidence | Result |
 | --- | --- | --- |
 | Lock screen | The card reads "Overdeck · 3 need you · 2 running", under iOS's first-run prompt "Allow Live Activities from Overdeck?". | [12](acceptance/12-live-activity-lock.png) — pass |
-| Dynamic Island | The island stayed empty with the app in the background. iOS shows a card in the island only after the user answers the first-run prompt with Allow. An `osascript` click on Allow did not register, so the island was not captured. | not captured |
+| Dynamic Island | The island stayed empty with the app in the background. iOS shows a card in the island only after the user answers the first-run prompt with Allow. Two scripted clicks on Allow were tried: a System Events click, and a CGEvent click at the button's position in the Simulator's screen view. After the second, Device → Home unlocked the Simulator with Settings in front, and the island was still empty. Whether the click missed or the Simulator does not draw the card in the island is not known. | not captured |
 
 Deviation from the PRD: `acceptance/11-live-activity-island.png` is not committed, because no screenshot
-showed the card in the island. To capture it, tap **Allow** on the lock screen in the Simulator
+showed the card in the island. The `acceptance.ac1` plan item is cancelled for this reason; the device
+run in PAN-4841 can capture the island. To capture it in the Simulator by hand, tap **Allow** on the lock screen in the Simulator
 window, unlock, open another app, and run `xcrun simctl io $U screenshot 11-live-activity-island.png`.
 
 ### Device checkpoint (AC-12, D-16)
