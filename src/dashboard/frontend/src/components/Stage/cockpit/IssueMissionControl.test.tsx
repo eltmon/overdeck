@@ -280,6 +280,7 @@ vi.mock('../../deft/DeftDecisionsTab', () => ({ DeftDecisionsTab: () => <div dat
 vi.mock('../../deft/DeftScopeView', () => ({ DeftScopeView: () => null }))
 vi.mock('../../deft/DeftScopeDag', () => ({ DeftScopeDag: () => null }))
 vi.mock('../../deft/DeftGatesPanel', () => ({ DeftGatesPanel: () => null }))
+vi.mock('../../deft/DeftReviewCyclePanel', () => ({ DeftReviewCyclePanel: () => null }))
 vi.mock('../../deft/DeftBadges', () => ({ DeftDeliveryChip: () => null }))
 // The ONE IssueDetail pulls in the whole transcript/WS chain; these tests
 // cover the cockpit chrome (tabs, header, lane). The mount contract is

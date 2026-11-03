@@ -136,6 +136,7 @@ src/components/deft/DeftBadges.test.tsx
 src/components/deft/DeftDecisionsTab.test.tsx
 src/components/deft/DeftFinishLoopFeed.test.tsx
 src/components/deft/DeftGatesPanel.test.tsx
+src/components/deft/DeftReviewCyclePanel.test.tsx
 src/components/deft/DeftScopeDag.test.tsx
 src/components/deft/DeftScopeSummary.test.tsx
 src/components/deft/DeftScopeView.test.tsx

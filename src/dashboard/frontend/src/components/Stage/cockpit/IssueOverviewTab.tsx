@@ -3,6 +3,7 @@ import { ShipProgress } from '../../issue-view/ShipProgress';
 import { StartAgentCta } from '../../issue-view/StartAgentCta';
 import type { IssueViewModel } from '../../issue-view/types';
 import { DeftGatesPanel } from '../../deft/DeftGatesPanel';
+import { DeftReviewCyclePanel } from '../../deft/DeftReviewCyclePanel';
 import { CockpitPill } from './CockpitCard';
 import { HappenedFeed } from './HappenedFeed';
 import { PickupGateCard } from './PickupGateCard';
@@ -86,6 +87,7 @@ export function IssueOverviewTab({
       </section>
       <SpecialistStrip specialists={specialists} />
       <DeftGatesPanel issueId={issueId} />
+      <DeftReviewCyclePanel issueId={issueId} />
       <HappenedFeed issueId={issueId} />
       <ShipSurface model={model} />
       <div data-section="PickupGateCard"><PickupGateCard issueId={issueId} /></div>

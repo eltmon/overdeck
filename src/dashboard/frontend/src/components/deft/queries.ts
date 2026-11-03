@@ -6,7 +6,7 @@
  * Cockpit surfaces read one issue's full state from `GET /api/issues/:id/deft`,
  * fetched only for a Deft issue.
  */
-import type { DeftIssueState, DeftIssueSummary } from '@overdeck/contracts';
+import type { DeftIssueState, DeftIssueSummary, DeftReviewCycle } from '@overdeck/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
 
@@ -52,6 +52,17 @@ export function useDeftIssueState(issueId: string) {
     queryKey: deftIssueQueryKey(issueId),
     queryFn: () => fetchJson<DeftIssueState>(`/api/issues/${encodeURIComponent(issueId)}/deft`),
     refetchInterval: 15_000,
+    enabled: isDeft,
+  });
+}
+
+/** Deft's review cycle for the issue's PR; polled slower than the state, because it reads forge data. */
+export function useDeftReviewCycle(issueId: string) {
+  const { isDeft } = useDeftIssueSummary(issueId);
+  return useQuery({
+    queryKey: [...deftIssueQueryKey(issueId), 'review-cycle'],
+    queryFn: () => fetchJson<DeftReviewCycle>(`/api/issues/${encodeURIComponent(issueId)}/deft/review-cycle`),
+    refetchInterval: 30_000,
     enabled: isDeft,
   });
 }
