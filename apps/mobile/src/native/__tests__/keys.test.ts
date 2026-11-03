@@ -54,4 +54,8 @@ describe('OverdeckKeysWeb', () => {
     expect(await keys.getSecret({ name: 'machines' })).toEqual({ value: null });
     expect((await keys.ensureKeys()).clientId).not.toBe(before.clientId);
   });
+
+  it('reports the sandbox APNs environment', async () => {
+    await expect(new OverdeckKeysWeb().pushEnvironment()).resolves.toEqual({ apsEnvironment: 'sandbox' });
+  });
 });
