@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4852",
   "created": "2026-11-03T02:45:30.764Z",
-  "updated": "2026-11-03T06:06:03.672Z",
+  "updated": "2026-11-03T06:06:32.411Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -322,6 +322,10 @@
     "link-command.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T06:06:03.672Z"
+    },
+    "link-command.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:06:32.411Z"
     }
   }
 }
