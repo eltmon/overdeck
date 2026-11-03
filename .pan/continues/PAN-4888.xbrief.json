@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4888",
   "created": "2026-11-03T08:25:32.067Z",
-  "updated": "2026-11-03T08:29:35.957Z",
+  "updated": "2026-11-03T08:29:42.654Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-4888",
       "claimedAt": "2026-11-03T08:27:28.252Z",
       "doneAt": "2026-11-03T08:29:35.957Z"
+    },
+    "gate-yield-hook": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4888",
+      "claimedAt": "2026-11-03T08:29:42.654Z"
     }
   }
 }
