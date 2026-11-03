@@ -408,11 +408,14 @@ operator-level link.
 ## Open in editor
 
 On a linked conversation, **Open in editor** opens the owner's checkout in your local
-editor over remote SSH: `code --remote ssh-remote+<host> <cwd>`. The host is the link's
-`ssh` route when there is one, else its Tailscale (`tailnet`) route's host name; a link
-with neither cannot do this (`no-ssh-host`). VS Code, VS Code Insiders and VSCodium are
-supported. Cursor and Windsurf are shown disabled: their remote-SSH launch could not be
-verified.
+editor over remote SSH: `code --remote ssh-remote+<authority> <cwd>`. For a machine added
+as an SSH machine, the host is the destination you added it with (for example
+`ssh-remote+root@build-box`), never the local port forward; otherwise it's the link's
+Tailscale (`tailnet`) host name. A link with neither cannot do this (`no-ssh-host`). A
+destination with a port, an IPv6 address or an uppercase letter is passed in Remote-SSH's
+encoded form (hex of `{"hostName","user","port"}`), so the command line shows a long hex
+string. VS Code, VS Code Insiders and VSCodium are supported. Cursor and Windsurf are
+shown disabled: their remote-SSH launch could not be verified.
 
 ## Fleet versions and Update all
 
