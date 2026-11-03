@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T03:26:38.053426Z · model: claude-opus-5-5 · open: 871_
+_Last sequenced: 2026-11-03T03:30:21.063380Z · model: claude-opus-5-5 · open: 873_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -9,6 +9,8 @@ _Last sequenced: 2026-11-03T03:26:38.053426Z · model: claude-opus-5-5 · open: 
 | 2 | PAN-4869 | S | medium | ok |  |  | In pipeline (planning): add a Machines sidebar entry, palette actions and a Home setup row so Anywhere is discoverable. |
 | 3 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 4 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install aborts workspace creation (since #4163); reproduced 2026-11-02 on botland too, so every polyrepo start fails. |
+| 5 | PAN-4871 | S | high | ok |  |  | In pipeline: phone app opens linked-machine rows by id -1 and @env/name never loads; route via the linked-conversation proxy |
+| 6 | PAN-4872 | S | medium | ok |  |  | In pipeline: new-conversation dialog keeps this machine's working directory after picking a linked machine |
 | 7 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
 | 8 | PAN-4690 | S | critical | ok |  |  | Review dispatch rewrites the tracked continue file uncommitted, so the dirty-tree gate blocks the review it dispatched |
 | 10 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
@@ -895,6 +897,14 @@ New substrate bug with a verified root cause: adoption (PAN-4605) calls startRev
 
 Moved from rank 9 to the free rank 4: a 2026-11-02 comment shows the same abort on a second polyrepo project (botland), so the bug now blocks workspace creation for every polyrepo project, not only mind-your-now.
 
+### PAN-4871 (rank 5)
+
+New issue already in the pipeline, so it is pinned into a free top rank without moving any other node; the phone web app currently has no working way into another machine's conversation, and the body names the files, the fix and the tests.
+
+### PAN-4872 (rank 6)
+
+New issue already in the pipeline, pinned into the next free top rank without moving other nodes; observed but not yet investigated, though the expected behaviour and the starting file are stated.
+
 ### PAN-4733 (rank 7)
 
 Rank held: parent PAN-4732 (move heavy e2e out of the default shards) closed as completed on 2026-11-01, so this follow-up is now unblocked and next in line.
@@ -1191,14 +1201,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
 
 New this pass. The deployment gate's queue message is unusually good — it names the holders, the queue age, and warns against forcing — and it promises a 'next verification boundary' trigger that does not exist. Every holder cleared and the deploy never fired; the live build stayed stale for 35 minutes until a manual reload. A correct-sounding instruction that cannot happen is worse than no message.
 
-### PAN-3118 (rank 79)
-
-Triage: verify "running at $0.00 with no capacity fallback" against the current liveness definition. Rank held.
-
-### PAN-3106 (rank 80)
-
-New this pass. shouldHoldForUat is consulted on exactly one merge path, so every other path merges a ready issue without asking whether its project holds for UAT — verified at code level on a real MIN-901 merge. This defeats the batch-train model directly: issues merge one at a time before a generation can assemble them.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1206,10 +1208,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T03:26:38.053426Z",
+  "generatedAt": "2026-11-03T03:30:21.063380Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 871,
+  "openCount": 873,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -12097,6 +12099,32 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "rationale": "Rank kept at the bottom: PAN-4820 closed so the dependency is dropped, but the operator still parks this undecided low-priority question.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4871",
+      "rank": 5,
+      "size": "S",
+      "importance": "high",
+      "score": 66,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: phone app opens linked-machine rows by id -1 and @env/name never loads; route via the linked-conversation proxy",
+      "rationale": "New issue already in the pipeline, so it is pinned into a free top rank without moving any other node; the phone web app currently has no working way into another machine's conversation, and the body names the files, the fix and the tests.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4872",
+      "rank": 6,
+      "size": "S",
+      "importance": "medium",
+      "score": 55,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: new-conversation dialog keeps this machine's working directory after picking a linked machine",
+      "rationale": "New issue already in the pipeline, pinned into the next free top rank without moving other nodes; observed but not yet investigated, though the expected behaviour and the starting file are stated.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13562,6 +13590,13 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-4869",
+      "to": "PAN-4872",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.3
     }
   ]
 }
