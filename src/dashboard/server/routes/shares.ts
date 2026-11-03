@@ -18,14 +18,16 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstab
 
 import { conversationWriteRefusalBody } from '../../../lib/overdeck/conversation-release.js';
 import { getConversationByName } from '../../../lib/overdeck/conversations.js';
+import { normalizeShareCode } from '../../../lib/sharing/share-code.js';
 import { jsonResponse } from '../http-helpers.js';
 import { getShareManager } from '../services/share-host.js';
 import { rejectUnauthorizedDashboardRequest, rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 
+export { normalizeShareCode };
+
 type Answer = { status: number; json?: unknown };
 
 const MAX_CONVERSATION_NAME = 200;
-const SHORT_CODE_ALPHABET = 'BCDFGHJKLMNPQRSTVWXZ23456789';
 const COMMAND_TYPES = new Set(['admit', 'kick', 'revoke', 'unrevoke', 'set-contributor']);
 
 function noStore(response: HttpServerResponse.HttpServerResponse): HttpServerResponse.HttpServerResponse {
@@ -48,14 +50,6 @@ function parseJsonObject(text: string): Record<string, unknown> | null {
 
 const readBody = (request: HttpServerRequest.HttpServerRequest) =>
   request.text.pipe(Effect.map(parseJsonObject), Effect.orElseSucceed(() => null));
-
-/** Uppercases and strips spaces and dashes like the share service; null unless 8 alphabet symbols remain. */
-export function normalizeShareCode(input: string): string | null {
-  const code = input.toUpperCase().replace(/[\s-]+/g, '');
-  if (code.length !== 8) return null;
-  for (const ch of code) if (!SHORT_CODE_ALPHABET.includes(ch)) return null;
-  return code;
-}
 
 /** Validates a browser command; null unless it is one of the slice-2 share commands. */
 export function parseShareCommand(body: Record<string, unknown> | null): ShareCommand | null {

@@ -70,6 +70,7 @@
               "cli/pair",
               "cli/tailscale",
               "cli/account",
+              "cli/share",
               "cli/devices",
               "cli/machines",
               "cli/token",
