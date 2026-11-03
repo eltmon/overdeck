@@ -12,6 +12,7 @@ import { ConversationPanel } from '../chat/ConversationPanel';
 import type { Conversation } from '../CommandDeck/ConversationList';
 import { fetchWithTimeout } from '../../lib/apiFetch';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
+import { conversationRouteKey } from '../../lib/linkedConversation';
 
 type ConversationRow = Conversation & { archivedAt?: string | null };
 
@@ -44,7 +45,7 @@ function ConversationListView({ onOpen }: { onOpen: (id: string) => void }) {
         <li key={c.id}>
           <button
             type="button"
-            onClick={() => onOpen(String(c.id))}
+            onClick={() => onOpen(conversationRouteKey(c))}
             className="flex min-h-11 w-full items-start justify-between gap-3 px-4 py-3 text-left"
           >
             <span className="min-w-0">

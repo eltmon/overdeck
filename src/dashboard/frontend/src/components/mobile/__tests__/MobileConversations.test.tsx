@@ -47,6 +47,21 @@ describe('MobileConversations', () => {
     expect(onOpen).toHaveBeenCalledWith('7');
   });
 
+  it('opens a linked row by its linked name', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify([
+      row(-1, 'Remote', '2026-11-01T00:00:00.000Z', {
+        name: '@env-a/conv-9',
+        origin: 'linked',
+        remoteName: 'conv-9',
+        machineLabel: 'laptop',
+      }),
+    ]), { status: 200 })));
+    const onOpen = vi.fn();
+    renderWithQuery(<MobileConversations conversationId={null} onOpen={onOpen} onBack={() => {}} />);
+    fireEvent.click(await screen.findByRole('button', { name: /Remote/ }));
+    expect(onOpen).toHaveBeenCalledWith('@env-a/conv-9');
+  });
+
   it('fetches the conversation and renders the panel with a Back control', async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify(row(7, 'Seven', '2026-11-01T00:00:00.000Z')), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
