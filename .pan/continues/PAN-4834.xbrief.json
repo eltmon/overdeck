@@ -1,0 +1,197 @@
+{
+  "version": "1",
+  "issueId": "PAN-4834",
+  "created": "2026-11-03T14:27:37.940Z",
+  "updated": "2026-11-03T15:18:38.686Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "http-wire": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4834",
+      "claimedAt": "2026-11-03T14:27:37.940Z",
+      "doneAt": "2026-11-03T14:32:06.467Z"
+    },
+    "channel-pool": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4834",
+      "claimedAt": "2026-11-03T14:32:12.562Z",
+      "doneAt": "2026-11-03T14:35:50.806Z"
+    },
+    "ws-framing": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4834",
+      "claimedAt": "2026-11-03T14:35:56.290Z",
+      "doneAt": "2026-11-03T14:38:27.029Z"
+    },
+    "ws-client": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4834",
+      "claimedAt": "2026-11-03T14:39:17.032Z",
+      "doneAt": "2026-11-03T14:43:46.369Z"
+    },
+    "shims": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4834",
+      "claimedAt": "2026-11-03T14:43:51.306Z",
+      "doneAt": "2026-11-03T14:46:37.427Z"
+    },
+    "cp2-attachment-images": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4834",
+      "claimedAt": "2026-11-03T14:46:42.815Z",
+      "doneAt": "2026-11-03T14:49:01.718Z"
+    },
+    "phone-channel-integration": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4834",
+      "claimedAt": "2026-11-03T14:49:06.521Z",
+      "doneAt": "2026-11-03T14:51:14.743Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4834",
+      "claimedAt": "2026-11-03T14:51:20.184Z",
+      "doneAt": "2026-11-03T15:00:33.836Z"
+    },
+    "http-wire.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:07:11.193Z"
+    },
+    "http-wire.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:07:31.288Z"
+    },
+    "http-wire.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:07:53.135Z"
+    },
+    "http-wire.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:08:12.266Z"
+    },
+    "channel-pool.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:08:33.197Z"
+    },
+    "channel-pool.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:08:52.234Z"
+    },
+    "channel-pool.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:09:09.531Z"
+    },
+    "channel-pool.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:09:27.013Z"
+    },
+    "ws-framing.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:09:44.802Z"
+    },
+    "ws-framing.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:10:05.173Z"
+    },
+    "ws-framing.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:10:24.402Z"
+    },
+    "ws-framing.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:10:43.296Z"
+    },
+    "ws-client.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:11:01.004Z"
+    },
+    "ws-client.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:11:19.201Z"
+    },
+    "ws-client.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:11:36.219Z"
+    },
+    "ws-client.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:11:53.052Z"
+    },
+    "ws-client.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:12:11.210Z"
+    },
+    "shims.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:12:28.238Z"
+    },
+    "shims.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:12:45.707Z"
+    },
+    "shims.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:13:03.803Z"
+    },
+    "shims.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:13:20.894Z"
+    },
+    "shims.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:13:38.564Z"
+    },
+    "shims.ac6": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:13:55.487Z"
+    },
+    "cp2-attachment-images.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:14:12.905Z"
+    },
+    "cp2-attachment-images.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:14:30.964Z"
+    },
+    "cp2-attachment-images.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:14:54.241Z"
+    },
+    "cp2-attachment-images.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:15:24.820Z"
+    },
+    "phone-channel-integration.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:15:56.336Z"
+    },
+    "phone-channel-integration.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:16:24.501Z"
+    },
+    "phone-channel-integration.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:16:51.598Z"
+    },
+    "phone-channel-integration.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:17:15.577Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:17:43.506Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:18:14.387Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:18:38.685Z"
+    }
+  }
+}
