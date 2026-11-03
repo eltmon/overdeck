@@ -63,7 +63,9 @@ src/components/Settings/anywhere/__tests__/MachinesPanel.load.test.tsx
 src/components/Settings/anywhere/__tests__/MachinesPanel.test.tsx
 src/components/Settings/anywhere/__tests__/McpUrlDialog.test.tsx
 src/components/Settings/anywhere/__tests__/PairDeviceDialog.test.tsx
+src/components/Settings/anywhere/__tests__/PairedPhonesList.test.tsx
 src/components/Settings/anywhere/__tests__/PushPanel.test.tsx
+src/components/Settings/anywhere/__tests__/SetUpPhoneAppPanel.test.tsx
 src/components/Settings/anywhere/__tests__/SetUpPhoneDialog.test.tsx
 src/components/Settings/anywhere/__tests__/TriggersPanel.test.tsx
 src/components/Settings/anywhere/__tests__/TailscalePeersPanel.test.tsx
@@ -214,6 +216,7 @@ src/lib/__tests__/simple-feed.test.ts
 src/lib/__tests__/syntaxTheme.test.ts
 src/lib/__tests__/telemetry.test.ts
 src/lib/__tests__/uiTokenStyles.test.ts
+src/lib/__tests__/useChannelMediaSrc.test.tsx
 src/lib/__tests__/useDecisions.fleet.test.tsx
 src/lib/__tests__/useDecisions.test.ts
 src/lib/__tests__/wsTransport-pairing.test.ts

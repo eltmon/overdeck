@@ -7,6 +7,8 @@
  * Every fetcher returns `{ status, body }` so a caller can branch on 403 (a
  * paired device's session cannot create pairing links or add addresses).
  */
+import type { EnvironmentDescriptor } from '@overdeck/contracts';
+
 import { dashboardMutationJsonHeaders } from '../../../lib/wsTransport';
 import { AccessTokensForbiddenError, type AccessTokenRecord } from '../sections/accessTokensShared';
 
@@ -79,6 +81,7 @@ export interface ApiResult<T> {
 
 export const ANYWHERE_DEVICES_QUERY_KEY = ['anywhere-devices'] as const;
 export const ANYWHERE_STATUS_QUERY_KEY = ['anywhere-status'] as const;
+export const ANYWHERE_ENVIRONMENT_QUERY_KEY = ['anywhere-environment'] as const;
 /** Shared with `sections/AccessTokensSection` so a revoke or mint refreshes both surfaces. */
 export const ANYWHERE_ACCESS_TOKENS_QUERY_KEY = ['access-tokens'] as const;
 export const ANYWHERE_TRIGGERS_QUERY_KEY = ['anywhere-triggers'] as const;
@@ -139,6 +142,23 @@ export async function revokeDevice(id: string): Promise<ApiResult<{ ok: true; de
 
 export async function fetchAnywhereStatus(): Promise<ApiResult<AnywhereStatus>> {
   return readResult(await fetch('/api/anywhere/status'));
+}
+
+export async function fetchEnvironment(): Promise<ApiResult<EnvironmentDescriptor>> {
+  return readResult(await fetch('/api/environment'));
+}
+
+/** Query function for `['anywhere-environment']`: this machine's descriptor, or a thrown error. */
+export async function loadEnvironment(): Promise<EnvironmentDescriptor> {
+  const result = await fetchEnvironment();
+  if (!isOk(result)) throw new Error(apiError(result));
+  return result.body;
+}
+
+/** "Expires in N minutes · works once" for a pairing code. */
+export function pairingExpiresInText(expiresAt: number): string {
+  const minutes = Math.max(1, Math.round((expiresAt - Date.now()) / 60_000));
+  return `Expires in ${minutes} minute${minutes === 1 ? '' : 's'} · works once`;
 }
 
 export async function issuePairingLink(): Promise<ApiResult<PairingLinkBody>> {

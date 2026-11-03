@@ -1,19 +1,26 @@
 /**
- * Set up a phone (PAN-2355 FR-7, D-9 to D-11): install Tailscale on the phone,
- * choose this machine's https:// address, confirm the token-mint gate, then
- * scan a pairing code that opens the phone shell at `<origin>/m#pair=<code>`.
+ * Set up a phone (PAN-2355 FR-7, D-9 to D-11; two tabs added by PAN-4836).
  *
- * Step 3 reads `dashboard.require_token_mint` and never writes it. While it is
- * off, a phone at the Tailscale Serve address would get the root session
- * (Serve proxies from 127.0.0.1), so step 4 stays hidden until it is on.
- * Pairing reuses the Pair-a-device routes; only the link path differs (`/m`).
+ * "Overdeck app" (PAN-4836, epic PAN-4823 W-MAC2): the native app's pairing
+ * QR, built in `SetUpPhoneAppPanel`, and the phones paired with this machine.
+ *
+ * "Browser on the phone" (`BrowserPhoneSetup`, unchanged): install Tailscale
+ * on the phone, choose this machine's https:// address, confirm the
+ * token-mint gate, then scan a pairing code that opens the phone shell at
+ * `<origin>/m#pair=<code>`. Step 3 reads `dashboard.require_token_mint` and
+ * never writes it. While it is off, a phone at the Tailscale Serve address
+ * would get the root session (Serve proxies from 127.0.0.1), so step 4 stays
+ * hidden until it is on. Pairing reuses the Pair-a-device routes; only the
+ * link path differs (`/m`).
  */
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import qrcode from 'qrcode-generator';
 import { X } from 'lucide-react';
 
+import { ViewToggle } from '../../shared/ViewToggle';
 import { openSettingsSection } from '../../../lib/settingsSection';
+import { SetUpPhoneAppPanel } from './SetUpPhoneAppPanel';
 import {
   ANYWHERE_STATUS_QUERY_KEY,
   addTrustedAddress,
@@ -21,6 +28,7 @@ import {
   isOk,
   issuePairingLink,
   loadAnywhereStatus,
+  pairingExpiresInText,
 } from './anywhereApi';
 
 const TAILSCALE_DOWNLOAD_URL = 'https://tailscale.com/download';
@@ -51,11 +59,6 @@ function originOf(raw: string): string | null {
   }
 }
 
-function expiresInText(expiresAt: number): string {
-  const minutes = Math.max(1, Math.round((expiresAt - Date.now()) / 60_000));
-  return `Expires in ${minutes} minute${minutes === 1 ? '' : 's'} · works once`;
-}
-
 function QrImage({ value, alt }: { value: string; alt: string }) {
   const src = useMemo(() => {
     const qr = qrcode(0, 'M');
@@ -80,7 +83,7 @@ export function SetUpPhoneDialog({ open, onClose }: { open: boolean; onClose: ()
   return <SetUpPhoneDialogBody onClose={onClose} />;
 }
 
-function SetUpPhoneDialogBody({ onClose }: { onClose: () => void }) {
+function BrowserPhoneSetup({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
   const { data: status } = useQuery({ queryKey: ANYWHERE_STATUS_QUERY_KEY, queryFn: loadAnywhereStatus });
   const tokenMint = useQuery({ queryKey: TOKEN_MINT_QUERY_KEY, queryFn: loadRequireTokenMint });
@@ -173,6 +176,165 @@ function SetUpPhoneDialogBody({ onClose }: { onClose: () => void }) {
   const pairUrl = pairing ? `${pairing.origin}/m#pair=${pairing.credential}` : '';
 
   return (
+    <div className="p-4 space-y-5 text-sm">
+      <Step n={1} title="Install Tailscale">
+        <p className="text-xs text-muted-foreground">
+          Install Tailscale on your phone and sign in with the same account as this machine.
+        </p>
+        <QrImage value={TAILSCALE_DOWNLOAD_URL} alt="Tailscale download QR code" />
+      </Step>
+
+      <Step n={2} title="Choose this machine's address">
+        {phoneOrigins.length > 0 ? (
+          <select
+            aria-label="Phone address"
+            value={selected ?? ''}
+            onChange={(e) => {
+              setChoice(e.target.value);
+              setPairing(null);
+              setForbidden(false);
+            }}
+            className="w-full bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
+          >
+            {phoneOrigins.map((origin) => <option key={origin} value={origin}>{origin}</option>)}
+          </select>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            No https:// address yet. Run <code>tailscale serve</code> for the dashboard port, then add its address, such as https://desk.tailnet.ts.net.
+          </p>
+        )}
+        <div className="flex gap-2">
+          <input
+            type="url"
+            aria-label="Add an https:// address"
+            placeholder="https://desk.tailnet.ts.net"
+            value={typed}
+            onChange={(e) => {
+              setTyped(e.target.value);
+              setAddError(null);
+            }}
+            className="flex-1 min-w-0 bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground font-mono focus:ring-1 focus:ring-primary"
+          />
+          <button
+            type="button"
+            onClick={() => void handleAdd()}
+            disabled={adding || typed.trim() === ''}
+            className="shrink-0 rounded-md border border-border px-2.5 py-1 text-xs text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50"
+          >
+            Add
+          </button>
+        </div>
+        {addError && <p className="text-xs text-destructive">{addError}</p>}
+      </Step>
+
+      <Step n={3} title="Require a token to sign in">
+        {tokenMint.data === true ? (
+          <p className="text-xs text-muted-foreground">On. A phone signs in only with its pairing code.</p>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">
+              {tokenMint.isError
+                ? 'Could not read this setting.'
+                : tokenMint.isLoading
+                  ? 'Checking the setting…'
+                  : 'This setting is off. Tailscale Serve forwards phone traffic from this machine, so the phone would sign in with full access and no pairing. Turn it on before you pair a phone.'}
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  openSettingsSection('access-tokens');
+                  onClose();
+                }}
+                className="rounded-md border border-border px-2.5 py-1 text-xs text-foreground hover:bg-muted/50 transition-colors"
+              >
+                Open the setting
+              </button>
+              <button
+                type="button"
+                onClick={() => void tokenMint.refetch()}
+                className="rounded-md border border-border px-2.5 py-1 text-xs text-foreground hover:bg-muted/50 transition-colors"
+              >
+                Check again
+              </button>
+            </div>
+          </div>
+        )}
+      </Step>
+
+      {tokenMint.data === true && (
+        <Step n={4} title="Scan the pairing code with the phone">
+          <div className="flex gap-2" role="group" aria-label="Phone type">
+            {(['android', 'iphone'] as const).map((p) => (
+              <button
+                key={p}
+                type="button"
+                aria-pressed={platform === p}
+                onClick={() => setPlatform(p)}
+                className={`rounded-md border px-2.5 py-1 text-xs transition-colors ${
+                  platform === p ? 'border-primary text-foreground' : 'border-border text-muted-foreground hover:bg-muted/50'
+                }`}
+              >
+                {p === 'android' ? 'Android' : 'iPhone'}
+              </button>
+            ))}
+          </div>
+
+          {forbidden ? (
+            <p className="text-xs text-muted-foreground">Pairing links can be created only from a browser on this machine.</p>
+          ) : pairing && !expired ? (
+            <div className="space-y-3">
+              <input
+                readOnly
+                aria-label="Pairing link"
+                value={pairUrl}
+                onFocus={(e) => e.target.select()}
+                className="w-full bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground font-mono"
+              />
+              {platform === 'iphone' ? (
+                <>
+                  <p className="text-xs text-foreground">1. Open in Safari, then Share → Add to Home Screen</p>
+                  <QrImage value={appUrl} alt="Phone app QR code" />
+                  <p className="text-xs text-foreground">2. In the installed app, tap Scan pairing code</p>
+                  <QrImage value={pairUrl} alt="Pairing QR code" />
+                </>
+              ) : (
+                <QrImage value={pairUrl} alt="Pairing QR code" />
+              )}
+              <p className="text-xs text-muted-foreground">{pairingExpiresInText(pairing.expiresAt)}</p>
+              <button
+                type="button"
+                onClick={() => void handleCreate()}
+                disabled={creating}
+                className="rounded-md border border-border px-2.5 py-1 text-xs text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50"
+              >
+                Create another code
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {expired && <p className="text-xs text-muted-foreground">This code expired.</p>}
+              <button
+                type="button"
+                onClick={() => void handleCreate()}
+                disabled={!selected || creating}
+                className="rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+              >
+                {expired ? 'Create another code' : 'Create pairing link'}
+              </button>
+            </div>
+          )}
+          {linkError && <p className="text-xs text-destructive">{linkError}</p>}
+        </Step>
+      )}
+    </div>
+  );
+}
+
+function SetUpPhoneDialogBody({ onClose }: { onClose: () => void }) {
+  const [tab, setTab] = useState<'app' | 'browser'>('app');
+
+  return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
       <div
         className="bg-card border border-border rounded-lg shadow-2xl w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto"
@@ -189,158 +351,22 @@ function SetUpPhoneDialogBody({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
-        <div className="p-4 space-y-5 text-sm">
-          <Step n={1} title="Install Tailscale">
-            <p className="text-xs text-muted-foreground">
-              Install Tailscale on your phone and sign in with the same account as this machine.
-            </p>
-            <QrImage value={TAILSCALE_DOWNLOAD_URL} alt="Tailscale download QR code" />
-          </Step>
-
-          <Step n={2} title="Choose this machine's address">
-            {phoneOrigins.length > 0 ? (
-              <select
-                aria-label="Phone address"
-                value={selected ?? ''}
-                onChange={(e) => {
-                  setChoice(e.target.value);
-                  setPairing(null);
-                  setForbidden(false);
-                }}
-                className="w-full bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
-              >
-                {phoneOrigins.map((origin) => <option key={origin} value={origin}>{origin}</option>)}
-              </select>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                No https:// address yet. Run <code>tailscale serve</code> for the dashboard port, then add its address, such as https://desk.tailnet.ts.net.
-              </p>
-            )}
-            <div className="flex gap-2">
-              <input
-                type="url"
-                aria-label="Add an https:// address"
-                placeholder="https://desk.tailnet.ts.net"
-                value={typed}
-                onChange={(e) => {
-                  setTyped(e.target.value);
-                  setAddError(null);
-                }}
-                className="flex-1 min-w-0 bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground font-mono focus:ring-1 focus:ring-primary"
-              />
-              <button
-                type="button"
-                onClick={() => void handleAdd()}
-                disabled={adding || typed.trim() === ''}
-                className="shrink-0 rounded-md border border-border px-2.5 py-1 text-xs text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50"
-              >
-                Add
-              </button>
-            </div>
-            {addError && <p className="text-xs text-destructive">{addError}</p>}
-          </Step>
-
-          <Step n={3} title="Require a token to sign in">
-            {tokenMint.data === true ? (
-              <p className="text-xs text-muted-foreground">On. A phone signs in only with its pairing code.</p>
-            ) : (
-              <div className="space-y-2">
-                <p className="text-xs text-muted-foreground">
-                  {tokenMint.isError
-                    ? 'Could not read this setting.'
-                    : tokenMint.isLoading
-                      ? 'Checking the setting…'
-                      : 'This setting is off. Tailscale Serve forwards phone traffic from this machine, so the phone would sign in with full access and no pairing. Turn it on before you pair a phone.'}
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      openSettingsSection('access-tokens');
-                      onClose();
-                    }}
-                    className="rounded-md border border-border px-2.5 py-1 text-xs text-foreground hover:bg-muted/50 transition-colors"
-                  >
-                    Open the setting
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void tokenMint.refetch()}
-                    className="rounded-md border border-border px-2.5 py-1 text-xs text-foreground hover:bg-muted/50 transition-colors"
-                  >
-                    Check again
-                  </button>
-                </div>
-              </div>
-            )}
-          </Step>
-
-          {tokenMint.data === true && (
-            <Step n={4} title="Scan the pairing code with the phone">
-              <div className="flex gap-2" role="group" aria-label="Phone type">
-                {(['android', 'iphone'] as const).map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    aria-pressed={platform === p}
-                    onClick={() => setPlatform(p)}
-                    className={`rounded-md border px-2.5 py-1 text-xs transition-colors ${
-                      platform === p ? 'border-primary text-foreground' : 'border-border text-muted-foreground hover:bg-muted/50'
-                    }`}
-                  >
-                    {p === 'android' ? 'Android' : 'iPhone'}
-                  </button>
-                ))}
-              </div>
-
-              {forbidden ? (
-                <p className="text-xs text-muted-foreground">Pairing links can be created only from a browser on this machine.</p>
-              ) : pairing && !expired ? (
-                <div className="space-y-3">
-                  <input
-                    readOnly
-                    aria-label="Pairing link"
-                    value={pairUrl}
-                    onFocus={(e) => e.target.select()}
-                    className="w-full bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground font-mono"
-                  />
-                  {platform === 'iphone' ? (
-                    <>
-                      <p className="text-xs text-foreground">1. Open in Safari, then Share → Add to Home Screen</p>
-                      <QrImage value={appUrl} alt="Phone app QR code" />
-                      <p className="text-xs text-foreground">2. In the installed app, tap Scan pairing code</p>
-                      <QrImage value={pairUrl} alt="Pairing QR code" />
-                    </>
-                  ) : (
-                    <QrImage value={pairUrl} alt="Pairing QR code" />
-                  )}
-                  <p className="text-xs text-muted-foreground">{expiresInText(pairing.expiresAt)}</p>
-                  <button
-                    type="button"
-                    onClick={() => void handleCreate()}
-                    disabled={creating}
-                    className="rounded-md border border-border px-2.5 py-1 text-xs text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50"
-                  >
-                    Create another code
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {expired && <p className="text-xs text-muted-foreground">This code expired.</p>}
-                  <button
-                    type="button"
-                    onClick={() => void handleCreate()}
-                    disabled={!selected || creating}
-                    className="rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
-                  >
-                    {expired ? 'Create another code' : 'Create pairing link'}
-                  </button>
-                </div>
-              )}
-              {linkError && <p className="text-xs text-destructive">{linkError}</p>}
-            </Step>
-          )}
+        <div className="px-4 pt-3">
+          <ViewToggle
+            ariaLabel="Phone setup"
+            options={[{ id: 'app', label: 'Overdeck app' }, { id: 'browser', label: 'Browser on the phone' }]}
+            value={tab}
+            onChange={setTab}
+          />
         </div>
+
+        {tab === 'app' ? (
+          <div className="p-4 space-y-5 text-sm">
+            <SetUpPhoneAppPanel />
+          </div>
+        ) : (
+          <BrowserPhoneSetup onClose={onClose} />
+        )}
       </div>
     </div>
   );

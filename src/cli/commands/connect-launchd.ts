@@ -6,6 +6,7 @@
  */
 import { join } from 'node:path';
 
+import { LOCAL_NETWORK_SETTINGS } from '../../lib/anywhere/local-network.js';
 import {
   installSupervisorAgent,
   SUPERVISOR_AGENT_LABEL,
@@ -53,6 +54,8 @@ export async function installMacService(ctx: ServiceContext, deps: Partial<MacSe
       + `It starts when ${ctx.user} logs in; for a Mac that must come back after a reboot with nobody logged in, `
       + 'turn on automatic login in System Settings → Users & Groups.',
     linger: 'not-applicable',
-    note: null,
+    note: `macOS blocks the server's connections to other machines on this network until you allow them: `
+      + `on this Mac, open ${LOCAL_NETWORK_SETTINGS} and turn on node (${d.execPath}). `
+      + 'node appears in that list after the server first tries to reach another machine, so check it once this Mac is linked.',
   };
 }

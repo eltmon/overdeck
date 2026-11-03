@@ -6,7 +6,7 @@
  * and wrong field types are all `bad_frame`. Each frame is rebuilt from its known keys only, so an
  * unlisted field is never stored or forwarded.
  */
-import { CONNECT_PROTOCOL_VERSION } from '../../../packages/contracts/src/connect.ts';
+import { CONNECT_PROTOCOL_VERSION, PUSH_SEALED_MAX_CHARS } from '../../../packages/contracts/src/connect.ts';
 import type { ClientToDirectoryFrame, DirectoryEndpoint, MachineToDirectoryFrame } from '../../../packages/contracts/src/connect.ts';
 import type { SignalData } from '../../../packages/contracts/src/sharing.ts';
 
@@ -20,6 +20,8 @@ export const MAX_SDP_CHARS = 32_768;
 export const MAX_CANDIDATE_CHARS = 2_048;
 /** One `relay-usage` report covers at most 1e9 bytes. */
 export const MAX_RELAY_USAGE_BYTES = 1_000_000_000;
+/** An APNs or FCM device token in `push-register` (PAN-4830 D-6). */
+export const MAX_PUSH_TOKEN_CHARS = 4_096;
 
 export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const KEY_HEX_RE = /^[0-9a-f]{64}$/;
@@ -31,6 +33,13 @@ const INBOX_ID_RE = /^ib_[0-9a-f]{16}$/;
 /** Inbox event ids are `crypto.randomUUID()` values. */
 const EVENT_ID_RE = UUID_RE;
 const ENDPOINT_URL_RE = /^(tcp|wss):\/\/[^\s]+$/;
+/**
+ * An APNs or FCM device token (PAN-4830 D-6). The token goes into the APNs URL path, so `/`, `?`,
+ * `%` and spaces are refused.
+ */
+const PUSH_TOKEN_RE = /^[0-9A-Za-z:_.-]+$/;
+/** Standard base64 with optional padding; a push's `sealed` blob (PAN-4830 D-6). */
+const BASE64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
 /** C0 and C1 control characters, plus DEL. */
 const CONTROL_CHARS = /[\u0000-\u001f\u007f-\u009f]/;
 
@@ -203,15 +212,26 @@ function build(obj: Obj): MachineToDirectoryFrame {
     }
     case 'relay-usage':
       return relayUsageOf(obj);
+    case 'push': {
+      const sealed = str(obj, 'sealed', PUSH_SEALED_MAX_CHARS, BASE64_RE);
+      if (sealed.length < 4 || sealed.length % 4 !== 0) fail();
+      const urgency = obj['urgency'];
+      if (urgency !== 'high' && urgency !== 'normal') fail();
+      return {
+        type,
+        requestId: str(obj, 'requestId', 32, ID_HEX_RE),
+        to: environmentIdOf(obj, 'to'),
+        sealed,
+        urgency,
+        collapseId: str(obj, 'collapseId', 32, ID_HEX_RE),
+      };
+    }
     default:
       return fail();
   }
 }
 
-/**
- * Client frames (PAN-4829 D-4). `push-register` and `push-unregister` stay `bad_frame` until push
- * delivery (PAN-4830); every machine-only type is `bad_frame`.
- */
+/** Client frames (PAN-4829 D-4, PAN-4830); every machine-only type is `bad_frame`. */
 function buildClient(obj: Obj): ClientToDirectoryFrame {
   const type = obj['type'];
   switch (type) {
@@ -245,6 +265,17 @@ function buildClient(obj: Obj): ClientToDirectoryFrame {
     case 'relay-usage':
       return relayUsageOf(obj);
     case 'forget-client':
+      return { type };
+    case 'push-register': {
+      const platform = obj['platform'];
+      if (platform !== 'ios' && platform !== 'android') fail();
+      const token = str(obj, 'token', MAX_PUSH_TOKEN_CHARS, PUSH_TOKEN_RE);
+      const apsEnvironment = obj['apsEnvironment'];
+      if (apsEnvironment === undefined) return { type, platform, token };
+      if (platform !== 'ios' || (apsEnvironment !== 'production' && apsEnvironment !== 'sandbox')) fail();
+      return { type, platform, token, apsEnvironment };
+    }
+    case 'push-unregister':
       return { type };
     default:
       return fail();

@@ -176,7 +176,7 @@ stack treats as a socket. Its `channel` marker carries `{ mode, remoteKeyHex, pa
 and its `remoteAddress` is `link:<first 16 hex of the remote key>`, so every channel
 request counts as remote (D-4645-10): never a loopback peer, never a trusted local caller.
 
-### Phone side (PAN-4833)
+### Phone side (PAN-4833, PAN-4834)
 
 The phone app imports the same protocol from `@overdeck/anywhere-channel/web`:
 `openSecureChannel` runs the shared initiator sequence (link and pairing only) on the web crypto
@@ -187,6 +187,15 @@ directory socket (`hello-client`, token in the `overdeck.bearer.<token>` subprot
 peer connection when a new offer arrives for the same peer, the dialer keeps one peer connection
 per (machine, relay) and opens one more data channel on it per dial. No server file imports
 `./web`. CP-1 timings are in `packages/anywhere-channel/CP-1.md`.
+
+The phone has no `http.Agent`, so `createChannelPool` and `ChannelWebSocket` speak HTTP/1.1 and
+RFC 6455 over channel streams themselves. The pool follows the same rules as `LinkAgent`: at
+most 4 channels per machine, a 4 s idle close, and one resend of a safe request that died on a
+stale channel. `installChannelShims` replaces `fetch` and `WebSocket`, so the unchanged
+frontend's `/api/*` and `/ws/rpc` traffic reaches the current machine with the phone token.
+Other URLs, such as the directory, keep the original implementations. The clients and shims are
+tested against `installChannelListener` in `tests/integration/anywhere/phone-channel.test.ts`;
+the package README has the details and the CP-2 direct-URL audit.
 
 ## One session per connection; the same port (D-4645-3, D-4645-4)
 
@@ -627,7 +636,13 @@ service, lingering, then one pairing link (`.pan/drafts/PAN-4656.md`).
 - **D-10 macOS.** `src/lib/launchd.ts` writes `~/Library/LaunchAgents/ai.overdeck.supervisor.plist`
   (`RunAtLoad`, `KeepAlive`) and bootstraps it into `gui/<uid>`, falling back to
   `user/<uid>`; a changed plist is booted out first. The agent starts at login only. `pan up`
-  on a Mac with the agent loaded does not start a second supervisor.
+  on a Mac with the agent loaded does not start a second supervisor. macOS 15+'s Local
+  Network privacy then applies to that launch agent (PAN-4897): the link supervisor
+  (`src/dashboard/server/services/link-supervisor.ts`) names the denial only when every LAN
+  `tcp://` route failed with `EHOSTUNREACH` (classified by `src/lib/anywhere/local-network.ts`)
+  **and** a gateway probe (`src/lib/anywhere/local-network-probe.ts`) confirms this process's
+  own access is denied; the probe is injected into `LinkSupervisorDeps.localNetworkAccess`
+  only on darwin, so linux and the phone build never run it.
 
 Update all, the update dialog and `pan update` reinstall into the same runtime (PAN-4722).
 

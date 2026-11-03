@@ -9,6 +9,7 @@ import type { Config, Deps, Env } from './env.ts';
 import { HDR_IDENTITY, INTERNAL, parseConfig, parseTurnConfig } from './env.ts';
 import { isWebSocketUpgrade, json, matchPattern, withSecurityHeaders } from './http.ts';
 import { inboxIntake } from './inbox-intake.ts';
+import { parsePushConfig } from './push/config.ts';
 
 /** Per-request context handed to every handler. */
 export interface RequestContext {
@@ -26,9 +27,10 @@ interface Route {
   handler: Handler;
 }
 
-/** GET /healthz: liveness, whether PUBLIC_BASE_URL is set, and whether TURN is available; reveals no value. */
+/** GET /healthz: liveness, whether PUBLIC_BASE_URL is set, and whether TURN, APNs and FCM are available; reveals no value. */
 function healthz(env: Env): Response {
-  return json({ ok: true, configured: parseConfig(env).ok, turn: parseTurnConfig(env) !== null });
+  const push = parsePushConfig(env);
+  return json({ ok: true, configured: parseConfig(env).ok, turn: parseTurnConfig(env) !== null, apns: push.apns !== null, fcm: push.fcm !== null });
 }
 
 /** The account's Durable Object stub, named by the account user id (D-2356-2). */
