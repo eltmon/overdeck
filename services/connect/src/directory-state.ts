@@ -467,6 +467,16 @@ function frame(state: DirectoryState, event: Extract<DirectoryEvent, { kind: 'fr
         ],
       };
     }
+    case 'push':
+      // PAN-4830 (PAN-4823 W-CON3) delivers pushes. Until then the decoder refuses `push`, so this
+      // answers exactly as an undecodable frame from a registered machine does today.
+      return {
+        state,
+        effects: [
+          { kind: 'send', to: 'self', frame: errorFrame('bad_frame', 'malformed frame') },
+          { kind: 'log', type: f.type, environmentId: self, outcome: 'bad_frame' },
+        ],
+      };
   }
 }
 

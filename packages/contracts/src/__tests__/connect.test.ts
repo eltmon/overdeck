@@ -73,6 +73,7 @@ describe("connect protocol constants", () => {
       unsupportedProtocol: 4010,
       replaced: 4011,
       forgotten: 4012,
+      clientLimit: 4013,
     })
   })
 
