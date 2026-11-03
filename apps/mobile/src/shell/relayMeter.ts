@@ -2,7 +2,7 @@
  * Relay metering for channels the phone dials through TURN (PAN-4837 FR-7, fact 11). The phone is
  * the initiator of every channel to a machine and the responder never reports, so the phone reports
  * its own relay bytes as `relay-usage`: every 60 s and when a channel closes, as the machine's
- * `relay-client.ts` does.
+ * `relay-client.ts` does. Bytes count as reported only once the directory socket accepts the frame.
  */
 export const RELAY_REPORT_INTERVAL_MS = 60_000;
 /** The directory accepts at most 1e9 bytes per report. */
@@ -32,21 +32,28 @@ export function createRelayMeter(
 ): RelayMeter {
   const tracked = new Set<Tracked>();
 
-  const sendBytes = (bytes: number): void => {
-    for (let left = bytes; left > 0; left -= MAX_REPORT_BYTES) send(Math.min(left, MAX_REPORT_BYTES));
+  /** Bytes taken from channels but not yet accepted by the directory socket. */
+  let unsent = 0;
+
+  /** Send what is owed; a send the socket refuses (it is reconnecting) keeps the rest for the next report. */
+  const flush = (): void => {
+    while (unsent > 0) {
+      const chunk = Math.min(unsent, MAX_REPORT_BYTES);
+      if (!send(chunk)) return;
+      unsent -= chunk;
+    }
   };
 
-  const take = (entry: Tracked): number => {
+  const take = (entry: Tracked): void => {
     const delta = entry.raw.bytesIn + entry.raw.bytesOut - entry.reported;
-    if (delta <= 0) return 0;
+    if (delta <= 0) return;
     entry.reported += delta;
-    return delta;
+    unsent += delta;
   };
 
   const report = (): void => {
-    let total = 0;
-    for (const entry of tracked) total += take(entry);
-    if (total > 0) sendBytes(total);
+    for (const entry of tracked) take(entry);
+    flush();
   };
 
   const timer = setInterval(report, intervalMs);
@@ -57,8 +64,8 @@ export function createRelayMeter(
       tracked.add(entry);
       raw.once('close', () => {
         tracked.delete(entry);
-        const delta = take(entry);
-        if (delta > 0) sendBytes(delta);
+        take(entry);
+        flush();
       });
     },
     stop() {

@@ -68,4 +68,20 @@ describe('createRelayMeter', () => {
     raw.emit('close');
     expect(send.mock.calls).toEqual([[MAX_REPORT_BYTES], [5]]);
   });
+
+  it('keeps bytes a refused send did not deliver and reports them next time', async () => {
+    let online = false;
+    const send = vi.fn(() => online);
+    meter = createRelayMeter(send);
+    const raw = new FakeRaw();
+    meter.track(raw);
+    raw.bytesIn = 3_000;
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(send).toHaveBeenLastCalledWith(3_000);
+    online = true;
+    raw.bytesOut = 500;
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(send).toHaveBeenLastCalledWith(3_500);
+    expect(send).toHaveBeenCalledTimes(2);
+  });
 });

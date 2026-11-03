@@ -34,6 +34,24 @@ interface Services {
 
 const errorText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
+/**
+ * The launch URL already handled in this WebView. Switching machines reloads the page (C-7), and
+ * on Android `App.getLaunchUrl()` keeps answering the activity's original launch intent, so without
+ * this a cold launch from a pair link would reopen the pair screen with a used code after each
+ * reload. Session storage survives a reload and is empty in a new app process.
+ */
+const LAUNCH_URL_KEY = 'overdeck.launchUrlHandled';
+
+function takeLaunchUrl(url: string): boolean {
+  try {
+    if (sessionStorage.getItem(LAUNCH_URL_KEY) === url) return false;
+    sessionStorage.setItem(LAUNCH_URL_KEY, url);
+  } catch {
+    // Storage unavailable: handle the URL.
+  }
+  return true;
+}
+
 interface ShellAppProps {
   /** Default `location.assign`: opening a machine reloads the page (C-7). */
   navigate?: (path: string) => void;
@@ -79,7 +97,7 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
         setMachines(machines);
         setBoot({ kind: 'ready', identity });
         const launch = await App.getLaunchUrl();
-        if (!cancelled && launch?.url) await handleUrl(launch.url);
+        if (!cancelled && launch?.url && takeLaunchUrl(launch.url)) await handleUrl(launch.url);
       } catch (e) {
         if (!cancelled) setBoot({ kind: 'failed', message: errorText(e) });
       }
@@ -93,6 +111,9 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
 
   useEffect(() => {
     if (account === null || pendingPairLink === null) return;
+    // Also leaves the machine view, which would otherwise keep rendering over the pair screen.
+    setCurrentMachineId(null);
+    if (location.pathname !== '/') history.replaceState(null, '', '/');
     setView({ kind: 'pair', link: pendingPairLink });
     setPendingPairLink(null);
   }, [account, pendingPairLink]);
@@ -213,13 +234,23 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
             onForget={() => void forget(current.environmentId)}
           />
         ) : sessionFor !== current.environmentId ? null : (
-          <MachineView
-            label={current.label}
-            onMachines={() => {
-              setCurrentMachineId(null);
-              navigate('/');
-            }}
-          />
+          <>
+            <MachineView
+              label={current.label}
+              onMachines={() => {
+                setCurrentMachineId(null);
+                navigate('/');
+              }}
+            />
+            {dialError ? (
+              <p
+                role="alert"
+                className="fixed inset-x-4 top-[calc(env(safe-area-inset-top)+3rem)] z-50 rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground"
+              >
+                {dialError.message}
+              </p>
+            ) : null}
+          </>
         )
       ) : view.kind === 'machines' ? (
         <MachinesScreen
