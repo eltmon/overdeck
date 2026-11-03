@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4897",
   "created": "2026-11-03T14:27:55.739Z",
-  "updated": "2026-11-03T15:04:03.502Z",
+  "updated": "2026-11-03T15:04:33.384Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -98,6 +98,10 @@
     "supervisor-local-network.ac5": {
       "status": "completed",
       "doneAt": "2026-11-03T15:04:03.502Z"
+    },
+    "connect-local-network-note.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:04:33.383Z"
     }
   }
 }
