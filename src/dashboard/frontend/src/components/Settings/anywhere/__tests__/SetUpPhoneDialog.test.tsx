@@ -3,9 +3,11 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
+import { DialogProvider } from '../../../DialogProvider';
 import { SetUpPhoneDialog } from '../SetUpPhoneDialog';
 import { openSettingsSection } from '../../../../lib/settingsSection';
 
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('../../../../lib/wsTransport', () => ({
   dashboardMutationJsonHeaders: vi.fn(async () => ({ 'Content-Type': 'application/json', 'x-overdeck-csrf-token': 'test' })),
 }));
@@ -40,6 +42,8 @@ function mockServer() {
       const { origin } = JSON.parse(String(init.body)) as { origin: string };
       return Promise.resolve(jsonResponse(200, { origin, added: true }));
     }
+    if (url === '/api/directory') return Promise.resolve(jsonResponse(200, { signedIn: false, state: 'off', url: null, plan: null, refusal: null, machines: [], approvals: [], joins: [], relay: null }));
+    if (url === '/api/devices') return Promise.resolve(jsonResponse(200, { devices: [] }));
     return Promise.resolve(jsonResponse(404, { error: 'not found' }));
   }));
 }
@@ -48,10 +52,13 @@ function renderDialog() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <SetUpPhoneDialog open onClose={() => undefined} />
+      <DialogProvider>
+        <SetUpPhoneDialog open onClose={() => undefined} />
+      </DialogProvider>
     </QueryClientProvider>,
   );
 }
+
 
 describe('SetUpPhoneDialog (PAN-2355)', () => {
   beforeEach(() => {
@@ -70,6 +77,7 @@ describe('SetUpPhoneDialog (PAN-2355)', () => {
     requireTokenMint = false;
     const user = userEvent.setup();
     renderDialog();
+    await user.click(await screen.findByRole('tab', { name: 'Browser on the phone' }));
     const open = await screen.findByRole('button', { name: 'Open the setting' });
     expect(screen.queryByRole('heading', { name: /Scan the pairing code/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Create pairing link' })).not.toBeInTheDocument();
@@ -80,6 +88,7 @@ describe('SetUpPhoneDialog (PAN-2355)', () => {
   it('creates a phone link at the chosen https address', async () => {
     const user = userEvent.setup();
     renderDialog();
+    await user.click(await screen.findByRole('tab', { name: 'Browser on the phone' }));
     await user.click(await screen.findByRole('button', { name: 'Create pairing link' }));
     expect(await screen.findByLabelText('Pairing link')).toHaveValue(`https://desk.tailnet.ts.net/m#pair=${CODE}`);
     expect(screen.getByAltText('Pairing QR code')).toHaveAttribute('data-qr-value', `https://desk.tailnet.ts.net/m#pair=${CODE}`);
@@ -93,6 +102,7 @@ describe('SetUpPhoneDialog (PAN-2355)', () => {
     ];
     const user = userEvent.setup();
     renderDialog();
+    await user.click(await screen.findByRole('tab', { name: 'Browser on the phone' }));
     const select = await screen.findByLabelText('Phone address');
     await waitFor(() => expect(Array.from((select as HTMLSelectElement).options).map((o) => o.value)).toEqual(['https://desk.tailnet.ts.net']));
     await user.type(screen.getByLabelText('Add an https:// address'), 'http://x');
@@ -103,6 +113,7 @@ describe('SetUpPhoneDialog (PAN-2355)', () => {
   it('shows two QR codes for an iPhone, the first opening the app', async () => {
     const user = userEvent.setup();
     renderDialog();
+    await user.click(await screen.findByRole('tab', { name: 'Browser on the phone' }));
     await user.click(await screen.findByRole('button', { name: 'iPhone' }));
     await user.click(screen.getByRole('button', { name: 'Create pairing link' }));
     expect(await screen.findByAltText('Phone app QR code')).toHaveAttribute('data-qr-value', 'https://desk.tailnet.ts.net/m');
@@ -113,7 +124,22 @@ describe('SetUpPhoneDialog (PAN-2355)', () => {
     pairingStatus = 403;
     const user = userEvent.setup();
     renderDialog();
+    await user.click(await screen.findByRole('tab', { name: 'Browser on the phone' }));
     await user.click(await screen.findByRole('button', { name: 'Create pairing link' }));
     expect(await screen.findByText('Pairing links can be created only from a browser on this machine.')).toBeInTheDocument();
+  });
+
+  it('opens on the Overdeck app tab with no PWA button visible', async () => {
+    renderDialog();
+    const appTab = await screen.findByRole('tab', { name: 'Overdeck app' });
+    expect(appTab).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByRole('button', { name: 'Create pairing link' })).not.toBeInTheDocument();
+  });
+
+  it('shows the PWA flow after clicking Browser on the phone', async () => {
+    const user = userEvent.setup();
+    renderDialog();
+    await user.click(await screen.findByRole('tab', { name: 'Browser on the phone' }));
+    expect(await screen.findByRole('heading', { name: '1. Install Tailscale' })).toBeInTheDocument();
   });
 });

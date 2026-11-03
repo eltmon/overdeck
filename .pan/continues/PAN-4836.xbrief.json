@@ -1,0 +1,127 @@
+{
+  "version": "1",
+  "issueId": "PAN-4836",
+  "created": "2026-11-03T14:20:05.683Z",
+  "updated": "2026-11-03T14:46:38.969Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "phone-pair-link": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4836",
+      "claimedAt": "2026-11-03T14:20:05.683Z",
+      "doneAt": "2026-11-03T14:22:28.352Z"
+    },
+    "paired-phones-list": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4836",
+      "claimedAt": "2026-11-03T14:22:47.329Z",
+      "doneAt": "2026-11-03T14:26:10.847Z"
+    },
+    "app-pairing-panel": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4836",
+      "claimedAt": "2026-11-03T14:26:19.829Z",
+      "doneAt": "2026-11-03T14:31:24.006Z"
+    },
+    "dialog-tabs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4836",
+      "claimedAt": "2026-11-03T14:31:31.200Z",
+      "doneAt": "2026-11-03T14:36:36.085Z"
+    },
+    "phone-setup-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4836",
+      "claimedAt": "2026-11-03T14:36:41.629Z",
+      "doneAt": "2026-11-03T14:37:47.063Z"
+    },
+    "phone-pair-link.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:41:12.595Z"
+    },
+    "phone-pair-link.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:41:30.344Z"
+    },
+    "phone-pair-link.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:41:46.720Z"
+    },
+    "phone-pair-link.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:42:03.424Z"
+    },
+    "paired-phones-list.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:42:20.802Z"
+    },
+    "paired-phones-list.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:42:38.277Z"
+    },
+    "paired-phones-list.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:42:54.068Z"
+    },
+    "paired-phones-list.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:43:10.397Z"
+    },
+    "paired-phones-list.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:43:26.027Z"
+    },
+    "app-pairing-panel.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:43:42.051Z"
+    },
+    "app-pairing-panel.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:43:57.726Z"
+    },
+    "app-pairing-panel.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:44:13.213Z"
+    },
+    "app-pairing-panel.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:44:28.298Z"
+    },
+    "app-pairing-panel.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:44:44.784Z"
+    },
+    "dialog-tabs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:45:01.047Z"
+    },
+    "dialog-tabs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:45:18.243Z"
+    },
+    "dialog-tabs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:45:33.981Z"
+    },
+    "dialog-tabs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:45:51.616Z"
+    },
+    "phone-setup-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:46:09.203Z"
+    },
+    "phone-setup-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:46:24.550Z"
+    },
+    "phone-setup-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:46:38.969Z"
+    }
+  }
+}
