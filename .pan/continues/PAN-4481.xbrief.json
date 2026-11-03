@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4481",
   "created": "2026-11-03T15:57:16.582Z",
-  "updated": "2026-11-03T16:01:28.858Z",
+  "updated": "2026-11-03T16:01:37.148Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-4481",
       "claimedAt": "2026-11-03T15:59:46.834Z",
       "doneAt": "2026-11-03T16:01:28.857Z"
+    },
+    "share-room-ping": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4481",
+      "claimedAt": "2026-11-03T16:01:37.148Z"
     }
   }
 }
