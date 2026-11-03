@@ -170,6 +170,7 @@ src/components/shared/ModelPicker/ModelPicker.render.test.tsx
 src/components/shared/ModelPicker/__tests__/harnessRows.test.ts
 src/components/shared/__tests__/Modal.test.tsx
 src/components/sidebar/__tests__/AddProjectToMachineDialog.test.tsx
+src/components/sidebar/__tests__/MachinesNavItem.test.tsx
 src/components/simple/SimpleQuestionCard.test.tsx
 src/components/terminal/TerminalDrawer.pending.test.tsx
 src/components/terminal/terminalControlFrames.test.ts

@@ -23,6 +23,7 @@ import { useFlywheelRunning } from '../lib/flywheelApi';
 import type { Issue } from '../types';
 import type { Tab } from './Header';
 import { OtherMachineProjects, ProjectMachineCount } from './sidebar/OtherMachineProjects';
+import { MachinesNavItem } from './sidebar/MachinesNavItem';
 
 type PipelineIssuePhase = 'ship' | 'review' | 'work' | 'plan' | 'todo';
 const PIPELINE_PHASES: PipelineIssuePhase[] = ['todo', 'plan', 'work', 'review', 'ship'];
@@ -575,11 +576,12 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
           )}
         </div>
 
-        {/* ─── Nav: Home · Order Book · Projects · More (PAN-1561) ─── */}
+        {/* ─── Nav: Home · Flywheel · Order Book · Machines · Projects · More (PAN-1561) ─── */}
         <nav className="flex-1 overflow-y-auto overflow-x-hidden py-2 scrollbar-hide">
           {/* Primary rail */}
           <div className={collapsed ? 'mb-2' : 'mb-1'}>
             {PRIMARY_ITEMS.map(renderNavItem)}
+            <MachinesNavItem collapsed={collapsed} onOpenSettings={() => { onTabChange('settings'); setMobileOpen(false); }} />
           </div>
 
           {/* ─── Workspaces (PAN-1990) ─── */}
