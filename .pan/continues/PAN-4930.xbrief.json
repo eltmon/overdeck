@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4930",
   "created": "2026-11-03T21:47:50.354Z",
-  "updated": "2026-11-03T23:24:04.353Z",
+  "updated": "2026-11-03T23:24:22.804Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -140,6 +140,10 @@
     "revoke-exited-event.ac2": {
       "status": "completed",
       "doneAt": "2026-11-03T23:24:04.352Z"
+    },
+    "revoke-exited-event.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:24:22.804Z"
     }
   }
 }
