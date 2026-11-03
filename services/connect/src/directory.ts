@@ -10,8 +10,9 @@
  * trusted here; the public `Authorization` header is never read.
  * This module uses Web APIs only; src/index.ts owns the `cloudflare:workers` import.
  */
+import { CONNECT_CLOSE_CODES } from '../../../packages/contracts/src/connect.ts';
 import type { DirectoryToClientFrame, DirectoryToMachineFrame } from '../../../packages/contracts/src/connect.ts';
-import { ACCOUNT_PATHS, accountView } from './account-view.ts';
+import { ACCOUNT_PATHS, ACCOUNT_TABLES, accountView } from './account-view.ts';
 import { reduceClient } from './client-state.ts';
 import type { ClientEvent } from './client-state.ts';
 import { EMPTY_DIRECTORY, reduce } from './directory-state.ts';
@@ -150,6 +151,7 @@ export class DirectoryHost {
       return json(accountView(this.state, online, this.deps.now(), relayCapBytes(this.env.RELAY_CAP_BYTES)));
     }
     if (pathname === ACCOUNT_PATHS.removeMachine && req.method === 'POST') return this.removeMachine(req);
+    if (pathname === ACCOUNT_PATHS.deleteAccount && req.method === 'POST') return this.deleteAccount();
     if (pathname !== INTERNAL.socket || !isWebSocketUpgrade(req)) return new Response(null, { status: 404 });
     const identity = parseIdentity(req.headers.get(HDR_IDENTITY));
     if (!identity) return new Response(null, { status: 400 });
@@ -217,6 +219,19 @@ export class DirectoryHost {
     if (!this.state.machines.some((m) => m.environmentId === environmentId)) return json({ error: 'unknown_machine' }, 404);
     await this.apply(null, { kind: 'remove-machine', environmentId });
     return json({ removed: true });
+  }
+
+  /**
+   * Account deletion (PAN-4959 WI-3, D-6): closes every machine and phone socket with 4001, empties
+   * every table and keeps the schema, which only the constructor creates. Idempotent.
+   */
+  private async deleteAccount(): Promise<Response> {
+    for (const ws of this.ctx.getWebSockets(MACHINE_TAG)) safeClose(ws, CONNECT_CLOSE_CODES.unauthorized, 'account deleted');
+    for (const table of ACCOUNT_TABLES) this.ctx.storage.sql.exec(`DELETE FROM ${table}`);
+    await this.ctx.storage.deleteAlarm();
+    this.state = EMPTY_DIRECTORY;
+    logFrame('delete-account', null, 'ok');
+    return json({ deleted: true });
   }
 
   /** A webhook event for one of this account's inboxes (the Worker already capped the body). */

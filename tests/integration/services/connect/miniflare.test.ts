@@ -47,6 +47,8 @@ const RELAY_TOKEN = 'odd_' + 'c'.repeat(64);
 const VIEW_TOKEN = 'odd_' + 'a'.repeat(64);
 /** A free account the remove-machine test fills and frees (PAN-4959), so 'u-free' stays full. */
 const removeToken = (n: number) => 'odd_' + n.toString(16).padStart(64, '9');
+/** A tester account the delete-account test empties (PAN-4959): device 1 is a machine, device 2 a phone. */
+const deleteToken = (n: number) => 'odd_' + n.toString(16).padStart(64, '8');
 
 const ACCOUNT_STUB = `
 import { WorkerEntrypoint } from 'cloudflare:workers';
@@ -60,6 +62,9 @@ export class AccountRpc extends WorkerEntrypoint {
     }
     if (token === ${JSON.stringify(VIEW_TOKEN)}) {
       return { ok: true, userId: 'u-view', githubId: 6, deviceId: 'd-view', entitlement: { plan: 'tester', maxDevices: null } };
+    }
+    if (/^odd_8+[0-9a-f]$/.test(token)) {
+      return { ok: true, userId: 'u-delete', githubId: 8, deviceId: 'd-x' + token.slice(-1), entitlement: { plan: 'tester', maxDevices: null } };
     }
     if (/^odd_9+[0-9a-f]$/.test(token)) {
       return { ok: true, userId: 'u-remove', githubId: 7, deviceId: 'd-r' + token.slice(-1), entitlement: { plan: 'free', maxDevices: 3 } };
@@ -462,6 +467,32 @@ describe('connect service on real workerd (PAN-2356 WI-3)', () => {
     b.close();
     c.close();
     d.close();
+  }, SLOW);
+
+  it('empties the account DO on POST /delete-account, closes every socket 4001 and stays idempotent (PAN-4959 WI-3)', async () => {
+    const ns = await mf.getDurableObjectNamespace('DIRECTORY');
+    const stub = ns.get(ns.idFromName('u-delete'));
+    const machine = await register(deleteToken(1), 51);
+    machine.send({ type: 'inbox-create', requestId: 'ib-del' });
+    const created = (await machine.waitFor(isType('inbox-created'))) as { url: string };
+    machine.send({ type: 'relay-usage', bytes: 100 });
+    expect(await machine.waitFor(isType('relay-status'))).toMatchObject({ bytesUsed: 100 });
+    const { peer: phone } = await registerPhone(deleteToken(2), 51);
+
+    const deleted = await stub.fetch('https://directory/delete-account', { method: 'POST' });
+    expect(deleted.status).toBe(200);
+    expect(await deleted.json()).toEqual({ deleted: true });
+    expect(await machine.waitClose()).toMatchObject({ code: 4001 });
+    expect(await phone.waitClose()).toMatchObject({ code: 4001 });
+
+    const view = await (await stub.fetch('https://directory/account-view')).json();
+    expect(view).toMatchObject({ machines: [], relay: { bytesUsed: 0, stopped: false } });
+    const hook = await mf.dispatchFetch(created.url, { method: 'POST', body: '{}', headers: { 'Content-Type': 'application/json' } } as never);
+    expect(hook.status).toBe(404);
+
+    const again = await stub.fetch('https://directory/delete-account', { method: 'POST' });
+    expect(again.status).toBe(200);
+    expect(await again.json()).toEqual({ deleted: true });
   }, SLOW);
 
   it('holds an event sealed while the machine is offline and delivers it on reconnect (WI-8)', async () => {

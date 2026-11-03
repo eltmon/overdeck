@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { ACCOUNT_PATHS, accountView } from '../../../../services/connect/src/account-view.ts';
+import { ACCOUNT_PATHS, ACCOUNT_TABLES, accountView } from '../../../../services/connect/src/account-view.ts';
 import { EMPTY_DIRECTORY } from '../../../../services/connect/src/directory-state.ts';
 import type { DirectoryState, MachineRow } from '../../../../services/connect/src/directory-state.ts';
+import { SCHEMA } from '../../../../services/connect/src/directory-store.ts';
+import { INBOX_SCHEMA } from '../../../../services/connect/src/inbox.ts';
 
 const NOW = Date.UTC(2026, 10, 3, 12, 0, 0);
 const CAP = 1_000;
@@ -51,5 +53,10 @@ describe('account view (PAN-4959 WI-1)', () => {
       machines: [],
       relay: { month: '2026-11', bytesUsed: 0, capBytes: CAP, stopped: false },
     });
+  });
+
+  it('lists every table the Directory DO creates, so /delete-account empties all of them (WI-3)', () => {
+    const created = [...SCHEMA, ...INBOX_SCHEMA].flatMap((sql) => /CREATE TABLE IF NOT EXISTS (\w+)/.exec(sql)?.[1] ?? []);
+    expect([...ACCOUNT_TABLES].sort()).toEqual([...created].sort());
   });
 });

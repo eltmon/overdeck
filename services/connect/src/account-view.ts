@@ -11,6 +11,9 @@ import { relayStatusOf } from './relay-meter.ts';
 
 export const ACCOUNT_PATHS = { view: '/account-view', removeMachine: '/remove-machine', deleteAccount: '/delete-account' } as const;
 
+/** Every table of the Directory DO; `/delete-account` empties each one and keeps the schema (D-6). */
+export const ACCOUNT_TABLES = ['machines', 'meta', 'approvals', 'relay_usage', 'clients', 'inboxes', 'inbox_events'] as const;
+
 export interface AccountViewMachine {
   environmentId: string;
   label: string;
