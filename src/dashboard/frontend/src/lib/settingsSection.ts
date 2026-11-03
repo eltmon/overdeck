@@ -31,3 +31,15 @@ export function consumePendingSettingsSection(): string | null {
     return null;
   }
 }
+
+/**
+ * Show Settings scrolled to `sectionId` from any page (PAN-4869): a dialog opened
+ * by the Anywhere dialog host may sit over another tab. Uses the URL door, as
+ * openSessionVaultSettings does.
+ */
+export function openSettingsSection(sectionId: string): void {
+  requestSettingsSection(sectionId);
+  if (window.location.pathname === '/settings') return;
+  window.history.pushState({ tab: 'settings' }, '', '/settings');
+  window.dispatchEvent(new PopStateEvent('popstate'));
+}

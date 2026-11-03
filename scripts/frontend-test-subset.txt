@@ -189,6 +189,7 @@ src/lib/__tests__/linkedConversation.test.ts
 src/lib/__tests__/pendingInput.test.ts
 src/lib/__tests__/pendingInputAnswer.test.ts
 src/lib/__tests__/selectBackendPanes.render-count.test.tsx
+src/lib/__tests__/settingsSection.test.ts
 src/lib/__tests__/simple-derive.test.ts
 src/lib/__tests__/simple-feed.test.ts
 src/lib/__tests__/syntaxTheme.test.ts
