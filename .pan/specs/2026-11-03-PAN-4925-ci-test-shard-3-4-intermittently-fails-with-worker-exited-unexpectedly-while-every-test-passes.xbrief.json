@@ -4,17 +4,17 @@
     "created": "2026-11-03T20:13:10Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4925: CI test-shard 3/4 intermittently fails with 'Worker exited unexpectedly' while every test passes",
-    "updated": "2026-11-03T20:24:53.412Z"
+    "updated": "2026-11-03T20:25:42.612Z"
   },
   "plan": {
     "id": "pan-4925",
     "title": "CI test-shard 3/4 intermittently fails with 'Worker exited unexpectedly' while every test passes",
-    "status": "proposed",
+    "status": "running",
     "uid": "2321b3bb-e21d-4bba-af10-6a837c5fccbe",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-03T20:13:10Z",
-    "updated": "2026-11-03T20:24:53.412Z",
+    "updated": "2026-11-03T20:25:42.612Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4925",
@@ -355,5 +355,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
