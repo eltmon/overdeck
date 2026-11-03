@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4830",
   "created": "2026-11-03T14:25:43.002Z",
-  "updated": "2026-11-03T14:49:04.242Z",
+  "updated": "2026-11-03T14:49:18.820Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -156,6 +156,10 @@
       "claimedBy": "agent-pan-4830",
       "claimedAt": "2026-11-03T14:46:10.693Z",
       "doneAt": "2026-11-03T14:49:04.241Z"
+    },
+    "push-registration.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:49:18.820Z"
     }
   }
 }
