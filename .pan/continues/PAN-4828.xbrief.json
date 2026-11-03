@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4828",
+  "created": "2026-11-03T04:08:00.094Z",
+  "updated": "2026-11-03T04:08:00.095Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "contract-frames": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4828",
+      "claimedAt": "2026-11-03T04:08:00.094Z"
+    }
+  }
+}
