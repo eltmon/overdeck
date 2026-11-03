@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4477",
   "created": "2026-11-03T15:02:33.095Z",
-  "updated": "2026-11-03T16:31:25.020Z",
+  "updated": "2026-11-03T16:31:40.708Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -142,6 +142,10 @@
     "tmux-hub-subscribe.ac5": {
       "status": "completed",
       "doneAt": "2026-11-03T16:31:25.020Z"
+    },
+    "terminal-bridge.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:31:40.708Z"
     }
   }
 }
