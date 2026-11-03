@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4961",
+  "created": "2026-11-03T23:57:34.038Z",
+  "updated": "2026-11-03T23:57:34.038Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "floor-ledger": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4961",
+      "claimedAt": "2026-11-03T23:57:34.038Z"
+    }
+  }
+}
