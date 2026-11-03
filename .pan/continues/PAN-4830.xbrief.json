@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4830",
   "created": "2026-11-03T14:25:43.002Z",
-  "updated": "2026-11-03T14:41:26.268Z",
+  "updated": "2026-11-03T14:41:42.053Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -110,6 +110,11 @@
     "fcm-sender.ac4": {
       "status": "completed",
       "doneAt": "2026-11-03T14:41:26.268Z"
+    },
+    "deliver": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4830",
+      "claimedAt": "2026-11-03T14:41:42.053Z"
     }
   }
 }
