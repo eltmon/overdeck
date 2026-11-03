@@ -150,7 +150,7 @@ describe('subscribeToTmuxHub', () => {
   function existingHub(): PtyHub & { pty: ReturnType<typeof makeFakePty> } {
     const fake = makeFakePty();
     allPtys.push(fake);
-    const hub = { ...makeHub(), cols: 80, rows: 24 };
+    const hub = { ...makeHub(), cols: 120, rows: 40 };
     hubs.set('sess', hub);
     attachHubPty(hubs, 'sess', hub, fake);
     return hub as PtyHub & { pty: ReturnType<typeof makeFakePty> };
@@ -212,7 +212,7 @@ describe('subscribeToTmuxHub', () => {
     await subscribeToTmuxHub('sess', (f) => frames.push(f), deps);
 
     expect(deps.spawn).not.toHaveBeenCalled();
-    expect(frames).toEqual([{ kind: 'snapshot', cols: 80, rows: 24, data: 'SCREEN' }]);
+    expect(frames).toEqual([{ kind: 'snapshot', cols: 120, rows: 40, data: 'SCREEN' }]);
   });
 
   it('delivers output that arrives during the capture after the snapshot, in order', async () => {
@@ -233,7 +233,7 @@ describe('subscribeToTmuxHub', () => {
     await vi.advanceTimersByTimeAsync(4);
 
     expect(frames).toEqual([
-      { kind: 'snapshot', cols: 80, rows: 24, data: 'SCREEN' },
+      { kind: 'snapshot', cols: 120, rows: 40, data: 'SCREEN' },
       { kind: 'output', data: 'ab' },
       { kind: 'output', data: 'c' },
     ]);
@@ -284,7 +284,7 @@ describe('subscribeToTmuxHub', () => {
     await vi.advanceTimersByTimeAsync(4);
     notifyHubSize(hub);
 
-    expect(frames).toEqual([{ kind: 'snapshot', cols: 80, rows: 24, data: 'SCREEN' }]);
+    expect(frames).toEqual([{ kind: 'snapshot', cols: 120, rows: 40, data: 'SCREEN' }]);
     expect(hub.pty.kill).not.toHaveBeenCalled();
   });
 });

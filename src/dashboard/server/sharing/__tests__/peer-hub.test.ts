@@ -775,10 +775,14 @@ describe('PeerHub terminal watch', () => {
     expect(peer.channel('terminal').sent).toEqual([]);
   });
 
-  it('closes the terminal bridge when the hub closes', async () => {
-    const s = setup();
-    await negotiated(s);
+  it('detaches the watch and closes the terminal bridge when the hub closes', async () => {
+    const rec = recordingTerminal();
+    const s = setup({ terminalAttach: rec.attach });
+    const peer = await negotiated(s);
+    peer.channel('control').onMessage.emit(viewerWatch(true));
+    await settle();
     s.hub.close();
+    expect(rec.detaches[0]).toHaveBeenCalledTimes(1);
     expect(s.terminal.close).toHaveBeenCalledTimes(1);
   });
 

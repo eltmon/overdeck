@@ -242,6 +242,10 @@ describe('hub listener output', () => {
     expect(thrower.onData).toHaveBeenCalledTimes(1);
     expect(healthy.onData).toHaveBeenNthCalledWith(1, 'first');
     expect(healthy.onData).toHaveBeenNthCalledWith(2, 'second');
+
+    notifyHubExit(hub);
+    expect(thrower.onExit).not.toHaveBeenCalled();
+    expect(healthy.onExit).toHaveBeenCalledTimes(1);
   });
 
   it('notifyHubSize passes the hub cols and rows', () => {

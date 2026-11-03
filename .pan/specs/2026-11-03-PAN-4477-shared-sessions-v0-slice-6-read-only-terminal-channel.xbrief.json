@@ -4,17 +4,17 @@
     "created": "2026-11-03T14:55:14Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4477: Shared Sessions v0 (slice 6): read-only terminal channel",
-    "updated": "2026-11-03T15:01:05.571Z"
+    "updated": "2026-11-03T15:02:15.972Z"
   },
   "plan": {
     "id": "pan-4477",
     "title": "Shared Sessions v0 (slice 6): read-only terminal channel",
-    "status": "proposed",
+    "status": "running",
     "uid": "448da68f-24c9-4681-848c-de62ac303570",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-03T14:55:14Z",
-    "updated": "2026-11-03T15:01:05.571Z",
+    "updated": "2026-11-03T15:02:15.972Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4477",
@@ -964,5 +964,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }

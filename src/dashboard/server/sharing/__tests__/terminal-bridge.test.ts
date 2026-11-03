@@ -183,6 +183,32 @@ describe('TerminalBridge', () => {
     expect(late.payloads).toEqual([]);
   });
 
+  it('two attaches each detach their own observation, then close() and a later attach send nothing', async () => {
+    const observations: Array<ReturnType<typeof makeObservation>> = [];
+    const deps = herdrDeps(observations);
+    const bridge = new TerminalBridge('conv', deps);
+    const first = makeSink();
+    const second = makeSink();
+    const detachFirst = await bridge.attach(first);
+    const detachSecond = await bridge.attach(second);
+
+    detachFirst();
+    detachSecond();
+    bridge.close();
+    observations[0]!.push(snapshot);
+    observations[1]!.push(snapshot);
+    await settle();
+    const late = makeSink();
+    await bridge.attach(late);
+
+    expect(deps.observeHerdr).toHaveBeenCalledTimes(2);
+    expect(observations[0]!.close).toHaveBeenCalledTimes(1);
+    expect(observations[1]!.close).toHaveBeenCalledTimes(1);
+    expect(first.payloads).toEqual([]);
+    expect(second.payloads).toEqual([]);
+    expect(late.payloads).toEqual([]);
+  });
+
   it('detaches a sink whose send throws', async () => {
     const observations: Array<ReturnType<typeof makeObservation>> = [];
     const sink: TerminalSink = { send: vi.fn(() => { throw new Error('closed'); }) };
