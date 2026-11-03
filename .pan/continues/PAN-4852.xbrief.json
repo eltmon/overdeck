@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4852",
   "created": "2026-11-03T02:45:30.764Z",
-  "updated": "2026-11-03T06:01:57.702Z",
+  "updated": "2026-11-03T06:02:33.850Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -290,6 +290,10 @@
     "placement.ac4": {
       "status": "completed",
       "doneAt": "2026-11-03T06:01:57.702Z"
+    },
+    "switch-off.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:02:33.849Z"
     }
   }
 }
