@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4830",
   "created": "2026-11-03T14:25:43.002Z",
-  "updated": "2026-11-03T14:37:53.099Z",
+  "updated": "2026-11-03T14:38:07.119Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -76,6 +76,10 @@
     "apns-sender.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T14:37:53.098Z"
+    },
+    "apns-sender.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:38:07.119Z"
     }
   }
 }
