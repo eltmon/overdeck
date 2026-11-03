@@ -253,6 +253,21 @@ describe("SharedChannelReader inbound cap", () => {
     expect(new SharedChannelReader(exact.length - 1).read(exact)).toEqual({ kind: "invalid", reason: "too_large" })
   })
 
+  it("refuses a message too long to be an envelope or a fragment before parsing it", () => {
+    const reader = new SharedChannelReader(SHARE_MAX_INBOUND_ENVELOPE_CHARS)
+    // Not JSON: a parse would report not_json, so too_large proves the length check came first.
+    expect(reader.read("{".repeat(SHARE_MAX_MESSAGE_CHARS * 6 + 1_000))).toEqual({ kind: "invalid", reason: "too_large" })
+    expect(reader.read("{".repeat(1_000))).toEqual({ kind: "invalid", reason: "not_json" })
+  })
+
+  it("still reads a fragment whose escaped data is longer than the inbound cap", () => {
+    // A quote is `\"` in the envelope and `\\\"` in the fragment, so each fragment roughly doubles.
+    const value = envelope({ text: '"'.repeat(40_000) })
+    const parts = encodeSharedMessage(value, 9)
+    expect(parts.some((part) => part.length > SHARE_MAX_INBOUND_ENVELOPE_CHARS)).toBe(true)
+    expect(readAll(parts).at(-1)).toEqual({ kind: "envelope", envelope: value })
+  })
+
   it("returns too_large for fragments whose count passes the cap", () => {
     const parts = encodeSharedMessage(envelope({ text: "a".repeat(100_000) }), 4)
     expect(new SharedChannelReader(100).read(parts[0] ?? "")).toEqual({ kind: "invalid", reason: "too_large" })

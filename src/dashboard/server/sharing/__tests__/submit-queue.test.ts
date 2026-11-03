@@ -208,6 +208,21 @@ describe('SubmitQueue', () => {
     expect(h.queue.view().delivering).toBe(false);
   });
 
+  it('reports a delivering item whose author lost the grant as grant_revoked on a 409, not re-queued', async () => {
+    const h = setup();
+    let resolve: (answer: DoorAnswer) => void = () => undefined;
+    h.answers.push(new Promise<DoorAnswer>((r) => { resolve = r; }));
+    h.queue.enqueue(contributor('A'));
+    await vi.advanceTimersByTimeAsync(QUEUE_TICK_MS);
+    expect(h.queue.dropAuthor(7)).toEqual([]);
+    resolve({ status: 409, body: {} });
+    await vi.advanceTimersByTimeAsync(QUEUE_TICK_MS * 3);
+    expect(h.outcomes).toEqual([['A', 'grant_revoked']]);
+    expect(h.undos).toEqual(['A']);
+    expect(h.delivered).toEqual(['A']);
+    expect(h.queue.view().items).toEqual([]);
+  });
+
   it('emits onStatus only when agentWorking or queued changed', async () => {
     const h = setup();
     h.activity.working = true;

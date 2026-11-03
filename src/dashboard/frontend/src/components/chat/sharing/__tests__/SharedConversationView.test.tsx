@@ -276,6 +276,13 @@ describe('SharedConversationView composer (PAN-4476 WI-13)', () => {
     expect(screen.getByText('Prompts cannot start with /, ! or #.')).toBeTruthy();
   });
 
+  it('shows no prefix hint for a blank box and a plain failure line for a rejected status without a reason', () => {
+    render(<SharedConversationView {...connected({ myDraft: '   ', submitStatus: { clientId: 'c1', status: 'rejected' } }, true)} />);
+    expect((button('Send prompt') as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByText('Prompts cannot start with /, ! or #.')).toBeNull();
+    expect(screen.getByText('Your prompt was not sent.')).toBeTruthy();
+  });
+
   it('a non-contributor gets a suggestion box and no Send prompt', () => {
     const setMyDraft = vi.fn();
     render(<SharedConversationView {...connected({ setMyDraft })} />);

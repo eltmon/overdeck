@@ -22,6 +22,7 @@ interface Fakes {
     closed: boolean;
     drafts: string[];
     submits: Array<[string, string]>;
+    submitOpen: boolean;
     callbacks: WebRtcViewerCallbacks;
   })[];
   viewer: ViewerFactory;
@@ -54,7 +55,12 @@ function fakes(initial: JoinView | null, create: () => Promise<JoinView> = async
       onSignal(data: SignalData) { created.signals.push(data); },
       close() { created.closed = true; },
       sendDraft(text: string) { created.drafts.push(text); return true; },
-      submit(clientId: string, text: string) { created.submits.push([clientId, text]); return true; },
+      submitOpen: true,
+      submit(clientId: string, text: string) {
+        if (!created.submitOpen) return false;
+        created.submits.push([clientId, text]);
+        return true;
+      },
     };
     viewers.push(created);
     return created;
@@ -261,6 +267,19 @@ describe('useSharedJoin drafts and prompts (PAN-4476 WI-13)', () => {
     act(() => peer.callbacks.onDraftSent?.());
     expect(result.current.draftSentNotice).toBe(true);
     expect(result.current.myDraft).toBe('');
+    // An empty snapshot clears any draft a late trailing send recreated on the host.
+    expect(peer.drafts.at(-1)).toBe('');
+  });
+
+  it('keeps the text and reports a rejected status when the channel cannot send the submit', async () => {
+    const { peer, result } = await live(true);
+    vi.useFakeTimers();
+    peer.submitOpen = false;
+    act(() => result.current.setMyDraft('Run the tests'));
+    act(() => result.current.submitPrompt());
+    expect(result.current.myDraft).toBe('Run the tests');
+    expect(result.current.submitStatus).toMatchObject({ status: 'rejected' });
+    expect(result.current.submitStatus?.reason).toBeUndefined();
   });
 
   it('re-sends the current draft on ready and keeps it across a reconnect', async () => {

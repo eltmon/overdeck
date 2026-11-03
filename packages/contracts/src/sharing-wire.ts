@@ -29,6 +29,12 @@ export const SHARE_MAX_INBOUND_ENVELOPE_CHARS = 65_536
 /** The longest shared prompt or draft, in UTF-16 code units (D-11). */
 export const SHARED_PROMPT_MAX_CHARS = 8_000
 
+/**
+ * The longest single message a fragment can be: JSON escaping can turn each of a slice's
+ * SHARE_MAX_MESSAGE_CHARS code units into six (`\u0000`), plus the chunk header.
+ */
+const MAX_FRAGMENT_MESSAGE_CHARS = SHARE_MAX_MESSAGE_CHARS * 6 + 256
+
 export type SharedReadResult =
   | { readonly kind: "envelope"; readonly envelope: SharedEnvelope }
   | { readonly kind: "pending" }
@@ -134,6 +140,11 @@ export class SharedChannelReader {
   constructor(private readonly maxEnvelopeChars: number = SHARE_MAX_ENVELOPE_CHARS) {}
 
   read(text: string): SharedReadResult {
+    // Refuse before parsing anything longer than either a capped envelope or a fragment can be, so an
+    // oversized message is never parsed; the exact cap for an unfragmented envelope is checked below.
+    if (text.length > Math.max(this.maxEnvelopeChars, MAX_FRAGMENT_MESSAGE_CHARS)) {
+      return { kind: "invalid", reason: "too_large" }
+    }
     let value: unknown
     try {
       value = JSON.parse(text)

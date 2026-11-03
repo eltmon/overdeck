@@ -67,7 +67,8 @@ function SharedComposer(props: SharedJoin) {
     avatarUrl: participants.find((p) => p.githubId === draft.authorGithubId)?.avatarUrl ?? null,
     text: draft.text,
   }));
-  const refusal = props.myDraft === '' ? null : sharedPromptRefusal(props.myDraft);
+  // The prefix hint is only for a prefix; an empty or blank box just disables Send.
+  const refusal = props.myDraft.trim() === '' ? null : sharedPromptRefusal(props.myDraft);
   const canSend = contributor && sharedPromptRefusal(props.myDraft) === null;
   return (
     <div data-component="shared-composer" className="space-y-2 border-t border-border px-4 py-3">

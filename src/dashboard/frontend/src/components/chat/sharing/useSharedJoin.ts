@@ -178,6 +178,8 @@ export function useSharedJoin(code: string, deps: { api?: JoinApi; viewer?: View
           if (viewerRef.current !== created || !aliveRef.current) return;
           setDraftSentNotice(true);
           clearMyDraft();
+          // A trailing snapshot sent just before the host took the draft would recreate it there.
+          created.sendDraft('');
         },
         onReady: () => {
           if (viewerRef.current === created && aliveRef.current) created.sendDraft(myDraftRef.current);
@@ -203,7 +205,12 @@ export function useSharedJoin(code: string, deps: { api?: JoinApi; viewer?: View
     const viewer = viewerRef.current;
     const text = myDraftRef.current;
     if (!viewer || !contributorRef.current || sharedPromptRefusal(text) !== null) return;
-    if (!viewer.submit(crypto.randomUUID(), text)) return;
+    const clientId = crypto.randomUUID();
+    if (!viewer.submit(clientId, text)) {
+      // The channel is not open: keep the text and say the prompt did not go out.
+      setSubmitStatus({ clientId, status: 'rejected' });
+      return;
+    }
     clearMyDraft();
     setSubmitStatus(null);
     viewer.sendDraft('');
