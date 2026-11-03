@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4835",
   "created": "2026-11-03T07:59:34.235Z",
-  "updated": "2026-11-03T09:24:38.330Z",
+  "updated": "2026-11-03T09:27:04.920Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-11-03T09:00:46.210Z"
     },
     "phone-scope-rows": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4835",
-      "claimedAt": "2026-11-03T09:01:13.877Z"
+      "claimedAt": "2026-11-03T09:01:13.877Z",
+      "doneAt": "2026-11-03T09:27:04.919Z"
     },
     "phones-exchange-route": {
       "status": "completed",
