@@ -490,6 +490,7 @@ await groups.register('swarm'); await groups.register('task');
 await groups.register('workspace');
 await groups.register('vault');
 await groups.register('account');
+await groups.register('sharing');
 await groups.register('test');
 await groups.register('tts');
 
