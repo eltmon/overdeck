@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4831",
   "created": "2026-11-03T04:00:12.397Z",
-  "updated": "2026-11-03T04:22:20.827Z",
+  "updated": "2026-11-03T04:22:39.230Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-4831",
       "claimedAt": "2026-11-03T04:00:12.397Z",
       "doneAt": "2026-11-03T04:22:20.827Z"
+    },
+    "phone-platforms": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4831",
+      "claimedAt": "2026-11-03T04:22:39.230Z"
     }
   }
 }
