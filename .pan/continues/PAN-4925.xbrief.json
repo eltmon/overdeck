@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4925",
   "created": "2026-11-03T20:26:03.235Z",
-  "updated": "2026-11-03T20:48:20.420Z",
+  "updated": "2026-11-03T20:48:45.403Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -43,6 +43,10 @@
     "fix-smee-stop-test.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T20:48:20.420Z"
+    },
+    "worker-signal-guard.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T20:48:45.403Z"
     }
   }
 }
