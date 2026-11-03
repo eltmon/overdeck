@@ -76,6 +76,7 @@ import { remoteWorkAgentsRouteLayer } from './routes/remote-work-agents.js'
 import { versionsSelfRouteLayer } from './routes/versions-self.js'
 import { machinesFleetRouteLayer } from './routes/machines-fleet.js'
 import { machinesPeerRouteLayer } from './routes/machines-peer.js'
+import { phonesRouteLayer } from './routes/phones.js'
 import { machinesWorkRouteLayer } from './routes/machines-work.js'
 import { machinesWorkLanesRouteLayer } from './routes/machines-work-lanes.js'
 import { fleetWorkRouteLayer } from './routes/fleet-work.js'
@@ -445,6 +446,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   versionsSelfRouteLayer,
   machinesFleetRouteLayer,
   machinesPeerRouteLayer,
+  phonesRouteLayer,
   machinesWorkRouteLayer,
   machinesWorkLanesRouteLayer,
   fleetWorkRouteLayer,

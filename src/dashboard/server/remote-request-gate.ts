@@ -32,10 +32,10 @@
  *
  * Secure channels (PAN-4645 WI-4): a request whose socket is a `ChannelSocket`
  * never counts as a trusted local caller. A pairing-mode channel may reach
- * exactly `GET /api/environment` and `POST /api/machines/exchange` and nothing
- * else; `POST /api/machines/exchange` is reachable only that way, so a plain
- * socket gets 401 there whatever it presents. A link-mode channel is judged by
- * its `machine` credential alone.
+ * exactly `GET /api/environment`, `POST /api/machines/exchange` and (PAN-4835)
+ * `POST /api/phones/exchange`, and nothing else; those two exchange routes are
+ * reachable only that way, so a plain socket gets 401 there whatever it
+ * presents. A link-mode channel is judged by its `machine` or `phone` credential.
  *
  * `GET /events/stream` also accepts its own `OVERDECK_EVENTS_TOKEN` bearer
  * (when that variable is set), so remote SSE consumers such as an external
@@ -110,12 +110,13 @@ export type RemoteGateRejection =
   | { status: 403; code: 'agent-fenced' }
   | { status: 404 };
 
-/** `METHOD path` pairs a pairing-mode channel may reach without a credential (PAN-4645). */
-export const PAIRING_CHANNEL_ALLOWLIST: ReadonlySet<string> = new Set(['GET /api/environment', 'POST /api/machines/exchange']);
+/** `METHOD path` pairs a pairing-mode channel may reach without a credential (PAN-4645, PAN-4835). */
+export const PAIRING_CHANNEL_ALLOWLIST: ReadonlySet<string> = new Set(['GET /api/environment', 'POST /api/machines/exchange', 'POST /api/phones/exchange']);
 /** `METHOD path` pairs an approval-mode channel may reach without a credential (PAN-2356 D-2356-9). */
 export const APPROVAL_CHANNEL_ALLOWLIST: ReadonlySet<string> = new Set(['GET /api/environment', 'POST /api/machines/approval-exchange']);
 const MACHINES_EXCHANGE = 'POST /api/machines/exchange';
 const APPROVAL_EXCHANGE = 'POST /api/machines/approval-exchange';
+const PHONES_EXCHANGE = 'POST /api/phones/exchange';
 
 /** The gate decision for one request: `null` lets it through. */
 export function remoteGateRejection(
@@ -135,7 +136,7 @@ export function remoteGateRejection(
   const surface = `${request.method} ${pathname}`;
   if (channel?.mode === 'pairing') return PAIRING_CHANNEL_ALLOWLIST.has(surface) ? null : { status: 401 };
   if (channel?.mode === 'approval') return APPROVAL_CHANNEL_ALLOWLIST.has(surface) ? null : { status: 401 };
-  if (surface === MACHINES_EXCHANGE || surface === APPROVAL_EXCHANGE) return { status: 401 };
+  if (surface === MACHINES_EXCHANGE || surface === APPROVAL_EXCHANGE || surface === PHONES_EXCHANGE) return { status: 401 };
   if (REMOTE_GATE_ALLOWLIST.has(surface)) return null;
   const headers = request.headers as HeaderMap;
   const credential = resolveDashboardCredential(headers, channel);
