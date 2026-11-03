@@ -388,6 +388,8 @@ export const AgentSnapshot = Schema.Struct({
   resolution: Schema.optional(AgentResolution),
   resolutionCount: Schema.optional(Schema.Number),
   turnEndAssessment: Schema.optional(TurnEndAssessment),
+  // PAN-4849 — open Deft `external` escalations: a quiet indicator, not pending input.
+  deftExternalEscalations: Schema.optional(Schema.Number),
 })
 export type AgentSnapshot = typeof AgentSnapshot.Type
 

@@ -1,0 +1,482 @@
+{
+  "version": "1",
+  "issueId": "PAN-4849",
+  "created": "2026-11-03T03:09:47.454Z",
+  "updated": "2026-11-03T05:27:32.299Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "state-reader": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4849",
+      "claimedAt": "2026-11-03T03:09:47.454Z",
+      "doneAt": "2026-11-03T03:16:51.944Z"
+    },
+    "deft-routes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4849",
+      "claimedAt": "2026-11-03T03:17:06.270Z",
+      "doneAt": "2026-11-03T03:20:37.219Z"
+    },
+    "escalation-resolve": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4849",
+      "claimedAt": "2026-11-03T03:20:41.799Z",
+      "doneAt": "2026-11-03T03:22:57.026Z"
+    },
+    "pending-escalations": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4849",
+      "claimedAt": "2026-11-03T03:23:02.373Z",
+      "doneAt": "2026-11-03T03:29:21.242Z"
+    },
+    "deft-menu-dialog": {
+      "status": "completed",
+      "doneAt": "2026-11-03T03:32:51.719Z"
+    },
+    "deft-queries": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4849",
+      "claimedAt": "2026-11-03T03:32:58.420Z",
+      "doneAt": "2026-11-03T03:35:12.953Z"
+    },
+    "scope-signoff": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4849",
+      "claimedAt": "2026-11-03T03:35:20.675Z",
+      "doneAt": "2026-11-03T03:37:11.756Z"
+    },
+    "review-cycle-derive": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4849",
+      "claimedAt": "2026-11-03T03:37:12.888Z",
+      "doneAt": "2026-11-03T03:40:23.276Z"
+    },
+    "review-cycle-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4849",
+      "claimedAt": "2026-11-03T03:40:29.763Z",
+      "doneAt": "2026-11-03T03:42:55.003Z"
+    },
+    "decisions-tab": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4849",
+      "claimedAt": "2026-11-03T03:43:06.969Z",
+      "doneAt": "2026-11-03T03:46:02.641Z"
+    },
+    "board-scope-summary": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4849",
+      "claimedAt": "2026-11-03T03:46:08.072Z",
+      "doneAt": "2026-11-03T03:48:31.065Z"
+    },
+    "heartbeat-rows": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4849",
+      "claimedAt": "2026-11-03T03:48:36.180Z",
+      "doneAt": "2026-11-03T03:50:18.939Z"
+    },
+    "scope-view": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4849",
+      "claimedAt": "2026-11-03T03:50:25.407Z",
+      "doneAt": "2026-11-03T03:52:05.900Z"
+    },
+    "scope-dag": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4849",
+      "claimedAt": "2026-11-03T03:52:11.803Z",
+      "doneAt": "2026-11-03T03:54:01.266Z"
+    },
+    "gates-panel": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4849",
+      "claimedAt": "2026-11-03T03:54:09.214Z",
+      "doneAt": "2026-11-03T03:57:29.982Z"
+    },
+    "delivery-chip": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4849",
+      "claimedAt": "2026-11-03T03:57:36.493Z",
+      "doneAt": "2026-11-03T03:59:36.822Z"
+    },
+    "drift-badges": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4849",
+      "claimedAt": "2026-11-03T03:59:43.743Z",
+      "doneAt": "2026-11-03T04:04:27.195Z"
+    },
+    "approved-scope-check": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4849",
+      "claimedAt": "2026-11-03T04:04:29.150Z",
+      "doneAt": "2026-11-03T04:07:42.766Z"
+    },
+    "finish-loop-feed": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4849",
+      "claimedAt": "2026-11-03T04:07:46.027Z",
+      "doneAt": "2026-11-03T04:09:37.386Z"
+    },
+    "needs-you-frontend": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4849",
+      "claimedAt": "2026-11-03T04:09:45.854Z",
+      "doneAt": "2026-11-03T04:14:40.750Z"
+    },
+    "review-cycle-panel": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4849",
+      "claimedAt": "2026-11-03T04:14:51.503Z",
+      "doneAt": "2026-11-03T04:21:31.435Z"
+    },
+    "switch-actions": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4849",
+      "claimedAt": "2026-11-03T04:21:39.478Z",
+      "doneAt": "2026-11-03T04:30:26.636Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4849",
+      "claimedAt": "2026-11-03T04:30:39.394Z",
+      "doneAt": "2026-11-03T04:32:07.683Z"
+    },
+    "state-reader.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:49:51.634Z"
+    },
+    "state-reader.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:50:15.793Z"
+    },
+    "state-reader.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:50:41.018Z"
+    },
+    "state-reader.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:51:08.931Z"
+    },
+    "deft-routes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:51:39.737Z"
+    },
+    "deft-routes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:52:06.804Z"
+    },
+    "deft-routes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:52:31.414Z"
+    },
+    "deft-routes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:52:57.431Z"
+    },
+    "escalation-resolve.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:53:21.151Z"
+    },
+    "escalation-resolve.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:53:44.394Z"
+    },
+    "escalation-resolve.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:54:10.868Z"
+    },
+    "escalation-resolve.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:54:33.678Z"
+    },
+    "pending-escalations.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:54:54.069Z"
+    },
+    "pending-escalations.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:55:14.747Z"
+    },
+    "pending-escalations.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:55:37.879Z"
+    },
+    "pending-escalations.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:56:03.149Z"
+    },
+    "pending-escalations.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:56:29.535Z"
+    },
+    "deft-menu-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:57:00.789Z"
+    },
+    "deft-menu-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:57:24.093Z"
+    },
+    "deft-menu-dialog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:57:45.245Z"
+    },
+    "deft-menu-dialog.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:58:11.356Z"
+    },
+    "deft-queries.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:58:32.657Z"
+    },
+    "deft-queries.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:59:00.710Z"
+    },
+    "deft-queries.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:59:26.418Z"
+    },
+    "decisions-tab.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:59:53.253Z"
+    },
+    "decisions-tab.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:00:21.971Z"
+    },
+    "decisions-tab.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:00:52.644Z"
+    },
+    "decisions-tab.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:01:33.879Z"
+    },
+    "board-scope-summary.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:02:17.767Z"
+    },
+    "board-scope-summary.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:02:43.588Z"
+    },
+    "board-scope-summary.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:03:09.730Z"
+    },
+    "heartbeat-rows.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:03:30.642Z"
+    },
+    "heartbeat-rows.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:03:54.772Z"
+    },
+    "heartbeat-rows.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:04:18.605Z"
+    },
+    "scope-signoff.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:04:42.738Z"
+    },
+    "scope-signoff.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:05:08.886Z"
+    },
+    "scope-signoff.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:05:40.887Z"
+    },
+    "scope-view.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:06:10.994Z"
+    },
+    "scope-view.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:06:42.667Z"
+    },
+    "scope-view.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:07:16.551Z"
+    },
+    "scope-dag.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:07:41.858Z"
+    },
+    "scope-dag.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:08:04.050Z"
+    },
+    "scope-dag.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:08:28.765Z"
+    },
+    "gates-panel.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:08:49.140Z"
+    },
+    "gates-panel.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:09:09.824Z"
+    },
+    "gates-panel.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:09:29.019Z"
+    },
+    "delivery-chip.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:09:47.837Z"
+    },
+    "delivery-chip.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:10:08.610Z"
+    },
+    "delivery-chip.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:10:28.826Z"
+    },
+    "drift-badges.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:10:52.011Z"
+    },
+    "drift-badges.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:11:12.018Z"
+    },
+    "drift-badges.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:11:32.069Z"
+    },
+    "approved-scope-check.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:11:50.320Z"
+    },
+    "approved-scope-check.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:12:12.235Z"
+    },
+    "approved-scope-check.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:12:34.265Z"
+    },
+    "finish-loop-feed.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:12:54.804Z"
+    },
+    "finish-loop-feed.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:13:14.470Z"
+    },
+    "finish-loop-feed.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:13:35.669Z"
+    },
+    "switch-actions.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:13:55.218Z"
+    },
+    "switch-actions.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:14:16.557Z"
+    },
+    "switch-actions.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:14:37.118Z"
+    },
+    "switch-actions.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:14:57.646Z"
+    },
+    "needs-you-frontend.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:15:22.827Z"
+    },
+    "needs-you-frontend.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:15:48.967Z"
+    },
+    "needs-you-frontend.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:16:15.815Z"
+    },
+    "needs-you-frontend.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:16:43.057Z"
+    },
+    "review-cycle-derive.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:17:07.856Z"
+    },
+    "review-cycle-derive.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:17:27.031Z"
+    },
+    "review-cycle-derive.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:17:46.280Z"
+    },
+    "review-cycle-derive.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:18:08.265Z"
+    },
+    "review-cycle-derive.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:18:29.135Z"
+    },
+    "review-cycle-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:18:50.259Z"
+    },
+    "review-cycle-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:19:11.158Z"
+    },
+    "review-cycle-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:19:33.261Z"
+    },
+    "review-cycle-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:19:56.161Z"
+    },
+    "review-cycle-panel.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:20:24.367Z"
+    },
+    "review-cycle-panel.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:20:48.356Z"
+    },
+    "review-cycle-panel.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:21:14.947Z"
+    },
+    "review-cycle-panel.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:21:40.678Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:22:03.807Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:22:25.700Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:22:45.054Z"
+    },
+    "docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:23:02.123Z"
+    }
+  },
+  "feedback": []
+}

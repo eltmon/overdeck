@@ -52,7 +52,14 @@ see [cli/skills-commands.mdx](../cli/skills-commands.mdx).
 | `role-refusal.ts` | `assertRoleRunsOnPipeline`, `DeftPipelineRoleRefusedError` |
 | `kickoff.ts` | `buildDeftWorkAgentPrompt`, `DeftNotInstalledError` (template `src/lib/cloister/prompts/work-deft.md`) |
 | `switch.ts` | `useDeftPipeline`, `backToOverdeck` |
-| `state-reader.ts` | Planned in PAN-4849: parses Directive's state files for the dashboard. Not in this tree yet. |
+| `state-reader.ts` | `readDeftIssueState`, `summarizeDeftIssueState`: parses Directive's state files in the worktree for the dashboard (fs only, never throws; PAN-4849) |
+| `escalations.ts` | `resolveDeftEscalation` (atomic rewrite of `.deft/escalations/<id>.json`), `notifyEscalationResolved` |
+| `pending.ts` | `deftEscalationQuestions`, `deftMenuQuestion`, `deftIssueForAgent`: Deft escalations and menus as pending questions (read side, imported by `agent-enrichment.ts`) |
+| `pending-answer.ts` | `answerDeftEscalation`, `answerDeftMenu`, `mapDeftEscalationAnswer`: the question dialog's answers (split from `pending.ts` to keep agent delivery out of the enrichment's imports) |
+| `menu-parser.ts` | `parseDeftMenu`: Deft's numbered menu ending Discuss/Back |
+| `signoff.ts` | `signOffDisposition`: human-event sign-off of a scope item's disposition |
+| `review-cycle.ts` | `deriveDeftReviewCycle`, `countSeverities`: pure review-cycle view model (reconstructed rounds, exit predicate, lease) |
+| `review-cycle-load.ts` | `loadDeftReviewCycle`, `listFixBatchCommits`: loads the review-cycle inputs (cached PR loaders, one async `git log`) |
 
 ### Deft pipeline
 

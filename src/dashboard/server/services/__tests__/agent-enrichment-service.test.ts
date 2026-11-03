@@ -215,3 +215,17 @@ describe('forced re-emission does not re-trigger awaiting-input rising edge', ()
     expect(isAwaitingInputRisingEdge(enrichment, enrichment)).toBe(false)
   })
 })
+
+describe('Deft external escalations stay quiet (PAN-4849 review)', () => {
+  const externalOnly = makeEnrichment(0, [], { deftExternalEscalations: 1 })
+
+  it('fires no awaiting-input rising edge, so no activity entry or TTS line', () => {
+    expect(isAwaitingInputRisingEdge(undefined, externalOnly)).toBe(false)
+    expect(isAwaitingInputRisingEdge(makeEnrichment(0), externalOnly)).toBe(false)
+  })
+
+  it('forces no re-emission and leaves nothing to reap', () => {
+    expect(shouldForceReemitPendingInput('stopped', externalOnly)).toBe(false)
+    expect(hasReapablePendingInput(externalOnly)).toBe(false)
+  })
+})

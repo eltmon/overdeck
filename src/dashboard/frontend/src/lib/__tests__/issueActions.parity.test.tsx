@@ -64,6 +64,8 @@ const AUDITED_REGISTRY_KEYS = [
   'recoverAgent',
   'resumeSession',
   'syncMain',
+  'runOnDeft',
+  'backToOverdeck',
   'rebuildAndStart',
   'merge',
   'reopen',

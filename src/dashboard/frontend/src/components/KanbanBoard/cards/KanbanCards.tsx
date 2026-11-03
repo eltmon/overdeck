@@ -22,6 +22,7 @@ import { DifficultyBadge, TrackerShadowBadges } from '../badges';
 import { avatarGradient, cardAvatarInitials, formatCost, formatRuntime, getCostColor } from '../kanban-utils';
 import type { ComplexityLevel, IssueCost, PlanningState } from '../types';
 import { StartAgentCta } from '../../issue-view';
+import { DeftScopeSummary } from '../../deft/DeftScopeSummary';
 
 const DIFFICULTY_LEVELS: ComplexityLevel[] = ['trivial', 'simple', 'medium', 'complex', 'expert'];
 
@@ -739,6 +740,7 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
         >
           {issue.title}
         </h3>
+        <DeftScopeSummary issueId={issue.identifier} />
 
         {/* Labels */}
         {issue.labels.length > 0 && (

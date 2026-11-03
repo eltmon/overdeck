@@ -7,9 +7,14 @@ import { computeAgentEnrichment, EMPTY_PENDING_INPUTS_SCAN } from '../agent-enri
 import * as agentState from '../agents/agent-state.js'
 import * as runtimeState from '../agents/runtime-state.js'
 import * as agentInputDetection from '../agent-input-detection.js'
+import * as deftPending from '../deft/pending.js'
 import { answerOperatorDecision, requestOperatorDecision } from '../cloister/operator-decision.js'
 
 vi.mock('../pipeline-notifier.js', () => ({ notifyPipeline: vi.fn() }))
+vi.mock('../deft/pending.js', () => ({
+  deftEscalationQuestions: vi.fn(async () => ({ questions: [], externalCount: 0 })),
+  deftMenuQuestion: vi.fn(async () => null),
+}))
 
 vi.mock('../agents/agent-state.js', async (importOriginal) => {
   const original = await importOriginal<typeof agentState>()
@@ -335,6 +340,41 @@ describe('computeAgentEnrichment cached-scan replay', () => {
     const enrichment = await computeAgentEnrichment(agentId, undefined, false, scanWithQuestion)
     expect(enrichment.jsonlScan).toEqual(scanWithQuestion)
 
+    rmSync(agentDir, { recursive: true, force: true })
+  })
+
+  it('surfaces open Deft escalations on an unchanged cached scan, even under specialist suppression (PAN-4849)', async () => {
+    const agentId = 'agent-cached-scan-5'
+    const agentDir = arrange('work', agentId)
+    vi.mocked(deftPending.deftEscalationQuestions).mockResolvedValue({
+      questions: [{
+        toolId: 'deft-escalation:esc-20261102120100-bbbbbb',
+        timestamp: '2026-11-02T12:01:00Z',
+        questions: [{ question: 'Which table layout?', header: 'question', multiSelect: false, options: [{ label: 'Dismiss', description: 'Resolve as dismissed' }] }],
+      }],
+      externalCount: 1,
+    })
+
+    for (const hasActiveSpecialist of [false, true]) {
+      const enrichment = await computeAgentEnrichment(agentId, '2026-11-02T13:00:00Z', hasActiveSpecialist, EMPTY_PENDING_INPUTS_SCAN)
+      expect(enrichment.pendingInputKinds).toEqual(['askUserQuestion'])
+      expect(enrichment.pendingAskUserQuestion?.toolUseId).toBe('deft-escalation:esc-20261102120100-bbbbbb')
+      expect(enrichment.deftExternalEscalations).toBe(1)
+    }
+
+    vi.mocked(deftPending.deftEscalationQuestions).mockResolvedValue({ questions: [], externalCount: 0 })
+    rmSync(agentDir, { recursive: true, force: true })
+  })
+
+  it('keeps an external-only Deft escalation out of pending input (PAN-4849 review)', async () => {
+    const agentId = 'agent-cached-scan-6'
+    const agentDir = arrange('work', agentId)
+    vi.mocked(deftPending.deftEscalationQuestions).mockResolvedValue({ questions: [], externalCount: 2 })
+
+    const enrichment = await computeAgentEnrichment(agentId, undefined, false, EMPTY_PENDING_INPUTS_SCAN)
+    expect(enrichment).toMatchObject({ pendingInputCount: 0, pendingInputKinds: [], hasPendingQuestion: false, deftExternalEscalations: 2 })
+
+    vi.mocked(deftPending.deftEscalationQuestions).mockResolvedValue({ questions: [], externalCount: 0 })
     rmSync(agentDir, { recursive: true, force: true })
   })
 

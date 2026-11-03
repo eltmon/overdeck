@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "xbriefRelPath": "xbrief/active/ui.xbrief.json",
+  "planId": "scope-ui",
+  "approvedAt": "2026-11-02T11:00:00Z",
+  "fileScope": [
+    "src/a.ts",
+    "docs/"
+  ],
+  "fileScopeDigest": "sha256:0f0f",
+  "humanApproval": {
+    "kind": "human-event",
+    "actor": "overdeck:eltmon",
+    "mintedAt": "2026-11-02T11:00:00Z"
+  }
+}

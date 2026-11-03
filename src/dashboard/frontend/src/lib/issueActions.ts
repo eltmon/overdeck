@@ -31,6 +31,8 @@ export type IssueActionKey =
   | 'resumeSession'
   | 'restartAgent'
   | 'syncMain'
+  | 'runOnDeft'
+  | 'backToOverdeck'
   | 'rebuildAndStart'
   | 'merge'
   | 'reopen'
@@ -97,6 +99,8 @@ export interface IssueActionState {
   hasPendingInput?: boolean;
   orderBooksLoaded?: boolean;
   isInActiveOrderBook?: boolean;
+  /** PAN-4849 — the issue runs on Deft Directive's pipeline (from GET /api/deft/issues). */
+  isDeftPipeline?: boolean;
 }
 
 interface ActionEntryBase<Key extends string> {
@@ -620,6 +624,8 @@ const ISSUE_ACTION_DEFINITIONS: Omit<IssueActionEntry, 'scope'>[] = [
   { key: 'resumeSession', label: 'Resume', description: 'Reopen the stopped agent’s saved session with its memory intact.', panVerb: 'resume', endpoint: '/api/agents/:agentId/resume', enabledWhen: canResumeWork, phasePrimary: phasePrimary('resumeSession'), kind: 'dialog', group: 'lifecycle', placement: 'menu' },
   { key: 'restartAgent', label: 'Restart agent…', description: 'Restart the agent, either keeping its memory or with a fresh session on the same branch.', panVerb: null, endpoint: '/api/agents/:agentId/restart', enabledWhen: canRestartAgent, phasePrimary: phasePrimary('restartAgent'), kind: 'dialog', group: 'lifecycle', placement: 'menu' },
   { key: 'syncMain', label: 'Update from main', description: 'Merge the latest main branch into this issue’s branch.', panVerb: 'sync-main', endpoint: '/api/issues/:id/sync-main', enabledWhen: canSyncMain, phasePrimary: phasePrimary('syncMain'), kind: 'safe', group: 'lifecycle', placement: 'menu' },
+  { key: 'runOnDeft', label: 'Run on Deft', description: 'Switch this issue onto Deft Directive’s own pipeline.', panVerb: 'skills deft use', endpoint: '/api/issues/:id/pipeline', enabledWhen: (state) => !state.isDeftPipeline && !isMerged(state) && !isDoneOrCanceled(state), phasePrimary: [], kind: 'safe', group: 'lifecycle', placement: 'menu' },
+  { key: 'backToOverdeck', label: 'Back to Overdeck', description: 'Remove the Deft install and return this issue to Overdeck’s pipeline.', panVerb: 'skills deft back', endpoint: '/api/issues/:id/pipeline', enabledWhen: (state) => state.isDeftPipeline === true, phasePrimary: [], kind: 'safe', group: 'lifecycle', placement: 'menu' },
   { key: 'rebuildAndStart', label: 'Rebuild & start', description: 'Rebuild the dev containers, then start the agent.', panVerb: 'workspace rebuild && start', endpoint: '/api/workspaces/:id/rebuild-and-start', enabledWhen: canRebuildAndStart, phasePrimary: phasePrimary('rebuildAndStart'), kind: 'safe', group: 'lifecycle', placement: 'contextual' },
   { key: 'merge', label: 'Merge to main', description: 'Merge this issue’s approved branch into main; nothing merges without you.', panVerb: null, endpoint: '/api/issues/:id/merge', enabledWhen: canMerge, phasePrimary: phasePrimary('merge'), kind: 'safe', group: 'lifecycle', placement: 'menu' },
   { key: 'reopen', label: 'Reopen', description: 'Bring a closed or canceled issue back into the pipeline.', panVerb: 'reopen', endpoint: '/api/issues/:id/reopen', enabledWhen: isDoneOrCanceled, phasePrimary: phasePrimary('reopen'), kind: 'safe', group: 'lifecycle', placement: 'menu' },
