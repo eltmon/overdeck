@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4897",
   "created": "2026-11-03T14:27:55.739Z",
-  "updated": "2026-11-03T14:27:55.740Z",
+  "updated": "2026-11-03T14:34:55.197Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "open-errno": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4897",
-      "claimedAt": "2026-11-03T14:27:55.739Z"
+      "claimedAt": "2026-11-03T14:27:55.739Z",
+      "doneAt": "2026-11-03T14:34:55.197Z"
     }
   }
 }
