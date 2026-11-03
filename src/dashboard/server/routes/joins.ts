@@ -7,17 +7,26 @@
  * POST   /api/joins/:code/signal       → 202 { ok: true } | 400 invalid_signal | 404 | 409 join_not_admitted
  * POST   /api/joins/:code/ice-servers  → 200 { iceServers } | 404 | 409 join_not_admitted
  * DELETE /api/joins/:code              → 204 | 404 join_not_found
+ * GET    /api/share-probe              → 200 { overdeck: true, v: 1 } (CORS for the share origin only)
+ * OPTIONS /api/share-probe             → 204 (CORS + Private Network Access for the share origin only)
  *
  * The join manager (`services/share-join.ts`) owns the join sockets; the device token never
  * appears in a response or an event (NFR-1). The join intent is a same-origin, CSRF-protected POST
  * sent after the user clicks Join (D-1). Events reach the one subscriber as server-sent events
  * (D-2, D-4). These stay behind the remote request gate at the default `admin` scope, and every
  * response is `Cache-Control: no-store`.
+ *
+ * The probe (D-16) lets the share landing page find a running Overdeck on this computer. It calls no
+ * dashboard auth function, because a cross-origin fetch carries no cookie; the remote request gate
+ * still admits only a loopback peer, and it is deliberately not in `REMOTE_GATE_ALLOWLIST`, so a
+ * LAN host cannot learn that Overdeck runs here. CORS headers go only to the configured share
+ * origin.
  */
 import type { JoinEvent, SignalData } from '@overdeck/contracts';
 import { Effect, Layer, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
+import { readShareUrl, shareOrigin, type ShareUrlResult } from '../../../lib/sharing/share-service.js';
 import { jsonResponse } from '../http-helpers.js';
 import { getJoinManager } from '../services/share-join.js';
 import { rejectUnauthorizedDashboardRequest, rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
@@ -93,6 +102,16 @@ export function parseSignalBody(body: Record<string, unknown> | null): SignalDat
   }
   if (!sdp && !candidate) return null;
   return { ...(sdp ? { sdp } : {}), ...(candidate ? { candidate } : {}) };
+}
+
+/** The share origin when `origin` is exactly it; null otherwise (no CORS header is sent). */
+export function probeCorsOrigin(origin: string | undefined, shareUrl: ShareUrlResult): string | null {
+  return origin !== undefined && 'url' in shareUrl && origin === shareOrigin(shareUrl.url) ? origin : null;
+}
+
+function requestHeader(request: HttpServerRequest.HttpServerRequest, name: string): string | undefined {
+  const value = (request.headers as Record<string, string | string[] | undefined>)[name];
+  return Array.isArray(value) ? value[0] : value;
 }
 
 /** One server-sent event; the SSE `event:` name is the event's `type`. */
@@ -269,6 +288,38 @@ const leaveJoinRoute = HttpRouter.add(
   }),
 );
 
+const shareProbeRoute = HttpRouter.add(
+  'GET',
+  '/api/share-probe',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const shareUrl = yield* Effect.promise(() => readShareUrl());
+    let response = HttpServerResponse.setHeader(respond({ status: 200, json: { overdeck: true, v: 1 } }), 'Vary', 'Origin');
+    const origin = probeCorsOrigin(requestHeader(request, 'origin'), shareUrl);
+    if (origin) response = HttpServerResponse.setHeader(response, 'Access-Control-Allow-Origin', origin);
+    return response;
+  }),
+);
+
+const shareProbePreflightRoute = HttpRouter.add(
+  'OPTIONS',
+  '/api/share-probe',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const shareUrl = yield* Effect.promise(() => readShareUrl());
+    let response = HttpServerResponse.setHeader(respond({ status: 204 }), 'Vary', 'Origin');
+    const origin = probeCorsOrigin(requestHeader(request, 'origin'), shareUrl);
+    if (origin) {
+      response = HttpServerResponse.setHeaders(response, {
+        'Access-Control-Allow-Origin': origin,
+        'Access-Control-Allow-Methods': 'GET',
+        'Access-Control-Allow-Private-Network': 'true',
+      });
+    }
+    return response;
+  }),
+);
+
 export const joinsRouteLayer = Layer.mergeAll(
   createJoinRoute,
   getJoinRoute,
@@ -276,4 +327,6 @@ export const joinsRouteLayer = Layer.mergeAll(
   signalJoinRoute,
   joinIceServersRoute,
   leaveJoinRoute,
+  shareProbeRoute,
+  shareProbePreflightRoute,
 );

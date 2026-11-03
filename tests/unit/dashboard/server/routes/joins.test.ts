@@ -7,7 +7,7 @@
 import { EventEmitter } from 'node:events';
 import { Effect, Layer, Option } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -16,12 +16,14 @@ import type { JoinView, ServiceToViewerFrame } from '@overdeck/contracts';
 
 import { _resetInternalTokenCacheForTests, INTERNAL_TOKEN_HEADER } from '../../../../../src/lib/internal-token.js';
 import { invalidateRemoteAccessConfig } from '../../../../../src/lib/remote-access/config.js';
+import { REMOTE_GATE_ALLOWLIST, remoteRequestGateLayer } from '../../../../../src/dashboard/server/remote-request-gate.js';
 import { _resetDashboardSessionTokenForTests } from '../../../../../src/dashboard/server/routes/dashboard-auth.js';
 import {
   formatJoinEvent,
   joinsRouteLayer,
   parseJoinTarget,
   parseSignalBody,
+  probeCorsOrigin,
 } from '../../../../../src/dashboard/server/routes/joins.js';
 import type { ShareSocket } from '../../../../../src/dashboard/server/services/share-host.js';
 import { JoinManager, setJoinManagerForTests } from '../../../../../src/dashboard/server/services/share-join.js';
@@ -102,10 +104,11 @@ async function raw(
   method: string,
   path: string,
   body?: unknown,
-  opts: { credential?: boolean; peer?: string; layer?: Layer.Layer<never, never, never> } = {},
+  opts: { credential?: boolean; peer?: string; origin?: string; layer?: Layer.Layer<never, never, never> } = {},
 ): Promise<HttpServerResponse.HttpServerResponse> {
   const headers: Record<string, string> = { 'content-type': 'application/json' };
   if (opts.credential !== false) headers[INTERNAL_TOKEN_HEADER] = INTERNAL;
+  if (opts.origin) headers.origin = opts.origin;
   const request = HttpServerRequest.fromWeb(new Request(`http://127.0.0.1${path}`, {
     method,
     headers,
@@ -121,7 +124,7 @@ async function call(
   method: string,
   path: string,
   body?: unknown,
-  opts: { credential?: boolean; peer?: string; layer?: Layer.Layer<never, never, never> } = {},
+  opts: { credential?: boolean; peer?: string; origin?: string; layer?: Layer.Layer<never, never, never> } = {},
 ) {
   const response = await raw(method, path, body, opts);
   const bytes = (response.body as { body?: Uint8Array } | null)?.body;
@@ -285,5 +288,60 @@ describe('join route helpers', () => {
     expect(formatJoinEvent({ type: 'state', view })).toBe(`event: state\ndata: ${JSON.stringify(view)}\n\n`);
     expect(formatJoinEvent({ type: 'signal', data: ANSWER as never })).toBe(`event: signal\ndata: ${JSON.stringify(ANSWER)}\n\n`);
     expect(formatJoinEvent({ type: 'replaced' })).toBe('event: replaced\ndata: {}\n\n');
+  });
+});
+
+describe('/api/share-probe (PAN-4475)', () => {
+  const SHARE_ORIGIN = 'http://127.0.0.1:8787';
+
+  beforeEach(async () => {
+    await writeFile(join(home, 'config.yaml'), `anywhere:\n  share_url: ${SHARE_ORIGIN}\n`);
+  });
+
+  it('answers the share origin with CORS', async () => {
+    const probed = await call('GET', '/api/share-probe', undefined, { credential: false, origin: SHARE_ORIGIN });
+    expect(probed.status).toBe(200);
+    expect(probed.body).toEqual({ overdeck: true, v: 1 });
+    expect(probed.headers['access-control-allow-origin']).toBe(SHARE_ORIGIN);
+    expect(probed.headers.vary).toBe('Origin');
+    expect(probed.headers['cache-control']).toBe('no-store');
+  });
+
+  it('sends no CORS header to another origin or without one', async () => {
+    const evil = await call('GET', '/api/share-probe', undefined, { credential: false, origin: 'https://evil.example' });
+    expect(evil.status).toBe(200);
+    expect(evil.headers['access-control-allow-origin']).toBeUndefined();
+    const none = await call('GET', '/api/share-probe', undefined, { credential: false });
+    expect(none.status).toBe(200);
+    expect(none.headers['access-control-allow-origin']).toBeUndefined();
+  });
+
+  it('answers the Private Network Access preflight for the share origin only', async () => {
+    const ok = await call('OPTIONS', '/api/share-probe', undefined, { credential: false, origin: SHARE_ORIGIN });
+    expect(ok.status).toBe(204);
+    expect(ok.headers['access-control-allow-origin']).toBe(SHARE_ORIGIN);
+    expect(ok.headers['access-control-allow-private-network']).toBe('true');
+    expect(ok.headers['access-control-allow-methods']).toBe('GET');
+    const other = await call('OPTIONS', '/api/share-probe', undefined, { credential: false, origin: 'https://evil.example' });
+    expect(other.status).toBe(204);
+    expect(other.headers['access-control-allow-origin']).toBeUndefined();
+    expect(other.headers['access-control-allow-private-network']).toBeUndefined();
+    expect(other.headers['access-control-allow-methods']).toBeUndefined();
+  });
+
+  it('needs no credential from a loopback peer and is not on the gate allowlist', async () => {
+    const gated = Layer.mergeAll(remoteRequestGateLayer, joinsRouteLayer);
+    const local = await call('GET', '/api/share-probe', undefined, { credential: false, peer: '127.0.0.1', origin: SHARE_ORIGIN, layer: gated });
+    expect(local.status).toBe(200);
+    expect(local.body).toEqual({ overdeck: true, v: 1 });
+    expect(REMOTE_GATE_ALLOWLIST.has('GET /api/share-probe')).toBe(false);
+    expect(REMOTE_GATE_ALLOWLIST.has('OPTIONS /api/share-probe')).toBe(false);
+  });
+
+  it('probeCorsOrigin matches the exact share origin', () => {
+    expect(probeCorsOrigin('https://share.overdeck.ai', { url: 'https://share.overdeck.ai' })).toBe('https://share.overdeck.ai');
+    expect(probeCorsOrigin('https://share.overdeck.ai.evil', { url: 'https://share.overdeck.ai' })).toBeNull();
+    expect(probeCorsOrigin(undefined, { url: 'https://share.overdeck.ai' })).toBeNull();
+    expect(probeCorsOrigin('https://share.overdeck.ai', { error: 'bad' })).toBeNull();
   });
 });
