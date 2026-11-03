@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4882",
   "created": "2026-11-03T06:27:51.535Z",
-  "updated": "2026-11-03T07:55:05.228Z",
+  "updated": "2026-11-03T07:55:29.670Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -216,6 +216,10 @@
     "ac15-open-in-editor.ac4": {
       "status": "completed",
       "doneAt": "2026-11-03T07:55:05.228Z"
+    },
+    "ac06-remove-managed.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:55:29.670Z"
     }
   }
 }
