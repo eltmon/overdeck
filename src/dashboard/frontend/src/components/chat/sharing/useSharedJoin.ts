@@ -2,7 +2,8 @@
  * The viewer page's join state (PAN-4475 WI-9): reads the join on mount, posts the join intent on
  * **Join** (D-1), subscribes to the join's event stream, and feeds `signal` events to one
  * `WebRtcViewer`. A join that leaves the live states closes the peer and the stream (D-10). A join
- * the server closed as `away` resumes without a second click (D-7).
+ * the server closed as `away` resumes without a second click (D-7). A peer that becomes `lost` while
+ * the join is `admitted` gets a new event stream after 5 s, at most 3 times in a row (PAN-4479 D-8).
  *
  * Drafts and prompts (PAN-4476 WI-13): `drafts` holds the other participants' drafts by author;
  * `setMyDraft` sends the viewer's own draft at most every DRAFT_SEND_MS (trailing); `submitPrompt`
@@ -92,7 +93,12 @@ export type ViewerPeer = Pick<
 >;
 export type ViewerFactory = (deps: WebRtcViewerDeps, callbacks: WebRtcViewerCallbacks) => ViewerPeer;
 
-export const LIVE_JOIN_STATES: ReadonlySet<JoinState> = new Set(['connecting', 'lobby', 'admitted', 'host-disconnected']);
+/** PAN-4479 D-8: a lost peer while admitted reopens the event stream after this delay… */
+export const PEER_AUTO_RECONNECT_DELAY_MS = 5_000;
+/** …at most this many times in a row; a connected peer resets the count. */
+export const PEER_AUTO_RECONNECT_MAX = 3;
+
+export const LIVE_JOIN_STATES: ReadonlySet<JoinState> = new Set(['connecting', 'lobby', 'admitted', 'host-disconnected', 'reconnecting']);
 
 const defaultViewer: ViewerFactory = (deps, callbacks) => new WebRtcViewer(deps, callbacks);
 
@@ -153,6 +159,9 @@ export function useSharedJoin(code: string, deps: { api?: JoinApi; viewer?: View
   const [hasHistory, setHasHistory] = useState(false);
   const [presence, setPresence] = useState<PresencePayload | null>(null);
   const [notices, setNotices] = useState<readonly ViewerNotice[]>([]);
+  /** Bumped by each automatic try so the effect re-arms while the peer stays `lost`. */
+  const [autoTick, setAutoTick] = useState(0);
+  const autoTries = useRef(0);
   const [drafts, setDrafts] = useState<readonly DraftPayload[]>([]);
   const [myDraft, setMyDraftState] = useState('');
   const [submitStatus, setSubmitStatus] = useState<SubmitAck | null>(null);
@@ -233,7 +242,9 @@ export function useSharedJoin(code: string, deps: { api?: JoinApi; viewer?: View
           if (viewerRef.current === created && aliveRef.current) setPresence(next);
         },
         onPhase: (next) => {
-          if (viewerRef.current === created && aliveRef.current) setPeerPhase(next);
+          if (viewerRef.current !== created || !aliveRef.current) return;
+          if (next === 'connected') autoTries.current = 0;
+          setPeerPhase(next);
         },
         onNotice: (notice) => {
           if (viewerRef.current !== created || !aliveRef.current) return;
@@ -363,6 +374,7 @@ export function useSharedJoin(code: string, deps: { api?: JoinApi; viewer?: View
   const join = useCallback(() => {
     closeLive();
     resetContent();
+    autoTries.current = 0;
     setApiError(null);
     setPhase('joining');
     apiRef.current.createJoin(code).then(
@@ -400,6 +412,7 @@ export function useSharedJoin(code: string, deps: { api?: JoinApi; viewer?: View
   const reconnect = useCallback(() => {
     // A new event stream is a new subscriber; the viewer server restarts the socket so the host
     // offers again (D-5, D-11).
+    autoTries.current = 0;
     resetContent();
     subscribe();
   }, [resetContent, subscribe]);
@@ -414,6 +427,20 @@ export function useSharedJoin(code: string, deps: { api?: JoinApi; viewer?: View
       viewerRef.current?.setTerminalWatch(false);
     };
   }, []);
+
+  // D-8: the same restart as reconnect(), but automatic and bounded, and it keeps the messages so
+  // the timeline does not blank. Host-disconnected and reconnecting recover through the host.
+  const joinState = view?.state;
+  useEffect(() => {
+    if (phase !== 'live' || joinState !== 'admitted' || peerPhase !== 'lost') return;
+    if (autoTries.current >= PEER_AUTO_RECONNECT_MAX) return;
+    const timer = setTimeout(() => {
+      autoTries.current += 1;
+      setAutoTick((n) => n + 1);
+      subscribe();
+    }, PEER_AUTO_RECONNECT_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [phase, joinState, peerPhase, autoTick, subscribe]);
 
   useEffect(() => {
     aliveRef.current = true;

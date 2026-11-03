@@ -54,6 +54,9 @@ person you can:
 
 **End share** closes the room for everyone. The link stops working.
 
+If your network drops or your dashboard restarts, Overdeck reconnects the share on its own.
+People you admitted come back without the lobby if you return within 5 minutes.
+
 From a terminal, run `pan share <conversation>`; it prints the link and the join code. See
 [`pan share and pan join`](/cli/share).
 
@@ -132,9 +135,13 @@ prompts run on your machine, with your agent's permissions.
   host's machine. **The host's terminal is not running.** means the conversation has no live
   terminal; **The host's terminal session ended.** means it stopped while you watched.
 - **Host disconnected — reconnecting…**: the host's machine lost its connection to the
-  share service. You keep the messages you already have.
-- **Connection to the host was lost.**: the direct connection to the host dropped. Click
-  **Reconnect** to get the conversation again.
+  share service. You keep the messages you already have. If the host comes back within
+  5 minutes, the conversation returns on its own and you do not wait in the lobby again.
+- **Reconnecting to the share service…**: your own machine lost its connection to the share
+  service. Overdeck reconnects on its own, and you keep your place in the room.
+- **Connection to the host was lost.**: the direct connection to the host dropped. Overdeck
+  tries to reconnect on its own, up to three times. If that does not work, click
+  **Reconnect**.
 - **Removed by host**: the host kicked you, and you can ask to join again, or the host
   revoked you, and you cannot.
 - **This share has ended.**: the host ended the share.
@@ -154,6 +161,7 @@ prompts run on your machine, with your agent's permissions.
 - A room holds at most 50 people, of whom at most 20 can wait in the lobby at once.
 - The link works as long as the share exists.
 - If the host's machine stays away from the share service for more than 5 minutes, the
-  room ends.
+  room ends and the link stops working. Share again to get a new link, and everyone joins
+  through the lobby.
 - A queue holds at most 20 prompts, at most 3 from one contributor, each up to 8,000
   characters.

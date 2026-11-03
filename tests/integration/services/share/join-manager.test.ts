@@ -26,8 +26,8 @@ import {
   removeShareRecord,
 } from '../../../../src/lib/sharing/share-record.js';
 import { createRoom, deleteRoom } from '../../../../src/lib/sharing/share-service.js';
-import { defaultOpenSocket, ShareManager } from '../../../../src/dashboard/server/services/share-host.js';
-import { JoinManager } from '../../../../src/dashboard/server/services/share-join.js';
+import { defaultOpenSocket, ShareManager, type ShareSocket } from '../../../../src/dashboard/server/services/share-host.js';
+import { JoinManager, type JoinManagerDeps } from '../../../../src/dashboard/server/services/share-join.js';
 import { parseEntireConversation } from '../../../../src/dashboard/server/services/conversation/parser.js';
 import type { ParseResult } from '../../../../src/dashboard/server/services/conversation/types.js';
 import { ConversationBridge } from '../../../../src/dashboard/server/sharing/conversation-bridge.js';
@@ -199,12 +199,13 @@ async function startHost(conversationId: string): Promise<Host> {
   return { manager, watch: () => watchCallback };
 }
 
-function viewerManager(): JoinManager {
+function viewerManager(overrides: Partial<JoinManagerDeps> = {}): JoinManager {
   return new JoinManager({
     readAccount: async () => account(VIEWER_A),
     readShareUrl: async () => ({ url: localUrl }),
     openSocket: defaultOpenSocket,
     now: () => Date.now(),
+    ...overrides,
   });
 }
 
@@ -302,6 +303,50 @@ describe('JoinManager through the share service on real workerd (PAN-4475)', () 
       joins.stop();
       host.manager.stop();
       for (const subscriber of subscribers) await subscriber.viewer.close();
+    }
+  }, SLOW);
+
+  it('a dropped join socket reconnects and returns to admitted with no lobby step', async () => {
+    const host = await startHost('conv-join-3');
+    const sockets: ShareSocket[] = [];
+    const joins = viewerManager({
+      reconnectDelaysMs: [0],
+      openSocket: (url, headers) => {
+        const socket = defaultOpenSocket(url, headers);
+        sockets.push(socket);
+        return socket;
+      },
+    });
+    let subscriber: Subscriber | null = null;
+    try {
+      const created = await host.manager.create({ kind: 'conversation', conversationId: 'conv-join-3' });
+      expect(created.kind).toBe('created');
+      if (created.kind !== 'created') return;
+      const { shortCode } = created.view;
+      await snapshotWhere(host.manager, shortCode, (s) => s.hostConnected);
+
+      await joins.join(shortCode);
+      subscriber = new Subscriber(joins, shortCode);
+      await subscriber.waitState('lobby');
+      await host.manager.command(shortCode, { type: 'admit', githubId: VIEWER_A.id });
+      await subscriber.waitState('admitted');
+      expect(sockets).toHaveLength(1);
+
+      // PAN-4479 FR-8: an unexpected loss of a seated join's socket reconnects on its own.
+      sockets[0]?.terminate();
+      await subscriber.waitState('reconnecting');
+      const states = () => subscriber!.events.flatMap((event) => (event.type === 'state' ? [event.view.state] : []));
+      await vi.waitFor(() => {
+        if (states().lastIndexOf('admitted') < states().indexOf('reconnecting')) throw new Error(`waiting: ${states().join(',')}`);
+      }, WAIT);
+      expect(sockets.length).toBeGreaterThanOrEqual(2);
+      expect(states().slice(states().indexOf('admitted'))).not.toContain('lobby');
+      expect(joins.get(shortCode)?.state).toBe('admitted');
+      await snapshotWhere(host.manager, shortCode, (s) => s.participants.some((p) => p.githubId === VIEWER_A.id && p.state === 'admitted' && p.connected));
+    } finally {
+      joins.stop();
+      host.manager.stop();
+      await subscriber?.viewer.close();
     }
   }, SLOW);
 

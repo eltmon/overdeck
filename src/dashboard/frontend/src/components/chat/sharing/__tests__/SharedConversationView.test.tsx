@@ -183,6 +183,48 @@ describe('SharedConversationView (PAN-4475 WI-9)', () => {
     expect(button('Leave')).toBeTruthy();
   });
 
+  it('reconnecting with history keeps the timeline under "Reconnecting to the share service…" and shows Leave', () => {
+    render(<SharedConversationView {...live('reconnecting', { peerPhase: 'connected', messages: MESSAGES, hasHistory: true })} />);
+    expect(screen.getByText('Reconnecting to the share service…')).toBeTruthy();
+    expect(document.querySelector('[data-testid="shared-conversation-timeline"]')?.textContent).toContain('Please fix the flaky test');
+    expect(button('Leave')).toBeTruthy();
+  });
+
+  it('reconnecting without history shows the reconnecting panel and Leave', () => {
+    render(<SharedConversationView {...live('reconnecting')} />);
+    expect(screen.getByText('Reconnecting to the share service…')).toBeTruthy();
+    expect(document.querySelector('[data-testid="shared-conversation-timeline"]')).toBeNull();
+    expect(button('Leave')).toBeTruthy();
+  });
+
+  it('admitted with history and peer connecting keeps the timeline', () => {
+    render(<SharedConversationView {...live('admitted', { peerPhase: 'connecting', messages: MESSAGES, hasHistory: true })} />);
+    expect(document.querySelector('[data-testid="shared-conversation-timeline"]')).not.toBeNull();
+    expect(screen.queryByText('Connecting to the host…')).toBeNull();
+  });
+
+  it('connecting with history keeps the timeline during an automatic retry', () => {
+    render(<SharedConversationView {...live('connecting', { peerPhase: 'lost', messages: MESSAGES, hasHistory: true })} />);
+    expect(document.querySelector('[data-testid="shared-conversation-timeline"]')?.textContent).toContain('Please fix the flaky test');
+    expect(screen.queryByText('Connecting…')).toBeNull();
+    expect(button('Leave')).toBeTruthy();
+  });
+
+  it('keeps the Terminal surface when a retry passes through connecting', () => {
+    const p = live('admitted', { peerPhase: 'connected', messages: MESSAGES, hasHistory: true });
+    const { rerender } = render(<SharedConversationView {...p} />);
+    fireEvent.click(button('Terminal'));
+    rerender(<SharedConversationView {...live('connecting', { peerPhase: 'connected', messages: MESSAGES, hasHistory: true })} />);
+    rerender(<SharedConversationView {...live('admitted', { peerPhase: 'connected', messages: MESSAGES, hasHistory: true })} />);
+    expect(button('Terminal').getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('reconnecting takes precedence over the lost banner', () => {
+    render(<SharedConversationView {...live('reconnecting', { peerPhase: 'lost', messages: MESSAGES, hasHistory: true })} />);
+    expect(screen.getByText('Reconnecting to the share service…')).toBeTruthy();
+    expect(screen.queryByText('Connection to the host was lost.')).toBeNull();
+  });
+
   it('kicked: Removed by host with Ask to join again', () => {
     const p = live('kicked');
     render(<SharedConversationView {...p} />);

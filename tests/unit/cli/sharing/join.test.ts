@@ -156,6 +156,20 @@ describe('joinCommand', () => {
     expect(deps.openUrl).not.toHaveBeenCalled();
   });
 
+  it('opens the page for a live join that is reconnecting (PAN-4479)', async () => {
+    await signIn();
+    const io = captureIo();
+    const { callDashboard } = dashboard(view('reconnecting', { error: 'connection_lost' }));
+    const deps = baseDeps({ callDashboard });
+
+    const code = await runCli(() => joinCommand('BCDFGHJK', {}, io, deps));
+
+    expect(code).toBe(0);
+    expect(io.exitCode).toBeNull();
+    expect(io.stdout.join('\n')).toContain('Reconnecting to the share service (BCDF-GHJK)');
+    expect(deps.openUrl).toHaveBeenCalledWith(`${API_URL}/#/shared/BCDFGHJK`);
+  });
+
   it('opens the page after the settle window when the join stays connecting', async () => {
     await signIn();
     const io = captureIo();

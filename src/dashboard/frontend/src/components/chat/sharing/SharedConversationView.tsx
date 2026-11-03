@@ -338,21 +338,34 @@ function terminalScreen(props: SharedJoin): ReactNode {
 
 function AdmittedScreen(props: SharedJoin) {
   const [surface, setSurface] = useState<'conversation' | 'terminal'>('conversation');
+  const reconnecting = props.view?.state === 'reconnecting';
   const hostDisconnected = props.view?.state === 'host-disconnected';
   const lost = props.peerPhase === 'lost';
-  const showTimeline = props.hasHistory && (props.peerPhase === 'connected' || hostDisconnected || lost);
-  const showToggle = props.peerPhase === 'connected' || (hostDisconnected && props.hasHistory);
+  // A kept timeline stays visible while the host renegotiates (PAN-4479 FR-11).
+  const showTimeline = props.hasHistory;
+  const showToggle = props.peerPhase === 'connected' || ((hostDisconnected || reconnecting) && props.hasHistory);
   const messages = props.messages.map(toChatMessage);
   const toggle = (value: 'conversation' | 'terminal', label: string) => (
     <button type="button" className={`${NEUTRAL_BUTTON} aria-pressed:bg-accent`} aria-pressed={surface === value} onClick={() => setSurface(value)}>
       {label}
     </button>
   );
+  let banner: ReactNode = null;
+  if (reconnecting) banner = <div className={BANNER} role="status">Reconnecting to the share service…</div>;
+  else if (hostDisconnected) banner = <div className={BANNER} role="status">Host disconnected — reconnecting…</div>;
+  else if (lost) {
+    banner = (
+      <div className={BANNER} role="status">
+        <span>Connection to the host was lost.</span>
+        <button type="button" className={NEUTRAL_BUTTON} onClick={props.reconnect}>Reconnect</button>
+      </div>
+    );
+  }
   if (surface === 'terminal' && !lost) {
     // Stays mounted through a renegotiation, so the new peer re-sends the watch (FR-7).
     return (
       <>
-        {hostDisconnected ? <div className={BANNER} role="status">Host disconnected — reconnecting…</div> : null}
+        {banner}
         {showToggle ? viewToggle(toggle) : null}
         <SharedTerminalView watch={props.watchTerminal} />
       </>
@@ -360,13 +373,7 @@ function AdmittedScreen(props: SharedJoin) {
   }
   return (
     <>
-      {hostDisconnected ? <div className={BANNER} role="status">Host disconnected — reconnecting…</div> : null}
-      {lost && !hostDisconnected ? (
-        <div className={BANNER} role="status">
-          <span>Connection to the host was lost.</span>
-          <button type="button" className={NEUTRAL_BUTTON} onClick={props.reconnect}>Reconnect</button>
-        </div>
-      ) : null}
+      {banner}
       {props.notices.map((notice) => (
         <p key={notice.kind} className="border-b border-border px-4 py-1.5 text-xs text-muted-foreground">{noticeText(notice)}</p>
       ))}
@@ -408,8 +415,11 @@ function body(props: SharedJoin & { code: string }): ReactNode {
   if (props.phase === 'confirm' && (!state || state === 'left')) return confirmScreen(props);
   switch (state) {
     case undefined:
-    case 'connecting':
       return <Panel><Note>Connecting…</Note></Panel>;
+    case 'connecting':
+      // History means a restart of an admitted join (an automatic or manual retry keeps it, PAN-4479
+      // D-8): keep the admitted screen and its surface instead of blanking to "Connecting…".
+      return props.hasHistory ? <AdmittedScreen {...props} /> : <Panel><Note>Connecting…</Note></Panel>;
     case 'lobby':
       return (
         <Panel heading="Waiting for the host to let you in">
@@ -419,6 +429,8 @@ function body(props: SharedJoin & { code: string }): ReactNode {
     case 'admitted':
     case 'host-disconnected':
       return <AdmittedScreen {...props} />;
+    case 'reconnecting':
+      return props.hasHistory ? <AdmittedScreen {...props} /> : <Panel><Note>Reconnecting to the share service…</Note></Panel>;
     default:
       return terminalScreen(props);
   }

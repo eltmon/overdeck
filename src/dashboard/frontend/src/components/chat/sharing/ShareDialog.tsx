@@ -134,9 +134,13 @@ function ConnectionLine({ share }: { share: ShareView }) {
       </p>
     );
   }
+  const text =
+    share.connection === 'connected' ? 'Connected'
+      : share.connection === 'reconnecting' ? 'Reconnecting to the share service…'
+        : 'Connecting to the share service…';
   return (
     <p className="text-xs text-muted-foreground" data-connection={share.connection}>
-      {share.connection === 'connected' ? 'Connected' : 'Connecting to the share service…'}
+      {text}
     </p>
   );
 }

@@ -1,12 +1,13 @@
 /** PAN-4475 WI-9: the viewer page's join hook — confirm, join intent, subscribe, signals, teardown. */
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
   JoinEvent,
   JoinState,
   JoinView,
   PresencePayload,
   SharedControllerCommand,
+  SharedMessage,
   SignalData,
   TerminalPayload,
 } from '@overdeck/contracts';
@@ -15,6 +16,8 @@ import { JoinApiError, type JoinEventHandlers } from '../joinApi';
 import {
   COMMAND_ACK_TIMEOUT_MS,
   DRAFT_SEND_MS,
+  PEER_AUTO_RECONNECT_DELAY_MS,
+  PEER_AUTO_RECONNECT_MAX,
   useSharedJoin,
   type JoinApi,
   type ViewerFactory,
@@ -280,6 +283,91 @@ describe('useSharedJoin terminal watch (PAN-4477 WI-9)', () => {
 
     expect(f.viewers[0]!.watches).toEqual([true, true]);
     expect(second).toHaveBeenCalledWith(output);
+  });
+});
+
+const MESSAGES: SharedMessage[] = [
+  { id: 'm1', role: 'user', text: 'Please fix the flaky test', createdAt: '2026-11-03T00:00:00.000Z' },
+];
+
+describe('useSharedJoin peer auto-reconnect (PAN-4479 D-8)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** Mounts on a join in `state`, receives an offer and history, then the peer is lost. */
+  async function lostPeer(state: JoinState) {
+    const f = fakes(view(state));
+    const hook = renderHook(() => useSharedJoin(CODE, { api: f.api, viewer: f.viewer }));
+    await act(async () => {});
+    expect(hook.result.current.phase).toBe('live');
+    emit(f, { type: 'signal', data: OFFER });
+    const peer = f.viewers.at(-1)!;
+    act(() => peer.callbacks.onMessages(MESSAGES));
+    act(() => peer.callbacks.onPhase('lost'));
+    return { f, hook, peer };
+  }
+
+  /** Advances in 1 s steps, each in its own act(), so effects re-arm between timers as in a browser. */
+  async function advance(ms: number): Promise<void> {
+    for (let left = ms; left > 0; left -= 1_000) {
+      const step = Math.min(left, 1_000);
+      await act(async () => { await vi.advanceTimersByTimeAsync(step); });
+    }
+  }
+
+  it('a lost peer while admitted opens a new event stream after 5 s and keeps the messages', async () => {
+    const { f, hook } = await lostPeer('admitted');
+    await advance(PEER_AUTO_RECONNECT_DELAY_MS - 1);
+    expect(f.api.openJoinEvents).toHaveBeenCalledTimes(1);
+    await advance(1);
+    expect(f.api.openJoinEvents).toHaveBeenCalledTimes(2);
+    expect(f.streams[0]?.closed).toBe(true);
+    expect(hook.result.current.messages).toEqual(MESSAGES);
+    expect(hook.result.current.hasHistory).toBe(true);
+  });
+
+  it('stops after 3 automatic tries and leaves the Reconnect banner', async () => {
+    const { f, hook } = await lostPeer('admitted');
+    await advance(60_000);
+    expect(f.api.openJoinEvents).toHaveBeenCalledTimes(1 + PEER_AUTO_RECONNECT_MAX);
+    expect(hook.result.current.peerPhase).toBe('lost');
+    await advance(60_000);
+    expect(f.api.openJoinEvents).toHaveBeenCalledTimes(4);
+  });
+
+  it('a connected peer resets the count', async () => {
+    const { f } = await lostPeer('admitted');
+    await advance(PEER_AUTO_RECONNECT_DELAY_MS);
+    expect(f.api.openJoinEvents).toHaveBeenCalledTimes(2);
+    emit(f, { type: 'signal', data: OFFER });
+    const next = f.viewers.at(-1)!;
+    expect(f.viewers).toHaveLength(2);
+    act(() => next.callbacks.onPhase('connected'));
+    act(() => next.callbacks.onPhase('lost'));
+    await advance(60_000);
+    expect(f.api.openJoinEvents).toHaveBeenCalledTimes(2 + PEER_AUTO_RECONNECT_MAX);
+  });
+
+  it('no automatic try while host-disconnected or reconnecting', async () => {
+    for (const state of ['host-disconnected', 'reconnecting'] as const) {
+      const { f, hook } = await lostPeer(state);
+      await advance(60_000);
+      expect(f.api.openJoinEvents).toHaveBeenCalledTimes(1);
+      hook.unmount();
+    }
+  });
+
+  it('a new offer before 5 s cancels the try', async () => {
+    const { f, peer } = await lostPeer('admitted');
+    await advance(PEER_AUTO_RECONNECT_DELAY_MS - 1_000);
+    act(() => peer.callbacks.onPhase('connecting'));
+    await advance(60_000);
+    expect(f.api.openJoinEvents).toHaveBeenCalledTimes(1);
   });
 });
 

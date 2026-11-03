@@ -117,6 +117,17 @@ describe('ShareDialog (PAN-4473 WI-8)', () => {
     expect(screen.getByText('Disconnected from the share service. End this share and create a new link.')).toBeTruthy();
   });
 
+  it('shows a reconnecting share as reconnecting with the lobby actions disabled (PAN-4479)', () => {
+    const base = SHARE.snapshot!;
+    const lobby = { githubId: 100, login: 'alice', avatarUrl: 'https://avatars.githubusercontent.com/u/100', state: 'lobby' as const, contributor: false, connected: true };
+    api.shares = { data: [{ ...SHARE, connection: 'reconnecting', snapshot: { ...base, participants: [lobby] } }], isLoading: false, error: null };
+    const { container } = wrap(<ShareDialog target={{ name: 'conv-a' }} onClose={vi.fn()} />);
+    const line = screen.getByText('Reconnecting to the share service…');
+    expect(line.getAttribute('data-connection')).toBe('reconnecting');
+    expect(container.textContent).not.toContain('End this share and create a new link');
+    expect((screen.getByRole('button', { name: 'Admit @alice' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
   it('relays a lobby command for this share', async () => {
     const base = SHARE.snapshot!;
     const lobby = { githubId: 100, login: 'alice', avatarUrl: 'https://avatars.githubusercontent.com/u/100', state: 'lobby' as const, contributor: false, connected: true };
