@@ -12,6 +12,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { AgentState } from '../../../../../src/lib/agents.js';
 import type { LegacyConversation } from '../../../../../src/lib/overdeck/conversations.js';
+import { conversationStateDir } from '../../../../../src/lib/overdeck/conversation-pane-role.js';
 
 vi.mock('../../../../../src/lib/persistent-logger.js', () => ({
   logAgentLifecycle: vi.fn(),
@@ -105,6 +106,14 @@ describe('applyAgentLifecycleEventWithDeps', () => {
     expect(eventStore.appended[0]?.['type']).toBe('agent.stopped');
   });
 
+  it('exited revokes the agent MCP token of that agent (PAN-4930)', async () => {
+    const revokeAgentMcpTokens = vi.fn(async (_agentId: string) => 1);
+    await applyAgentLifecycleEventWithDeps(makeEventStore(), 'agent-pan-1908', { event: 'exited', at: '2026-06-15T10:07:00.000Z' }, { ...deps, revokeAgentMcpTokens });
+
+    expect(revokeAgentMcpTokens).toHaveBeenCalledTimes(1);
+    expect(revokeAgentMcpTokens).toHaveBeenCalledWith('agent-pan-1908');
+  });
+
   it('emits agent.activity_changed for turn boundaries', async () => {
     const eventStore = makeEventStore();
     await applyAgentLifecycleEventWithDeps(eventStore, 'agent-pan-1908', { event: 'turn-started', at }, deps);
@@ -189,8 +198,19 @@ describe('applyAgentLifecycleEventWithDeps for a supervised conversation (PAN-39
       markConversationEnded: vi.fn(),
       cleanupEndedConversation: vi.fn(async () => undefined),
       closeCompanionTerminal: vi.fn(async (_ownerSession: string) => undefined),
+      revokeAgentMcpTokens: vi.fn(async (_agentId: string, _opts?: { agentKind?: 'agent' | 'conversation'; dir?: string }) => 1),
     };
   }
+
+  it('exited revokes the conversation MCP token by name and conv dir, also on an already-ended row (PAN-4930)', async () => {
+    for (const [status, exitAt] of [['active', at], ['ended', '2026-09-22T10:06:00.000Z']] as const) {
+      const deps = makeConversationDeps({ conversation: { ...conversation, status } as LegacyConversation });
+      await applyAgentLifecycleEventWithDeps(makeEventStore(), SESSION, { event: 'exited', at: exitAt }, deps);
+
+      expect(deps.revokeAgentMcpTokens, status).toHaveBeenCalledTimes(1);
+      expect(deps.revokeAgentMcpTokens, status).toHaveBeenCalledWith(conversation.name, { agentKind: 'conversation', dir: conversationStateDir(SESSION) });
+    }
+  });
 
   it('exited marks the row ended and runs attachment cleanup exactly once', async () => {
     const deps = makeConversationDeps();
@@ -255,6 +275,7 @@ describe('applyAgentLifecycleEventWithDeps for a supervised conversation (PAN-39
       expect(deps.cleanupEndedConversation).not.toHaveBeenCalled();
       // The replacing generation owns the companion now; an ignored exit leaves it.
       expect(deps.closeCompanionTerminal).not.toHaveBeenCalled();
+      expect(deps.revokeAgentMcpTokens).not.toHaveBeenCalled();
     });
 
     it('the NEW harness exiting during the respawn window (resume onto a dead model) ends the row', async () => {
