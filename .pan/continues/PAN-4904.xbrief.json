@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4904",
   "created": "2026-11-03T15:44:28.853Z",
-  "updated": "2026-11-03T16:04:32.451Z",
+  "updated": "2026-11-03T16:04:43.436Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-4904",
       "claimedAt": "2026-11-03T15:47:45.754Z",
       "doneAt": "2026-11-03T16:04:32.450Z"
+    },
+    "docs-pull-title": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4904",
+      "claimedAt": "2026-11-03T16:04:43.436Z"
     }
   }
 }
