@@ -1,11 +1,11 @@
 /**
  * Client for the Shared Sessions host routes (PAN-4473 WI-7): `GET/POST /api/shares`,
- * `POST /api/shares/:code/commands`, `DELETE /api/shares/:code`. The share dialog polls the list
+ * `POST /api/shares/:code/commands`, `POST /api/shares/:code/prompts` (PAN-4476), `DELETE /api/shares/:code`. The share dialog polls the list
  * once a second while it is open (D-6); the snapshot lives in the dashboard server's memory, so a
  * poll is a local read.
  */
 import { useQuery } from '@tanstack/react-query';
-import type { ListSharesResponse, ShareCommand, ShareView } from '@overdeck/contracts';
+import type { ListSharesResponse, SendSharePromptRequest, ShareCommand, ShareView } from '@overdeck/contracts';
 
 import { fetchWithTimeout } from '../../../lib/apiFetch';
 import { dashboardMutationJsonHeaders } from '../../../lib/wsTransport';
@@ -51,6 +51,18 @@ export async function sendShareCommand(shortCode: string, command: ShareCommand)
     body: JSON.stringify(command),
   });
   if (!response.ok) throw await failure(response);
+}
+
+/** Queues a controller send; resolves to its 1-based queue position. */
+export async function sendSharePrompt(shortCode: string, body: SendSharePromptRequest): Promise<{ position: number }> {
+  const response = await fetch(`/api/shares/${encodeURIComponent(shortCode)}/prompts`, {
+    method: 'POST',
+    headers: await dashboardMutationJsonHeaders(),
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) throw await failure(response);
+  const answer = (await response.json()) as { position?: unknown };
+  return { position: typeof answer.position === 'number' ? answer.position : 0 };
 }
 
 export async function endShare(shortCode: string): Promise<void> {
