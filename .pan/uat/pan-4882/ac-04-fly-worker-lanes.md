@@ -179,6 +179,8 @@ $ sed -i '27s/^enabled = true$/enabled = false/' ~/.overdeck/config.toml; grep -
 27-enabled = false
 $ grep -c pan4882 ~/.overdeck/projects.yaml
 0
+$ pan projects list | grep -c pan4882          # run 07:5x, after teardown
+0
 $ pan machines list --json | jq -c '[.links[].label]'
 []
 $ fly machines list -a pan-workspaces
