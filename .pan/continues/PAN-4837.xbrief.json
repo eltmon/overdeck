@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4837",
   "created": "2026-11-03T16:16:59.604Z",
-  "updated": "2026-11-03T19:25:10.132Z",
+  "updated": "2026-11-03T19:25:42.022Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -530,6 +530,9 @@
       "doneAt": "2026-11-03T19:24:30.400Z"
     },
     "cp3-cp4-checkpoints.ac1": {
+      "status": "cancelled"
+    },
+    "ci-android.ac3": {
       "status": "cancelled"
     }
   }
