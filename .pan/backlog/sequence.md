@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T07:32:16.216123Z · model: claude-opus-5-5 · open: 873_
+_Last sequenced: 2026-11-03T07:41:15.848285Z · model: claude-opus-5-5 · open: 875_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -153,6 +153,7 @@ _Last sequenced: 2026-11-03T07:32:16.216123Z · model: claude-opus-5-5 · open: 
 | 144 | PAN-2593 | S | high | ok |  |  | server children inherit bare system PATH |
 | 145 | PAN-4302 | M | high | ok |  |  | ~19 files exec gh directly, bypassing runGh: spend is unattributed and keeps hitting GitHub during quota pause. Follow-up to PAN-4291 |
 | 146 | PAN-2080 | M | high | needs-refinement |  |  | External transports (email/Slack/push/TTS) still plausible; its stated dependency on the PAN-2079 Inbox spine is undercut by boot… |
+| 147 | PAN-4885 | S | high | ok |  |  | pan worker run to an online Fly link fails 2 of 3 times: the 2.5 s secure-channel open budget is too short for the public Fly route. |
 | 148 | PAN-1436 | S | high | ok |  |  | PAN-1419 follow-up: stale stopped-agent zombies still pollute dashboard list |
 | 149 | PAN-3556 | S | high | ok |  |  | No per-agent spawn mutex: two flows allocated session identities 3s apart and the second pin orphaned the first transcript. |
 | 150 | PAN-3553 | S | high | ok |  |  | tmux list-panes -a exits 1 on a zero-session server, so the census reads unavailable post-reboot and conversations hang on 'Starting…'. |
@@ -313,6 +314,7 @@ _Last sequenced: 2026-11-03T07:32:16.216123Z · model: claude-opus-5-5 · open: 
 | 309 | PAN-1253 | M | high | needs-refinement |  |  | Flywheel: respect issue dependencies before autopicking work |
 | 310 | PAN-1357 | M | high | ok |  |  | Template conversations: load curated skill bundles into a single conversation |
 | 311 | PAN-1915 | M | high | ok |  |  | enhancement(security): API key at-rest hardening |
+| 312 | PAN-4886 | S | medium | ok |  |  | Live TURN relay check for PAN-4862 on Fly; scripted except one device-code sign-in, so it needs the operator present to approve. |
 | 313 | PAN-1435 | XS | high | ok |  |  | API keys in ~/.panopticon/config.yaml stored as plaintext |
 | 314 | PAN-1672 | M | high | ok |  |  | GPT-5.5/CLIProxy context-window deadlock: conversations get no overflow recovery + 200k window illusion |
 | 315 | PAN-1640 | M | high | ok |  |  | Re-platform interactive permission allow/deny onto a PreToolUse hook (provider-agnostic) |
@@ -1208,10 +1210,10 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T07:32:16.216123Z",
+  "generatedAt": "2026-11-03T07:41:15.848285Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 873,
+  "openCount": 875,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -12127,6 +12129,32 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "rationale": "New in-pipeline verification issue: the v0.73.0 acceptance run failed AC-2/3/4/6/15, and the fixes (PAN-4862, PAN-4861, PAN-4859, #4864) are closed, so nothing blocks the re-run. It is already picked up, so it takes the free rank 5 without moving any other node; it shares the release checklist with PAN-4863, recorded as an advisory informs edge.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4885",
+      "rank": 147,
+      "size": "S",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan worker run to an online Fly link fails 2 of 3 times: the 2.5 s secure-channel open budget is too short for the public Fly route.",
+      "rationale": "New defect found by the in-pipeline PAN-4882 re-run: remote worker starts against an online Fly link intermittently fail on LINK_WAIT_MS (2.5 s) in link-client.ts. The fix is small and well-specified (larger open budget for online links, or one retry), and it makes Anywhere remote workers reliable, so it takes the free rank 147 beside other high, small reliability fixes without moving any node.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4886",
+      "rank": 312,
+      "size": "S",
+      "importance": "medium",
+      "score": 45,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Live TURN relay check for PAN-4862 on Fly; scripted except one device-code sign-in, so it needs the operator present to approve.",
+      "rationale": "New manual verification issue: the relay fix shipped in 0.73.0 with unit tests only, and two live attempts expired unapproved. It is operator-gated like PAN-4863, so it takes the free rank 312 next to it; the PRD it replays lives on feature/pan-4882, recorded as an advisory informs edge.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13606,6 +13634,20 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
+    },
+    {
+      "from": "PAN-4882",
+      "to": "PAN-4886",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4882",
+      "to": "PAN-4885",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.3
     }
   ]
 }
