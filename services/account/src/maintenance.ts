@@ -18,7 +18,7 @@ export const RETENTION = {
 
 export interface MaintenanceReport {
   deletionJobsRun: number;
-  purged: Record<'auth_requests' | 'auth_codes' | 'admin_sessions' | 'device_grants' | 'pending_attempts' | 'devices' | 'rate_limits' | 'deletion_jobs', number>;
+  purged: Record<'auth_requests' | 'auth_codes' | 'admin_sessions' | 'user_sessions' | 'device_grants' | 'pending_attempts' | 'devices' | 'rate_limits' | 'deletion_jobs', number>;
 }
 
 export async function runMaintenance(env: Env, deps: Deps): Promise<MaintenanceReport> {
@@ -34,6 +34,7 @@ export async function runMaintenance(env: Env, deps: Deps): Promise<MaintenanceR
     auth_requests: await purge('DELETE FROM auth_requests WHERE expires_at < ?', now),
     auth_codes: await purge('DELETE FROM auth_codes WHERE expires_at < ?', now),
     admin_sessions: await purge('DELETE FROM admin_sessions WHERE expires_at < ?', now),
+    user_sessions: await purge('DELETE FROM user_sessions WHERE expires_at < ?', now),
     device_grants: await purge('DELETE FROM device_grants WHERE expires_at < ?', now - RETENTION.deviceGrantsAfterExpiryMs),
     pending_attempts: await purge('DELETE FROM pending_attempts WHERE last_seen_at < ?', now - RETENTION.pendingAttemptsMs),
     devices: await purge('DELETE FROM devices WHERE revoked_at IS NOT NULL AND revoked_at < ?', now - RETENTION.revokedDevicesMs),
