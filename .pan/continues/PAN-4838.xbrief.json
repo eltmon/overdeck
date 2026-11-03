@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4838",
   "created": "2026-11-03T21:01:46.602Z",
-  "updated": "2026-11-03T21:58:18.861Z",
+  "updated": "2026-11-03T21:58:37.810Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -182,6 +182,10 @@
     "notification-tap.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T21:58:18.860Z"
+    },
+    "settings-notifications-switch.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T21:58:37.810Z"
     }
   }
 }
