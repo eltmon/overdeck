@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T15:38:04Z · model: claude-opus-5-5 · open: 870_
+_Last sequenced: 2026-11-03T15:41:30Z · model: claude-opus-5-5 · open: 871_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -456,6 +456,7 @@ _Last sequenced: 2026-11-03T15:38:04Z · model: claude-opus-5-5 · open: 870_
 | 455 | PAN-3354 | XS | medium | ok |  |  | The archive write door accepts kind=main, hiding a project's singleton workspace with no unarchive affordance in the UI. |
 | 456 | PAN-3178 | XL | medium | ok |  |  | Make worktrees and diffs first class: +/- badge, dedicated Changes surface, conversation worktrees. PRD and mockup exist. |
 | 457 | PAN-3017 | S | medium | ok |  |  | The issue-page UAT panel renders only inline actions, so restart/rebuild/stop are unreachable outside the rail's context menu. |
+| 458 | PAN-4906 | S | medium | ok |  |  | Dark theme: fenced code blocks in assistant messages render at ~1.5:1 contrast, nearly unreadable; needs WCAG AA mono color. |
 | 459 | PAN-3873 | M | medium | ok |  |  | GitHub event delivery: support gh webhook forward alongside smee with guided setup, settings exposure, and docs |
 | 460 | PAN-1150 | S | medium | ok |  |  | Settings: "Anthropic is not configured" warning persists in Model Routing after claude /login (Provider tab disagrees) |
 | 461 | PAN-1149 | S | medium | ok |  |  | v0.9.3 upgraders: stale workhorses.mid: claude-sonnet-4-7 in config.yaml keeps breaking Model Routing saves |
@@ -1205,10 +1206,10 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T15:38:04Z",
+  "generatedAt": "2026-11-03T15:41:30Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 870,
+  "openCount": 871,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -12053,6 +12054,19 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "condition": "ok",
       "dependsOn": [],
       "why": "Add a Fly machine error says 'the Overdeck config' but remote.enabled is read only from config.toml; name the file and key exactly.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4906",
+      "rank": 458,
+      "size": "S",
+      "importance": "medium",
+      "score": 52,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Dark theme: fenced code blocks in assistant messages render at ~1.5:1 contrast, nearly unreadable; needs WCAG AA mono color.",
+      "rationale": "New issue with clear repro and expected result; a self-contained theme-token fix that every conversation reader hits, slotted into the free rank 458 among medium UI bugs.",
       "gate": "auto",
       "planning": "auto"
     }
