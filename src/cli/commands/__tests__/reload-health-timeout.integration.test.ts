@@ -72,6 +72,7 @@ vi.mock('../../../lib/platform-lifecycle.js', async (importActual) => ({
 // waits on; no old dashboard runs here, so report none.
 vi.mock('../../../lib/deploy/running-boot-gates.js', () => ({
   readRunningDashboardBootGates: async () => ({ gates: null, reason: 'no dashboard in this test' }),
+  readRunningBuildCommit: vi.fn(async () => null),
 }));
 
 vi.mock('../restart.js', () => ({

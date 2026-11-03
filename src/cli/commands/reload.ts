@@ -21,8 +21,8 @@ import {
   writeActiveDashboardBundle,
 } from '../../lib/deploy/active-dashboard-bundle.js';
 import { repointGlobalCliToDeployment } from '../../lib/deploy/global-cli-link.js';
-import { acquireReloadLock } from '../../lib/deploy/reload-supersede.js';
-import { readRunningDashboardBootGates } from '../../lib/deploy/running-boot-gates.js';
+import { acquireReloadLock, reloadSupersedeDetail } from '../../lib/deploy/reload-supersede.js';
+import { readRunningBuildCommit, readRunningDashboardBootGates } from '../../lib/deploy/running-boot-gates.js';
 import { formatBootGateState, type BootGateState } from '../../lib/boot-gates.js';
 import { supervisorDeploymentFailure } from '../../lib/channels/pty-supervisor-locate.js';
 import { dashboardServerBootFailure } from '../../lib/deploy/dashboard-bundle-integrity.js';
@@ -136,8 +136,8 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
     reportComposerReloadProgress(phase, activityId, logPath);
   await progress('building');
   try {
-    await runReload(options, progress);
-    await progress(process.exitCode ? 'failed' : 'completed');
+    const outcome = await runReload(options, progress);
+    await progress(outcome === 'superseded' ? 'superseded' : process.exitCode ? 'failed' : 'completed');
   } catch (error) {
     await progress('failed');
     throw error;
@@ -147,7 +147,7 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
 async function runReload(
   options: ReloadOptions,
   progress: (phase: Parameters<typeof reportComposerReloadProgress>[0]) => Promise<void>,
-): Promise<void> {
+): Promise<'superseded' | void> {
   let startedAt = Date.now();
   let healthTimeoutMs: number;
   try {
@@ -355,7 +355,35 @@ async function runReload(
         ? `post-merge deploy for ${postMergeIssue}`
         : 'pan reload — put the freshly built dashboard live',
       ...(deployment?.builtSha ? { builtSha: deployment.builtSha } : {}),
-    });
+    }, { shouldYield: () => reloadSupersedeDetail() });
+    if (!gate.proceed && gate.reason === 'superseded') {
+      // PAN-4888: a newer reload builds a newer origin/main. Record no status:
+      // this is not a failure.
+      const runningCommit = deployment?.builtSha
+        ? await readRunningBuildCommit(config.dashboardApiPort)
+        : null;
+      if (deployment && runningCommit === deployment.builtSha) {
+        // Another restart already put this build live: it is the running
+        // server's code, so keep it exactly as the satisfied branch does.
+        await activation?.commit();
+        const repointError = await reportCliRepoint(deployment.deployRoot);
+        if (repointError) {
+          await recordReloadStatus(startedAt, false, repointError);
+          process.exitCode = 1;
+          return;
+        }
+        await sweepDashboardDeployments(repoRoot, dashboardDeploymentRoots()).catch(() => undefined);
+        console.log(chalk.green(`✓ Stepped aside — ${gate.detail}. Another restart already put this build live, so it stays.`));
+        return 'superseded';
+      }
+      // Undo this build the way a failed restart does, so the record and dist/
+      // never name a build that will not run.
+      await writeActiveDashboardBundle(previousBundle).catch(() => undefined);
+      await activation?.rollback();
+      if (deployment) await removeDashboardDeployment(repoRoot, deployment.deployRoot);
+      console.log(chalk.green(`✓ Stepped aside — ${gate.detail}. Nothing was restarted; this build was discarded.`));
+      return 'superseded';
+    }
     if (!gate.proceed) {
       // Same disposition as a restart that left the old dashboard running: the
       // build is good and stays the recorded active deployment, so whichever

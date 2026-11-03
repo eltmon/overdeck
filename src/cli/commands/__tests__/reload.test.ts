@@ -32,6 +32,7 @@ const mocks = vi.hoisted(() => ({
   dashboardServerBootFailure: vi.fn(),
   waitForRestartApproval: vi.fn(),
   readRunningDashboardBootGates: vi.fn(),
+  readRunningBuildCommit: vi.fn(),
   repointGlobalCliToDeployment: vi.fn(),
   acquireReloadLock: vi.fn(),
   reloadSupersedeDetail: vi.fn(),
@@ -55,6 +56,7 @@ vi.mock('../../../lib/deploy/global-cli-link.js', () => ({
 // PAN-3899: reload reads the running dashboard's boot gates over HTTP first.
 vi.mock('../../../lib/deploy/running-boot-gates.js', () => ({
   readRunningDashboardBootGates: mocks.readRunningDashboardBootGates,
+  readRunningBuildCommit: mocks.readRunningBuildCommit,
 }));
 
 // PAN-4888: the supersede protocol owns the reload lock; its own tests cover it.
@@ -232,6 +234,7 @@ describe('reloadCommand', () => {
       },
     });
     mocks.reloadSupersedeDetail.mockResolvedValue(null);
+    mocks.readRunningBuildCommit.mockResolvedValue(null);
     mocks.readPlatformConfig.mockReturnValue({
       dashboardPort: 3010,
       dashboardApiPort: 3011,
@@ -985,7 +988,7 @@ describe('reloadCommand', () => {
       expect(mocks.waitForRestartApproval).toHaveBeenCalledWith(expect.objectContaining({
         kind: 'reload',
         requesterId: 'reload:1234',
-      }));
+      }), expect.anything());
       expect(mocks.reportComposerReloadProgress.mock.calls.map(([phase]) => phase))
         .toEqual(['building', 'awaiting-approval', 'restarting', 'completed']);
       expect(mocks.reportComposerReloadProgress).toHaveBeenLastCalledWith('completed', 'reload-42', '/tmp/reload-42.log');
@@ -1012,7 +1015,7 @@ describe('reloadCommand', () => {
         kind: 'deploy',
         reason: 'post-merge deploy for PAN-3329',
         builtSha: DEFAULT_ORIGIN_MAIN_SHA,
-      });
+      }, expect.objectContaining({ shouldYield: expect.any(Function) }));
     });
 
     it('keeps the freshly built deployment but restarts nothing when another approved restart already ran', async () => {
@@ -1033,6 +1036,74 @@ describe('reloadCommand', () => {
       expect(process.exitCode).toBeUndefined();
       const messages = vi.mocked(console.log).mock.calls.map(([message]) => String(message));
       expect(messages.some(message => message.includes('restarted nothing'))).toBe(true);
+    });
+  });
+
+  describe('step aside for a newer reload (PAN-4888)', () => {
+    const previousBundle = {
+      repoRoot: DEFAULT_REPO_ROOT,
+      deployRoot: DEFAULT_BUILD_WORKTREE,
+      serverPath: `${DEFAULT_BUILD_WORKTREE}/dist/dashboard/server.js`,
+    };
+    const detail = 'superseded by a newer pan reload (PID 9) that builds origin/main 222222222222';
+
+    beforeEach(() => {
+      mocks.readActiveDashboardBundle.mockReturnValue(previousBundle);
+      mocks.statSync.mockReturnValue({ mtimeMs: 2000 });
+      mocks.exec.mockImplementation(async (command: string) => {
+        if (command === "git 'rev-parse' '--show-toplevel'") return { stdout: `${DEFAULT_REPO_ROOT}\n`, stderr: '' };
+        if (command === "git 'rev-parse' 'HEAD'" || command === "git 'rev-parse' 'origin/main'") {
+          return { stdout: `${DEFAULT_ORIGIN_MAIN_SHA}\n`, stderr: '' };
+        }
+        return { stdout: '', stderr: '' };
+      });
+      mockSpawnExits();
+      mocks.waitForRestartApproval.mockResolvedValue({ proceed: false, reason: 'superseded', detail });
+    });
+
+    it('passes a shouldYield hook to the gate wait', async () => {
+      await reloadCommand({});
+
+      const options = mocks.waitForRestartApproval.mock.calls[0]?.[1] as { shouldYield?: () => Promise<string | null> };
+      expect(options.shouldYield).toEqual(expect.any(Function));
+      await options.shouldYield?.();
+      expect(mocks.reloadSupersedeDetail).toHaveBeenCalled();
+    });
+
+    it('steps aside before approval and restores the previous build', async () => {
+      vi.stubEnv('OVERDECK_COMPOSER_RELOAD_ACTIVITY', 'reload-7');
+
+      await reloadCommand({});
+      vi.unstubAllEnvs();
+
+      expect(mocks.writeActiveDashboardBundle).toHaveBeenLastCalledWith(previousBundle);
+      expect(mocks.fsRename).toHaveBeenCalledWith(`/repo/dist.rollback.${process.pid}`, '/repo/dist');
+      expect(mocks.exec).toHaveBeenCalledWith(
+        `git 'worktree' 'remove' '--force' '${ALTERNATE_BUILD_WORKTREE}'`,
+        expect.objectContaining({ cwd: DEFAULT_REPO_ROOT }),
+      );
+      expect(mocks.restartDashboard).not.toHaveBeenCalled();
+      expect(mocks.writeRestartStatus).not.toHaveBeenCalled();
+      expect(process.exitCode).toBeUndefined();
+      expect(mocks.reportComposerReloadProgress).toHaveBeenLastCalledWith('superseded', 'reload-7', undefined);
+    });
+
+    it('keeps the build when the running dashboard already runs it', async () => {
+      mocks.readRunningBuildCommit.mockResolvedValue(DEFAULT_ORIGIN_MAIN_SHA);
+
+      await reloadCommand({});
+
+      expect(mocks.readRunningBuildCommit).toHaveBeenCalledWith(3011);
+      expect(mocks.fsRename).not.toHaveBeenCalledWith(`/repo/dist.rollback.${process.pid}`, '/repo/dist');
+      expect(mocks.exec).not.toHaveBeenCalledWith(
+        `git 'worktree' 'remove' '--force' '${ALTERNATE_BUILD_WORKTREE}'`,
+        expect.anything(),
+      );
+      expect(mocks.writeActiveDashboardBundle).not.toHaveBeenCalledWith(previousBundle);
+      expect(mocks.restartDashboard).not.toHaveBeenCalled();
+      expect(mocks.writeRestartStatus).not.toHaveBeenCalled();
+      expect(process.exitCode).toBeUndefined();
+      expect(mocks.reportComposerReloadProgress.mock.calls.at(-1)?.[0]).toBe('superseded');
     });
   });
 });
