@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4881",
   "created": "2026-11-03T06:05:06.618Z",
-  "updated": "2026-11-03T06:16:31.989Z",
+  "updated": "2026-11-03T06:34:02.665Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,10 @@
       "claimedBy": "agent-pan-4881",
       "claimedAt": "2026-11-03T06:15:20.360Z",
       "doneAt": "2026-11-03T06:16:31.989Z"
+    },
+    "rename-test-hermetic-token.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:34:02.665Z"
     }
   }
 }
