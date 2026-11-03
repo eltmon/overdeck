@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4931",
   "created": "2026-11-03T21:41:36.078Z",
-  "updated": "2026-11-03T22:02:54.553Z",
+  "updated": "2026-11-03T22:07:07.113Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -28,9 +28,10 @@
       "doneAt": "2026-11-03T22:02:48.265Z"
     },
     "serve-token-file": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4931",
-      "claimedAt": "2026-11-03T22:02:54.553Z"
+      "claimedAt": "2026-11-03T22:02:54.553Z",
+      "doneAt": "2026-11-03T22:07:07.112Z"
     }
   }
 }
