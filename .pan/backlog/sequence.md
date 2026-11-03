@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T21:45:23.962064Z · model: claude-opus-5-5 · open: 895_
+_Last sequenced: 2026-11-03T21:48:00.431440Z · model: claude-opus-5-5 · open: 896_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -600,6 +600,7 @@ _Last sequenced: 2026-11-03T21:45:23.962064Z · model: claude-opus-5-5 · open: 
 | 600 | PAN-958 | M | medium | ok |  |  | Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
 | 601 | PAN-949 | M | medium | ok |  |  | feat: add conversation for project from sidebar |
 | 602 | PAN-3157 | XS | medium | ok |  |  | Rescoped: Awareness rail should show conv-flywheel as the Flywheel with its last tick (derive-status.ts) and link to /flywheel. |
+| 603 | PAN-4960 | M | medium | ok |  |  | Dashboard Settings → Anywhere Account card with PKCE sign-in; no code deps, so it ranks ahead of the PAN-4959 page it links to. |
 | 604 | PAN-4908 | S | low | ok |  |  | Other remote-not-enabled messages name no file and the dead verb 'pan remote setup'; reuse PAN-4905's remoteEnabledHint(). |
 | 605 | PAN-947 | M | medium | ok |  |  | feat: project management actions in unified sidebar |
 | 606 | PAN-938 | M | medium | ok |  |  | Fizzy visual pipeline |
@@ -1230,10 +1231,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T21:45:23.962064Z",
+  "generatedAt": "2026-11-03T21:48:00.431440Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 895,
+  "openCount": 896,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -12463,6 +12464,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "rationale": "New child of PAN-2350 filed 2026-11-03; it depends on PAN-4294 billing (rank 663) so it takes the free slot after it, and stays needs-refinement until the operator decides whether it ships with billing or read-only first.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4960",
+      "rank": 603,
+      "size": "M",
+      "importance": "medium",
+      "score": 30,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Dashboard Settings → Anywhere Account card with PKCE sign-in; no code deps, so it ranks ahead of the PAN-4959 page it links to.",
+      "rationale": "New child of PAN-2350, split from PAN-4959 on 2026-11-03. It needs no billing work, so it takes the free slot at 603, ahead of PAN-4959 (686), which waits on PAN-4294.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -14222,6 +14236,20 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.8
+    },
+    {
+      "from": "PAN-2350",
+      "to": "PAN-4960",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4959",
+      "to": "PAN-4960",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
     }
   ]
 }
