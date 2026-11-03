@@ -43,4 +43,8 @@ export class OverdeckKeysWeb extends WebPlugin implements OverdeckKeysPlugin {
     localStorage.removeItem(IDENTITY_KEY);
     for (const name of SECRET_NAMES) localStorage.removeItem(SECRET_PREFIX + name);
   }
+
+  async pushEnvironment() {
+    return { apsEnvironment: 'sandbox' as const };
+  }
 }

@@ -279,8 +279,11 @@ describe('createWorkspace: aborted setup steps report failure (PAN-3905)', () =>
       let installed = false;
       mockExecAsync.mockImplementation(async (command: string, args?: string[]) => {
         if (isWorktreeAddCall(command, args)) {
-          const { mkdirSync } = await import('node:fs');
+          const { mkdirSync, writeFileSync } = await import('node:fs');
           mkdirSync(workspacePath, { recursive: true });
+          // A real monorepo checkout has a root package.json (PAN-4929: createWorkspace
+          // now skips the install entirely when it's missing).
+          writeFileSync(join(workspacePath, 'package.json'), JSON.stringify({ name: 'test', private: true }), 'utf8');
         }
         if (failsOn(String(command), installed)) throw new Error(`${step} exploded`);
         if (command === 'npm install') installed = true;
