@@ -1,6 +1,6 @@
 # PAN-4862 — Live UDP-blocked relay check (WI-4)
 
-Status: pending operator approval (not passed, not run)
+Status: superseded — re-run attempted in PAN-4882, not-run (device codes unapproved); see .pan/uat/pan-4882/ac-02-03-relay.md and #4886
 
 The live check never reached the UDP-blocked step. The Fly VM was built and started, but its
 `pan account login` device code was never approved, so the VM could not sign in to the relay-plan

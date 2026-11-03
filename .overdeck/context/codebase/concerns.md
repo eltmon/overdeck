@@ -622,4 +622,10 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   `setLocalDescription` waits for gathering. Passing Cloudflare's list as-is (UDP first) makes the relay
   route miss its 10 s budget on UDP-blocked networks. The relay route's list goes through
   `relayIceServers` (`src/lib/anywhere/channel/relay-ice-servers.ts`: TLS 443 first, no STUN) on both ends.
+- **Fly VMs and SSH hosts must run home's exact `pan` version from npm** (PAN-4882) —
+  `provisionFlyMachine` (`src/lib/anywhere/fly/provision.ts`) runs `npm install -g @overdeck/core@<home
+  version>` and throws `version-mismatch` when that fails; the SSH-machine add answers 409
+  `version-mismatch`. Both pin to home's version, not npm `latest`, so a newer `latest` is harmless (PAN-4882
+  ran on home 0.73.0 with `latest` 0.73.1). Only a deployed version not yet on npm breaks both until it is
+  published; live checks then need a branch image built from the deployed commit.
 <!-- last-verified: 2026-11-03 -->
