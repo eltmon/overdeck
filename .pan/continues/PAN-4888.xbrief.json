@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4888",
   "created": "2026-11-03T08:25:32.067Z",
-  "updated": "2026-11-03T09:17:32.771Z",
+  "updated": "2026-11-03T09:17:54.002Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -108,6 +108,10 @@
     "docs-supersede.ac2": {
       "status": "completed",
       "doneAt": "2026-11-03T09:17:32.770Z"
+    },
+    "docs-supersede.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:17:54.001Z"
     }
   }
 }
