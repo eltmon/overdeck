@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4862",
   "created": "2026-11-02T23:48:40.343Z",
-  "updated": "2026-11-03T00:37:00.077Z",
+  "updated": "2026-11-03T00:37:12.257Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -78,6 +78,10 @@
     "relay-docs.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T00:37:00.077Z"
+    },
+    "live-relay-check.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:37:12.257Z"
     }
   }
 }
