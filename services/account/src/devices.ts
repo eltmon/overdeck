@@ -15,7 +15,7 @@ import { json } from './http.ts';
 export type DeviceContext = GrantsContext;
 
 export const TOKEN_RE = /^odd_[0-9a-f]{64}$/;
-export const PLATFORM_RE = /^(linux|darwin|win32)-(x64|arm64)$/;
+export const PLATFORM_RE = /^((linux|darwin|win32)-(x64|arm64)|(ios|android)-arm64)$/;
 export const ENVIRONMENT_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 export const LABEL_MAX_LENGTH = 64;
 /** D-18: last_used_at is written at most once per device per 5 minutes. */
@@ -58,6 +58,8 @@ export function normalizeLabel(label: unknown): string | null {
 export function defaultLabel(platform: string): string {
   if (platform.startsWith('darwin-')) return 'macOS device';
   if (platform.startsWith('win32-')) return 'Windows device';
+  if (platform.startsWith('ios-')) return 'iPhone';
+  if (platform.startsWith('android-')) return 'Android phone';
   return 'Linux device';
 }
 
