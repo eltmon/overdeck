@@ -23,6 +23,7 @@ const { fetchWithTimeout } = await import('../apiFetch');
 const {
   conversationApiName,
   conversationRouteKey,
+  findLinkedConversationRow,
   isLinkedConversation,
   resetLinkedTransportsForTests,
   terminalWsPathFor,
@@ -78,5 +79,33 @@ describe('linked conversations (PAN-4650 WI-8)', () => {
     const url = vi.mocked(fetchWithTimeout).mock.calls[0]![0] as string;
     expect(url).toBe(`/api/conversations/${encodeURIComponent('@env-desk/conv-x')}/pane-choice`);
     expect(url).not.toContain('-4');
+  });
+});
+
+describe('findLinkedConversationRow', () => {
+  const rows = [
+    { name: 'conv-9', origin: 'local' as const },
+    { name: '@env-a/conv-9', origin: 'linked' as const, machineLabel: 'laptop', remoteName: 'conv-9' },
+    { name: 'conv-looks-linked', origin: 'local' as const, machineLabel: 'laptop', remoteName: 'conv-9' },
+  ];
+
+  it('returns the row whose name is the exact linked key', () => {
+    expect(findLinkedConversationRow(rows, '@env-a/conv-9')).toBe(rows[1]);
+  });
+
+  it('falls back to the linked row matching the machine label and owner name', () => {
+    expect(findLinkedConversationRow(rows, '@laptop/conv-9')).toBe(rows[1]);
+  });
+
+  it('returns null for a local key even when a row of that name exists', () => {
+    expect(findLinkedConversationRow(rows, 'conv-9')).toBeNull();
+  });
+
+  it('returns null when no row matches the linked key', () => {
+    expect(findLinkedConversationRow(rows, '@env-b/conv-9')).toBeNull();
+  });
+
+  it('ignores a non-linked row that carries a matching machineLabel and remoteName', () => {
+    expect(findLinkedConversationRow(rows, '@laptop/conv-9')).not.toBe(rows[2]);
   });
 });
