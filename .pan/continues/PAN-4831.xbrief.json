@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4831",
   "created": "2026-11-03T04:00:12.397Z",
-  "updated": "2026-11-03T05:12:02.393Z",
+  "updated": "2026-11-03T05:12:22.596Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -64,6 +64,10 @@
     "native-signin-e2e.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T05:12:02.392Z"
+    },
+    "native-signin-e2e.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:12:22.595Z"
     }
   }
 }
