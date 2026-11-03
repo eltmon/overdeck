@@ -170,3 +170,102 @@ describe('client reducer: registration and the 5-phone cap (PAN-4829 WI-3)', () 
     for (const entry of logged) expect(entry).toMatchObject({ environmentId: null, clientId: expect.any(String) });
   });
 });
+
+const SESSION = 'c'.repeat(32);
+const SDP = { sdp: { type: 'offer' as const, sdp: 'v=0' } };
+
+function clientSignal(clientId: string, to: string, over: Partial<ReduceContext> = {}, state = phones(machines(3), 2)) {
+  return reduceClient(
+    state,
+    { kind: 'client-frame', clientId, frame: { type: 'signal', to, session: SESSION, purpose: 'link', relay: false, data: SDP } },
+    ctx(over),
+  );
+}
+
+function machineSignal(from: string, to: string, purpose: 'link' | 'approval', over: Partial<ReduceContext> = {}) {
+  return reduce(
+    phones(machines(3), 2),
+    { kind: 'frame', registeredAs: from, frame: { type: 'signal', to, session: SESSION, purpose, relay: true, data: SDP } },
+    ctx(over),
+  );
+}
+
+describe('client reducer: signals, ICE servers and relay metering (PAN-4829 WI-4)', () => {
+  it('forwards a phone signal to an online machine with from = the client id', () => {
+    const { effects } = clientSignal(cid(1), env(2), { online: new Set([env(1), env(2)]) });
+    expect(sends(effects)).toEqual([
+      { kind: 'send', to: { environmentId: env(2) }, frame: { type: 'signal', from: cid(1), session: SESSION, purpose: 'link', relay: false, data: SDP } },
+    ]);
+  });
+
+  it('answers peer_offline with the session when the machine is offline', () => {
+    const { effects } = clientSignal(cid(1), env(2), { online: new Set([env(1)]) });
+    expect(sends(effects)).toEqual([
+      { kind: 'send', to: 'self', frame: { type: 'error', code: 'peer_offline', message: 'the machine is offline', session: SESSION } },
+    ]);
+  });
+
+  it('refuses a phone signalling another phone or itself', () => {
+    for (const to of [cid(2), cid(1)]) {
+      const { effects } = clientSignal(cid(1), to, { online: new Set([env(1)]), onlineClients: new Set([cid(2)]) });
+      expect(sends(effects)).toEqual([
+        { kind: 'send', to: 'self', frame: { type: 'error', code: 'bad_frame', message: 'a phone cannot signal a phone', session: SESSION } },
+      ]);
+    }
+  });
+
+  it('forwards a machine link signal to an online phone with from = the environment id', () => {
+    const { effects } = machineSignal(env(1), cid(1), 'link', { online: new Set([env(2)]), onlineClients: new Set([cid(1)]) });
+    expect(sends(effects)).toEqual([
+      { kind: 'send', to: { clientId: cid(1) }, frame: { type: 'signal', from: env(1), session: SESSION, purpose: 'link', relay: true, data: SDP } },
+    ]);
+    expect(logs(effects)).toContainEqual(expect.objectContaining({ outcome: 'forwarded_client' }));
+  });
+
+  it('answers peer_offline to a machine signalling an offline phone', () => {
+    const { effects } = machineSignal(env(1), cid(1), 'link');
+    expect(sends(effects)).toEqual([
+      { kind: 'send', to: 'self', frame: { type: 'error', code: 'peer_offline', message: 'the other machine is offline', session: SESSION } },
+    ]);
+  });
+
+  it('never routes a machine approval signal to a phone', () => {
+    const { effects } = machineSignal(env(1), cid(1), 'approval', { onlineClients: new Set([cid(1)]) });
+    expect(sends(effects)).toEqual([
+      {
+        kind: 'send',
+        to: 'self',
+        frame: { type: 'error', code: 'approval_unknown', message: 'no pending approval between these machines', session: SESSION },
+      },
+    ]);
+  });
+
+  it('answers phone ice-servers with the machine rules', () => {
+    const iceServers = (state: DirectoryState, relay: boolean, over: Partial<ReduceContext> = {}) =>
+      reduceClient(state, { kind: 'client-frame', clientId: cid(1), frame: { type: 'ice-servers', requestId: 'r-1', relay } }, ctx(over)).effects;
+
+    const free = phones(machines(1), 1);
+    expect(sends(iceServers(free, false, { stunUrls: ['stun:s:1'] }))).toEqual([
+      { kind: 'send', to: 'self', frame: { type: 'ice-servers', requestId: 'r-1', iceServers: [{ urls: ['stun:s:1'] }] } },
+    ]);
+    expect(sends(iceServers(free, true))).toEqual([
+      { kind: 'send', to: 'self', frame: { type: 'error', code: 'relay_not_allowed', message: 'the relay needs the relay plan', requestId: 'r-1' } },
+    ]);
+    const tester = phones(machines(1, TESTER), 1, TESTER);
+    const turn = iceServers(tester, true, { turnConfigured: true });
+    expect(turn).toContainEqual({ kind: 'fetch-turn', requestId: 'r-1' });
+    expect(logs(turn)).toEqual([{ kind: 'log', type: 'ice-servers', environmentId: null, clientId: cid(1), outcome: 'turn' }]);
+  });
+
+  it('meters phone relay usage against the account and tells machines and phones', () => {
+    const state = phones(machines(1, TESTER), 1, TESTER);
+    const { state: next, effects } = reduceClient(state, { kind: 'client-frame', clientId: cid(1), frame: { type: 'relay-usage', bytes: 500 } }, ctx());
+    expect(next.relay?.bytes).toBe(500);
+    expect(effects).toContainEqual({ kind: 'put-relay-usage', usage: expect.objectContaining({ bytes: 500 }) });
+    const targets = sends(effects).map((e) => [e.to, e.frame.type]);
+    expect(targets).toEqual([
+      ['all', 'relay-status'],
+      ['clients', 'relay-status'],
+    ]);
+  });
+});

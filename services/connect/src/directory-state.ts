@@ -11,7 +11,6 @@ import {
   CONNECT_CLOSE_CODES,
   CONNECT_PROTOCOL_VERSION,
   FREE_MACHINE_LIMIT_MESSAGE,
-  RELAY_CAP_MESSAGE,
 } from '../../../packages/contracts/src/connect.ts';
 import type {
   ClientPlatform,
@@ -23,7 +22,8 @@ import type {
   DirectoryToMachineFrame,
   MachineToDirectoryFrame,
 } from '../../../packages/contracts/src/connect.ts';
-import { addUsage, bytesThisMonth, relayStatusOf } from './relay-meter.ts';
+import { iceServersAnswer, relayUsageAnswer } from './ice-relay.ts';
+import { relayStatusOf } from './relay-meter.ts';
 import type { RelayUsage } from './relay-meter.ts';
 
 /** One registered machine: a row of the `machines` table. */
@@ -378,51 +378,34 @@ function frame(state: DirectoryState, event: Extract<DirectoryEvent, { kind: 'fr
       if (f.purpose === 'approval' && !approvalBetween(state.approvals, self, f.to)) {
         return refuse('approval_unknown', 'no pending approval between these machines', 'approval_unknown');
       }
-      if (!ctx.online.has(f.to)) return refuse('peer_offline', 'the other machine is offline', 'peer_offline');
-      return {
-        state,
-        effects: [
-          {
-            kind: 'send',
-            to: { environmentId: f.to },
-            // `from` is the sender socket's machine, never a field of the frame (D-2356-6).
-            frame: { type: 'signal', from: self, session: f.session, purpose: f.purpose, relay: f.relay, data: f.data },
-          },
-          { kind: 'log', type: f.type, environmentId: self, outcome: 'forwarded' },
-        ],
-      };
-    }
-    case 'ice-servers': {
-      if (f.relay) {
-        const ids = { requestId: f.requestId };
-        const refuse = (code: ConnectErrorCode, message: string): ReduceResult => ({
-          state,
-          effects: [
-            { kind: 'send', to: 'self', frame: errorFrame(code, message, ids) },
-            { kind: 'log', type: f.type, environmentId: self, outcome: code },
-          ],
-        });
-        // D-2356-12: plan, then cap, then TURN configured.
-        if (state.plan !== 'tester') return refuse('relay_not_allowed', 'the relay needs the relay plan');
-        if (bytesThisMonth(state.relay, ctx.now) >= ctx.relayCapBytes) return refuse('relay_cap_reached', RELAY_CAP_MESSAGE);
-        if (!ctx.turnConfigured) return refuse('turn_unavailable', 'relay credentials are not available');
+      if (ctx.online.has(f.to)) {
         return {
           state,
           effects: [
-            { kind: 'fetch-turn', requestId: f.requestId },
-            { kind: 'log', type: f.type, environmentId: self, outcome: 'turn' },
+            {
+              kind: 'send',
+              to: { environmentId: f.to },
+              // `from` is the sender socket's machine, never a field of the frame (D-2356-6).
+              frame: { type: 'signal', from: self, session: f.session, purpose: f.purpose, relay: f.relay, data: f.data },
+            },
+            { kind: 'log', type: f.type, environmentId: self, outcome: 'forwarded' },
           ],
         };
       }
-      const iceServers = ctx.stunUrls.length > 0 ? [{ urls: [...ctx.stunUrls] }] : [];
-      return {
-        state,
-        effects: [
-          { kind: 'send', to: 'self', frame: { type: 'ice-servers', requestId: f.requestId, iceServers } },
-          { kind: 'log', type: f.type, environmentId: self, outcome: 'stun' },
-        ],
-      };
+      // A machine answers a phone's link offer (PAN-4829 D-7); approvals never reach a phone.
+      if (onlineClientsOf(ctx).has(f.to) && f.purpose === 'link') {
+        return {
+          state,
+          effects: [
+            { kind: 'send', to: { clientId: f.to }, frame: { type: 'signal', from: self, session: f.session, purpose: 'link', relay: f.relay, data: f.data } },
+            { kind: 'log', type: f.type, environmentId: self, outcome: 'forwarded_client' },
+          ],
+        };
+      }
+      return refuse('peer_offline', 'the other machine is offline', 'peer_offline');
     }
+    case 'ice-servers':
+      return iceServersAnswer(state, f, ctx, { environmentId: self });
     case 'inbox-create':
       if (state.plan !== 'tester') {
         return {
@@ -446,20 +429,8 @@ function frame(state: DirectoryState, event: Extract<DirectoryEvent, { kind: 'fr
           { kind: 'log', type: f.type, environmentId: self, outcome: 'ok' },
         ],
       };
-    case 'relay-usage': {
-      const { usage, reachedCap } = addUsage(state.relay, f.bytes, ctx.now, ctx.relayCapBytes);
-      const next: DirectoryState = { ...state, relay: usage };
-      const effects: DirectoryEffect[] = [{ kind: 'put-relay-usage', usage }];
-      const status = relayStatusOf(usage, ctx.now, ctx.relayCapBytes);
-      if (reachedCap || !status.stopped) {
-        // Every machine's status card shows the month's traffic, so each report refreshes it. At the
-        // cap every machine closes its relay channels (no new credentials until the next month);
-        // later reports in a stopped month send nothing, since the stop was already broadcast.
-        effects.push({ kind: 'send', to: 'all', frame: { type: 'relay-status', ...status } });
-      }
-      effects.push({ kind: 'log', type: f.type, environmentId: self, outcome: reachedCap ? 'cap_reached' : 'counted' });
-      return { state: next, effects };
-    }
+    case 'relay-usage':
+      return relayUsageAnswer(state, f.bytes, ctx, { environmentId: self });
     case 'approval-request': {
       const ids = { requestId: f.requestId };
       const refuse = (code: ConnectErrorCode, message: string, outcome: string): ReduceResult => ({

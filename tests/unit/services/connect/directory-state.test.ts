@@ -294,11 +294,15 @@ describe('directory reducer: relay credentials and metering (PAN-2356 WI-7)', ()
     const first = report(state, 600);
     expect(sends(first.effects)).toEqual([
       { kind: 'send', to: 'all', frame: { type: 'relay-status', month: '2026-11', bytesUsed: 600, capBytes: CAP, stopped: false } },
+      // Phones see the same status (PAN-4829 FR-8).
+      { kind: 'send', to: 'clients', frame: { type: 'relay-status', month: '2026-11', bytesUsed: 600, capBytes: CAP, stopped: false } },
     ]);
     state = first.state;
     const second = report(state, 500);
     expect(sends(second.effects)).toEqual([
       { kind: 'send', to: 'all', frame: { type: 'relay-status', month: '2026-11', bytesUsed: 1_100, capBytes: CAP, stopped: true } },
+      // Phones see the same status (PAN-4829 FR-8).
+      { kind: 'send', to: 'clients', frame: { type: 'relay-status', month: '2026-11', bytesUsed: 1_100, capBytes: CAP, stopped: true } },
     ]);
     const third = report(second.state, 10);
     expect(sends(third.effects)).toEqual([]);

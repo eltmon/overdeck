@@ -15,6 +15,7 @@ import {
 import type { ClientToDirectoryFrame } from '../../../packages/contracts/src/connect.ts';
 import { errorFrame, onlineClientsOf, toDirectoryMachines } from './directory-state.ts';
 import type { ClientRow, DirectoryEffect, DirectoryState, ReduceContext, ReduceResult, SocketIdentity } from './directory-state.ts';
+import { iceServersAnswer, relayUsageAnswer } from './ice-relay.ts';
 
 type HelloClientFrame = Extract<ClientToDirectoryFrame, { type: 'hello-client' }>;
 type LaterClientFrame = Exclude<ClientToDirectoryFrame, { type: 'hello-client' }>;
@@ -98,7 +99,7 @@ function helloClient(state: DirectoryState, event: Extract<ClientEvent, { kind: 
   return { state: next, effects };
 }
 
-function clientFrame(state: DirectoryState, event: Extract<ClientEvent, { kind: 'client-frame' }>): ReduceResult {
+function clientFrame(state: DirectoryState, event: Extract<ClientEvent, { kind: 'client-frame' }>, ctx: ReduceContext): ReduceResult {
   const { clientId, frame: f } = event;
   switch (f.type) {
     case 'forget-client': {
@@ -111,13 +112,46 @@ function clientFrame(state: DirectoryState, event: Extract<ClientEvent, { kind: 
         effects: [{ kind: 'delete-client', clientId }, forgotten, log(f.type, clientId, 'ok')],
       };
     }
-    case 'signal':
+    case 'signal': {
+      const session = { session: f.session };
+      if (state.clients.some((c) => c.clientId === f.to)) {
+        return {
+          state,
+          effects: [
+            { kind: 'send', to: 'self', frame: errorFrame('bad_frame', 'a phone cannot signal a phone', session) },
+            log(f.type, clientId, 'client_to_client'),
+          ],
+        };
+      }
+      if (!ctx.online.has(f.to)) {
+        return {
+          state,
+          effects: [
+            { kind: 'send', to: 'self', frame: errorFrame('peer_offline', 'the machine is offline', session) },
+            log(f.type, clientId, 'peer_offline'),
+          ],
+        };
+      }
+      return {
+        state,
+        effects: [
+          {
+            kind: 'send',
+            to: { environmentId: f.to },
+            // `from` is the sender socket's client id, never a field of the frame (D-2356-6).
+            frame: { type: 'signal', from: clientId, session: f.session, purpose: 'link', relay: f.relay, data: f.data },
+          },
+          log(f.type, clientId, 'forwarded'),
+        ],
+      };
+    }
     case 'ice-servers':
+      return iceServersAnswer(state, f, ctx, { environmentId: null, clientId });
     case 'relay-usage':
+      return relayUsageAnswer(state, f.bytes, ctx, { environmentId: null, clientId });
     case 'push-register':
     case 'push-unregister':
-      // The decoder refuses push-register and push-unregister until PAN-4830, so they answer as an
-      // undecodable frame does.
+      // The decoder refuses these until PAN-4830, so they answer as an undecodable frame does.
       return {
         state,
         effects: [{ kind: 'send', to: 'self', frame: errorFrame('bad_frame', 'malformed frame') }, log(f.type, clientId, 'bad_frame')],
@@ -130,7 +164,7 @@ export function reduceClient(state: DirectoryState, event: ClientEvent, ctx: Red
     case 'hello-client':
       return helloClient(state, event, ctx);
     case 'client-frame':
-      return clientFrame(state, event);
+      return clientFrame(state, event, ctx);
     case 'client-bad-frame': {
       if (event.reason === 'unsupported') {
         return {
