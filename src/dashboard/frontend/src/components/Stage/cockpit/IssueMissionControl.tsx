@@ -48,6 +48,7 @@ import { UatEnvironmentPanel } from '../../CommandDeck/UatEnvironmentPanel'
 import { ChangedFilesView } from './ChangedFilesView'
 import { DeftDecisionsTab } from '../../deft/DeftDecisionsTab'
 import { DeftScopeView } from '../../deft/DeftScopeView'
+import { DeftScopeDag } from '../../deft/DeftScopeDag'
 import { useDeftIssueSummary } from '../../deft/queries'
 import { CockpitPhaseRail } from './CockpitPhaseRail'
 import { IssueOverviewTab } from './IssueOverviewTab'
@@ -803,7 +804,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
                 {activeSubView === 'tasks' ? (
                   <><DeftScopeView issueId={issueId} /><div data-section="TasksRail / TasksTab"><TasksPanel issueId={issueId} /></div></>
                 ) : null}
-                {activeSubView === 'map' ? <PlanMapCard issueId={issueId} /> : null}
+                {activeSubView === 'map' ? <><DeftScopeDag issueId={issueId} /><PlanMapCard issueId={issueId} /></> : null}
                 {activeSubView === 'prd' ? <PrdViewer issueId={issueId} onClose={() => selectTab('plan', 'map')} /> : null}
               </div>
             )}

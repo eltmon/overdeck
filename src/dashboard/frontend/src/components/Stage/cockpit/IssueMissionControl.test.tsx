@@ -278,6 +278,7 @@ const deftSummary = vi.hoisted(() => ({ isDeft: false }))
 vi.mock('../../deft/queries', () => ({ useDeftIssueSummary: () => ({ isDeft: deftSummary.isDeft, summary: null, isLoading: false }) }))
 vi.mock('../../deft/DeftDecisionsTab', () => ({ DeftDecisionsTab: () => <div data-testid="deft-decisions">Deft decisions</div> }))
 vi.mock('../../deft/DeftScopeView', () => ({ DeftScopeView: () => null }))
+vi.mock('../../deft/DeftScopeDag', () => ({ DeftScopeDag: () => null }))
 // The ONE IssueDetail pulls in the whole transcript/WS chain; these tests
 // cover the cockpit chrome (tabs, header, lane). The mount contract is
 // asserted via this props-recording stub.
