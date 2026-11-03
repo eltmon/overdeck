@@ -1,0 +1,162 @@
+# node scripts/anywhere/two-machine-smoke.mjs  (commit b647cea46d2, 2026-11-02)
+[   0.0 s] step fake-clis
+(node:2991361) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+[   0.0 s] step start
+[   1.0 s] A listening on :3041 (home /home/eltmon/Projects/overdeck/workspaces/feature-pan-4774/.tmp/anywhere-a), B on :3042 (home /home/eltmon/Projects/overdeck/workspaces/feature-pan-4774/.tmp/anywhere-b)
+[   1.0 s] step proxy
+[   1.0 s] proxy 127.0.0.1:45103 -> 127.0.0.1:3042
+[   1.0 s] step pair+link
+[   1.4 s] B issued a pairing link expiring 2026-11-02T21:37:57.411Z
+[   1.9 s] A linked eltmon-z790 (033f-f5ee-db4d-598b-dc5b) over pairing:tcp://127.0.0.1:45103, advertised:tcp://192.168.1.64:3042, advertised:tcp://192.168.1.86:3042
+[   2.6 s] step online
+[   3.0 s] A->B online via tcp://127.0.0.1:45103; B->A online via tcp://192.168.1.64:3041
+[   3.0 s] step versions
+[   3.4 s] eltmon-z790: Overdeck 0.72.0 (development), claude 2.1.0, codex 0.150.0
+[   3.4 s] eltmon-z790: Overdeck 0.72.0 (development), claude 2.1.0, codex 0.150.0
+[   3.4 s] step update-all
+[   3.9 s] started on eltmon-z790, eltmon-z790; skipped none
+[   4.3 s] eltmon-z790 done: claude 2.1.0 → 2.1.5 (updated), codex 0.150.0 → 0.159.0 (updated), overdeck skipped; eltmon-z790 done: claude 2.1.0 → 2.1.5 (updated), codex 0.150.0 → 0.159.0 (updated), overdeck skipped
+[   4.3 s] step seed
+[   4.3 s] B transcript 5053880 bytes; A holds saved copy vault-6f1c4650-0000-4000-8000-0000000000aa
+[   4.3 s] step list
+[  17.4 s] @bcd7e47e-835f-4206-a45b-972a3bcf6a50/smoke-desk listed once (machine eltmon-z790, online, saved copy vault-6f1c4650-0000-4000-8000-0000000000aa)
+[  17.4 s] step open-budget
+[  17.4 s] open moved 618957 bytes B->A (budget 1114112; transcript 5053880)
+[  17.4 s] step image
+[  17.4 s] attachment matched B's 70 bytes (image/png)
+[  17.4 s] step tell-once
+[  19.6 s] repeat replayed the first answer (exit 1: Message NOT delivered to smoke-desk on bcd7e47e-835f-4206-a45b-972a3bcf6a50: Delivery could not be confirmed); other text refused by the receipt
+[  19.6 s] step released-409
+[  19.6 s] 409 conversation-released: Continued on env-else; this copy is read-only
+[  19.6 s] step forward
+[  20.1 s] forward b:37467 -> http://127.0.0.1:42935 relayed the page
+[  21.0 s] a forward to B's dashboard port :3042 was refused
+[  21.0 s] step load
+[  21.3 s] A sees B: load {"cpuPsiSomeAvg10":0,"cpuSaturated":false,"memAvailableBytes":32851607552,"workingAgents":0,"sampledAt":"2026-11-02T21:28:12.117Z"}, tags ["gpu","linux","smoke-tag"]
+[  21.3 s] step projects
+[  47.4 s] github.com/smoke/repo: local smoke, machines eltmon-z790
+[  47.4 s] step needs
+[  47.4 s] needs smoke-tag -> eltmon-z790: Auto → eltmon-z790 (CPU pressure 0%, 30 GB free, 0 agents)
+[  47.4 s] step needs-docker
+[  47.8 s] needs docker -> eltmon-z790: Auto → eltmon-z790 (CPU pressure 0%, 30 GB free, 0 agents)
+[  48.5 s] lane 20261102-7171 on A (machine auto, needs docker) in /home/eltmon/Projects/overdeck/workspaces/feature-pan-4774/.tmp/anywhere-a/fakehome/lanes/smoke-docker-docker-play-i1
+[  50.6 s] stopped and reaped 20261102-7171
+[  50.6 s] step compare
+[  50.6 s] compare: 3 difference(s); pan admin config set resources.quality_gate_slots 2
+[  50.6 s] step usage
+[  50.6 s] usage rows: eltmon-z790 $0, eltmon-z790 $0
+[  50.6 s] step mcp
+[  56.1 s] mcp: B listed, @bcd7e47e-835f-4206-a45b-972a3bcf6a50/smoke-desk reached (owner answered an error: HTTP 500: Delivery could not be confirmed), settings 403
+[  56.1 s] step remote-worker
+[  57.0 s] stand-in agent-smk-1-worker-1 for agent-smk-1-worker-1 on eltmon-z790
+[  64.1 s] A printed B's report: smoke report one
+[  64.1 s] step worker-offline
+[  66.1 s] B stopped (SIGSTOP) for 25 s
+[  91.1 s] B continued (SIGCONT)
+[ 106.8 s] the wait survived B's pause and printed report two
+[ 107.4 s] stopped agent-smk-1-worker-1 on B through the fleet route
+[ 107.4 s] step lane-remote
+[ 108.0 s] lane 20261102-3396 on eltmon-z790 in /home/eltmon/Projects/overdeck/workspaces/feature-pan-4774/.tmp/anywhere-b/fakehome/lanes/smoke-smoke-play-i1
+[ 108.0 s] step lane-report
+[ 115.6 s] A printed B's lane report; pan lane list shows 20261102-3396 on eltmon-z790 (idle)
+[ 115.6 s] step lane-nest
+[ 115.6 s] root 4, linked parent 4, run smoke
+[ 115.6 s] step lane-reap
+[ 117.6 s] Reaped lane smoke/smoke (20261102-3396): directory removed, conversation archived; B archived the row, A archived the stand-in
+[ 117.6 s] step kill B
+[ 117.6 s] server b exited (code null, signal SIGKILL)
+[ 118.0 s] A->B offline (tcp://127.0.0.1:45103: Responder closed the connection before proving the pinned machine key; tcp://192.168.1.64:3042: tcp://192.168.1.64:3042: connect ECONNREFUSED 192.168.1.64:3042; tcp://192.168.1.86:3042: tcp://192.168.1.86:3042: connect ECONNREFUSED 192.168.1.86:3042) after 0.4 s
+[ 118.0 s] step restart B
+[ 120.6 s] A->B online via tcp://127.0.0.1:45103 after 1.8 s
+[ 120.6 s] step auto
+[ 134.9 s] Auto → eltmon-z790 (CPU pressure 0%, 30 GB free, 0 agents); rejected eltmon-z790: CPU saturated
+[ 134.9 s] step no-http
+[ 134.9 s] proxy carried 667139 bytes across the pairing route
+[ 134.9 s] step stop
+[ 134.9 s] server a exited (code 0, signal null)
+[ 134.9 s] server b exited (code 130, signal null)
+[ 135.0 s] OK: two dashboards linked, updated both machines' CLIs with Update all, survived a restart, and spoke only the secure channel on the pairing route
+# exit 0
+
+# node scripts/anywhere/two-machine-smoke.mjs --inject-plain-http  (commit b647cea46d2)
+[   0.0 s] step fake-clis
+(node:3132680) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+[   0.0 s] step start
+[   1.2 s] A listening on :3041 (home /home/eltmon/Projects/overdeck/workspaces/feature-pan-4774/.tmp/anywhere-a), B on :3042 (home /home/eltmon/Projects/overdeck/workspaces/feature-pan-4774/.tmp/anywhere-b)
+[   1.2 s] step proxy
+[   1.2 s] proxy 127.0.0.1:39485 -> 127.0.0.1:3042
+[   1.2 s] step pair+link
+[   1.7 s] B issued a pairing link expiring 2026-11-02T21:40:12.756Z
+[   2.3 s] A linked eltmon-z790 (870b-5d37-28d3-c67d-30eb) over pairing:tcp://127.0.0.1:39485, advertised:tcp://192.168.1.64:3042, advertised:tcp://192.168.1.86:3042
+[   3.3 s] step online
+[   3.7 s] A->B online via tcp://127.0.0.1:39485; B->A online via tcp://192.168.1.64:3041
+[   3.7 s] step versions
+[   4.2 s] eltmon-z790: Overdeck 0.72.0 (development), claude 2.1.0, codex 0.150.0
+[   4.2 s] eltmon-z790: Overdeck 0.72.0 (development), claude 2.1.0, codex 0.150.0
+[   4.2 s] step update-all
+[   4.7 s] started on eltmon-z790, eltmon-z790; skipped none
+[   5.2 s] eltmon-z790 done: claude 2.1.0 → 2.1.5 (updated), codex 0.150.0 → 0.159.0 (updated), overdeck skipped; eltmon-z790 done: claude 2.1.0 → 2.1.5 (updated), codex 0.150.0 → 0.159.0 (updated), overdeck skipped
+[   5.2 s] step seed
+[   5.2 s] B transcript 5053880 bytes; A holds saved copy vault-6f1c4650-0000-4000-8000-0000000000aa
+[   5.2 s] step list
+[  18.3 s] @f9c798f7-4d33-42b3-9e59-1f713c3a29a9/smoke-desk listed once (machine eltmon-z790, online, saved copy vault-6f1c4650-0000-4000-8000-0000000000aa)
+[  18.3 s] step open-budget
+[  18.3 s] open moved 618957 bytes B->A (budget 1114112; transcript 5053880)
+[  18.3 s] step image
+[  18.4 s] attachment matched B's 70 bytes (image/png)
+[  18.4 s] step tell-once
+[  20.7 s] repeat replayed the first answer (exit 1: Message NOT delivered to smoke-desk on f9c798f7-4d33-42b3-9e59-1f713c3a29a9: Delivery could not be confirmed); other text refused by the receipt
+[  20.7 s] step released-409
+[  20.8 s] 409 conversation-released: Continued on env-else; this copy is read-only
+[  20.8 s] step forward
+[  21.3 s] forward b:34085 -> http://127.0.0.1:43755 relayed the page
+[  22.2 s] a forward to B's dashboard port :3042 was refused
+[  22.2 s] step load
+[  22.6 s] A sees B: load {"cpuPsiSomeAvg10":0.04,"cpuSaturated":false,"memAvailableBytes":32631832576,"workingAgents":0,"sampledAt":"2026-11-02T21:30:27.335Z"}, tags ["gpu","linux","smoke-tag"]
+[  22.6 s] step projects
+[  47.7 s] github.com/smoke/repo: local smoke, machines eltmon-z790
+[  47.7 s] step needs
+[  47.7 s] needs smoke-tag -> eltmon-z790: Auto → eltmon-z790 (CPU pressure 0%, 30 GB free, 0 agents)
+[  47.7 s] step needs-docker
+[  48.1 s] needs docker -> eltmon-z790: Auto → eltmon-z790 (CPU pressure 0%, 30 GB free, 0 agents)
+[  48.7 s] lane 20261102-3537 on A (machine auto, needs docker) in /home/eltmon/Projects/overdeck/workspaces/feature-pan-4774/.tmp/anywhere-a/fakehome/lanes/smoke-docker-docker-play-i1
+[  50.8 s] stopped and reaped 20261102-3537
+[  50.8 s] step compare
+[  50.8 s] compare: 3 difference(s); pan admin config set resources.quality_gate_slots 2
+[  50.8 s] step usage
+[  50.9 s] usage rows: eltmon-z790 $0, eltmon-z790 $0
+[  50.9 s] step mcp
+[  56.3 s] mcp: B listed, @f9c798f7-4d33-42b3-9e59-1f713c3a29a9/smoke-desk reached (owner answered an error: HTTP 500: Delivery could not be confirmed), settings 403
+[  56.3 s] step remote-worker
+[  57.2 s] stand-in agent-smk-1-worker-1 for agent-smk-1-worker-1 on eltmon-z790
+[  64.5 s] A printed B's report: smoke report one
+[  64.5 s] step worker-offline
+[  66.5 s] B stopped (SIGSTOP) for 25 s
+[  91.5 s] B continued (SIGCONT)
+[ 109.2 s] the wait survived B's pause and printed report two
+[ 109.8 s] stopped agent-smk-1-worker-1 on B through the fleet route
+[ 109.8 s] step lane-remote
+[ 110.4 s] lane 20261102-9466 on eltmon-z790 in /home/eltmon/Projects/overdeck/workspaces/feature-pan-4774/.tmp/anywhere-b/fakehome/lanes/smoke-smoke-play-i1
+[ 110.4 s] step lane-report
+[ 118.1 s] A printed B's lane report; pan lane list shows 20261102-9466 on eltmon-z790 (idle)
+[ 118.1 s] step lane-nest
+[ 124.2 s] root 4, linked parent 4, run smoke
+[ 124.2 s] step lane-reap
+[ 126.2 s] Reaped lane smoke/smoke (20261102-9466): directory removed, conversation archived; B archived the row, A archived the stand-in
+[ 126.2 s] step kill B
+[ 126.2 s] server b exited (code null, signal SIGKILL)
+[ 126.6 s] A->B offline (tcp://127.0.0.1:39485: Responder closed the connection before proving the pinned machine key; tcp://192.168.1.64:3042: tcp://192.168.1.64:3042: connect ECONNREFUSED 192.168.1.64:3042; tcp://192.168.1.86:3042: tcp://192.168.1.86:3042: connect ECONNREFUSED 192.168.1.86:3042) after 0.4 s
+[ 126.6 s] step restart B
+[ 127.9 s] A->B online via tcp://127.0.0.1:39485 after 0.4 s
+[ 127.9 s] step auto
+[ 143.2 s] Auto → eltmon-z790 (CPU pressure 0%, 30 GB free, 0 agents); rejected eltmon-z790: CPU saturated
+[ 143.2 s] step inject plain http
+[ 143.2 s] step no-http
+[ 143.2 s] proxy carried 670275 bytes across the pairing route
+FAILED at step no-http: plain HTTP crossed the pairing route at byte 669472: "\u0017ÕnçFÿJÑtàäÏ:Õ_¦5â§GET /api/environment HTTP/1.1\r\nhost: 127.0.0.1:39485\r\nconnect"
+server logs: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4774/.tmp/anywhere-a/server.log and /home/eltmon/Projects/overdeck/workspaces/feature-pan-4774/.tmp/anywhere-b/server.log
+[ 143.2 s] server a exited (code 0, signal null)
+[ 143.2 s] server b exited (code 130, signal null)
+# exit 1

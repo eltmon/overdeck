@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { WorkerReport } from '../../../lib/agents/worker/report.js';
 import type { RemoteStandIn } from '../../../lib/agents/worker/remote-standin.js';
+import { WAIT_STARTUP_GRACE_MS } from '../../../lib/agents/worker/wait.js';
 import {
   FOLLOW_BACKOFF_CAP_MS,
   FOLLOW_POLL_MS,
@@ -139,12 +140,41 @@ describe('remote worker follower (D-4651-5)', () => {
     expect(follower.isTracking(LOCAL)).toBe(false);
   });
 
-  it('a confirmed-dead worker becomes exited with its last assistant message', async () => {
+  it('a confirmed-dead worker past the startup grace becomes exited with its last assistant message', async () => {
+    await writeRemoteStandIn(LOCAL, standIn({ createdAt: new Date(Date.now() - WAIT_STARTUP_GRACE_MS).toISOString() }));
     const owner: Owner = { online: true, reports: [], dead: true, stops: 0, statusCalls: [] };
     const { follower } = harness(owner);
     await follower.start();
     await vi.advanceTimersByTimeAsync(10);
     expect(await readRemoteStandIn(LOCAL)).toMatchObject({ state: 'exited', lastAssistantMessage: 'bye' });
+    expect(follower.isTracking(LOCAL)).toBe(false);
+  });
+
+  it('PAN-4774: a worker read as dead before its harness starts keeps being followed and its report arrives', async () => {
+    // The owner's liveness is `runtime-missing` (dead) until the launcher starts the harness.
+    const owner: Owner = { online: true, reports: [], dead: true, stops: 0, statusCalls: [] };
+    const { follower } = harness(owner);
+    await follower.start();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(await readRemoteStandIn(LOCAL)).toMatchObject({ state: 'running' });
+    owner.dead = false;
+    owner.reports.push(report(1));
+    await vi.advanceTimersByTimeAsync(FOLLOW_POLL_MS);
+    expect(mirrored.has(mirroredFile(1))).toBe(true);
+    owner.dead = true;
+    await vi.advanceTimersByTimeAsync(FOLLOW_POLL_MS);
+    expect(await readRemoteStandIn(LOCAL)).toMatchObject({ state: 'exited', lastSeq: 1, lastAssistantMessage: 'bye' });
+    expect(follower.isTracking(LOCAL)).toBe(false);
+  });
+
+  it('PAN-4774: a worker never seen alive becomes exited once the startup grace has passed', async () => {
+    const owner: Owner = { online: true, reports: [], dead: true, stops: 0, statusCalls: [] };
+    const { follower } = harness(owner);
+    await follower.start();
+    await vi.advanceTimersByTimeAsync(WAIT_STARTUP_GRACE_MS - FOLLOW_POLL_MS);
+    expect(await readRemoteStandIn(LOCAL)).toMatchObject({ state: 'running' });
+    await vi.advanceTimersByTimeAsync(FOLLOW_POLL_MS * 2);
+    expect(await readRemoteStandIn(LOCAL)).toMatchObject({ state: 'exited' });
     expect(follower.isTracking(LOCAL)).toBe(false);
   });
 });

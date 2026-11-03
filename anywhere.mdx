@@ -212,14 +212,16 @@ consists of hosted services.
     **Shipped (next release). Free, open source; you pay Fly directly.**
 
     `pan machines add-fly` starts a Fly.io VM that runs Overdeck and links to your machine,
-    so it runs conversations and gauntlet lanes like any other linked machine. See
-    [Fly machines](/configuration/linked-machines#fly-machines).
+    so it runs conversations and gauntlet lanes like any other linked machine. `pan start <id>
+    --remote` runs an issue's work agent there as a linked conversation on the VM's server. See
+    [Fly machines](/configuration/linked-machines#fly-machines) and
+    [Work agents on Fly](/configuration/linked-machines#work-agents-on-fly).
     [PAN-4652](https://github.com/eltmon/overdeck/issues/4652),
-    [PAN-4638](https://github.com/eltmon/overdeck/issues/4638)
+    [PAN-4638](https://github.com/eltmon/overdeck/issues/4638),
+    [PAN-4734](https://github.com/eltmon/overdeck/issues/4734)
 
-    Still planned: Fly work agents as linked conversations on the VM's server
-    ([PAN-4734](https://github.com/eltmon/overdeck/issues/4734)), and moving a workspace between
-    your machine and Fly ([PAN-1676](https://github.com/eltmon/overdeck/issues/1676)).
+    Still planned: moving a workspace between your machine and Fly
+    ([PAN-1676](https://github.com/eltmon/overdeck/issues/1676)).
   </Step>
   <Step title="Webhook triggers and the MCP server">
     **Shipped (next release). Free, open source.**
