@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4835",
   "created": "2026-11-03T07:59:34.235Z",
-  "updated": "2026-11-03T09:39:41.748Z",
+  "updated": "2026-11-03T09:47:02.629Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -70,9 +70,10 @@
       "doneAt": "2026-11-03T09:39:02.380Z"
     },
     "devices-panel-phones": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4835",
-      "claimedAt": "2026-11-03T09:39:41.747Z"
+      "claimedAt": "2026-11-03T09:39:41.747Z",
+      "doneAt": "2026-11-03T09:47:02.628Z"
     }
   }
 }
