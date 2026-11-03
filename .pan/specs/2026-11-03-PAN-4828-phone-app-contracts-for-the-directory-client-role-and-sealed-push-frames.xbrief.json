@@ -4,17 +4,17 @@
     "created": "2026-11-03T04:02:38Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4828: Phone app: contracts for the directory client role and sealed push frames",
-    "updated": "2026-11-03T04:04:20.094Z"
+    "updated": "2026-11-03T04:06:57.462Z"
   },
   "plan": {
     "id": "pan-4828",
     "title": "Phone app: contracts for the directory client role and sealed push frames",
-    "status": "proposed",
+    "status": "running",
     "uid": "77a8b5cd-13f1-437d-ba88-15b0c59c9000",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-03T04:02:38Z",
-    "updated": "2026-11-03T04:04:20.094Z",
+    "updated": "2026-11-03T04:06:57.462Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4828",
@@ -405,5 +405,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
