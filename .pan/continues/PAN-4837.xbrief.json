@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4837",
   "created": "2026-11-03T16:16:59.604Z",
-  "updated": "2026-11-03T19:02:24.596Z",
+  "updated": "2026-11-03T19:02:52.634Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -312,6 +312,10 @@
     "sign-in.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T19:02:24.596Z"
+    },
+    "machines-screen.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T19:02:52.634Z"
     }
   }
 }
