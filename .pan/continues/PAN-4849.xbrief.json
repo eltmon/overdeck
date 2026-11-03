@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4849",
   "created": "2026-11-03T03:09:47.454Z",
-  "updated": "2026-11-03T05:11:32.069Z",
+  "updated": "2026-11-03T05:11:50.321Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -352,6 +352,10 @@
     "drift-badges.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T05:11:32.069Z"
+    },
+    "approved-scope-check.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:11:50.320Z"
     }
   }
 }
