@@ -316,6 +316,24 @@ active `machine` record or an active `phone` record
 (`findActiveChannelTokenByKey`), so a phone's handshake reaches HTTP the same
 way a linked machine's does.
 
+## Phone Live Activity (PAN-4839)
+
+The only phone data that leaves the secure channel in plain text is the two
+Live Activity counts (OD-1): how many items need the operator and how many
+agents are running. iOS draws the card from an APNs push with no app code in
+between, so the push cannot be sealed the way needs-you notifications are.
+
+The flow: the primary dashboard's `live-activity-service.ts` reads this
+machine's counts every 5 s (the Needs-You feed, and agents in the dashboard
+pill's running set) and `src/lib/push/live-activity-sender.ts` sends
+`push-activity { to, needsYou, running }` to the directory for each paired
+phone, on a change at most every 15 s and otherwise every 5 minutes. The
+directory sums the fresh reports of all machines for that phone and pushes
+the sum to APNs (`docs/CONNECT-SERVICE.md`, "Live Activity (PAN-4839)"). The
+phone registers its activity push token with `activity-register` when the app
+comes to the foreground. Linked machines' rows are not counted: each machine
+reports only its own.
+
 ## `/ws/rpc` restricted group (D-4645-14, D-4645-15)
 
 RPC middleware sees per-message headers, not the upgrade, so the group is chosen at upgrade
