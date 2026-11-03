@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-4948",
   "created": "2026-11-03T21:39:04.258Z",
-  "updated": "2026-11-03T23:06:45.020Z",
+  "updated": "2026-11-03T23:19:42.928Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-03T23:19Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-03T23:19:42.928Z"
+    }
+  ],
   "items": {
     "contracts-platform-split": {
       "status": "completed",
@@ -125,5 +131,14 @@
       "status": "completed",
       "doneAt": "2026-11-03T23:06:45.020Z"
     }
-  }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-03T23:19:42Z",
+      "markdownBody": "# CI Failure Feedback for PAN-4948\n\nPull request: https://github.com/eltmon/overdeck/pull/4966 (head `01050a50`)\n\nSource: check_run:build (22)\n\n## Failing checks (1)\n\n### build (22)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/126271148317/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/41737617200/job/126271148317  \n```\nere-channel\n> tsc --noEmit -p packages/anywhere-channel/tsconfig.json\n\n\n> @overdeck/core@0.73.1 typecheck:mobile\n> tsc --noEmit -p apps/mobile/tsconfig.json\n\n##[error]apps/mobile/src/native/push.ts(115,7): error TS2322: Type 'ClientPlatform' is not assignable to type 'PhonePlatform'.\n  Type '\"node\"' is not assignable to type 'PhonePlatform'.\n##[error]Process completed with exit code 2.\nPost job cleanup.\n[command]/usr/bin/git version\ngit version 2.56.0\nTemporarily overriding HOME='/home/runner/work/_temp/4478e20e-eded-409f-8a8a-04abc50233f2' before making global git config changes\nAdding repository directory to the temporary git global config as a safe directory\n[command]/usr/bin/git config --global --add safe.directory /home/runner/work/overdeck/overdeck\n[command]/usr/bin/git config --local --name-only --get-regexp core\\.sshCommand\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'core\\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp http\\.https\\:\\/\\/github\\.com\\/\\.extraheader\nhttp.https://github.com/.extraheader\n[command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'http\\.https\\:\\/\\/github\\.com\\/\\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\\.gitdir:\n[command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url\nCleaning up orphan processes\n##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ]
 }
