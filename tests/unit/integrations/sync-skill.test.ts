@@ -88,3 +88,31 @@ describe('sync-skill.mjs (fixture root)', () => {
     expect(result.stderr).toContain('usage:');
   });
 });
+
+describe('integrations/ in this repository', () => {
+  it('the committed skill copies match the shared skill', () => {
+    const result = run(['--check']);
+
+    expect(result.status).toBe(0);
+  });
+
+  it('the shared skill keeps the frontmatter every loader accepts', () => {
+    const skillPath = new URL('../../../integrations/shared/SKILL.md', import.meta.url);
+    const lines = readFileSync(skillPath, 'utf-8').split('\n');
+
+    expect(lines[0]).toBe('---');
+    expect(lines[1]).toBe('name: overdeck');
+    expect(lines[2]).toMatch(/^description: /);
+    expect(lines[2].slice('description: '.length)).not.toContain(': ');
+    expect(lines[3]).toBe('---');
+  });
+
+  it('the shared skill stays within its context budget', () => {
+    const skillPath = new URL('../../../integrations/shared/SKILL.md', import.meta.url);
+    const content = readFileSync(skillPath);
+    const lineCount = (content.toString('utf-8').match(/\n/g) ?? []).length;
+
+    expect(lineCount).toBeLessThanOrEqual(100);
+    expect(content.byteLength).toBeLessThanOrEqual(6000);
+  });
+});
