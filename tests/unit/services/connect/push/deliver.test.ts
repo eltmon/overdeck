@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApnsTokenCache } from '../../../../../services/connect/src/push/apns.ts';
 import type { PushConfig, PushRegistration } from '../../../../../services/connect/src/push/config.ts';
-import { deliverPush, PUSH_RETRY_DELAY_MS } from '../../../../../services/connect/src/push/deliver.ts';
+import { deliverActivity, deliverPush, PUSH_RETRY_DELAY_MS } from '../../../../../services/connect/src/push/deliver.ts';
 import { FCM_TOKEN_URL, FcmTokenCache } from '../../../../../services/connect/src/push/fcm.ts';
 
 const NOW = 1_800_000_000_000;
@@ -125,5 +125,51 @@ describe('deliverPush (PAN-4830 WI-6)', () => {
     await vi.advanceTimersByTimeAsync(1);
     expect(await pending).toEqual({ kind: 'failed', detail: 'apns_network' });
     expect(urls).toHaveLength(2);
+  });
+});
+
+describe('deliverActivity (PAN-4839 WI-3)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const req = { token: IOS.token, apsEnvironment: 'production' as const, needsYou: 3, running: 2, priority: 'high' as const };
+  const opts = (fetchFn: typeof fetch, over: Partial<PushConfig> = {}, sleep?: (ms: number) => Promise<void>) => ({
+    config: { ...config, ...over },
+    fetch: fetchFn,
+    now: () => NOW,
+    apnsTokens,
+    fcmTokens,
+    sleep,
+  });
+
+  it('sends one Live Activity request to APNs', async () => {
+    const stub = stubFetch([200]);
+    expect(await deliverActivity(req, opts(stub.fetchFn))).toEqual({ kind: 'delivered' });
+    expect(stub.sends().map((u) => new URL(u).host)).toEqual(['api.push.apple.com']);
+  });
+
+  it('answers not_configured with no request when APNs is unset', async () => {
+    const stub = stubFetch([200]);
+    expect(await deliverActivity(req, opts(stub.fetchFn, { apns: null }))).toEqual({ kind: 'not_configured' });
+    expect(stub.sends()).toHaveLength(0);
+  });
+
+  it('retries a 503 once after one injected 2,000 ms sleep', async () => {
+    const stub = stubFetch([503, 200]);
+    const sleep = vi.fn(async (_ms: number) => {});
+    expect(await deliverActivity(req, opts(stub.fetchFn, {}, sleep))).toEqual({ kind: 'delivered' });
+    expect(sleep).toHaveBeenCalledTimes(1);
+    expect(sleep).toHaveBeenCalledWith(2000);
+    expect(stub.sends()).toHaveLength(2);
+  });
+
+  it('answers gone for a 410 with no retry', async () => {
+    const stub = stubFetch([410]);
+    expect(await deliverActivity(req, opts(stub.fetchFn))).toEqual({ kind: 'gone' });
+    expect(stub.sends()).toHaveLength(1);
   });
 });
