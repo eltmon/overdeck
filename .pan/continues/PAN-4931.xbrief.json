@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4931",
   "created": "2026-11-03T21:41:36.078Z",
-  "updated": "2026-11-03T21:41:36.078Z",
+  "updated": "2026-11-03T21:56:09.782Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "tool-scope-audience": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4931",
-      "claimedAt": "2026-11-03T21:41:36.078Z"
+      "claimedAt": "2026-11-03T21:41:36.078Z",
+      "doneAt": "2026-11-03T21:56:09.782Z"
     }
   }
 }
