@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4477",
   "created": "2026-11-03T15:02:33.095Z",
-  "updated": "2026-11-03T15:20:19.646Z",
+  "updated": "2026-11-03T15:23:42.270Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -28,9 +28,10 @@
       "doneAt": "2026-11-03T15:20:12.441Z"
     },
     "tmux-hub-subscribe": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4477",
-      "claimedAt": "2026-11-03T15:20:19.646Z"
+      "claimedAt": "2026-11-03T15:20:19.646Z",
+      "doneAt": "2026-11-03T15:23:42.270Z"
     }
   }
 }
