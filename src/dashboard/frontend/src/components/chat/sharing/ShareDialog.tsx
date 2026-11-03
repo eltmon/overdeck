@@ -222,7 +222,7 @@ export function ShareDialog({ target, onClose }: { target: ShareTarget; onClose:
 
   return (
     <Modal title="Share conversation" description={target.title ?? target.name} onClose={onClose} pinned={pinned} footer={footer}>
-      {body}
+      <div className="py-4">{body}</div>
     </Modal>
   );
 }
