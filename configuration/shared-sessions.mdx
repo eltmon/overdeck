@@ -30,9 +30,10 @@ In this release:
 
 - The host runs Overdeck on their own computer and is signed in to overdeck.ai with
   [`pan account login`](/cli/account), which the host needs to create the link.
-- A viewer can join in two ways: from their own Overdeck (signed in with
-  `pan account login`), or from a browser with no install (see
-  [Join in a browser](#join-in-a-browser)). Either way the host sees who is asking to join.
+- A viewer can join in three ways: from their own Overdeck (signed in with
+  `pan account login`), without installing it with `npx @overdeck/core join <CODE>`
+  (Node 22 or newer), or from a browser (see [Join in a browser](#join-in-a-browser)).
+  Every way signs the viewer in, so the host sees who is asking to join.
 - overdeck.ai accounts are invite-only. A viewer must be on the allowlist before they can
   sign in.
 
@@ -54,6 +55,9 @@ person you can:
 
 **End share** closes the room for everyone. The link stops working.
 
+From a terminal, run `pan share <conversation>`; it prints the link and the join code. See
+[`pan share and pan join`](/cli/share).
+
 ## Join a shared conversation
 
 These steps join from your own Overdeck. To join with only a browser, see
@@ -70,6 +74,12 @@ These steps join from your own Overdeck. To join with only a browser, see
 5. Wait in the lobby until the host admits you.
 
 Click **Leave** at any time to leave the shared conversation.
+
+### From a terminal
+
+`pan join <link-or-code>` signs you in if needed, starts Overdeck if it is not running and opens
+the lobby. On a computer without Overdeck, `npx @overdeck/core join <CODE>` does the same with only
+Node 22 or newer. See [`pan share and pan join`](/cli/share).
 
 ## Join in a browser
 

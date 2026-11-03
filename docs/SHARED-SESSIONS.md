@@ -60,7 +60,7 @@ Short codes are 8 symbols from `BCDFGHJKLMNPQRSTVWXZ23456789` (no vowels, no 0/O
 | `DELETE /v1/rooms/:code` | `Bearer odh_…` (host token) | 204; 401 `invalid_token` for a missing or malformed host token; 404 `not_found` for an unknown code, an ended room or a wrong token (no oracle) |
 | `GET /v1/rooms/:code/host?v=1` | `Bearer odh_…`, `Upgrade: websocket` | 101; 426 `upgrade_required` without the upgrade header; 400 `unsupported_protocol` when `v` is not `1`; 401 `invalid_token`; 404 `not_found` for an unknown code, an ended room or a wrong token |
 | `GET /v1/rooms/:code/join?v=1` | `Bearer odd_…`, `Upgrade: websocket` | 101; 426; 400 `unsupported_protocol`; 401/403/503 as for `POST /v1/rooms`; 404 `not_found` for an unknown code or an ended room. Refusals for a blocked identity, the data owner or a full room arrive **after** the upgrade as close codes |
-| `GET /s/:code` | none | 200 HTML invite page that finds Overdeck on this computer (PAN-4475): one nonce'd inline script probes `GET /api/share-probe` on `http://localhost:3011` and `http://127.0.0.1:3011` (1.5 s each, `credentials: 'omit'`) and navigates to `<origin>/#/shared/<CODE>` when one answers. The page always shows a manual **Open it in Overdeck on this computer** link, `pan up` instructions, a hint to allow Chrome's local-network prompt, and a link to install docs. Its CSP adds a fresh 16-byte nonce per response: `default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-…'; connect-src http://localhost:3011 http://127.0.0.1:3011; frame-ancestors 'none'; base-uri 'none'; form-action 'none'`. Slice 9 ([PAN-4480](https://github.com/eltmon/overdeck/issues/4480)) adds `pan join` back. 404 HTML "This share link has ended or does not exist.", with no script and CSP `default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'`. Neither page shows a host name, scope or participant count. **With web join configured (PAN-4481):** `<body data-short-code="<CODE>">`, the content above inside `<section id="local-join">`, then a hidden `<section id="web-join">` that the viewer bundle fills, the probe script, and `<script src="/viewer/viewer.js" defer>`. The CSP becomes `default-src 'none'; style-src 'unsafe-inline'; script-src 'self' 'nonce-…'; connect-src 'self' wss://<share host> http://localhost:3011 http://127.0.0.1:3011; img-src https://avatars.githubusercontent.com; frame-ancestors 'none'; base-uri 'none'; form-action 'self'`, and `Referrer-Policy` is `same-origin` instead of `no-referrer` (under `no-referrer` a same-origin form POST carries `Origin: null`, which would fail the **Sign out** Origin check). In both modes the probe navigates only when `document.documentElement.dataset.hostedJoin` is not `"started"`. |
+| `GET /s/:code` | none | 200 HTML invite page that finds Overdeck on this computer (PAN-4475): one nonce'd inline script probes `GET /api/share-probe` on `http://localhost:3011` and `http://127.0.0.1:3011` (1.5 s each, `credentials: 'omit'`) and navigates to `<origin>/#/shared/<CODE>` when one answers. The page always shows a manual **Open it in Overdeck on this computer** link, `pan up` instructions, a hint to allow Chrome's local-network prompt, and a link to install docs. Its CSP adds a fresh 16-byte nonce per response: `default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-…'; connect-src http://localhost:3011 http://127.0.0.1:3011; frame-ancestors 'none'; base-uri 'none'; form-action 'none'`. It also shows `pan join <CODE>` and the no-install `npx @overdeck/core join <CODE>` (slice 9, [PAN-4480](https://github.com/eltmon/overdeck/issues/4480)). 404 HTML "This share link has ended or does not exist.", with no script and CSP `default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'`. Neither page shows a host name, scope or participant count. **With web join configured (PAN-4481):** `<body data-short-code="<CODE>">`, the content above inside `<section id="local-join">`, then a hidden `<section id="web-join">` that the viewer bundle fills, the probe script, and `<script src="/viewer/viewer.js" defer>`. The CSP becomes `default-src 'none'; style-src 'unsafe-inline'; script-src 'self' 'nonce-…'; connect-src 'self' wss://<share host> http://localhost:3011 http://127.0.0.1:3011; img-src https://avatars.githubusercontent.com; frame-ancestors 'none'; base-uri 'none'; form-action 'self'`, and `Referrer-Policy` is `same-origin` instead of `no-referrer` (under `no-referrer` a same-origin form POST carries `Origin: null`, which would fail the **Sign out** Origin check). In both modes the probe navigates only when `document.documentElement.dataset.hostedJoin` is not `"started"`. |
 | `GET /auth/signin?code=<CODE>` | none | 302 to `<ACCOUNT_BASE_URL>/auth/start` with `redirect_uri=<PUBLIC_BASE_URL>/auth/callback`, a fresh `state`, an S256 `code_challenge`, `platform=web` and the browser's `environment_id`; sets `__Host-ods_signin` and `__Host-ods_env`. 400 HTML "This share link is not valid." for a bad code |
 | `GET /auth/callback` | `__Host-ods_signin` cookie | 303 to `/s/<CODE>` with `__Host-ods_session` after `AccountRpc.redeemWebCode`. HTML error pages, each with a link back to `/s/<CODE>`: 400 expired (missing, wrong or older-than-10-minutes sign-in cookie, or a redeem `invalid_grant`), 403 invite-only (`invite_only` or a redeem `access_denied`), 400 cancelled on GitHub (`github_denied`), 403 account being deleted (`account_deleting`), 503 account service unavailable. Always clears the sign-in cookie |
 | `POST /auth/signout` | `Origin` equal to `PUBLIC_BASE_URL`; form field `code` | 303 to `/s/<CODE>`; revokes the web device through `AccountRpc.signOutDevice` and clears `__Host-ods_session`. 403 `forbidden_origin`; 400 HTML for an invalid code (the cookie is still cleared) |
@@ -371,6 +371,38 @@ Once the peer is connected, the viewer page shows a **Conversation** / **Termina
 **Overflow.** The terminal channel uses the same writer rule as the others: a peer whose queued content passes 64 Mi characters is closed, and the viewer sees "Connection to the host was lost." with **Reconnect**.
 
 **Version skew.** The change is additive and the wire version stays 1. An older host ignores `terminal-watch` (it acts only on `hello` and, from slice 5, `submit` on `control`), so its viewer's terminal view stays empty. An older viewer never sends a watch and has no `terminal` listener, so it receives nothing.
+
+## CLI: pan share and pan join (slice 9, PAN-4480)
+
+User docs: [`cli/share.mdx`](../cli/share.mdx). Code: `src/cli/commands/sharing/`, short-code
+parsing in the import-free leaf `src/lib/sharing/share-code.ts` (the dashboard routes re-export it).
+
+- **`pan share <conversation>`** resolves a conversation id or name, calls `POST /api/shares` on the
+  running dashboard with the internal token (`callDashboard`) and prints the join link, the join
+  code (`BCDF-GHJK`) and both join commands. It never starts a dashboard: the host hub needs the
+  full `pan up` stack (D-3).
+- **`pan join <link-or-code>`** runs in this order: parse the target (`parseJoinTarget`, no network
+  or file write on a bad one); sign in with `loginCommand` when `account.json` is missing;
+  `ensureLocalDashboard()`; `POST /api/joins { code }`; poll `GET /api/joins/<code>` every 500 ms
+  while `connecting`, for at most 15 s; open `<apiUrl>/#/shared/<CODE>` for a live state. A
+  terminal state prints a one-line reason and exits 1.
+- **Why the CLI may post the join intent (D-5).** The user ran an explicit command, so it keeps
+  PAN-4475 D-1. The internal token skips the browser CSRF check. The browser URL carries no token;
+  `useSharedJoin` subscribes to the live join without a second click.
+- **Auto-start (D-1, D-12, D-14)** is modelled on `pan serve`, not `pan up`: when nothing answers
+  `/api/health` (any HTTP answer, even 503, counts as running) on a loopback `http:` API URL with a
+  port, it spawns `<packageRoot>/dist/dashboard/server.js` under `process.execPath`, detached, `cwd`
+  `OVERDECK_HOME`, logging to `dashboard.log`. Its env drops `DASHBOARD_URL` and
+  `OVERDECK_DASHBOARD_URL`, sets `PORT`/`API_PORT`/`OVERDECK_MODE=production`, and goes through
+  `applyBootGateEnv(env, { resume: false })`. It waits for health from the spawned PID (120 s) and
+  never kills the child. No Herdr, tmux or Traefik is started.
+- **npx bin rule (D-2, H-1).** `npx @overdeck/core join <CODE>` works only while every `bin` entry in
+  `package.json` points at the same file (`./dist/cli/index.js`). A bin with a different target
+  breaks zero-install join with "could not determine executable to run".
+- **Cold-start test.** `tests/integration/cli/join-cold-start.slow.test.ts` runs the built CLI's
+  `join` in a temp `HOME`/`OVERDECK_HOME` with `tmux`, `herdr` and `pan` shadowed by stubs, a fake
+  account service and the share Worker on Miniflare, and asserts a `lobby` join. Run it after
+  `npm run build` with `VITEST_INCLUDE_SLOW=1 npx vitest run tests/integration/cli/join-cold-start.slow.test.ts`.
 
 ## Local development
 
