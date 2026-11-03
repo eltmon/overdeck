@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4959",
   "created": "2026-11-03T21:54:38.804Z",
-  "updated": "2026-11-03T23:18:41.352Z",
+  "updated": "2026-11-03T23:18:58.659Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -88,6 +88,10 @@
     "connect-remove-machine.ac2": {
       "status": "completed",
       "doneAt": "2026-11-03T23:18:41.352Z"
+    },
+    "connect-remove-machine.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:18:58.659Z"
     }
   }
 }
