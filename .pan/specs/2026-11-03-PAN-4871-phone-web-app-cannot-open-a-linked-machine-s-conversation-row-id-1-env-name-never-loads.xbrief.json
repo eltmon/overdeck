@@ -4,17 +4,17 @@
     "created": "2026-11-03T03:33:45Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4871: Phone web app cannot open a linked machine's conversation (row id -1, @env/name never loads)",
-    "updated": "2026-11-03T03:35:04.237Z"
+    "updated": "2026-11-03T03:36:03.415Z"
   },
   "plan": {
     "id": "pan-4871",
     "title": "Phone web app cannot open a linked machine's conversation (row id -1, @env/name never loads)",
-    "status": "proposed",
+    "status": "running",
     "uid": "bde6f3b0-e48d-4623-b511-6b0c2766908f",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-03T03:33:45Z",
-    "updated": "2026-11-03T03:35:04.237Z",
+    "updated": "2026-11-03T03:36:03.415Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4871",
@@ -347,5 +347,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
