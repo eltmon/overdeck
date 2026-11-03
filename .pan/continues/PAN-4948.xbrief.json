@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4948",
   "created": "2026-11-03T21:39:04.258Z",
-  "updated": "2026-11-03T23:05:33.320Z",
+  "updated": "2026-11-03T23:05:54.135Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -108,6 +108,10 @@
     "web-client-connector-refusal.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T23:05:33.320Z"
+    },
+    "docs-connector-clients.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:05:54.134Z"
     }
   }
 }
