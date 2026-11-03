@@ -60,6 +60,7 @@ const mocks = vi.hoisted(() => {
     SageoxConfigError,
     listSageoxUploads: vi.fn(),
     setSageoxUpload: vi.fn(),
+    readSageoxLinkState: vi.fn(),
   };
 });
 
@@ -78,6 +79,8 @@ vi.mock('../../../lib/sageox/config.js', () => ({
   listSageoxUploads: mocks.listSageoxUploads,
   setSageoxUpload: mocks.setSageoxUpload,
 }));
+
+vi.mock('../../../lib/sageox/binding.js', () => ({ readSageoxLinkState: mocks.readSageoxLinkState }));
 
 vi.mock('../../../lib/skill-packs/sources.js', () => ({
   PackSourceError: mocks.PackSourceError,
@@ -892,22 +895,33 @@ describe('pan skills pack sageox (PAN-2444)', () => {
       global: {},
       packs: { global: {}, project: projectKey === 'oss' ? { sageox: true } : {} },
     }));
+    // oss has a binding in the store; work has none (PAN-4852 AD-26).
+    mocks.readSageoxLinkState.mockImplementation(async (projectKey: string) => (projectKey === 'oss' ? 'held' : 'none'));
   });
 
-  it('reports pack and upload state per project as JSON', async () => {
+  it('reports pack, upload and link state per project as JSON', async () => {
     await run('pack', 'sageox', 'status', '--json');
     expect(JSON.parse(logs.join('\n'))).toEqual({
       registered: true,
       projects: [
-        { project: 'oss', pack: 'on', packSource: 'project', upload: true },
-        { project: 'work', pack: 'off', packSource: 'default', upload: false },
+        { project: 'oss', pack: 'on', packSource: 'project', upload: true, link: 'held' },
+        { project: 'work', pack: 'off', packSource: 'default', upload: false, link: 'none' },
       ],
     });
+    expect(mocks.readSageoxLinkState).toHaveBeenCalledWith('oss');
+    expect(mocks.readSageoxLinkState).toHaveBeenCalledWith('work');
+  });
+
+  it('shows the link column in the table (PAN-4852 AD-26)', async () => {
+    mocks.readSageoxLinkState.mockResolvedValue('committed');
+    await run('pack', 'sageox', 'status');
+    expect(logs.join('\n')).toMatch(/PROJECT\s+PACK\s+SOURCE\s+UPLOAD\s+LINK/);
+    expect(logs.join('\n')).toMatch(/oss\s+on\s+project\s+enabled\s+committed/);
   });
 
   it('filters status to one project and rejects an unknown one', async () => {
     await run('pack', 'sageox', 'status', '--project', 'work');
-    expect(logs.join('\n')).toMatch(/work\s+off\s+default\s+disabled/);
+    expect(logs.join('\n')).toMatch(/work\s+off\s+default\s+disabled\s+none/);
     expect(logs.join('\n')).not.toContain('oss');
     await expect(run('pack', 'sageox', 'status', '--project', 'nope')).rejects.toThrow('exit 1');
     expect(errors.join('\n')).toContain('unknown project: nope');
@@ -916,7 +930,8 @@ describe('pan skills pack sageox (PAN-2444)', () => {
   it('hints how to add the pack when it is not registered', async () => {
     mocks.getPack.mockResolvedValue(null);
     await run('pack', 'sageox', 'status');
-    expect(logs.join('\n')).toContain('pan skills pack add sageox https://github.com/eltmon/ox');
+    expect(logs.join('\n')).toContain('The sageox pack is not registered. Add it with: pan skills pack add sageox');
+    expect(logs.join('\n')).not.toContain('--ref <ref>');
   });
 
   it('turns uploads on for a project and says what leaves the machine', async () => {

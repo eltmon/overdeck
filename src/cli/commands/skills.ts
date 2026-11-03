@@ -580,8 +580,9 @@ export async function skillsPackGcCommand(options: PackGcOptions): Promise<void>
 // ── pan skills pack sageox (PAN-2444) ───────────────────────────────────
 
 export async function skillsPackSageoxStatusCommand(options: SageoxStatusOptions): Promise<void> {
-  const [{ listSageoxUploads }, { loadSkillOverrideLayers }, { resolvePackToggle }, { getPack }] = await Promise.all([
+  const [{ listSageoxUploads }, { readSageoxLinkState }, { loadSkillOverrideLayers }, { resolvePackToggle }, { getPack }] = await Promise.all([
     import('../../lib/sageox/config.js'),
+    import('../../lib/sageox/binding.js'),
     import('../../lib/skill-overrides/store.js'),
     import('../../lib/skill-overrides/resolve.js'),
     import('../../lib/skill-packs/sources.js'),
@@ -595,17 +596,18 @@ export async function skillsPackSageoxStatusCommand(options: SageoxStatusOptions
   const registered = (await getPack('sageox')) !== null;
   const projects = await Promise.all(selected.map(async ({ projectKey, upload }) => {
     const pack = resolvePackToggle('sageox', await loadSkillOverrideLayers({ projectKey }));
-    return { project: projectKey, pack: pack.enabled ? 'on' : 'off', packSource: pack.source, upload };
+    const link = await readSageoxLinkState(projectKey);
+    return { project: projectKey, pack: pack.enabled ? 'on' : 'off', packSource: pack.source, upload, link };
   }));
   if (options.json) {
     console.log(JSON.stringify({ registered, projects }, null, 2));
     return;
   }
-  if (!registered) console.log(chalk.yellow('The sageox pack is not registered. Add it with: pan skills pack add sageox https://github.com/eltmon/ox --ref <ref>'));
+  if (!registered) console.log(chalk.yellow('The sageox pack is not registered. Add it with: pan skills pack add sageox'));
   const width = Math.max(7, ...projects.map(row => row.project.length));
-  console.log(chalk.dim(`${'PROJECT'.padEnd(width)}  PACK  ${'SOURCE'.padEnd(7)}  UPLOAD`));
+  console.log(chalk.dim(`${'PROJECT'.padEnd(width)}  PACK  ${'SOURCE'.padEnd(7)}  ${'UPLOAD'.padEnd(8)}  LINK`));
   for (const row of projects) {
-    console.log(`${row.project.padEnd(width)}  ${row.pack.padEnd(4)}  ${row.packSource.padEnd(7)}  ${row.upload ? 'enabled' : 'disabled'}`);
+    console.log(`${row.project.padEnd(width)}  ${row.pack.padEnd(4)}  ${row.packSource.padEnd(7)}  ${(row.upload ? 'enabled' : 'disabled').padEnd(8)}  ${row.link}`);
   }
 }
 
@@ -672,7 +674,7 @@ export function registerSkillsCommands(program: Command): void {
     .option('--max-age-days <n>', 'Keep unused mounts younger than this', '7').action(skillsPackGcCommand);
 
   const sageox = pack.command('sageox').description('SageOx pack state and per-project upload opt-in (PAN-2444)');
-  sageox.command('status').description('Show, per project, the sageox pack state and the upload state')
+  sageox.command('status').description('Show, per project, the sageox pack state, the upload state and the link state')
     .option('--project <key>', 'Only this project').option('--json', 'Output as JSON')
     .action(skillsPackSageoxStatusCommand);
   sageox.command('upload <state>').description('Turn SageOx uploads on or off for a project (off by default)')
