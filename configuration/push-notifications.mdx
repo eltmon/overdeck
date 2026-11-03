@@ -129,6 +129,28 @@ Settings → Anywhere → Phone notifications shows the count, such as
 `Overdeck app: 2 phones`, and removing a phone from the device list stops its
 notifications within 5 seconds. To pair a phone, see [Phone](/configuration/phone).
 
+### On Android
+
+- **Permission.** On Android 13 and later, the app asks for notification
+  permission on the first launch after you sign in. If you decline, the app
+  still works; it just does not notify you.
+- **Channels.** Notifications arrive on two channels. **Needs you** carries
+  questions, approvals and failures, at high importance. **Updates** carries
+  finished work, summaries and test notifications, at default importance. You
+  can change each one in Android Settings.
+- **Encryption.** The phone opens each notification with its own key, so Google
+  sees only ciphertext.
+- **When a notification cannot be opened**, the phone shows
+  "Overdeck — Something needs you" instead.
+- **Tapping a notification** opens the machine and the screen it came from. A
+  notification from a machine this phone is no longer paired with opens the
+  machine list.
+- **Force stop** in Android Settings blocks notifications until you open the app
+  again. Swiping the app away does not.
+- **Turning them back on.** Open Android Settings → Apps → Overdeck →
+  Notifications. The app's Settings screen shows the current state: `On`, `Off`,
+  `Not set up in this build`, or a **Turn on** button when Android can still ask.
+
 ## Optional: ntfy
 
 [ntfy](https://ntfy.sh) is a simple publish-subscribe notification service.
