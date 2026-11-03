@@ -12,7 +12,7 @@ import { answerOperatorDecision, requestOperatorDecision } from '../cloister/ope
 
 vi.mock('../pipeline-notifier.js', () => ({ notifyPipeline: vi.fn() }))
 vi.mock('../deft/pending.js', () => ({
-  deftEscalationQuestions: vi.fn(async () => ({ questions: [], hasExternal: false })),
+  deftEscalationQuestions: vi.fn(async () => ({ questions: [], externalCount: 0 })),
   deftMenuQuestion: vi.fn(async () => null),
 }))
 
@@ -352,16 +352,29 @@ describe('computeAgentEnrichment cached-scan replay', () => {
         timestamp: '2026-11-02T12:01:00Z',
         questions: [{ question: 'Which table layout?', header: 'question', multiSelect: false, options: [{ label: 'Dismiss', description: 'Resolve as dismissed' }] }],
       }],
-      hasExternal: true,
+      externalCount: 1,
     })
 
     for (const hasActiveSpecialist of [false, true]) {
       const enrichment = await computeAgentEnrichment(agentId, '2026-11-02T13:00:00Z', hasActiveSpecialist, EMPTY_PENDING_INPUTS_SCAN)
-      expect(enrichment.pendingInputKinds).toEqual(expect.arrayContaining(['askUserQuestion', 'deftExternal']))
+      expect(enrichment.pendingInputKinds).toEqual(['askUserQuestion'])
       expect(enrichment.pendingAskUserQuestion?.toolUseId).toBe('deft-escalation:esc-20261102120100-bbbbbb')
+      expect(enrichment.deftExternalEscalations).toBe(1)
     }
 
-    vi.mocked(deftPending.deftEscalationQuestions).mockResolvedValue({ questions: [], hasExternal: false })
+    vi.mocked(deftPending.deftEscalationQuestions).mockResolvedValue({ questions: [], externalCount: 0 })
+    rmSync(agentDir, { recursive: true, force: true })
+  })
+
+  it('keeps an external-only Deft escalation out of pending input (PAN-4849 review)', async () => {
+    const agentId = 'agent-cached-scan-6'
+    const agentDir = arrange('work', agentId)
+    vi.mocked(deftPending.deftEscalationQuestions).mockResolvedValue({ questions: [], externalCount: 2 })
+
+    const enrichment = await computeAgentEnrichment(agentId, undefined, false, EMPTY_PENDING_INPUTS_SCAN)
+    expect(enrichment).toMatchObject({ pendingInputCount: 0, pendingInputKinds: [], hasPendingQuestion: false, deftExternalEscalations: 2 })
+
+    vi.mocked(deftPending.deftEscalationQuestions).mockResolvedValue({ questions: [], externalCount: 0 })
     rmSync(agentDir, { recursive: true, force: true })
   })
 

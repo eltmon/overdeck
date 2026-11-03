@@ -50,11 +50,11 @@ describe('deftIssueForAgent', () => {
 });
 
 describe('deftEscalationQuestions', () => {
-  it('offers the open blocking escalations and flags an open external one', async () => {
+  it('offers the open blocking escalations and counts the open external one', async () => {
     const { deps } = depsFor(FIXTURE_DIR);
     const result = await deftEscalationQuestions('agent-pan-1', deps);
 
-    expect(result.hasExternal).toBe(true);
+    expect(result.externalCount).toBe(1);
     expect(result.questions.map(q => q.toolId)).toEqual([
       'deft-escalation:esc-20261102120000-aaaaaa',
       'deft-escalation:esc-20261102120100-bbbbbb',
@@ -83,7 +83,7 @@ describe('deftEscalationQuestions', () => {
 
   it('returns nothing for an agent that is not on a Deft issue', async () => {
     const { deps } = depsFor(FIXTURE_DIR);
-    expect(await deftEscalationQuestions('agent-pan-1', { ...deps, isDeft: async () => false })).toEqual({ questions: [], hasExternal: false });
+    expect(await deftEscalationQuestions('agent-pan-1', { ...deps, isDeft: async () => false })).toEqual({ questions: [], externalCount: 0 });
   });
 
   it('reuses the read for 10 seconds, then reads again', async () => {

@@ -71,8 +71,6 @@ export type PendingInputKind =
   // pane or runtime state, with no structured payload. Answered in the
   // terminal, not through a dashboard control.
   | 'paneQuestion'
-  // PAN-4849 — an open Deft escalation of type external (non-blocking).
-  | 'deftExternal'
 
 export interface PendingAskUserQuestionSnapshot {
   toolUseId: string
@@ -114,6 +112,8 @@ export interface AgentEnrichment {
   jsonlScan?: PendingInputsScan
   /** PAN-4371 — advisory Jev reading of why a bare turn end happened. Only present alongside pendingInputKinds:['agentTurnEnded']. */
   turnEndAssessment?: TurnEndAssessment
+  /** PAN-4849 — open Deft escalations of type external: a quiet indicator, never pending input. */
+  deftExternalEscalations?: number
 }
 
 // PAN-1520 / PAN-1834 — promote pane-detected blocking surfaces into the
@@ -659,7 +659,7 @@ function openDecisionForAgent(agentId: string): OperatorDecision | null {
   return decision && decision.agentId === agentId ? decision : null
 }
 
-const NO_DEFT_QUESTIONS = { questions: [] as PendingQuestion[], hasExternal: false }
+const NO_DEFT_QUESTIONS = { questions: [] as PendingQuestion[], externalCount: 0 }
 
 function toPendingAskUserQuestion(q: PendingQuestion): PendingAskUserQuestionSnapshot {
   return {
@@ -876,7 +876,6 @@ export async function computeAgentEnrichment(
   if (!shouldSuppressPendingInput) {
     appendPaneDetectionKind(detection, pendingInputKinds)
   }
-  if (deft.hasExternal) pendingInputKinds.push('deftExternal')
 
   return {
     role,
@@ -910,5 +909,6 @@ export async function computeAgentEnrichment(
     resolutionCount: runtimeState?.resolutionCount || 0,
     jsonlScan: scan,
     ...(turnEndAssessment && pendingInputKinds.includes('agentTurnEnded') ? { turnEndAssessment } : {}),
+    ...(deft.externalCount > 0 ? { deftExternalEscalations: deft.externalCount } : {}),
   }
 }

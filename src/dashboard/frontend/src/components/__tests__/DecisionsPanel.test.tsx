@@ -6,6 +6,8 @@ import type { ReactElement } from 'react';
 import { DecisionsPanel, DecisionsCount } from '../DecisionsPanel';
 import * as useDecisionsModule from '../../lib/useDecisions';
 import { useAskUserQuestionUiStore } from '../../lib/askUserQuestionUiStore';
+import { useDashboardStore } from '../../lib/store';
+import { isAwaitingInput } from '../../lib/pendingInput';
 
 function renderWithQuery(ui: ReactElement) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -114,6 +116,23 @@ describe('DecisionsPanel', () => {
     const otherRow = container.querySelector('[data-decision-id="conv-20260716-6155"]') as HTMLElement;
     expect(otherRow.textContent).not.toContain('SLA');
     expect(otherRow.textContent).not.toContain('dangerous');
+  });
+
+  it('shows an external-only Deft escalation as a quiet note, not a decision or a waiting agent (PAN-4849 review)', () => {
+    const agent = { id: 'agent-pan-1', issueId: 'PAN-1', status: 'running', pendingInputCount: 0, pendingInputKinds: [], deftExternalEscalations: 1 };
+    const previous = useDashboardStore.getState().agentsById;
+    useDashboardStore.setState({ agentsById: { 'agent-pan-1': agent } } as unknown as Parameters<typeof useDashboardStore.setState>[0]);
+    try {
+      vi.spyOn(useDecisionsModule, 'useDecisions').mockReturnValue([]);
+      renderWithQuery(<DecisionsPanel />);
+      expect(screen.getByTestId('decisions-empty')).toBeTruthy();
+      expect(screen.getByTestId('deft-external-notes').textContent).toBe('PAN-1 · Deft: waiting on external (1)');
+      const { container } = renderWithQuery(<DecisionsCount />);
+      expect(container.innerHTML).toBe('');
+      expect(isAwaitingInput(agent)).toBe(false);
+    } finally {
+      useDashboardStore.setState({ agentsById: previous } as Parameters<typeof useDashboardStore.setState>[0]);
+    }
   });
 
   it('shows the actual question text, not just the kind', () => {

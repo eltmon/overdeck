@@ -4,7 +4,8 @@
  * An open Deft escalation of a blocking type becomes a `PendingQuestion` on
  * the issue's work agent, with tool id `deft-escalation:<id>`, so it shows in
  * Needs-you and the question dialog. An open `external` escalation is not a
- * question: it only marks the agent with the non-blocking `deftExternal` kind.
+ * question and not pending input (Deft: "dashboard indicator, no interrupt"):
+ * it is only counted, into the enrichment's `deftExternalEscalations`.
  *
  * Escalation files change without the transcript changing, so the enrichment
  * reads them on every poll, outside its transcript-scan cache (hazard H1). A
@@ -95,13 +96,13 @@ const DECISION_OPTIONS = [
 ];
 const DISMISS_ONLY = [DECISION_OPTIONS[2]!];
 
-/** Open blocking escalations as pending questions, and whether an `external` one is open. */
+/** Open blocking escalations as pending questions, and how many `external` ones are open. */
 export async function deftEscalationQuestions(
   agentId: string,
   deps: DeftPendingDeps = {},
-): Promise<{ questions: DeftPendingQuestion[]; hasExternal: boolean }> {
+): Promise<{ questions: DeftPendingQuestion[]; externalCount: number }> {
   const target = await deftIssueForAgent(agentId, deps);
-  if (!target) return { questions: [], hasExternal: false };
+  if (!target) return { questions: [], externalCount: 0 };
   const state = await cachedState(target.worktree, target.issueId, deps);
   const open = state.escalations.filter(escalation => escalation.status === 'open');
   const questions = open
@@ -120,7 +121,7 @@ export async function deftEscalationQuestions(
         }],
       };
     });
-  return { questions, hasExternal: open.some(escalation => escalation.type === 'external') };
+  return { questions, externalCount: open.filter(escalation => escalation.type === 'external').length };
 }
 
 const TRANSCRIPT_TAIL_BYTES = 64 * 1024;
