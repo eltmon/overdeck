@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4479",
   "created": "2026-11-03T15:06:40.232Z",
-  "updated": "2026-11-03T15:24:21.751Z",
+  "updated": "2026-11-03T15:27:52.630Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -54,9 +54,10 @@
       "doneAt": "2026-11-03T15:24:01.263Z"
     },
     "host-repark-boot": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4479",
-      "claimedAt": "2026-11-03T15:24:21.751Z"
+      "claimedAt": "2026-11-03T15:24:21.751Z",
+      "doneAt": "2026-11-03T15:27:52.629Z"
     }
   }
 }
