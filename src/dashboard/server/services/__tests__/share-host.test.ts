@@ -550,6 +550,9 @@ class FakeHub implements HostHub {
   drafts: ShareDraftView[] = [];
   queue: ShareQueueView = { agentWorking: false, delivering: false, items: [] };
   sendResult: ControllerSendResult = { ok: true, position: 1 };
+  /** The effective controller the hub reports; null = before the first snapshot (PAN-4478). */
+  controller: number | null = null;
+  readonly admitted = new Set<number>();
   constructor(readonly ctx: PeerHubContext, private readonly socketSent: () => number) {}
   admit(githubId: number): void {
     this.calls.push(['admit', githubId, this.socketSent()]);
@@ -578,6 +581,15 @@ class FakeHub implements HostHub {
   sendFromController(input: SendSharePromptRequest, controller: ShareIdentity | null): ControllerSendResult {
     this.calls.push(['sendFromController', input, controller]);
     return this.sendResult;
+  }
+  controllerGithubId(): number | null {
+    return this.controller;
+  }
+  isHostAdmitted(githubId: number): boolean {
+    return this.admitted.has(githubId);
+  }
+  appoint(githubId: number): void {
+    this.calls.push(['appoint', githubId]);
   }
   close(): void {
     this.calls.push(['close']);
@@ -813,5 +825,91 @@ describe('ShareManager prompts (PAN-4476)', () => {
     expect(await h.manager.sendPrompt('BCDFGHJK', { text: 'Go' })).toEqual({ status: 404, body: { error: 'share_not_found' } });
     h.store.VWXZ2345 = { scopeKind: 'conversation', scopeId: 'conv-z', hostToken: hostToken(9), joinUrl: `${BASE}/s/VWXZ2345`, createdAt: '2026-11-01T00:00:00.000Z' };
     expect(await h.manager.sendPrompt('VWXZ2345', { text: 'Go' })).toEqual({ status: 409, body: { error: 'share_not_live' } });
+  });
+});
+
+describe('ShareManager controller gate (PAN-4478)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const BOB = { githubId: 200, login: 'bob', avatarUrl: 'https://a/200' };
+  const bobAdmitted = { ...BOB, state: 'admitted' as const, contributor: false, connected: true };
+
+  function gateHarness() {
+    const hubs: FakeHub[] = [];
+    const h = harness({
+      createHub: (ctx) => {
+        const hub = new FakeHub(ctx, () => 0);
+        hubs.push(hub);
+        return hub;
+      },
+    });
+    return { h, hub: () => hubs.at(-1) as FakeHub };
+  }
+
+  /** A connected share whose snapshot lists bob as admitted and controller, and whose hub agrees. */
+  async function bobControls() {
+    const g = gateHarness();
+    const socket = await createConnected(g.h);
+    socket.deliver({ type: 'room', snapshot: snapshot('BCDFGHJK', { participants: [bobAdmitted], controllerGithubId: BOB.githubId }) });
+    g.hub().admitted.add(BOB.githubId);
+    g.hub().controller = BOB.githubId;
+    return { ...g, socket };
+  }
+
+  it('answers 409 not_controller for owner commands and prompts while a viewer controls', async () => {
+    const { h, hub, socket } = await bobControls();
+    const sent = socket.sent.length;
+    const refused = { status: 409, body: { error: 'not_controller', message: 'Another participant has control. Reclaim control first.' } };
+    expect(await h.manager.command('BCDFGHJK', { type: 'kick', githubId: BOB.githubId })).toEqual(refused);
+    expect(await h.manager.command('BCDFGHJK', { type: 'unrevoke', githubId: 9 })).toEqual(refused);
+    expect(await h.manager.sendPrompt('BCDFGHJK', { text: 'Go' })).toEqual(refused);
+    expect(socket.sent).toHaveLength(sent);
+    expect(hub().count('remove')).toBe(0);
+    expect(hub().count('sendFromController')).toBe(0);
+  });
+
+  it('always accepts reclaim and mirrors it to hub.appoint', async () => {
+    const { h, hub, socket } = await bobControls();
+    expect(await h.manager.command('BCDFGHJK', { type: 'set-controller', githubId: OWNER.githubId })).toEqual({ status: 202, body: { ok: true } });
+    expect(JSON.parse(socket.sent.at(-1) as string)).toEqual({ type: 'set-controller', githubId: OWNER.githubId });
+    expect(hub().calls.at(-1)).toEqual(['appoint', OWNER.githubId]);
+  });
+
+  it('hands control to a host-admitted participant and mirrors it to hub.appoint', async () => {
+    const g = gateHarness();
+    const socket = await createConnected(g.h);
+    socket.deliver({ type: 'room', snapshot: snapshot('BCDFGHJK', { participants: [bobAdmitted] }) });
+    g.hub().admitted.add(BOB.githubId);
+    g.hub().controller = OWNER.githubId;
+    expect(await g.h.manager.command('BCDFGHJK', { type: 'set-controller', githubId: BOB.githubId })).toEqual({ status: 202, body: { ok: true } });
+    expect(JSON.parse(socket.sent.at(-1) as string)).toEqual({ type: 'set-controller', githubId: BOB.githubId });
+    expect(g.hub().calls.at(-1)).toEqual(['appoint', BOB.githubId]);
+  });
+
+  it('refuses set-controller to a participant the hub never admitted with unknown_participant', async () => {
+    const g = gateHarness();
+    const socket = await createConnected(g.h);
+    socket.deliver({ type: 'room', snapshot: snapshot('BCDFGHJK', { participants: [bobAdmitted] }) });
+    g.hub().controller = OWNER.githubId;
+    const sent = socket.sent.length;
+    expect(await g.h.manager.command('BCDFGHJK', { type: 'set-controller', githubId: BOB.githubId })).toEqual({
+      status: 409,
+      body: { error: 'unknown_participant', message: 'That person is not in the room.' },
+    });
+    expect(socket.sent).toHaveLength(sent);
+    expect(g.hub().count('appoint')).toBe(0);
+  });
+
+  it('views carry the hub\'s controllerGithubId', async () => {
+    const { h, hub } = await bobControls();
+    expect((await h.manager.list())[0]?.controllerGithubId).toBe(BOB.githubId);
+    hub().controller = OWNER.githubId;
+    expect((await h.manager.list())[0]?.controllerGithubId).toBe(OWNER.githubId);
   });
 });

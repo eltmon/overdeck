@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T18:54:34.447436Z · model: claude-opus-5-5 · open: 866_
+_Last sequenced: 2026-11-03T19:15:15.485076Z · model: claude-opus-5-5 · open: 866_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -433,7 +433,7 @@ _Last sequenced: 2026-11-03T18:54:34.447436Z · model: claude-opus-5-5 · open: 
 | 434 | PAN-1461 | S | medium | ok |  |  | Conversation transcript: in-page search (Ctrl+F) only finds text in currently-rendered virtualized rows |
 | 435 | PAN-1449 | S | medium | ok |  |  | Memory extraction still failing; the live symptom PAN-4370 closed and PAN-4374 adds a working provider; layout half remains |
 | 436 | PAN-1446 | S | medium | ok |  |  | PAN-1231 follow-up: remove or implement Table + Timeline modes in FleetAgentsView (scope-creep stubs) |
-| 437 | PAN-4480 | M | medium | ok |  |  | Shared Sessions slice 9: pan share/join CLI plus zero-install npx join and invite-page command; needs PAN-4475, PAN-4330 |
+| 437 | PAN-4920 | M | medium | ok |  |  | Anywhere UI polish for launch video: chip wrap, cramped machine rows, 12px dialogs, dark code blocks (#4906), banners |
 | 438 | PAN-1445 | S | medium | ok |  |  | PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs) |
 | 439 | PAN-3616 | S | medium | ok |  |  | Planned deploy restarts show the alarm-toned Reconnecting banner; use the lifecycle signal for calm 'updating' copy. |
 | 440 | PAN-2982 | XS | medium | ok |  |  | Nothing runs a skill's own selftest when sync-sources/skills/** changes; a convoy passed a PR with its selftest red. |
@@ -447,7 +447,7 @@ _Last sequenced: 2026-11-03T18:54:34.447436Z · model: claude-opus-5-5 · open: 
 | 448 | PAN-4151 | L | medium | needs-refinement |  | PAN-3822 | Deferred remainder of PAN-3822/#4067: GitLab MR sync, PR page + search, handoff link copy, diffstat, link-dialog a11y, sync throttle |
 | 449 | PAN-1330 | S | medium | ok |  |  | CLI cannot address planning-*/specialist-* sessions |
 | 450 | PAN-4481 | M | medium | ok |  |  | Shared Sessions slice 10: hosted web join page; awaits operator decision OD-1 on sign-in without a local install |
-| 451 | PAN-4482 | S | medium | ok |  | PAN-4478, PAN-4479, PAN-4480, PAN-4481 | Shared Sessions slice 11: signaling-privacy e2e, forced-TURN check (operator checkpoint) and full AC sweep |
+| 451 | PAN-4482 | S | medium | ok |  | PAN-4478, PAN-4479, PAN-4481 | Shared Sessions slice 11: signaling-privacy e2e, forced-TURN check (operator checkpoint) and full AC sweep |
 | 452 | PAN-1226 | L | medium | ok |  |  | PAN-1148 unified-dashboard redesign |
 | 453 | PAN-1173 | S | medium | ok |  |  | pan show <bare-number> derives wrong agent ID for PAN-prefixed issues |
 | 454 | PAN-1154 | M | medium | ok |  |  | pan up does not kill existing port holders |
@@ -1201,7 +1201,7 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T18:54:34.447436Z",
+  "generatedAt": "2026-11-03T19:15:15.485076Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 866,
@@ -6588,19 +6588,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
-      "issue": "PAN-4480",
-      "rank": 437,
-      "size": "M",
-      "importance": "medium",
-      "score": 52,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Shared Sessions slice 9: pan share/join CLI plus zero-install npx join and invite-page command; needs PAN-4475, PAN-4330",
-      "rationale": "Rank held: dependency PAN-4475 (Shared Sessions slice 4, viewer surface) closed completed on 2026-11-03; no open dependency remains, but sibling slices ahead of it are still in the pipeline.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1445",
       "rank": 438,
       "size": "S",
@@ -6771,7 +6758,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "dependsOn": [
         "PAN-4478",
         "PAN-4479",
-        "PAN-4480",
         "PAN-4481"
       ],
       "why": "Shared Sessions slice 11: signaling-privacy e2e, forced-TURN check (operator checkpoint) and full AC sweep",
@@ -11992,6 +11978,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "rationale": "PAN-4835 merged in #4894, which clears its only dependency; rank held because the Anywhere phone epic is low-impact relative to substrate work above it.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4920",
+      "rank": 437,
+      "size": "M",
+      "importance": "medium",
+      "score": 50,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Anywhere UI polish for launch video: chip wrap, cramped machine rows, 12px dialogs, dark code blocks (#4906), banners",
+      "rationale": "New issue: seven verified 1600x900 UI defects blocking the Anywhere launch video; overlaps PAN-4918 and subsumes PAN-4906, so it takes the slot freed by closed PAN-4480.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12829,13 +12828,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "confidence": 1
     },
     {
-      "from": "PAN-4480",
-      "to": "PAN-4482",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4481",
       "to": "PAN-4482",
       "type": "unblocks",
@@ -13228,11 +13220,18 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "confidence": 0.8
     },
     {
-      "from": "PAN-4917",
-      "to": "PAN-4480",
-      "type": "unblocks",
+      "from": "PAN-4920",
+      "to": "PAN-4906",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4920",
+      "to": "PAN-4918",
+      "type": "informs",
       "source": "ai-inferred",
-      "confidence": 0.8
+      "confidence": 0.7
     }
   ]
 }

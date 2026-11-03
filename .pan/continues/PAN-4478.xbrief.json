@@ -1,0 +1,231 @@
+{
+  "version": "1",
+  "issueId": "PAN-4478",
+  "created": "2026-11-03T17:36:37.149Z",
+  "updated": "2026-11-03T18:43:10.573Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "wire-types": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4478",
+      "claimedAt": "2026-11-03T17:36:37.149Z",
+      "doneAt": "2026-11-03T17:42:46.422Z"
+    },
+    "controller-gate": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4478",
+      "claimedAt": "2026-11-03T17:42:58.802Z",
+      "doneAt": "2026-11-03T17:45:23.136Z"
+    },
+    "hub-control": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4478",
+      "claimedAt": "2026-11-03T17:45:45.739Z",
+      "doneAt": "2026-11-03T17:50:08.746Z"
+    },
+    "host-gate": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4478",
+      "claimedAt": "2026-11-03T17:50:19.865Z",
+      "doneAt": "2026-11-03T17:53:01.001Z"
+    },
+    "viewer-peer": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4478",
+      "claimedAt": "2026-11-03T17:53:09.307Z",
+      "doneAt": "2026-11-03T17:55:11.626Z"
+    },
+    "viewer-hook": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4478",
+      "claimedAt": "2026-11-03T17:55:17.114Z",
+      "doneAt": "2026-11-03T17:57:38.594Z"
+    },
+    "lobby-roster": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4478",
+      "claimedAt": "2026-11-03T17:57:47.885Z",
+      "doneAt": "2026-11-03T17:59:39.482Z"
+    },
+    "host-dialog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4478",
+      "claimedAt": "2026-11-03T17:59:47.168Z",
+      "doneAt": "2026-11-03T18:01:30.599Z"
+    },
+    "viewer-controller-ui": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4478",
+      "claimedAt": "2026-11-03T18:01:41.874Z",
+      "doneAt": "2026-11-03T18:05:41.532Z"
+    },
+    "e2e": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4478",
+      "claimedAt": "2026-11-03T18:05:50.842Z",
+      "doneAt": "2026-11-03T18:09:16.881Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4478",
+      "claimedAt": "2026-11-03T18:09:22.232Z",
+      "doneAt": "2026-11-03T18:10:29.704Z"
+    },
+    "wire-types.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:29:16.430Z"
+    },
+    "wire-types.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:29:32.667Z"
+    },
+    "wire-types.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:29:49.900Z"
+    },
+    "controller-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:30:09.827Z"
+    },
+    "controller-gate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:30:40.224Z"
+    },
+    "controller-gate.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:31:01.868Z"
+    },
+    "controller-gate.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:31:20.189Z"
+    },
+    "hub-control.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:31:38.738Z"
+    },
+    "hub-control.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:31:55.048Z"
+    },
+    "hub-control.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:32:15.779Z"
+    },
+    "hub-control.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:32:44.323Z"
+    },
+    "hub-control.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:33:10.706Z"
+    },
+    "host-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:33:41.733Z"
+    },
+    "host-gate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:34:12.696Z"
+    },
+    "host-gate.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:34:29.081Z"
+    },
+    "host-gate.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:34:46.421Z"
+    },
+    "viewer-peer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:35:02.957Z"
+    },
+    "viewer-peer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:35:19.874Z"
+    },
+    "viewer-peer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:35:48.432Z"
+    },
+    "viewer-hook.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:36:15.847Z"
+    },
+    "viewer-hook.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:36:46.344Z"
+    },
+    "viewer-hook.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:37:01.745Z"
+    },
+    "viewer-hook.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:37:18.339Z"
+    },
+    "lobby-roster.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:37:36.308Z"
+    },
+    "lobby-roster.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:37:53.619Z"
+    },
+    "lobby-roster.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:38:09.469Z"
+    },
+    "host-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:38:25.889Z"
+    },
+    "host-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:38:54.132Z"
+    },
+    "viewer-controller-ui.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:39:27.018Z"
+    },
+    "viewer-controller-ui.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:39:56.961Z"
+    },
+    "viewer-controller-ui.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:40:31.538Z"
+    },
+    "viewer-controller-ui.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:41:04.124Z"
+    },
+    "e2e.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:41:34.528Z"
+    },
+    "e2e.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:42:02.529Z"
+    },
+    "e2e.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:42:21.048Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:42:39.605Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:42:55.479Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:43:10.573Z"
+    }
+  }
+}

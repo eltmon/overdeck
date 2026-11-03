@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { ShareView } from '@overdeck/contracts';
 
-import { SharingLobbyPanel } from '../SharingLobbyPanel';
+import { LobbyRoster, SharingLobbyPanel } from '../SharingLobbyPanel';
 
 const avatar = (id: number) => `https://avatars.githubusercontent.com/u/${id}`;
 const person = (githubId: number, login: string) => ({ githubId, login, avatarUrl: avatar(githubId) });
@@ -69,7 +69,7 @@ describe('SharingLobbyPanel (PAN-4473 WI-7)', () => {
   it('ac4: disables every action when the host socket is disconnected', () => {
     render(<SharingLobbyPanel share={share({ connection: 'disconnected' })} onCommand={vi.fn()} />);
     const buttons = screen.getAllByRole('button');
-    expect(buttons.length).toBe(10);
+    expect(buttons.length).toBe(12); // includes Hand control on the two admitted rows (PAN-4478)
     for (const button of buttons) expect((button as HTMLButtonElement).disabled).toBe(true);
   });
 
@@ -88,5 +88,52 @@ describe('SharingLobbyPanel (PAN-4473 WI-7)', () => {
     render(<SharingLobbyPanel share={{ ...base, snapshot: { ...base.snapshot!, participants: [], blocked: [] } }} onCommand={vi.fn()} />);
     expect(screen.getByText('No one has joined yet. People who open the link wait here until you admit them.')).toBeTruthy();
     expect(screen.queryAllByRole('button')).toEqual([]);
+  });
+});
+
+describe('SharingLobbyPanel controller handoff (PAN-4478 WI-7)', () => {
+  it('shows Hand control on admitted rows while the data owner controls and sends set-controller', () => {
+    const onCommand = vi.fn();
+    render(<SharingLobbyPanel share={share()} onCommand={onCommand} />);
+    expect(screen.queryByRole('button', { name: 'Hand control to @alice' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Hand control to @carol' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Hand control to @bob' }));
+    expect(onCommand.mock.calls[0]?.[0]).toStrictEqual({ type: 'set-controller', githubId: 200 });
+    expect(screen.queryByRole('button', { name: 'Reclaim control' })).toBeNull();
+  });
+
+  it('while a viewer controls shows "@bob has control.", Reclaim control and no other actions', () => {
+    const onCommand = vi.fn();
+    render(<SharingLobbyPanel share={share({ controllerGithubId: 200 })} onCommand={onCommand} />);
+    expect(screen.getByRole('status').textContent).toBe('@bob has control.');
+    expect(screen.getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual(['Reclaim control']);
+    expect(screen.getByText('controller')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Reclaim control' }));
+    expect(onCommand.mock.calls[0]?.[0]).toStrictEqual({ type: 'set-controller', githubId: 1 });
+  });
+
+  it('LobbyRoster with blocked null hides the Blocked section and never offers actions on selfGithubId', () => {
+    const onCommand = vi.fn();
+    render(
+      <LobbyRoster
+        people={[
+          { ...person(100, 'alice'), state: 'lobby', contributor: false },
+          { ...person(200, 'bob'), state: 'admitted', contributor: false },
+          { ...person(300, 'carol'), state: 'admitted', contributor: true },
+        ]}
+        blocked={null}
+        controllerGithubId={200}
+        selfGithubId={200}
+        canAct
+        disabled={false}
+        onCommand={onCommand}
+      />,
+    );
+    expect(screen.queryByRole('heading', { name: /Blocked/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /@bob/ })).toBeNull();
+    expect(screen.queryByText('offline')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Admit @alice' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Hand control to @carol' }));
+    expect(onCommand.mock.calls[0]?.[0]).toStrictEqual({ type: 'set-controller', githubId: 300 });
   });
 });

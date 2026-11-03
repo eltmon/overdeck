@@ -1,10 +1,20 @@
 /** PAN-4475 WI-9: the viewer page's join hook — confirm, join intent, subscribe, signals, teardown. */
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { JoinEvent, JoinState, JoinView, SharedMessage, SignalData, TerminalPayload } from '@overdeck/contracts';
+import type {
+  JoinEvent,
+  JoinState,
+  JoinView,
+  PresencePayload,
+  SharedControllerCommand,
+  SharedMessage,
+  SignalData,
+  TerminalPayload,
+} from '@overdeck/contracts';
 
 import { JoinApiError, type JoinEventHandlers } from '../joinApi';
 import {
+  COMMAND_ACK_TIMEOUT_MS,
   DRAFT_SEND_MS,
   PEER_AUTO_RECONNECT_DELAY_MS,
   PEER_AUTO_RECONNECT_MAX,
@@ -32,6 +42,8 @@ interface Fakes {
     submits: Array<[string, string]>;
     submitOpen: boolean;
     watches: boolean[];
+    /** Controller commands and sends, in order (PAN-4478). */
+    controls: Array<{ clientId: string; command?: SharedControllerCommand; text?: string; draftGithubId?: number }>;
     callbacks: WebRtcViewerCallbacks;
   })[];
   viewer: ViewerFactory;
@@ -72,6 +84,17 @@ function fakes(initial: JoinView | null, create: () => Promise<JoinView> = async
         return true;
       },
       setTerminalWatch(watch: boolean) { created.watches.push(watch); },
+      controls: [] as Fakes['viewers'][number]['controls'],
+      command(clientId: string, command: SharedControllerCommand) {
+        if (!created.submitOpen) return false;
+        created.controls.push({ clientId, command });
+        return true;
+      },
+      controllerSend(clientId: string, text: string, draftGithubId?: number) {
+        if (!created.submitOpen) return false;
+        created.controls.push(draftGithubId === undefined ? { clientId, text } : { clientId, text, draftGithubId });
+        return true;
+      },
     };
     viewers.push(created);
     return created;
@@ -447,5 +470,88 @@ describe('useSharedJoin drafts and prompts (PAN-4476 WI-13)', () => {
     const next = f.viewers.at(-1);
     act(() => next?.callbacks.onReady?.());
     expect(next?.drafts).toEqual(['half typed']);
+  });
+});
+
+describe('useSharedJoin controller commands (PAN-4478 WI-6)', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  async function live() {
+    const f = fakes(view('admitted'));
+    const hook = renderHook(() => useSharedJoin(CODE, { api: f.api, viewer: f.viewer }));
+    await waitFor(() => expect(hook.result.current.phase).toBe('live'));
+    emit(f, { type: 'signal', data: OFFER });
+    const peer = f.viewers.at(-1);
+    if (!peer) throw new Error('no viewer');
+    return { f, peer, result: hook.result };
+  }
+
+  const presence = (controllerGithubId: number): PresencePayload => ({ controllerGithubId, participants: [], streams: [] });
+
+  it('isController follows identity and presence', async () => {
+    const { peer, result } = await live();
+    expect(result.current.selfGithubId).toBeNull();
+    act(() => peer.callbacks.onPresence(presence(100)));
+    expect(result.current.isController).toBe(false);
+    act(() => peer.callbacks.onIdentity?.(100));
+    expect(result.current.selfGithubId).toBe(100);
+    expect(result.current.isController).toBe(true);
+    act(() => peer.callbacks.onPresence(presence(1)));
+    expect(result.current.isController).toBe(false);
+  });
+
+  it('sendCommand resolves on accepted and rejects with the refusal text', async () => {
+    const { peer, result } = await live();
+    let accepted: Promise<void> | undefined;
+    act(() => { accepted = result.current.sendCommand({ type: 'admit', githubId: 200 }); });
+    const first = peer.controls[0];
+    expect(first?.command).toEqual({ type: 'admit', githubId: 200 });
+    act(() => peer.callbacks.onCommandAck?.({ clientId: first?.clientId ?? '', status: 'accepted' }));
+    await expect(accepted).resolves.toBeUndefined();
+
+    let rejected: Promise<void> | undefined;
+    act(() => { rejected = result.current.sendCommand({ type: 'kick', githubId: 200 }); });
+    act(() => peer.callbacks.onCommandAck?.({ clientId: peer.controls[1]?.clientId ?? '', status: 'rejected', reason: 'not_controller' }));
+    await expect(rejected).rejects.toThrow('You no longer have control.');
+
+    let queued: Promise<number> | undefined;
+    act(() => { queued = result.current.sendControllerPrompt('Run it', 300); });
+    expect(peer.controls[2]).toMatchObject({ text: 'Run it', draftGithubId: 300 });
+    act(() => peer.callbacks.onCommandAck?.({ clientId: peer.controls[2]?.clientId ?? '', status: 'accepted', position: 2 }));
+    await expect(queued).resolves.toBe(2);
+  });
+
+  it('rejects at once when the peer cannot send', async () => {
+    const { peer, result } = await live();
+    peer.submitOpen = false;
+    await expect(result.current.sendCommand({ type: 'kick', githubId: 200 })).rejects.toThrow('Not connected to the host.');
+  });
+
+  it('a command with no ack rejects after 10 s', async () => {
+    const { result } = await live();
+    vi.useFakeTimers();
+    let pending: Promise<void> | undefined;
+    act(() => { pending = result.current.sendCommand({ type: 'kick', githubId: 200 }); });
+    const settled = pending?.catch((error: Error) => error.message);
+    await act(async () => { await vi.advanceTimersByTimeAsync(COMMAND_ACK_TIMEOUT_MS - 1); });
+    let done = false;
+    void settled?.then(() => { done = true; });
+    await act(async () => { await Promise.resolve(); });
+    expect(done).toBe(false);
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    await expect(settled).resolves.toBe('The host did not answer.');
+  });
+
+  it('a reconnect rejects pending commands', async () => {
+    const { peer, result } = await live();
+    act(() => peer.callbacks.onIdentity?.(100));
+    let pending: Promise<number> | undefined;
+    act(() => { pending = result.current.sendControllerPrompt('Run it'); });
+    const settled = pending?.catch((error: Error) => error.message);
+    act(() => result.current.reconnect());
+    await expect(settled).resolves.toBe('Connection to the host was lost.');
+    expect(result.current.selfGithubId).toBeNull();
   });
 });

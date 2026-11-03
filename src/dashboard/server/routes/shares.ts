@@ -4,8 +4,10 @@
  * GET    /api/shares                 → 200 { shares: ShareView[] } | 500 share_record_unreadable
  * POST   /api/shares                 → 201 ShareView (new room) | 200 ShareView (already live) | 400 | 404 | 409 | 412 | 429 | 500 | 502
  * POST   /api/shares/:code/commands  → 202 { ok: true } | 400 invalid_command | 404 | 409 share_not_connected
+ *                                       | 409 not_controller | unknown_participant (PAN-4478)
  * POST   /api/shares/:code/prompts   → 202 { ok: true, position } | 400 invalid_request | invalid_prompt | too_long
  *                                       | 404 share_not_found | 409 share_not_live | 429 queue_full (PAN-4476)
+ *                                       | 409 not_controller (PAN-4478)
  * DELETE /api/shares/:code           → 204 | 404 | 500 | 502
  *
  * The share manager (`services/share-host.ts`) owns the rooms and host sockets; the host token
@@ -28,7 +30,7 @@ export { normalizeShareCode };
 type Answer = { status: number; json?: unknown };
 
 const MAX_CONVERSATION_NAME = 200;
-const COMMAND_TYPES = new Set(['admit', 'kick', 'revoke', 'unrevoke', 'set-contributor']);
+const COMMAND_TYPES = new Set(['admit', 'kick', 'revoke', 'unrevoke', 'set-contributor', 'set-controller']);
 
 function noStore(response: HttpServerResponse.HttpServerResponse): HttpServerResponse.HttpServerResponse {
   return HttpServerResponse.setHeader(response, 'Cache-Control', 'no-store');
@@ -51,7 +53,7 @@ function parseJsonObject(text: string): Record<string, unknown> | null {
 const readBody = (request: HttpServerRequest.HttpServerRequest) =>
   request.text.pipe(Effect.map(parseJsonObject), Effect.orElseSucceed(() => null));
 
-/** Validates a browser command; null unless it is one of the slice-2 share commands. */
+/** Validates a browser command; null unless it is one of the share commands. */
 export function parseShareCommand(body: Record<string, unknown> | null): ShareCommand | null {
   if (!body || typeof body.type !== 'string' || !COMMAND_TYPES.has(body.type)) return null;
   const githubId = body.githubId;
@@ -66,6 +68,7 @@ export function parseShareCommand(body: Record<string, unknown> | null): ShareCo
     case 'kick':
     case 'revoke':
     case 'unrevoke':
+    case 'set-controller':
       return { type: body.type, githubId };
     default:
       return null;

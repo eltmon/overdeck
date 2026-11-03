@@ -9,6 +9,7 @@
  * Prompts (PAN-4476 WI-14, D-2): under the lobby the dialog shows the queue line, the queued prompts
  * and the viewers' drafts as a controller-mode `SuggestionList`. **Use** → edit → **Send** posts the
  * text to `POST /api/shares/:code/prompts` with the draft's author, so the prompt joins the queue.
+ * While a viewer controls (PAN-4478 WI-8), the suggestions are read-only until the host reclaims.
  *
  * The share list is polled once a second while the dialog is open (D-6). **End share** asks for
  * confirmation inside this dialog rather than through `useConfirm()`: the confirm dialog renders
@@ -87,7 +88,15 @@ const PROMPT_ERRORS: Record<string, string> = {
   too_long: 'Prompts can be at most 8,000 characters.',
   queue_full: 'The queue is full. Try again later.',
   share_not_live: 'This share is not live.',
+  not_controller: 'Someone else has control. Reclaim control first.',
 };
+
+/** True unless the share's effective controller is known and is not the data owner (PAN-4478). */
+function ownerControls(share: ShareView): boolean {
+  const controller = share.controllerGithubId ?? share.snapshot?.controllerGithubId;
+  const owner = share.snapshot?.dataOwner.githubId;
+  return controller === undefined || owner === undefined || controller === owner;
+}
 
 /** The queue line and the queued prompts, read-only (FR-10). Renders nothing for an idle, empty queue. */
 function QueuePanel({ share }: { share: ShareView }) {
@@ -233,7 +242,7 @@ export function ShareDialog({ target, onClose }: { target: ShareTarget; onClose:
         <QueuePanel share={share} />
         <SuggestionList
           items={(share.drafts ?? []).map((draft) => ({ githubId: draft.githubId, login: draft.login, avatarUrl: draft.avatarUrl, text: draft.text }))}
-          mode="controller"
+          mode={ownerControls(share) ? 'controller' : 'view'}
           onSend={onSendSuggestion}
         />
       </div>
