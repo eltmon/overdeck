@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4837",
   "created": "2026-11-03T16:16:59.604Z",
-  "updated": "2026-11-03T19:12:45.174Z",
+  "updated": "2026-11-03T19:13:14.841Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -404,6 +404,10 @@
     "hide-conversation-actions.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T19:12:45.174Z"
+    },
+    "hide-conversation-actions.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T19:13:14.841Z"
     }
   }
 }
