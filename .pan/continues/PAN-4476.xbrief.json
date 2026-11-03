@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4476",
   "created": "2026-11-03T15:05:40.423Z",
-  "updated": "2026-11-03T16:08:54.028Z",
+  "updated": "2026-11-03T16:09:09.728Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -184,6 +184,10 @@
     "hub-drafts.ac2": {
       "status": "completed",
       "doneAt": "2026-11-03T16:08:54.027Z"
+    },
+    "hub-drafts.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:09:09.728Z"
     }
   }
 }
