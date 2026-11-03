@@ -484,6 +484,30 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
     }
   }
 
+  // Opt-in per-repo installs for polyrepo repos that set package_manager (PAN-4929).
+  // Unset means a container or the quality gates own that repo's dependencies.
+  if (workspaceConfig.type === 'polyrepo' && workspaceConfig.repos) {
+    for (const repo of workspaceConfig.repos) {
+      if (repo.link_type === 'symlink' || !repo.package_manager) continue;
+      const repoDir = join(workspacePath, repo.name);
+      if (!existsSync(repoDir)) continue; // progressive mode: repo not added yet
+      if (!hasPackageJson(repoDir)) {
+        result.steps.push(`${repo.name}: no package.json; skipped install`);
+        continue;
+      }
+      progress('Installing dependencies', `${repo.name} (${repo.package_manager})`);
+      try {
+        await execAsync(installCommandFor(repo.package_manager), { cwd: repoDir, encoding: 'utf-8' });
+        result.steps.push(`Installed dependencies in ${repo.name} (${repo.package_manager})`);
+      } catch (installErr: any) {
+        result.errors.push(`Dependency install failed in ${repo.name} (${repo.package_manager}): ${installErr.message?.slice(0, 200)}`);
+        result.success = false;
+        progress('Installing dependencies', `Failed in ${repo.name} — workspace creation aborted`, 'error');
+        return result;
+      }
+    }
+  }
+
   // Package installers such as Husky regenerate the resolved hooks directory.
   // Reinstall the guard after dependencies so workspace creation cannot erase it.
   const hookTargets = workspaceConfig.type === 'polyrepo' && workspaceConfig.repos

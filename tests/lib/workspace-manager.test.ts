@@ -394,6 +394,93 @@ describe('createWorkspace', () => {
       unregisterProject('wm-test-monorepo-install-fail');
     }
   });
+
+  it('runs a per-repo install only for repos that set package_manager', async () => {
+    const workspacePath = join(tempDir, 'workspaces', 'feature-pan-9010');
+
+    mkdirSync(join(tempDir, 'docs'), { recursive: true });
+
+    mockExecAsync.mockImplementation(async (command: string, args?: string[]) => {
+      if (isWorktreeAddCall(command, args)) {
+        const targetPath = Array.isArray(args) ? args[args.length - 2] : workspacePath;
+        mkdirSync(targetPath, { recursive: true });
+        writeFileSync(join(targetPath, 'package.json'), JSON.stringify({ name: 'x', private: true }), 'utf8');
+      }
+      return { stdout: '', stderr: '' };
+    });
+
+    const workspace = {
+      type: 'polyrepo' as const,
+      repos: [
+        { name: 'fe', path: 'frontend', package_manager: 'pnpm' as const },
+        { name: 'api', path: 'api' },
+        { name: 'docs', path: 'docs', link_type: 'symlink' as const, package_manager: 'npm' as const },
+      ],
+    };
+
+    const { registerProject, unregisterProject } = await import('../../src/lib/projects.js');
+    registerProject('wm-test-per-repo-install', { name: 'Test', path: tempDir, package_manager: 'npm', workspace });
+
+    try {
+      const { createWorkspace } = await import('../../src/lib/workspace-manager.js');
+      const result = await createWorkspace({
+        projectConfig: { name: 'Test', path: tempDir, package_manager: 'npm', workspace },
+        featureName: 'pan-9010',
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.steps).toContain('Installed dependencies in fe (pnpm)');
+
+      const installCalls = mockExecAsync.mock.calls.filter(
+        ([cmd]) => typeof cmd === 'string' && cmd.trim().endsWith(' install'),
+      );
+      expect(installCalls).toHaveLength(1);
+      expect(installCalls[0][0]).toBe('pnpm install');
+      expect(installCalls[0][1]).toEqual(expect.objectContaining({ cwd: join(workspacePath, 'fe') }));
+    } finally {
+      unregisterProject('wm-test-per-repo-install');
+    }
+  });
+
+  it('fails creation when a per-repo install fails', async () => {
+    const workspacePath = join(tempDir, 'workspaces', 'feature-pan-9011');
+
+    mockExecAsync.mockImplementation(async (command: string, args?: string[]) => {
+      if (isWorktreeAddCall(command, args)) {
+        const targetPath = Array.isArray(args) ? args[args.length - 2] : workspacePath;
+        mkdirSync(targetPath, { recursive: true });
+        writeFileSync(join(targetPath, 'package.json'), JSON.stringify({ name: 'x', private: true }), 'utf8');
+        return { stdout: '', stderr: '' };
+      }
+      if (command === 'pnpm install') {
+        throw new Error('pnpm boom');
+      }
+      return { stdout: '', stderr: '' };
+    });
+
+    const workspace = {
+      type: 'polyrepo' as const,
+      repos: [
+        { name: 'fe', path: 'frontend', package_manager: 'pnpm' as const },
+      ],
+    };
+
+    const { registerProject, unregisterProject } = await import('../../src/lib/projects.js');
+    registerProject('wm-test-per-repo-install-fail', { name: 'Test', path: tempDir, package_manager: 'npm', workspace });
+
+    try {
+      const { createWorkspace } = await import('../../src/lib/workspace-manager.js');
+      const result = await createWorkspace({
+        projectConfig: { name: 'Test', path: tempDir, package_manager: 'npm', workspace },
+        featureName: 'pan-9011',
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.errors.some((e) => e.startsWith('Dependency install failed in fe (pnpm): pnpm boom'))).toBe(true);
+    } finally {
+      unregisterProject('wm-test-per-repo-install-fail');
+    }
+  });
 });
 
 describe('stopWorkspaceDocker', () => {
