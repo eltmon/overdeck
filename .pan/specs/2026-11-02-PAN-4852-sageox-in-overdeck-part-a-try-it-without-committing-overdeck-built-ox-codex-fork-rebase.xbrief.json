@@ -4,17 +4,17 @@
     "created": "2026-11-02T18:00:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4852: SageOx in Overdeck, part A: try it without committing, Overdeck-built ox, Codex, fork rebase",
-    "updated": "2026-11-02T17:39:52.002Z"
+    "updated": "2026-11-03T02:45:10.834Z"
   },
   "plan": {
     "id": "pan-4852",
     "title": "SageOx in Overdeck, part A: try it without committing, Overdeck-built ox, Codex, fork rebase",
-    "status": "proposed",
+    "status": "running",
     "uid": "600e4d5c-196b-4de1-98f3-b1d64ce45f35",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-11-02T18:00:00.000Z",
-    "updated": "2026-11-02T17:39:52.002Z",
+    "updated": "2026-11-03T02:45:10.834Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4852",
@@ -1785,5 +1785,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
