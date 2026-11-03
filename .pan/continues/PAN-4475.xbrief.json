@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4475",
   "created": "2026-11-03T09:11:44.436Z",
-  "updated": "2026-11-03T13:47:52.085Z",
+  "updated": "2026-11-03T13:48:05.272Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -156,6 +156,10 @@
     "join-manager-relay.ac5": {
       "status": "completed",
       "doneAt": "2026-11-03T13:47:52.084Z"
+    },
+    "viewer-routes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:48:05.272Z"
     }
   },
   "agentModel": "claude-opus-5-5"
