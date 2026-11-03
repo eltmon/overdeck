@@ -4,7 +4,8 @@
  * machine by label, and "Fly (new VM)" (PAN-4743), enabled only when the
  * dialog has a project. Choosing Auto reveals a Needs input: comma-separated
  * capability tags every candidate must have. Machine labels are muted text,
- * never a badge.
+ * never a badge. The Working directory field shows `machineCwdHint` instead
+ * of this machine's path when another machine is chosen (PAN-4872).
  */
 import { useId } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -24,6 +25,25 @@ export const THIS_MACHINE: MachineChoice = { machine: '', needs: '' };
 /** Comma-separated tags as the fleet route takes them. */
 export function parseNeedsInput(text: string): string[] {
   return [...new Set(text.split(',').map((tag) => tag.trim().toLowerCase()).filter((tag) => tag !== ''))];
+}
+
+/**
+ * PAN-4872: what the Working directory field says when another machine runs the
+ * conversation. That machine picks the directory from the project's repository
+ * (the work door never takes a path), so this machine's path is never shown.
+ * Null for this machine.
+ */
+export function machineCwdHint(machine: string, label: string | null, projectName: string | null): string | null {
+  if (machine === '') return null;
+  const who = machine === 'auto' ? 'the machine Auto picks' : machine === 'fly' ? 'the new Fly machine' : (label ?? 'the chosen machine');
+  return `Set by ${who}: ${projectName ? `its copy of ${projectName}` : 'its default working directory'}`;
+}
+
+/** `machineCwdHint` with the chosen link's label from the shared machines query. */
+export function useMachineCwdHint(choice: MachineChoice, projectName: string | null): string | null {
+  const { data } = useQuery({ queryKey: MACHINES_QUERY_KEY, queryFn: loadMachines, staleTime: 15_000 });
+  const label = (data?.links ?? []).find((link) => link.environmentId === choice.machine)?.label ?? null;
+  return machineCwdHint(choice.machine, label, projectName);
 }
 
 export function MachineField({ value, onChange, hasProject }: { value: MachineChoice; onChange: (next: MachineChoice) => void; hasProject: boolean }) {

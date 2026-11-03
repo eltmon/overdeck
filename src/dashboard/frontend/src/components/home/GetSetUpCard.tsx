@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, Check, RefreshCw, X } from 'lucide-react';
 import { useUiMode } from '../../lib/simple/uiMode';
 import { SIMPLE_STRINGS } from '../../lib/simple/strings';
+import { AnywhereSetUpRow } from './AnywhereSetUpRow';
 import {
   CopyableCommand,
   installHintFor,
@@ -164,7 +165,7 @@ function hasRequiredFailing(report: GetSetUpReport): boolean {
   return false;
 }
 
-export function GetSetUpCard() {
+export function GetSetUpCard({ onOpenSettings }: { onOpenSettings?: () => void } = {}) {
   const mode = useUiMode((state) => state.mode);
   const strings = mode === 'simple' ? SIMPLE_STRINGS.setup : ADVANCED_SETUP_STRINGS;
   const queryClient = useQueryClient();
@@ -292,6 +293,7 @@ export function GetSetUpCard() {
             )}
           </div>
         ))}
+        {onOpenSettings && <AnywhereSetUpRow setUpLabel={strings.setUp} onOpenSettings={onOpenSettings} />}
         {report.memory && (
           <div className="py-2 flex items-center gap-3 min-w-0">
             <span className="w-4 h-4 shrink-0" />

@@ -1,0 +1,351 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-03T03:33:45Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4871: Phone web app cannot open a linked machine's conversation (row id -1, @env/name never loads)",
+    "updated": "2026-11-03T03:36:03.415Z"
+  },
+  "plan": {
+    "id": "pan-4871",
+    "title": "Phone web app cannot open a linked machine's conversation (row id -1, @env/name never loads)",
+    "status": "running",
+    "uid": "bde6f3b0-e48d-4623-b511-6b0c2766908f",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-03T03:33:45Z",
+    "updated": "2026-11-03T03:36:03.415Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4871",
+        "label": "PAN-4871",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4871.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "mobile",
+      "anywhere",
+      "linked-conversations",
+      "frontend",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "The phone app (/m) cannot open a conversation owned by a linked machine. The list opens rows by String(c.id), and linked rows have a negative id, so a tap goes to /m?conversation=-1 and shows 'Couldn't load this conversation.' Opening /m?conversation=@<env>/<name> fetches GET /api/conversations/%40env%2Fname, which the linked-conversation proxy forwards to the owner; the owner returns its own row (positive id, local name, no origin). ConversationPanel then subscribes on this machine's /ws/rpc under the owner's local name, this server never finds it, and the view stays on 'Discovering conversation…'.",
+      "Proposal": "Do what the desktop Command Deck does. The list opens every row by conversationRouteKey(c) (linked name for linked rows, numeric id otherwise). The view, for a linked key, takes the viewer-shaped row from the merged GET /api/conversations list through a new pure helper findLinkedConversationRow (exact name match, then machine label + remoteName) and passes it to ConversationPanel, whose calls then go through the proxy by linked name. Local ids keep the single-row fetch. ConversationPanel, the proxy and the server are not changed. Docs in configuration/phone.mdx, configuration/linked-machines.mdx and docs/ANYWHERE-ARCHITECTURE.md describe the phone address and why the list row is used.",
+      "NonGoals": "- No change to src/dashboard/frontend/src/components/chat/ConversationPanel.tsx (PAN-2355 D-14).\n- No change to the linked-conversation proxy or any file under src/dashboard/server.\n- No terminals on the phone.\n- No change to MobileNeedsYou.tsx; its conversation ids come from the local decisions feed and linked rows never appear there.\n- No change to whether ConversationPanel streams or polls a linked row; the phone gets whatever the desktop gets for the same row.\n- No fallback to the proxied single-row read (GET /api/conversations/@env/name) when a linked key is missing from the merged list."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Resolve a linked key from the merged GET /api/conversations list instead of the proxied single-row read.",
+        "rationale": "The proxied read returns the owner's local row, which is the cause of the 'Discovering…' hang. The merged row is the exact shape the desktop passes to ConversationPanel, so the panel's linked branches (machine banner, machine state, remote open-in) work unchanged and every panel call still goes through the proxy."
+      },
+      {
+        "summary": "Do not patch the proxied owner row and do not add a server route for one merged row.",
+        "rationale": "Patching would rebuild merge-only fields (machineLabel, machineState, savedCopyName, releasedTo) and drift from linkedListRow; a new route needs route-scope and no-loss-matrix rows and server tests, more surface than a frontend bug needs."
+      },
+      {
+        "summary": "Match the linked key by exact row name first, then by machine label plus remoteName.",
+        "rationale": "List rows use the environment id, so exact match covers every in-app open; the label fallback covers hand-typed or shared @<label>/<name> links, which the proxy also accepts."
+      },
+      {
+        "summary": "A linked key missing from the merged list shows the existing 'Couldn't load this conversation' text, with no fallback.",
+        "rationale": "Any fallback through the proxied single-row read reproduces the bug; the error is the true state (machine unlinked, sharing off, or row not cached)."
+      },
+      {
+        "summary": "Browser UAT with two linked dashboards is best-effort; component tests are the required proof.",
+        "rationale": "Standing up two linked dashboards is heavy and environment-dependent; the component tests assert the exact navigation target and the row shape the panel receives, which is where both defects lived."
+      }
+    ],
+    "items": [
+      {
+        "id": "open-linked-rows",
+        "title": "Phone list opens linked rows by their linked name",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T03:33:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4871",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/mobile/MobileConversations.tsx",
+            "src/dashboard/frontend/src/components/mobile/__tests__/MobileConversations.test.tsx",
+            "src/dashboard/frontend/src/components/mobile/__tests__/MobileApp.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/mobile/__tests__/MobileConversations.test.tsx src/dashboard/frontend/src/components/mobile/__tests__/MobileApp.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "MobileConversations.test.tsx and MobileApp.test.tsx pass, including 'opens a linked row by its linked name'",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In MobileConversations.tsx import conversationRouteKey from '../../lib/linkedConversation' and change the list button's onClick from onOpen(String(c.id)) to onOpen(conversationRouteKey(c)). Add test 'opens a linked row by its linked name' in MobileConversations.test.tsx using row(-1, 'Remote', '2026-11-01T00:00:00.000Z', { name: '@env-a/conv-9', origin: 'linked', remoteName: 'conv-9', machineLabel: 'laptop' }). Keep 'opens a row by id' unchanged. In MobileApp.test.tsx describe('readMobileRoute') assert readMobileRoute('?conversation=%40env-a%2Fconv-9') returns { tab: 'conversations', subjectId: null, conversationId: '@env-a/conv-9', issueId: null }."
+        },
+        "items": [
+          {
+            "id": "open-linked-rows.ac1",
+            "title": "Given a list row with id -1, name '@env-a/conv-9' and origin 'linked', when its button is clicked, then onOpen is called with '@env-a/conv-9'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "open-linked-rows.ac2",
+            "title": "Given a local row with id 7, when its button is clicked, then onOpen is still called with '7'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "open-linked-rows.ac3",
+            "title": "readMobileRoute('?conversation=%40env-a%2Fconv-9') returns conversationId '@env-a/conv-9' with tab 'conversations' in MobileApp.test.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "linked-row-lookup",
+        "title": "Add pure findLinkedConversationRow helper to linkedConversation.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T03:33:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4871",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/linkedConversation.ts",
+            "src/dashboard/frontend/src/lib/__tests__/linkedConversation.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/lib/__tests__/linkedConversation.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "linkedConversation.test.ts passes including the describe('findLinkedConversationRow') cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Export findLinkedConversationRow<T extends { name: string; origin?: string; machineLabel?: string; remoteName?: string }>(rows: readonly T[], key: string): T | null from src/dashboard/frontend/src/lib/linkedConversation.ts. It returns null when parseLinkedConversationName(key) is null; else the row with name === key; else the row where isLinkedConversation(row) && row.machineLabel === target && row.remoteName === name; else null. Use the exact code in the PRD. Add five unit cases in a new describe block in linkedConversation.test.ts: exact name, label fallback, local key returns null, unmatched linked key returns null, non-linked row with matching label/remoteName is ignored."
+        },
+        "items": [
+          {
+            "id": "linked-row-lookup.ac1",
+            "title": "findLinkedConversationRow(rows, '@env-a/conv-9') returns the row whose name is '@env-a/conv-9'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linked-row-lookup.ac2",
+            "title": "findLinkedConversationRow(rows, '@laptop/conv-9') returns the linked row with machineLabel 'laptop' and remoteName 'conv-9'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linked-row-lookup.ac3",
+            "title": "findLinkedConversationRow returns null for a local key 'conv-9', for an unmatched '@env-b/conv-9', and ignores a row with origin 'local' that carries matching machineLabel and remoteName",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mobile-view-linked",
+        "title": "Phone conversation view loads a linked key from the merged list",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T03:33:45Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4871",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/mobile/MobileConversations.tsx",
+            "src/dashboard/frontend/src/components/mobile/__tests__/MobileConversations.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/mobile/__tests__/MobileConversations.test.tsx",
+            "npm run typecheck",
+            "git diff --stat origin/main -- src/dashboard/frontend/src/components/chat/ConversationPanel.tsx src/dashboard/server"
+          ],
+          "expected_outputs": [
+            "MobileConversations.test.tsx passes including 'loads a linked conversation from the merged list', 'resolves a linked key by machine label' and 'shows the load error when no linked row matches'",
+            "typecheck completes without errors",
+            "the git diff command prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In ConversationView's queryFn: when parseLinkedConversationName(conversationId) (from '@overdeck/contracts') is non-null, call the existing fetchConversationList(), pass the rows to findLinkedConversationRow(rows, conversationId), throw an Error when it returns null, else return the row as Conversation. Otherwise keep the existing GET /api/conversations/<encoded id> fetch. Keep refetchInterval 5000 and the render branches. Rewrite the module header sentence about 'numeric id or name — the read route resolves both' to say linked names come from the merged list (PAN-4871) because the proxied single-row read returns the owner's own row. Change the ConversationPanel mock in MobileConversations.test.tsx to render data-name, data-id and data-origin, and add the three tests named in expected_outputs exactly as the PRD describes. Do not edit ConversationPanel.tsx or any server file."
+        },
+        "items": [
+          {
+            "id": "mobile-view-linked.ac1",
+            "title": "Given conversationId '@env-a/conv-9' and a merged list containing that linked row, the mocked ConversationPanel renders with data-name '@env-a/conv-9', data-id '-1' and data-origin 'linked'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mobile-view-linked.ac2",
+            "title": "Given conversationId '@env-a/conv-9', no fetch call is made to '/api/conversations/%40env-a%2Fconv-9'; every fetch goes to '/api/conversations'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mobile-view-linked.ac3",
+            "title": "Given conversationId '@laptop/conv-9', the panel renders with data-name '@env-a/conv-9'; given '@env-b/conv-9' with no matching row, the view renders the 'Couldn’t load this conversation' text and no panel",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mobile-view-linked.ac4",
+            "title": "Given conversationId '7', the view still fetches '/api/conversations/7' and renders the panel with a working Back control",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mobile-view-linked.ac5",
+            "title": "git diff origin/main for ConversationPanel.tsx and src/dashboard/server produces no output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-phone-linked",
+        "title": "Document opening linked conversations on the phone",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T03:33:45Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4871",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/phone.mdx",
+            "configuration/linked-machines.mdx",
+            "docs/ANYWHERE-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '/m?conversation=@<environment-id>/<name>' configuration/phone.mdx configuration/linked-machines.mdx",
+            "grep -n 'PAN-4871' docs/ANYWHERE-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "both .mdx files print a matching line",
+            "ANYWHERE-ARCHITECTURE.md prints a line in the remote-control section"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. configuration/phone.mdx, '## What the phone can and cannot do', paragraph starting 'The phone lists conversations and opens one full screen.': add that the list includes linked machines' conversations, that opening one reads it from the machine that runs it as the desktop does, and its address /m?conversation=@<environment-id>/<name>. configuration/linked-machines.mdx, '## Remote control' first paragraph: add 'or on the phone at /m?conversation=@<environment-id>/<name>'. docs/ANYWHERE-ARCHITECTURE.md, '### Remote control: the proxy prefix and the WebSocket pipes (D-4650-4/5/6)': add a paragraph that the phone app opens a linked row by its linked name and takes the row from the merged GET /api/conversations list, never from GET /api/conversations/@<machine>/<name>, because the proxy returns the owner's own row (positive id, local name), which would subscribe on this machine's /ws/rpc and stay on 'Discovering conversation…' (PAN-4871). Plain prose, short sentences."
+        },
+        "items": [
+          {
+            "id": "docs-phone-linked.ac1",
+            "title": "configuration/phone.mdx states that the phone opens linked machines' conversations and shows the address /m?conversation=@<environment-id>/<name>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-phone-linked.ac2",
+            "title": "Given configuration/linked-machines.mdx, when its '## Remote control' section is read, then it renders the phone address /m?conversation=@<environment-id>/<name> next to /conv/@<environment-id>/<name>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-phone-linked.ac3",
+            "title": "docs/ANYWHERE-ARCHITECTURE.md remote-control section explains that the phone takes linked rows from the merged list because the proxied single-row read returns the owner's row, citing PAN-4871",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "open-linked-rows",
+        "to": "mobile-view-linked",
+        "type": "blocks"
+      },
+      {
+        "from": "linked-row-lookup",
+        "to": "mobile-view-linked",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-03-PAN-4871-phone-web-app-cannot-open-a-linked-machine-s-conversation-row-id-1-env-name-never-loads.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

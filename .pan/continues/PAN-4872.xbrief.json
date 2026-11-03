@@ -1,0 +1,53 @@
+{
+  "version": "1",
+  "issueId": "PAN-4872",
+  "created": "2026-11-03T03:35:53.319Z",
+  "updated": "2026-11-03T03:53:47.967Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "cwd-hint": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4872",
+      "claimedAt": "2026-11-03T03:35:53.319Z",
+      "doneAt": "2026-11-03T03:47:16.106Z"
+    },
+    "docs-remote-cwd": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4872",
+      "claimedAt": "2026-11-03T03:47:21.705Z",
+      "doneAt": "2026-11-03T03:50:17.121Z"
+    },
+    "cwd-hint.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T03:51:30.930Z"
+    },
+    "cwd-hint.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T03:51:57.763Z"
+    },
+    "cwd-hint.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T03:52:17.986Z"
+    },
+    "cwd-hint.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T03:52:38.524Z"
+    },
+    "docs-remote-cwd.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T03:52:58.901Z"
+    },
+    "docs-remote-cwd.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T03:53:20.988Z"
+    },
+    "docs-remote-cwd.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T03:53:47.967Z"
+    }
+  }
+}

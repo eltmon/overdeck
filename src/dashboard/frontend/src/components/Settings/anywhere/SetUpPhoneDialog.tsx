@@ -13,7 +13,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import qrcode from 'qrcode-generator';
 import { X } from 'lucide-react';
 
-import { requestSettingsSection } from '../../../lib/settingsSection';
+import { openSettingsSection } from '../../../lib/settingsSection';
 import {
   ANYWHERE_STATUS_QUERY_KEY,
   addTrustedAddress,
@@ -256,7 +256,7 @@ function SetUpPhoneDialogBody({ onClose }: { onClose: () => void }) {
                   <button
                     type="button"
                     onClick={() => {
-                      requestSettingsSection('access-tokens');
+                      openSettingsSection('access-tokens');
                       onClose();
                     }}
                     className="rounded-md border border-border px-2.5 py-1 text-xs text-foreground hover:bg-muted/50 transition-colors"

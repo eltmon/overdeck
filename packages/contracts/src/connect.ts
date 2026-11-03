@@ -1,6 +1,8 @@
 // Directory protocol (PAN-2356, Anywhere W-LINK5 / W-LINK8 / directory inbox): the frames a machine
 // exchanges with its account's directory Durable Object at `wss://connect.overdeck.ai/v1/directory`,
-// plus the constants and user-facing strings both sides share.
+// plus the constants and user-facing strings both sides share. PAN-4823 W-CON1 adds the phone app's
+// client role (`ClientToDirectoryFrame` / `DirectoryToClientFrame`) and the sealed `push` /
+// `push-result` frames; the directory serves them from W-CON2 (client role) and W-CON3 (push).
 //
 // Runtime-import-free (like sharing.ts): the connect Worker imports this file by relative path, so it
 // may only `import type`. The dashboard's `GET /api/directory` view schemas live in connect-view.ts.
@@ -21,10 +23,25 @@ export const INBOX_BODY_MAX_BYTES = 262_144
 export const INBOX_HOLD_MS = 86_400_000
 /** How long an approval request stays live (D-2356-9). */
 export const APPROVAL_TTL_MS = 600_000
+/** Phones (directory clients) one account may register (PAN-4823 D-2, NFR-3). Clients never count as machines. */
+export const CLIENT_LIMIT = 5
+/** Pushes the directory forwards per account per minute (PAN-4823 D-9). */
+export const PUSH_RATE_PER_MINUTE = 30
+/**
+ * Longest `sealed` field of a `push` frame, in base64 characters. It keeps the APNs and FCM bodies
+ * well under their 4 KB limits.
+ */
+export const PUSH_SEALED_MAX_CHARS = 3_072
+/**
+ * Largest plaintext a machine may seal into one push: `crypto_box_seal` adds 48 bytes and base64
+ * grows by 4/3, so 2,256 bytes seal to exactly `PUSH_SEALED_MAX_CHARS` characters.
+ */
+export const PUSH_PLAINTEXT_MAX_BYTES = 2_256
 
 export const FREE_MACHINE_LIMIT_MESSAGE = "The free account includes 3 machines"
 export const NO_DIRECT_PATH_MESSAGE = "No direct path; install Tailscale or use the relay plan"
 export const RELAY_CAP_MESSAGE = "Relay allowance used; install Tailscale or add 50 GB"
+export const CLIENT_LIMIT_MESSAGE = "This account already has 5 phones. Remove one in the app or on a machine."
 
 /** WebSocket close codes the directory uses. */
 export const CONNECT_CLOSE_CODES = {
@@ -35,6 +52,8 @@ export const CONNECT_CLOSE_CODES = {
   /** Replaced by a newer socket for the same machine. */
   replaced: 4011,
   forgotten: 4012,
+  /** A sixth phone on one account (PAN-4823 D-2). */
+  clientLimit: 4013,
 } as const
 export type ConnectCloseCode = (typeof CONNECT_CLOSE_CODES)[keyof typeof CONNECT_CLOSE_CODES]
 
@@ -44,7 +63,7 @@ export type ConnectPlan = "free" | "tester"
 export type ConnectErrorCode =
   | "unauthorized" | "unsupported" | "machine_limit" | "peer_offline"
   | "approval_limit" | "approval_unknown" | "relay_not_allowed" | "relay_cap_reached"
-  | "turn_unavailable" | "plan_required" | "bad_frame"
+  | "turn_unavailable" | "plan_required" | "bad_frame" | "client_limit"
 
 /** An endpoint a machine advertises; structurally `AdvertisedEndpoint` of machines.ts. */
 export interface DirectoryEndpoint { readonly kind: "lan" | "tailnet"; readonly url: string }
@@ -73,6 +92,14 @@ export interface RelayStatus {
 }
 
 export type SignalPurpose = "link" | "approval"
+
+/** The phone app's platform. */
+export type ClientPlatform = "ios" | "android"
+/** Which APNs host a token belongs to: Debug builds register `sandbox`, Release builds `production`. */
+export type ApsEnvironment = "production" | "sandbox"
+/** `high` for question, approval and failed; else `normal` (the Web Push rule). */
+export type PushUrgency = "high" | "normal"
+export type PushResultError = "no_registration" | "rate_limited" | "delivery_failed" | "unknown_client"
 
 /** Machine → directory. */
 export type MachineToDirectoryFrame =
@@ -110,6 +137,19 @@ export type MachineToDirectoryFrame =
   | { readonly type: "inbox-ack"; readonly eventId: string }
   /** `retryAfterSeconds` is 60–3600. */
   | { readonly type: "inbox-nack"; readonly eventId: string; readonly retryAfterSeconds: number }
+  /** A notification sealed to one phone's push key (PAN-4823 D-5). */
+  | {
+    readonly type: "push"
+    /** 32 lowercase hex. */
+    readonly requestId: string
+    /** The phone's clientId (uuid v4). */
+    readonly to: string
+    /** `crypto_box_seal` to the phone's push key, base64, at most `PUSH_SEALED_MAX_CHARS`. */
+    readonly sealed: string
+    readonly urgency: PushUrgency
+    /** 32 lowercase hex: the first 32 hex characters of sha256(notification tag). */
+    readonly collapseId: string
+  }
 
 /** Directory → machine. */
 export type DirectoryToMachineFrame =
@@ -157,6 +197,9 @@ export type DirectoryToMachineFrame =
     /** Sealed box (`crypto_box_seal`) to the machine key, base64. */
     readonly sealed: string
   }
+  /** The answer to one `push`; `no_registration` and `unknown_client` are not operator-facing errors. */
+  | { readonly type: "push-result"; readonly requestId: string; readonly ok: true }
+  | { readonly type: "push-result"; readonly requestId: string; readonly ok: false; readonly error: PushResultError }
   | {
     readonly type: "error"
     readonly code: ConnectErrorCode
@@ -164,3 +207,46 @@ export type DirectoryToMachineFrame =
     readonly requestId?: string
     readonly session?: string
   }
+
+/** Phone (directory client) → directory (PAN-4823 W-CON1). */
+export type ClientToDirectoryFrame =
+  | {
+    readonly type: "hello-client"
+    readonly protocol: ConnectProtocolVersion
+    /** uuid v4, generated once per app install. */
+    readonly clientId: string
+    /** At most 64 characters. */
+    readonly label: string
+    /** X25519 link public key, 64 lowercase hex. */
+    readonly publicKeyHex: string
+    /** At most 32 characters. */
+    readonly appVersion: string
+    readonly platform: ClientPlatform
+  }
+  /** Same shape as the machine's `signal`, but a phone only ever opens link channels. */
+  | {
+    readonly type: "signal"
+    /** The machine's environment id. */
+    readonly to: string
+    /** 32 lowercase hex. */
+    readonly session: string
+    readonly purpose: "link"
+    readonly relay: boolean
+    readonly data: SignalData
+  }
+  | Extract<MachineToDirectoryFrame, { type: "ice-servers" | "relay-usage" }>
+  /** `token` is at most 4096 characters; `apsEnvironment` is sent by iOS only. */
+  | { readonly type: "push-register"; readonly platform: ClientPlatform; readonly token: string; readonly apsEnvironment?: ApsEnvironment }
+  | { readonly type: "push-unregister" }
+  | { readonly type: "forget-client" }
+
+/** Directory → phone. Clients reuse the machine frames below; they never get approvals or inbox frames. */
+export type DirectoryToClientFrame =
+  | {
+    readonly type: "welcome-client"
+    readonly protocol: ConnectProtocolVersion
+    readonly plan: ConnectPlan
+    readonly relayAllowed: boolean
+    readonly machines: readonly DirectoryMachine[]
+  }
+  | Extract<DirectoryToMachineFrame, { type: "directory" | "signal" | "ice-servers" | "relay-status" | "error" }>

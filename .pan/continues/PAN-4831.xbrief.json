@@ -1,0 +1,93 @@
+{
+  "version": "1",
+  "issueId": "PAN-4831",
+  "created": "2026-11-03T04:00:12.397Z",
+  "updated": "2026-11-03T05:14:08.215Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "native-redirect": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4831",
+      "claimedAt": "2026-11-03T04:00:12.397Z",
+      "doneAt": "2026-11-03T04:22:20.827Z"
+    },
+    "phone-platforms": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4831",
+      "claimedAt": "2026-11-03T04:22:39.230Z",
+      "doneAt": "2026-11-03T04:38:20.377Z"
+    },
+    "native-signin-e2e": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4831",
+      "claimedAt": "2026-11-03T04:38:31.489Z",
+      "doneAt": "2026-11-03T05:05:08.855Z"
+    },
+    "account-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4831",
+      "claimedAt": "2026-11-03T05:05:17.021Z",
+      "doneAt": "2026-11-03T05:07:09.550Z"
+    },
+    "native-redirect.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:09:33.949Z"
+    },
+    "native-redirect.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:09:53.032Z"
+    },
+    "native-redirect.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:10:14.253Z"
+    },
+    "native-redirect.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:10:34.004Z"
+    },
+    "phone-platforms.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:10:59.996Z"
+    },
+    "phone-platforms.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:11:20.399Z"
+    },
+    "phone-platforms.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:11:39.389Z"
+    },
+    "native-signin-e2e.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:12:02.392Z"
+    },
+    "native-signin-e2e.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:12:22.595Z"
+    },
+    "native-signin-e2e.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:12:45.046Z"
+    },
+    "native-signin-e2e.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:13:04.746Z"
+    },
+    "account-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:13:28.601Z"
+    },
+    "account-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:13:47.696Z"
+    },
+    "account-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:14:08.215Z"
+    }
+  }
+}

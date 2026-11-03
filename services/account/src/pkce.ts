@@ -1,5 +1,6 @@
 /**
- * PKCE loopback flow for the local dashboard (PRD PAN-4293 §7.6; D-7, D-11, D-13; RFC 7636, RFC 8252 §7.3).
+ * PKCE loopback flow for the local dashboard (PRD PAN-4293 §7.6; D-7, D-11, D-13; RFC 7636, RFC 8252 §7.3)
+ * and the phone app's private-use scheme redirect (PRD PAN-4823 D-6; RFC 8252 §7.1).
  *
  * GET /auth/start validates everything before any redirect; the GitHub leg continuation issues a single-use
  * 5-minute authorization code only after resolveSignIn() allowed the identity; POST /oauth/token exchanges it
@@ -35,6 +36,14 @@ export function validateLoopbackRedirect(raw: string | null): string | null {
   return raw;
 }
 
+/** The phone app's private-use scheme redirect (RFC 8252 §7.1), allowed exactly. */
+export const NATIVE_APP_REDIRECT = 'ai.overdeck.app:/oauth/callback';
+
+export function validateClientRedirect(raw: string | null): string | null {
+  if (raw === NATIVE_APP_REDIRECT) return raw;
+  return validateLoopbackRedirect(raw);
+}
+
 interface StartParams {
   redirectUri: string;
   clientState: string;
@@ -44,7 +53,7 @@ interface StartParams {
 }
 
 function parseStart(url: URL): { ok: true; params: StartParams } | { ok: false; param: string } {
-  const redirectUri = validateLoopbackRedirect(url.searchParams.get('redirect_uri'));
+  const redirectUri = validateClientRedirect(url.searchParams.get('redirect_uri'));
   if (!redirectUri) return { ok: false, param: 'redirect_uri' };
   const clientState = url.searchParams.get('state') ?? '';
   if (clientState.length < 1 || clientState.length > 256) return { ok: false, param: 'state' };
@@ -70,7 +79,7 @@ export const start: Handler = async (req, rc) => {
 function readPayload(payload: Payload): StartParams | null {
   const { redirectUri, clientState, codeChallenge, platform, environmentId } = payload;
   if ([redirectUri, clientState, codeChallenge, platform, environmentId].some((v) => typeof v !== 'string')) return null;
-  if (!validateLoopbackRedirect(redirectUri as string)) return null;
+  if (!validateClientRedirect(redirectUri as string)) return null;
   return { redirectUri, clientState, codeChallenge, platform, environmentId } as StartParams;
 }
 
