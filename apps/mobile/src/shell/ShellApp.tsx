@@ -1,19 +1,22 @@
 /** The phone app's root: identity, the account, URL opens, and which shell screen shows (PAN-4837). */
 import { App } from '@capacitor/app';
 import { PHONE_PAIR_LINK_PREFIX, parsePhonePairLink } from '@overdeck/contracts';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 
 import { type DeviceIdentity, loadIdentity } from '../native/keys';
 import { type Connection, createConnection } from './connection';
 import { createDirectory, type ShellDirectory } from './directory';
 import { MachinesScreen } from './MachinesScreen';
+import { MachineView } from './MachineView';
 import { PairScreen } from './PairScreen';
 import { pairMachine } from './pairing';
 import { shellPlatform } from './platform';
 import { createRelayMeter } from './relayMeter';
+import { RemovedScreen } from './RemovedScreen';
+import { lastDialError, onSessionChange, setSession } from './session';
 import { SignInScreen } from './SignInScreen';
 import { completeSignIn, isSignInCallback, startSignIn } from './signIn';
-import { readAccount, readMachines, setCurrentMachineId, useShellStore } from './store';
+import { currentMachineId, readAccount, readMachines, setCurrentMachineId, useShellStore, writeMachines } from './store';
 import type { PairedMachine } from './types';
 
 type Boot = { kind: 'loading' } | { kind: 'failed'; message: string } | { kind: 'ready'; identity: DeviceIdentity };
@@ -131,6 +134,39 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
     [services, identity, account],
   );
 
+  // The machine view: a current, paired machine at /m (C-7: switching machines reloads the page).
+  const current = paired.find((m) => m.environmentId === currentMachineId()) ?? null;
+  const inMachineView = current !== null && location.pathname.startsWith('/m');
+  const dialError = useSyncExternalStore(onSessionChange, lastDialError);
+  const connection = services?.connection ?? null;
+  /** The machine the shims route to; MachineView mounts only after it is set, so its first request finds it. */
+  const [sessionFor, setSessionFor] = useState<string | null>(null);
+  useEffect(() => {
+    if (!inMachineView || !current || !connection) return;
+    setSession(current, connection);
+    setSessionFor(current.environmentId);
+    return () => {
+      setSession(null, null);
+      setSessionFor(null);
+    };
+  }, [inMachineView, current, connection]);
+
+  const leaveMachine = useCallback((next: View) => {
+    setCurrentMachineId(null);
+    history.replaceState(null, '', '/');
+    setView(next);
+  }, []);
+
+  const forget = useCallback(
+    async (environmentId: string) => {
+      const remaining = paired.filter((m) => m.environmentId !== environmentId);
+      await writeMachines(remaining);
+      setMachines(remaining);
+      leaveMachine({ kind: 'machines' });
+    },
+    [paired, setMachines, leaveMachine],
+  );
+
   const onPaired = useCallback(
     (machine: PairedMachine) => {
       setCurrentMachineId(machine.environmentId);
@@ -147,7 +183,23 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
         </p>
       ) : account === null ? (
         <SignInScreen error={signInError} onSignIn={() => startSignIn(boot.identity, shellPlatform())} />
-      ) : services === null ? null : view.kind === 'machines' ? (
+      ) : services === null ? null : inMachineView && current ? (
+        dialError?.kind === 'removed' ? (
+          <RemovedScreen
+            label={current.label}
+            onPairAgain={() => leaveMachine({ kind: 'pair', link: null })}
+            onForget={() => void forget(current.environmentId)}
+          />
+        ) : sessionFor !== current.environmentId ? null : (
+          <MachineView
+            label={current.label}
+            onMachines={() => {
+              setCurrentMachineId(null);
+              navigate('/');
+            }}
+          />
+        )
+      ) : view.kind === 'machines' ? (
         <MachinesScreen
           client={services.directory.client}
           paired={paired}
