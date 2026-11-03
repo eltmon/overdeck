@@ -40,7 +40,9 @@ export function useDeftIssues() {
 export function useDeftIssueSummary(issueId: string): { isDeft: boolean; summary: DeftIssueSummary | null; isLoading: boolean } {
   const { data, isLoading } = useDeftIssues();
   const wanted = issueId.toUpperCase();
-  const summary = data?.issues.find(row => row.issueId.toUpperCase() === wanted) ?? null;
+  // A malformed response reads as "not Deft" rather than breaking every card that asks.
+  const rows = Array.isArray(data?.issues) ? data.issues : [];
+  const summary = rows.find(row => row?.issueId?.toUpperCase() === wanted) ?? null;
   return { isDeft: summary !== null, summary, isLoading };
 }
 

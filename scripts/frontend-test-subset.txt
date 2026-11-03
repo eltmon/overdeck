@@ -132,6 +132,7 @@ src/components/chat/messagesTimeline/__tests__/workLogRows.test.tsx
 src/components/chat/messagesTimeline/messageRows.test.tsx
 src/components/costs/__tests__/FleetUsagePanel.test.tsx
 src/components/deft/DeftDecisionsTab.test.tsx
+src/components/deft/DeftScopeSummary.test.tsx
 src/components/deft/queries.test.ts
 src/components/drawer/IssueDrawer.tracker-fallback.test.tsx
 src/components/drawer/useDrawerData.absent-issue.test.tsx

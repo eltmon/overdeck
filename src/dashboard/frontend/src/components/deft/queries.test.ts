@@ -53,6 +53,13 @@ describe('useDeftIssueSummary', () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current).toMatchObject({ isDeft: false, summary: null });
   });
+
+  it('reads a malformed list response as not Deft instead of throwing', async () => {
+    fetchMock.mockImplementationOnce(async () => new Response('{}'));
+    const { result } = renderHook(() => useDeftIssueSummary('PAN-1'), { wrapper: wrapper() });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.isDeft).toBe(false);
+  });
 });
 
 describe('useDeftIssueState', () => {
