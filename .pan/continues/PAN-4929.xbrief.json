@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4929",
   "created": "2026-11-03T21:43:38.500Z",
-  "updated": "2026-11-03T21:53:14.601Z",
+  "updated": "2026-11-03T21:53:25.552Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-4929",
       "claimedAt": "2026-11-03T21:43:38.500Z",
       "doneAt": "2026-11-03T21:53:14.600Z"
+    },
+    "per-repo-install": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4929",
+      "claimedAt": "2026-11-03T21:53:25.552Z"
     }
   }
 }
