@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4849",
   "created": "2026-11-03T03:09:47.454Z",
-  "updated": "2026-11-03T03:59:43.743Z",
+  "updated": "2026-11-03T04:04:27.195Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -104,9 +104,10 @@
       "doneAt": "2026-11-03T03:59:36.822Z"
     },
     "drift-badges": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4849",
-      "claimedAt": "2026-11-03T03:59:43.743Z"
+      "claimedAt": "2026-11-03T03:59:43.743Z",
+      "doneAt": "2026-11-03T04:04:27.195Z"
     }
   }
 }
