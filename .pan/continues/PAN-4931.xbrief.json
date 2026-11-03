@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4931",
   "created": "2026-11-03T21:41:36.078Z",
-  "updated": "2026-11-03T23:08:32.023Z",
+  "updated": "2026-11-03T23:08:55.227Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -82,6 +82,10 @@
     "dashboard-api-methods.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T23:08:32.023Z"
+    },
+    "serve-token-file.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:08:55.227Z"
     }
   }
 }
