@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4882",
   "created": "2026-11-03T06:27:51.535Z",
-  "updated": "2026-11-03T06:38:03.358Z",
+  "updated": "2026-11-03T06:43:00.470Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,9 +32,10 @@
       "claimedAt": "2026-11-03T06:34:07.297Z"
     },
     "ac06-add-managed": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4882",
-      "claimedAt": "2026-11-03T06:38:03.358Z"
+      "claimedAt": "2026-11-03T06:38:03.358Z",
+      "doneAt": "2026-11-03T06:43:00.470Z"
     }
   }
 }
