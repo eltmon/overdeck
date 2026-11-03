@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4948",
   "created": "2026-11-03T21:39:04.258Z",
-  "updated": "2026-11-03T22:14:49.312Z",
+  "updated": "2026-11-03T22:15:06.322Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -64,6 +64,10 @@
     "decoder-node-hello.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T22:14:49.311Z"
+    },
+    "decoder-node-hello.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:15:06.322Z"
     }
   }
 }
