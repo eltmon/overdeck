@@ -294,14 +294,28 @@ Any remote access (a trusted remote address, a paired device, a machine link or 
 turns `require_token_mint` on by itself; YAML `false` cannot turn it off while remote access
 exists (D-4645-12). A plain-HTTP browser on another device gets the "Use HTTPS" page (D-4645-13).
 
+## Phone credentials (PAN-4835)
+
+The phone app's machine-side identity is a `kind: 'phone'` access-token
+record, minted by `POST /api/phones/exchange` and bound to the phone's link
+key the same way a `machine` record is bound to `machineKey`. Full detail —
+the record fields, `PHONE_TOKEN_SCOPES`, the two self-service routes,
+revocation and the device list — lives in `docs/DASHBOARD-AUTH.md` under
+"Phone credentials (PAN-4835)". The one fact that belongs here: the link-mode
+handshake's `isPinnedPeer` (`server.ts`) accepts a key held by either an
+active `machine` record or an active `phone` record
+(`findActiveChannelTokenByKey`), so a phone's handshake reaches HTTP the same
+way a linked machine's does.
+
 ## `/ws/rpc` restricted group (D-4645-14, D-4645-15)
 
 RPC middleware sees per-message headers, not the upgrade, so the group is chosen at upgrade
-time (`ws-rpc-auth.ts`): an admin credential gets the full `PanRpcGroup`; a machine, device
-or token credential gets the group with every tag omitted whose `RPC_METHOD_SCOPES` entry is
-outside the credential's scopes. Revoking the credential closes its sockets with code 4401,
-the raw socket found through the request's `IncomingMessage`, for `net.Socket` and
-`ChannelSocket` alike.
+time (`ws-rpc-auth.ts`): an admin credential gets the full `PanRpcGroup`; a machine, phone,
+device or token credential gets the group with every tag omitted whose `RPC_METHOD_SCOPES`
+entry is outside the credential's scopes — PAN-4835 added `pan.getSnapshot` (`read:state`) and
+`pan.replayEvents` (`read:events`), the boot calls every dashboard client makes. Revoking the
+credential closes its sockets with code 4401, the raw socket found through the request's
+`IncomingMessage`, for `net.Socket` and `ChannelSocket` alike.
 
 ## Directory and direct connections (D-3)
 
