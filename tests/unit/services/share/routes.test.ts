@@ -378,7 +378,8 @@ describe('GET /s/:code', () => {
     expect(text).toContain('"BCDFGHJK"');
     expect(text).toContain('href="http://localhost:3011/#/shared/BCDFGHJK"');
     expect(text).toContain('pan up');
-    expect(text).not.toContain('pan join');
+    expect(text).toContain('pan join BCDFGHJK');
+    expect(text).toContain('npx @overdeck/core join BCDFGHJK');
     expect(text.match(/<script/g)).toHaveLength(1);
     // Still no room data: no host login and no scope.
     expect(text).not.toContain('octo');

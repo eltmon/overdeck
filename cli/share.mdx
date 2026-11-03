@@ -1,0 +1,95 @@
+---
+title: pan share and pan join
+description: Share a conversation by link and join one from the terminal
+---
+
+# `pan share` and `pan join`
+
+Shared Sessions from the terminal. `pan share` creates the link for a conversation you host.
+`pan join` joins someone else's shared conversation. See
+[Shared Sessions](/configuration/shared-sessions) for what viewers see and how roles work.
+
+## pan share
+
+```bash
+pan share <conversation> [--json]
+```
+
+`<conversation>` is the conversation id (the number in `/conv/<id>`) or the conversation name.
+The command needs a running dashboard (`pan up`) and a signed-in machine
+([`pan account login`](/cli/account)). It never starts a dashboard.
+
+It prints:
+
+```
+Shared conversation <name>.
+Link:      https://share.overdeck.ai/s/BCDFGHJK
+Join code: BCDF-GHJK
+Viewers join with: pan join BCDF-GHJK
+No Overdeck installed? npx @overdeck/core join BCDF-GHJK
+Let people in from the share dialog in the dashboard (⋮ → Share this conversation).
+```
+
+When the conversation is already shared, the first line is
+`Conversation <name> is already shared.` and the rest is the same. `--json` prints the share as
+JSON and nothing else.
+
+`pan share` exits 1 with a one-line reason when:
+
+- no conversation matches the id or name;
+- the dashboard is not running (`Start it with pan up`);
+- the dashboard refuses the share, for example `Sign in with pan account login to share
+  conversations.` or a conversation that was released to another machine.
+
+## pan join
+
+```bash
+pan join <link-or-code> [--no-open]
+```
+
+`<link-or-code>` is a join link (`https://share.overdeck.ai/s/<code>`) or a join code
+(`BCDF-GHJK`). Dashes, spaces and case do not matter. `pan join`:
+
+1. Signs this machine in to overdeck.ai with the device flow when it is not signed in yet. You
+   must be on the overdeck.ai invite list.
+2. Starts the dashboard when none answers on the configured API port. The auto-started dashboard
+   runs in the background, logs to `~/.overdeck/logs/dashboard.log`, and does not resume stopped
+   agents. A later `pan up` replaces it. Auto-start runs only for a local `http://` API URL with a
+   port; otherwise `pan join` asks you to run `pan up`.
+3. Asks the dashboard to join and waits up to 15 seconds for the share service to answer.
+4. Opens `http://localhost:<port>/#/shared/<CODE>` in your browser, where you wait in the lobby
+   until the host lets you in.
+
+| State | Message | Browser | Exit |
+| --- | --- | --- | --- |
+| lobby | `Waiting for the host to let you in (BCDF-GHJK).` | opens | 0 |
+| admitted | `You are in (BCDF-GHJK).` | opens | 0 |
+| host disconnected | `You are in, but the host is disconnected. The page reconnects when the host returns.` | opens | 0 |
+| still connecting after 15 s | `Still connecting to the share service. The page shows the lobby when it connects.` | opens | 0 |
+| ended | `This share has ended, or the code is wrong.` | no | 1 |
+| rejected | `overdeck.ai rejected this sign-in. Run: pan account login` | no | 1 |
+| is host | `You are the host of this share. Open the conversation in your dashboard instead.` | no | 1 |
+| full | `This share is full.` | no | 1 |
+| revoked | `The host blocked you from this share.` | no | 1 |
+| disconnected | `Cannot reach the share service (<reason>).` | no | 1 |
+| any other | `The join ended (<state>). Run pan join again.` | no | 1 |
+
+### Without Overdeck installed
+
+On a computer with Node 22 or newer and no Overdeck, run:
+
+```bash
+npx @overdeck/core join BCDF-GHJK
+```
+
+It does the same four steps. It needs no global install, tmux or Herdr.
+
+### Headless machines
+
+`--no-open` prints the URL instead of opening a browser. With no page open, the join closes after
+about 60 seconds. Opening the URL later rejoins automatically.
+
+### Token-mint lockdown
+
+With `dashboard.require_token_mint: true`, the browser must already be signed in to the dashboard;
+the URL `pan join` opens carries no token.
