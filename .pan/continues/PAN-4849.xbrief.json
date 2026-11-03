@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4849",
   "created": "2026-11-03T03:09:47.454Z",
-  "updated": "2026-11-03T04:58:11.356Z",
+  "updated": "2026-11-03T04:58:32.658Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -228,6 +228,10 @@
     "deft-menu-dialog.ac4": {
       "status": "completed",
       "doneAt": "2026-11-03T04:58:11.356Z"
+    },
+    "deft-queries.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:58:32.657Z"
     }
   }
 }
