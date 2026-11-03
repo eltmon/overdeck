@@ -57,4 +57,24 @@ describe('native project config', () => {
     expect(pbxproj).toContain('relativePath = ../OverdeckPush;');
     expect(pbxproj).not.toContain('KeychainStore.swift in Sources');
   });
+
+  it('embeds a NotificationService extension that reads only the shared Keychain group (PAN-4838 WI-5)', () => {
+    const plist = read('ios/App/NotificationService/Info.plist');
+    expect(plist).toContain('<string>com.apple.usernotifications.service</string>');
+    expect(plist).toContain('<string>$(PRODUCT_MODULE_NAME).NotificationService</string>');
+
+    const groups = [...read('ios/App/NotificationService/NotificationService.entitlements').matchAll(/<string>([^<]*)<\/string>/g)].map(
+      (match) => match[1],
+    );
+    expect(groups).toEqual(['$(AppIdentifierPrefix)ai.overdeck.shared']);
+
+    const pbxproj = read('ios/App/App.xcodeproj/project.pbxproj');
+    expect(pbxproj).toContain('PRODUCT_BUNDLE_IDENTIFIER = ai.overdeck.app.NotificationService;');
+    expect(pbxproj).toContain('productType = "com.apple.product-type.app-extension";');
+    expect(pbxproj).toContain('dstSubfolderSpec = 13;');
+    const marketing = new Set([...pbxproj.matchAll(/MARKETING_VERSION = ([^;]+);/g)].map((match) => match[1]));
+    const build = new Set([...pbxproj.matchAll(/CURRENT_PROJECT_VERSION = ([^;]+);/g)].map((match) => match[1]));
+    expect([...marketing]).toEqual(['1.0']);
+    expect([...build]).toEqual(['1']);
+  });
 });
