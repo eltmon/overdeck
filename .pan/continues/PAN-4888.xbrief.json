@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4888",
   "created": "2026-11-03T08:25:32.067Z",
-  "updated": "2026-11-03T09:18:17.773Z",
+  "updated": "2026-11-03T09:18:40.042Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -116,6 +116,10 @@
     "docs-supersede.ac4": {
       "status": "completed",
       "doneAt": "2026-11-03T09:18:17.773Z"
+    },
+    "gate-withdraw-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:18:40.041Z"
     }
   }
 }
