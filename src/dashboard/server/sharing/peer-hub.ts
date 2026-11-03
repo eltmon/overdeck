@@ -17,7 +17,12 @@
  * its hello when `control` opens and sends no content until the viewer's hello negotiates; a failed
  * negotiation answers with a `control` error and nothing else. A negotiated peer's `conversation`
  * channel carries the bridge's `history`, then `append` and `update`. The hub reads inbound messages
- * on `control` only; `drafts` and `terminal` carry nothing in this slice (NFR-4).
+ * on `control` only; `drafts` carries nothing yet (NFR-4).
+ *
+ * Terminal (PAN-4477): a negotiated viewer turns its read-only terminal view on and off with a
+ * `terminal-watch` control payload. While the watch is on, its `terminal` channel carries the
+ * terminal bridge's `snapshot`, `output`, `size` and `unavailable` payloads. Read-only is
+ * structural: the hub subscribes to no inbound message on `terminal`.
  *
  * Presence (FR-9, D-17, D-18): a negotiated peer's `presence` channel carries the roster (data owner
  * first), the controller and the stream when it opens, and again after every snapshot that changes
@@ -42,6 +47,7 @@ import {
   type SharedChannel,
   type SharedHello,
   type SignalData,
+  type TerminalPayload,
 } from '@overdeck/contracts';
 import { RTCPeerConnection } from 'werift';
 
@@ -52,6 +58,7 @@ import {
   productionBridgeDeps,
   type ConversationSink,
 } from './conversation-bridge.js';
+import { TerminalBridge, productionTerminalBridgeDeps, type TerminalSink } from './terminal-bridge.js';
 
 export const ICE_SERVERS_TIMEOUT_MS = 5_000;
 export const ICE_SERVERS_CACHE_MS = 50 * 60_000;
@@ -105,6 +112,7 @@ export interface PeerHubDeps {
     iceServers: Array<{ urls: string[]; username?: string; credential?: string }>;
   }): HubPeerConnection;
   bridge: { attach(sink: ConversationSink): Promise<() => void>; close(): void };
+  terminal: { attach(sink: TerminalSink): Promise<() => void>; close(): void };
   streamLabel(): Promise<string>;
   now(): number;
 }
@@ -128,6 +136,10 @@ interface PeerEntry {
   helloState: 'waiting' | 'negotiated' | 'failed';
   detachConversation: (() => void) | null;
   conversationAttached: boolean;
+  /** The viewer's terminal watch (D-8); `terminalGeneration` invalidates payloads of an earlier watch. */
+  terminalWatch: boolean;
+  terminalGeneration: number;
+  detachTerminal: (() => void) | null;
   /** The presence JSON last sent to this peer; an unchanged roster is not sent again. */
   presenceSent: string | null;
   closed: boolean;
@@ -213,6 +225,7 @@ export class PeerHub implements HostHub {
     this.hostAdmitted.clear();
     if (this.pendingIce) this.resolveIce(this.pendingIce, []);
     this.deps.bridge.close();
+    this.deps.terminal.close();
   }
 
   private reconcile(): void {
@@ -246,6 +259,9 @@ export class PeerHub implements HostHub {
       helloState: 'waiting',
       detachConversation: null,
       conversationAttached: false,
+      terminalWatch: false,
+      terminalGeneration: 0,
+      detachTerminal: null,
       presenceSent: null,
       closed: false,
     };
@@ -278,7 +294,8 @@ export class PeerHub implements HostHub {
           if (state === 'open') this.onChannelOpen(entry, label);
           else if (state === 'closed') this.closePeer(entry);
         });
-        // Inbound messages are read on `control` only (NFR-4).
+        // Inbound messages are read on `control` only (NFR-4). No subscription on `terminal` is what
+        // makes the shared terminal read-only (FR-3).
         if (label === 'control') channel.onMessage.subscribe((data) => this.onControlMessage(entry, data));
       }
       const offer = await pc.createOffer();
@@ -379,14 +396,21 @@ export class PeerHub implements HostHub {
     if (label === 'control') this.sendEnvelope(entry, 'control', { kind: 'hello', hello: this.hostHello });
     else if (label === 'conversation') this.maybeAttachConversation(entry);
     else if (label === 'presence') this.maybeSendPresence(entry);
+    else if (label === 'terminal') this.maybeAttachTerminal(entry);
   }
 
   private onControlMessage(entry: PeerEntry, data: string | Buffer): void {
     if (entry.closed || typeof data !== 'string') return;
     const result = entry.reader.read(data);
     if (result.kind !== 'envelope' || result.envelope.ch !== 'control') return;
-    const payload = result.envelope.payload as { kind?: unknown; hello?: unknown } | null;
-    if (typeof payload !== 'object' || payload === null || payload.kind !== 'hello') return;
+    const payload = result.envelope.payload as { kind?: unknown; hello?: unknown; watch?: unknown } | null;
+    if (typeof payload !== 'object' || payload === null) return;
+    if (payload.kind === 'terminal-watch') {
+      if (entry.helloState !== 'negotiated' || typeof payload.watch !== 'boolean') return;
+      this.setTerminalWatch(entry, payload.watch);
+      return;
+    }
+    if (payload.kind !== 'hello') return;
     if (entry.helloState !== 'waiting') return;
     const negotiated = negotiateHello(this.hostHello, payload.hello);
     if (negotiated.ok) {
@@ -408,6 +432,38 @@ export class PeerHub implements HostHub {
       if (entry.closed) detach();
       else entry.detachConversation = detach;
     });
+  }
+
+  private setTerminalWatch(entry: PeerEntry, watch: boolean): void {
+    if (entry.terminalWatch === watch) return;
+    entry.terminalWatch = watch;
+    if (watch) {
+      this.maybeAttachTerminal(entry);
+      return;
+    }
+    entry.terminalGeneration++;
+    const detach = entry.detachTerminal;
+    entry.detachTerminal = null;
+    detach?.();
+  }
+
+  private maybeAttachTerminal(entry: PeerEntry): void {
+    if (entry.closed || entry.helloState !== 'negotiated' || !entry.terminalWatch) return;
+    if (!entry.open.has('terminal') || entry.detachTerminal !== null) return;
+    const generation = ++entry.terminalGeneration;
+    void this.deps.terminal.attach({ send: (payload) => this.sendTerminal(entry, generation, payload) }).then((detach) => {
+      if (entry.closed || entry.terminalGeneration !== generation) detach();
+      else entry.detachTerminal = detach;
+    });
+  }
+
+  private sendTerminal(entry: PeerEntry, generation: number, payload: TerminalPayload): void {
+    if (entry.terminalGeneration !== generation) return;
+    try {
+      this.sendEnvelope(entry, 'terminal', payload);
+    } catch (error) {
+      if (!(error instanceof RangeError)) throw error;
+    }
   }
 
   private maybeSendPresence(entry: PeerEntry): void {
@@ -432,7 +488,7 @@ export class PeerHub implements HostHub {
   private sendEnvelope(
     entry: PeerEntry,
     ch: SharedChannel,
-    payload: ControlPayload | ConversationPayload | PresencePayload,
+    payload: ControlPayload | ConversationPayload | PresencePayload | TerminalPayload,
   ): void {
     if (entry.closed) return;
     const writer = entry.writers.get(ch);
@@ -449,6 +505,9 @@ export class PeerHub implements HostHub {
     if (this.peers.get(entry.githubId) === entry) this.peers.delete(entry.githubId);
     entry.detachConversation?.();
     entry.detachConversation = null;
+    entry.terminalGeneration++;
+    entry.detachTerminal?.();
+    entry.detachTerminal = null;
     for (const writer of entry.writers.values()) writer.close();
     for (const channel of entry.channels.values()) {
       try {
@@ -496,6 +555,7 @@ export function productionPeerHubDeps(conversationName: string): PeerHubDeps {
   return {
     createPeerConnection: (config) => new RTCPeerConnection(config) as unknown as HubPeerConnection,
     bridge: new ConversationBridge(conversationName, productionBridgeDeps()),
+    terminal: new TerminalBridge(conversationName, productionTerminalBridgeDeps()),
     streamLabel: () => conversationLabel(conversationName),
     now: () => Date.now(),
   };
