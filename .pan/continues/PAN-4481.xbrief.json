@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4481",
   "created": "2026-11-03T15:57:16.582Z",
-  "updated": "2026-11-03T17:00:00.543Z",
+  "updated": "2026-11-03T17:00:17.009Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -208,6 +208,10 @@
     "share-invite-page-hosted.ac4": {
       "status": "completed",
       "doneAt": "2026-11-03T17:00:00.543Z"
+    },
+    "docs-hosted-join.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T17:00:17.009Z"
     }
   }
 }
