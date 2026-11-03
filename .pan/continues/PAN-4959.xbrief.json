@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4959",
   "created": "2026-11-03T21:54:38.804Z",
-  "updated": "2026-11-03T23:26:36.769Z",
+  "updated": "2026-11-03T23:26:51.810Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -192,6 +192,10 @@
     "account-directory-holder.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T23:26:36.768Z"
+    },
+    "account-directory-holder.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:26:51.810Z"
     }
   }
 }
