@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4843",
   "created": "2026-11-03T14:22:31.106Z",
-  "updated": "2026-11-03T14:49:45.274Z",
+  "updated": "2026-11-03T14:49:58.915Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -70,6 +70,10 @@
     "payload-contract.ac2": {
       "status": "completed",
       "doneAt": "2026-11-03T14:49:45.274Z"
+    },
+    "payload-builder.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:49:58.915Z"
     }
   }
 }
