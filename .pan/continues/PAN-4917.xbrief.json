@@ -1,0 +1,115 @@
+{
+  "version": "1",
+  "issueId": "PAN-4917",
+  "created": "2026-11-03T18:32:48.231Z",
+  "updated": "2026-11-03T19:19:26.440Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "trailer-fetch-mode": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4917",
+      "claimedAt": "2026-11-03T18:32:48.231Z",
+      "doneAt": "2026-11-03T18:34:15.759Z"
+    },
+    "ci-prompt-gate-fetch": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4917",
+      "claimedAt": "2026-11-03T18:34:23.849Z",
+      "doneAt": "2026-11-03T18:35:28.924Z"
+    },
+    "check-failures-module": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4917",
+      "claimedAt": "2026-11-03T18:35:34.370Z",
+      "doneAt": "2026-11-03T18:47:48.898Z"
+    },
+    "repair-gate-unfinished-checks": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4917",
+      "claimedAt": "2026-11-03T18:47:57.245Z",
+      "doneAt": "2026-11-03T18:50:17.166Z"
+    },
+    "docs-ci-gate-and-repair": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4917",
+      "claimedAt": "2026-11-03T18:50:34.005Z",
+      "doneAt": "2026-11-03T18:52:18.341Z"
+    },
+    "trailer-fetch-mode.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T19:13:08.998Z"
+    },
+    "trailer-fetch-mode.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T19:13:37.046Z"
+    },
+    "trailer-fetch-mode.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T19:14:08.183Z"
+    },
+    "trailer-fetch-mode.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T19:14:37.840Z"
+    },
+    "ci-prompt-gate-fetch.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T19:15:05.178Z"
+    },
+    "ci-prompt-gate-fetch.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T19:15:23.866Z"
+    },
+    "ci-prompt-gate-fetch.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T19:15:40.848Z"
+    },
+    "check-failures-module.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T19:16:10.339Z"
+    },
+    "check-failures-module.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T19:16:38.499Z"
+    },
+    "check-failures-module.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T19:17:03.907Z"
+    },
+    "check-failures-module.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T19:17:20.734Z"
+    },
+    "repair-gate-unfinished-checks.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T19:17:36.498Z"
+    },
+    "repair-gate-unfinished-checks.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T19:17:52.132Z"
+    },
+    "repair-gate-unfinished-checks.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T19:18:07.636Z"
+    },
+    "repair-gate-unfinished-checks.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T19:18:22.276Z"
+    },
+    "docs-ci-gate-and-repair.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T19:18:39.149Z"
+    },
+    "docs-ci-gate-and-repair.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T19:18:55.589Z"
+    },
+    "docs-ci-gate-and-repair.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T19:19:26.439Z"
+    }
+  }
+}

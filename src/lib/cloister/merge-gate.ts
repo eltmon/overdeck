@@ -209,14 +209,36 @@ export interface ConflictRepairGateResult {
  *
  * PAN-4451: CI evidence is waived. GitHub builds no merge ref for a conflicting
  * PR, so pull_request CI never runs on it; pending, absent or test-job-less
- * checks pass. Red checks still disqualify. The merge gate re-judges CI on the
- * repaired head.
+ * checks pass. Red checks still disqualify, unless every failing check was
+ * cancelled, timed out or went stale (PAN-4917). The merge gate re-judges CI
+ * on the repaired head.
  *
  * PAN-4467: a GitHub approval of an older head (the head moved since the
  * approving review) still counts here and is reported as `staleApproval`; the
  * merge gate still needs approval at the repaired head. A PR the forge does
  * not call approved at any head is not repaired.
  */
+
+/**
+ * PAN-4917: conclusions of a check that stopped before it judged the code.
+ * GitHub reports a job killed by its own timeout-minutes as CANCELLED, the same
+ * as a run a newer push superseded, so the rule is by conclusion, not cause.
+ */
+const UNFINISHED_CHECK_CONCLUSIONS = new Set(['CANCELLED', 'TIMED_OUT', 'STALE']);
+
+/**
+ * PAN-4917: why a red head is not repaired, naming each failing check, or null
+ * when every failing check is unfinished. The repair pushes a new head that CI
+ * runs again, and the merge gate judges CI there. With no per-check detail
+ * (GitLab) a red head still declines.
+ */
+function redHeadDeclineReason(facts: PrFacts): string | null {
+  const failures = facts.checkFailures ?? [];
+  if (failures.length > 0 && failures.every((check) => UNFINISHED_CHECK_CONCLUSIONS.has(check.conclusion))) return null;
+  const named = failures.map((check) => `${check.name} (${check.conclusion})`).join(', ');
+  return `CI checks failing on PR HEAD ${facts.headSha ?? 'unknown'}${named ? `: ${named}` : ''}`;
+}
+
 export async function evaluateConflictRepairGate(
   issueId: string,
   deps: MergeGateDeps = {},
@@ -230,9 +252,11 @@ export async function evaluateConflictRepairGate(
   }
   // PAN-4451: GitHub builds no merge ref for a conflicting PR, so pull_request CI
   // never runs on it and its head cannot get a test result. Only a red head
-  // disqualifies; the merge gate re-judges CI on the repaired head.
+  // disqualifies, and not one whose failing checks never finished (PAN-4917);
+  // the merge gate re-judges CI on the repaired head.
   if (facts.checks === 'red') {
-    return { conflicting: false, reason: `CI checks failing on PR HEAD ${facts.headSha ?? 'unknown'}`, facts };
+    const reason = redHeadDeclineReason(facts);
+    if (reason) return { conflicting: false, reason, facts };
   }
   let approvedAtHead = facts.approvedAtHead === true;
   if (!approvedAtHead && facts.forge === 'github') {

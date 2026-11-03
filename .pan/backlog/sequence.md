@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T19:24:52.776378Z · model: claude-opus-5-5 · open: 866_
+_Last sequenced: 2026-11-03T19:41:44.848695Z · model: claude-opus-5-5 · open: 864_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -433,7 +433,6 @@ _Last sequenced: 2026-11-03T19:24:52.776378Z · model: claude-opus-5-5 · open: 
 | 434 | PAN-1461 | S | medium | ok |  |  | Conversation transcript: in-page search (Ctrl+F) only finds text in currently-rendered virtualized rows |
 | 435 | PAN-1449 | S | medium | ok |  |  | Memory extraction still failing; the live symptom PAN-4370 closed and PAN-4374 adds a working provider; layout half remains |
 | 436 | PAN-1446 | S | medium | ok |  |  | PAN-1231 follow-up: remove or implement Table + Timeline modes in FleetAgentsView (scope-creep stubs) |
-| 437 | PAN-4920 | M | medium | ok |  |  | Anywhere UI polish for launch video: chip wrap, cramped machine rows, 12px dialogs, dark code blocks (#4906), banners |
 | 438 | PAN-1445 | S | medium | ok |  |  | PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs) |
 | 439 | PAN-3616 | S | medium | ok |  |  | Planned deploy restarts show the alarm-toned Reconnecting banner; use the lifecycle signal for calm 'updating' copy. |
 | 440 | PAN-2982 | XS | medium | ok |  |  | Nothing runs a skill's own selftest when sync-sources/skills/** changes; a convoy passed a PR with its selftest red. |
@@ -454,7 +453,6 @@ _Last sequenced: 2026-11-03T19:24:52.776378Z · model: claude-opus-5-5 · open: 
 | 455 | PAN-3354 | XS | medium | ok |  |  | The archive write door accepts kind=main, hiding a project's singleton workspace with no unarchive affordance in the UI. |
 | 456 | PAN-3178 | XL | medium | ok |  |  | Make worktrees and diffs first class: +/- badge, dedicated Changes surface, conversation worktrees. PRD and mockup exist. |
 | 457 | PAN-3017 | S | medium | ok |  |  | The issue-page UAT panel renders only inline actions, so restart/rebuild/stop are unreachable outside the rail's context menu. |
-| 458 | PAN-4906 | S | medium | ok |  |  | Dark theme: fenced code blocks in assistant messages render at ~1.5:1 contrast, nearly unreadable; needs WCAG AA mono color. |
 | 459 | PAN-3873 | M | medium | ok |  |  | GitHub event delivery: support gh webhook forward alongside smee with guided setup, settings exposure, and docs |
 | 460 | PAN-1150 | S | medium | ok |  |  | Settings: "Anthropic is not configured" warning persists in Model Routing after claude /login (Provider tab disagrees) |
 | 461 | PAN-1149 | S | medium | ok |  |  | v0.9.3 upgraders: stale workhorses.mid: claude-sonnet-4-7 in config.yaml keeps breaking Model Routing saves |
@@ -1201,10 +1199,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T19:24:52.776378Z",
+  "generatedAt": "2026-11-03T19:41:44.848695Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 866,
+  "openCount": 864,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -6839,19 +6837,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
-      "issue": "PAN-4906",
-      "rank": 458,
-      "size": "S",
-      "importance": "medium",
-      "score": 52,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Dark theme: fenced code blocks in assistant messages render at ~1.5:1 contrast, nearly unreadable; needs WCAG AA mono color.",
-      "rationale": "New issue with clear repro and expected result; a self-contained theme-token fix that every conversation reader hits, slotted into the free rank 458 among medium UI bugs.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3873",
       "rank": 459,
       "size": "M",
@@ -11978,19 +11963,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "rationale": "PAN-4835 merged in #4894, which clears its only dependency; rank held because the Anywhere phone epic is low-impact relative to substrate work above it.",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-4920",
-      "rank": 437,
-      "size": "M",
-      "importance": "medium",
-      "score": 50,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Anywhere UI polish for launch video: chip wrap, cramped machine rows, 12px dialogs, dark code blocks (#4906), banners",
-      "rationale": "New issue: seven verified 1600x900 UI defects blocking the Anywhere launch video; overlaps PAN-4918 and subsumes PAN-4906, so it takes the slot freed by closed PAN-4480.",
-      "gate": "auto",
-      "planning": "auto"
     }
   ],
   "edges": [
@@ -13218,20 +13190,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.8
-    },
-    {
-      "from": "PAN-4920",
-      "to": "PAN-4906",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4920",
-      "to": "PAN-4918",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
     }
   ]
 }
