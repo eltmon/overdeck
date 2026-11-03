@@ -9,11 +9,12 @@
  * header is trusted here; the public `Authorization` header is never read.
  * This module uses Web APIs only; src/index.ts owns the `cloudflare:workers` import.
  */
-import type { ConnectPlan, DirectoryEndpoint, DirectoryToClientFrame, DirectoryToMachineFrame } from '../../../packages/contracts/src/connect.ts';
+import type { DirectoryToClientFrame, DirectoryToMachineFrame } from '../../../packages/contracts/src/connect.ts';
 import { reduceClient } from './client-state.ts';
 import type { ClientEvent } from './client-state.ts';
 import { EMPTY_DIRECTORY, reduce } from './directory-state.ts';
-import type { ApprovalRow, ClientRow, DirectoryEffect, DirectoryEvent, DirectoryState, MachineRow, ReduceContext, Target } from './directory-state.ts';
+import type { DirectoryEffect, DirectoryEvent, DirectoryState, ReduceContext, Target } from './directory-state.ts';
+import { loadDirectory, PUT_CLIENT_PUSH_SQL, PUT_CLIENT_SQL, PUT_PUSH_WINDOW_SQL, SCHEMA } from './directory-store.ts';
 import type { ConnectIdentity, Deps, Env } from './env.ts';
 import { HDR_IDENTITY, HDR_INBOX_HEADERS, HDR_INBOX_SECRET_HASH, INTERNAL, parseConfig, parseTurnConfig } from './env.ts';
 import { keyFingerprint } from './fingerprint.ts';
@@ -22,9 +23,12 @@ import { bytesToBase64, InboxStore, NOT_FOUND } from './inbox.ts';
 import type { PendingEvent } from './inbox.ts';
 import { logFrame } from './log.ts';
 import { decodeFrame } from './protocol.ts';
+import { reducePushOutcome } from './push-state.ts';
+import type { PushOutcomeEvent } from './push-state.ts';
+import { parsePushConfig } from './push/config.ts';
+import { deliverPush } from './push/deliver.ts';
 import type { SocketRole } from './protocol.ts';
 import { relayCapBytes } from './relay-meter.ts';
-import type { RelayUsage } from './relay-meter.ts';
 import { fetchIceServers } from './turn.ts';
 
 /**
@@ -48,85 +52,6 @@ interface Attachment {
 export function roleOf(a: Attachment): SocketRole | null {
   if (a.clientId) return 'client';
   return a.environmentId ? 'machine' : null;
-}
-
-export const SCHEMA = [
-  `CREATE TABLE IF NOT EXISTS machines (
-    environment_id TEXT PRIMARY KEY,
-    label TEXT NOT NULL,
-    public_key_hex TEXT NOT NULL,
-    fingerprint TEXT NOT NULL,
-    endpoints_json TEXT NOT NULL,
-    server_version TEXT NOT NULL,
-    device_id TEXT NOT NULL,
-    registered_at INTEGER NOT NULL,
-    last_seen_at INTEGER NOT NULL
-  )`,
-  `CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`,
-  `CREATE TABLE IF NOT EXISTS approvals (
-    request_id TEXT PRIMARY KEY,
-    from_env TEXT NOT NULL,
-    to_env TEXT,
-    created_at INTEGER NOT NULL,
-    expires_at INTEGER NOT NULL
-  )`,
-  `CREATE TABLE IF NOT EXISTS relay_usage (month TEXT PRIMARY KEY, bytes INTEGER NOT NULL)`,
-  // Phones (PAN-4829). The push columns are for PAN-4830: `CREATE TABLE IF NOT EXISTS` cannot add
-  // columns to a table that already exists, so they are created now and never written here.
-  `CREATE TABLE IF NOT EXISTS clients (
-    client_id TEXT PRIMARY KEY,
-    label TEXT NOT NULL,
-    public_key_hex TEXT NOT NULL,
-    platform TEXT NOT NULL,
-    app_version TEXT NOT NULL,
-    device_id TEXT NOT NULL,
-    registered_at INTEGER NOT NULL,
-    last_seen_at INTEGER NOT NULL,
-    push_platform TEXT,
-    push_token TEXT,
-    aps_environment TEXT
-  )`,
-];
-
-/** The `clients` upsert. It never writes the push columns, so a re-registering phone keeps them (D-13). */
-export const PUT_CLIENT_SQL = `INSERT INTO clients (client_id, label, public_key_hex, platform, app_version, device_id, registered_at, last_seen_at)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  ON CONFLICT(client_id) DO UPDATE SET label = excluded.label, public_key_hex = excluded.public_key_hex,
-    platform = excluded.platform, app_version = excluded.app_version, device_id = excluded.device_id,
-    last_seen_at = excluded.last_seen_at`;
-
-interface ClientSqlRow {
-  client_id: string;
-  label: string;
-  public_key_hex: string;
-  platform: string;
-  app_version: string;
-  device_id: string;
-  registered_at: number;
-  last_seen_at: number;
-  [key: string]: SqlStorageValue;
-}
-
-interface ApprovalSqlRow {
-  request_id: string;
-  from_env: string;
-  to_env: string | null;
-  created_at: number;
-  expires_at: number;
-  [key: string]: SqlStorageValue;
-}
-
-interface MachineSqlRow {
-  environment_id: string;
-  label: string;
-  public_key_hex: string;
-  fingerprint: string;
-  endpoints_json: string;
-  server_version: string;
-  device_id: string;
-  registered_at: number;
-  last_seen_at: number;
-  [key: string]: SqlStorageValue;
 }
 
 /** Trusted header from the Worker, still shape-checked so a bug there cannot corrupt the registry. */
@@ -198,57 +123,8 @@ export class DirectoryHost {
     void ctx.blockConcurrencyWhile(async () => {
       for (const statement of SCHEMA) ctx.storage.sql.exec(statement);
       this.inbox = new InboxStore(ctx.storage.sql, { ...deps, randomUUID: () => crypto.randomUUID() });
-      this.state = this.load();
+      this.state = loadDirectory(ctx.storage.sql);
     });
-  }
-
-  private load(): DirectoryState {
-    const sql = this.ctx.storage.sql;
-    const machines = sql
-      .exec<MachineSqlRow>('SELECT * FROM machines ORDER BY registered_at, environment_id')
-      .toArray()
-      .map((r): MachineRow => ({
-        environmentId: r.environment_id,
-        label: r.label,
-        publicKeyHex: r.public_key_hex,
-        fingerprint: r.fingerprint,
-        endpoints: JSON.parse(r.endpoints_json) as DirectoryEndpoint[],
-        serverVersion: r.server_version,
-        deviceId: r.device_id,
-        registeredAt: r.registered_at,
-        lastSeenAt: r.last_seen_at,
-      }));
-    const planRow = sql.exec<{ value: string }>(`SELECT value FROM meta WHERE key = 'plan'`).toArray()[0];
-    const plan = planRow?.value === 'free' || planRow?.value === 'tester' ? (planRow.value as ConnectPlan) : null;
-    const approvals = sql
-      .exec<ApprovalSqlRow>('SELECT * FROM approvals ORDER BY created_at, request_id')
-      .toArray()
-      .map((r): ApprovalRow => ({
-        requestId: r.request_id,
-        fromEnv: r.from_env,
-        toEnv: r.to_env,
-        createdAt: r.created_at,
-        expiresAt: r.expires_at,
-      }));
-    const relayRow = sql.exec<{ month: string; bytes: number }>('SELECT month, bytes FROM relay_usage ORDER BY month DESC LIMIT 1').toArray()[0];
-    const relay: RelayUsage | null = relayRow ? { month: relayRow.month, bytes: relayRow.bytes } : null;
-    const clients = sql
-      .exec<ClientSqlRow>('SELECT * FROM clients ORDER BY registered_at, client_id')
-      .toArray()
-      .flatMap((r): ClientRow[] =>
-        r.platform === 'ios' || r.platform === 'android'
-          ? [{
-            clientId: r.client_id,
-            label: r.label,
-            publicKeyHex: r.public_key_hex,
-            platform: r.platform,
-            appVersion: r.app_version,
-            deviceId: r.device_id,
-            registeredAt: r.registered_at,
-            lastSeenAt: r.last_seen_at,
-          }]
-          : []);
-    return { plan, machines, clients, approvals, relay };
   }
 
   async fetch(req: Request): Promise<Response> {
@@ -423,6 +299,13 @@ export class DirectoryHost {
     await this.execute(ws, effects);
   }
 
+  /** The second step of a push (PAN-4830 D-1), reduced against the state current after delivery. */
+  private async applyPushOutcome(ws: WebSocket, event: PushOutcomeEvent): Promise<void> {
+    const { state, effects } = reducePushOutcome(this.state, event);
+    this.state = state;
+    await this.execute(ws, effects);
+  }
+
   private resolve(self: WebSocket, to: Target): WebSocket[] {
     if (to === 'self') return [self];
     if (to === 'clients') return this.registeredClients(self).map((r) => r.ws);
@@ -449,11 +332,14 @@ export class DirectoryHost {
       'inbox-nack': 0,
       'inbox-forget': 0,
       'put-client': 0,
+      'put-client-push': 0,
+      'put-push-window': 0,
       'delete-client': 0,
       register: 1,
       'register-client': 1,
       send: 2,
       'fetch-turn': 2,
+      'deliver-push': 2,
       'inbox-create': 2,
       'inbox-deliver': 2,
       close: 3,
@@ -557,6 +443,20 @@ export class DirectoryHost {
         case 'put-client': {
           const r = e.row;
           sql.exec(PUT_CLIENT_SQL, r.clientId, r.label, r.publicKeyHex, r.platform, r.appVersion, r.deviceId, r.registeredAt, r.lastSeenAt);
+          break;
+        }
+        case 'put-client-push': {
+          const r = e.registration;
+          sql.exec(PUT_CLIENT_PUSH_SQL, r?.platform ?? null, r?.token ?? null, r?.apsEnvironment ?? null, e.clientId);
+          break;
+        }
+        case 'put-push-window':
+          sql.exec(PUT_PUSH_WINDOW_SQL, JSON.stringify(e.window));
+          break;
+        case 'deliver-push': {
+          const outcome = await deliverPush(e, { config: parsePushConfig(this.env), fetch: this.deps.fetch, now: this.deps.now });
+          // Other events ran during the await (H-2): read the socket's machine and the state only now.
+          await this.applyPushOutcome(self, { requestId: e.requestId, clientId: e.clientId, environmentId: selfEnv(), token: e.registration.token, outcome });
           break;
         }
         case 'delete-client':

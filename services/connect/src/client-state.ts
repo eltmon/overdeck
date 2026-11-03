@@ -16,6 +16,7 @@ import type { ClientToDirectoryFrame } from '../../../packages/contracts/src/con
 import { errorFrame, onlineClientsOf, toDirectoryMachines } from './directory-state.ts';
 import type { ClientRow, DirectoryEffect, DirectoryState, ReduceContext, ReduceResult, SocketIdentity } from './directory-state.ts';
 import { iceServersAnswer, relayUsageAnswer } from './ice-relay.ts';
+import { pushRegistrationAnswer } from './push-state.ts';
 
 type HelloClientFrame = Extract<ClientToDirectoryFrame, { type: 'hello-client' }>;
 type LaterClientFrame = Exclude<ClientToDirectoryFrame, { type: 'hello-client' }>;
@@ -75,6 +76,8 @@ function helloClient(state: DirectoryState, event: Extract<ClientEvent, { kind: 
     deviceId: identity.deviceId,
     registeredAt: existing?.registeredAt ?? ctx.now,
     lastSeenAt: ctx.now,
+    // A re-hello keeps the push registration; only push-register and push-unregister change it.
+    push: existing?.push ?? null,
   };
   const next: DirectoryState = { ...planned, clients: replaceClient(planned.clients, row) };
   effects.push({ kind: 'put-client', row });
@@ -151,11 +154,7 @@ function clientFrame(state: DirectoryState, event: Extract<ClientEvent, { kind: 
       return relayUsageAnswer(state, f.bytes, ctx, { environmentId: null, clientId });
     case 'push-register':
     case 'push-unregister':
-      // The decoder refuses these until PAN-4830, so they answer as an undecodable frame does.
-      return {
-        state,
-        effects: [{ kind: 'send', to: 'self', frame: errorFrame('bad_frame', 'malformed frame') }, log(f.type, clientId, 'bad_frame')],
-      };
+      return pushRegistrationAnswer(state, clientId, f);
   }
 }
 

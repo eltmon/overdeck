@@ -21,8 +21,12 @@ import type {
   DirectoryToClientFrame,
   DirectoryToMachineFrame,
   MachineToDirectoryFrame,
+  PushUrgency,
 } from '../../../packages/contracts/src/connect.ts';
 import { iceServersAnswer, relayUsageAnswer } from './ice-relay.ts';
+import { pushAnswer } from './push-state.ts';
+import type { PushWindow } from './push-state.ts';
+import type { PushRegistration } from './push/config.ts';
 import { relayStatusOf } from './relay-meter.ts';
 import type { RelayUsage } from './relay-meter.ts';
 
@@ -53,6 +57,8 @@ export interface ClientRow {
   readonly registeredAt: number;
   /** Unix milliseconds. */
   readonly lastSeenAt: number;
+  /** The phone's APNs or FCM token (PAN-4830); written only by `push-register` and `push-unregister`. */
+  readonly push: PushRegistration | null;
 }
 
 /** A pending approval request (D-2356-9): a row of the `approvals` table. */
@@ -77,6 +83,8 @@ export interface DirectoryState {
   readonly approvals: readonly ApprovalRow[];
   /** The latest `relay_usage` row; a row from an earlier month counts as zero. */
   readonly relay: RelayUsage | null;
+  /** This UTC minute's accepted pushes (PAN-4830 D-8), persisted as the `meta` row `push_window`. */
+  readonly pushWindow: PushWindow | null;
 }
 
 export const MAX_PENDING_APPROVALS_PER_MACHINE = 1;
@@ -157,6 +165,19 @@ export type DirectoryEffect =
   | { readonly kind: 'put-client'; readonly row: ClientRow }
   | { readonly kind: 'delete-client'; readonly clientId: string }
   | { readonly kind: 'register-client'; readonly clientId: string }
+  /** Store or clear a phone's push registration (PAN-4830 D-5); `put-client` never touches it. */
+  | { readonly kind: 'put-client-push'; readonly clientId: string; readonly registration: PushRegistration | null }
+  | { readonly kind: 'put-push-window'; readonly window: PushWindow }
+  /** Send one push to APNs or FCM, then feed the outcome back through `reducePushOutcome` (D-1). */
+  | {
+    readonly kind: 'deliver-push';
+    readonly requestId: string;
+    readonly clientId: string;
+    readonly registration: PushRegistration;
+    readonly sealed: string;
+    readonly urgency: PushUrgency;
+    readonly collapseId: string;
+  }
   | { readonly kind: 'send'; readonly to: Target; readonly frame: DirectoryToMachineFrame | DirectoryToClientFrame }
   | { readonly kind: 'close'; readonly to: Target; readonly code: number; readonly reason: string }
   | {
@@ -173,7 +194,7 @@ export interface ReduceResult {
   readonly effects: DirectoryEffect[];
 }
 
-export const EMPTY_DIRECTORY: DirectoryState = { plan: null, machines: [], clients: [], approvals: [], relay: null };
+export const EMPTY_DIRECTORY: DirectoryState = { plan: null, machines: [], clients: [], approvals: [], relay: null, pushWindow: null };
 
 export function toDirectoryMachines(machines: readonly MachineRow[], online: ReadonlySet<string>): DirectoryMachine[] {
   return machines.map((row) => ({
@@ -494,15 +515,7 @@ function frame(state: DirectoryState, event: Extract<DirectoryEvent, { kind: 'fr
       };
     }
     case 'push':
-      // PAN-4830 (PAN-4823 W-CON3) delivers pushes. Until then the decoder refuses `push`, so this
-      // answers exactly as an undecodable frame from a registered machine does today.
-      return {
-        state,
-        effects: [
-          { kind: 'send', to: 'self', frame: errorFrame('bad_frame', 'malformed frame') },
-          { kind: 'log', type: f.type, environmentId: self, outcome: 'bad_frame' },
-        ],
-      };
+      return pushAnswer(state, f, ctx, self);
   }
 }
 
