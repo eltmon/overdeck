@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4838",
   "created": "2026-11-03T21:01:46.602Z",
-  "updated": "2026-11-03T21:01:46.602Z",
+  "updated": "2026-11-03T21:02:05.343Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "phone-push-fixture": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4838",
-      "claimedAt": "2026-11-03T21:01:46.602Z"
+      "claimedAt": "2026-11-03T21:01:46.602Z",
+      "doneAt": "2026-11-03T21:02:05.343Z"
     }
   }
 }
