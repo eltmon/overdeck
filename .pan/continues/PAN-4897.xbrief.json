@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4897",
   "created": "2026-11-03T14:27:55.739Z",
-  "updated": "2026-11-03T14:37:46.308Z",
+  "updated": "2026-11-03T14:38:01.663Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-4897",
       "claimedAt": "2026-11-03T14:35:04.134Z",
       "doneAt": "2026-11-03T14:37:46.308Z"
+    },
+    "gateway-probe": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4897",
+      "claimedAt": "2026-11-03T14:38:01.663Z"
     }
   }
 }
