@@ -4,17 +4,17 @@
     "created": "2026-11-03T05:55:45Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4881: Flaky in the release full-suite run: projects-rename.test.ts gets 401 from leaked internal-token state",
-    "updated": "2026-11-03T06:02:25.987Z"
+    "updated": "2026-11-03T06:04:10.000Z"
   },
   "plan": {
     "id": "pan-4881",
     "title": "Flaky in the release full-suite run: projects-rename.test.ts gets 401 from leaked internal-token state",
-    "status": "proposed",
+    "status": "running",
     "uid": "16a66384-c1a5-4dc3-aa5e-b59669ecfad8",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-03T05:55:45Z",
-    "updated": "2026-11-03T06:02:25.987Z",
+    "updated": "2026-11-03T06:04:10.000Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4881",
@@ -372,5 +372,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
