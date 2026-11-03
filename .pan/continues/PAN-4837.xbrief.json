@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4837",
   "created": "2026-11-03T16:16:59.604Z",
-  "updated": "2026-11-03T19:15:51.310Z",
+  "updated": "2026-11-03T19:16:17.388Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -432,6 +432,10 @@
     "native-quiet-reads.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T19:15:51.310Z"
+    },
+    "machine-view.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T19:16:17.388Z"
     }
   }
 }
