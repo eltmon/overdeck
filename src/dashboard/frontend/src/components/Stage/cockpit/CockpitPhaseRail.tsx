@@ -4,6 +4,7 @@ import { PHASES, phaseLabel, phaseRailState, type Phase, type PhaseStepState } f
 import type { PipelineState } from '../../../lib/issuePipelineState';
 import { cn } from '../../../lib/utils';
 import { ShipProgress } from '../../issue-view/ShipProgress';
+import { DeftDeliveryChip } from '../../deft/DeftBadges';
 import type { AgentRowModel, IssueShipModel } from '../../issue-view/types';
 
 const ACCENT: Record<PhaseStepState, string> = {
@@ -78,11 +79,14 @@ export function CockpitPhaseRail({
   agents,
   ship,
   onSelectPhase,
+  issueId,
 }: {
   pipelineState: PipelineState;
   agents: AgentRowModel[];
   ship: IssueShipModel;
   onSelectPhase: (phase: Phase, sessionId?: string) => void;
+  /** PAN-4849: enables the Deft delivery chip in the ship cell. */
+  issueId?: string;
 }) {
   const now = useSharedTick();
   const rail = useMemo(() => phaseRailState(pipelineState), [pipelineState]);
@@ -136,6 +140,7 @@ export function CockpitPhaseRail({
             {phase === 'ship' && ship.status === 'ready' ? (
               <div className="mt-1.5"><ShipProgress ship={ship} compact /></div>
             ) : null}
+            {phase === 'ship' && issueId ? <DeftDeliveryChip issueId={issueId} /> : null}
           </div>
         );
       })}

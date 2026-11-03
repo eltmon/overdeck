@@ -695,6 +695,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
         agents={issueView.agents}
         ship={cockpitShip}
         onSelectPhase={selectPipelinePhase}
+        issueId={issueId}
       />
 
       <nav data-section="Detail Tabs" className="flex flex-nowrap gap-1 overflow-x-auto border-b border-border bg-card px-3 pt-2" aria-label="Issue cockpit tabs">
