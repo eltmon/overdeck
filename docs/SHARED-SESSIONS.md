@@ -60,7 +60,7 @@ Short codes are 8 symbols from `BCDFGHJKLMNPQRSTVWXZ23456789` (no vowels, no 0/O
 | `DELETE /v1/rooms/:code` | `Bearer odh_…` (host token) | 204; 401 `invalid_token` for a missing or malformed host token; 404 `not_found` for an unknown code, an ended room or a wrong token (no oracle) |
 | `GET /v1/rooms/:code/host?v=1` | `Bearer odh_…`, `Upgrade: websocket` | 101; 426 `upgrade_required` without the upgrade header; 400 `unsupported_protocol` when `v` is not `1`; 401 `invalid_token`; 404 `not_found` for an unknown code, an ended room or a wrong token |
 | `GET /v1/rooms/:code/join?v=1` | `Bearer odd_…`, `Upgrade: websocket` | 101; 426; 400 `unsupported_protocol`; 401/403/503 as for `POST /v1/rooms`; 404 `not_found` for an unknown code or an ended room. Refusals for a blocked identity, the data owner or a full room arrive **after** the upgrade as close codes |
-| `GET /s/:code` | none | 200 HTML invite page with `pan join <CODE>` and a link to install docs; 404 HTML "This share link has ended or does not exist." The page shows no host name, scope or participant count. CSP: `default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'` |
+| `GET /s/:code` | none | 200 HTML invite page that finds Overdeck on this computer (PAN-4475): one nonce'd inline script probes `GET /api/share-probe` on `http://localhost:3011` and `http://127.0.0.1:3011` (1.5 s each, `credentials: 'omit'`) and navigates to `<origin>/#/shared/<CODE>` when one answers. The page always shows a manual **Open it in Overdeck on this computer** link, `pan up` instructions, a hint to allow Chrome's local-network prompt, and a link to install docs. Its CSP adds a fresh 16-byte nonce per response: `default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-…'; connect-src http://localhost:3011 http://127.0.0.1:3011; frame-ancestors 'none'; base-uri 'none'; form-action 'none'`. Slice 9 ([PAN-4480](https://github.com/eltmon/overdeck/issues/4480)) adds `pan join` back. 404 HTML "This share link has ended or does not exist.", with no script and CSP `default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'`. Neither page shows a host name, scope or participant count. |
 
 `hostToken` (`odh_` + 64 hex) appears only in the `POST /v1/rooms` response. The Worker stores and forwards only its SHA-256 and never logs either.
 
@@ -211,6 +211,58 @@ Content travels peer-to-peer over WebRTC data channels between the host's dashbo
 **Host socket loss.** A host whose host socket dropped keeps streaming to its established peers, even after the share service ends the room on its 5-minute alarm. A viewer must therefore tear down its peer connection when its own join socket closes with 4004.
 
 **For slice 4.** `@overdeck/contracts` exports the wire format types from `sharing.ts` and the runtime helpers from `sharing-wire.ts` (`toSharedMessage`, `decodeEnvelope`, `encodeSharedMessage`, `SharedChannelReader`, `SeqTracker`, `negotiateHello`). The share Worker imports only `sharing.ts`, which stays type-only. `src/dashboard/server/sharing/__tests__/loopback-viewer.ts` is a werift viewer that tests use as a stand-in for the browser.
+
+## Viewer side in the dashboard (slice 4, PAN-4475)
+
+The viewer is the joiner's own dashboard: its server holds the device token and the join socket, and its browser holds the `RTCPeerConnection`. The browser never sees the device token.
+
+**Join intent is a click.** Opening the join socket shows the joiner's GitHub login and avatar to the host, so it must never happen as a side effect of a navigation. The landing page only navigates to `/#/shared/<code>`; that page shows **Join**, and the click sends a same-origin `POST /api/joins` with the normal CSRF headers. The only cross-origin surface is the read-only probe.
+
+**JoinManager.** `src/dashboard/server/services/share-join.ts` keeps one join per short code in this process. `join(code)` reads `anywhere.share_url` and `account.json` (412 `not_signed_in` without it), then opens `GET /v1/rooms/:code/join?v=1` with `Authorization: Bearer <device token>`. The socket keeps alive like the host socket: a ping every 30 s, terminate after 75 s without a pong. Every status frame, close code and upgrade refusal becomes one `JoinState`:
+
+| Input | State |
+| --- | --- |
+| `status lobby` / `admitted` (+ `contributor`) / `host-disconnected` / `host-reconnected` | `lobby` / `admitted` / `host-disconnected` / `admitted` |
+| close 1000, or any close after **Leave** | `left` |
+| close 4003 or 4011 | `revoked` |
+| close 4004 / 4008 / 4009 / 4010 / 4013 | `ended` / `replaced` / `is-host` / `kicked` / `full` |
+| close after the grace timer | `away` |
+| any other close, or 75 s without a pong | `disconnected` (`connection_lost`) |
+| upgrade 404 / 401 or 403 / other | `ended` / `rejected` / `disconnected` (`http_<status>`) |
+| socket `error` | `disconnected` (`unreachable`) |
+
+`connecting`, `lobby`, `admitted` and `host-disconnected` are live. An unexpected close is never reconnected here: the page offers **Rejoin**, and the service restores an admitted viewer without the lobby. Automatic restore is slice 8 ([PAN-4479](https://github.com/eltmon/overdeck/issues/4479)).
+
+**Routes** (`src/dashboard/server/routes/joins.ts`, every answer `Cache-Control: no-store`):
+
+| Method & path | Answers |
+| --- | --- |
+| `POST /api/joins` `{ code }` (a code or a join URL) | 201 `JoinView`; 200 when that code's join is already live; 400 `invalid_code`; 412 `not_signed_in`; 500 |
+| `GET /api/joins/:code` | 200 `JoinView`; 404 `join_not_found` |
+| `GET /api/joins/:code/events` | 200 `text/event-stream` with `state`, `signal` and `replaced` events; 404 |
+| `POST /api/joins/:code/signal` | 202; 400 `invalid_signal` (an offer, or anything but an answer or candidate); 404; 409 `join_not_admitted` |
+| `POST /api/joins/:code/ice-servers` | 200 `{ iceServers }`; 404; 409 `join_not_admitted` |
+| `DELETE /api/joins/:code` | 204 after sending `leave`; 404 |
+| `GET /api/share-probe` | 200 `{ "overdeck": true, "v": 1 }` |
+| `OPTIONS /api/share-probe` | 204 |
+
+Mutations need the dashboard CSRF token; the two `GET /api/joins` routes need a dashboard credential. The signal route rebuilds the body from its known keys, so nothing else reaches the share service.
+
+**Event stream and subscriber.** A join has at most one subscriber: the viewer page's `EventSource`. A new subscriber replaces the old one, which receives `replaced` and is ended, because the host keeps one peer connection per GitHub id and two tabs answering the same offer would break both. A `signal` frame goes to the subscriber, or into a buffer of at most 64 that the next subscriber receives in order; a new socket clears the buffer. A lobby join never emits a `signal` event.
+
+**Restart.** When a subscriber attaches to an `admitted` or `host-disconnected` join that already had a subscriber on the current socket, the manager restarts the socket so the host offers again with a fresh history (a reloaded page needs both). It closes the socket with code 1000 and no `leave` frame (the service would re-lobby a viewer that sends `leave`), and opens the new socket only from the old one's `close` event, or after 5 s with a `terminate()`. This is the order slice 3 requires; the Miniflare test `tests/integration/services/share/join-manager.test.ts` asserts the second offer.
+
+**Grace timer.** A live join with no subscriber for 60 s is closed with a plain close and becomes `away`. An admitted viewer stays admitted on the service; a lobby viewer leaves the lobby. `POST /api/joins` on an `away` join reopens it, and the page does so without asking again.
+
+**ICE servers.** On `status admitted` the manager sends one `ice-servers` frame per socket unless a list younger than 50 minutes is cached. The ice-servers route answers the cached list or waits for the pending request; `error turn_unavailable` or 5 s without an answer gives `[]`.
+
+**Probe.** `GET /api/share-probe` calls no dashboard auth function, because a cross-origin fetch carries no cookie. The remote request gate still admits it only from a loopback peer, and it is deliberately not in `REMOTE_GATE_ALLOWLIST`, so a LAN host cannot learn that Overdeck runs here. `Access-Control-Allow-Origin` is set only when the request's `Origin` equals the origin of `anywhere.share_url`; `OPTIONS` adds `Access-Control-Allow-Methods: GET` and `Access-Control-Allow-Private-Network: true` for that origin only (the older Private Network Access preflight). Chrome's Local Network Access check instead shows the user a permission prompt; the landing page tells them to choose Allow, and its manual link covers a denied prompt or a dashboard on another port.
+
+**Browser peer.** `components/chat/sharing/webrtc-viewer.ts` (`WebRtcViewer`) answers the host's offer: it fetches ICE servers from the viewer server, buffers early remote candidates until the offer is set, sends its own candidates only after the answer, and reads `control`, `conversation` and `presence` with one `SharedChannelReader` each (`drafts` and `terminal` get no listener yet). It replies to the host hello after `negotiateHello`, rebuilds every message field by field (never `author` or unknown keys), and reports notices: a newer host, an unsupported scope kind, a failed hello, an unavailable or too-large transcript, and a `seq` gap (once per peer). A new offer closes the old peer first.
+
+**Route and screens.** `App.tsx` renders `SharedConversationRoute` when the hash matches `#/shared/<code>`, before the deck; a same-tab hash change into it reloads the page. `useSharedJoin` reads the join on mount (minting the dashboard session first), shows **Join** for a new or finished join, resumes an `away` join, and subscribes to a live one. `SharedConversationView` shows one screen per state: the confirmation, the lobby, "Connecting to the host…", the conversation through `MessagesTimeline` with an empty work log, the "Host disconnected — reconnecting…" banner, "Connection to the host was lost." with **Reconnect**, and the terminal screens ("Removed by host", "This share has ended.", and the others). The timeline mounts only when admitted and a history arrived, so a lobby viewer never renders host content.
+
+**Teardown.** Join-socket close 4004 closes the browser peer, because the host may keep streaming after the room ends. `host-disconnected` keeps the peer and shows the banner; `host-reconnected` removes it. Kick, revoke, blocked, replaced, is-host, full, rejected and disconnected close the peer and the event stream. A peer that fails on its own shows **Reconnect**, which opens a new event stream; the restart rule above makes the host offer again.
 
 ## Local development
 
