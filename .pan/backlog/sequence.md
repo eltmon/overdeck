@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T07:44:44.383451Z · model: claude-opus-5-5 · open: 875_
+_Last sequenced: 2026-11-03T07:49:51.974846Z · model: claude-opus-5-5 · open: 876_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -880,6 +880,7 @@ _Last sequenced: 2026-11-03T07:44:44.383451Z · model: claude-opus-5-5 · open: 
 | 879 | PAN-4839 | S | low | ok |  | PAN-4838 | Phone app W-IOS2: counts-only Live Activity, on by default with a Settings off switch; OD-1 settled; after PAN-4838. |
 | 880 | PAN-4842 | S | medium | ok |  | PAN-4837 | Phone app W-DOC: phone-app.mdx and updates to Anywhere, push, tailscale and service docs; finished last. |
 | 881 | PAN-4851 | S | low | needs-refinement |  |  | Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them |
+| 882 | PAN-4887 | M | medium | ok |  | PAN-4835 | Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); machines stay refused. |
 
 ## Rationale detail
 
@@ -1210,10 +1211,10 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T07:44:44.383451Z",
+  "generatedAt": "2026-11-03T07:49:51.974846Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 875,
+  "openCount": 876,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -12155,6 +12156,21 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "rationale": "New manual verification issue: the relay fix shipped in 0.73.0 with unit tests only, and two live attempts expired unapproved. It is operator-gated like PAN-4863, so it takes the free rank 312 next to it; the PRD it replays lives on feature/pan-4882, recorded as an advisory informs edge.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4887",
+      "rank": 882,
+      "size": "M",
+      "importance": "medium",
+      "score": 30,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4835"
+      ],
+      "why": "Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); machines stay refused.",
+      "rationale": "New child of the phone-app epic PAN-4823, split from PAN-4835 and explicitly sequenced after it; placed at the tail of the phone-app chain so no existing rank moves.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13648,6 +13664,27 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.3
+    },
+    {
+      "from": "PAN-4823",
+      "to": "PAN-4887",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4835",
+      "to": "PAN-4887",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4887",
+      "to": "PAN-4842",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
     }
   ]
 }
