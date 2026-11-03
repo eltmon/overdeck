@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4862",
   "created": "2026-11-02T23:48:40.343Z",
-  "updated": "2026-11-03T00:36:21.669Z",
+  "updated": "2026-11-03T00:36:34.884Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -66,6 +66,10 @@
     "relay-ice-wire.ac4": {
       "status": "completed",
       "doneAt": "2026-11-03T00:36:21.668Z"
+    },
+    "relay-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:36:34.883Z"
     }
   }
 }
