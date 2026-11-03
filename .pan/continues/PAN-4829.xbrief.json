@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4829",
   "created": "2026-11-03T07:49:13.339Z",
-  "updated": "2026-11-03T08:23:33.260Z",
+  "updated": "2026-11-03T08:23:59.779Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -156,6 +156,10 @@
     "do-glue.ac4": {
       "status": "completed",
       "doneAt": "2026-11-03T08:23:33.260Z"
+    },
+    "miniflare-ac2.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:23:59.779Z"
     }
   }
 }
