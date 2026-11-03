@@ -14,7 +14,7 @@ import { reduceClient } from './client-state.ts';
 import type { ClientEvent } from './client-state.ts';
 import { EMPTY_DIRECTORY, reduce } from './directory-state.ts';
 import type { DirectoryEffect, DirectoryEvent, DirectoryState, ReduceContext, Target } from './directory-state.ts';
-import { loadDirectory, PUT_CLIENT_PUSH_SQL, PUT_CLIENT_SQL, SCHEMA } from './directory-store.ts';
+import { loadDirectory, PUT_CLIENT_PUSH_SQL, PUT_CLIENT_SQL, PUT_PUSH_WINDOW_SQL, SCHEMA } from './directory-store.ts';
 import type { ConnectIdentity, Deps, Env } from './env.ts';
 import { HDR_IDENTITY, HDR_INBOX_HEADERS, HDR_INBOX_SECRET_HASH, INTERNAL, parseConfig, parseTurnConfig } from './env.ts';
 import { keyFingerprint } from './fingerprint.ts';
@@ -23,6 +23,10 @@ import { bytesToBase64, InboxStore, NOT_FOUND } from './inbox.ts';
 import type { PendingEvent } from './inbox.ts';
 import { logFrame } from './log.ts';
 import { decodeFrame } from './protocol.ts';
+import { reducePushOutcome } from './push-state.ts';
+import type { PushOutcomeEvent } from './push-state.ts';
+import { parsePushConfig } from './push/config.ts';
+import { deliverPush } from './push/deliver.ts';
 import type { SocketRole } from './protocol.ts';
 import { relayCapBytes } from './relay-meter.ts';
 import { fetchIceServers } from './turn.ts';
@@ -295,6 +299,13 @@ export class DirectoryHost {
     await this.execute(ws, effects);
   }
 
+  /** The second step of a push (PAN-4830 D-1), reduced against the state current after delivery. */
+  private async applyPushOutcome(ws: WebSocket, event: PushOutcomeEvent): Promise<void> {
+    const { state, effects } = reducePushOutcome(this.state, event);
+    this.state = state;
+    await this.execute(ws, effects);
+  }
+
   private resolve(self: WebSocket, to: Target): WebSocket[] {
     if (to === 'self') return [self];
     if (to === 'clients') return this.registeredClients(self).map((r) => r.ws);
@@ -322,11 +333,13 @@ export class DirectoryHost {
       'inbox-forget': 0,
       'put-client': 0,
       'put-client-push': 0,
+      'put-push-window': 0,
       'delete-client': 0,
       register: 1,
       'register-client': 1,
       send: 2,
       'fetch-turn': 2,
+      'deliver-push': 2,
       'inbox-create': 2,
       'inbox-deliver': 2,
       close: 3,
@@ -435,6 +448,15 @@ export class DirectoryHost {
         case 'put-client-push': {
           const r = e.registration;
           sql.exec(PUT_CLIENT_PUSH_SQL, r?.platform ?? null, r?.token ?? null, r?.apsEnvironment ?? null, e.clientId);
+          break;
+        }
+        case 'put-push-window':
+          sql.exec(PUT_PUSH_WINDOW_SQL, JSON.stringify(e.window));
+          break;
+        case 'deliver-push': {
+          const outcome = await deliverPush(e, { config: parsePushConfig(this.env), fetch: this.deps.fetch, now: this.deps.now });
+          // Other events ran during the await (H-2): read the socket's machine and the state only now.
+          await this.applyPushOutcome(self, { requestId: e.requestId, clientId: e.clientId, environmentId: selfEnv(), token: e.registration.token, outcome });
           break;
         }
         case 'delete-client':

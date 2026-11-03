@@ -6,6 +6,7 @@
  */
 import type { ConnectPlan, DirectoryEndpoint } from '../../../packages/contracts/src/connect.ts';
 import type { ApprovalRow, ClientRow, DirectoryState, MachineRow } from './directory-state.ts';
+import type { PushWindow } from './push-state.ts';
 import type { PushRegistration } from './push/config.ts';
 import type { RelayUsage } from './relay-meter.ts';
 
@@ -57,6 +58,9 @@ export const PUT_CLIENT_SQL = `INSERT INTO clients (client_id, label, public_key
 /** A phone's push registration (PAN-4830 D-5): `push-register` sets it, `push-unregister` and a dead token clear it. */
 export const PUT_CLIENT_PUSH_SQL = 'UPDATE clients SET push_platform = ?, push_token = ?, aps_environment = ? WHERE client_id = ?';
 
+/** The push rate-limit window (PAN-4830 D-8), a JSON `{ minute, count }` in `meta`. */
+export const PUT_PUSH_WINDOW_SQL = `INSERT INTO meta (key, value) VALUES ('push_window', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`;
+
 interface ClientSqlRow {
   client_id: string;
   label: string;
@@ -102,6 +106,22 @@ function pushOf(r: ClientSqlRow): PushRegistration | null {
   }
   if (r.push_platform === 'android') return { platform: 'android', token: r.push_token, apsEnvironment: null };
   return null;
+}
+
+/** The stored push window, or null when it is absent, not JSON or the wrong shape. */
+function pushWindowOf(raw: string | undefined): PushWindow | null {
+  if (raw === undefined) return null;
+  let value: unknown;
+  try {
+    value = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (typeof value !== 'object' || value === null) return null;
+  const { minute, count } = value as Record<string, unknown>;
+  if (typeof minute !== 'number' || !Number.isSafeInteger(minute) || minute < 0) return null;
+  if (typeof count !== 'number' || !Number.isSafeInteger(count) || count < 0) return null;
+  return { minute, count };
 }
 
 /** Rebuilds the reducer state from the tables, oldest first. */
@@ -151,5 +171,6 @@ export function loadDirectory(sql: SqlStorage): DirectoryState {
           push: pushOf(r),
         }]
         : []);
-  return { plan, machines, clients, approvals, relay };
+  const windowRow = sql.exec<{ value: string }>(`SELECT value FROM meta WHERE key = 'push_window'`).toArray()[0];
+  return { plan, machines, clients, approvals, relay, pushWindow: pushWindowOf(windowRow?.value) };
 }
