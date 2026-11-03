@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4479",
   "created": "2026-11-03T15:06:40.232Z",
-  "updated": "2026-11-03T15:21:58.075Z",
+  "updated": "2026-11-03T15:22:20.478Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -24,6 +24,10 @@
     "contract-states.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T15:21:58.075Z"
+    },
+    "contract-states.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:22:20.477Z"
     }
   }
 }
