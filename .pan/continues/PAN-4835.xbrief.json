@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4835",
   "created": "2026-11-03T07:59:34.235Z",
-  "updated": "2026-11-03T08:24:00.970Z",
+  "updated": "2026-11-03T08:25:08.251Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-4835",
       "claimedAt": "2026-11-03T07:59:34.235Z",
       "doneAt": "2026-11-03T08:24:00.969Z"
+    },
+    "phone-credential-resolve": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4835",
+      "claimedAt": "2026-11-03T08:25:08.251Z"
     }
   }
 }
