@@ -500,6 +500,9 @@ export async function skillsPackRemoveCommand(id: string): Promise<void> {
   console.log(
     `Removed pack ${id}, its cache, ${swept.removedMounts.length} mount(s) and ${swept.removedCodexCaches.length} Codex cache(s).`,
   );
+  if (result.keptBindings) {
+    console.log(`kept SageOx link files in ${result.keptBindings}/ (delete them by hand to forget every project's SageOx link)`);
+  }
   if (runtimePack) {
     for (const dir of await projectGstackDirs()) {
       console.log(`Project files gstack skills wrote (not removed): ${dir}  — remove with: rm -rf ${dir}`);

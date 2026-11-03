@@ -656,6 +656,17 @@ describe('pan skills pack', () => {
     mocks.listLowerLevelPackOverrides.mockResolvedValue({ mattpocock: { projects: ['tst'], issues: ['TST-1'] } });
     await run('pack', 'remove', 'mattpocock');
     expect(logs.join('\n')).toContain('2 project or issue toggle(s) for mattpocock remain');
+    expect(logs.join('\n')).not.toContain('kept SageOx link files');
+  });
+
+  it('names the kept SageOx binding store after removing sageox (PAN-4852 AD-10)', async () => {
+    mocks.removePack.mockResolvedValue({ removed: true, keptBindings: '/home/x/.overdeck/packs/sageox/bindings' });
+    mocks.removePackFromMounts.mockResolvedValue({ removedMounts: [], removedLinks: [], removedCodexCaches: [], failures: [] });
+    mocks.listLowerLevelPackOverrides.mockResolvedValue({});
+    await run('pack', 'remove', 'sageox');
+    expect(logs.join('\n')).toContain(
+      "kept SageOx link files in /home/x/.overdeck/packs/sageox/bindings/ (delete them by hand to forget every project's SageOx link)",
+    );
   });
 
   it('names project .gstack dirs for a gstack fork registered under another id, and not for other packs', async () => {

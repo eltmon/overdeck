@@ -20,7 +20,19 @@ const { overdeckHome } = await vi.hoisted(async () => {
 
 import { getGlobalConfigPath } from '../../config-yaml/load.js';
 import { __setOxBuildRunnerForTests, isOxBuildReady, type OxBuildRunner } from '../ox-build.js';
-import { addPack, getPack, packExtractDir, packGoDir, packsHome, PackSourceError, syncPack, updatePack } from '../sources.js';
+import {
+  addPack,
+  getPack,
+  packCacheDir,
+  packExtractDir,
+  packGoDir,
+  packRepoDir,
+  packsHome,
+  PackSourceError,
+  removePack,
+  syncPack,
+  updatePack,
+} from '../sources.js';
 
 const skillMd = (name: string): string => `---\nname: ${name}\ndescription: ${name}.\n---\n`;
 
@@ -194,5 +206,34 @@ describe('syncPack sageox', () => {
     __setOxBuildRunnerForTests(runner.run);
     await syncPack('sageox');
     expect(runner.calls).toEqual([]);
+  });
+});
+
+describe('removePack sageox (WI-4)', () => {
+  it('keeps the binding store and deletes the rest of the pack cache', async () => {
+    __setOxBuildRunnerForTests(fakeRunner().run);
+    await addPack({ id: 'sageox', url: up.url, ref: first }, accept);
+    const cacheDir = packCacheDir('sageox');
+    const config = join(cacheDir, 'bindings', 'app', 'config.json');
+    mkdirSync(join(cacheDir, 'bindings', 'app'), { recursive: true });
+    writeFileSync(config, '{}\n');
+    expect(existsSync(binDir(first))).toBe(true);
+    expect(existsSync(packGoDir('sageox'))).toBe(true);
+    expect(existsSync(packRepoDir('sageox'))).toBe(true);
+
+    expect(await removePack('sageox')).toEqual({ removed: true, keptBindings: join(cacheDir, 'bindings') });
+    expect(existsSync(config)).toBe(true);
+    expect(existsSync(binDir(first))).toBe(false);
+    expect(existsSync(packExtractDir('sageox', first))).toBe(false);
+    expect(existsSync(packGoDir('sageox'))).toBe(false);
+    expect(existsSync(packRepoDir('sageox'))).toBe(false);
+    expect(await getPack('sageox')).toBeNull();
+  });
+
+  it('deletes the whole cache when there is no binding store', async () => {
+    __setOxBuildRunnerForTests(fakeRunner().run);
+    await addPack({ id: 'sageox', url: up.url, ref: first }, accept);
+    expect(await removePack('sageox')).toEqual({ removed: true });
+    expect(existsSync(packCacheDir('sageox'))).toBe(false);
   });
 });

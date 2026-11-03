@@ -10,7 +10,7 @@
  */
 import { execFile } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { lstat, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { isMap, isScalar, parse as parseYaml, parseDocument, type Document } from 'yaml';
@@ -684,12 +684,22 @@ export async function disablePackBrowser(id: string): Promise<{ changed: boolean
 /**
  * PD-11: unregister a pack, clear its global toggle and global per-skill
  * overrides, and delete its cache. Project and issue entries stay (inert).
+ * PAN-4852 AD-10: the sageox cache keeps its `bindings/` (SageOx link files need `ox login` and the
+ * network to recreate); everything else in it is derived and goes.
  */
-export async function removePack(id: string): Promise<{ removed: boolean }> {
+export async function removePack(id: string): Promise<{ removed: boolean; keptBindings?: string }> {
   if (!PACK_ID_PATTERN.test(id)) throw new PackSourceError('bad-id', `invalid pack id: ${JSON.stringify(id)}`);
   const removed = (await getPack(id)) !== null;
   if (removed) await deletePackEntry(id);
-  await rm(packCacheDir(id), { recursive: true, force: true });
+  const cacheDir = packCacheDir(id);
+  const bindings = join(cacheDir, 'bindings');
+  if (id === 'sageox' && (await lstat(bindings).then((s) => s.isDirectory(), () => false))) {
+    for (const child of await readdir(cacheDir)) {
+      if (child !== 'bindings') await rm(join(cacheDir, child), { recursive: true, force: true });
+    }
+    return { removed, keptBindings: bindings };
+  }
+  await rm(cacheDir, { recursive: true, force: true });
   return { removed };
 }
 
