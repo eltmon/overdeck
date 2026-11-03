@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4882",
   "created": "2026-11-03T06:27:51.535Z",
-  "updated": "2026-11-03T07:59:24.073Z",
+  "updated": "2026-11-03T07:59:47.338Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -264,6 +264,10 @@
     "checklist-doc.ac4": {
       "status": "completed",
       "doneAt": "2026-11-03T07:59:24.073Z"
+    },
+    "checklist-doc.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:59:47.338Z"
     }
   }
 }
