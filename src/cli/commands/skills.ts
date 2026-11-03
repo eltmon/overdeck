@@ -11,6 +11,7 @@
  *   pan skills pack browser <id> [on|off] [--yes]   (PAN-4730; gstack's browser runtime, second consent; ./skills-pack-browser.ts)
  *   pan skills pack list [--json] [--offline] | remove <id> | sync [id] | gc [--max-age-days <n>]
  *   pan skills pack sageox status [--project <key>] [--json] | upload on|off --project <key>   (PAN-2444)
+ *   pan skills pack sageox link --project <key> [--team <team>] | commit --project <key>   (PAN-4852; ./skills-sageox.ts)
  *   pan skills deft status|enable|disable …   (PAN-3943; ./skills-deft.ts)
  *
  * `src/cli/index.ts` imports this module at startup to register the verbs, so
@@ -21,6 +22,7 @@ import chalk from 'chalk';
 import type { Command } from 'commander';
 import type { DeftLaunchResult } from '../../lib/skill-overrides/launch.js';
 import { registerSkillsDeftCommands } from './skills-deft.js';
+import { registerSkillsSageoxCommands } from './skills-sageox.js';
 
 interface ListOptions { project?: string; issue?: string; json?: boolean }
 interface SetOptions { project?: string; issue?: string; pack?: string }
@@ -675,6 +677,7 @@ export function registerSkillsCommands(program: Command): void {
     .action(skillsPackSageoxStatusCommand);
   sageox.command('upload <state>').description('Turn SageOx uploads on or off for a project (off by default)')
     .requiredOption('--project <key>', 'Project key').action(skillsPackSageoxUploadCommand);
+  registerSkillsSageoxCommands(sageox);
 
   registerSkillsDeftCommands(skills);
 }
