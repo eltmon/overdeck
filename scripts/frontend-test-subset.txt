@@ -95,6 +95,7 @@ src/components/__tests__/palette-fleet-hits.test.tsx
 src/components/chat/__tests__/ChatMarkdown.issue-links.test.tsx
 src/components/chat/__tests__/ChatMarkdown.pull-request-links.test.tsx
 src/components/chat/__tests__/ComposerFooter.citations.test.tsx
+src/components/chat/__tests__/ComposerFooter.native.test.tsx
 src/components/chat/__tests__/ComposerFooter.schedule.test.tsx
 src/components/chat/__tests__/ComposerFooter.streaming-render-count.test.tsx
 src/components/chat/__tests__/ConversationAboutDrawer.test.tsx
