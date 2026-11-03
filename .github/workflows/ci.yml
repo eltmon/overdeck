@@ -147,15 +147,18 @@ jobs:
   prompt-gate:
     runs-on: ubuntu-latest
     name: Prompt change trailer gate
-    timeout-minutes: 5
+    # PAN-1651: cap wall-clock. PAN-4917: 5 minutes was too tight once the
+    # full-history checkout below got slow; 20 matches build and lint-group.
+    timeout-minutes: 20
 
     steps:
+      # PAN-4917: a one-commit checkout. The script's --fetch then fetches
+      # only main and HEAD, blobless, never every branch (fetch-depth: 0 also
+      # pulled the archived overdeck-state branch and timed the job out).
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Check Prompt-Change trailer for roles/ and docs/flywheel-brief.md
-        run: bash scripts/check-prompt-change-trailer.sh
+      - name: Check Prompt-Change trailer for roles/ and the flywheel skill
+        run: bash scripts/check-prompt-change-trailer.sh --fetch
 
   # The root vitest suite (~1,300 files) is split across four parallel jobs.
   # Each shard runs four workers on the runner's four cores. Most of the
