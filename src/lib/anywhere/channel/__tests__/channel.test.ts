@@ -343,8 +343,10 @@ describe('secure channel (PAN-4645 WI-2)', () => {
     const port = (closed.address() as { port: number }).port;
     await new Promise<void>((resolve) => closed.close(() => resolve()));
 
-    await expect(openChannel(`tcp://127.0.0.1:${port}`, { mode: 'link', localKey: freshKey(), remoteKeyHex: 'ab'.repeat(32), timeoutMs: 2_000 }))
-      .rejects.toMatchObject({ code: 'unreachable' });
+    const url = `tcp://127.0.0.1:${port}`;
+    const error: Error = await openChannel(url, { mode: 'link', localKey: freshKey(), remoteKeyHex: 'ab'.repeat(32), timeoutMs: 2_000 }).catch((caught: Error) => caught);
+    expect(error).toMatchObject({ code: 'unreachable', detail: { cause: 'ECONNREFUSED' } });
+    expect(error.message).toMatch(new RegExp(`^${url}: .*ECONNREFUSED`));
   });
 });
 

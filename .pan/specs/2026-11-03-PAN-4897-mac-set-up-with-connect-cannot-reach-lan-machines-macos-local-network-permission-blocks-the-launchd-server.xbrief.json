@@ -4,17 +4,17 @@
     "created": "2026-11-03T14:23:30Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4897: Mac set up with connect cannot reach LAN machines: macOS Local Network permission blocks the launchd server",
-    "updated": "2026-11-03T14:26:29.163Z"
+    "updated": "2026-11-03T14:27:34.967Z"
   },
   "plan": {
     "id": "pan-4897",
     "title": "Mac set up with connect cannot reach LAN machines: macOS Local Network permission blocks the launchd server",
-    "status": "proposed",
+    "status": "running",
     "uid": "5b0be759-6f88-497f-b527-dac7b1465f75",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-03T14:23:30Z",
-    "updated": "2026-11-03T14:26:29.163Z",
+    "updated": "2026-11-03T14:27:34.967Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4897",
@@ -457,5 +457,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
