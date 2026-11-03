@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4931",
   "created": "2026-11-03T21:41:36.078Z",
-  "updated": "2026-11-03T23:07:36.040Z",
+  "updated": "2026-11-03T23:07:57.485Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -70,6 +70,10 @@
     "visible-tools-filter.ac4": {
       "status": "completed",
       "doneAt": "2026-11-03T23:07:36.039Z"
+    },
+    "dashboard-api-methods.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:07:57.485Z"
     }
   }
 }
