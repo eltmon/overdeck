@@ -142,17 +142,22 @@ export function hasDashboardInternalToken(request: HttpServerRequest.HttpServerR
 
 /**
  * Who a request authenticates as. `internal-token` and `root-session` are root
- * credentials and imply `admin`. `device`, `token` and `machine` are registry
- * credentials: they carry their record's scopes and are revocable. A `machine`
- * credential (PAN-4645) exists only inside a link-mode secure channel bound to
- * its key; `scopes` are already narrowed by the actor stamp's ceiling.
+ * credentials and imply `admin`. `device`, `token`, `machine` and `phone` are
+ * registry credentials: they carry their record's scopes and are revocable. A
+ * `machine` credential (PAN-4645) exists only inside a link-mode secure
+ * channel bound to its key; `scopes` are already narrowed by the actor
+ * stamp's ceiling. A `phone` credential (PAN-4835) likewise exists only
+ * inside a link-mode channel bound to its `phoneKey`, carries its record's
+ * scopes unnarrowed (a phone sends no actor stamp or ceiling header), and
+ * never carries `admin` or `forward`.
  */
 export type DashboardCredential =
   | { kind: 'internal-token' }
   | { kind: 'root-session' }
   | { kind: 'device'; deviceId: string; scopes: AccessTokenScope[] }
   | { kind: 'token'; tokenId: string; scopes: AccessTokenScope[] }
-  | { kind: 'machine'; tokenId: string; environmentId: string; scopes: AccessTokenScope[]; actor: LinkActor; access: MachineAccess };
+  | { kind: 'machine'; tokenId: string; environmentId: string; scopes: AccessTokenScope[]; actor: LinkActor; access: MachineAccess }
+  | { kind: 'phone'; tokenId: string; clientId: string; phoneKey: string; scopes: AccessTokenScope[] };
 
 /** The scopes a credential grants: `['admin']` for root credentials, else the record's scopes. */
 export function credentialScopes(credential: DashboardCredential): readonly string[] {
@@ -167,11 +172,12 @@ export function dashboardDeviceTokenFromHeaders(headers: HeaderMap): string | un
 /**
  * Resolve the credential a request presents. `channel` is the secure-channel
  * marker of the request's socket (D-4645-9): inside a channel only a `machine`
- * record bound to the channel's remote key resolves, from the Bearer header;
- * the internal token, the root session, device cookies and `token` bearers all
- * resolve to `null` there (NFR-2). On a plain socket a `machine` record never
+ * record bound to the channel's remote key, or a `phone` record bound to its
+ * `phoneKey` (PAN-4835 FR-3), resolves, from the Bearer header; the internal
+ * token, the root session, device cookies and `token` bearers all resolve to
+ * `null` there (NFR-2). On a plain socket a `machine` or `phone` record never
  * resolves. (`verifyAccessToken` stamps `lastUsedAt` before this check, so a
- * refused machine presentation still updates the timestamp; harmless.)
+ * refused machine or phone presentation still updates the timestamp; harmless.)
  */
 export function resolveDashboardCredential(headers: HeaderMap, channel: ChannelMarker | null = null): DashboardCredential | null {
   if (channel !== null) {
@@ -179,6 +185,10 @@ export function resolveDashboardCredential(headers: HeaderMap, channel: ChannelM
     const verified = verifyAccessToken(bearerToken(headers));
     if (!verified.ok) return null;
     const { record } = verified;
+    if (record.kind === 'phone') {
+      if (record.phoneKey !== channel.remoteKeyHex || !record.clientId) return null;
+      return { kind: 'phone', tokenId: record.id, clientId: record.clientId, phoneKey: record.phoneKey, scopes: record.scopes };
+    }
     if (record.kind !== 'machine' || record.machineKey !== channel.remoteKeyHex || !record.environmentId || !record.access) return null;
     const { actor, ceiling } = parseLinkActor(
       getHeaderFromMap(headers, LINK_ACTOR_HEADER),
@@ -205,6 +215,8 @@ export function resolveDashboardCredential(headers: HeaderMap, channel: ChannelM
   const { record } = verified;
   // PAN-4645 D-4645-9: a machine token authenticates only inside its channel.
   if (record.kind === 'machine') return null;
+  // PAN-4835 FR-3: a phone token authenticates only inside its link channel.
+  if (record.kind === 'phone') return null;
   if (record.kind === 'token') {
     // PAN-2351 D-9: a token authenticates only from the Bearer header.
     return cookieToken === undefined ? { kind: 'token', tokenId: record.id, scopes: record.scopes } : null;
@@ -257,8 +269,9 @@ export function rejectUnsafeDashboardMutationRequest(
 
   // Header-borne credentials cannot be sent by a cross-site form, so they skip
   // the Origin and CSRF checks (PAN-2351 FR-9). A token never arrives by cookie.
-  const credentialKind = resolveDashboardCredential(headers)?.kind;
-  if (credentialKind === 'internal-token' || credentialKind === 'token') return null;
+  // A phone's bearer rides a Noise-authenticated channel (PAN-4823 D-4), so it skips them too.
+  const credentialKind = resolveRequestCredential(request)?.kind;
+  if (credentialKind === 'internal-token' || credentialKind === 'token' || credentialKind === 'phone') return null;
 
   const origin = getHeaderFromMap(headers, 'origin');
   if (origin && !hasTrustedExactOrigin(headers)) {
