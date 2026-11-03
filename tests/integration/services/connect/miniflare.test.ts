@@ -45,6 +45,8 @@ const pushToken = (n: number) => 'odd_' + n.toString(16).padStart(64, '6');
 const RELAY_TOKEN = 'odd_' + 'c'.repeat(64);
 /** A tester account whose Directory DO the account-view test reads through the DO stub (PAN-4959). */
 const VIEW_TOKEN = 'odd_' + 'a'.repeat(64);
+/** A free account the remove-machine test fills and frees (PAN-4959), so 'u-free' stays full. */
+const removeToken = (n: number) => 'odd_' + n.toString(16).padStart(64, '9');
 
 const ACCOUNT_STUB = `
 import { WorkerEntrypoint } from 'cloudflare:workers';
@@ -58,6 +60,9 @@ export class AccountRpc extends WorkerEntrypoint {
     }
     if (token === ${JSON.stringify(VIEW_TOKEN)}) {
       return { ok: true, userId: 'u-view', githubId: 6, deviceId: 'd-view', entitlement: { plan: 'tester', maxDevices: null } };
+    }
+    if (/^odd_9+[0-9a-f]$/.test(token)) {
+      return { ok: true, userId: 'u-remove', githubId: 7, deviceId: 'd-r' + token.slice(-1), entitlement: { plan: 'free', maxDevices: 3 } };
     }
     if (/^odd_6+[0-9a-f]$/.test(token)) {
       return { ok: true, userId: 'u-push', githubId: 5, deviceId: 'd-u' + token.slice(-1), entitlement: { plan: 'free', maxDevices: 3 } };
@@ -428,6 +433,35 @@ describe('connect service on real workerd (PAN-2356 WI-3)', () => {
     expect(view.relay).toMatchObject({ bytesUsed: 0, capBytes: RELAY_CAP, stopped: false });
     a.close();
     b.close();
+  }, SLOW);
+
+  it('removes a machine on POST /remove-machine with no calling socket and frees its free-plan slot (PAN-4959 WI-2)', async () => {
+    const ns = await mf.getDurableObjectNamespace('DIRECTORY');
+    const stub = ns.get(ns.idFromName('u-remove'));
+    const remove = (body: string) => stub.fetch('https://directory/remove-machine', { method: 'POST', body });
+    const a = await register(removeToken(1), 41);
+    const b = await register(removeToken(2), 42);
+    const c = await register(removeToken(3), 43);
+
+    expect((await remove('{}')).status).toBe(400);
+    expect(await (await remove(JSON.stringify({ environmentId: 7 }))).json()).toEqual({ error: 'bad_request' });
+    const unknown = await remove(JSON.stringify({ environmentId: envId(49) }));
+    expect(unknown.status).toBe(404);
+    expect(await unknown.json()).toEqual({ error: 'unknown_machine' });
+
+    const from = b.frames.length;
+    const removed = await remove(JSON.stringify({ environmentId: envId(41) }));
+    expect(removed.status).toBe(200);
+    expect(await removed.json()).toEqual({ removed: true });
+    expect(await a.waitClose()).toMatchObject({ code: 4012 });
+    const directory = await b.waitFor(isType('directory'), from);
+    expect((directory['machines'] as Frame[]).map((m) => m['environmentId'])).toEqual([envId(42), envId(43)]);
+
+    const d = await register(removeToken(4), 44);
+    expect(d.frames.find(isType('welcome'))).toMatchObject({ plan: 'free', maxMachines: 3 });
+    b.close();
+    c.close();
+    d.close();
   }, SLOW);
 
   it('holds an event sealed while the machine is offline and delivers it on reconnect (WI-8)', async () => {

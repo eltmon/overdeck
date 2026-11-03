@@ -111,6 +111,19 @@ function parseHeaders(raw: string | null): Record<string, string> {
   }
 }
 
+/** The `environmentId` of a `/remove-machine` body: a string of 1-64 characters, else null. */
+async function parseEnvironmentId(req: Request): Promise<string | null> {
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return null;
+  }
+  if (typeof body !== 'object' || body === null) return null;
+  const { environmentId } = body as Record<string, unknown>;
+  return typeof environmentId === 'string' && environmentId.length >= 1 && environmentId.length <= 64 ? environmentId : null;
+}
+
 export class DirectoryHost {
   private state: DirectoryState = EMPTY_DIRECTORY;
   private inbox!: InboxStore;
@@ -136,6 +149,7 @@ export class DirectoryHost {
       const online = new Set(this.registered().map((r) => r.environmentId));
       return json(accountView(this.state, online, this.deps.now(), relayCapBytes(this.env.RELAY_CAP_BYTES)));
     }
+    if (pathname === ACCOUNT_PATHS.removeMachine && req.method === 'POST') return this.removeMachine(req);
     if (pathname !== INTERNAL.socket || !isWebSocketUpgrade(req)) return new Response(null, { status: 404 });
     const identity = parseIdentity(req.headers.get(HDR_IDENTITY));
     if (!identity) return new Response(null, { status: 400 });
@@ -194,6 +208,15 @@ export class DirectoryHost {
     this.sendEvents(due);
     this.inbox.markSent(due.map((e) => e.eventId));
     await this.rearm();
+  }
+
+  /** The account page's Remove (PAN-4959 WI-2): `{ environmentId }`, with no calling socket. */
+  private async removeMachine(req: Request): Promise<Response> {
+    const environmentId = await parseEnvironmentId(req);
+    if (environmentId === null) return json({ error: 'bad_request' }, 400);
+    if (!this.state.machines.some((m) => m.environmentId === environmentId)) return json({ error: 'unknown_machine' }, 404);
+    await this.apply(null, { kind: 'remove-machine', environmentId });
+    return json({ removed: true });
   }
 
   /** A webhook event for one of this account's inboxes (the Worker already capped the body). */
@@ -279,8 +302,8 @@ export class DirectoryHost {
     await this.apply(ws, { kind: 'socket-gone', registeredAs: environmentId });
   }
 
-  /** The reducer context for an event on `ws`: who else is online, excluding `ws` itself. */
-  private context(ws: WebSocket): ReduceContext {
+  /** The reducer context for an event on `ws`: who else is online, excluding `ws` itself (null ⇒ every socket). */
+  private context(ws: WebSocket | null): ReduceContext {
     const config = parseConfig(this.env);
     return {
       now: this.deps.now(),
@@ -292,7 +315,8 @@ export class DirectoryHost {
     };
   }
 
-  private async apply(ws: WebSocket, event: DirectoryEvent): Promise<void> {
+  /** `ws` is null for an event no socket sent (PAN-4959 D-5: the account page's remove-machine). */
+  private async apply(ws: WebSocket | null, event: DirectoryEvent): Promise<void> {
     const { state, effects } = reduce(this.state, event, this.context(ws));
     this.state = state;
     await this.execute(ws, effects);
@@ -312,20 +336,20 @@ export class DirectoryHost {
     await this.execute(ws, effects);
   }
 
-  private resolve(self: WebSocket, to: Target): WebSocket[] {
-    if (to === 'self') return [self];
+  private resolve(self: WebSocket | null, to: Target): WebSocket[] {
+    if (to === 'self') return self ? [self] : [];
     if (to === 'clients') return this.registeredClients(self).map((r) => r.ws);
     if (typeof to === 'object' && 'clientId' in to) {
       return this.registeredClients(self).filter((r) => r.clientId === to.clientId).map((r) => r.ws);
     }
     const others = this.registered(self);
     if (to === 'others') return others.map((r) => r.ws);
-    if (to === 'all') return [self, ...others.map((r) => r.ws)];
+    if (to === 'all') return self ? [self, ...others.map((r) => r.ws)] : others.map((r) => r.ws);
     return others.filter((r) => r.environmentId === to.environmentId).map((r) => r.ws);
   }
 
   /** Persistence, then registration, then sends (and TURN answers), then closes, then logs. */
-  private async execute(self: WebSocket, effects: DirectoryEffect[]): Promise<void> {
+  private async execute(self: WebSocket | null, effects: DirectoryEffect[]): Promise<void> {
     const order: Record<DirectoryEffect['kind'], number> = {
       'put-plan': 0,
       'put-machine': 0,
@@ -354,7 +378,7 @@ export class DirectoryHost {
     const sorted = effects.map((e, i) => ({ e, i })).sort((a, b) => order[a.e.kind] - order[b.e.kind] || a.i - b.i);
     const sql = this.ctx.storage.sql;
     // Read lazily: a `register` effect earlier in this run binds the socket to its machine.
-    const selfEnv = (): string | null => attachmentOf(self)?.environmentId ?? null;
+    const selfEnv = (): string | null => (self ? (attachmentOf(self)?.environmentId ?? null) : null);
     let inboxChanged = false;
     for (const { e } of sorted) {
       switch (e.kind) {
@@ -396,7 +420,7 @@ export class DirectoryHost {
           break;
         case 'inbox-create': {
           const self$ = selfEnv();
-          if (!self$) break;
+          if (!self || !self$) break;
           const config = parseConfig(this.env);
           if (!config.ok) {
             safeSend(self, { type: 'error', code: 'unsupported', message: 'the inbox is not configured', requestId: e.requestId });
@@ -430,13 +454,14 @@ export class DirectoryHost {
           break;
         case 'inbox-deliver': {
           const self$ = selfEnv();
-          if (!self$) break;
+          if (!self || !self$) break;
           const pending = this.inbox.pendingFor(self$);
           for (const event of pending) safeSend(self, inboxEventFrame(event));
           this.inbox.markSent(pending.map((p) => p.eventId));
           break;
         }
         case 'fetch-turn': {
+          if (!self) break;
           const result = await fetchIceServers(parseTurnConfig(this.env), this.deps);
           safeSend(
             self,
@@ -460,6 +485,7 @@ export class DirectoryHost {
           sql.exec(PUT_PUSH_WINDOW_SQL, JSON.stringify(e.window));
           break;
         case 'deliver-push': {
+          if (!self) break;
           const outcome = await deliverPush(e, { config: parsePushConfig(this.env), fetch: this.deps.fetch, now: this.deps.now });
           // Other events ran during the await (H-2): read the socket's machine and the state only now.
           await this.applyPushOutcome(self, { requestId: e.requestId, clientId: e.clientId, environmentId: selfEnv(), token: e.registration.token, outcome });
@@ -469,11 +495,13 @@ export class DirectoryHost {
           sql.exec('DELETE FROM clients WHERE client_id = ?', e.clientId);
           break;
         case 'register-client': {
+          if (!self) break;
           const attachment = attachmentOf(self);
           if (attachment) self.serializeAttachment({ ...attachment, clientId: e.clientId } satisfies Attachment);
           break;
         }
         case 'register': {
+          if (!self) break;
           const attachment = attachmentOf(self);
           if (attachment) self.serializeAttachment({ ...attachment, environmentId: e.environmentId } satisfies Attachment);
           break;
