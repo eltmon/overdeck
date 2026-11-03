@@ -122,6 +122,8 @@ export function buildCodeRabbitFeedbackBody(event: CodeRabbitReviewEvent, thread
     `   \`gh api repos/${event.repo}/pulls/${event.prNumber}/comments/<thread id>/replies -f body="<reason>"\``,
     `4. If you changed code: run the quality gates on what you touched, commit, push, then run \`pan review request ${id}\`.`,
     '   If you only replied, you are done.',
+    `5. If PR #${event.prNumber} has already merged when you read this, nothing more lands on it: open a follow-up issue`,
+    '   for the findings you agree with instead of pushing.',
   ].join('\n');
 }
 

@@ -148,6 +148,7 @@ describe('buildCodeRabbitFeedbackBody', () => {
     expect(body).toContain('gh api repos/eltmon/overdeck/pulls/42/comments/<thread id>/replies -f body="<reason>"');
     expect(body).toContain('pan review request PAN-1');
     expect(body).toContain('If you only replied, you are done.');
+    expect(body).toContain('If PR #42 has already merged when you read this');
   });
 });
 
