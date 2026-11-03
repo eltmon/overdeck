@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4852",
   "created": "2026-11-03T02:45:30.764Z",
-  "updated": "2026-11-03T03:47:47.187Z",
+  "updated": "2026-11-03T03:48:02.494Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -69,9 +69,10 @@
       "doneAt": "2026-11-03T03:47:47.186Z"
     },
     "doctor-built-ox": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4852",
-      "claimedAt": "2026-11-03T03:21:30.311Z"
+      "claimedAt": "2026-11-03T03:21:30.311Z",
+      "doneAt": "2026-11-03T03:48:02.494Z"
     },
     "switch-off": {
       "status": "in_progress",
