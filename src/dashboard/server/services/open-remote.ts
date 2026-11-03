@@ -11,6 +11,7 @@
 import type { EditorId } from '@overdeck/contracts';
 
 import type { MachineLink } from '../../../lib/anywhere/link-store.js';
+import { parseSshDestination } from '../../../lib/anywhere/ssh/target.js';
 
 /** Editors whose CLI takes `--remote ssh-remote+<host>`. */
 export const REMOTE_EDITOR_COMMANDS: Partial<Record<EditorId, string>> = {
@@ -44,6 +45,14 @@ export function sshHostFor(link: Pick<MachineLink, 'routes'>): string | null {
     if (host) return host;
   }
   return null;
+}
+
+/** The `ssh-remote+` authority for an SSH machine destination (D-2): plain `[user@]host`, or hex JSON when a port, an IPv6 host or an uppercase letter would not survive the plain form. */
+export function sshRemoteAuthority(destination: string): string {
+  const { user, host, port } = parseSshDestination(destination);
+  const plain = user !== undefined ? `${user}@${host}` : host;
+  if (port === undefined && !host.includes(':') && !/[A-Z]/.test(plain)) return plain;
+  return Buffer.from(JSON.stringify({ hostName: host, user, port }), 'utf8').toString('hex');
 }
 
 export function resolveRemoteEditorLaunch(input: { editor: string; link: Pick<MachineLink, 'routes'>; cwd: string }): RemoteEditorLaunch {

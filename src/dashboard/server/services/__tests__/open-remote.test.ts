@@ -6,7 +6,7 @@ import type { SharedConversationRow } from '@overdeck/contracts';
 import type { LinkRoute } from '../../../../lib/anywhere/routes.js';
 import type { MachineLink } from '../../../../lib/anywhere/link-store.js';
 import { handleLinkedOpenInEditor } from '../../routes/linked-open.js';
-import { resolveRemoteEditorLaunch, sshHostFor } from '../open-remote.js';
+import { resolveRemoteEditorLaunch, sshHostFor, sshRemoteAuthority } from '../open-remote.js';
 
 const route = (url: string, kind: LinkRoute['kind']): LinkRoute => ({ url, kind, source: 'pairing', addedAt: '2026-11-01T00:00:00.000Z' });
 
@@ -60,5 +60,43 @@ describe('remote editor launch (PAN-4650 WI-20)', () => {
       expect(response.status).toBe(409);
     }
     expect(launch).not.toHaveBeenCalled();
+  });
+});
+
+describe('sshRemoteAuthority (PAN-4859)', () => {
+  it.each([
+    ['build-box', 'build-box'],
+    ['root@build-box', 'root@build-box'],
+    ['ssh://root@build-box', 'root@build-box'],
+    [
+      'ssh://root@build-box:2222',
+      '7b22686f73744e616d65223a226275696c642d626f78222c2275736572223a22726f6f74222c22706f7274223a323232327d',
+    ],
+    ['ssh://build-box:2222', '7b22686f73744e616d65223a226275696c642d626f78222c22706f7274223a323232327d'],
+    ['[::1]', '7b22686f73744e616d65223a223a3a31227d'],
+    [
+      'ssh://me@[fd00::5]:2200',
+      '7b22686f73744e616d65223a22666430303a3a35222c2275736572223a226d65222c22706f7274223a323230307d',
+    ],
+  ] as const)('encodes %s as %s', (destination, authority) => {
+    expect(sshRemoteAuthority(destination)).toBe(authority);
+  });
+
+  it('encodes an uppercase user as hex that round-trips to the object', () => {
+    const authority = sshRemoteAuthority('Admin@build-box');
+    expect(JSON.parse(Buffer.from(authority, 'hex').toString())).toEqual({ hostName: 'build-box', user: 'Admin' });
+  });
+
+  it('every hex vector round-trips through Buffer.from(x, "hex")', () => {
+    const vectors: Array<[string, Record<string, unknown>]> = [
+      ['ssh://root@build-box:2222', { hostName: 'build-box', user: 'root', port: 2222 }],
+      ['ssh://build-box:2222', { hostName: 'build-box', port: 2222 }],
+      ['[::1]', { hostName: '::1' }],
+      ['ssh://me@[fd00::5]:2200', { hostName: 'fd00::5', user: 'me', port: 2200 }],
+    ];
+    for (const [destination, expected] of vectors) {
+      const authority = sshRemoteAuthority(destination);
+      expect(JSON.parse(Buffer.from(authority, 'hex').toString())).toEqual(expected);
+    }
   });
 });
