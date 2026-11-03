@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T05:49:06.675432Z · model: claude-opus-5-5 · open: 872_
+_Last sequenced: 2026-11-03T05:51:29.375642Z · model: claude-opus-5-5 · open: 873_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -9,6 +9,7 @@ _Last sequenced: 2026-11-03T05:49:06.675432Z · model: claude-opus-5-5 · open: 
 | 2 | PAN-4881 | S | high | ok |  |  | Order-dependent 401 in projects-rename.test.ts failed the v0.73.1 release full-suite run; make the test hermetic. |
 | 3 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 4 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install aborts workspace creation (since #4163); reproduced 2026-11-02 on botland too, so every polyrepo start fails. |
+| 5 | PAN-4882 | M | high | ok |  |  | Re-run the five v0.73 Anywhere checks fixed after the release run (TURN relay on Fly, AC-4, AC-6, AC-15) on deployed main. |
 | 7 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
 | 8 | PAN-4690 | S | critical | ok |  |  | Review dispatch rewrites the tracked continue file uncommitted, so the dirty-tree gate blocks the review it dispatched |
 | 10 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
@@ -896,6 +897,10 @@ New substrate bug with a verified root cause: adoption (PAN-4605) calls startRev
 
 Moved from rank 9 to the free rank 4: a 2026-11-02 comment shows the same abort on a second polyrepo project (botland), so the bug now blocks workspace creation for every polyrepo project, not only mind-your-now.
 
+### PAN-4882 (rank 5)
+
+New in-pipeline verification issue: the v0.73.0 acceptance run failed AC-2/3/4/6/15, and the fixes (PAN-4862, PAN-4861, PAN-4859, #4864) are closed, so nothing blocks the re-run. It is already picked up, so it takes the free rank 5 without moving any other node; it shares the release checklist with PAN-4863, recorded as an advisory informs edge.
+
 ### PAN-4733 (rank 7)
 
 Rank held: parent PAN-4732 (move heavy e2e out of the default shards) closed as completed on 2026-11-01, so this follow-up is now unblocked and next in line.
@@ -1196,10 +1201,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
 
 Triage: verify "running at $0.00 with no capacity fallback" against the current liveness definition. Rank held.
 
-### PAN-3106 (rank 80)
-
-New this pass. shouldHoldForUat is consulted on exactly one merge path, so every other path merges a ready issue without asking whether its project holds for UAT — verified at code level on a real MIN-901 merge. This defeats the batch-train model directly: issues merge one at a time before a generation can assemble them.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1207,10 +1208,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T05:49:06.675432Z",
+  "generatedAt": "2026-11-03T05:51:29.375642Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 872,
+  "openCount": 873,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -12113,6 +12114,19 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "rationale": "Rank kept at the bottom: PAN-4820 closed so the dependency is dropped, but the operator still parks this undecided low-priority question.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4882",
+      "rank": 5,
+      "size": "M",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Re-run the five v0.73 Anywhere checks fixed after the release run (TURN relay on Fly, AC-4, AC-6, AC-15) on deployed main.",
+      "rationale": "New in-pipeline verification issue: the v0.73.0 acceptance run failed AC-2/3/4/6/15, and the fixes (PAN-4862, PAN-4861, PAN-4859, #4864) are closed, so nothing blocks the re-run. It is already picked up, so it takes the free rank 5 without moving any other node; it shares the release checklist with PAN-4863, recorded as an advisory informs edge.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13585,6 +13599,13 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.7
+    },
+    {
+      "from": "PAN-4882",
+      "to": "PAN-4863",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
     }
   ]
 }
