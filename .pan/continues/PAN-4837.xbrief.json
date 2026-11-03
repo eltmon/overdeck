@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4837",
   "created": "2026-11-03T16:16:59.604Z",
-  "updated": "2026-11-03T18:52:06.643Z",
+  "updated": "2026-11-03T18:52:35.646Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -228,6 +228,10 @@
     "directory-state-events.ac2": {
       "status": "completed",
       "doneAt": "2026-11-03T18:52:06.643Z"
+    },
+    "directory-state-events.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:52:35.645Z"
     }
   }
 }
