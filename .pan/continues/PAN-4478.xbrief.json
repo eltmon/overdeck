@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4478",
   "created": "2026-11-03T17:36:37.149Z",
-  "updated": "2026-11-03T18:38:25.890Z",
+  "updated": "2026-11-03T18:38:54.132Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -182,6 +182,10 @@
     "host-dialog.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T18:38:25.889Z"
+    },
+    "host-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:38:54.132Z"
     }
   }
 }
