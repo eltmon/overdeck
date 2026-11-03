@@ -6,7 +6,8 @@ description: Optional overdeck.ai sign-in for this machine (directory and hosted
 # `pan account`
 
 Sign this machine in to your overdeck.ai account with GitHub's device flow. Sign-in is
-optional: nothing else in the CLI reads the token file, and no command prompts for it.
+optional: `pan share` needs it, and `pan join` runs this sign-in itself when the machine is not
+signed in (see [`pan share and pan join`](/cli/share)).
 It is the prerequisite for the directory ([PAN-2356](https://github.com/eltmon/overdeck/issues/2356))
 and Shared Sessions — see [`anywhere`](/anywhere).
 
