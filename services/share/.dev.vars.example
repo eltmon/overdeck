@@ -3,3 +3,8 @@
 # Leave the TURN values empty to run with STUN only (/healthz then reports "turn":false).
 TURN_KEY_ID=
 TURN_KEY_API_TOKEN=
+# Web join (PAN-4481): .dev.vars overrides the committed wrangler.jsonc vars for `wrangler dev --local`.
+# The web-join Origin check compares against PUBLIC_BASE_URL, so local development needs the localhost value.
+PUBLIC_BASE_URL=http://localhost:8787
+ACCOUNT_BASE_URL=http://localhost:8788
+WEB_SESSION_KEY=<64 hex characters, e.g. from openssl rand -hex 32>

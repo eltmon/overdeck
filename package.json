@@ -112,7 +112,7 @@
     "typecheck:acp": "tsc --noEmit -p packages/effect-acp/tsconfig.json",
     "typecheck:anywhere-channel": "tsc --noEmit -p packages/anywhere-channel/tsconfig.json",
     "typecheck:account": "tsc --noEmit -p services/account/tsconfig.json",
-    "typecheck:share": "tsc --noEmit -p services/share/tsconfig.json",
+    "typecheck:share": "tsc --noEmit -p services/share/tsconfig.json && tsc --noEmit -p services/share/web/tsconfig.json",
     "typecheck:connect": "tsc --noEmit -p services/connect/tsconfig.json",
     "typecheck:contracts": "tsc --noEmit -p packages/contracts/tsconfig.json",
     "typecheck:hooks": "tsc --noEmit -p tsconfig.hooks.json",
