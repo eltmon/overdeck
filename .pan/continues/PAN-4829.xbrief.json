@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4829",
   "created": "2026-11-03T07:49:13.339Z",
-  "updated": "2026-11-03T08:13:27.788Z",
+  "updated": "2026-11-03T08:13:50.909Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -60,6 +60,10 @@
     "subprotocol-auth.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T08:13:27.788Z"
+    },
+    "subprotocol-auth.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:13:50.909Z"
     }
   }
 }
