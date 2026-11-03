@@ -654,5 +654,3 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   the zero-install `npx @overdeck/core join <CODE>` on the share invite page works. A bin with a
   different target breaks it with "could not determine executable to run".
 <!-- last-verified: 2026-11-03 -->
-<!-- last-verified: 2026-11-03 (PAN-4905) -->
-<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917) -->
