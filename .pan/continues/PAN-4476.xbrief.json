@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4476",
   "created": "2026-11-03T15:05:40.423Z",
-  "updated": "2026-11-03T16:10:45.400Z",
+  "updated": "2026-11-03T16:11:01.147Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -212,6 +212,10 @@
     "hub-submit.ac5": {
       "status": "completed",
       "doneAt": "2026-11-03T16:10:45.400Z"
+    },
+    "host-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:11:01.147Z"
     }
   }
 }
