@@ -17,6 +17,7 @@
  */
 import {
   CLIENT_LIMIT_MESSAGE,
+  type ClientPlatform,
   type ClientToDirectoryFrame,
   CONNECT_CLOSE_CODES,
   CONNECT_PROTOCOL_VERSION,
@@ -47,7 +48,7 @@ export interface DirectoryWebDeps {
   label: string;
   publicKeyHex: string;
   appVersion: string;
-  platform: 'ios' | 'android';
+  platform: ClientPlatform;
   /** Default `globalThis.WebSocket`. */
   WebSocket?: typeof WebSocket;
   /** Default `Math.random`. */
