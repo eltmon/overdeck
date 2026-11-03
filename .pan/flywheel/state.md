@@ -553,3 +553,14 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
 - Build 530ee175e8c is live and includes all PAN-4774 fixes: PAN-4774 (#4864), 4859 (#4867), 4860 (#4865), 4861 (#4866), 4862 (#4868). All five closed out; close-out PR lookup worked first try (PAN-4821 fix live).
 - Deploy note: a reload started by another session held the restart lock ~2h with a pre-merge build; after the operator approved it, a second reload was needed. Starting a reload while another is pending is refused ("restart in progress"), so check the lock holder's build before telling the operator one approval ships everything.
 - Release gate remaining (operator): AC-3 Tailscale on this host, AC-10 real VPS (PAN-4863), PAN-4862 live Fly relay check (device code needs operator OK), then `pan release stable`. PAN-4823 phone app and Shared Sessions slices start after the release ships.
+
+## 2026-11-03 03:00Z — operator answers
+- PAN-4773 decided: no auto-merge hold; CodeRabbit findings route to the work agent, which fixes the ones it agrees with and replies on the PR with its reason for each rejection. Routed to the merge-systems handoff (conv 3466, TENET-10).
+- Release: ship as-is as v0.73.0; the Flywheel cuts it (`pan release stable --version 0.73.0`, then push main and the tag), but HOLD until the operator sends "go release". Known post-release gaps: AC-3 Tailscale on this host, AC-10 VPS (PAN-4863), PAN-4862 live relay re-check.
+- After the release ships: start PAN-4823 phone-app wave 1 (4828, 4831, 4833) and Shared Sessions PAN-4473, per the recorded orders and the PAN-4481/PAN-4831 pkce.ts conflict rule.
+- Standing rule (operator memory operator-decides-only-real-tradeoffs): decide routine pipeline and policy questions myself; only product direction, money, unapproved external publication or irreversible actions go to the operator. Fly device-code approvals: ask in this conversation, not via the operator dashboard.
+
+## 2026-11-03 03:40Z — v0.73.0 cut
+- Operator said "go release". Changelog drafted by a subagent (no "t3code"; features spelled out), finalized and committed (f92fcebfa65); `pan release stable --version 0.73.0 --skip-tests` (main CI already green on 04f8bccc9df; host must not run the full suite) made 7de98491242 + tag v0.73.0. PAN-4869 had no PR yet, so it goes in the next release.
+- Gotchas: `pan release` needs a fully clean tree including untracked files (moved two .impeccable tool folders aside and restored them); the agent main-push guard refuses the release commit (package.json version bumps) — operator-directed release pushes use OVERDECK_OPERATOR_PUSH=1.
+- Next: when the Release workflow publishes, start PAN-4823 wave 1 (4828, 4831, 4833) and Shared Sessions PAN-4473.
