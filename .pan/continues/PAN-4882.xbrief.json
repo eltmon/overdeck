@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4882",
   "created": "2026-11-03T06:27:51.535Z",
-  "updated": "2026-11-03T07:52:38.876Z",
+  "updated": "2026-11-03T07:52:57.786Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -188,6 +188,10 @@
     "ssh-vm-setup.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T07:52:38.876Z"
+    },
+    "ssh-vm-setup.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:52:57.786Z"
     }
   }
 }
