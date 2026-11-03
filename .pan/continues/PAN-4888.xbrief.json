@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4888",
   "created": "2026-11-03T08:25:32.067Z",
-  "updated": "2026-11-03T09:24:25.821Z",
+  "updated": "2026-11-03T09:24:47.923Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -176,6 +176,10 @@
     "reload-holder-yield.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T09:24:25.820Z"
+    },
+    "reload-holder-yield.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:24:47.922Z"
     }
   }
 }
