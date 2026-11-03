@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4852",
   "created": "2026-11-03T02:45:30.764Z",
-  "updated": "2026-11-03T03:48:02.494Z",
+  "updated": "2026-11-03T03:48:18.461Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -75,9 +75,10 @@
       "doneAt": "2026-11-03T03:48:02.494Z"
     },
     "switch-off": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4852",
-      "claimedAt": "2026-11-03T03:21:35.362Z"
+      "claimedAt": "2026-11-03T03:21:35.362Z",
+      "doneAt": "2026-11-03T03:48:18.461Z"
     },
     "merge-gate-wiring": {
       "status": "in_progress",
