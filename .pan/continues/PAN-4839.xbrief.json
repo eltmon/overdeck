@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4839",
   "created": "2026-11-03T21:01:30.274Z",
-  "updated": "2026-11-03T22:04:13.275Z",
+  "updated": "2026-11-03T22:04:33.185Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -100,6 +100,10 @@
     "apns-liveactivity.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T22:04:13.274Z"
+    },
+    "apns-liveactivity.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:04:33.184Z"
     }
   }
 }
