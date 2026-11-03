@@ -11,6 +11,9 @@
  * never sees the HTTP status of a refused upgrade, so a 401 arrives as close 1006 and is retried;
  * close codes 4001, 4003, 4010, 4011, 4012 and 4013 stop retrying. Keepalive: the text `ping` every
  * 30 s; 75 s without `pong` drops the socket and reconnects.
+ *
+ * `onStateChange` listeners hear every state change and every machine-list update (`welcome-client`,
+ * `directory`), so one subscription keeps a screen current (PAN-4837 WI-4).
  */
 import {
   CLIENT_LIMIT_MESSAGE,
@@ -102,6 +105,7 @@ export class DirectoryWebClient {
   private pingTimer: ReturnType<typeof setInterval> | null = null;
   private lastPongAt = 0;
   private readonly handlers = new Map<FrameType, Set<(frame: DirectoryToClientFrame) => void>>();
+  private readonly stateListeners = new Set<(state: DirectoryWebState) => void>();
 
   constructor(private readonly deps: DirectoryWebDeps) {}
 
@@ -136,7 +140,7 @@ export class DirectoryWebClient {
     this.stopped = true;
     this.clearReconnect();
     this.dropSocket();
-    this._state = 'off';
+    this.setState('off');
   }
 
   /** Sends a frame when the socket is online; false otherwise. */
@@ -157,6 +161,17 @@ export class DirectoryWebClient {
     set.add(entry);
     return () => {
       set.delete(entry);
+    };
+  }
+
+  /**
+   * Subscribe to state changes and machine-list updates; returns the unsubscribe function. A
+   * machine-list update calls the listener with the unchanged state.
+   */
+  onStateChange(listener: (state: DirectoryWebState) => void): () => void {
+    this.stateListeners.add(listener);
+    return () => {
+      this.stateListeners.delete(listener);
     };
   }
 
@@ -199,14 +214,14 @@ export class DirectoryWebClient {
     }
     if (this.stopped) return;
     if (token === null) {
-      this._state = 'off';
       this._refusal = null;
       this._machines = [];
       this._plan = null;
       this._relayAllowed = false;
+      this.setState('off');
       return;
     }
-    this._state = 'connecting';
+    this.setState('connecting');
     const protocol = BEARER_PROTOCOL_PREFIX + token;
     const WebSocketClass = this.deps.WebSocket ?? globalThis.WebSocket;
     let socket: WebSocket;
@@ -274,15 +289,16 @@ export class DirectoryWebClient {
     if (typeof frame !== 'object' || frame === null || typeof frame.type !== 'string') return;
     switch (frame.type) {
       case 'welcome-client':
-        this._state = 'online';
         this._refusal = null;
         this.backoffMs = BACKOFF_INITIAL_MS;
         this._plan = frame.plan;
         this._relayAllowed = frame.relayAllowed;
         this._machines = [...frame.machines];
+        this.setState('online', true);
         break;
       case 'directory':
         this._machines = [...frame.machines];
+        this.notifyState();
         break;
       case 'error':
         if (frame.code === 'client_limit') this._refusal = frame.message;
@@ -302,13 +318,30 @@ export class DirectoryWebClient {
   private refuse(message: string): void {
     this.dropSocket();
     this.clearReconnect();
-    this._state = 'refused';
     this._refusal = message;
+    this.setState('refused');
+  }
+
+  /** Assigns the state and tells the listeners when it changed, or always when `notify` is set. */
+  private setState(next: DirectoryWebState, notify = false): void {
+    const changed = this._state !== next;
+    this._state = next;
+    if (changed || notify) this.notifyState();
+  }
+
+  private notifyState(): void {
+    for (const listener of [...this.stateListeners]) {
+      try {
+        listener(this._state);
+      } catch {
+        // A listener's failure must not break the socket.
+      }
+    }
   }
 
   private scheduleReconnect(): void {
     if (this.stopped) return;
-    this._state = 'connecting';
+    this.setState('connecting');
     this.clearReconnect();
     const random = this.deps.random ?? Math.random;
     const jitter = 1 + (random() * 2 - 1) * BACKOFF_JITTER;
