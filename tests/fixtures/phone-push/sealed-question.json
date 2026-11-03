@@ -1,0 +1,17 @@
+{
+  "publicKeyHex": "33dc112d65f9c8fe030bd29d21004c04bc157c05864f235cabe5164b18956d47",
+  "secretKeyHex": "fbc77e68bd4d2a88b57ffee20b13f42e63443c97f275b4c830095a64d6bededf",
+  "payload": {
+    "v": 1,
+    "machine": "e91ffda1-431a-483d-a6e4-a72079516ea4",
+    "kind": "question",
+    "title": "PAN-4840 asks: Ship the Android handler?",
+    "body": "Choose one: yes, no, later",
+    "url": "/m?subject=pan-4840-conv",
+    "tag": "auq:toolu_fixture",
+    "issueId": "PAN-4840",
+    "ts": "2026-11-03T20:00:00.000Z"
+  },
+  "sealedBase64": "i/UZtlAMi1zZJ7pxCRI97MzFU1EoPy/FkkLDfL1ga0Wq8u3UFdsbHMrE6qdUm+ncaxcdvqgSBGQMyEpalztMowqbED4sHo6lImE/RQUkpaLKK1cYyzQEYTfZtMB2yzwKSeZuA0Z9Iqso7yDdl8XVriCKCFz8qS2oxKnpIx/s3M1fEvEDVkjAN77wpMYWtCbr8+OGUKb4ebPuuvqMwBerPeujKs+hK/8lC07SCdozi5ZlJjflq42U7bHrX2l3jqssGRI7tzPWZvCrcBF0h7a9ZOYx7y/p+vHXGyvnK25dRV+E71fMrheFPH5Aghv8PEc2foQYEk4vwJ/a1ri5Mb+CgwDq9ZtwIQf2279c31k0B3LJTkzUcuF3AIS5x0SO2KVAZ0X1wKnl93LGSoE7ajdyNyGw1zrO5uaIb7jiTtBIZiv8",
+  "tamperedBase64": "i/UZtlAMi1zZJ7pxCRI97MzFU1EoPy/FkkLDfL1ga0Wq8u3UFdsbHMrE6qdUm+ncaxcdvqgSBGQMyEpalztMowqbED4sHo6lImE/RQUkpaLKK1cYyzQEYTfZtMB2yzwKSeZuA0Z9Iqso7yDdl8XVriCKCFz8qS2oxKnpIx/s3M1fEvEDVkjAN77wpMYWtCbr8+OGUKb4ebPuuvqMwBerPeujKs+hK/8lC07SCdozi5ZlJjflq42U7bHrX2l3jqssGRI7tzPWZvCrcBF0h7a9ZOYx7y/p+vHXGyvnK25dRV+E71fMrheFPH5Aghv8PEc2foQYEk4vwJ/a1ri5Mb+CgwDq9ZtwIQf2279c31k0B3LJTkzUcuF3AIS5x0SO2KVAZ0X1wKnl93LGSoE7ajdyNyGw1zrO5uaIb7jiTtBIZiv9"
+}
