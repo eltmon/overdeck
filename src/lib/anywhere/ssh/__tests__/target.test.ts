@@ -10,6 +10,7 @@ import {
   formatHelperResult,
   listSshConfigAliases,
   parseHelperResult,
+  parseSshDestination,
   parseVersionOutput,
   remoteCommand,
   type SshConfigIo,
@@ -60,6 +61,25 @@ describe('validateSshDestination (D-4404-6)', () => {
     'desk\nhost',
   ])('rejects %j with bad-destination', (dest) => {
     expect(codeOf(() => validateSshDestination(dest))).toBe('bad-destination');
+  });
+});
+
+describe('parseSshDestination', () => {
+  it.each([
+    ['build-box', { host: 'build-box' }],
+    ['root@build-box', { user: 'root', host: 'build-box' }],
+    ['ssh://root@build-box', { user: 'root', host: 'build-box' }],
+    ['ssh://root@build-box:2222', { user: 'root', host: 'build-box', port: 2222 }],
+    ['ssh://build-box:2222', { host: 'build-box', port: 2222 }],
+    ['[fd00::5]', { host: 'fd00::5' }],
+    ['ssh://me@[fd00::5]:2200', { user: 'me', host: 'fd00::5', port: 2200 }],
+    [' root@build-box ', { user: 'root', host: 'build-box' }],
+  ] as const)('parses %j', (input, expected) => {
+    expect(parseSshDestination(input)).toEqual(expected);
+  });
+
+  it.each(['build-box:2222', '-oProxyCommand=x', ''])('rejects %j with bad-destination', (input) => {
+    expect(codeOf(() => parseSshDestination(input))).toBe('bad-destination');
   });
 });
 
