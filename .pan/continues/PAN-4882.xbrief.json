@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4882",
   "created": "2026-11-03T06:27:51.535Z",
-  "updated": "2026-11-03T07:48:54.331Z",
+  "updated": "2026-11-03T07:49:15.565Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -152,6 +152,10 @@
     "ac04-fly-setup.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T07:48:54.331Z"
+    },
+    "ac04-fly-setup.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:49:15.565Z"
     }
   }
 }
