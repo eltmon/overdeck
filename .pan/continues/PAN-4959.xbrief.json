@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4959",
   "created": "2026-11-03T21:54:38.804Z",
-  "updated": "2026-11-03T21:58:29.945Z",
+  "updated": "2026-11-03T21:58:46.581Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-4959",
       "claimedAt": "2026-11-03T21:54:38.804Z",
       "doneAt": "2026-11-03T21:58:29.945Z"
+    },
+    "connect-remove-machine": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4959",
+      "claimedAt": "2026-11-03T21:58:46.581Z"
     }
   }
 }
