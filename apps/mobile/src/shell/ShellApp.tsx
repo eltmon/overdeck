@@ -140,14 +140,23 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
     setServices({ directory, connection, liveActivity });
     void directory.client.start();
     void liveActivity.refresh();
-    if (platform === 'ios') {
+    // The operator may change the iOS permission in iOS Settings while the app is in the background,
+    // so the Settings row reads it again on every resume.
+    const readLiveActivityStatus = () => {
+      if (platform !== 'ios') return;
       OverdeckLiveActivity.status().then(setLiveActivityStatus, (e: unknown) => console.warn('[live-activity] status failed', e));
-    }
+    };
+    readLiveActivityStatus();
     const uninstallResume = installResumeHandler(() => ({
       directory: directory.client,
       connection,
       resetTransport: () => resetTransport(),
-      liveActivity,
+      liveActivity: {
+        refresh: () => {
+          readLiveActivityStatus();
+          return liveActivity.refresh();
+        },
+      },
     }));
     return () => {
       uninstallResume();

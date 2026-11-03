@@ -7,6 +7,7 @@ const harness = vi.hoisted(() => ({
   dialKind: 'removed' as 'removed' | 'no-path',
   launchUrl: undefined as string | undefined,
   urlListeners: [] as Array<(event: { url: string }) => void>,
+  resumeListeners: [] as Array<(state: { isActive: boolean }) => void>,
   platform: 'android' as 'ios' | 'android',
   sent: [] as Array<{ type: string }>,
   liveActivity: {
@@ -20,8 +21,9 @@ const harness = vi.hoisted(() => ({
 vi.mock('@capacitor/app', () => ({
   App: {
     getLaunchUrl: vi.fn(async () => (harness.launchUrl ? { url: harness.launchUrl } : undefined)),
-    addListener: vi.fn(async (_event: string, listener: (event: { url: string }) => void) => {
-      harness.urlListeners.push(listener);
+    addListener: vi.fn(async (event: string, listener: (event: never) => void) => {
+      if (event === 'appStateChange') harness.resumeListeners.push(listener);
+      else harness.urlListeners.push(listener);
       return { remove: vi.fn() };
     }),
   },
@@ -107,6 +109,7 @@ beforeEach(async () => {
   harness.dialKind = 'removed';
   harness.launchUrl = undefined;
   harness.urlListeners.length = 0;
+  harness.resumeListeners.length = 0;
   harness.platform = 'android';
   harness.sent.length = 0;
   for (const fn of Object.values(harness.liveActivity)) fn.mockClear();
@@ -190,6 +193,21 @@ describe('ShellApp Live Activity (PAN-4839 WI-10)', () => {
     expect(harness.sent).toContainEqual({ type: 'activity-unregister' });
     expect(localStorage.getItem('overdeck.liveActivity')).toBe('off');
     expect(screen.getByRole('switch', { name: 'Live Activity' }).getAttribute('aria-checked')).toBe('false');
+  });
+
+  it('reads the iOS permission again on resume, so the Settings row follows iOS Settings', async () => {
+    harness.platform = 'ios';
+    render(<ShellApp navigate={() => undefined} />);
+    const settings = await screen.findByText('Settings');
+    await act(async () => settings.click());
+    expect(await screen.findByRole('switch', { name: 'Live Activity' })).toBeTruthy();
+    harness.liveActivity.status.mockResolvedValueOnce({ supported: true, enabled: false });
+    await act(async () => {
+      for (const listener of harness.resumeListeners) listener({ isActive: true });
+    });
+    expect(await screen.findByText('Turn on Live Activities for Overdeck in iOS Settings.')).toBeTruthy();
+    expect(screen.queryByRole('switch', { name: 'Live Activity' })).toBeNull();
+    expect(harness.liveActivity.start).toHaveBeenCalledTimes(2);
   });
 
   it('shows no Live Activity row and never calls the plugin on Android', async () => {
