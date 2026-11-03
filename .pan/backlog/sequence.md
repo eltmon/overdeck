@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T23:27:04.504781Z · model: claude-opus-5-5 · open: 894_
+_Last sequenced: 2026-11-03T23:29:34.927893Z · model: claude-opus-5-5 · open: 893_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -865,10 +865,9 @@ _Last sequenced: 2026-11-03T23:27:04.504781Z · model: claude-opus-5-5 · open: 
 | 871 | PAN-4592 | M | low | ok |  | PAN-4590 | pan semgrep ci-setup opens a PR adding a Semgrep Actions workflow + failure relay; needs gate mode from PAN-4590. |
 | 872 | PAN-4594 | M | low | ok |  | PAN-4590 | Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590. |
 | 873 | PAN-4593 | L | low | needs-refinement |  | PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
-| 876 | PAN-4838 | M | medium | ok |  |  | Phone app W-IOS1: APNs registration and Notification Service Extension that decrypts sealed alerts. |
 | 877 | PAN-4840 | M | medium | ok |  |  | Phone app W-AND1: FCM FirebaseMessagingService decrypts sealed data payloads and posts notifications. |
 | 878 | PAN-4841 | M | medium | ok |  |  | Phone app W-REL1: Apple/Firebase/Play/Cloudflare setup and first store builds; operator approves purchases. |
-| 879 | PAN-4839 | S | low | ok |  | PAN-4838 | Phone app W-IOS2: counts-only Live Activity, on by default with a Settings off switch; OD-1 settled; after PAN-4838. |
+| 879 | PAN-4839 | S | low | ok |  |  | Phone app W-IOS2: counts-only Live Activity, on by default with a Settings off switch; OD-1 settled; after PAN-4838. |
 | 880 | PAN-4842 | S | medium | ok |  |  | Phone app W-DOC: phone-app.mdx and updates to Anywhere, push, tailscale and service docs; finished last. |
 | 881 | PAN-4851 | S | low | needs-refinement |  |  | Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them |
 | 882 | PAN-4887 | M | medium | ok |  |  | Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); PAN-4835 merged. |
@@ -1229,10 +1228,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T23:27:04.504781Z",
+  "generatedAt": "2026-11-03T23:29:34.927893Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 894,
+  "openCount": 893,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -11831,19 +11830,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
-      "issue": "PAN-4838",
-      "rank": 876,
-      "size": "M",
-      "importance": "medium",
-      "score": 30,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Phone app W-IOS1: APNs registration and Notification Service Extension that decrypts sealed alerts.",
-      "rationale": "PAN-4830 and PAN-4843 closed; rank unchanged because the remaining dependency PAN-4837 is still in the work phase.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4840",
       "rank": 877,
       "size": "M",
@@ -11876,9 +11862,7 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "importance": "low",
       "score": 22,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4838"
-      ],
+      "dependsOn": [],
       "why": "Phone app W-IOS2: counts-only Live Activity, on by default with a Settings off switch; OD-1 settled; after PAN-4838.",
       "rationale": "PAN-4774 (Anywhere release AC run) closed as completed, so that dependency is removed; rank held because the phone-app epic is feature work that still ranks below substrate items.",
       "gate": "auto",
@@ -13523,13 +13507,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
     },
     {
       "from": "PAN-4823",
-      "to": "PAN-4838",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4823",
       "to": "PAN-4840",
       "type": "contains",
       "source": "github-ref",
@@ -13550,25 +13527,11 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "confidence": 1
     },
     {
-      "from": "PAN-4838",
-      "to": "PAN-4839",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.9
-    },
-    {
       "from": "PAN-4823",
       "to": "PAN-4842",
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-4838",
-      "to": "PAN-4841",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.8
     },
     {
       "from": "PAN-4840",
