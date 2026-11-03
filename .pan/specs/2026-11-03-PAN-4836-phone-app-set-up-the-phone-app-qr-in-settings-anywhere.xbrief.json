@@ -4,17 +4,17 @@
     "created": "2026-11-03T14:14:08Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4836: Phone app: Set up the phone app QR in Settings > Anywhere",
-    "updated": "2026-11-03T14:18:58.501Z"
+    "updated": "2026-11-03T14:19:53.014Z"
   },
   "plan": {
     "id": "pan-4836",
     "title": "Phone app: Set up the phone app QR in Settings > Anywhere",
-    "status": "proposed",
+    "status": "running",
     "uid": "2d9c7737-f1ea-4ce7-a51b-0704242af1ff",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-03T14:14:08Z",
-    "updated": "2026-11-03T14:18:58.501Z",
+    "updated": "2026-11-03T14:19:53.014Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4836",
@@ -470,5 +470,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
