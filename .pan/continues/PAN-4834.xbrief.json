@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4834",
   "created": "2026-11-03T14:27:37.940Z",
-  "updated": "2026-11-03T15:10:05.174Z",
+  "updated": "2026-11-03T15:10:24.402Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -96,6 +96,10 @@
     "ws-framing.ac2": {
       "status": "completed",
       "doneAt": "2026-11-03T15:10:05.173Z"
+    },
+    "ws-framing.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:10:24.402Z"
     }
   }
 }
