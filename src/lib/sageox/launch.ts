@@ -2,14 +2,15 @@
  * SageOx wiring for a managed launch (PAN-2444 FR-8, FR-9).
  *
  * The `sageox` skill pack toggle is the opt-in (D1). When it is on for a
- * Claude Code launch and the Overdeck-built `ox` (PAN-4852 WI-7:
+ * Claude Code or Codex launch and the Overdeck-built `ox` (PAN-4852 WI-7:
  * `<packdir>/<commit>/bin/ox`, never one on PATH) answers the fork's host
  * contract (D7), the launch places the project's binding into the git root's
  * `.sageox/` (PAN-4852 WI-13, AD-15/AD-16; a tracked or hand-made `.sageox/`
  * is used as it is) and gets the host-managed env and six `ox agent hook`
- * entries in its `--settings` JSON (D13). Each hook calls the built `ox` by
- * absolute path. Uploads stay off unless the project's upload flag is enabled
- * (D6). When SageOx resolves off, the launch removes a placed binding from its
+ * entries in its `--settings` JSON (D13); a Codex launch gets the same
+ * commands in its `hooks.json` (WI-17, `codex-hooks.ts`). Each hook calls
+ * the built `ox` by absolute path. Uploads stay off unless the project's
+ * upload flag is enabled (D6). When SageOx resolves off, the launch removes a placed binding from its
  * cwd (AD-17).
  *
  * Fail open for the launch, fail closed for SageOx (NFR-3): any failed
@@ -40,6 +41,8 @@ export interface SageoxClaudeSettings {
 
 export interface SageoxLaunch {
   active: boolean;
+  /** The built `ox` (absolute path) when active; Codex hooks call it (PAN-4852 WI-17). */
+  bin?: string;
   settings?: SageoxClaudeSettings;
   warnings: string[];
 }
@@ -132,7 +135,7 @@ export function sageoxClaudeHooks(env: Record<string, string>, bin: string): Rec
   }]]));
 }
 
-async function resolve(ctx: LaunchSkillContext, harness: 'claude-code' | 'codex', deps: SageoxLaunchDeps): Promise<SageoxLaunch> {
+async function resolve(ctx: LaunchSkillContext, deps: SageoxLaunchDeps): Promise<SageoxLaunch> {
   const { layers, projectKey } = await deps.loadLayers(ctx);
   if (!(await sageoxActive(layers))) {
     // AD-17: switch-off removes a binding Overdeck placed; a failure costs one warning.
@@ -142,9 +145,6 @@ async function resolve(ctx: LaunchSkillContext, harness: 'claude-code' | 'codex'
       return { active: false, warnings: [`${WARN} SageOx placed files not removed: ${error instanceof Error ? error.message : String(error)}`] };
     }
     return { active: false, warnings: [] };
-  }
-  if (harness === 'codex') {
-    return { active: false, warnings: [`${WARN} SageOx is on but supports Claude Code launches only; sageox skills and hooks not applied`] };
   }
   const root = await deps.gitRoot(ctx.cwd);
   if (!root) return { active: false, warnings: [`${WARN} SageOx not applied: ${ctx.cwd} is not in a git repository`] };
@@ -160,17 +160,20 @@ async function resolve(ctx: LaunchSkillContext, harness: 'claude-code' | 'codex'
   if (!placed.ok) return { active: false, warnings: [`${WARN} ${placed.warning}`] };
   const upload = await deps.readUpload(projectKey);
   const env = sageoxEnv(root, upload);
-  return { active: true, settings: { env, hooks: sageoxClaudeHooks(env, binary.bin) }, warnings: [] };
+  return { active: true, bin: binary.bin, settings: { env, hooks: sageoxClaudeHooks(env, binary.bin) }, warnings: [] };
 }
 
-/** SageOx wiring for one launch. Never throws: an error drops SageOx, not the launch. */
+/**
+ * SageOx wiring for one launch. Never throws: an error drops SageOx, not the
+ * launch. Both harnesses resolve the same way; the caller writes the hooks.
+ */
 export async function resolveSageoxLaunch(
   ctx: LaunchSkillContext,
-  harness: 'claude-code' | 'codex',
+  _harness: 'claude-code' | 'codex',
   deps: SageoxLaunchDeps = defaultDeps,
 ): Promise<SageoxLaunch> {
   try {
-    return await resolve(ctx, harness, deps);
+    return await resolve(ctx, deps);
   } catch (error) {
     return { active: false, warnings: [`${WARN} SageOx not applied: ${error instanceof Error ? error.message : String(error)}`] };
   }

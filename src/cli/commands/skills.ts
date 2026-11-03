@@ -191,6 +191,14 @@ export async function skillsLaunchSettingsCommand(options: LaunchSettingsOptions
     const { writeCodexPackBlock } = await import('../../lib/skill-packs/mount.js');
     await writeCodexPackBlock(codexHome, null);
   });
+  // PAN-4852 AD-23/AD-24: pre-trusted SageOx hooks, written last so the trust block ends config.toml. Fail open.
+  try {
+    const hooks = await import('../../lib/sageox/codex-hooks.js');
+    if (sageox.active && sageox.settings && sageox.bin) await hooks.writeSageoxCodexHooks(codexHome, sageox.settings.env, sageox.bin);
+    else await hooks.removeSageoxCodexHooks(codexHome);
+  } catch (error) {
+    console.error(`[launcher] WARNING: SageOx hooks not applied: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 function mergeSkillNames(disabled: readonly string[], hidden: readonly string[]): string[] {

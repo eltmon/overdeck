@@ -56,6 +56,8 @@ const mocks = vi.hoisted(() => {
     disableDeftManaged: vi.fn(),
     getPack: vi.fn(),
     resolveSageoxLaunch: vi.fn(),
+    writeSageoxCodexHooks: vi.fn(),
+    removeSageoxCodexHooks: vi.fn(),
     loadSkillOverrideLayers: vi.fn(),
     SageoxConfigError,
     listSageoxUploads: vi.fn(),
@@ -73,6 +75,11 @@ vi.mock('../../../lib/skill-overrides/store.js', () => ({
 }));
 
 vi.mock('../../../lib/sageox/launch.js', () => ({ SAGEOX_PACK_ID: 'sageox', resolveSageoxLaunch: mocks.resolveSageoxLaunch }));
+
+vi.mock('../../../lib/sageox/codex-hooks.js', () => ({
+  writeSageoxCodexHooks: mocks.writeSageoxCodexHooks,
+  removeSageoxCodexHooks: mocks.removeSageoxCodexHooks,
+}));
 
 vi.mock('../../../lib/sageox/config.js', () => ({
   SageoxConfigError: mocks.SageoxConfigError,
@@ -443,13 +450,35 @@ describe('pan skills launch-settings SageOx wiring (PAN-2444)', () => {
     expect(mocks.applyClaudePacks).toHaveBeenCalledWith({ cwd: '/w', issueId: undefined }, '/tmp/none/skill-packs', new Set(['sageox']));
   });
 
-  it('excludes sageox from Codex and prints the Codex warning', async () => {
+  it('excludes sageox from Codex, prints the warning and removes the SageOx Codex hooks when inactive', async () => {
     mocks.resolveLaunchDisabledSkills.mockResolvedValue([]);
-    mocks.resolveSageoxLaunch.mockResolvedValue({ active: false, warnings: ['[launcher] WARNING: SageOx is on but supports Claude Code launches only'] });
+    mocks.resolveSageoxLaunch.mockResolvedValue({ active: false, warnings: ['[launcher] WARNING: SageOx not applied: probe failed'] });
     await run('launch-settings', '--harness', 'codex', '--cwd', '/w', '--codex-home', '/ch');
     expect(mocks.resolveSageoxLaunch).toHaveBeenCalledWith({ cwd: '/w', issueId: undefined }, 'codex');
-    expect(errors).toEqual(['[launcher] WARNING: SageOx is on but supports Claude Code launches only']);
+    expect(errors).toEqual(['[launcher] WARNING: SageOx not applied: probe failed']);
     expect(mocks.applyCodexPacks).toHaveBeenCalledWith({ cwd: '/w', issueId: undefined }, '/ch', new Set(['sageox']));
+    expect(mocks.removeSageoxCodexHooks).toHaveBeenCalledWith('/ch');
+    expect(mocks.writeSageoxCodexHooks).not.toHaveBeenCalled();
+  });
+
+  it('mounts sageox for Codex and writes its hooks after the skill block when active (PAN-4852 WI-17)', async () => {
+    mocks.resolveLaunchDisabledSkills.mockResolvedValue([]);
+    mocks.resolveSageoxLaunch.mockResolvedValue({ active: true, bin: '/p/bin/ox', settings: { env, hooks }, warnings: [] });
+    await run('launch-settings', '--harness', 'codex', '--cwd', '/w', '--codex-home', '/ch');
+    expect(mocks.applyCodexPacks).toHaveBeenCalledWith({ cwd: '/w', issueId: undefined }, '/ch', new Set());
+    expect(mocks.writeSageoxCodexHooks).toHaveBeenCalledWith('/ch', env, '/p/bin/ox');
+    expect(mocks.writeCodexSkillOverrides.mock.invocationCallOrder[0])
+      .toBeLessThan(mocks.writeSageoxCodexHooks.mock.invocationCallOrder[0]!);
+    expect(mocks.removeSageoxCodexHooks).not.toHaveBeenCalled();
+    expect(errors).toEqual([]);
+  });
+
+  it('fails open with one warning when the SageOx Codex hooks cannot be written', async () => {
+    mocks.resolveLaunchDisabledSkills.mockResolvedValue([]);
+    mocks.resolveSageoxLaunch.mockResolvedValue({ active: true, bin: '/p/bin/ox', settings: { env, hooks }, warnings: [] });
+    mocks.writeSageoxCodexHooks.mockRejectedValueOnce(new Error('EACCES: permission denied'));
+    await run('launch-settings', '--harness', 'codex', '--cwd', '/w', '--codex-home', '/ch');
+    expect(errors).toEqual(['[launcher] WARNING: SageOx hooks not applied: EACCES: permission denied']);
   });
 });
 

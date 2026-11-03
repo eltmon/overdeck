@@ -3,6 +3,7 @@
  * upload flag; the `.sageox/` check runs against a real temp dir.
  * PAN-4852 WI-7: the probe and hooks use the built `ox` by absolute path.
  * PAN-4852 WI-13: placement and switch-off are injected and recorded.
+ * PAN-4852 WI-17: Codex launches resolve like Claude Code launches.
  */
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -191,12 +192,12 @@ describe('resolveSageoxLaunch', () => {
     expect((await resolveSageoxLaunch(ctx(), 'claude-code', deps({ layers: narrowedOff }))).active).toBe(false);
   });
 
-  it('never wires Codex and warns when the pack would have been on', async () => {
+  it('wires Codex like Claude Code and returns the built ox for its hooks (WI-17)', async () => {
     const result = await resolveSageoxLaunch(ctx(), 'codex', deps());
-    expect(result).toEqual({
-      active: false,
-      warnings: ['[launcher] WARNING: SageOx is on but supports Claude Code launches only; sageox skills and hooks not applied'],
-    });
+    expect(result.active).toBe(true);
+    expect(result.bin).toBe(BIN);
+    expect(result.warnings).toEqual([]);
+    expect(placeCalls).toEqual([[root, 'oss']]);
     expect(await resolveSageoxLaunch(ctx(), 'codex', deps({ layers: packOff }))).toEqual({ active: false, warnings: [] });
   });
 
