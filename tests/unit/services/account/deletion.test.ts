@@ -8,8 +8,8 @@ import { call, dbOf, fakeCtx, makeDeps, makeEnv, makeRc, type TestDeps } from '.
 const ENV_A = '11111111-2222-4333-8444-555555555555';
 const ENV_B = '66666666-7777-4888-9999-aaaaaaaaaaaa';
 
-async function setup(vault?: AccountDataHolder) {
-  const env = makeEnv(vault ? { VAULT: vault } : {});
+async function setup(vault?: AccountDataHolder, extra: Partial<Env> = {}) {
+  const env = makeEnv({ ...(vault ? { VAULT: vault } : {}), ...extra });
   const deps = makeDeps({ now: Date.UTC(2026, 9, 1, 12) });
   const ctx = fakeCtx();
   const rc = makeRc({ env, deps, ctx });
@@ -69,6 +69,54 @@ describe('account deletion (PAN-4293 account-deletion)', () => {
     expect((await del(env, deps, ctx, alice.token)).status).toBe(202);
     expect(await count(env, 'user_sessions', "user_id = 'u-alice'")).toBe(0);
     expect(await count(env, 'user_sessions', "user_id = 'u-bob'")).toBe(1);
+  });
+
+  /** A fake DIRECTORY namespace answering `/delete-account` with `status`; records each call (PAN-4959 WI-9). */
+  function fakeDirectory(status: number) {
+    const calls: Array<{ name: string; path: string; method: string }> = [];
+    const namespace = {
+      idFromName: (name: string) => ({ name }) as unknown as DurableObjectId,
+      get: (id: { name: string }) =>
+        ({
+          async fetch(input: RequestInfo, init?: RequestInit) {
+            const req = new Request(input, init);
+            calls.push({ name: id.name, path: new URL(req.url).pathname, method: req.method });
+            return Response.json(status === 200 ? { deleted: true } : { error: 'boom' }, { status });
+          },
+        }) as unknown as DurableObjectStub,
+    } as unknown as DurableObjectNamespace;
+    return { namespace, calls };
+  }
+
+  it('lists the holders bound in this deployment, vault before directory', async () => {
+    const vault: AccountDataHolder = { deleteAccountData: async () => ({ deleted: true }) };
+    const directory = fakeDirectory(200).namespace;
+    expect(boundHolders(makeEnv({ DIRECTORY: directory }))).toEqual(['directory']);
+    expect(boundHolders(makeEnv({ VAULT: vault, DIRECTORY: directory }))).toEqual(['vault', 'directory']);
+  });
+
+  it('a bound DIRECTORY holder empties the account DO before the job completes', async () => {
+    const directory = fakeDirectory(200);
+    const { env, deps, ctx, alice } = await setup(undefined, { DIRECTORY: directory.namespace });
+    expect((await del(env, deps, ctx, alice.token)).status).toBe(202);
+    await ctx.drain();
+    expect(directory.calls).toEqual([{ name: 'u-alice', path: '/delete-account', method: 'POST' }]);
+    expect(await job(env, 'u-alice')).toMatchObject({ completed_at: deps.now(), holders_pending: '[]', attempts: 0, last_error: null });
+    expect(await count(env, 'users', "user_id = 'u-alice'")).toBe(0);
+  });
+
+  it('a DIRECTORY answering 500 keeps the job open with attempts 1 and the HTTP status in last_error', async () => {
+    const directory = fakeDirectory(500);
+    const { env, deps, ctx, alice } = await setup(undefined, { DIRECTORY: directory.namespace });
+    expect((await del(env, deps, ctx, alice.token)).status).toBe(202);
+    await ctx.drain();
+    expect(await job(env, 'u-alice')).toMatchObject({
+      holders_pending: '["directory"]',
+      attempts: 1,
+      last_error: 'directory delete failed: HTTP 500',
+      completed_at: null,
+    });
+    expect(await count(env, 'users', "user_id = 'u-alice' AND deleted_at IS NOT NULL")).toBe(1);
   });
 
   it('a succeeding VAULT holder receives the userId and the job completes', async () => {
