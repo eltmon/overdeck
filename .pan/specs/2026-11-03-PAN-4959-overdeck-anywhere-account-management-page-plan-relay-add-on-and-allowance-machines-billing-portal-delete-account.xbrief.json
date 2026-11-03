@@ -4,17 +4,17 @@
     "created": "2026-11-03T21:50:29Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4959: Overdeck Anywhere: account management page (plan, relay add-on and allowance, machines, billing portal, delete account)",
-    "updated": "2026-11-03T21:52:31.617Z"
+    "updated": "2026-11-03T21:54:07.577Z"
   },
   "plan": {
     "id": "pan-4959",
     "title": "Overdeck Anywhere: account management page (plan, relay add-on and allowance, machines, billing portal, delete account)",
-    "status": "proposed",
+    "status": "running",
     "uid": "3e6cff11-28bf-45c1-abdd-8eded9313d6e",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-03T21:50:29Z",
-    "updated": "2026-11-03T21:52:31.617Z",
+    "updated": "2026-11-03T21:54:07.577Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4959",
@@ -854,5 +854,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
