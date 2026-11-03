@@ -49,6 +49,22 @@ describe('deftIssueForAgent', () => {
   });
 });
 
+describe('cached Deft pipeline check (PAN-4849 review)', () => {
+  it('asks once per issue per 10 s across the escalation and menu lookups, and forgets on clear', async () => {
+    const isDeft = vi.fn(async () => false);
+    const deps = { isDeft, agentWorkspace: () => FIXTURE_DIR, now: () => Date.now() };
+    await deftEscalationQuestions('agent-pan-1', deps);
+    await deftMenuQuestion('agent-pan-1', null, deps);
+    expect(isDeft).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(10_001);
+    await deftEscalationQuestions('agent-pan-1', deps);
+    expect(isDeft).toHaveBeenCalledTimes(2);
+    clearDeftPendingCache();
+    await deftEscalationQuestions('agent-pan-1', deps);
+    expect(isDeft).toHaveBeenCalledTimes(3);
+  });
+});
+
 describe('deftEscalationQuestions', () => {
   it('offers the open blocking escalations and counts the open external one', async () => {
     const { deps } = depsFor(FIXTURE_DIR);
@@ -186,6 +202,7 @@ describe('deftMenuQuestion', () => {
     const userLast = transcript([assistant('msg_3', [{ type: 'text', text: menuText }]), JSON.stringify({ type: 'user', message: { content: '1' } })]);
     expect(await deftMenuQuestion('agent-pan-1', userLast, deps)).toBeNull();
     const menuLast = transcript([assistant('msg_4', [{ type: 'text', text: menuText }])]);
+    clearDeftPendingCache(); // a pipeline switch clears the cached "is on Deft" answer
     expect(await deftMenuQuestion('agent-pan-1', menuLast, { ...deps, isDeft: async () => false })).toBeNull();
   });
 });

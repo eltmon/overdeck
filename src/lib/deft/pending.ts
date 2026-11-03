@@ -54,11 +54,23 @@ export interface DeftPendingDeps {
 
 const STATE_CACHE_MS = 10_000;
 const stateCache = new Map<string, { at: number; state: DeftIssueState }>();
+/** "Is this issue on Deft", per issue: the escalation and menu checks share one answer per poll window. */
+const deftIssueCache = new Map<string, { at: number; isDeft: boolean }>();
 
-/** Drop cached Deft state (one worktree, or all of it). */
+/** Drop cached Deft state (one worktree, or all of it) and every cached "is on Deft" answer. */
 export function clearDeftPendingCache(worktree?: string): void {
   if (worktree) stateCache.delete(worktree);
   else stateCache.clear();
+  deftIssueCache.clear();
+}
+
+async function cachedIsDeft(issueId: string, deps: DeftPendingDeps): Promise<boolean> {
+  const now = (deps.now ?? Date.now)();
+  const hit = deftIssueCache.get(issueId);
+  if (hit && now - hit.at < STATE_CACHE_MS) return hit.isDeft;
+  const isDeft = await (deps.isDeft ?? isDeftPipelineIssue)(issueId);
+  deftIssueCache.set(issueId, { at: now, isDeft });
+  return isDeft;
 }
 
 function defaultAgentWorkspace(agentId: string): string | null {
@@ -75,7 +87,7 @@ export async function deftIssueForAgent(
   const candidate = agentId.slice('agent-'.length);
   if (!parseIssueId(candidate)) return null;
   const issueId = candidate.toUpperCase();
-  if (!(await (deps.isDeft ?? isDeftPipelineIssue)(issueId))) return null;
+  if (!(await cachedIsDeft(issueId, deps))) return null;
   const worktree = (deps.agentWorkspace ?? defaultAgentWorkspace)(agentId);
   return worktree ? { issueId, worktree } : null;
 }
