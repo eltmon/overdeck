@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4835",
   "created": "2026-11-03T07:59:34.235Z",
-  "updated": "2026-11-03T10:01:27.189Z",
+  "updated": "2026-11-03T10:01:55.316Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -128,6 +128,10 @@
     "phone-key-pinned.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T10:01:27.189Z"
+    },
+    "phone-revocation-closes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T10:01:55.316Z"
     }
   }
 }
