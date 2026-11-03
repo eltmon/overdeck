@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4829",
   "created": "2026-11-03T07:49:13.339Z",
-  "updated": "2026-11-03T08:19:03.565Z",
+  "updated": "2026-11-03T08:19:27.004Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -112,6 +112,10 @@
     "client-registry.ac6": {
       "status": "completed",
       "doneAt": "2026-11-03T08:19:03.565Z"
+    },
+    "client-signal-routing.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:19:27.004Z"
     }
   }
 }
