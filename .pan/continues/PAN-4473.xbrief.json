@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4473",
   "created": "2026-11-03T04:12:49.385Z",
-  "updated": "2026-11-03T04:29:57.159Z",
+  "updated": "2026-11-03T04:38:24.024Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-11-03T04:29:52.898Z"
     },
     "shares-routes": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4473",
-      "claimedAt": "2026-11-03T04:29:57.159Z"
+      "claimedAt": "2026-11-03T04:29:57.159Z",
+      "doneAt": "2026-11-03T04:38:24.024Z"
     }
   }
 }
