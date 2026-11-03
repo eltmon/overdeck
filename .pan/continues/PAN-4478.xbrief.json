@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4478",
   "created": "2026-11-03T17:36:37.149Z",
-  "updated": "2026-11-03T18:31:55.048Z",
+  "updated": "2026-11-03T18:32:15.779Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -110,6 +110,10 @@
     "hub-control.ac2": {
       "status": "completed",
       "doneAt": "2026-11-03T18:31:55.048Z"
+    },
+    "hub-control.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:32:15.779Z"
     }
   }
 }
