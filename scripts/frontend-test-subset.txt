@@ -99,6 +99,7 @@ src/components/chat/__tests__/ComposerFooter.schedule.test.tsx
 src/components/chat/__tests__/ComposerFooter.streaming-render-count.test.tsx
 src/components/chat/__tests__/ConversationAboutDrawer.test.tsx
 src/components/chat/__tests__/ConversationMachineBanner.test.tsx
+src/components/chat/__tests__/ConversationPanel.native.test.tsx
 src/components/chat/__tests__/ConversationPanel.test.tsx
 src/components/chat/__tests__/ConversationScheduleDialog.test.tsx
 src/components/chat/__tests__/EffortPicker.test.tsx
