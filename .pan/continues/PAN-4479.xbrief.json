@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4479",
   "created": "2026-11-03T15:06:40.232Z",
-  "updated": "2026-11-03T15:49:47.107Z",
+  "updated": "2026-11-03T15:50:03.928Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -190,6 +190,10 @@
     "join-restore-integration.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T15:49:47.106Z"
+    },
+    "join-restore-integration.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:50:03.927Z"
     }
   }
 }
