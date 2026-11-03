@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4475",
   "created": "2026-11-03T09:11:44.436Z",
-  "updated": "2026-11-03T13:50:58.027Z",
+  "updated": "2026-11-03T13:51:11.696Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -212,6 +212,10 @@
     "landing-detect.ac5": {
       "status": "completed",
       "doneAt": "2026-11-03T13:50:58.027Z"
+    },
+    "browser-peer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:51:11.696Z"
     }
   },
   "agentModel": "claude-opus-5-5"
