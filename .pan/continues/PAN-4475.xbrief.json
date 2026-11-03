@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4475",
   "created": "2026-11-03T09:11:44.436Z",
-  "updated": "2026-11-03T10:12:39.301Z",
+  "updated": "2026-11-03T10:12:41.086Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -62,6 +62,11 @@
       "claimedBy": "agent-pan-4475",
       "claimedAt": "2026-11-03T09:59:25.175Z",
       "doneAt": "2026-11-03T10:12:39.300Z"
+    },
+    "relay-integration-test": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4475",
+      "claimedAt": "2026-11-03T10:12:41.086Z"
     }
   }
 }
