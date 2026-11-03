@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4882",
   "created": "2026-11-03T06:27:51.535Z",
-  "updated": "2026-11-03T06:43:09.762Z",
+  "updated": "2026-11-03T06:47:35.848Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,9 +38,10 @@
       "doneAt": "2026-11-03T06:43:00.470Z"
     },
     "ac15-open-in-editor": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4882",
-      "claimedAt": "2026-11-03T06:43:09.762Z"
+      "claimedAt": "2026-11-03T06:43:09.762Z",
+      "doneAt": "2026-11-03T06:47:35.847Z"
     }
   }
 }
