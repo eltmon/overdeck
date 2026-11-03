@@ -4,17 +4,17 @@
     "created": "2026-11-03T15:40:42Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4904: Pull here on a Codex conversation replaces its title with injected <recommended_plugins> text",
-    "updated": "2026-11-03T15:42:09.502Z"
+    "updated": "2026-11-03T15:43:49.777Z"
   },
   "plan": {
     "id": "pan-4904",
     "title": "Pull here on a Codex conversation replaces its title with injected <recommended_plugins> text",
-    "status": "proposed",
+    "status": "running",
     "uid": "e31412b0-3950-4b8f-a3fe-5745e3ebe633",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-03T15:40:42Z",
-    "updated": "2026-11-03T15:42:09.502Z",
+    "updated": "2026-11-03T15:43:49.777Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4904",
@@ -258,5 +258,5 @@
     ],
     "edges": []
   },
-  "status": "proposed"
+  "status": "active"
 }
