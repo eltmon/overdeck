@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4473",
   "created": "2026-11-03T04:12:49.385Z",
-  "updated": "2026-11-03T04:38:24.024Z",
+  "updated": "2026-11-03T04:38:30.698Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,11 @@
       "claimedBy": "agent-pan-4473",
       "claimedAt": "2026-11-03T04:29:57.159Z",
       "doneAt": "2026-11-03T04:38:24.024Z"
+    },
+    "host-manager-miniflare-test": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4473",
+      "claimedAt": "2026-11-03T04:38:30.698Z"
     }
   }
 }
