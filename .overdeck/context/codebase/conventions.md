@@ -75,5 +75,8 @@
   `/ws/rpc` (`pan-4523-river-bands.spec.ts`); never add a production store hook.
 
 - Issue IDs are `LETTERS-NUMBER`: `parseIssueId` (`src/lib/issue-id.ts`) and dozens of path/session regexes assume a letters-only prefix, so project issue prefixes must be letters only; use `issue_pattern` for other ID shapes (PAN-4860).
+- Root `setupFiles` (`vitest.config.ts`) run in order: `tests/setup/overdeck-home.ts`,
+  `tests/setup/no-real-home-writes.ts`, `tests/setup/no-worker-signals.ts`, `tests/setup.ts`; the
+  latter two guards throw `[test-guard]` errors (PAN-4925).
 
-<!-- last-verified: 2026-11-02 -->
+<!-- last-verified: 2026-11-03 -->
