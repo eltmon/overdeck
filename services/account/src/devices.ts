@@ -5,7 +5,7 @@
  * only in mintDevice()'s return value. Revocation is a column write, and verification is one D1 lookup
  * with no cache in front of it, so a revoked token is refused on the very next request (FR-5).
  */
-import type { VerifyError, VerifyResult } from './contract.ts';
+import type { SignOutResult, VerifyError, VerifyResult } from './contract.ts';
 import { randomHex, sha256Hex } from './crypto.ts';
 import { entitlementFor, type Entitlement } from './entitlement.ts';
 import type { RequestContext } from './env.ts';
@@ -184,6 +184,17 @@ export async function verifyDeviceToken(rc: DeviceContext, token: string): Promi
   if (found.auth.grantExpired) return { ok: false, error: 'grant_expired' };
   const { userId, githubId, githubLogin, deviceId, entitlement } = found.auth;
   return { ok: true, userId, githubId, githubLogin, deviceId, entitlement };
+}
+
+/**
+ * AccountRpc.signOutDevice (PAN-4481 FR-4): the device of a valid token revokes itself. A lapsed grant still
+ * signs out, so a browser whose grant expired can leave cleanly.
+ */
+export async function signOutDeviceToken(rc: DeviceContext, token: string): Promise<SignOutResult> {
+  const found = await lookupDevice(rc, token);
+  if (!found.ok) return found;
+  await revokeDevice(rc, found.auth.userId, found.auth.deviceId, 'user');
+  return { ok: true };
 }
 
 export type AuthenticateResult = { ok: true; auth: DeviceAuth } | { ok: false; response: Response };

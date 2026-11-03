@@ -7,6 +7,7 @@
  * 5-minute authorization code only after resolveSignIn() allowed the identity; POST /oauth/token exchanges it
  * with the identical redirect_uri and a matching S256 verifier, re-checking the allowlist before minting (D-11).
  */
+import type { RedeemResult, RedeemWebCodeInput } from './contract.ts';
 import { randomHex, s256Challenge, sha256Hex } from './crypto.ts';
 import { isValidEnvironmentId, isValidPlatform, mintDevice } from './devices.ts';
 import type { Config, Handler, RequestContext } from './env.ts';
@@ -139,21 +140,35 @@ interface AuthCodeRow {
   expires_at: number;
 }
 
-/** POST /oauth/token with grant_type=authorization_code (§7.6 step 3). */
-export async function exchangeAuthorizationCode(rc: RequestContext, form: URLSearchParams): Promise<Response> {
-  const code = form.get('code') ?? '';
-  const verifier = form.get('code_verifier') ?? '';
-  const redirectUri = form.get('redirect_uri') ?? '';
-  if (code === '' || redirectUri === '' || !CODE_VERIFIER_RE.test(verifier)) return json({ error: 'invalid_request' }, 400);
+/**
+ * Redeems a PKCE authorization code (§7.6 step 3): single use, 5-minute expiry, identical redirect_uri,
+ * S256 verifier, and an allowlist re-check before minting (D-11).
+ */
+export async function redeemAuthorizationCode(rc: RequestContext, input: RedeemWebCodeInput): Promise<RedeemResult> {
+  const { code, codeVerifier, redirectUri } = input;
+  if (code === '' || redirectUri === '' || !CODE_VERIFIER_RE.test(codeVerifier)) return { ok: false, error: 'invalid_request' };
 
   // Single use even when the exchange then fails: the row is gone before any check runs.
   const row = await rc.env.DB.prepare('DELETE FROM auth_codes WHERE code_hash = ? RETURNING *').bind(await sha256Hex(code)).first<AuthCodeRow>();
-  if (!row || row.expires_at <= rc.deps.now() || row.redirect_uri !== redirectUri) return json({ error: 'invalid_grant' }, 400);
-  if ((await s256Challenge(verifier)) !== row.code_challenge) return json({ error: 'invalid_grant' }, 400);
+  if (!row || row.expires_at <= rc.deps.now() || row.redirect_uri !== redirectUri) return { ok: false, error: 'invalid_grant' };
+  if ((await s256Challenge(codeVerifier)) !== row.code_challenge) return { ok: false, error: 'invalid_grant' };
 
   const user = await rc.env.DB.prepare('SELECT github_id, deleted_at FROM users WHERE user_id = ?').bind(row.user_id).first<{ github_id: number; deleted_at: number | null }>();
-  if (!user || user.deleted_at !== null || !(await isAllowed(rc, user.github_id))) return json({ error: 'access_denied' }, 400);
+  if (!user || user.deleted_at !== null || !(await isAllowed(rc, user.github_id))) return { ok: false, error: 'access_denied' };
 
   const minted = await mintDevice(rc, row.user_id, row.platform, row.environment_id);
-  return json({ access_token: minted.token, token_type: 'Bearer', device_id: minted.deviceId, label: minted.label });
+  return { ok: true, accessToken: minted.token, deviceId: minted.deviceId, label: minted.label };
+}
+
+/** POST /oauth/token with grant_type=authorization_code (§7.6 step 3). */
+export async function exchangeAuthorizationCode(rc: RequestContext, form: URLSearchParams): Promise<Response> {
+  const result = await redeemAuthorizationCode(rc, { code: form.get('code') ?? '', codeVerifier: form.get('code_verifier') ?? '', redirectUri: form.get('redirect_uri') ?? '' });
+  if (!result.ok) return json({ error: result.error }, 400);
+  return json({ access_token: result.accessToken, token_type: 'Bearer', device_id: result.deviceId, label: result.label });
+}
+
+/** AccountRpc.redeemWebCode (PAN-4481 FR-3): only codes issued to the share redirect. */
+export async function redeemWebCode(rc: RequestContext, input: RedeemWebCodeInput): Promise<RedeemResult> {
+  if (validateShareRedirect(input.redirectUri, rc.config) === null) return { ok: false, error: 'invalid_request' };
+  return redeemAuthorizationCode(rc, input);
 }
