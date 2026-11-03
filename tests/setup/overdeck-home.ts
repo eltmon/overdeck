@@ -1,5 +1,5 @@
 
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, rmSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -11,6 +11,10 @@ const overdeckHome = join(runRoot, `worker-${workerId}`);
 
 process.env.OVERDECK_HOME = overdeckHome;
 mkdirSync(overdeckHome, { recursive: true });
+// Every test file in this pool slot shares this home, and the internal-token
+// file wins over OVERDECK_INTERNAL_TOKEN (PAN-4628). Start each file without
+// one, so a file that minted a token cannot 401 the next file (PAN-4881).
+rmSync(join(overdeckHome, 'internal-token'), { force: true });
 
 // HOME is a temp dir too, so code that writes under the home directory (e.g.
 // the Claude Code pre-trust into ~/.claude.json, PAN-3905) never reaches the
