@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4929",
+  "created": "2026-11-03T21:43:38.500Z",
+  "updated": "2026-11-03T21:43:38.500Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "root-install-guard": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4929",
+      "claimedAt": "2026-11-03T21:43:38.500Z"
+    }
+  }
+}
