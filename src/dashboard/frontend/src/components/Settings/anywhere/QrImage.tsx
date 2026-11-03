@@ -12,5 +12,5 @@ export function QrImage({ link, alt }: { link: string; alt: string }) {
     qr.make();
     return qr.createDataURL(6, 8);
   }, [link]);
-  return <img alt={alt} src={src} className="rounded-md bg-white p-1 w-48 h-48" />;
+  return <img alt={alt} src={src} data-qr-value={link} className="rounded-md bg-white p-1 w-48 h-48" />;
 }
