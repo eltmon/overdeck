@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4852",
   "created": "2026-11-03T02:45:30.764Z",
-  "updated": "2026-11-03T06:03:01.605Z",
+  "updated": "2026-11-03T06:03:34.162Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -298,6 +298,10 @@
     "switch-off.ac2": {
       "status": "completed",
       "doneAt": "2026-11-03T06:03:01.604Z"
+    },
+    "switch-off.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:03:34.162Z"
     }
   }
 }
