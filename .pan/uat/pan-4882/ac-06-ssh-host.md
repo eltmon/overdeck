@@ -45,3 +45,51 @@ $ ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -p 10022 root@127.0.0
 
 A plain non-login `ssh … 'command -v claude'` prints `/usr/bin/claude`: the workspace image carries a real Claude
 Code. The managed server starts through the login shell, so it gets the fake harness from `/root/.profile`.
+
+## Add (managed) — from the browser
+
+Browser: Playwright 1.63 Chromium (headless), own `userDataDir` `.tmp/pan-4882/pw-ac06`, home
+`http://127.0.0.1:3011/settings#overdeck_token=<redacted>` → **Anywhere** → Machines → **Add an SSH machine** →
+host `ssh://root@127.0.0.1:10022` → **Add** (06:39:45–06:40:47 UTC). Another agent's operator question
+(PAN-4852) opened as a modal over the page; the script clicked its **Minimize** button, which keeps the question
+open in "Needs you" and answers nothing.
+
+```
+POST /api/machines/ssh 200 27.2s
+{"id":"4155fbb0-246b-42f7-9a51-85512ed0675a","label":"811d674f124718","access":"operator","state":"connecting",
+ "routes":[{"url":"tcp://127.0.0.1:45239","kind":"ssh",…},{"url":"tcp://172.19.12.186:3011","kind":"lan",…},
+           {"url":"tcp://172.19.12.187:3011","kind":"lan",…}],
+ "peerVersion":"0.73.0",
+ "ssh":{"destination":"ssh://root@127.0.0.1:10022","launch":"managed","forward":"up","localPort":45239,"remotePort":3011}}
+
+$ pan machines list --json | jq -c '.links[] | select(.label=="811d674f124718") | {label,state,access,currentRoute,ssh,peerVersion}'
+{"label":"811d674f124718","state":"online","access":"operator","currentRoute":"tcp://127.0.0.1:45239",
+ "ssh":{"destination":"ssh://root@127.0.0.1:10022","launch":"managed","forward":"up","forwardDetail":null,"localPort":45239,"remotePort":3011},
+ "peerVersion":"0.73.0"}
+```
+
+The machine row (DOM text; the screenshot [ac-06-online.png](ac-06-online.png) truncates the second and third
+lines with an ellipsis at every viewport width):
+
+```
+811d674f124718 · Online · via ssh · tcp://127.0.0.1:45239 · Operator-level · Overdeck 0.73.0 · heartbeat just now ·
+CPU 2% · 1 GB · 0 agents · tags: linux · SSH ssh://root@127.0.0.1:10022 · forward up · Started by Overdeck ·
+Routes (3) · Compare settings · Add a project · Remove
+```
+
+On the VM after the add:
+
+```
+$ ps -eo pid,etimes,args | grep -E 'supervisor/server.js|dashboard/server.js' | grep -v grep
+ 1966      79 /usr/bin/node /usr/lib/node_modules/@overdeck/core/dist/dashboard/server.js
+ 2187      71 /usr/bin/node /usr/lib/node_modules/@overdeck/core/dist/supervisor/server.js
+$ curl -s 127.0.0.1:3011/api/health
+{"status":"ok","repoRoot":"/usr/lib/node_modules/@overdeck/core","mode":"primary","pid":1966,
+ "buildCommit":"7de984912426d60fef92d4d6024078d7c9257818","builtAt":"2026-11-03T03:19:58.364Z",…}
+$ cat /root/.overdeck/ssh-launch/server.json
+{"v":1,"pid":1966,"apiPort":3011,"version":"0.73.0","startedAt":"2026-11-03T06:40:29.287Z","startedBy":"<home env id>"}
+```
+
+The VM runs the published 0.73.0 build, `7de98491242` (tag `v0.73.0`). All four fix SHAs are ancestors of it
+(`git merge-base --is-ancestor <sha> 7de98491242` → yes for `04f8bccc9df`, `6ca4ae19e6e`, `af764fb9907`,
+`054aea3e486`), so the VM-side half of PAN-4861 (the helper's stop) is the fixed code.
