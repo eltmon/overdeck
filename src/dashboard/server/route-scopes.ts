@@ -34,6 +34,8 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'GET', path: '/api/flywheel/status', scope: 'read:state' },
   { method: 'GET', path: '/api/pipeline/membership', scope: 'read:state' },
   { method: 'GET', path: '/api/conversations', scope: 'read:conversations' },
+  // PAN-4835: the Needs-you feed, explicit so it never depends on the `:id` pattern below.
+  { method: 'GET', path: '/api/conversations/pending-input', scope: 'read:conversations' },
   { method: 'GET', path: '/api/conversations/:id', scope: 'read:conversations' },
   { method: 'GET', path: '/api/conversations/:name/messages', scope: 'read:conversations' },
   { method: 'GET', path: '/api/conversations/:name/about', scope: 'read:conversations' },
@@ -131,6 +133,8 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'GET', path: '/api/conversations/:name/diffs', scope: 'read:conversations' },
   { method: 'GET', path: '/api/conversations/:name/diffs/:turnId', scope: 'read:conversations' },
   { method: 'POST', path: '/api/conversations/:name/upload-image', scope: 'tell' },
+  // PAN-4835 D-7: the undo of upload-image.
+  { method: 'POST', path: '/api/conversations/:name/delete-image', scope: 'tell' },
   { method: 'POST', path: '/api/conversations/:name/switch-model', scope: 'operate' },
   { method: 'POST', path: '/api/conversations/:name/compact', scope: 'operate' },
   { method: 'POST', path: '/api/conversations/:name/thinking-level', scope: 'operate' },
@@ -141,6 +145,11 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   // update job; the handler also requires the operator actor stamp (D-10).
   { method: 'POST', path: '/api/versions/self/update', scope: 'operate' },
   { method: 'DELETE', path: '/api/versions/self/update', scope: 'operate' },
+  // PAN-4835: the phone app boots on the activity feed and answers its own self-service routes
+  // (the handlers also require a phone credential).
+  { method: 'GET', path: '/api/activity', scope: 'read:state' },
+  { method: 'PUT', path: '/api/phones/self/push-key', scope: 'tell' },
+  { method: 'DELETE', path: '/api/phones/self', scope: 'tell' },
 ];
 
 /** `/ws/terminal` needs `operate`; every other WebSocket path keeps the `admin` default. */
@@ -152,6 +161,9 @@ export const WS_TERMINAL_SCOPE: AccessTokenScope = 'operate';
  * one of `WS_RPC_UPGRADE_SCOPES`.
  */
 export const RPC_METHOD_SCOPES: Readonly<Record<string, AccessTokenScope>> = {
+  // PAN-4835: the snapshot and replay every dashboard client boots on (phone app, linked machines, tokens).
+  'pan.getSnapshot': 'read:state',
+  'pan.replayEvents': 'read:events',
   'pan.subscribeConversationMessages': 'read:conversations',
   'pan.subscribeDomainEvents': 'read:events',
 };
