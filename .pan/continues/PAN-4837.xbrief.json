@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4837",
   "created": "2026-11-03T16:16:59.604Z",
-  "updated": "2026-11-03T17:48:06.326Z",
+  "updated": "2026-11-03T17:48:14.558Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -152,6 +152,11 @@
       "claimedBy": "agent-pan-4837",
       "claimedAt": "2026-11-03T17:47:01.620Z",
       "doneAt": "2026-11-03T17:48:06.326Z"
+    },
+    "ac10-emulator-run": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4837",
+      "claimedAt": "2026-11-03T17:48:14.558Z"
     }
   }
 }
