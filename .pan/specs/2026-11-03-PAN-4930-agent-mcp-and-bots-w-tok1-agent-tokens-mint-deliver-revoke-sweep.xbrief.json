@@ -4,17 +4,17 @@
     "created": "2026-11-03T21:38:23Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4930: Agent MCP and bots (W-TOK1): Agent tokens: mint, deliver, revoke, sweep",
-    "updated": "2026-11-03T21:45:58.465Z"
+    "updated": "2026-11-03T21:47:21.178Z"
   },
   "plan": {
     "id": "pan-4930",
     "title": "Agent MCP and bots (W-TOK1): Agent tokens: mint, deliver, revoke, sweep",
-    "status": "proposed",
+    "status": "running",
     "uid": "a400bab3-2797-408c-bcf5-f9ae795e7057",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-03T21:38:23Z",
-    "updated": "2026-11-03T21:45:58.465Z",
+    "updated": "2026-11-03T21:47:21.178Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4930",
@@ -770,5 +770,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
