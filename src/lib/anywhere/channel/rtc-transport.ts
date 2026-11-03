@@ -8,24 +8,22 @@
  * on an incoming offer and hands every data channel the initiator opens to `onIncoming`.
  *
  * Only ciphertext crosses a data channel: the secure channel runs on top of it.
- * `relay: true` forces TURN on the initiator (`iceTransportPolicy: 'relay'`).
+ * `relay: true` forces TURN on the initiator (`iceTransportPolicy: 'relay'`), and both ends pass the relay
+ * route's list through `relayIceServers` (TLS TURN first, no STUN).
  */
 import { randomBytes } from 'node:crypto';
 import type { Duplex } from 'node:stream';
 import type { SignalData } from '@overdeck/contracts';
 import { RTCPeerConnection, type RTCDataChannel } from 'werift';
 
+import { relayIceServers, type RTCIceServerLike } from './relay-ice-servers.js';
 import { RtcDuplex } from './rtc-duplex.js';
+
+export type { RTCIceServerLike } from './relay-ice-servers.js';
 
 export const RTC_DATA_CHANNEL_LABEL = 'ovdl';
 
 export type RtcPurpose = 'link' | 'approval';
-
-export interface RTCIceServerLike {
-  urls: string | string[];
-  username?: string;
-  credential?: string;
-}
 
 export interface RtcSignalingPort {
   send(to: string, session: string, purpose: RtcPurpose, relay: boolean, data: SignalData): void;
@@ -113,9 +111,15 @@ export class RtcTransport {
     return this.awaitOpen(entry, entry.pc.createDataChannel(RTC_DATA_CHANNEL_LABEL, { ordered: true }), opts.signal, false);
   }
 
+  /** The relay route's list is reordered for werift's one-TURN-URL rule (PAN-4862). */
+  private async peerIceServers(relay: boolean): Promise<RTCIceServerLike[]> {
+    const servers = await this.port.iceServers(relay);
+    return relay ? relayIceServers(servers) : servers;
+  }
+
   /** Initiator: a new peer connection, its first data channel and the offer. */
   private async create(key: string, peer: string, relay: boolean, purpose: RtcPurpose): Promise<{ entry: PeerEntry; channel: RTCDataChannel }> {
-    const iceServers = await this.port.iceServers(relay);
+    const iceServers = await this.peerIceServers(relay);
     const pc = new RTCPeerConnection({ iceServers, iceTransportPolicy: relay ? 'relay' : 'all' });
     const entry = this.register(pc, key, peer, randomBytes(16).toString('hex'), purpose, relay);
     // The first channel must exist before the offer so the SDP carries the SCTP section.
@@ -251,7 +255,7 @@ export class RtcTransport {
     const key = entryKey(from, relay, purpose);
     const previous = this.byKey.get(key);
     if (previous) this.closeEntry(previous);
-    const iceServers = await this.port.iceServers(relay);
+    const iceServers = await this.peerIceServers(relay);
     const pc = new RTCPeerConnection({ iceServers });
     const entry = this.register(pc, key, from, session, purpose, relay);
     await this.setRemote(entry, 'offer', sdp);

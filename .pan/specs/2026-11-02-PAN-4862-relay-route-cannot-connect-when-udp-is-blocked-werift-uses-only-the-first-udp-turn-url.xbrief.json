@@ -1,0 +1,385 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T23:42:35Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4862: Relay route cannot connect when UDP is blocked: werift uses only the first (UDP) TURN URL",
+    "updated": "2026-11-02T23:48:28.925Z"
+  },
+  "plan": {
+    "id": "pan-4862",
+    "title": "Relay route cannot connect when UDP is blocked: werift uses only the first (UDP) TURN URL",
+    "status": "running",
+    "uid": "4d4e0141-66c1-41ff-9846-f44bd26b993d",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-02T23:42:35Z",
+    "updated": "2026-11-02T23:48:28.925Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4862",
+        "label": "PAN-4862",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4862.md",
+        "label": "PRD",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4774",
+        "label": "PAN-4774 (release UAT that found it)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "anywhere",
+      "webrtc",
+      "relay",
+      "turn",
+      "werift"
+    ],
+    "narratives": {
+      "Problem": "On the relay route (rtc+turn://) werift 0.25.1 uses only the first TURN URL in the ICE list. Cloudflare's list puts turn:...:3478?transport=udp first, so on a UDP-blocked network the allocation waits ~6.35 s (RETRY_RTO 50 ms doubled over 6 retransmissions) before werift's own TCP fallback, and setLocalDescription waits for gathering, so the offer/answer leaves too late. The responder additionally waits the 5 s STUN gather timeout. The 10 s RELAY_PROBE_TIMEOUT_MS expires before ICE checks start, the initiator closes its peer connection, and every retry starts over, so the relay never connects.",
+      "Proposal": "Add a pure helper relayIceServers (src/lib/anywhere/channel/relay-ice-servers.ts) that, for the relay route only, drops stun:/stuns: URLs and orders TURN URLs turns: on 443 > other turns: > turn: transport=tcp > other turn:, keeping username/credential on their entry. RtcTransport.create and accept both obtain ICE servers through one private method that applies it when relay is true. Pin werift's actual choice in tests with werift's exported parseIceServers. Document the TURN preference, and run a live UDP-blocked relay check that records TLS allocation and channel-open outcomes separately (PRD WI-4 decision rules).",
+      "NonGoals": "- Fixing werift upstream or bumping the werift version.\n- Retrying a failed relay dial with a different TURN URL.\n- Changing services/connect (it keeps passing Cloudflare's list verbatim) or services/share.\n- Changing link-supervisor phase order or RELAY_PROBE_TIMEOUT_MS (stays 10 000 ms).\n- Changing the direct route's (rtc://) ICE list.\n- Setting iceTransportPolicy 'relay' on the responder.\n- Root-causing issue section 2 (pair checks failing with UDP open to TURN) beyond recording the live-check outcome and filing a follow-up issue.\n- Docs claiming the relay connects on every UDP-blocked network unless the live check showed the channel open."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix on the machine side (rtc-transport.ts create and accept), not by reordering in the connect Worker.",
+        "rationale": "The single-URL limit is werift's; the responder needs a relay candidate as much as the initiator; a machine-side rule does not depend on which Worker version is deployed, and the Worker keeps returning Cloudflare's full list for any other client."
+      },
+      {
+        "summary": "Rank TURN URLs turns: on 443 > other turns: > turn: transport=tcp > other turn: instead of hard-coding one URL.",
+        "rationale": "TLS on 443 passes the most restrictive firewalls, the relay's main use case; ranking keeps working if Cloudflare changes ports or order, and still yields UDP when that is all the list holds."
+      },
+      {
+        "summary": "Drop STUN URLs from the relay-route list rather than shortening the STUN gather timeout or forcing relay policy on the responder.",
+        "rationale": "Removes the responder's 5 s STUN wait on UDP-blocked networks with no new werift config; forcing relay policy would also drop host candidates. The cost (no server-reflexive candidate, so two TURN legs instead of one in some sessions) is acceptable because the direct route already covers STUN-based paths."
+      },
+      {
+        "summary": "Keep RELAY_PROBE_TIMEOUT_MS at 10 000 ms.",
+        "rationale": "With TLS allocation (~5 RTT to the Cloudflare edge) and no STUN wait, the whole open (signalling, ICE through two relays, DTLS, SCTP, data channel, Noise) is about 3-4 s at a 150 ms RTT; the live check records the measured time and a follow-up proposes a larger budget only if it exceeds 7 s."
+      },
+      {
+        "summary": "Pick the best URL up front; no per-attempt rotation across TURN URLs.",
+        "rationale": "Rotation would cost a full 10 s failed attempt per URL and add state, for no gain over choosing the most reachable URL first."
+      },
+      {
+        "summary": "Treat issue section 2 as a recorded live-check outcome with a follow-up issue, not as scope to root-cause here.",
+        "rationale": "The issue itself marks it as an unestablished observation; the plausible cause (responder STUN wait, then the initiator closing at 10 s) is removed by this fix, and the live check separates TLS allocation (this issue's defect) from channel open so a remaining defect is filed with evidence instead of guessed at."
+      },
+      {
+        "summary": "Move the RTCIceServerLike interface into relay-ice-servers.ts and re-export it from rtc-transport.ts.",
+        "rationale": "Keeps the import one-way (rtc-transport -> relay-ice-servers) so lint:circular stays green and the helper has no runtime werift import, while directory-rtc.ts keeps its existing import path."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Small surface: one new module plus test, a two-call-site change in rtc-transport.ts, three doc files, one evidence file.",
+      "canonicalFilename": "2026-11-02-PAN-4862-relay-route-cannot-connect-when-udp-is-blocked-werift-uses-only-the-first-udp-turn-url.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "relay-ice-helper",
+        "title": "Add relayIceServers: TLS-first TURN ordering without STUN for the relay route",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T23:42:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4862",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/anywhere/channel/relay-ice-servers.ts",
+            "src/lib/anywhere/channel/__tests__/relay-ice-servers.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/anywhere/channel/__tests__/relay-ice-servers.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "relay-ice-servers.test.ts passes, including the case where werift parseIceServers returns turnTransport 'tls' and port 443",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "FR-5",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/anywhere/channel/relay-ice-servers.ts exactly as PRD WI-1 specifies: export interface RTCIceServerLike { urls: string | string[]; username?: string; credential?: string } (moved here from rtc-transport.ts; that file re-exports it in item relay-ice-wire), export turnUrlRank(url): 0 for turns: with port 443, 1 for any other turns: (no port counts as 5349), 2 for turn: with query transport=tcp, 3 for any other turn:, null otherwise (scheme case-insensitive; port = digits after the last ':' of the part before '?'). Export relayIceServers(servers): normalise urls to arrays, keep only ranked URLs stable-sorted by rank, drop entries left empty, stable-sort entries by their lowest rank, copy username/credential only when present, and return the input unchanged when no entry kept a URL. No runtime werift import in this module. Write src/lib/anywhere/channel/__tests__/relay-ice-servers.test.ts with the Cloudflare fixture from the PRD and the seven named cases there; the werift-pinning cases import { parseIceServers } from 'werift'. Pure tests: no timers, no network."
+        },
+        "items": [
+          {
+            "id": "relay-ice-helper.ac1",
+            "title": "Given the PRD's Cloudflare fixture, when relayIceServers runs, then it returns one entry whose urls start with 'turns:turn.cloudflare.com:443?transport=tcp', contain no stun: URL, and keep username 'u' and credential 'c'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-ice-helper.ac2",
+            "title": "Given the Cloudflare fixture, when werift's exported parseIceServers is applied to relayIceServers' output, then it returns turnServer ['turn.cloudflare.com', 443], turnTransport 'tls' and stunServer undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-ice-helper.ac3",
+            "title": "Given a list with turn: tcp and udp URLs but no turns:, when parsed by werift after relayIceServers, then turnTransport is 'tcp'; given a UDP-only TURN list, then turnTransport is 'udp'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-ice-helper.ac4",
+            "title": "Given a UDP entry with credentials A before a TLS entry with credentials B, when relayIceServers runs, then the TLS entry comes first and still carries credentials B",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-ice-helper.ac5",
+            "title": "Given [{ urls: ['stun:s:3478'] }] (no TURN URL), when relayIceServers runs, then it returns a list deep-equal to the input",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "relay-ice-wire",
+        "title": "Route both RtcTransport.create and accept through relayIceServers when relay is true",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T23:42:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4862",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/anywhere/channel/rtc-transport.ts",
+            "src/lib/anywhere/channel/__tests__/rtc-transport.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/anywhere/channel/__tests__/rtc-transport.test.ts src/lib/anywhere/channel/__tests__/relay-ice-servers.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "rtc-transport.test.ts and relay-ice-servers.test.ts pass",
+            "typecheck completes without errors (directory-rtc.ts still imports RTCIceServerLike from rtc-transport.js)",
+            "lint:circular reports no cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/anywhere/channel/rtc-transport.ts: delete the local RTCIceServerLike interface and add `export type { RTCIceServerLike } from './relay-ice-servers.js';` plus a runtime import of relayIceServers (and a type import of RTCIceServerLike for local use). Add the private method from PRD WI-2: `private async peerIceServers(relay: boolean): Promise<RTCIceServerLike[]> { const servers = await this.port.iceServers(relay); return relay ? relayIceServers(servers) : servers; }`. Replace both `const iceServers = await this.port.iceServers(relay);` lines (in create and in accept) with `const iceServers = await this.peerIceServers(relay);`. Leave iceTransportPolicy unchanged (initiator: relay ? 'relay' : 'all'; responder: default). Update the header comment's last line to say the relay route's list goes through relayIceServers (TLS TURN first, no STUN). In rtc-transport.test.ts add one case: a hub whose iceServers records its relay argument; a direct dial (relay: false) still round-trips bytes over loopback and the recorded argument is false. Never dial with relay: true against a TURN URL in this file (it would reach a real TURN server). Keep the file's real timers (it tests real loopback UDP I/O, as its header says)."
+        },
+        "items": [
+          {
+            "id": "relay-ice-wire.ac1",
+            "title": "Given rtc-transport.ts after the change, when grep -c 'this.port.iceServers(' runs on it, then it returns 1 (only inside peerIceServers), and both create and accept call this.peerIceServers(relay)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-ice-wire.ac2",
+            "title": "Given peerIceServers, when relay is true it returns relayIceServers(servers), and when relay is false it returns the directory's list unchanged (visible in the diff of rtc-transport.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-ice-wire.ac3",
+            "title": "When npx vitest run src/lib/anywhere/channel/__tests__/rtc-transport.test.ts runs, then every case passes, including the new case asserting a direct dial requests iceServers with relay false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-ice-wire.ac4",
+            "title": "When npm run typecheck and npm run lint:circular run, then both exit 0 with directory-rtc.ts unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "relay-docs",
+        "title": "Document the relay route's TURN transport preference",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T23:42:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4862",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ANYWHERE-ARCHITECTURE.md",
+            "docs/CONNECT-SERVICE.md",
+            "configuration/linked-machines.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'relayIceServers' docs/ANYWHERE-ARCHITECTURE.md",
+            "grep -n \"turnTransport: 'tls'\" docs/CONNECT-SERVICE.md",
+            "grep -n '443' configuration/linked-machines.mdx",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "each grep prints at least one matching line in the named section",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Make the four edits in PRD WI-3. (1) docs/ANYWHERE-ARCHITECTURE.md 'Relay and metering (D-2356-12)': after the sentence ending \"sets `iceTransportPolicy: 'relay'`.\", state that both ends pass the credential list through relayIceServers (src/lib/anywhere/channel/relay-ice-servers.ts), which orders turns: on 443, other turns:, turn: over TCP, then UDP, and drops STUN URLs, because werift 0.25.1 uses only the first TURN URL and its UDP-to-TCP fallback starts after about 6.35 s, which the 10 s relay probe cannot afford. (2) Same file, the **WebRTC transport** bullet: add that werift reads a single TURN URL per peer connection. (3) docs/CONNECT-SERVICE.md deploy step 7: add the UDP-blocked recipe (iptables and ip6tables drop all UDP except port 53) and that DEBUG=werift* shows turnTransport: 'tls' when the relay picks TLS. (4) configuration/linked-machines.mdx 'Through the overdeck.ai directory' paragraph: say the relay tries the TURN server over TLS on port 443 first, so a network that blocks UDP can still reach it; do not claim it connects on every UDP-blocked network. Follow the repo writing style (plain, short sentences)."
+        },
+        "items": [
+          {
+            "id": "relay-docs.ac1",
+            "title": "Given docs/ANYWHERE-ARCHITECTURE.md, when the 'Relay and metering' section is read, then it names relayIceServers, the order TLS 443 > TLS > TCP > UDP, the dropped STUN URLs, and the werift one-TURN-URL limit with the ~6.35 s fallback",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-docs.ac2",
+            "title": "Given docs/CONNECT-SERVICE.md step 7, when read, then it gives the iptables/ip6tables UDP-drop recipe that allows port 53 and says DEBUG=werift* shows turnTransport: 'tls'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-docs.ac3",
+            "title": "Given configuration/linked-machines.mdx, when the 'Through the overdeck.ai directory' paragraph is read, then it says the relay tries TURN over TLS on port 443 first and makes no claim that the relay connects on every UDP-blocked network",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "live-relay-check",
+        "title": "Live UDP-blocked relay check with separately recorded allocation and channel-open outcomes",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T23:42:35Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-4862",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/uat/pan-4862/live-relay.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "test -f .pan/uat/pan-4862/live-relay.md",
+            "grep -nE 'Outcome A|Outcome B|Status: not-run' .pan/uat/pan-4862/live-relay.md"
+          ],
+          "expected_outputs": [
+            "the evidence file exists on the branch",
+            "it records Outcome A and Outcome B for the UDP-blocked run (and the TCP-443-only variant), or Status: not-run with the reason"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implementation checkpoint, run after relay-ice-helper and relay-ice-wire are committed and pushed. Follow PRD WI-4: a Fly VM on a branch-built image running `pan serve --port 3011 --no-open` with DEBUG=werift*, signed in to the same relay-plan account as home (device code relayed with `pan tell flywheel-orchestrator`), joined/approved/accepted; home on the branch build. Block UDP on the VM except port 53 (iptables and ip6tables rules in the PRD), POST /api/machines/<link>/reconnect on home, poll `pan machines list --json` for 120 s. Repeat with the TCP-443-only variant. Record per run: Outcome A (VM log shows iceOptions turnServer ['turn.cloudflare.com', 443] turnTransport 'tls' and a turn candidateAddress line) and Outcome B (link online on the rtc+turn:// route, with seconds from reconnect to online). Decision rules: A+B pass -> done. A passes, B fails -> collect DEBUG=werift* logs from both ends, file a follow-up issue 'Relay data channel does not open over TLS TURN (PAN-4862 section 2)', link it in the evidence file, pan tell flywheel-orchestrator. A fails -> reopen relay-ice-helper/relay-ice-wire. Environment cannot be set up (no Fly access, device code unapproved for 30 min) -> write 'Status: not-run' with the reason, pan tell flywheel-orchestrator; the PAN-4774 AC-3 re-run is the backstop. Clean up: VM pan account logout, home pan machines unlink + forget, fly machine destroy --force."
+        },
+        "items": [
+          {
+            "id": "live-relay-check.ac1",
+            "title": "Given the branch build on both machines and UDP blocked on the VM except port 53, when home reconnects the link, then .pan/uat/pan-4862/live-relay.md records Outcome A (werift iceOptions with turnTransport 'tls' and a turn candidateAddress line) or Status: not-run with the reason",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-relay-check.ac2",
+            "title": "Given the same run, then the evidence file records Outcome B (link online on rtc+turn:// with the seconds from reconnect to online) or the failure, separately from Outcome A",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-relay-check.ac3",
+            "title": "Given Outcome A passes and Outcome B fails, then the evidence file links a newly filed follow-up issue carrying the DEBUG=werift* logs from both ends",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-relay-check.ac4",
+            "title": "Given the run finishes, then the evidence file records the cleanup: VM signed out, link unlinked and forgotten on home, Fly machine destroyed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "relay-ice-helper",
+        "to": "relay-ice-wire",
+        "type": "blocks"
+      },
+      {
+        "from": "relay-ice-helper",
+        "to": "live-relay-check",
+        "type": "blocks"
+      },
+      {
+        "from": "relay-ice-wire",
+        "to": "live-relay-check",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

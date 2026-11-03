@@ -17,6 +17,8 @@ type SignalHandler = (from: string, session: string, purpose: RtcPurpose, relay:
 /** Delivers each signal on a later turn, stamping `from` the way the directory does. */
 function hub() {
   const handlers = new Map<string, Set<SignalHandler>>();
+  /** The `relay` argument of every `iceServers` call, in order. */
+  const iceRelays: boolean[] = [];
   const port = (self: string): RtcSignalingPort => ({
     send(to, session, purpose, relay, data) {
       setImmediate(() => {
@@ -29,9 +31,12 @@ function hub() {
       set.add(handler);
       return () => set.delete(handler);
     },
-    iceServers: async () => [],
+    iceServers: async (relay) => {
+      iceRelays.push(relay);
+      return [];
+    },
   });
-  return { port };
+  return { port, iceRelays };
 }
 
 function readBytes(stream: Duplex, count: number): Promise<Buffer> {
@@ -86,6 +91,21 @@ describe('RtcTransport (PAN-2356 WI-10)', () => {
     expect(await readBytes(accepted.raw, 10)).toEqual(ping);
     accepted.raw.write(Buffer.from('9876543210'));
     expect((await readBytes(raw, 10)).toString()).toBe('9876543210');
+  }, 20_000);
+
+  // A relay dial would reach a real TURN server, so only the direct branch is dialled here; the relay
+  // list itself is covered by relay-ice-servers.test.ts.
+  it('asks both ends for the direct list on a direct dial and still connects', async () => {
+    const h = hub();
+    const incoming: Duplex[] = [];
+    const a = new RtcTransport(h.port(A), () => undefined);
+    const b = new RtcTransport(h.port(B), (raw) => incoming.push(raw));
+    transports.push(a, b);
+    const raw = await a.dial(B, { relay: false, purpose: 'link', signal: new AbortController().signal });
+    while (incoming.length === 0) await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(h.iceRelays).toEqual([false, false]);
+    raw.write(Buffer.from('direct'));
+    expect((await readBytes(incoming[0]!, 6)).toString()).toBe('direct');
   }, 20_000);
 
   it('carries 1 MiB written in one write intact in under 5 s', async () => {

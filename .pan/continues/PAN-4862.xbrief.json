@@ -1,0 +1,99 @@
+{
+  "version": "1",
+  "issueId": "PAN-4862",
+  "created": "2026-11-02T23:48:40.343Z",
+  "updated": "2026-11-03T00:37:49.946Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "relay-ice-helper": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4862",
+      "claimedAt": "2026-11-02T23:48:40.343Z",
+      "doneAt": "2026-11-02T23:50:31.382Z"
+    },
+    "relay-ice-wire": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4862",
+      "claimedAt": "2026-11-02T23:50:37.516Z",
+      "doneAt": "2026-11-02T23:55:09.179Z"
+    },
+    "relay-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4862",
+      "claimedAt": "2026-11-02T23:55:15.962Z",
+      "doneAt": "2026-11-02T23:55:50.530Z"
+    },
+    "live-relay-check": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:33:44.365Z"
+    },
+    "relay-ice-helper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:34:34.268Z"
+    },
+    "relay-ice-helper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:34:46.765Z"
+    },
+    "relay-ice-helper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:34:59.477Z"
+    },
+    "relay-ice-helper.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:35:12.322Z"
+    },
+    "relay-ice-helper.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:35:26.562Z"
+    },
+    "relay-ice-wire.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:35:42.026Z"
+    },
+    "relay-ice-wire.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:35:56.804Z"
+    },
+    "relay-ice-wire.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:36:09.763Z"
+    },
+    "relay-ice-wire.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:36:21.668Z"
+    },
+    "relay-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:36:34.883Z"
+    },
+    "relay-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:36:47.947Z"
+    },
+    "relay-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:37:00.077Z"
+    },
+    "live-relay-check.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:37:12.257Z"
+    },
+    "live-relay-check.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:37:25.041Z"
+    },
+    "live-relay-check.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:37:37.326Z"
+    },
+    "live-relay-check.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:37:49.946Z"
+    }
+  }
+}
