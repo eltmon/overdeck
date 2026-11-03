@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4837",
   "created": "2026-11-03T16:16:59.604Z",
-  "updated": "2026-11-03T18:50:59.798Z",
+  "updated": "2026-11-03T18:51:32.314Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -220,6 +220,10 @@
     "channel-keygen.ac2": {
       "status": "completed",
       "doneAt": "2026-11-03T18:50:59.798Z"
+    },
+    "directory-state-events.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:51:32.314Z"
     }
   }
 }
