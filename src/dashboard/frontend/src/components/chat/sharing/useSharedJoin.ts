@@ -114,6 +114,8 @@ export function useSharedJoin(code: string, deps: { api?: JoinApi; viewer?: View
           if (viewerRef.current !== created || !aliveRef.current) return;
           setNotices((prev) => (prev.some((n) => sameNotice(n, notice)) ? prev : [...prev, notice]));
         },
+        // No terminal view yet: nothing watches, so nothing arrives.
+        onTerminal: () => undefined,
       },
     );
     viewerRef.current = created;

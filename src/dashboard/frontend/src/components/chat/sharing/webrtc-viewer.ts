@@ -3,10 +3,14 @@
  *
  * The host always offers; this side answers. Signals reach it from the viewer server's event
  * stream (`onSignal`) and leave through `deps.sendSignal` (`POST /api/joins/:code/signal`). The
- * peer reads three of the five channels: `control` (the hello handshake), `conversation` (history,
- * append, update) and `presence` (the roster header). `drafts` and `terminal` get no listener in
- * this slice. Every message is read with `SharedChannelReader`, and one `SeqTracker` per peer
- * reports a missed update once.
+ * peer reads four of the five channels: `control` (the hello handshake), `conversation` (history,
+ * append, update), `presence` (the roster header) and `terminal` (the host's read-only terminal,
+ * PAN-4477). `drafts` gets no listener yet. Every message is read with `SharedChannelReader`, and
+ * one `SeqTracker` per peer reports a missed update once.
+ *
+ * Terminal (PAN-4477): `setTerminalWatch` sends a `terminal-watch` control payload once the hello
+ * reply is out, and again after the hello of every new peer while the watch is on. The viewer
+ * never sends on `terminal`.
  *
  * A new offer closes the old peer first (D-11). A peer that fails or closes on its own reports
  * phase `lost`; `close()` stops every callback.
@@ -26,6 +30,7 @@ import {
   type SharedHello,
   type SharedMessage,
   type SignalData,
+  type TerminalPayload,
 } from '@overdeck/contracts';
 
 export type ViewerPeerPhase = 'waiting' | 'connecting' | 'connected' | 'lost';
@@ -46,6 +51,7 @@ export interface WebRtcViewerCallbacks {
   onPresence(presence: PresencePayload): void;
   onPhase(phase: ViewerPeerPhase): void;
   onNotice(notice: ViewerNotice): void;
+  onTerminal(payload: TerminalPayload): void;
 }
 
 type Candidate = NonNullable<SignalData['candidate']>;
@@ -64,6 +70,9 @@ interface Negotiation {
   gapReported: boolean;
   helloDone: boolean;
   streamId: string | null;
+  /** The `control` channel and the seq of the last control envelope this side sent (hello reply = 1). */
+  control: RTCDataChannel | null;
+  controlSeq: number;
   readonly messages: Map<string, SharedMessage>;
   closedByViewer: boolean;
 }
@@ -120,10 +129,42 @@ export function readPresence(value: unknown): PresencePayload | null {
   };
 }
 
+function readDimension(value: unknown): number | null {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 1 && value <= 1000 ? value : null;
+}
+
+/** A terminal payload rebuilt field by field; anything malformed is null and dropped. */
+export function readTerminalPayload(value: unknown): TerminalPayload | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const raw = value as Record<string, unknown>;
+  switch (raw.kind) {
+    case 'snapshot': {
+      const cols = readDimension(raw.cols);
+      const rows = readDimension(raw.rows);
+      if (cols === null || rows === null || typeof raw.data !== 'string') return null;
+      return { kind: 'snapshot', cols, rows, data: raw.data };
+    }
+    case 'output':
+      return typeof raw.data === 'string' ? { kind: 'output', data: raw.data } : null;
+    case 'size': {
+      const cols = readDimension(raw.cols);
+      const rows = readDimension(raw.rows);
+      return cols === null || rows === null ? null : { kind: 'size', cols, rows };
+    }
+    case 'unavailable':
+      return raw.reason === 'terminal_not_found' || raw.reason === 'terminal_ended'
+        ? { kind: 'unavailable', reason: raw.reason }
+        : null;
+    default:
+      return null;
+  }
+}
+
 export class WebRtcViewer {
   private current: Negotiation | null = null;
   private closed = false;
   private chunkId = 0;
+  private terminalWatch = false;
 
   constructor(
     private readonly deps: WebRtcViewerDeps,
@@ -134,6 +175,13 @@ export class WebRtcViewer {
     if (this.closed) return;
     if (data.sdp?.type === 'offer') void this.answer(data.sdp.sdp);
     if (data.candidate) this.addRemoteCandidate(data.candidate);
+  }
+
+  /** Turns the host terminal stream on or off; a new peer re-sends `true` after its hello (FR-7). */
+  setTerminalWatch(watch: boolean): void {
+    this.terminalWatch = watch;
+    const negotiation = this.current;
+    if (negotiation && !this.closed) this.sendTerminalWatch(negotiation, watch);
   }
 
   close(): void {
@@ -156,6 +204,8 @@ export class WebRtcViewer {
       gapReported: false,
       helloDone: false,
       streamId: null,
+      control: null,
+      controlSeq: 0,
       messages: new Map(),
       closedByViewer: false,
     };
@@ -227,8 +277,9 @@ export class WebRtcViewer {
   private wireChannel(negotiation: Negotiation, channel: RTCDataChannel): void {
     negotiation.channels.push(channel);
     const label = channel.label;
-    // `drafts` and `terminal` belong to later slices: no listener.
-    if (label !== 'control' && label !== 'conversation' && label !== 'presence') return;
+    // `drafts` belongs to a later slice: no listener.
+    if (label !== 'control' && label !== 'conversation' && label !== 'presence' && label !== 'terminal') return;
+    if (label === 'control') negotiation.control = channel;
     const reader = new SharedChannelReader();
     channel.addEventListener('message', (event: MessageEvent) => {
       if (!this.isCurrent(negotiation) || typeof event.data !== 'string') return;
@@ -242,6 +293,7 @@ export class WebRtcViewer {
       }
       if (label === 'control') this.onControl(negotiation, channel, envelope);
       else if (label === 'conversation') this.onConversation(negotiation, envelope);
+      else if (label === 'terminal') this.onTerminalEnvelope(negotiation, envelope);
       else this.onPresenceEnvelope(envelope);
     });
   }
@@ -284,10 +336,39 @@ export class WebRtcViewer {
     };
     try {
       for (const part of encodeSharedMessage(reply, ++this.chunkId)) channel.send(part);
+      negotiation.controlSeq = 1;
       negotiation.streamId = envelope.streamId;
     } catch {
       this.emitPhase(negotiation, 'lost');
+      return;
     }
+    if (this.terminalWatch) this.sendTerminalWatch(negotiation, true);
+  }
+
+  /** Sends `terminal-watch` on `control` once this peer's hello reply is out; before that, nothing. */
+  private sendTerminalWatch(negotiation: Negotiation, watch: boolean): void {
+    const channel = negotiation.control;
+    if (negotiation.streamId === null || channel === null || channel.readyState !== 'open') return;
+    const envelope: SharedEnvelope = {
+      v: SHARED_WIRE_VERSION,
+      ch: 'control',
+      streamId: negotiation.streamId,
+      seq: negotiation.controlSeq + 1,
+      t: this.deps.now?.() ?? Date.now(),
+      payload: { kind: 'terminal-watch', watch },
+    };
+    try {
+      for (const part of encodeSharedMessage(envelope, ++this.chunkId)) channel.send(part);
+      negotiation.controlSeq = envelope.seq;
+    } catch {
+      this.emitPhase(negotiation, 'lost');
+    }
+  }
+
+  private onTerminalEnvelope(negotiation: Negotiation, envelope: SharedEnvelope): void {
+    if (negotiation.streamId === null || envelope.streamId !== negotiation.streamId) return;
+    const payload = readTerminalPayload(envelope.payload);
+    if (payload) this.callbacks.onTerminal(payload);
   }
 
   private onConversation(negotiation: Negotiation, envelope: SharedEnvelope): void {
