@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { DirectoryMachine, DirectoryView } from '../../../../services/account/src/directory-view.ts';
 import type { Env } from '../../../../services/account/src/env.ts';
 import { makeAccountClient, type AccountUser } from './helpers/account.ts';
-import { dbOf, makeDeps, makeEnv } from './helpers/harness.ts';
+import { dbOf, fakeCtx, makeDeps, makeEnv } from './helpers/harness.ts';
 
 const NOW = Date.UTC(2026, 10, 15, 12);
 const TESS: AccountUser = { githubId: 500, login: 'tess' };
@@ -236,5 +236,71 @@ describe('removing a machine from the account page (PAN-4959 WI-7)', () => {
     const res = await client.post('/account/machines/env-1/remove');
     expect(res.status).toBe(503);
     expect(await res.text()).toContain('Machines and relay use are unavailable right now.');
+  });
+});
+
+describe('deleting the account from the page (PAN-4959 WI-8)', () => {
+  /** A vault holder that fails keeps the deletion job open, so the users row (and deleted_at) stays readable. */
+  async function deleting(vaultFails = false) {
+    const env = makeEnv(vaultFails ? { VAULT: { deleteAccountData: async () => { throw new Error('vault down'); } } } : {});
+    const deps = makeDeps({ now: NOW });
+    await seedGrant(env, TESS, 'tester');
+    const client = await makeAccountClient(env, deps, 'u-tess', TESS);
+    const deletedAt = () => dbOf(env).prepare('SELECT deleted_at FROM users WHERE user_id = ?').bind('u-tess').first<number | null>('deleted_at');
+    const sessions = () => dbOf(env).prepare("SELECT COUNT(*) AS n FROM user_sessions WHERE user_id = 'u-tess'").first<number>('n');
+    return { env, deps, client, deletedAt, sessions };
+  }
+
+  it('POST /account/delete shows the confirm page and deletes nothing', async () => {
+    const { client, deletedAt } = await deleting();
+    const res = await client.post('/account/delete');
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    expect(body).toContain('Deleting your account signs out every device, removes your machines from the directory and deletes all of your hosted data within 24 hours.');
+    expect(body).toContain('<form method="post" action="/account/delete/confirm">');
+    expect(body).toContain('name="confirm"');
+    expect(body).toContain(`<input type="hidden" name="csrf" value="${client.csrf}">`);
+    expect(body).toContain('Delete my account');
+    expect(body).toContain('<a href="/account">Cancel</a>');
+    expect(await deletedAt()).toBeNull();
+  });
+
+  it('refuses POST /account/delete and /account/delete/confirm without csrf', async () => {
+    const { client, deletedAt } = await deleting();
+    expect((await client.post('/account/delete', {}, { csrf: null })).status).toBe(403);
+    expect((await client.post('/account/delete/confirm', { confirm: 'tess' }, { csrf: null })).status).toBe(403);
+    expect(await deletedAt()).toBeNull();
+  });
+
+  it('a login that does not match answers 400 with the confirm page and deletes nothing', async () => {
+    const { client, deletedAt, sessions } = await deleting();
+    const res = await client.post('/account/delete/confirm', { confirm: 'someone-else' });
+    expect(res.status).toBe(400);
+    const body = await res.text();
+    expect(body).toContain('Type your GitHub login to confirm.');
+    expect(body).toContain('<form method="post" action="/account/delete/confirm">');
+    expect(await deletedAt()).toBeNull();
+    expect(await sessions()).toBe(1);
+  });
+
+  it('the login in another letter case starts deletion, ends every web session and clears the cookie', async () => {
+    const { env, deps, client, deletedAt, sessions } = await deleting(true);
+    await dbOf(env)
+      .prepare('INSERT INTO user_sessions (session_hash, user_id, csrf_token, created_at, expires_at) VALUES (?, ?, ?, ?, ?)')
+      .bind('second-session', 'u-tess', 'x', deps.now(), deps.now() + 1000)
+      .run();
+    const ctx = fakeCtx();
+    const res = await client.post('/account/delete/confirm', { confirm: 'TESS' }, { ctx });
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain('Your account is being deleted.');
+    expect(res.headers.get('Set-Cookie')).toMatch(/^__Host-od_account=;/);
+    expect(await sessions()).toBe(0);
+    expect(ctx.pending).toHaveLength(1);
+    await ctx.drain();
+    // The job ran with the request; the failing vault keeps it open, so the users row is still there.
+    expect(await deletedAt()).toBe(NOW);
+    expect(await dbOf(env).prepare('SELECT requested_at, completed_at, last_error FROM deletion_jobs WHERE user_id = ?').bind('u-tess').first()).toEqual({ requested_at: NOW, completed_at: null, last_error: 'vault down' });
+    // The old cookie no longer opens the page.
+    expect(await (await client.get()).text()).toContain('Sign in with GitHub');
   });
 });

@@ -59,6 +59,18 @@ describe('account deletion (PAN-4293 account-deletion)', () => {
     expect(await getActiveGrant(rc, 200)).not.toBeNull();
   });
 
+  it('DELETE /v1/account also ends every web session of the user and keeps other users\' (PAN-4959)', async () => {
+    const { env, deps, ctx, alice } = await setup();
+    const insert = (hash: string, userId: string) =>
+      dbOf(env).prepare('INSERT INTO user_sessions (session_hash, user_id, csrf_token, created_at, expires_at) VALUES (?, ?, ?, ?, ?)').bind(hash, userId, 'x', 0, deps.now() + 1000).run();
+    await insert('s-alice-1', 'u-alice');
+    await insert('s-alice-2', 'u-alice');
+    await insert('s-bob', 'u-bob');
+    expect((await del(env, deps, ctx, alice.token)).status).toBe(202);
+    expect(await count(env, 'user_sessions', "user_id = 'u-alice'")).toBe(0);
+    expect(await count(env, 'user_sessions', "user_id = 'u-bob'")).toBe(1);
+  });
+
   it('a succeeding VAULT holder receives the userId and the job completes', async () => {
     const vault: AccountDataHolder = { deleteAccountData: vi.fn(async () => ({ deleted: true as const })) };
     const { env, deps, ctx, alice } = await setup(vault);

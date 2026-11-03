@@ -53,6 +53,7 @@ export async function requestDeletion(rc: DeletionContext, userId: string): Prom
     db.prepare("UPDATE devices SET revoked_at = ?, revoked_by = 'account-deletion' WHERE user_id = ? AND revoked_at IS NULL").bind(now, userId),
     db.prepare('DELETE FROM grants WHERE github_id = ?').bind(user.github_id),
     db.prepare('DELETE FROM pending_attempts WHERE github_id = ?').bind(user.github_id),
+    db.prepare('DELETE FROM user_sessions WHERE user_id = ?').bind(userId),
     db.prepare('INSERT OR IGNORE INTO deletion_jobs (user_id, requested_at, holders_pending) VALUES (?, ?, ?)').bind(userId, now, JSON.stringify(boundHolders(rc.env))),
   ]);
   const job = await db.prepare('SELECT requested_at FROM deletion_jobs WHERE user_id = ?').bind(userId).first<number>('requested_at');

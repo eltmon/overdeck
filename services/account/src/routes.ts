@@ -61,6 +61,8 @@ const ROUTES: Route[] = [
   { method: 'POST', pattern: '/account/login', handler: accountSession.login, bucket: 'account-login' },
   { method: 'POST', pattern: '/account/logout', handler: accountSession.logout, bucket: 'account-action' },
   { method: 'POST', pattern: '/account/machines/:environmentId/remove', handler: accountActions.removeMachine, bucket: 'account-action' },
+  { method: 'POST', pattern: '/account/delete', handler: accountActions.deleteAccount, bucket: 'account-action' },
+  { method: 'POST', pattern: '/account/delete/confirm', handler: accountActions.confirmDeleteAccount, bucket: 'account-action' },
 ];
 
 function matchPattern(pattern: string, pathname: string): Record<string, string> | null {
