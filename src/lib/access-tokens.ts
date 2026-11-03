@@ -21,6 +21,14 @@
  * record missing any of those fields makes the file corrupt, so a downgrade to
  * a version without this kind refuses every token until links are removed (H4).
  *
+ * A `phone` record (PAN-4835) is bound to the phone app's link key
+ * (`phoneKey`, 64 hex) and its directory client id (`clientId`, a UUID v4), and
+ * may carry a push key (`pushKey`, 64 hex) once the app sends one. It always
+ * carries `PHONE_TOKEN_SCOPES` and never `admin` or `forward`, and
+ * authenticates only inside a secure channel whose remote key equals
+ * `phoneKey`. A `phone` record missing `phoneKey` or `clientId` makes the file
+ * corrupt, exactly like an incomplete `machine` record.
+ *
  * `onAccessTokensRevoked` tells the dashboard when a record was revoked or
  * vanished, whether by this process or by another one seen at the next refresh
  * (D-4645-16), so live sockets of that record can be closed.
@@ -64,12 +72,13 @@ export const ACCESS_TOKEN_SCOPES = [
   'admin',
 ] as const;
 export type AccessTokenScope = (typeof ACCESS_TOKEN_SCOPES)[number];
-export type AccessTokenKind = 'device' | 'token' | 'machine';
+export type AccessTokenKind = 'device' | 'token' | 'machine' | 'phone';
 /** Access level of a machine link (PAN-4645 FR-4). */
 export type MachineAccess = 'operator' | 'agent-fenced';
 export const MACHINE_ACCESS_LEVELS: readonly MachineAccess[] = ['operator', 'agent-fenced'];
 
 const MACHINE_KEY_HEX = /^[0-9a-f]{64}$/;
+const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 export interface AccessTokenRecord {
   id: string;
@@ -87,6 +96,12 @@ export interface AccessTokenRecord {
   environmentId?: string;
   /** `machine` only: the link's access level. */
   access?: MachineAccess;
+  /** `phone` only: the phone's link public key, 64 lowercase hex (PAN-4835). */
+  phoneKey?: string;
+  /** `phone` only: the phone app's directory client id, a UUID v4. */
+  clientId?: string;
+  /** `phone` only: the phone's push public key, 64 lowercase hex; absent until the app sends one. */
+  pushKey?: string;
 }
 
 /** The scopes a `machine` token carries (FR-7): never `admin`; `forward` only on operator-level links. */
@@ -95,6 +110,9 @@ export function MACHINE_TOKEN_SCOPES(access: MachineAccess): AccessTokenScope[] 
   // Operator-level links answer the other machine's prompts (`approve`, PAN-4649) and forward; fenced links do neither.
   return access === 'operator' ? [...scopes, 'approve', 'forward'] : scopes;
 }
+
+/** The scopes a `phone` token carries (PAN-4823 NFR-4): a linked machine's operator scopes without `forward`. */
+export const PHONE_TOKEN_SCOPES: readonly AccessTokenScope[] = ['read:events', 'read:state', 'read:conversations', 'read:costs', 'read:settings', 'tell', 'operate', 'approve'];
 
 /** A record as shown to callers: never carries the hash. */
 export type PublicAccessTokenRecord = Omit<AccessTokenRecord, 'tokenHash'>;
@@ -207,18 +225,26 @@ function isRecord(value: unknown): value is AccessTokenRecord {
     typeof r.createdAt === 'string' &&
     (r.lastUsedAt === null || typeof r.lastUsedAt === 'string') &&
     (r.revokedAt === undefined || typeof r.revokedAt === 'string') &&
-    (r.kind === undefined || r.kind === 'device' || r.kind === 'token' || r.kind === 'machine');
+    (r.kind === undefined || r.kind === 'device' || r.kind === 'token' || r.kind === 'machine' || r.kind === 'phone');
   if (!base) return false;
   const machineKeyOk = typeof r.machineKey === 'string' && MACHINE_KEY_HEX.test(r.machineKey);
   const environmentOk = typeof r.environmentId === 'string' && r.environmentId !== '';
   const accessOk = isMachineAccess(r.access);
-  // A machine record needs all three binding fields; other kinds may carry none,
-  // and any field present must still be well-formed.
-  if (r.kind === 'machine') return machineKeyOk && environmentOk && accessOk;
+  const phoneKeyOk = typeof r.phoneKey === 'string' && MACHINE_KEY_HEX.test(r.phoneKey);
+  const clientIdOk = typeof r.clientId === 'string' && UUID_V4.test(r.clientId);
+  const pushKeyOk = r.pushKey === undefined || (typeof r.pushKey === 'string' && MACHINE_KEY_HEX.test(r.pushKey));
+  // A machine record needs all three binding fields; a phone record needs its
+  // own two plus an optional push key; other kinds may carry none of either
+  // set, and any field present must still be well-formed.
+  if (r.kind === 'machine') return machineKeyOk && environmentOk && accessOk && r.phoneKey === undefined && r.clientId === undefined && r.pushKey === undefined;
+  if (r.kind === 'phone') return phoneKeyOk && clientIdOk && pushKeyOk && r.machineKey === undefined && r.environmentId === undefined && r.access === undefined;
   return (
     (r.machineKey === undefined || machineKeyOk) &&
     (r.environmentId === undefined || environmentOk) &&
-    (r.access === undefined || accessOk)
+    (r.access === undefined || accessOk) &&
+    r.phoneKey === undefined &&
+    r.clientId === undefined &&
+    r.pushKey === undefined
   );
 }
 
@@ -339,6 +365,12 @@ export interface CreateAccessTokenInput {
   environmentId?: string;
   /** Required for `kind: 'machine'`. */
   access?: MachineAccess;
+  /** Required for `kind: 'phone'`: the phone's link public key, 64 lowercase hex. */
+  phoneKey?: string;
+  /** Required for `kind: 'phone'`: the phone app's directory client id, a UUID v4. */
+  clientId?: string;
+  /** Optional for `kind: 'phone'`: the phone's push public key, 64 lowercase hex. */
+  pushKey?: string;
 }
 
 export async function createAccessToken(input: CreateAccessTokenInput): Promise<{ token: string; record: PublicAccessTokenRecord }> {
@@ -352,7 +384,7 @@ export async function createAccessToken(input: CreateAccessTokenInput): Promise<
   } catch (error) {
     throw new Error(`Invalid access-token scopes: ${(error as Error).message}`);
   }
-  let binding: Pick<AccessTokenRecord, 'machineKey' | 'environmentId' | 'access'> = {};
+  let binding: Pick<AccessTokenRecord, 'machineKey' | 'environmentId' | 'access' | 'phoneKey' | 'clientId' | 'pushKey'> = {};
   if (input.kind === 'machine') {
     if (typeof input.machineKey !== 'string' || !MACHINE_KEY_HEX.test(input.machineKey)) {
       throw new Error('A machine token needs machineKey: 64 lowercase hex characters');
@@ -366,9 +398,31 @@ export async function createAccessToken(input: CreateAccessTokenInput): Promise<
     if (scopes.includes('admin')) {
       throw new Error('A machine token never carries admin (PAN-4645 FR-7)');
     }
+    if (input.phoneKey !== undefined || input.clientId !== undefined || input.pushKey !== undefined) {
+      throw new Error('phoneKey, clientId and pushKey belong to kind: phone only');
+    }
     binding = { machineKey: input.machineKey, environmentId: input.environmentId, access: input.access };
+  } else if (input.kind === 'phone') {
+    if (typeof input.phoneKey !== 'string' || !MACHINE_KEY_HEX.test(input.phoneKey)) {
+      throw new Error('A phone token needs phoneKey: 64 lowercase hex characters');
+    }
+    if (typeof input.clientId !== 'string' || !UUID_V4.test(input.clientId)) {
+      throw new Error('A phone token needs clientId: a UUID v4');
+    }
+    if (input.pushKey !== undefined && (typeof input.pushKey !== 'string' || !MACHINE_KEY_HEX.test(input.pushKey))) {
+      throw new Error('A phone token pushKey must be 64 lowercase hex characters');
+    }
+    if (scopes.includes('admin') || scopes.includes('forward')) {
+      throw new Error('A phone token never carries admin or forward (PAN-4823 NFR-4)');
+    }
+    if (input.machineKey !== undefined || input.environmentId !== undefined || input.access !== undefined) {
+      throw new Error('machineKey, environmentId and access belong to kind: machine only');
+    }
+    binding = { phoneKey: input.phoneKey, clientId: input.clientId, ...(input.pushKey !== undefined ? { pushKey: input.pushKey } : {}) };
   } else if (input.machineKey !== undefined || input.environmentId !== undefined || input.access !== undefined) {
     throw new Error('machineKey, environmentId and access belong to kind: machine only');
+  } else if (input.phoneKey !== undefined || input.clientId !== undefined || input.pushKey !== undefined) {
+    throw new Error('phoneKey, clientId and pushKey belong to kind: phone only');
   }
   const token = `${ACCESS_TOKEN_PREFIX}${randomBytes(32).toString('hex')}`;
   const record: AccessTokenRecord = {
@@ -400,6 +454,13 @@ export function findActiveMachineTokenByKey(machineKey: string): PublicAccessTok
   return match ? toPublic(match) : null;
 }
 
+/** The active `machine` or `phone` record a link-mode initiator key is pinned by (PAN-4835 D-1); null when none. */
+export function findActiveChannelTokenByKey(keyHex: string): PublicAccessTokenRecord | null {
+  const match = snapshot.records.find((record) => !record.revokedAt
+    && ((record.kind === 'machine' && record.machineKey === keyHex) || (record.kind === 'phone' && record.phoneKey === keyHex)));
+  return match ? toPublic(match) : null;
+}
+
 /** All records, revoked included, freshly read from the file. */
 export async function listAccessTokens(): Promise<PublicAccessTokenRecord[]> {
   return (await readRegistry(accessTokensPath())).map(toPublic);
@@ -421,6 +482,21 @@ export async function revokeAccessToken(id: string): Promise<PublicAccessTokenRe
   });
   if (fire) fireRevoked([fire]);
   return result;
+}
+
+/** Replace an active phone record's `pushKey`. Returns the updated record, or null when no active phone record has that id. */
+export async function setPhonePushKey(id: string, pushKey: string): Promise<PublicAccessTokenRecord | null> {
+  if (!MACHINE_KEY_HEX.test(pushKey)) {
+    throw new Error('pushKey must be 64 lowercase hex characters');
+  }
+  return mutate((records) => {
+    const index = records.findIndex((record) => record.id === id && record.kind === 'phone' && !record.revokedAt);
+    if (index === -1) return { records, result: null };
+    const updated = { ...records[index]!, pushKey };
+    const next = records.slice();
+    next[index] = updated;
+    return { records: next, result: toPublic(updated) };
+  });
 }
 
 function recordLastUsed(record: AccessTokenRecord): void {
