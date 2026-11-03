@@ -26,6 +26,7 @@ function status(subscriptions: PushStatus['webpush']['subscriptions'] = []): Pus
     includePreview: false,
     webpush: { subscriptions },
     ntfy: { state: 'off' },
+    native: { phones: 0, directoryOnline: false },
     stats: { sent: 0, dropped: 0, rateLimited: 0, lastError: null },
   };
 }

@@ -3,6 +3,7 @@
 // plus the constants and user-facing strings both sides share. PAN-4823 W-CON1 adds the phone app's
 // client role (`ClientToDirectoryFrame` / `DirectoryToClientFrame`) and the sealed `push` /
 // `push-result` frames; the directory serves them from W-CON2 (client role) and W-CON3 (push).
+// `PhonePushPayload` is the plaintext a machine seals into `push` (PAN-4843).
 //
 // Runtime-import-free (like sharing.ts): the connect Worker imports this file by relative path, so it
 // may only `import type`. The dashboard's `GET /api/directory` view schemas live in connect-view.ts.
@@ -100,6 +101,24 @@ export type ApsEnvironment = "production" | "sandbox"
 /** `high` for question, approval and failed; else `normal` (the Web Push rule). */
 export type PushUrgency = "high" | "normal"
 export type PushResultError = "no_registration" | "rate_limited" | "delivery_failed" | "unknown_client"
+
+/** The plaintext a machine seals into a `push` frame (PAN-4843). UTF-8 JSON, at most PUSH_PLAINTEXT_MAX_BYTES. */
+export interface PhonePushPayload {
+  readonly v: 1
+  /** The sending machine's environment id; the phone opens this machine when the notification is tapped. */
+  readonly machine: string
+  readonly kind: "question" | "approval" | "finished" | "failed" | "summary" | "test"
+  /** The full title (the Web Push `title`), never `publicTitle`: the payload is end-to-end encrypted. */
+  readonly title: string
+  readonly body: string
+  /** Same-origin dashboard path, e.g. `/m?subject=my-conv`. */
+  readonly url: string
+  /** Dedup and replace key; the phone uses it as the notification thread / tag. */
+  readonly tag: string
+  readonly issueId: string | null
+  /** ISO 8601. */
+  readonly ts: string
+}
 
 /** Machine → directory. */
 export type MachineToDirectoryFrame =

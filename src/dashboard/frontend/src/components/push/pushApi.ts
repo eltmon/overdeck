@@ -23,6 +23,7 @@ export interface PushStatus {
     }>;
   };
   ntfy: { state: 'off' | 'misconfigured' | 'ready'; reason?: string; host?: string; topicHint?: string };
+  native: { phones: number; directoryOnline: boolean };
   stats: { sent: number; dropped: number; rateLimited: number; lastError: string | null };
 }
 

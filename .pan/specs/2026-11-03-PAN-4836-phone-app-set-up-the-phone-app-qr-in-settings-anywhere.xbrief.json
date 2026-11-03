@@ -1,0 +1,474 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-03T14:14:08Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4836: Phone app: Set up the phone app QR in Settings > Anywhere",
+    "updated": "2026-11-03T14:19:53.014Z"
+  },
+  "plan": {
+    "id": "pan-4836",
+    "title": "Phone app: Set up the phone app QR in Settings > Anywhere",
+    "status": "running",
+    "uid": "2d9c7737-f1ea-4ce7-a51b-0704242af1ff",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-03T14:14:08Z",
+    "updated": "2026-11-03T14:19:53.014Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4836",
+        "label": "PAN-4836",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4823",
+        "label": "PAN-4823 epic",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "phone-app",
+      "anywhere",
+      "settings",
+      "frontend",
+      "pairing"
+    ],
+    "narratives": {
+      "Problem": "The Set up a phone dialog in Settings -> Anywhere only sets up the Tailscale PWA. The native Overdeck app (epic PAN-4823) pairs by scanning a QR that carries this machine's environment id, machine public key and a one-time odp_ pairing code, and needs the machine to be signed in to overdeck.ai. There is no place in the dashboard that shows that QR or lists the phones paired with this machine.",
+      "Proposal": "Define the pair-link string ai.overdeck.app:/pair#v=1&e=<environmentId>&k=<machineKeyHex>&c=<odp_code> once, in @overdeck/contracts (buildPhonePairLink). Turn SetUpPhoneDialog into a tab shell: a new first tab 'Overdeck app' (SetUpPhoneAppPanel: store links, the overdeck.ai sign-in gate read from GET /api/directory, the QR built from GET /api/environment and POST /api/pairing/credentials, and PairedPhonesList with Remove via DELETE /api/devices/:id) and the unchanged PWA flow as 'Browser on the phone'. Update configuration/phone.mdx. No server change. PRD: .pan/drafts/PAN-4836.md.",
+      "NonGoals": "- No change to the PWA flow's behavior or text\n- No QR parser and no apps/mobile code (PAN-4837)\n- No server, route or environment-descriptor change; no new no-loss-matrix row\n- No configuration/phone-app.mdx and no anywhere.mdx pricing text (PAN-4842)\n- No real App Store id (PAN-4841)\n- No removal of the duplicate QrImage/expiresInText in PairDeviceDialog.tsx or the dialog's private QrImage\n- No change to DevicesPanel.tsx"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Read environmentId and machineKey from GET /api/environment via a new loadEnvironment() in anywhereApi.ts",
+        "rationale": "The descriptor is unauthenticated and carries both values; AnywhereStatus has no machine key and is null when identity is unreadable."
+      },
+      {
+        "summary": "Gate the QR on DirectoryResponse.signedIn only; show non-blocking notes for refused/connecting/off",
+        "rationale": "The issue and epic AC-8 require sign-in; directory socket state can recover within the 10-minute code lifetime."
+      },
+      {
+        "summary": "Put buildPhonePairLink and the format regexes in packages/contracts/src/phone-pairing.ts",
+        "rationale": "The QR text is a cross-component wire format the phone app (PAN-4837) must parse byte for byte; one definition prevents drift (epic NFR-1 spirit)."
+      },
+      {
+        "summary": "Google Play link derived from the package id; App Store link points at https://overdeck.ai/configuration/phone-app until PAN-4841 creates the App Store record",
+        "rationale": "Apple's numeric app id does not exist yet and must not be invented; both URLs are exported constants so PAN-4841 changes one line."
+      },
+      {
+        "summary": "New SetUpPhoneAppPanel.tsx and PairedPhonesList.tsx; existing body becomes BrowserPhoneSetup in the same dialog file",
+        "rationale": "Keeps the PWA flow byte-identical in behavior, keeps files small, and lets each new component carry its own test."
+      },
+      {
+        "summary": "Use the shared ViewToggle for the tabs and the shared QrImage (with an added data-qr-value attribute) in the new panel",
+        "rationale": "Reuses existing components instead of adding a third QR or tab implementation; data-qr-value lets tests assert the encoded text."
+      },
+      {
+        "summary": "Docs: update configuration/phone.mdx 'Set up a phone' only",
+        "rationale": "PAN-4842 owns phone-app.mdx and the wider docs sweep; linking a page that does not exist yet would add a dead link."
+      }
+    ],
+    "metadata": {
+      "prd": ".pan/drafts/PAN-4836.md",
+      "canonicalFilename": "2026-11-03-PAN-4836-phone-app-set-up-the-phone-app-qr-in-settings-anywhere.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "phone-pair-link",
+        "title": "Define the phone app pair-link format in @overdeck/contracts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:14:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-4836",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "api",
+          "foundationFor": [
+            "app-pairing-panel"
+          ],
+          "files_scope": [
+            "packages/contracts/src/phone-pairing.ts",
+            "packages/contracts/src/index.ts",
+            "packages/contracts/src/__tests__/phone-pairing.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run packages/contracts/src/__tests__/phone-pairing.test.ts",
+            "npm run typecheck:contracts"
+          ],
+          "expected_outputs": [
+            "phone-pairing.test.ts passes",
+            "typecheck:contracts completes without errors"
+          ],
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4836.md work item W-1. Create packages/contracts/src/phone-pairing.ts exactly as the PRD snippet shows (contracts style: double quotes, no semicolons): PHONE_APP_SCHEME = \"ai.overdeck.app\", PHONE_PAIR_LINK_VERSION = 1, PHONE_PAIR_LINK_PREFIX = \"ai.overdeck.app:/pair#\" (single slash), PHONE_PAIR_ENVIRONMENT_ID_RE (lowercase UUID v4, same as UUID_V4_LOWERCASE in src/lib/environment-identity.ts:32), PHONE_PAIR_MACHINE_KEY_RE /^[0-9a-f]{64}$/, PHONE_PAIR_CODE_RE /^odp_[0-9a-f]{64}$/, interface PhonePairLinkInput { environmentId, machineKeyHex, code }, and buildPhonePairLink(input) which validates each field (throwing an Error naming the field) and returns `ai.overdeck.app:/pair#v=1&e=<environmentId>&k=<machineKeyHex>&c=<code>` with no URL encoding. Add `export * from \"./phone-pairing\"` to packages/contracts/src/index.ts after the connect-view export (line 43). Write packages/contracts/src/__tests__/phone-pairing.test.ts with the PRD's ENV/KEY/CODE fixtures. Do not write a parser (PAN-4837 owns it)."
+        },
+        "items": [
+          {
+            "id": "phone-pair-link.ac1",
+            "title": "Given ENV '0b5c6c1e-3f2a-4d8e-9a7b-1c2d3e4f5a6b', KEY 'ab' x32 and CODE 'odp_' + 'cd34' x16, when buildPhonePairLink is called, then it returns exactly 'ai.overdeck.app:/pair#v=1&e=' + ENV + '&k=' + KEY + '&c=' + CODE",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phone-pair-link.ac2",
+            "title": "Given the returned link, then it starts with 'ai.overdeck.app:/pair#' and contains no '://'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phone-pair-link.ac3",
+            "title": "Given an uppercase machine key, a 63-character key, a non-v4 UUID, or a code without the odp_ prefix, when buildPhonePairLink is called, then it throws an Error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phone-pair-link.ac4",
+            "title": "Given buildPhonePairLink and PHONE_PAIR_LINK_PREFIX imported from the '@overdeck/contracts' index in the test, then both are defined and PHONE_PAIR_LINK_PREFIX equals 'ai.overdeck.app:/pair#'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "paired-phones-list",
+        "title": "Add PairedPhonesList: phones paired with this machine, with Remove",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:14:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-4836",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "frontend",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/PairedPhonesList.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/PairedPhonesList.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend test -- src/components/Settings/anywhere/__tests__/PairedPhonesList.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "PairedPhonesList.test.tsx passes all five cases",
+            "typecheck:frontend completes without errors"
+          ],
+          "traces": [
+            "FR-5",
+            "NFR-3",
+            "NFR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-2. New src/dashboard/frontend/src/components/Settings/anywhere/PairedPhonesList.tsx exporting PairedPhonesList(). useQuery({ queryKey: ANYWHERE_DEVICES_QUERY_KEY, queryFn: loadDevices, refetchInterval: 5000 }); phones = devices.filter(d => d.kind === 'phone' && d.revokedAt === null). Wrapper div data-component=\"paired-phones-list\", heading h4 'Phones paired with this machine'. States: 'Loading phones…', 'Could not load phones: <message>' (text-destructive), empty 'No phones are paired with this machine yet.'. Rows li data-device-id: name, meta 'paired <formatRelativeTime(createdAt)> · last seen <formatRelativeTime(lastUsedAt) or —>', and a Remove button using the destructive class from DevicesPanel.tsx:82. Remove copies DevicesPanel.tsx:26-46 with confirm title `Remove ${name}?`, message 'The phone app is signed out of this machine and its open connections close now.', confirmLabel 'Remove', variant 'destructive'; toast.error(apiError) on failure; then invalidate ANYWHERE_DEVICES_QUERY_KEY and ANYWHERE_STATUS_QUERY_KEY. Must not import from SetUpPhoneDialog.tsx. Test file renders inside QueryClientProvider + DialogProvider, mocks sonner and lib/wsTransport like DevicesPanel.test.tsx:11-14. Append 'src/components/Settings/anywhere/__tests__/PairedPhonesList.test.tsx' to scripts/frontend-test-subset.txt after PairDeviceDialog.test.tsx."
+        },
+        "items": [
+          {
+            "id": "paired-phones-list.ac1",
+            "title": "Given /api/devices returns a browser device, a revoked phone and an active phone named iris, when PairedPhonesList renders, then only the iris row renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "paired-phones-list.ac2",
+            "title": "Given /api/devices returns no active phone row, when PairedPhonesList renders, then it shows 'No phones are paired with this machine yet.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "paired-phones-list.ac3",
+            "title": "Given the iris row, when the operator clicks Remove and confirms, then the component sends DELETE /api/devices/phone-1; when the operator cancels instead, then no DELETE is sent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "paired-phones-list.ac4",
+            "title": "Given the DELETE answers 500 with {error:'boom'}, when Remove is confirmed, then toast.error is called with 'boom'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "paired-phones-list.ac5",
+            "title": "Given scripts/frontend-test-subset.txt, then it lists src/components/Settings/anywhere/__tests__/PairedPhonesList.test.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "app-pairing-panel",
+        "title": "Add SetUpPhoneAppPanel: store links, overdeck.ai sign-in gate and the pair-link QR",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:14:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-4836",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "frontend",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/SetUpPhoneAppPanel.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/anywhereApi.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/QrImage.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/SetUpPhoneAppPanel.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend test -- src/components/Settings/anywhere/__tests__/SetUpPhoneAppPanel.test.tsx",
+            "npm run typecheck:frontend",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "SetUpPhoneAppPanel.test.tsx passes all six cases",
+            "typecheck:frontend completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-6",
+            "FR-7",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-3. (1) anywhereApi.ts: add ANYWHERE_ENVIRONMENT_QUERY_KEY ['anywhere-environment'], fetchEnvironment() (GET /api/environment), loadEnvironment() typed EnvironmentDescriptor from @overdeck/contracts, and pairingExpiresInText(expiresAt) with the text 'Expires in N minute(s) · works once' (copy of SetUpPhoneDialog.tsx:54-57). (2) QrImage.tsx: add data-qr-value={link} to the img, nothing else. (3) New SetUpPhoneAppPanel.tsx exporting GOOGLE_PLAY_URL = 'https://play.google.com/store/apps/details?id=ai.overdeck.app', APP_STORE_URL = 'https://overdeck.ai/configuration/phone-app' (comment: PAN-4841 swaps it to https://apps.apple.com/app/id<n> once the App Store record exists) and SetUpPhoneAppPanel(). Section '1. Install the Overdeck app' with text and 'Google Play' / 'App Store' links (target=_blank rel=noreferrer). Section '2. Scan the pairing code with the app': directory query (DIRECTORY_QUERY_KEY, loadDirectory, refetchInterval 5000); environment query enabled only when signedIn. Loading 'Checking the overdeck.ai sign-in…'; error 'Could not check the overdeck.ai sign-in: <message>'; signedIn false -> p data-testid=\"phone-app-signed-out\" 'Sign in to overdeck.ai on this machine first: pan account login' (pan account login in font-mono span) and nothing else. Signed in: refused+refusal -> refusal text (text-warning-foreground); connecting/off -> 'This machine is not connected to overdeck.ai right now. A phone can pair once it is.'; neither blocks. Environment error or missing machineKey -> 'Could not read this machine's identity: <message>' ('no machine key' when absent), no button. Otherwise 'Create pairing code' calls issuePairingLink(); 403 -> 'Pairing codes can be created only from a browser on this machine.'; other errors -> apiError text; success -> QrImage link=buildPhonePairLink({environmentId, machineKeyHex: machineKey, code: credential}) alt 'Overdeck app pairing QR code' (builder throw -> show its message, no QR), pairingExpiresInText, 'Create another code'; expiry via useEffect+setTimeout -> 'This code expired.' + 'Create another code'. Section 3 renders <PairedPhonesList />. Must not import from SetUpPhoneDialog.tsx. Append 'src/components/Settings/anywhere/__tests__/SetUpPhoneAppPanel.test.tsx' to scripts/frontend-test-subset.txt before SetUpPhoneDialog.test.tsx."
+        },
+        "items": [
+          {
+            "id": "app-pairing-panel.ac1",
+            "title": "Given /api/directory reports signedIn true and /api/environment returns environmentId ENV and machineKey KEY, when the operator clicks 'Create pairing code', then an image with alt 'Overdeck app pairing QR code' renders with data-qr-value exactly 'ai.overdeck.app:/pair#v=1&e=' + ENV + '&k=' + KEY + '&c=' + CODE",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "app-pairing-panel.ac2",
+            "title": "Given /api/directory reports signedIn false, when the panel renders, then data-testid phone-app-signed-out shows 'Sign in to overdeck.ai on this machine first: pan account login' and no 'Create pairing code' button exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "app-pairing-panel.ac3",
+            "title": "Given POST /api/pairing/credentials answers 403, when the operator clicks 'Create pairing code', then the panel shows 'Pairing codes can be created only from a browser on this machine.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "app-pairing-panel.ac4",
+            "title": "Given a descriptor without machineKey, when the panel renders signed in, then it shows 'Could not read this machine's identity: no machine key' and no create button; given state 'refused' with refusal 'limit', then it shows 'limit' and still offers 'Create pairing code'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "app-pairing-panel.ac5",
+            "title": "Given the panel renders, then links named 'Google Play' and 'App Store' have href GOOGLE_PLAY_URL and APP_STORE_URL, and scripts/frontend-test-subset.txt lists SetUpPhoneAppPanel.test.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dialog-tabs",
+        "title": "Turn SetUpPhoneDialog into a tab shell: Overdeck app first, Browser on the phone second",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:14:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-4836",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "frontend",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/SetUpPhoneDialog.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/SetUpPhoneDialog.test.tsx"
+          ],
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend test -- src/components/Settings/anywhere/__tests__/SetUpPhoneDialog.test.tsx src/components/Settings/anywhere/__tests__/AnywhereDialogHost.test.tsx",
+            "npm run typecheck:frontend",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "SetUpPhoneDialog.test.tsx and AnywhereDialogHost.test.tsx pass",
+            "typecheck:frontend completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "traces": [
+            "FR-1",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-4. In SetUpPhoneDialog.tsx: rewrite the module header (lines 1-10) to describe the two tabs ('Overdeck app', PAN-4836; 'Browser on the phone', the PAN-2355 PWA flow). Delete local expiresInText (54-57) and use pairingExpiresInText from ./anywhereApi (call at line 317). Rename the current body to BrowserPhoneSetup({ onClose }) returning only the inner <div className=\"p-4 space-y-5 text-sm\"> block (192-343) with its state, effects and handlers unchanged. New SetUpPhoneDialogBody keeps the overlay, role=dialog container and title row (176-190), adds <div className=\"px-4 pt-3\"><ViewToggle ariaLabel=\"Phone setup\" options={[{id:'app',label:'Overdeck app'},{id:'browser',label:'Browser on the phone'}]} value={tab} onChange={setTab} /></div> (ViewToggle from ../../shared/ViewToggle; useState<'app'|'browser'>('app')), then tab === 'app' ? <div className=\"p-4 space-y-5 text-sm\"><SetUpPhoneAppPanel /></div> : <BrowserPhoneSetup onClose={onClose} />. Tests: wrap renderDialog in DialogProvider, mock sonner, stub /api/directory (signedIn false) and /api/devices ({devices: []}); in each of the five existing tests click the 'Browser on the phone' tab first and keep every existing assertion; add the two new tab tests."
+        },
+        "items": [
+          {
+            "id": "dialog-tabs.ac1",
+            "title": "Given the dialog opens, then the tab named 'Overdeck app' has aria-selected='true' and no 'Create pairing link' button exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-tabs.ac2",
+            "title": "Given the operator clicks the 'Browser on the phone' tab, then the 'Install Tailscale' step heading renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-tabs.ac3",
+            "title": "Given the Browser on the phone tab is selected, when the operator clicks 'Create pairing link', then the 'Pairing link' input shows 'https://desk.tailnet.ts.net/m#pair=' + CODE and the 403 and iPhone two-QR cases still render their original texts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-tabs.ac4",
+            "title": "Given SetUpPhoneDialog.tsx after the change, then it contains no local expiresInText function and imports pairingExpiresInText from ./anywhereApi",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "phone-setup-docs",
+        "title": "Document the two Set up a phone tabs in configuration/phone.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:14:08Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-4836",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "docs",
+          "files_scope": [
+            "configuration/phone.mdx"
+          ],
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n \"### Overdeck app\\|### Browser on the phone\\|pan account login\\|Create pairing code\" configuration/phone.mdx"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors",
+            "grep prints the two new subsection headings, the pan account login line and the Create pairing code line"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-5. In configuration/phone.mdx, section '## Set up a phone' (lines 27-42): say the dialog has two tabs, **Overdeck app** (first) and **Browser on the phone**. Add '### Overdeck app': the machine must be signed in to overdeck.ai with `pan account login`, else the tab says so and shows no code; install Overdeck from Google Play or the App Store; select **Create pairing code** and scan the QR with the app; the code works once and expires after 10 minutes; the tab lists the phones paired with this machine and **Remove** signs a phone out of this machine and closes its connections; the app needs no Tailscale. Put the existing four steps under '### Browser on the phone' with their text unchanged. Do not link configuration/phone-app.mdx (PAN-4842 creates it)."
+        },
+        "items": [
+          {
+            "id": "phone-setup-docs.ac1",
+            "title": "Given configuration/phone.mdx, then the 'Set up a phone' section contains the headings '### Overdeck app' and '### Browser on the phone'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phone-setup-docs.ac2",
+            "title": "Given the Overdeck app subsection, then it states that the machine must be signed in with pan account login, names the Create pairing code button, the 10-minute single-use code, and Remove",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phone-setup-docs.ac3",
+            "title": "Given the Browser on the phone subsection, then it lists the original four steps (Install Tailscale, Choose this machine's address, Require a token to sign in, Scan the pairing code) with their wording unchanged, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "phone-pair-link",
+        "to": "app-pairing-panel",
+        "type": "blocks"
+      },
+      {
+        "from": "paired-phones-list",
+        "to": "app-pairing-panel",
+        "type": "blocks"
+      },
+      {
+        "from": "app-pairing-panel",
+        "to": "dialog-tabs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

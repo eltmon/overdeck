@@ -20,6 +20,12 @@ function ntfyLine(ntfy: PushStatus['ntfy']): string {
   return 'ntfy: not configured (optional — see docs).';
 }
 
+function nativeLine(native: PushStatus['native']): string {
+  if (native.phones === 0) return 'Overdeck app: no phones paired.';
+  const phones = `Overdeck app: ${native.phones} ${native.phones === 1 ? 'phone' : 'phones'}`;
+  return native.directoryOnline ? phones : `${phones} · not connected to overdeck.ai, so no notifications reach them`;
+}
+
 /** Settings → Anywhere → Phone notifications: needs-you push devices, test send and ntfy status (PAN-2354). */
 export function PushPanel() {
   const queryClient = useQueryClient();
@@ -55,7 +61,7 @@ export function PushPanel() {
     try {
       const outcomes = await sendTestPush();
       const sent = outcomes.filter((outcome) => outcome.ok).length;
-      const failure = outcomes.find((outcome) => !outcome.ok);
+      const failure = outcomes.find((outcome) => !outcome.ok && outcome.reason !== 'skipped');
       if (failure && !failure.ok) toast.error(`Test failed: ${failure.reason}${failure.status ? ` (${failure.status})` : ''}`);
       else toast.success(`Test sent to ${sent} target(s)`);
     } catch (err) {
@@ -115,7 +121,12 @@ export function PushPanel() {
           ))}
         </ul>
       )}
-      {status ? <p className="text-xs text-muted-foreground px-4 pt-2">{ntfyLine(status.ntfy)}</p> : null}
+      {status ? (
+        <>
+          <p className="text-xs text-muted-foreground px-4 pt-2">{ntfyLine(status.ntfy)}</p>
+          <p data-testid="push-native-line" className="text-xs text-muted-foreground px-4 pt-1">{nativeLine(status.native)}</p>
+        </>
+      ) : null}
     </div>
   );
 }
