@@ -202,8 +202,9 @@ export type SharedSubmitReason =
   | 'grant_revoked' | 'delivery_refused' | 'delivery_unknown';
 
 /**
- * `control` payloads. Slice 5 adds submit (viewer → host), submit-ack and draft-sent (host → viewer).
- * Slice 7 adds identity and command-ack (host → viewer), command and controller-send (viewer → host).
+ * `control` payloads. Slice 5 adds submit (viewer → host), submit-ack and draft-sent (host → viewer);
+ * slice 6 adds the viewer's terminal watch. Slice 7 adds identity and command-ack (host → viewer),
+ * command and controller-send (viewer → host).
  */
 export type ControlPayload =
   | { readonly kind: 'hello'; readonly hello: SharedHello }
@@ -217,6 +218,8 @@ export type ControlPayload =
       readonly reason?: SharedSubmitReason; // with 'rejected'
     }
   | { readonly kind: 'draft-sent' }
+  /** Viewer → host: start (`true`) or stop (`false`) the read-only terminal stream (slice 6). */
+  | { readonly kind: 'terminal-watch'; readonly watch: boolean }
   | { readonly kind: 'identity'; readonly githubId: number }
   | { readonly kind: 'command'; readonly clientId: string; readonly command: SharedControllerCommand }
   | { readonly kind: 'controller-send'; readonly clientId: string; readonly text: string; readonly draftGithubId?: number }
@@ -227,6 +230,18 @@ export type ControlPayload =
       readonly position?: number;              // 1-based, with an accepted controller-send
       readonly reason?: SharedCommandRefusal;  // with 'rejected'
     };
+
+export type TerminalUnavailableReason = 'terminal_not_found' | 'terminal_ended';
+
+/**
+ * `terminal` payloads (slice 6), host → viewer only. A watch starts with `snapshot`; `data` is raw
+ * terminal output (escape sequences included). The host reads nothing on this channel.
+ */
+export type TerminalPayload =
+  | { readonly kind: 'snapshot'; readonly cols: number; readonly rows: number; readonly data: string }
+  | { readonly kind: 'output'; readonly data: string }
+  | { readonly kind: 'size'; readonly cols: number; readonly rows: number }
+  | { readonly kind: 'unavailable'; readonly reason: TerminalUnavailableReason };
 
 /** The allow-listed subset of the internal ChatMessage that may cross to a viewer. */
 export interface SharedMessage {

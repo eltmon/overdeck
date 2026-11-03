@@ -1,7 +1,15 @@
 /** PAN-4475 WI-9: the viewer page's join hook — confirm, join intent, subscribe, signals, teardown. */
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { JoinEvent, JoinState, JoinView, PresencePayload, SharedControllerCommand, SignalData } from '@overdeck/contracts';
+import type {
+  JoinEvent,
+  JoinState,
+  JoinView,
+  PresencePayload,
+  SharedControllerCommand,
+  SignalData,
+  TerminalPayload,
+} from '@overdeck/contracts';
 
 import { JoinApiError, type JoinEventHandlers } from '../joinApi';
 import {
@@ -30,6 +38,7 @@ interface Fakes {
     drafts: string[];
     submits: Array<[string, string]>;
     submitOpen: boolean;
+    watches: boolean[];
     /** Controller commands and sends, in order (PAN-4478). */
     controls: Array<{ clientId: string; command?: SharedControllerCommand; text?: string; draftGithubId?: number }>;
     callbacks: WebRtcViewerCallbacks;
@@ -60,6 +69,7 @@ function fakes(initial: JoinView | null, create: () => Promise<JoinView> = async
       closed: false,
       drafts: [] as string[],
       submits: [] as Array<[string, string]>,
+      watches: [] as boolean[],
       callbacks,
       onSignal(data: SignalData) { created.signals.push(data); },
       close() { created.closed = true; },
@@ -70,6 +80,7 @@ function fakes(initial: JoinView | null, create: () => Promise<JoinView> = async
         created.submits.push([clientId, text]);
         return true;
       },
+      setTerminalWatch(watch: boolean) { created.watches.push(watch); },
       controls: [] as Fakes['viewers'][number]['controls'],
       command(clientId: string, command: SharedControllerCommand) {
         if (!created.submitOpen) return false;
@@ -212,6 +223,63 @@ describe('useSharedJoin (PAN-4475 WI-9)', () => {
     unmount();
     expect(f.viewers[0]?.closed).toBe(true);
     expect(f.streams[0]?.closed).toBe(true);
+  });
+});
+
+describe('useSharedJoin terminal watch (PAN-4477 WI-9)', () => {
+  const output: TerminalPayload = { kind: 'output', data: 'x' };
+
+  async function live() {
+    const f = fakes(view('admitted'));
+    const hook = renderHook(() => useSharedJoin(CODE, { api: f.api, viewer: f.viewer }));
+    await waitFor(() => expect(hook.result.current.phase).toBe('live'));
+    emit(f, { type: 'signal', data: OFFER });
+    return { f, hook };
+  }
+
+  it('turns the watch on, delivers terminal payloads to the listener, and stops cleanly', async () => {
+    const { f, hook } = await live();
+    const peer = f.viewers[0]!;
+    const listener = vi.fn();
+
+    const stop = hook.result.current.watchTerminal(listener);
+    peer.callbacks.onTerminal(output);
+    stop();
+    peer.callbacks.onTerminal({ kind: 'output', data: 'late' });
+
+    expect(peer.watches).toEqual([true, false]);
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(listener).toHaveBeenCalledWith(output);
+  });
+
+  it('starts a new peer with the watch on while a listener is registered', async () => {
+    const { f, hook } = await live();
+    const listener = vi.fn();
+    hook.result.current.watchTerminal(listener);
+
+    emit(f, { type: 'state', view: view('host-disconnected') });
+    emit(f, { type: 'state', view: view('left') });
+    act(() => hook.result.current.reconnect());
+    emit(f, { type: 'signal', data: OFFER });
+
+    const second = f.viewers.at(-1)!;
+    expect(second).not.toBe(f.viewers[0]);
+    expect(second.watches).toEqual([true]);
+    second.callbacks.onTerminal(output);
+    expect(listener).toHaveBeenCalledWith(output);
+  });
+
+  it('a stale stop function leaves a newer listener watching', async () => {
+    const { f, hook } = await live();
+    const stopFirst = hook.result.current.watchTerminal(vi.fn());
+    const second = vi.fn();
+    hook.result.current.watchTerminal(second);
+
+    stopFirst();
+    f.viewers[0]!.callbacks.onTerminal(output);
+
+    expect(f.viewers[0]!.watches).toEqual([true, true]);
+    expect(second).toHaveBeenCalledWith(output);
   });
 });
 

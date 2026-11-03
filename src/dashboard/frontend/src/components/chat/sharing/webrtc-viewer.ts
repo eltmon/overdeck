@@ -3,14 +3,19 @@
  *
  * The host always offers; this side answers. Signals reach it from the viewer server's event
  * stream (`onSignal`) and leave through `deps.sendSignal` (`POST /api/joins/:code/signal`). The
- * peer reads four of the five channels: `control` (the hello handshake, submit acks, draft-sent),
- * `conversation` (history, append, update), `presence` (the roster header and queue status) and
- * `drafts` (the other participants' drafts, PAN-4476). `terminal` gets no listener. Every message is
- * read with `SharedChannelReader`, and one `SeqTracker` per peer reports a missed update once.
+ * peer reads all five channels: `control` (the hello handshake, submit acks, draft-sent),
+ * `conversation` (history, append, update), `presence` (the roster header and queue status),
+ * `drafts` (the other participants' drafts, PAN-4476) and `terminal` (the host's read-only terminal,
+ * PAN-4477). Every message is read with `SharedChannelReader`, and one `SeqTracker` per peer reports
+ * a missed update once.
  *
  * Outbound (PAN-4476): after the hello reply (`control` seq 1), `sendDraft` writes the viewer's whole
  * draft on `drafts` and `submit` writes a contributor prompt on `control`, each with that channel's
  * next seq. A message keeps `author` only when it has a string login and an https avatar URL.
+ *
+ * Terminal (PAN-4477): `setTerminalWatch` sends a `terminal-watch` control payload once the hello
+ * reply is out, and again after the hello of every new peer while the watch is on. The viewer
+ * never sends on `terminal`.
  *
  * Control (PAN-4478): the host's `identity` (this viewer's own id) and `command-ack` come in on
  * `control`; a viewer-controller's `command` and `controller-send` go out on it.
@@ -39,6 +44,7 @@ import {
   type SharedMessage,
   type SharedSubmitReason,
   type SignalData,
+  type TerminalPayload,
 } from '@overdeck/contracts';
 
 export type ViewerPeerPhase = 'waiting' | 'connecting' | 'connected' | 'lost';
@@ -82,6 +88,7 @@ export interface WebRtcViewerCallbacks {
   onDraftSent?(): void;
   /** Once per negotiation, right after the hello reply: `sendDraft` and `submit` now work. */
   onReady?(): void;
+  onTerminal(payload: TerminalPayload): void;
   /** The host told this viewer its own GitHub id (PAN-4478). */
   onIdentity?(githubId: number): void;
   onCommandAck?(ack: CommandAck): void;
@@ -206,10 +213,42 @@ export function readPresence(value: unknown): PresencePayload | null {
   };
 }
 
+function readDimension(value: unknown): number | null {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 1 && value <= 1000 ? value : null;
+}
+
+/** A terminal payload rebuilt field by field; anything malformed is null and dropped. */
+export function readTerminalPayload(value: unknown): TerminalPayload | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const raw = value as Record<string, unknown>;
+  switch (raw.kind) {
+    case 'snapshot': {
+      const cols = readDimension(raw.cols);
+      const rows = readDimension(raw.rows);
+      if (cols === null || rows === null || typeof raw.data !== 'string') return null;
+      return { kind: 'snapshot', cols, rows, data: raw.data };
+    }
+    case 'output':
+      return typeof raw.data === 'string' ? { kind: 'output', data: raw.data } : null;
+    case 'size': {
+      const cols = readDimension(raw.cols);
+      const rows = readDimension(raw.rows);
+      return cols === null || rows === null ? null : { kind: 'size', cols, rows };
+    }
+    case 'unavailable':
+      return raw.reason === 'terminal_not_found' || raw.reason === 'terminal_ended'
+        ? { kind: 'unavailable', reason: raw.reason }
+        : null;
+    default:
+      return null;
+  }
+}
+
 export class WebRtcViewer {
   private current: Negotiation | null = null;
   private closed = false;
   private chunkId = 0;
+  private terminalWatch = false;
 
   constructor(
     private readonly deps: WebRtcViewerDeps,
@@ -230,6 +269,12 @@ export class WebRtcViewer {
   /** Sends a contributor prompt on `control`; false before the hello reply or when the channel is not open. */
   submit(clientId: string, text: string): boolean {
     return this.sendOn('control', { kind: 'submit', clientId, text });
+  }
+
+  /** Turns the host terminal stream on or off; a new peer re-sends `true` after its hello (FR-7). */
+  setTerminalWatch(watch: boolean): void {
+    this.terminalWatch = watch;
+    this.sendOn('control', { kind: 'terminal-watch', watch });
   }
 
   /** Sends a controller command on `control`; false before the hello reply or when the channel is not open. */
@@ -338,8 +383,7 @@ export class WebRtcViewer {
     negotiation.channels.push(channel);
     const label = channel.label;
     negotiation.channelsByLabel.set(label, channel);
-    // `terminal` belongs to a later slice: no listener.
-    if (label !== 'control' && label !== 'conversation' && label !== 'presence' && label !== 'drafts') return;
+    if (label !== 'control' && label !== 'conversation' && label !== 'presence' && label !== 'drafts' && label !== 'terminal') return;
     const reader = new SharedChannelReader();
     channel.addEventListener('message', (event: MessageEvent) => {
       if (!this.isCurrent(negotiation) || typeof event.data !== 'string') return;
@@ -354,6 +398,7 @@ export class WebRtcViewer {
       if (label === 'control') this.onControl(negotiation, channel, envelope);
       else if (label === 'conversation') this.onConversation(negotiation, envelope);
       else if (label === 'drafts') this.onDraftEnvelope(negotiation, envelope);
+      else if (label === 'terminal') this.onTerminalEnvelope(negotiation, envelope);
       else this.onPresenceEnvelope(envelope);
     });
   }
@@ -421,6 +466,7 @@ export class WebRtcViewer {
       this.emitPhase(negotiation, 'lost');
       return;
     }
+    if (this.terminalWatch) this.sendOn('control', { kind: 'terminal-watch', watch: true });
     this.callbacks.onReady?.();
   }
 
@@ -428,6 +474,12 @@ export class WebRtcViewer {
     if (negotiation.streamId === null || envelope.streamId !== negotiation.streamId) return;
     const draft = readDraftPayload(envelope.payload);
     if (draft) this.callbacks.onDraft?.(draft);
+  }
+
+  private onTerminalEnvelope(negotiation: Negotiation, envelope: SharedEnvelope): void {
+    if (negotiation.streamId === null || envelope.streamId !== negotiation.streamId) return;
+    const payload = readTerminalPayload(envelope.payload);
+    if (payload) this.callbacks.onTerminal(payload);
   }
 
   private sendOn(ch: SharedChannel, payload: unknown): boolean {

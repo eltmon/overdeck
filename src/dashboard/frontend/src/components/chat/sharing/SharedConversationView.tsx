@@ -11,6 +11,9 @@
  * participants' drafts and the viewer's own draft box. A contributor also gets **Send prompt**
  * (and Ctrl/Cmd+Enter); everyone else's box is a suggestion the host can pick.
  *
+ * Once the peer is connected, a **Conversation** / **Terminal** toggle switches the admitted screen
+ * to `SharedTerminalView`, the host's read-only terminal (PAN-4477). Conversation is the default.
+ *
  * Control (PAN-4478 WI-9): while presence names this viewer as controller, `SharedControllerPanel`
  * shows **You have control** with **Hand control back** and the lobby roster's controller actions
  * (no Blocked section, no un-revoke), each sent over `control` and answered by the host's ack. The
@@ -28,6 +31,7 @@ import { useState, type ReactNode } from 'react';
 
 import type { ChatMessage } from '../chat-types';
 import { MessagesTimeline } from '../MessagesTimeline';
+import { SharedTerminalView } from './SharedTerminalView';
 import { LobbyRoster } from './SharingLobbyPanel';
 import { queueStatusText, SuggestionList, type SuggestionItem } from './SuggestionList';
 import { LIVE_JOIN_STATES, useSharedJoin, type SharedJoin } from './useSharedJoin';
@@ -332,11 +336,28 @@ function terminalScreen(props: SharedJoin): ReactNode {
   }
 }
 
-function admittedScreen(props: SharedJoin): ReactNode {
+function AdmittedScreen(props: SharedJoin) {
+  const [surface, setSurface] = useState<'conversation' | 'terminal'>('conversation');
   const hostDisconnected = props.view?.state === 'host-disconnected';
   const lost = props.peerPhase === 'lost';
   const showTimeline = props.hasHistory && (props.peerPhase === 'connected' || hostDisconnected || lost);
+  const showToggle = props.peerPhase === 'connected' || (hostDisconnected && props.hasHistory);
   const messages = props.messages.map(toChatMessage);
+  const toggle = (value: 'conversation' | 'terminal', label: string) => (
+    <button type="button" className={`${NEUTRAL_BUTTON} aria-pressed:bg-accent`} aria-pressed={surface === value} onClick={() => setSurface(value)}>
+      {label}
+    </button>
+  );
+  if (surface === 'terminal' && !lost) {
+    // Stays mounted through a renegotiation, so the new peer re-sends the watch (FR-7).
+    return (
+      <>
+        {hostDisconnected ? <div className={BANNER} role="status">Host disconnected — reconnecting…</div> : null}
+        {showToggle ? viewToggle(toggle) : null}
+        <SharedTerminalView watch={props.watchTerminal} />
+      </>
+    );
+  }
   return (
     <>
       {hostDisconnected ? <div className={BANNER} role="status">Host disconnected — reconnecting…</div> : null}
@@ -349,6 +370,7 @@ function admittedScreen(props: SharedJoin): ReactNode {
       {props.notices.map((notice) => (
         <p key={notice.kind} className="border-b border-border px-4 py-1.5 text-xs text-muted-foreground">{noticeText(notice)}</p>
       ))}
+      {showToggle ? viewToggle(toggle) : null}
       {showTimeline ? (
         <div data-testid="shared-conversation-timeline" className="flex min-h-0 flex-1 flex-col">
           <MessagesTimeline
@@ -365,6 +387,15 @@ function admittedScreen(props: SharedJoin): ReactNode {
       <SharedControllerPanel {...props} />
       {showTimeline ? <SharedComposer {...props} /> : null}
     </>
+  );
+}
+
+function viewToggle(toggle: (value: 'conversation' | 'terminal', label: string) => ReactNode): ReactNode {
+  return (
+    <div role="group" aria-label="Shared view" data-testid="shared-view-toggle" className="flex items-center gap-2 border-b border-border px-4 py-1.5">
+      {toggle('conversation', 'Conversation')}
+      {toggle('terminal', 'Terminal')}
+    </div>
   );
 }
 
@@ -387,7 +418,7 @@ function body(props: SharedJoin & { code: string }): ReactNode {
       );
     case 'admitted':
     case 'host-disconnected':
-      return admittedScreen(props);
+      return <AdmittedScreen {...props} />;
     default:
       return terminalScreen(props);
   }

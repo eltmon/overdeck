@@ -6,10 +6,12 @@ import type {
   ShareScope,
   SharedEnvelope,
   SignalData,
+  TerminalPayload,
 } from '@overdeck/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ConversationSink } from '../conversation-bridge.js';
+import type { TerminalSink } from '../terminal-bridge.js';
 import {
   ICE_SERVERS_CACHE_MS,
   ICE_SERVERS_TIMEOUT_MS,
@@ -151,6 +153,7 @@ function setup(
     onPeer?: (peer: FakePeer) => void;
     attach?: PeerHubDeps['bridge']['attach'];
     queue?: Partial<SubmitQueueDeps>;
+    terminalAttach?: PeerHubDeps['terminal']['attach'];
   } = {},
 ) {
   const frames: HostFrame[] = [];
@@ -165,6 +168,7 @@ function setup(
     activity: vi.fn(options.queue?.activity ?? (async () => ({ working: false, lastMessageId: null }))),
     now: options.queue?.now ?? (() => Date.now()),
   };
+  const terminal = { attach: vi.fn(options.terminalAttach ?? (async () => () => undefined)), close: vi.fn() };
   const deps: PeerHubDeps = {
     createPeerConnection: (config) => {
       const peer = new FakePeer(config);
@@ -174,6 +178,7 @@ function setup(
     },
     bridge,
     queue,
+    terminal,
     streamLabel: options.streamLabel ?? (async () => 'Fixture conversation'),
     now: () => Date.now(),
   };
@@ -191,7 +196,7 @@ function setup(
   hubs.push(hub);
   const ofType = <T extends HostFrame['type']>(type: T) =>
     frames.filter((frame): frame is Extract<HostFrame, { type: T }> => frame.type === type);
-  return { hub, frames, peers, bridge, queue, ofType };
+  return { hub, frames, peers, bridge, queue, terminal, ofType };
 }
 
 /** Admits a viewer and brings its peer connection up to a sent offer. */
@@ -571,14 +576,20 @@ describe('PeerHub hello and conversation content', () => {
     expect(detach).toHaveBeenCalledTimes(1);
   });
 
-  it('never writes to or reads from terminal', async () => {
-    const s = setup();
+  it('never reads from terminal and sends on it only after a watch', async () => {
+    const s = setup({
+      terminalAttach: async (sink: TerminalSink) => {
+        sink.send({ kind: 'output', data: 'x' });
+        return () => undefined;
+      },
+    });
     const peer = await connected(s);
     for (const channel of peer.channels) channel.open();
     peer.channel('control').onMessage.emit(viewerHello());
     await settle();
     expect(peer.channel('drafts').sent).toEqual([]);
     expect(peer.channel('terminal').sent).toEqual([]);
+    expect(s.terminal.attach).not.toHaveBeenCalled();
     expect(peer.channels.map((c) => [c.label, c.onMessage.subscriptions])).toEqual([
       ['control', 1],
       ['conversation', 0],
@@ -912,6 +923,157 @@ describe('PeerHub prompts', () => {
     const s = setup();
     expect(s.hub.sendFromController({ text: 'From the host' }, owner)).toEqual({ ok: true, position: 1 });
     expect(s.hub.queueView().items).toEqual([expect.objectContaining({ login: 'owner', source: 'controller' })]);
+  });
+});
+
+function viewerWatch(watch: unknown, seq = 2): string {
+  return JSON.stringify({ v: 1, ch: 'control', streamId: 'conv-a', seq, t: 1, payload: { kind: 'terminal-watch', watch } });
+}
+
+describe('PeerHub terminal watch', () => {
+  /** A terminal dep that records each attach's sink and detach. */
+  function recordingTerminal() {
+    const sinks: TerminalSink[] = [];
+    const detaches: Array<ReturnType<typeof vi.fn>> = [];
+    const attach = async (sink: TerminalSink) => {
+      sinks.push(sink);
+      const detach = vi.fn();
+      detaches.push(detach);
+      return detach;
+    };
+    return { sinks, detaches, attach };
+  }
+
+  async function negotiated(s: ReturnType<typeof setup>): Promise<FakePeer> {
+    const peer = await connected(s);
+    for (const channel of peer.channels) channel.open();
+    peer.channel('control').onMessage.emit(viewerHello());
+    await settle();
+    return peer;
+  }
+
+  const snapshotPayload: TerminalPayload = { kind: 'snapshot', cols: 100, rows: 30, data: 'SCREEN' };
+
+  it('ignores a watch that arrives before the viewer hello', async () => {
+    const s = setup();
+    const peer = await connected(s);
+    for (const channel of peer.channels) channel.open();
+    peer.channel('control').onMessage.emit(viewerWatch(true, 1));
+    await settle();
+    expect(s.terminal.attach).not.toHaveBeenCalled();
+  });
+
+  it('attaches once after negotiation and sends the snapshot as terminal seq 1', async () => {
+    const rec = recordingTerminal();
+    const s = setup({ terminalAttach: rec.attach });
+    const peer = await negotiated(s);
+
+    peer.channel('control').onMessage.emit(viewerWatch(true));
+    await settle();
+    rec.sinks[0]!.send(snapshotPayload);
+    peer.channel('control').onMessage.emit(viewerWatch(true, 3));
+    await settle();
+
+    expect(s.terminal.attach).toHaveBeenCalledTimes(1);
+    expect(envelopes(peer.channel('terminal'))).toEqual([
+      { v: 1, ch: 'terminal', streamId: 'conv-a', seq: 1, t: expect.any(Number), payload: snapshotPayload },
+    ]);
+  });
+
+  it('attaches when the terminal channel opens after the watch', async () => {
+    const s = setup();
+    const peer = await connected(s);
+    peer.channel('control').open();
+    peer.channel('control').onMessage.emit(viewerHello());
+    peer.channel('control').onMessage.emit(viewerWatch(true));
+    expect(s.terminal.attach).not.toHaveBeenCalled();
+    peer.channel('terminal').open();
+    expect(s.terminal.attach).toHaveBeenCalledTimes(1);
+  });
+
+  it('detaches on watch false, drops the old sink, and a new watch continues the seq', async () => {
+    const rec = recordingTerminal();
+    const s = setup({ terminalAttach: rec.attach });
+    const peer = await negotiated(s);
+    peer.channel('control').onMessage.emit(viewerWatch(true));
+    await settle();
+    rec.sinks[0]!.send(snapshotPayload);
+
+    peer.channel('control').onMessage.emit(viewerWatch(false, 3));
+    peer.channel('control').onMessage.emit(viewerWatch(false, 4));
+    rec.sinks[0]!.send({ kind: 'output', data: 'stale' });
+    expect(rec.detaches[0]).toHaveBeenCalledTimes(1);
+
+    peer.channel('control').onMessage.emit(viewerWatch(true, 5));
+    await settle();
+    rec.sinks[1]!.send(snapshotPayload);
+
+    expect(s.terminal.attach).toHaveBeenCalledTimes(2);
+    expect(envelopes(peer.channel('terminal')).map((e) => [e.seq, e.payload])).toEqual([
+      [1, snapshotPayload],
+      [2, snapshotPayload],
+    ]);
+  });
+
+  it('detaches an attach that resolves after the watch was turned off', async () => {
+    let finish: (detach: () => void) => void = () => undefined;
+    const s = setup({ terminalAttach: () => new Promise((resolve) => { finish = resolve; }) });
+    const peer = await negotiated(s);
+    peer.channel('control').onMessage.emit(viewerWatch(true));
+    peer.channel('control').onMessage.emit(viewerWatch(false, 3));
+    const detach = vi.fn();
+    finish(detach);
+    await settle();
+    expect(detach).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores a watch after a failed hello and a non-boolean watch', async () => {
+    const s = setup();
+    const peer = await connected(s);
+    for (const channel of peer.channels) channel.open();
+    peer.channel('control').onMessage.emit(viewerHello({ scopeKinds: [] }));
+    peer.channel('control').onMessage.emit(viewerWatch(true));
+    await settle();
+    expect(s.terminal.attach).not.toHaveBeenCalled();
+
+    const s2 = setup();
+    const peer2 = await negotiated(s2);
+    peer2.channel('control').onMessage.emit(viewerWatch('yes'));
+    peer2.channel('control').onMessage.emit(viewerWatch(1, 3));
+    await settle();
+    expect(s2.terminal.attach).not.toHaveBeenCalled();
+  });
+
+  it('detaches the terminal when the viewer is kicked', async () => {
+    const rec = recordingTerminal();
+    const s = setup({ terminalAttach: rec.attach });
+    const peer = await negotiated(s);
+    peer.channel('control').onMessage.emit(viewerWatch(true));
+    await settle();
+    s.hub.remove(7);
+    rec.sinks[0]!.send(snapshotPayload);
+    expect(rec.detaches[0]).toHaveBeenCalledTimes(1);
+    expect(peer.channel('terminal').sent).toEqual([]);
+  });
+
+  it('detaches the watch and closes the terminal bridge when the hub closes', async () => {
+    const rec = recordingTerminal();
+    const s = setup({ terminalAttach: rec.attach });
+    const peer = await negotiated(s);
+    peer.channel('control').onMessage.emit(viewerWatch(true));
+    await settle();
+    s.hub.close();
+    expect(rec.detaches[0]).toHaveBeenCalledTimes(1);
+    expect(s.terminal.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('never attaches for a lobby viewer, who gets no peer', async () => {
+    const s = setup();
+    s.hub.admit(7);
+    s.hub.onSnapshot(snapshot(participant(7, 'lobby')));
+    await settle();
+    expect(s.peers).toHaveLength(0);
+    expect(s.terminal.attach).not.toHaveBeenCalled();
   });
 });
 

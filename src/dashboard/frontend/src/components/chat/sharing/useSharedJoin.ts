@@ -9,6 +9,10 @@
  * posts a contributor prompt and clears the box. The viewer's own typing is not host content, so it
  * survives a reconnect, and every new negotiation re-sends it at once (`onReady`).
  *
+ * `watchTerminal` (PAN-4477) registers the one terminal listener and turns the peer's terminal watch
+ * on; terminal payloads go straight to that listener, never through React state (D-12). A peer
+ * created while a listener is registered starts with the watch on.
+ *
  * Control (PAN-4478 WI-6): the host's `identity` sets `selfGithubId`, and `isController` is true while
  * presence names this viewer as controller. `sendCommand` and `sendControllerPrompt` resolve on the
  * host's `command-ack`, reject with the refusal text, after COMMAND_ACK_TIMEOUT_MS without an ack, or
@@ -25,6 +29,7 @@ import {
   type SharedCommandRefusal,
   type SharedControllerCommand,
   type SharedMessage,
+  type TerminalPayload,
 } from '@overdeck/contracts';
 
 import * as joinApi from './joinApi';
@@ -76,10 +81,15 @@ export interface SharedJoin {
   join(): void;
   leave(): void;
   reconnect(): void;
+  /** Starts the host terminal stream for this listener; returns the function that stops it. */
+  watchTerminal(listener: (payload: TerminalPayload) => void): () => void;
 }
 
 export type JoinApi = Pick<typeof joinApi, 'getJoin' | 'createJoin' | 'postSignal' | 'fetchJoinIceServers' | 'leaveJoin' | 'openJoinEvents'>;
-export type ViewerPeer = Pick<WebRtcViewer, 'onSignal' | 'close' | 'sendDraft' | 'submit' | 'command' | 'controllerSend'>;
+export type ViewerPeer = Pick<
+  WebRtcViewer,
+  'onSignal' | 'close' | 'sendDraft' | 'submit' | 'setTerminalWatch' | 'command' | 'controllerSend'
+>;
 export type ViewerFactory = (deps: WebRtcViewerDeps, callbacks: WebRtcViewerCallbacks) => ViewerPeer;
 
 export const LIVE_JOIN_STATES: ReadonlySet<JoinState> = new Set(['connecting', 'lobby', 'admitted', 'host-disconnected']);
@@ -156,6 +166,7 @@ export function useSharedJoin(code: string, deps: { api?: JoinApi; viewer?: View
 
   const viewerRef = useRef<ViewerPeer | null>(null);
   const streamRef = useRef<{ close(): void } | null>(null);
+  const terminalListenerRef = useRef<((payload: TerminalPayload) => void) | null>(null);
   const aliveRef = useRef(true);
 
   /** Rejects and forgets every command still waiting for its ack. */
@@ -249,6 +260,9 @@ export function useSharedJoin(code: string, deps: { api?: JoinApi; viewer?: View
         onReady: () => {
           if (viewerRef.current === created && aliveRef.current) created.sendDraft(myDraftRef.current);
         },
+        onTerminal: (payload) => {
+          if (viewerRef.current === created && aliveRef.current) terminalListenerRef.current?.(payload);
+        },
         onIdentity: (githubId) => {
           if (viewerRef.current === created && aliveRef.current) setSelfGithubId(githubId);
         },
@@ -264,6 +278,7 @@ export function useSharedJoin(code: string, deps: { api?: JoinApi; viewer?: View
       },
     );
     viewerRef.current = created;
+    if (terminalListenerRef.current) created.setTerminalWatch(true);
     return created;
   }, [clearMyDraft, code]);
 
@@ -389,6 +404,17 @@ export function useSharedJoin(code: string, deps: { api?: JoinApi; viewer?: View
     subscribe();
   }, [resetContent, subscribe]);
 
+  const watchTerminal = useCallback((listener: (payload: TerminalPayload) => void) => {
+    terminalListenerRef.current = listener;
+    viewerRef.current?.setTerminalWatch(true);
+    return () => {
+      // A newer listener owns the watch now; leave it on.
+      if (terminalListenerRef.current !== listener) return;
+      terminalListenerRef.current = null;
+      viewerRef.current?.setTerminalWatch(false);
+    };
+  }, []);
+
   useEffect(() => {
     aliveRef.current = true;
     let cancelled = false;
@@ -438,5 +464,6 @@ export function useSharedJoin(code: string, deps: { api?: JoinApi; viewer?: View
     join,
     leave,
     reconnect,
+    watchTerminal,
   };
 }

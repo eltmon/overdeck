@@ -191,6 +191,7 @@ async function startHost(conversationId: string): Promise<Host> {
         activity: async () => ({ working: false, lastMessageId: null }),
         now: () => Date.now(),
       },
+      terminal: { attach: async () => () => undefined, close: () => undefined },
       streamLabel: async () => 'Fixture',
       now: () => Date.now(),
     }),
