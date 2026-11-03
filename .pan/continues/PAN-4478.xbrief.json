@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4478",
   "created": "2026-11-03T17:36:37.149Z",
-  "updated": "2026-11-03T18:41:04.124Z",
+  "updated": "2026-11-03T18:41:34.528Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -202,6 +202,10 @@
     "viewer-controller-ui.ac4": {
       "status": "completed",
       "doneAt": "2026-11-03T18:41:04.124Z"
+    },
+    "e2e.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:41:34.528Z"
     }
   }
 }
