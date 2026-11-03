@@ -31,7 +31,8 @@ On the machine that should reach it, paste the link:
 pan machines link https://desk.tailnet.ts.net/#pair=odp_…
 ```
 
-or **Settings → Anywhere → Machines → Link a machine**. The dialog takes the pairing
+or **Settings → Anywhere → Machines → Link a machine** (also the command palette's
+**Link a machine**). The dialog takes the pairing
 link, the access level and the **Link both ways** checkbox. Linking takes a few seconds:
 the two machines prove their keys to each other through the pairing code, exchange
 tokens, and the new link shows up as **Online** on both sides.
@@ -43,7 +44,7 @@ pairing link only works on the machine that printed it.
 
 A machine that this one reaches only over SSH (a VPS, a lab box behind a bastion) can be
 linked without running anything there by hand. Use **Settings → Anywhere → Machines →
-Add an SSH machine**, or:
+Add an SSH machine** (also the command palette's **Add an SSH machine**), or:
 
 ```bash
 pan machines add-ssh me@vps.example.com
@@ -130,7 +131,8 @@ pan machines add-fly --project overdeck --harness codex --model gpt-6.1-sol --me
 ```
 
 Settings → Anywhere → Machines has the same door as a dialog: **Add a Fly machine**, next to
-**Add an SSH machine**. It takes an optional project and, under Advanced, an optional
+**Add an SSH machine** (also the command palette's **Add a Fly machine**). It takes an
+optional project and, under Advanced, an optional
 region; it has no message, harness or model field, because it only links the machine — start
 a conversation on it from the new-conversation dialog's **Fly (new VM)** choice (see
 [Start work on another machine](#start-work-on-another-machine)) or with `--message` above.
