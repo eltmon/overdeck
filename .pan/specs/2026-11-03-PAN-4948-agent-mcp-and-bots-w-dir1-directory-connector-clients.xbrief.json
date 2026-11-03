@@ -4,17 +4,17 @@
     "created": "2026-11-03T21:35:12Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4948: Agent MCP and bots (W-DIR1): Directory: connector clients",
-    "updated": "2026-11-03T21:37:09.931Z"
+    "updated": "2026-11-03T21:38:13.947Z"
   },
   "plan": {
     "id": "pan-4948",
     "title": "Agent MCP and bots (W-DIR1): Directory: connector clients",
-    "status": "proposed",
+    "status": "running",
     "uid": "aaf79256-866b-4f84-8e44-880e055d3a2b",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-03T21:35:12Z",
-    "updated": "2026-11-03T21:37:09.931Z",
+    "updated": "2026-11-03T21:38:13.947Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4948",
@@ -495,5 +495,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
