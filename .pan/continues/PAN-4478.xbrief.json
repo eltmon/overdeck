@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4478",
   "created": "2026-11-03T17:36:37.149Z",
-  "updated": "2026-11-03T18:38:09.469Z",
+  "updated": "2026-11-03T18:38:25.890Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -178,6 +178,10 @@
     "lobby-roster.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T18:38:09.469Z"
+    },
+    "host-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:38:25.889Z"
     }
   }
 }
