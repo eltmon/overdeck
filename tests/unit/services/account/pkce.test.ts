@@ -3,7 +3,7 @@ import { verifyDeviceToken } from '../../../../services/account/src/devices.ts';
 import type { Env } from '../../../../services/account/src/env.ts';
 import type { GitHubIdentity } from '../../../../services/account/src/github.ts';
 import { addGrant, getPendingAttempt, revokeGrant } from '../../../../services/account/src/grants.ts';
-import { AUTH_CODE_TTL_MS, validateLoopbackRedirect } from '../../../../services/account/src/pkce.ts';
+import { AUTH_CODE_TTL_MS, NATIVE_APP_REDIRECT, validateClientRedirect, validateLoopbackRedirect } from '../../../../services/account/src/pkce.ts';
 import { githubMock } from './helpers/github-mock.ts';
 import { call, dbOf, form, makeDeps, makeEnv, makeRc, TEST_OWNER_GITHUB_ID, type TestDeps } from './helpers/harness.ts';
 
@@ -83,6 +83,69 @@ describe('PKCE loopback flow (PAN-4293 account-pkce-flow)', () => {
     expect(validateLoopbackRedirect('http://[::1]:8080/x')).toBe('http://[::1]:8080/x');
     expect(validateLoopbackRedirect('http://127.0.0.1/cb?keep=1')).toBe('http://127.0.0.1/cb?keep=1');
     expect((await call('GET', startQuery({ redirect_uri: 'http://localhost:9999/x' }), { env, deps })).status).toBe(302);
+  });
+
+  it('accepts exactly the native redirect ai.overdeck.app:/oauth/callback and refuses near misses with 400', async () => {
+    const { env, deps } = setup();
+    expect((await call('GET', startQuery({ redirect_uri: NATIVE_APP_REDIRECT }), { env, deps })).status).toBe(302);
+
+    const bad = [
+      'ai.overdeck.app:/other',
+      'ai.overdeck.app://oauth/callback',
+      'evil:/oauth/callback',
+      'AI.OVERDECK.APP:/oauth/callback',
+      'ai.overdeck.app:/oauth/callback?x=1',
+      'ai.overdeck.app:/oauth/callback#',
+    ];
+    for (const redirect_uri of bad) {
+      const res = await call('GET', startQuery({ redirect_uri }), { env, deps });
+      expect(res.status, redirect_uri).toBe(400);
+      expect(res.headers.get('Location'), redirect_uri).toBeNull();
+      expect(await res.text()).toContain('redirect_uri');
+    }
+
+    expect(validateClientRedirect(NATIVE_APP_REDIRECT)).toBe(NATIVE_APP_REDIRECT);
+    expect(validateClientRedirect(REDIRECT)).toBe(REDIRECT);
+    expect(validateClientRedirect(null)).toBeNull();
+  });
+
+  it('native sign-in: ai.overdeck.app:/oauth/callback with ios-arm64 mints a device labelled iPhone', async () => {
+    const { env, deps, rc } = setup();
+    const back = await signIn(env, deps, { redirect_uri: NATIVE_APP_REDIRECT, platform: 'ios-arm64' });
+    expect(back.protocol + back.pathname).toBe(NATIVE_APP_REDIRECT);
+    expect(back.searchParams.get('state')).toBe('client-state-123');
+    const code = back.searchParams.get('code') ?? '';
+    expect(code).toMatch(/^odc_[0-9a-f]{64}$/);
+    expect(back.searchParams.get('error')).toBeNull();
+
+    const res = await exchange(env, deps, { code, redirect_uri: NATIVE_APP_REDIRECT });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { access_token: string; label: string };
+    expect(body.label).toBe('iPhone');
+    expect(body.access_token).toMatch(/^odd_[0-9a-f]{64}$/);
+    expect(await verifyDeviceToken(rc, body.access_token)).toMatchObject({ ok: true });
+    expect(await dbOf(env).prepare('SELECT platform FROM devices').first()).toEqual({ platform: 'ios-arm64' });
+
+    const code2 = (await signIn(env, deps, { redirect_uri: NATIVE_APP_REDIRECT, platform: 'ios-arm64' })).searchParams.get('code') ?? '';
+    expect(await (await exchange(env, deps, { code: code2, redirect_uri: REDIRECT })).json()).toEqual({ error: 'invalid_grant' });
+  });
+
+  it('native sign-in with android-arm64 mints a device labelled Android phone', async () => {
+    const { env, deps, rc } = setup();
+    const back = await signIn(env, deps, { redirect_uri: NATIVE_APP_REDIRECT, platform: 'android-arm64' });
+    expect(back.protocol + back.pathname).toBe(NATIVE_APP_REDIRECT);
+    expect(back.searchParams.get('state')).toBe('client-state-123');
+    const code = back.searchParams.get('code') ?? '';
+    expect(code).toMatch(/^odc_[0-9a-f]{64}$/);
+    expect(back.searchParams.get('error')).toBeNull();
+
+    const res = await exchange(env, deps, { code, redirect_uri: NATIVE_APP_REDIRECT });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { access_token: string; label: string };
+    expect(body.label).toBe('Android phone');
+    expect(body.access_token).toMatch(/^odd_[0-9a-f]{64}$/);
+    expect(await verifyDeviceToken(rc, body.access_token)).toMatchObject({ ok: true });
+    expect(await dbOf(env).prepare('SELECT platform FROM devices').first()).toEqual({ platform: 'android-arm64' });
   });
 
   it('rejects code_challenge_method=plain, a bad challenge, a missing state, a bad platform and a bad environment_id', async () => {

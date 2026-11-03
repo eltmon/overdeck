@@ -134,6 +134,7 @@ import { ttsRouteLayer } from './routes/tts.js';
 import { webhooksRouteLayer } from './routes/webhooks.js';
 import { triggerHooksRouteLayer } from './routes/trigger-hooks.js';
 import { triggersRouteLayer } from './routes/triggers.js';
+import { sharesRouteLayer } from './routes/shares.js';
 import { hooksRouteLayer } from './routes/hooks.js';
 import { diffsRouteLayer } from './routes/diffs.js';
 import { diffCompareRouteLayer } from './routes/diff-compare.js';
@@ -417,6 +418,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   webhooksRouteLayer,
   triggerHooksRouteLayer,
   triggersRouteLayer,
+  sharesRouteLayer,
   hooksRouteLayer,
   diffsRouteLayer,
   diffCompareRouteLayer,

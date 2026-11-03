@@ -34,6 +34,7 @@ import { DiffWorkerPoolProvider } from '../DiffWorkerPoolProvider';
 import { PanOpenInPicker } from '../PanOpenInPicker';
 import { acceptsInput, ConversationMachineBanner, ConversationMachineChip, conversationHeaderStatus, conversationMachineState, isLiveMachineState, PullHereButton, RemoteHeaderActions, runsHere } from './ConversationMachineBanner';
 import { ConversationBranchMeta } from './ConversationBranchMeta';
+import { ShareConversationMenuItem } from './sharing/ShareDialog';
 import { ConversationPullRequestProvider } from './TranscriptPullRequestLink';
 import { ConversationBookmarksProvider } from './bookmarks/ConversationBookmarks';
 import { BookmarksToggle, BookmarksDrawer } from './bookmarks/BookmarksDrawer';
@@ -913,6 +914,7 @@ export function ConversationPanel({
                           Continue on another device
                         </MenuItemButton>
                       )}
+                      <ShareConversationMenuItem conversation={conversation} onDone={() => setMenuOpen(false)} />
 
                       {(conversation.handoffDocPath || conversation.handoffTargetConvId) && (
                         <MenuSeparator />
