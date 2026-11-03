@@ -1,11 +1,18 @@
 import { EventEmitter } from 'node:events';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WebSocket } from 'ws';
-import type { JoinState, ServiceToViewerFrame } from '@overdeck/contracts';
+import type { IceServer, JoinEvent, JoinState, ServiceToViewerFrame, SignalData } from '@overdeck/contracts';
 
 import type { AccountRecord } from '../../../../lib/account/store.js';
 import { PONG_TIMEOUT_MS, type ShareSocket } from '../share-host.js';
-import { JOIN_CLOSE_FALLBACK_MS, JoinManager, type JoinManagerDeps } from '../share-join.js';
+import {
+  JOIN_CLOSE_FALLBACK_MS,
+  JOIN_ICE_TIMEOUT_MS,
+  JOIN_MAX_PENDING_SIGNALS,
+  JOIN_UNSUBSCRIBED_GRACE_MS,
+  JoinManager,
+  type JoinManagerDeps,
+} from '../share-join.js';
 
 const BASE = 'https://share.overdeck.ai';
 const CODE = 'BCDFGHJK';
@@ -252,6 +259,7 @@ describe('JoinManager lifecycle', () => {
     const h = harness();
     const socket = await joined(h);
     socket.deliver({ type: 'status', status: 'admitted' });
+    socket.sent.length = 0;
     expect(h.manager.leave(CODE)).toBe('left');
     expect(socket.sent).toEqual(['{"type":"leave"}']);
     expect(state(h)).toBe('admitted');
@@ -304,5 +312,248 @@ describe('JoinManager lifecycle', () => {
     expect(again.kind).toBe('created');
     expect(h.sockets).toHaveLength(2);
     expect(state(h)).toBe('connecting');
+  });
+});
+
+const OFFER: SignalData = { sdp: { type: 'offer', sdp: 'v=0 offer' } };
+const ANSWER: SignalData = { sdp: { type: 'answer', sdp: 'v=0 answer' } };
+const ICE: IceServer[] = [{ urls: ['turn:turn.example:3478'], username: 'u', credential: 'c' }];
+
+function candidate(n: number): SignalData {
+  return { candidate: { candidate: `candidate:${n}`, sdpMid: '0', sdpMLineIndex: 0 } };
+}
+
+function record(h: Harness): { events: JoinEvent[]; unsubscribe: () => void } {
+  const events: JoinEvent[] = [];
+  const unsubscribe = h.manager.subscribe(CODE, (event) => events.push(event));
+  if (!unsubscribe) throw new Error('no join');
+  return { events, unsubscribe };
+}
+
+function signals(events: readonly JoinEvent[]): SignalData[] {
+  return events.flatMap((event) => (event.type === 'signal' ? [event.data] : []));
+}
+
+function states(events: readonly JoinEvent[]): JoinState[] {
+  return events.flatMap((event) => (event.type === 'state' ? [event.view.state] : []));
+}
+
+async function admitted(h: Harness): Promise<FakeSocket> {
+  const socket = await joined(h);
+  socket.deliver({ type: 'status', status: 'admitted' });
+  socket.deliver({ type: 'ice-servers', iceServers: ICE });
+  socket.sent.length = 0;
+  return socket;
+}
+
+describe('JoinManager relay', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'] });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('subscribe on an unknown code answers null', () => {
+    expect(harness().manager.subscribe(CODE, () => undefined)).toBeNull();
+  });
+
+  it('a subscriber gets the current state at once and every change after', async () => {
+    const h = harness();
+    const socket = await joined(h);
+    const { events } = record(h);
+    expect(events).toEqual([{ type: 'state', view: h.manager.get(CODE) }]);
+    socket.deliver({ type: 'status', status: 'lobby' });
+    expect(states(events)).toEqual(['connecting', 'lobby']);
+  });
+
+  it('a lobby subscriber never receives a signal event', async () => {
+    const h = harness();
+    const socket = await joined(h);
+    socket.deliver({ type: 'status', status: 'lobby' });
+    const { events } = record(h);
+    socket.deliver({ type: 'signal', data: OFFER });
+    expect(signals(events)).toEqual([]);
+    expect(states(events)).toEqual(['lobby']);
+  });
+
+  it('buffers signals without a subscriber and flushes them in order to the first one', async () => {
+    const h = harness();
+    const socket = await admitted(h);
+    socket.deliver({ type: 'signal', data: OFFER });
+    socket.deliver({ type: 'signal', data: candidate(1) });
+    const { events } = record(h);
+    expect(signals(events)).toEqual([OFFER, candidate(1)]);
+    expect(h.sockets).toHaveLength(1);
+    expect(socket.closedWith).toBeUndefined();
+    // Live signals go straight to the subscriber.
+    socket.deliver({ type: 'signal', data: candidate(2) });
+    expect(signals(events)).toEqual([OFFER, candidate(1), candidate(2)]);
+  });
+
+  it('drops signals past the buffer limit', async () => {
+    const h = harness();
+    const socket = await admitted(h);
+    for (let n = 0; n <= JOIN_MAX_PENDING_SIGNALS; n += 1) socket.deliver({ type: 'signal', data: candidate(n) });
+    const { events } = record(h);
+    const got = signals(events);
+    expect(got).toHaveLength(JOIN_MAX_PENDING_SIGNALS);
+    expect(got.at(-1)).toEqual(candidate(JOIN_MAX_PENDING_SIGNALS - 1));
+  });
+
+  it('a second subscriber replaces the first', async () => {
+    const h = harness();
+    const socket = await joined(h);
+    socket.deliver({ type: 'status', status: 'lobby' });
+    const first = record(h);
+    const second = record(h);
+    expect(first.events.at(-1)).toEqual({ type: 'replaced' });
+    socket.deliver({ type: 'status', status: 'admitted' });
+    expect(first.events.at(-1)).toEqual({ type: 'replaced' });
+    expect(states(second.events)).toEqual(['lobby', 'admitted']);
+    // The replaced subscriber's unsubscribe does not detach the new one.
+    first.unsubscribe();
+    socket.deliver({ type: 'status', status: 'host-disconnected' });
+    expect(states(second.events).at(-1)).toBe('host-disconnected');
+  });
+
+  it('a second subscriber on an admitted join restarts the socket after its close event', async () => {
+    const h = harness();
+    const socket = await admitted(h);
+    const first = record(h);
+    first.unsubscribe();
+    const second = record(h);
+    expect(socket.closedWith).toBe(1000);
+    expect(socket.sent).toEqual([]);
+    expect(h.sockets).toHaveLength(1);
+    socket.drop(1000);
+    expect(h.sockets).toHaveLength(2);
+    expect(state(h)).toBe('connecting');
+    const next = h.sockets[1] as FakeSocket;
+    expect(next.url).toBe(socket.url);
+    next.open();
+    next.deliver({ type: 'status', status: 'admitted' });
+    next.deliver({ type: 'signal', data: OFFER });
+    expect(states(second.events)).toEqual(['admitted', 'connecting', 'admitted']);
+    expect(signals(second.events)).toEqual([OFFER]);
+    // A late frame from the old socket is ignored.
+    socket.emit('message', Buffer.from(JSON.stringify({ type: 'signal', data: candidate(9) })), false);
+    expect(signals(second.events)).toEqual([OFFER]);
+  });
+
+  it('a restart without a close event terminates the old socket after the fallback', async () => {
+    const h = harness();
+    const socket = await admitted(h);
+    record(h).unsubscribe();
+    record(h);
+    await vi.advanceTimersByTimeAsync(JOIN_CLOSE_FALLBACK_MS - 1);
+    expect(h.sockets).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(socket.terminated).toBe(true);
+    expect(h.sockets).toHaveLength(2);
+    expect(state(h)).toBe('connecting');
+  });
+
+  it('a live join with no subscriber for 60 s closes and becomes away', async () => {
+    const h = harness();
+    const socket = await joined(h);
+    socket.deliver({ type: 'status', status: 'lobby' });
+    record(h).unsubscribe();
+    await vi.advanceTimersByTimeAsync(JOIN_UNSUBSCRIBED_GRACE_MS - 1);
+    expect(socket.closedWith).toBeUndefined();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(socket.closedWith).toBe(1000);
+    expect(socket.sent).toEqual([]);
+    socket.drop(1000);
+    expect(state(h)).toBe('away');
+  });
+
+  it('a subscriber attached before the grace period ends cancels it', async () => {
+    const h = harness();
+    const socket = await joined(h);
+    socket.deliver({ type: 'status', status: 'lobby' });
+    record(h).unsubscribe();
+    await vi.advanceTimersByTimeAsync(JOIN_UNSUBSCRIBED_GRACE_MS - 1_000);
+    record(h);
+    socket.emit('pong');
+    await vi.advanceTimersByTimeAsync(JOIN_UNSUBSCRIBED_GRACE_MS);
+    expect(socket.closedWith).toBeUndefined();
+    expect(state(h)).toBe('lobby');
+  });
+
+  it('join on an away join opens a new socket and keeps the subscriber', async () => {
+    const h = harness();
+    const socket = await joined(h);
+    socket.deliver({ type: 'status', status: 'lobby' });
+    record(h).unsubscribe();
+    await vi.advanceTimersByTimeAsync(JOIN_UNSUBSCRIBED_GRACE_MS);
+    socket.drop(1000);
+    expect(state(h)).toBe('away');
+    const { events } = record(h);
+    const again = await h.manager.join(CODE);
+    expect(again.kind).toBe('created');
+    expect(h.sockets).toHaveLength(2);
+    expect(states(events)).toEqual(['away', 'connecting']);
+  });
+
+  it('status admitted sends one ice-servers frame and iceServers answers its list', async () => {
+    const h = harness();
+    const socket = await joined(h);
+    socket.deliver({ type: 'status', status: 'admitted' });
+    expect(socket.sent).toEqual(['{"type":"ice-servers"}']);
+    const pending = h.manager.iceServers(CODE);
+    socket.deliver({ type: 'ice-servers', iceServers: ICE });
+    expect(await pending).toEqual({ ok: true, iceServers: ICE });
+    // Cached: no new frame.
+    expect(await h.manager.iceServers(CODE)).toEqual({ ok: true, iceServers: ICE });
+    socket.deliver({ type: 'status', status: 'host-reconnected' });
+    expect(socket.sent).toEqual(['{"type":"ice-servers"}']);
+  });
+
+  it('iceServers answers [] after turn_unavailable', async () => {
+    const h = harness();
+    const socket = await joined(h);
+    socket.deliver({ type: 'status', status: 'admitted' });
+    const pending = h.manager.iceServers(CODE);
+    socket.deliver({ type: 'error', code: 'turn_unavailable' });
+    expect(await pending).toEqual({ ok: true, iceServers: [] });
+  });
+
+  it('iceServers answers [] after the timeout', async () => {
+    const h = harness();
+    const socket = await joined(h);
+    socket.deliver({ type: 'status', status: 'admitted' });
+    const pending = h.manager.iceServers(CODE);
+    await vi.advanceTimersByTimeAsync(JOIN_ICE_TIMEOUT_MS);
+    expect(await pending).toEqual({ ok: true, iceServers: [] });
+  });
+
+  it('iceServers and signal in the lobby answer not_admitted and send nothing', async () => {
+    const h = harness();
+    const socket = await joined(h);
+    socket.deliver({ type: 'status', status: 'lobby' });
+    expect(await h.manager.iceServers(CODE)).toEqual({ ok: false, reason: 'not_admitted' });
+    expect(h.manager.signal(CODE, ANSWER)).toBe('not_admitted');
+    expect(socket.sent).toEqual([]);
+    expect(h.manager.signal('LMNPQRST', ANSWER)).toBe('not_found');
+    expect(await h.manager.iceServers('LMNPQRST')).toEqual({ ok: false, reason: 'not_found' });
+  });
+
+  it('signal when admitted sends the signal frame', async () => {
+    const h = harness();
+    const socket = await admitted(h);
+    expect(h.manager.signal(CODE, ANSWER)).toBe('sent');
+    expect(socket.sent).toEqual([JSON.stringify({ type: 'signal', data: ANSWER })]);
+  });
+
+  it('never exposes the device token in an event', async () => {
+    const h = harness();
+    const socket = await joined(h);
+    const { events } = record(h);
+    socket.deliver({ type: 'status', status: 'admitted' });
+    socket.deliver({ type: 'signal', data: OFFER });
+    socket.drop(4010);
+    expect(JSON.stringify(events)).not.toContain('odd_');
   });
 });

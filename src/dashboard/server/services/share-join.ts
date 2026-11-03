@@ -8,20 +8,30 @@
  * browser only ever sees `JoinView`s and `JoinEvent`s, which have no device token by construction
  * (NFR-1).
  *
+ * Subscriber (D-4, D-6): one viewer-browser event stream per join; a new one replaces the old one.
+ * A `signal` frame goes to the subscriber, or into a per-generation buffer flushed to the next one.
+ * A second subscriber on an admitted join restarts the socket (D-5): a plain close, then a new socket
+ * only from the old one's `close` event, so the service flips `connected` and the host offers again.
+ * A live join with no subscriber for 60 s is closed and becomes `away` (D-7).
+ *
  * Keepalive copies `share-host.ts`: a protocol ping every 30 s; 75 s without a pong terminates the
  * socket and the join becomes `disconnected`. An unexpected close is never reconnected here (D-8;
  * slice 8, PAN-4479, adds automatic restore).
  *
  * Plain async class with injected seams, like `share-host.ts` (slice-2 D-8). Nothing here logs.
  */
-import type { JoinEvent, JoinState, JoinView, ServiceToViewerFrame, SignalData } from '@overdeck/contracts';
+import type { IceServer, JoinEvent, JoinState, JoinView, ServiceToViewerFrame, SignalData, ViewerFrame } from '@overdeck/contracts';
 import { WebSocket } from 'ws';
 
 import { readAccount, type AccountRecord } from '../../../lib/account/store.js';
 import { joinSocketUrl, readShareUrl, type ShareUrlResult } from '../../../lib/sharing/share-service.js';
 import { defaultOpenSocket, PING_INTERVAL_MS, PONG_TIMEOUT_MS, type ShareSocket } from './share-host.js';
 
+export const JOIN_UNSUBSCRIBED_GRACE_MS = 60_000;
 export const JOIN_CLOSE_FALLBACK_MS = 5_000;
+export const JOIN_ICE_TIMEOUT_MS = 5_000;
+export const JOIN_ICE_CACHE_MS = 50 * 60_000;
+export const JOIN_MAX_PENDING_SIGNALS = 64;
 
 export interface JoinManagerDeps {
   readAccount(): Promise<AccountRecord | null>;
@@ -54,10 +64,24 @@ interface Join {
   error: string | null;
   generation: number;
   subscriber: ((event: JoinEvent) => void) | null;
+  /** The current socket generation already had a subscriber: a new one restarts (D-5). */
+  subscribedThisGeneration: boolean;
+  pendingSignals: SignalData[];
   leaving: boolean;
+  restarting: boolean;
+  graceClosing: boolean;
+  iceCache: { readonly iceServers: IceServer[]; readonly at: number } | null;
+  icePending: IcePending | null;
   pingTimer: NodeJS.Timeout | null;
   pongTimer: NodeJS.Timeout | null;
   closeFallbackTimer: NodeJS.Timeout | null;
+  graceTimer: NodeJS.Timeout | null;
+}
+
+interface IcePending {
+  readonly promise: Promise<IceServer[]>;
+  readonly resolve: (iceServers: IceServer[]) => void;
+  readonly timer: NodeJS.Timeout;
 }
 
 const LIVE_STATES: ReadonlySet<JoinState> = new Set(['connecting', 'lobby', 'admitted', 'host-disconnected']);
@@ -113,6 +137,49 @@ export class JoinManager {
     return join ? viewOf(join) : null;
   }
 
+  /** null when no join exists. Emits the current state at once (D-4, D-5, D-6). Returns unsubscribe. */
+  subscribe(shortCode: string, listener: (event: JoinEvent) => void): (() => void) | null {
+    const join = this.joins.get(shortCode);
+    if (!join) return null;
+    const previous = join.subscriber;
+    join.subscriber = null;
+    previous?.({ type: 'replaced' });
+    join.subscriber = listener;
+    this.clearGrace(join);
+    listener({ type: 'state', view: viewOf(join) });
+    if ((join.state === 'admitted' || join.state === 'host-disconnected') && join.subscribedThisGeneration) {
+      this.restart(join);
+    } else {
+      const pending = join.pendingSignals;
+      join.pendingSignals = [];
+      for (const data of pending) listener({ type: 'signal', data });
+    }
+    join.subscribedThisGeneration = true;
+    return () => {
+      const entry = this.joins.get(shortCode);
+      if (!entry || entry.subscriber !== listener) return;
+      entry.subscriber = null;
+      if (isLive(entry)) this.armGrace(entry);
+    };
+  }
+
+  /** Relays the browser's answer or ICE candidate (already rebuilt by the route) to the host. */
+  signal(shortCode: string, data: SignalData): 'sent' | 'not_found' | 'not_admitted' {
+    const join = this.joins.get(shortCode);
+    if (!join) return 'not_found';
+    if (join.state !== 'admitted') return 'not_admitted';
+    return this.sendFrame(join, { type: 'signal', data }) ? 'sent' : 'not_admitted';
+  }
+
+  /** The cached ICE servers, or the answer to a pending or new request; `[]` on timeout (D-9). */
+  async iceServers(shortCode: string): Promise<{ ok: true; iceServers: IceServer[] } | { ok: false; reason: 'not_found' | 'not_admitted' }> {
+    const join = this.joins.get(shortCode);
+    if (!join) return { ok: false, reason: 'not_found' };
+    if (join.state !== 'admitted' && join.state !== 'host-disconnected') return { ok: false, reason: 'not_admitted' };
+    if (this.freshIce(join)) return { ok: true, iceServers: join.iceCache!.iceServers };
+    return { ok: true, iceServers: await this.requestIce(join) };
+  }
+
   /** Sends `leave`; the join becomes `left` on the socket's close, or after the fallback. */
   leave(shortCode: string): 'left' | 'not_found' {
     const join = this.joins.get(shortCode);
@@ -120,11 +187,7 @@ export class JoinManager {
     const conn = join.conn;
     if (!conn.done && conn.socket.readyState === WebSocket.OPEN) {
       join.leaving = true;
-      try {
-        conn.socket.send(JSON.stringify({ type: 'leave' }));
-      } catch {
-        // The close handler or the fallback settles the join.
-      }
+      this.sendFrame(join, { type: 'leave' });
       this.armCloseFallback(join, () => {
         this.finishConnection(join, 'terminate');
         this.setState(join, 'left');
@@ -140,6 +203,7 @@ export class JoinManager {
   stop(): void {
     for (const join of this.joins.values()) {
       this.finishConnection(join, 'close');
+      this.resolveIce(join, []);
       join.subscriber = null;
     }
     this.joins.clear();
@@ -179,10 +243,17 @@ export class JoinManager {
       error: null,
       generation: 1,
       subscriber,
+      subscribedThisGeneration: subscriber !== null,
+      pendingSignals: [],
       leaving: false,
+      restarting: false,
+      graceClosing: false,
+      iceCache: null,
+      icePending: null,
       pingTimer: null,
       pongTimer: null,
       closeFallbackTimer: null,
+      graceTimer: null,
     };
     this.joins.set(shortCode, join);
     this.listen(join, join.conn);
@@ -215,17 +286,15 @@ export class JoinManager {
       if (!current()) return;
       this.finishConnection(join, 'none');
       join.closeCode = code;
-      if (join.leaving) this.setState(join, 'left');
-      else {
-        const state = CLOSE_STATES.get(code);
-        if (state) this.setState(join, state);
-        else this.setState(join, 'disconnected', 'connection_lost');
-      }
+      if (this.settleIntent(join)) return;
+      const state = CLOSE_STATES.get(code);
+      if (state) this.setState(join, state);
+      else this.setState(join, 'disconnected', 'connection_lost');
     });
     socket.on('error', () => {
       if (!current()) return;
       this.finishConnection(join, 'terminate');
-      this.setState(join, 'disconnected', 'unreachable');
+      if (!this.settleIntent(join)) this.setState(join, 'disconnected', 'unreachable');
     });
   }
 
@@ -243,16 +312,144 @@ export class JoinManager {
       else if (frame.status === 'admitted') {
         join.contributor = frame.contributor === true;
         this.setState(join, 'admitted');
+        if (!this.freshIce(join) && !join.icePending) void this.requestIce(join);
       } else if (frame.status === 'host-disconnected') this.setState(join, 'host-disconnected');
       else if (frame.status === 'host-reconnected') this.setState(join, 'admitted');
+    } else if (frame.type === 'signal' && typeof frame.data === 'object' && frame.data !== null) {
+      // The service relays signals only to admitted viewers; a lobby join never emits one (FR-3).
+      if (join.state !== 'admitted' && join.state !== 'host-disconnected') return;
+      if (join.subscriber) join.subscriber({ type: 'signal', data: frame.data });
+      else if (join.pendingSignals.length < JOIN_MAX_PENDING_SIGNALS) join.pendingSignals.push(frame.data);
+    } else if (frame.type === 'ice-servers' && Array.isArray(frame.iceServers)) {
+      join.iceCache = { iceServers: [...frame.iceServers], at: this.deps.now() };
+      this.resolveIce(join, join.iceCache.iceServers);
+    } else if (frame.type === 'error' && frame.code === 'turn_unavailable') {
+      this.resolveIce(join, []);
     }
     // Unknown types are ignored.
+  }
+
+  /** A close or error the manager asked for: restart, leave or grace. False when none applies. */
+  private settleIntent(join: Join): boolean {
+    if (join.restarting) {
+      this.reopen(join);
+      return true;
+    }
+    if (join.leaving) {
+      this.setState(join, 'left');
+      return true;
+    }
+    if (join.graceClosing) {
+      this.setState(join, 'away');
+      return true;
+    }
+    return false;
+  }
+
+  /** D-5: a plain close (never `leave`), then a new socket only from the old one's `close` event. */
+  private restart(join: Join): void {
+    join.restarting = true;
+    const { socket } = join.conn;
+    if (socket.readyState !== WebSocket.OPEN) {
+      this.finishConnection(join, 'terminate');
+      this.reopen(join);
+      return;
+    }
+    try {
+      socket.close(1000, 'reconnect');
+    } catch {
+      // The fallback below terminates it.
+    }
+    this.armCloseFallback(join, () => {
+      this.finishConnection(join, 'terminate');
+      this.reopen(join);
+    });
+  }
+
+  private reopen(join: Join): void {
+    join.restarting = false;
+    join.generation += 1;
+    join.pendingSignals = [];
+    join.subscribedThisGeneration = join.subscriber !== null;
+    this.resolveIce(join, []);
+    join.conn = { socket: this.deps.openSocket(join.socketUrl, join.headers), done: false };
+    this.listen(join, join.conn);
+    this.setState(join, 'connecting');
+  }
+
+  /** D-7: no subscriber for 60 s closes a live join; it becomes `away`. */
+  private armGrace(join: Join): void {
+    this.clearGrace(join);
+    join.graceTimer = setTimeout(() => {
+      join.graceTimer = null;
+      if (join.subscriber || !isLive(join) || this.joins.get(join.shortCode) !== join || join.conn.done) return;
+      join.graceClosing = true;
+      const { socket } = join.conn;
+      if (socket.readyState !== WebSocket.OPEN) {
+        this.finishConnection(join, 'terminate');
+        this.setState(join, 'away');
+        return;
+      }
+      try {
+        socket.close(1000, 'away');
+      } catch {
+        // The fallback below terminates it.
+      }
+      this.armCloseFallback(join, () => {
+        this.finishConnection(join, 'terminate');
+        this.setState(join, 'away');
+      });
+    }, JOIN_UNSUBSCRIBED_GRACE_MS);
+    join.graceTimer.unref?.();
+  }
+
+  private clearGrace(join: Join): void {
+    if (join.graceTimer) clearTimeout(join.graceTimer);
+    join.graceTimer = null;
+  }
+
+  private freshIce(join: Join): boolean {
+    return join.iceCache !== null && this.deps.now() - join.iceCache.at < JOIN_ICE_CACHE_MS;
+  }
+
+  /** Sends one `ice-servers` frame and waits for its answer; `[]` on timeout or a failed send. */
+  private requestIce(join: Join): Promise<IceServer[]> {
+    if (join.icePending) return join.icePending.promise;
+    if (!this.sendFrame(join, { type: 'ice-servers' })) return Promise.resolve([]);
+    let resolve!: (iceServers: IceServer[]) => void;
+    const promise = new Promise<IceServer[]>((r) => { resolve = r; });
+    const timer = setTimeout(() => this.resolveIce(join, []), JOIN_ICE_TIMEOUT_MS);
+    timer.unref?.();
+    join.icePending = { promise, resolve, timer };
+    return promise;
+  }
+
+  private resolveIce(join: Join, iceServers: IceServer[]): void {
+    const pending = join.icePending;
+    if (!pending) return;
+    join.icePending = null;
+    clearTimeout(pending.timer);
+    pending.resolve(iceServers);
+  }
+
+  private sendFrame(join: Join, frame: ViewerFrame): boolean {
+    if (join.conn.done || join.conn.socket.readyState !== WebSocket.OPEN) return false;
+    try {
+      join.conn.socket.send(JSON.stringify(frame));
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private setState(join: Join, state: JoinState, error: string | null = null): void {
     join.state = state;
     join.error = error;
-    if (!LIVE_STATES.has(state)) this.stopTimers(join);
+    if (!LIVE_STATES.has(state)) {
+      this.stopTimers(join);
+      this.clearGrace(join);
+      this.resolveIce(join, []);
+    }
     this.emit(join, { type: 'state', view: viewOf(join) });
   }
 
