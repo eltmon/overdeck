@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T21:25:18.150330Z · model: claude-opus-5-5 · open: 865_
+_Last sequenced: 2026-11-03T21:31:11.034965Z · model: claude-opus-5-5 · open: 895_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -327,17 +327,19 @@ _Last sequenced: 2026-11-03T21:25:18.150330Z · model: claude-opus-5-5 · open: 
 | 321 | PAN-1219 | M | high | needs-refinement |  |  | Promote across-cycle review state to first-class data (cycle SHA, prior findings) instead of prompt-derived |
 | 322 | PAN-1451 | M | high | needs-refinement |  |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
 | 323 | PAN-1452 | M | high | ok |  |  | PAN-1381 follow-up: per-reviewer restart with model override (architectural mismatch with PAN-1048) |
-| 324 | PAN-4927 | XL | medium | needs-refinement | ✓ |  | Epic: inject Overdeck MCP into every managed agent + OAuth /mcp + Hermes/OpenClaw/Grok plugins; PRD in progress, no children filed. |
+| 324 | PAN-4927 | XL | medium | ok | ✓ |  | Epic: Overdeck MCP in every managed agent, OAuth /mcp, Hermes/OpenClaw/Grok plugins; PRD written, 29 children filed. |
 | 325 | PAN-4929 | S | medium | needs-refinement |  | PAN-4553 | Likely duplicate of PAN-4553 (polyrepo root npm install aborts pan start; MIN-1135 repro). Close when PAN-4553 lands. |
 | 326 | PAN-1553 | M | high | ok |  |  | Investigate Claude Code Fast mode support (and fast-tier pricing) |
 | 327 | PAN-1504 | M | high | ok |  |  | pan hygiene |
 | 328 | PAN-1480 | L | high | ok |  |  | TLDR: 93% bypass rate |
 | 329 | PAN-1479 | M | high | ok |  |  | RTK: Add telemetry to measure token savings from bash output compression |
 | 330 | PAN-2950 | L | high | ok |  |  | Refactor god files back under file-size ceilings after the UX overhaul |
+| 331 | PAN-4930 | L | high | ok |  |  | Root of PAN-4927: per-agent scoped MCP token minted, delivered as 0600 file, revoked on kill/exit/close-out, swept. |
 | 332 | PAN-2720 | M | high | ok |  |  | File-size ratchet counts lines, so it rewards line-packing on the god files it means to improve |
 | 333 | PAN-2650 | S | high | ok |  |  | Shed-stack half is moot (slot merges verify on host); remaining: pan swarm recover path for a stuck ready-to-merge slot. |
 | 334 | PAN-2358 | M | high | ok |  |  | PAN-2145 follow-up: restore PAN-1535 hardening in transformMessageForHarness (rewritten during conversations.ts decomposition) |
 | 335 | PAN-2334 | XS | high | ok |  |  | write a Definition of Ready (DoR) |
+| 336 | PAN-4931 | M | high | ok |  |  | Root of PAN-4927: MCP tool module with per-token visibility, methods and token file; gates injection and all tools. |
 | 337 | PAN-2193 | S | high | ok |  |  | Held issues (objection/parked/vetoed/needs-handoff) are invisible in the Command Deck tree |
 | 338 | PAN-1984 | XS | high | ok |  |  | Migrate or delete the 18 dead panopticon.db modules referenced by ~30 test files (#1983 follow-up) |
 | 339 | PAN-1913 | XS | high | ok |  |  | Project description: show on click, edit in dashboard, mirror into the project layer (and document what's in .pan and ~/.panopticon) |
@@ -680,6 +682,7 @@ _Last sequenced: 2026-11-03T21:25:18.150330Z · model: claude-opus-5-5 · open: 
 | 683 | PAN-1983 | L | low | ok |  |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
 | 684 | PAN-2672 | S | low | needs-refinement |  |  | Transcript half reported fixed; parent-stays-ended half moved to PAN-4485. Verify on current build, then close. |
 | 685 | PAN-1958 | M | low | ok |  |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
+| 686 | PAN-4959 | L | medium | needs-refinement |  | PAN-4294 | Anywhere account page (plan, relay allowance, machines, Creem portal, delete) + dashboard card; waits on PAN-4294 billing and OD. |
 | 687 | PAN-1907 | M | low | ok |  |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every… |
 | 688 | PAN-1895 | M | low | ok |  |  | Spawn work agents from issue workspace slide-out |
 | 689 | PAN-1878 | M | low | ok |  |  | process: bake 'docs updated' into acceptance criteria / definition-of-done in role + planning prompts |
@@ -870,6 +873,33 @@ _Last sequenced: 2026-11-03T21:25:18.150330Z · model: claude-opus-5-5 · open: 
 | 880 | PAN-4842 | S | medium | ok |  |  | Phone app W-DOC: phone-app.mdx and updates to Anywhere, push, tailscale and service docs; finished last. |
 | 881 | PAN-4851 | S | low | needs-refinement |  |  | Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them |
 | 882 | PAN-4887 | M | medium | ok |  |  | Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); PAN-4835 merged. |
+| 883 | PAN-4948 | M | medium | ok |  |  | Directory gains connector clients for outside bots; no deps in epic, unblocks CONN2 and the integration plugins. |
+| 884 | PAN-4952 | S | medium | ok |  |  | Shared Overdeck skill text reused by Hermes, OpenClaw and Grok plugins; no deps, unblocks all four integrations. |
+| 885 | PAN-4958 | S | low | ok |  |  | Docs for agent MCP and bot plugins; no hard deps but best written once Part A and B surfaces have landed. |
+| 886 | PAN-4932 | M | high | ok |  | PAN-4930, PAN-4931 | Inject Overdeck MCP server into Claude Code agents, role runs and conversations; unblocks INJ2/3/4 and FUN1. |
+| 887 | PAN-4936 | M | high | ok |  | PAN-4930, PAN-4931 | Self routes foundation: agent identity, jobs and waits; unblocks SELF2, DEL1, MEM1, SEC1 and PR1 tools. |
+| 888 | PAN-4939 | S | medium | ok |  | PAN-4931 | MCP tools for scheduled messages and recurring schedules; needs only the tool module (W-MCP1). |
+| 889 | PAN-4944 | M | medium | ok |  | PAN-4931 | Approvals for every harness plus a fleet-wide pending list exposed as tools; needs only W-MCP1. |
+| 890 | PAN-4945 | L | medium | ok |  | PAN-4930 | OAuth 2.1 server for /mcp with access levels and expiry; gates dashboard OAuth UI, Funnel and Grok bot. |
+| 891 | PAN-4949 | M | medium | ok |  | PAN-4930 | Machine side of bot connectors: credential, pairing intents and exchange; unblocks CONN2 and Connect-a-bot UI. |
+| 892 | PAN-4937 | M | medium | ok |  | PAN-4936 | Checklist, done, handoff and worker-report as MCP tools so agents stop shelling to pan over Bash. |
+| 893 | PAN-4938 | M | medium | ok |  | PAN-4936 | Delegation, lanes, issue start and conversation stop/interrupt as MCP tools for managed agents. |
+| 894 | PAN-4940 | S | medium | ok |  | PAN-4936 | Memory add and search as MCP tools scoped to the calling agent. |
+| 895 | PAN-4941 | M | medium | ok |  | PAN-4936 | request_secret tool: agent asks operator for a secret without it entering the transcript; unblocks link_machine. |
+| 896 | PAN-4943 | S | medium | ok |  | PAN-4936 | Link and watch pull requests from an agent via MCP tools. |
+| 897 | PAN-4933 | S | medium | ok |  | PAN-4932 | Codex harness: write [mcp_servers.overdeck] so Codex agents get the Overdeck tools. |
+| 898 | PAN-4934 | S | medium | ok |  | PAN-4932 | ACP harnesses (acp, opencode) get the Overdeck MCP server injected. |
+| 899 | PAN-4942 | S | medium | ok |  | PAN-4941 | link_machine tool: a conversation asks the operator to link a machine; builds on request_secret. |
+| 900 | PAN-4946 | M | medium | ok |  | PAN-4945 | Dashboard OAuth approval card and sign-in list for /mcp clients. |
+| 901 | PAN-4950 | M | medium | ok |  | PAN-4949, PAN-4948, PAN-4931 | pan mcp connector process bridging outside bots to /mcp; gates Hermes, OpenClaw and Grok Build plugins. |
+| 902 | PAN-4951 | M | medium | ok |  | PAN-4949 | "Connect a bot" flow in Settings > Anywhere for pairing outside bots. |
+| 903 | PAN-4947 | L | medium | ok |  | PAN-4945, PAN-4932 | Opt-in public /mcp via Tailscale Funnel, TLS ends on the user machine; no plaintext relay on overdeck.ai. |
+| 904 | PAN-4953 | M | medium | ok |  | PAN-4952, PAN-4950 | integrations/hermes/: Hermes plugin with its own revocable scoped token. |
+| 905 | PAN-4954 | M | medium | ok |  | PAN-4952, PAN-4950 | integrations/openclaw/: OpenClaw plugin with its own revocable scoped token. |
+| 906 | PAN-4955 | S | medium | ok |  | PAN-4952, PAN-4950 | integrations/grok-build/: Grok Build plugin with its own revocable scoped token. |
+| 907 | PAN-4956 | S | low | ok |  | PAN-4952, PAN-4946, PAN-4947 | integrations/grok-bot/ and xAI API example; needs OAuth UI and public Funnel /mcp, not the connector. |
+| 908 | PAN-4935 | M | medium | ok |  | PAN-4932, PAN-4937, PAN-4938, PAN-4939, PAN-4940, PAN-4941, PAN-4942, PAN-4943, PAN-4944 | Instruction blocks and no-MCP fallback; lands last in Part A since it documents every tool to agents. |
+| 909 | PAN-4957 | S | low | ok |  | PAN-4953, PAN-4954, PAN-4955, PAN-4956 | CI for the four integration packages; lands after all integrations exist. |
 
 ## Rationale detail
 
@@ -1200,10 +1230,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T21:25:18.150330Z",
+  "generatedAt": "2026-11-03T21:31:11.034965Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 865,
+  "openCount": 895,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -11951,11 +11981,11 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "rank": 324,
       "size": "XL",
       "importance": "medium",
-      "score": 55,
-      "condition": "needs-refinement",
+      "score": 58,
+      "condition": "ok",
       "dependsOn": [],
-      "why": "Epic: inject Overdeck MCP into every managed agent + OAuth /mcp + Hermes/OpenClaw/Grok plugins; PRD in progress, no children filed.",
-      "rationale": "New issue that describes itself as an epic: it injects the Overdeck MCP server into every managed harness with per-agent scoped tokens, turns agent workflow verbs into tools, adds OAuth and an opt-in Tailscale Funnel /mcp, and ships Hermes, OpenClaw and Grok plugins. The PRD is still being written and no child issues are filed, so it is needs-refinement and marked as an epic so nothing picks it up directly. It slots into free rank 324 beside the overlapping MCP and Anywhere work (PAN-3789, PAN-2350) without moving any other node.",
+      "why": "Epic: Overdeck MCP in every managed agent, OAuth /mcp, Hermes/OpenClaw/Grok plugins; PRD written, 29 children filed.",
+      "rationale": "The PRD (.pan/drafts/pan-4927.md) is now written and 29 child issues (PAN-4930 to PAN-4958) were filed per work item, so the epic moves from needs-refinement to ok and keeps rank 324. Its two roots, W-TOK1 and W-MCP1, take free slots 331 and 336; the other children sit at the tail in build order only because an incremental pass preserves existing ranks.",
       "gate": "auto",
       "planning": "auto",
       "isEpic": true
@@ -11972,6 +12002,467 @@ New this pass. The test role evaluates the workspace working tree rather than th
       ],
       "why": "Likely duplicate of PAN-4553 (polyrepo root npm install aborts pan start; MIN-1135 repro). Close when PAN-4553 lands.",
       "rationale": "New since the prior run: it reports the same root-level npm install failure as PAN-4553 on a fresh MIN-1135 start, so it waits behind PAN-4553 at a free mid rank instead of competing for pickup.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4930",
+      "rank": 331,
+      "size": "L",
+      "importance": "high",
+      "score": 62,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Root of PAN-4927: per-agent scoped MCP token minted, delivered as 0600 file, revoked on kill/exit/close-out, swept.",
+      "rationale": "New child W-TOK1 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Placed in a free slot next to the epic because it is a root that unblocks most of the epic.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4931",
+      "rank": 336,
+      "size": "M",
+      "importance": "high",
+      "score": 61,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Root of PAN-4927: MCP tool module with per-token visibility, methods and token file; gates injection and all tools.",
+      "rationale": "New child W-MCP1 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Placed in a free slot next to the epic because it is a root that unblocks most of the epic.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4948",
+      "rank": 883,
+      "size": "M",
+      "importance": "medium",
+      "score": 44,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Directory gains connector clients for outside bots; no deps in epic, unblocks CONN2 and the integration plugins.",
+      "rationale": "New child W-DIR1 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4952",
+      "rank": 884,
+      "size": "S",
+      "importance": "medium",
+      "score": 42,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Shared Overdeck skill text reused by Hermes, OpenClaw and Grok plugins; no deps, unblocks all four integrations.",
+      "rationale": "New child W-INT0 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4958",
+      "rank": 885,
+      "size": "S",
+      "importance": "low",
+      "score": 30,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Docs for agent MCP and bot plugins; no hard deps but best written once Part A and B surfaces have landed.",
+      "rationale": "New child W-DOC of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4932",
+      "rank": 886,
+      "size": "M",
+      "importance": "high",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4930",
+        "PAN-4931"
+      ],
+      "why": "Inject Overdeck MCP server into Claude Code agents, role runs and conversations; unblocks INJ2/3/4 and FUN1.",
+      "rationale": "New child W-INJ1 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4936",
+      "rank": 887,
+      "size": "M",
+      "importance": "high",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4930",
+        "PAN-4931"
+      ],
+      "why": "Self routes foundation: agent identity, jobs and waits; unblocks SELF2, DEL1, MEM1, SEC1 and PR1 tools.",
+      "rationale": "New child W-SELF1 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4939",
+      "rank": 888,
+      "size": "S",
+      "importance": "medium",
+      "score": 45,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4931"
+      ],
+      "why": "MCP tools for scheduled messages and recurring schedules; needs only the tool module (W-MCP1).",
+      "rationale": "New child W-SCHED1 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4944",
+      "rank": 889,
+      "size": "M",
+      "importance": "medium",
+      "score": 48,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4931"
+      ],
+      "why": "Approvals for every harness plus a fleet-wide pending list exposed as tools; needs only W-MCP1.",
+      "rationale": "New child W-APPR1 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4945",
+      "rank": 890,
+      "size": "L",
+      "importance": "medium",
+      "score": 47,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4930"
+      ],
+      "why": "OAuth 2.1 server for /mcp with access levels and expiry; gates dashboard OAuth UI, Funnel and Grok bot.",
+      "rationale": "New child W-OAUTH1 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4949",
+      "rank": 891,
+      "size": "M",
+      "importance": "medium",
+      "score": 46,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4930"
+      ],
+      "why": "Machine side of bot connectors: credential, pairing intents and exchange; unblocks CONN2 and Connect-a-bot UI.",
+      "rationale": "New child W-CONN1 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4937",
+      "rank": 892,
+      "size": "M",
+      "importance": "medium",
+      "score": 50,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4936"
+      ],
+      "why": "Checklist, done, handoff and worker-report as MCP tools so agents stop shelling to pan over Bash.",
+      "rationale": "New child W-SELF2 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4938",
+      "rank": 893,
+      "size": "M",
+      "importance": "medium",
+      "score": 50,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4936"
+      ],
+      "why": "Delegation, lanes, issue start and conversation stop/interrupt as MCP tools for managed agents.",
+      "rationale": "New child W-DEL1 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4940",
+      "rank": 894,
+      "size": "S",
+      "importance": "medium",
+      "score": 44,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4936"
+      ],
+      "why": "Memory add and search as MCP tools scoped to the calling agent.",
+      "rationale": "New child W-MEM1 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4941",
+      "rank": 895,
+      "size": "M",
+      "importance": "medium",
+      "score": 45,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4936"
+      ],
+      "why": "request_secret tool: agent asks operator for a secret without it entering the transcript; unblocks link_machine.",
+      "rationale": "New child W-SEC1 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4943",
+      "rank": 896,
+      "size": "S",
+      "importance": "medium",
+      "score": 43,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4936"
+      ],
+      "why": "Link and watch pull requests from an agent via MCP tools.",
+      "rationale": "New child W-PR1 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4933",
+      "rank": 897,
+      "size": "S",
+      "importance": "medium",
+      "score": 46,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4932"
+      ],
+      "why": "Codex harness: write [mcp_servers.overdeck] so Codex agents get the Overdeck tools.",
+      "rationale": "New child W-INJ2 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4934",
+      "rank": 898,
+      "size": "S",
+      "importance": "medium",
+      "score": 44,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4932"
+      ],
+      "why": "ACP harnesses (acp, opencode) get the Overdeck MCP server injected.",
+      "rationale": "New child W-INJ3 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4942",
+      "rank": 899,
+      "size": "S",
+      "importance": "medium",
+      "score": 40,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4941"
+      ],
+      "why": "link_machine tool: a conversation asks the operator to link a machine; builds on request_secret.",
+      "rationale": "New child W-LINK1 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4946",
+      "rank": 900,
+      "size": "M",
+      "importance": "medium",
+      "score": 42,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4945"
+      ],
+      "why": "Dashboard OAuth approval card and sign-in list for /mcp clients.",
+      "rationale": "New child W-OAUTH2 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4950",
+      "rank": 901,
+      "size": "M",
+      "importance": "medium",
+      "score": 44,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4949",
+        "PAN-4948",
+        "PAN-4931"
+      ],
+      "why": "pan mcp connector process bridging outside bots to /mcp; gates Hermes, OpenClaw and Grok Build plugins.",
+      "rationale": "New child W-CONN2 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4951",
+      "rank": 902,
+      "size": "M",
+      "importance": "medium",
+      "score": 40,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4949"
+      ],
+      "why": "\"Connect a bot\" flow in Settings > Anywhere for pairing outside bots.",
+      "rationale": "New child W-BOT1 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4947",
+      "rank": 903,
+      "size": "L",
+      "importance": "medium",
+      "score": 38,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4945",
+        "PAN-4932"
+      ],
+      "why": "Opt-in public /mcp via Tailscale Funnel, TLS ends on the user machine; no plaintext relay on overdeck.ai.",
+      "rationale": "New child W-FUN1 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4953",
+      "rank": 904,
+      "size": "M",
+      "importance": "medium",
+      "score": 40,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4952",
+        "PAN-4950"
+      ],
+      "why": "integrations/hermes/: Hermes plugin with its own revocable scoped token.",
+      "rationale": "New child W-INT1 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4954",
+      "rank": 905,
+      "size": "M",
+      "importance": "medium",
+      "score": 38,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4952",
+        "PAN-4950"
+      ],
+      "why": "integrations/openclaw/: OpenClaw plugin with its own revocable scoped token.",
+      "rationale": "New child W-INT2 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4955",
+      "rank": 906,
+      "size": "S",
+      "importance": "medium",
+      "score": 36,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4952",
+        "PAN-4950"
+      ],
+      "why": "integrations/grok-build/: Grok Build plugin with its own revocable scoped token.",
+      "rationale": "New child W-INT3 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4956",
+      "rank": 907,
+      "size": "S",
+      "importance": "low",
+      "score": 32,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4952",
+        "PAN-4946",
+        "PAN-4947"
+      ],
+      "why": "integrations/grok-bot/ and xAI API example; needs OAuth UI and public Funnel /mcp, not the connector.",
+      "rationale": "New child W-INT4 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4935",
+      "rank": 908,
+      "size": "M",
+      "importance": "medium",
+      "score": 42,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4932",
+        "PAN-4937",
+        "PAN-4938",
+        "PAN-4939",
+        "PAN-4940",
+        "PAN-4941",
+        "PAN-4942",
+        "PAN-4943",
+        "PAN-4944"
+      ],
+      "why": "Instruction blocks and no-MCP fallback; lands last in Part A since it documents every tool to agents.",
+      "rationale": "New child W-INJ4 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4957",
+      "rank": 909,
+      "size": "S",
+      "importance": "low",
+      "score": 30,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4953",
+        "PAN-4954",
+        "PAN-4955",
+        "PAN-4956"
+      ],
+      "why": "CI for the four integration packages; lands after all integrations exist.",
+      "rationale": "New child W-CI1 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4959",
+      "rank": 686,
+      "size": "L",
+      "importance": "medium",
+      "score": 24,
+      "condition": "needs-refinement",
+      "dependsOn": [
+        "PAN-4294"
+      ],
+      "why": "Anywhere account page (plan, relay allowance, machines, Creem portal, delete) + dashboard card; waits on PAN-4294 billing and OD.",
+      "rationale": "New child of PAN-2350 filed 2026-11-03; it depends on PAN-4294 billing (rank 663) so it takes the free slot after it, and stays needs-refinement until the operator decides whether it ships with billing or read-only first.",
       "gate": "auto",
       "planning": "auto"
     }
@@ -13194,6 +13685,538 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.95
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4930",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4931",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4948",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4952",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4958",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4930",
+      "to": "PAN-4932",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4931",
+      "to": "PAN-4932",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4932",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4930",
+      "to": "PAN-4936",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4931",
+      "to": "PAN-4936",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4936",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4931",
+      "to": "PAN-4939",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4939",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4931",
+      "to": "PAN-4944",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4944",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4930",
+      "to": "PAN-4945",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4945",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4930",
+      "to": "PAN-4949",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4949",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4936",
+      "to": "PAN-4937",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4937",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4936",
+      "to": "PAN-4938",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4938",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4936",
+      "to": "PAN-4940",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4940",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4936",
+      "to": "PAN-4941",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4941",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4936",
+      "to": "PAN-4943",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4943",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4932",
+      "to": "PAN-4933",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4933",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4932",
+      "to": "PAN-4934",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4934",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4941",
+      "to": "PAN-4942",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4942",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4945",
+      "to": "PAN-4946",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4946",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4949",
+      "to": "PAN-4950",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4948",
+      "to": "PAN-4950",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4931",
+      "to": "PAN-4950",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4950",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4949",
+      "to": "PAN-4951",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4951",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4945",
+      "to": "PAN-4947",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4932",
+      "to": "PAN-4947",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4947",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4952",
+      "to": "PAN-4953",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4950",
+      "to": "PAN-4953",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4953",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4952",
+      "to": "PAN-4954",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4950",
+      "to": "PAN-4954",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4954",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4952",
+      "to": "PAN-4955",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4950",
+      "to": "PAN-4955",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4955",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4952",
+      "to": "PAN-4956",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4946",
+      "to": "PAN-4956",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4947",
+      "to": "PAN-4956",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4956",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4932",
+      "to": "PAN-4935",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4937",
+      "to": "PAN-4935",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4938",
+      "to": "PAN-4935",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4939",
+      "to": "PAN-4935",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4940",
+      "to": "PAN-4935",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4941",
+      "to": "PAN-4935",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4942",
+      "to": "PAN-4935",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4943",
+      "to": "PAN-4935",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4944",
+      "to": "PAN-4935",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4935",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4953",
+      "to": "PAN-4957",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4954",
+      "to": "PAN-4957",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4955",
+      "to": "PAN-4957",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4956",
+      "to": "PAN-4957",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4957",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4294",
+      "to": "PAN-4959",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2350",
+      "to": "PAN-4959",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
     }
   ]
 }
