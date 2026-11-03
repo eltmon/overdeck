@@ -368,6 +368,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/issues/:id/test-removal-waiver',             kind: 'http', disposition: 'READ',        door: 'readTestSkipWaiver + snapshotWorkspaceHeads' },
   { surface: 'POST /api/issues/:id/test-removal-waiver',            kind: 'http', disposition: 'WRITE',       door: 'grantTestSkipWaiver → <workspace>/.overdeck/test-removal-waiver.json' },
   { surface: 'GET /api/issues/:id/deft',                            kind: 'http', disposition: 'READ',        door: 'readDeftIssueState' },
+  { surface: 'GET /api/issues/:id/deft/review-cycle',               kind: 'http', disposition: 'READ',        door: 'loadDeftReviewCycle' },
   { surface: 'GET /api/deft/issues',                                kind: 'http', disposition: 'READ',        door: 'summarizeDeftIssueState' },
   { surface: 'POST /api/issues/:id/pipeline',                       kind: 'http', disposition: 'WRITE',       door: 'pan skills deft use|back (useDeftPipeline / backToOverdeck)' },
   { surface: 'POST /api/issues/:id/deft/scopes/signoff',          kind: 'http', disposition: 'WRITE',       door: 'signOffDisposition → <worktree>/xbrief/<folder>/<scope>.xbrief.json' },

@@ -13,6 +13,8 @@
  *   escalation file (`resolveDeftEscalation`) and tell the work agent.
  * - `POST /api/issues/:id/deft/scopes/signoff` — sign off a scope item's
  *   disposition as a human event (`signOffDisposition`).
+ * - `GET /api/issues/:id/deft/review-cycle` — Deft's review cycle for the
+ *   issue's PR (`loadDeftReviewCycle`), kept out of the 15 s state poll.
  */
 import { spawn as nodeSpawn, type ChildProcess } from 'node:child_process';
 import { readdir } from 'node:fs/promises';
@@ -25,6 +27,7 @@ import { emitActivityEntry } from '../../../lib/activity-logger.js';
 import { buildChildEnvWithoutTmux } from '../../../lib/child-env.js';
 import { DEFT_ESCALATION_DECISIONS, notifyEscalationResolved, resolveDeftEscalation } from '../../../lib/deft/escalations.js';
 import { isDeftPipelineIssue } from '../../../lib/deft/issue-pipeline.js';
+import { defaultDeftReviewCycleLoadDeps, type DeftReviewCycleLoadDeps, loadDeftReviewCycle } from '../../../lib/deft/review-cycle-load.js';
 import { signOffDisposition } from '../../../lib/deft/signoff.js';
 import { readDeftIssueState, summarizeDeftIssueState } from '../../../lib/deft/state-reader.js';
 import { parseIssueId } from '../../../lib/issue-id.js';
@@ -45,6 +48,13 @@ const defaultSpawner: DeftPipelineSpawner = (args, env) =>
 
 let spawner: DeftPipelineSpawner = defaultSpawner;
 const runningSwitches = new Set<string>();
+
+let reviewCycleDeps: DeftReviewCycleLoadDeps = defaultDeftReviewCycleLoadDeps;
+
+/** Override the review-cycle loaders; pass null to restore the real ones. */
+export function setDeftReviewCycleDepsForTests(deps: Partial<DeftReviewCycleLoadDeps> | null): void {
+  reviewCycleDeps = deps ? { ...defaultDeftReviewCycleLoadDeps, ...deps } : defaultDeftReviewCycleLoadDeps;
+}
 
 /** Replace the `pan` spawner; pass null to restore the real one. */
 export function setDeftPipelineSpawnerForTests(fn: DeftPipelineSpawner | null): void {
@@ -115,6 +125,24 @@ const getDeftIssueRoute = HttpRouter.add(
       const worktree = getIssueWorkspacePath(issueId);
       if (!worktree) return jsonResponse({ error: 'no workspace' }, { status: 404 });
       return jsonResponse(await readDeftIssueState(worktree, issueId));
+    });
+  }),
+);
+
+const getDeftReviewCycleRoute = HttpRouter.add(
+  'GET',
+  '/api/issues/:id/deft/review-cycle',
+  Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    if (!parseIssueId(id)) return jsonResponse({ error: 'Invalid issue ID' }, { status: 400 });
+    const issueId = id.toUpperCase();
+    return yield* Effect.promise(async () => {
+      if (!(await isDeftPipelineIssue(issueId))) {
+        return jsonResponse({ error: `${issueId} does not run on Deft` }, { status: 404 });
+      }
+      if (!getIssueWorkspacePath(issueId)) return jsonResponse({ error: 'no workspace' }, { status: 404 });
+      return jsonResponse(await loadDeftReviewCycle(issueId, reviewCycleDeps));
     });
   }),
 );
@@ -275,6 +303,7 @@ const postScopeSignoffRoute = HttpRouter.add(
 
 export const deftRouteLayer = Layer.mergeAll(
   getDeftIssueRoute,
+  getDeftReviewCycleRoute,
   getDeftIssuesRoute,
   postPipelineRoute,
   postResolveEscalationRoute,

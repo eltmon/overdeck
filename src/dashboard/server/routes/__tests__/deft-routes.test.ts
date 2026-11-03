@@ -34,7 +34,7 @@ vi.mock('../../../../lib/projects.js', async importOriginal => ({
   listProjectsAsync: mocks.listProjectsAsync,
 }));
 
-const { deftRouteLayer, setDeftPipelineSpawnerForTests } = await import('../deft.js');
+const { deftRouteLayer, setDeftPipelineSpawnerForTests, setDeftReviewCycleDepsForTests } = await import('../deft.js');
 
 const GOLDEN = JSON.parse(readFileSync(GOLDEN_PATH, 'utf8'));
 const scratch = mkdtempSync(join(tmpdir(), 'deft-routes-'));
@@ -271,5 +271,41 @@ describe('POST /api/issues/:id/deft/scopes/signoff', () => {
     expect((await call('POST', '/api/issues/PAN-1/deft/scopes/signoff', { body: { ...body, scopePath: 'xbrief/../x.json' } })).status).toBe(404);
     mocks.isDeftPipelineIssue.mockResolvedValue(false);
     expect((await call('POST', '/api/issues/PAN-1/deft/scopes/signoff', { body })).status).toBe(404);
+  });
+});
+
+describe('GET /api/issues/:id/deft/review-cycle', () => {
+  const REVIEW_FIXTURES = fileURLToPath(new URL('../../../../lib/deft/__tests__/fixtures/review-cycle/main.json', import.meta.url));
+  const MAIN = JSON.parse(readFileSync(REVIEW_FIXTURES, 'utf8'));
+  const deps = {
+    workspacePath: () => FIXTURE_DIR,
+    pullRequest: async () => ({ number: MAIN.prNumber, headRefOid: MAIN.headSha }),
+    checkRuns: async () => MAIN.checkRuns,
+    discussions: async () => MAIN.discussions,
+    fixCommits: async () => MAIN.fixCommits,
+    readState: async () => ({ ...GOLDEN, ...MAIN.state }),
+    now: () => Date.parse('2026-11-02T18:00:00Z'),
+  };
+
+  afterEach(() => setDeftReviewCycleDepsForTests(null));
+
+  it('returns 404 for a non-Deft issue', async () => {
+    mocks.isDeftPipelineIssue.mockResolvedValue(false);
+    expect((await call('GET', '/api/issues/PAN-1/deft/review-cycle')).status).toBe(404);
+  });
+
+  it('returns the derived review cycle', async () => {
+    setDeftReviewCycleDepsForTests(deps);
+    const res = await call('GET', '/api/issues/PAN-1/deft/review-cycle');
+    expect(res.status).toBe(200);
+    expect(res.json).toMatchObject({ verdict: 'NEW_P0_P1', prNumber: 12, errors: [] });
+    expect(res.json.rounds).toHaveLength(2);
+  });
+
+  it('records a failing loader in errors and still answers 200', async () => {
+    setDeftReviewCycleDepsForTests({ ...deps, discussions: async () => { throw new Error('rate limited'); } });
+    const res = await call('GET', '/api/issues/PAN-1/deft/review-cycle');
+    expect(res.status).toBe(200);
+    expect(res.json.errors).toEqual(['discussions failed: rate limited']);
   });
 });
