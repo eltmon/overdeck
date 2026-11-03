@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4888",
   "created": "2026-11-03T08:25:32.067Z",
-  "updated": "2026-11-03T09:14:13.493Z",
+  "updated": "2026-11-03T09:14:35.706Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -76,6 +76,10 @@
     "banner-build-sha.ac2": {
       "status": "completed",
       "doneAt": "2026-11-03T09:14:13.493Z"
+    },
+    "build-pinned-target.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:14:35.705Z"
     }
   }
 }
