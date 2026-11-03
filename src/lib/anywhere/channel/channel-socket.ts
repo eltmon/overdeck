@@ -19,21 +19,9 @@
 import { createRequire } from 'node:module';
 import { Duplex } from 'node:stream';
 
-import type { ChannelMode, HandshakeResult } from '@overdeck/anywhere-channel';
+import type { ChannelMarker, HandshakeResult } from '@overdeck/anywhere-channel';
 
-export type { ChannelMode } from '@overdeck/anywhere-channel';
-
-export interface ChannelMarker {
-  mode: ChannelMode;
-  /** Peer static key, 64 lowercase hex characters. */
-  remoteKeyHex: string;
-  /** Pairing mode only. */
-  pairingId: string | null;
-  /** Approval mode only (PAN-2356): the approval request id, 32 hex. */
-  requestId?: string;
-  /** Approval mode only: the six-digit SAS both operators compare, as `123 456`. */
-  approvalSas?: string;
-}
+export type { ChannelMarker, ChannelMode } from '@overdeck/anywhere-channel';
 
 interface SecretStreamLike {
   write(chunk: Uint8Array): boolean;

@@ -5,7 +5,9 @@
  * dashboard port, or `wss://host[:port]/ws/link` inside HTTPS), writes the
  * preamble, runs Noise IK (link: proves the pinned machine key before any
  * application byte) or XXpsk0 (pairing: keyed by the pairing code) and
- * resolves with a {@link ChannelSocket}.
+ * resolves with a {@link ChannelSocket}. The transport-agnostic handshake
+ * sequence lives in `@overdeck/anywhere-channel` (`runInitiatorHandshake`,
+ * PAN-4833 D-6); this module keeps the Node transports.
  *
  * Timeouts use `AbortController` + `setTimeout`, never `AbortSignal.timeout`
  * (it ignores fake timers under happy-dom).
@@ -13,14 +15,13 @@
 import { connect as netConnect, type Socket } from 'node:net';
 import type { Duplex } from 'node:stream';
 
-import { APPROVAL_NONCE_BYTES, approvalCommitment, approvalNonce, approvalSas, type ChannelMode, encodeFrame, encodePreamble, FrameReader, type Handshake, ikInitiator, NOISE_LINK_PROTOCOL, pairingSecrets, prologueFor, type Refusal, REFUSAL_CODES, WireError, xxInitiator, xxPskInitiator } from '@overdeck/anywhere-channel';
+import { ChannelOpenError, type InitiatorFinish, type InitiatorOptions, runInitiatorHandshake, toOpenError, withDeadline } from '@overdeck/anywhere-channel';
 import { nodeCrypto } from '@overdeck/anywhere-channel/node';
 import { createWebSocketStream, WebSocket as WsClient } from 'ws';
 
-import type { MachineKeyPair } from '../machine-key.js';
-import { type ChannelMarker, type ChannelSocket, createChannelSocket } from './channel-socket.js';
+import { type ChannelSocket, createChannelSocket } from './channel-socket.js';
 
-export const DEFAULT_OPEN_TIMEOUT_MS = 10_000;
+export { ChannelOpenError, type ChannelOpenDetail, type ChannelOpenErrorCode, DEFAULT_OPEN_TIMEOUT_MS } from '@overdeck/anywhere-channel';
 
 /** wss route query parameter naming one Fly machine; sent as `fly-force-instance-id` (PAN-4652 D-3). */
 export const FLY_INSTANCE_PARAM = 'fly-instance';
@@ -37,53 +38,17 @@ export function setRtcDialer(dialer: RtcDialer | null): void {
   rtcDialer = dialer;
 }
 
-export type ChannelOpenErrorCode =
-  | 'unreachable'
-  | 'timeout'
-  | 'aborted'
-  | 'identity-refused'
-  | 'unknown-peer'
-  | 'unsupported'
-  | 'pairing-refused'
-  | 'busy'
-  | 'protocol';
+export type OpenChannelOptions = InitiatorOptions;
 
-export interface ChannelOpenDetail {
-  /** `unsupported` only: what the responder speaks. */
-  linkProtocol?: number;
-  serverVersion?: string;
-  cause?: string;
-}
-
-export class ChannelOpenError extends Error {
-  constructor(
-    readonly code: ChannelOpenErrorCode,
-    message: string,
-    readonly detail: ChannelOpenDetail = {},
-  ) {
-    super(message);
-    this.name = 'ChannelOpenError';
-  }
-}
-
-interface CommonOpenOptions {
-  localKey: MachineKeyPair;
-  signal?: AbortSignal;
-  /** Whole open (connect + handshake) must finish within this; default 10 s. */
-  timeoutMs?: number;
-}
-
-export type OpenChannelOptions =
-  | (CommonOpenOptions & { mode: 'link'; remoteKeyHex: string })
-  | (CommonOpenOptions & { mode: 'pairing'; pairingCode: string })
-  /** PAN-2356 D-2356-9: Noise XX for one approval request (32 hex); authenticated only by the SAS. */
-  | (CommonOpenOptions & { mode: 'approval'; requestId: string });
+/** Builds the secure stream in the same tick as the last handshake frame. */
+const toChannelSocket: InitiatorFinish<ChannelSocket, Duplex> = ({ raw, handshake, leftover, channel }) =>
+  createChannelSocket({ raw, initiator: true, handshake, channel, leftover });
 
 export async function openChannel(url: TransportUrl, opts: OpenChannelOptions): Promise<ChannelSocket> {
-  return withDeadline(url, opts, async (signal, track) => {
+  return withDeadline<ChannelSocket, Duplex>(url, opts, async (signal, track) => {
     const raw = await connectTransport(url, signal);
     track(raw);
-    return handshakeAsInitiator(raw, url, opts, track);
+    return runInitiatorHandshake(raw, url, opts, nodeCrypto, track, toChannelSocket);
   });
 }
 
@@ -93,187 +58,10 @@ export async function openChannel(url: TransportUrl, opts: OpenChannelOptions): 
  * The same timeout and abort rules as {@link openChannel} apply.
  */
 export async function openChannelOverTransport(raw: Duplex, opts: OpenChannelOptions, label = 'transport'): Promise<ChannelSocket> {
-  return withDeadline(label, opts, async (_signal, track) => {
+  return withDeadline<ChannelSocket, Duplex>(label, opts, async (_signal, track) => {
     track(raw);
-    return handshakeAsInitiator(raw, label, opts, track);
+    return runInitiatorHandshake(raw, label, opts, nodeCrypto, track, toChannelSocket);
   });
-}
-
-interface Tracked {
-  raw: Duplex | null;
-  reader: FrameReader | null;
-}
-
-/**
- * Deadline + abort plumbing shared by both entry points: a timer and the
- * caller's signal both abort an internal controller; aborting fails the
- * pending frame read and destroys the transport.
- */
-async function withDeadline(
-  label: string,
-  opts: OpenChannelOptions,
-  run: (signal: AbortSignal, track: (raw: Duplex, reader?: FrameReader) => void) => Promise<ChannelSocket>,
-): Promise<ChannelSocket> {
-  const controller = new AbortController();
-  const tracked: Tracked = { raw: null, reader: null };
-  let reason: ChannelOpenError | null = null;
-  const abortWith = (error: ChannelOpenError): void => {
-    if (reason) return;
-    reason = error;
-    controller.abort(error);
-  };
-  const timeoutMs = opts.timeoutMs ?? DEFAULT_OPEN_TIMEOUT_MS;
-  const timer = setTimeout(
-    () => abortWith(new ChannelOpenError('timeout', `Secure channel to ${label} did not open within ${timeoutMs} ms`)),
-    timeoutMs,
-  );
-  const onExternalAbort = (): void => abortWith(new ChannelOpenError('aborted', `Secure channel open to ${label} was aborted`));
-  if (opts.signal?.aborted) onExternalAbort();
-  else opts.signal?.addEventListener('abort', onExternalAbort, { once: true });
-  const onAbort = (): void => {
-    if (reason) tracked.reader?.fail(reason);
-    tracked.raw?.destroy();
-  };
-  controller.signal.addEventListener('abort', onAbort, { once: true });
-
-  try {
-    if (reason) throw reason;
-    return await run(controller.signal, (raw, reader) => {
-      tracked.raw = raw;
-      if (reader) tracked.reader = reader;
-    });
-  } catch (error) {
-    tracked.reader?.detach();
-    if (tracked.raw && !tracked.raw.destroyed) tracked.raw.destroy();
-    throw reason ?? toOpenError(error, label);
-  } finally {
-    clearTimeout(timer);
-    controller.signal.removeEventListener('abort', onAbort);
-    opts.signal?.removeEventListener('abort', onExternalAbort);
-  }
-}
-
-async function handshakeAsInitiator(
-  raw: Duplex,
-  label: string,
-  opts: OpenChannelOptions,
-  track: (raw: Duplex, reader?: FrameReader) => void,
-): Promise<ChannelSocket> {
-  const reader = new FrameReader(raw);
-  // Register the reader with the deadline so an abort fails the pending read.
-  track(raw, reader);
-
-  if (opts.mode === 'link') {
-    raw.write(encodePreamble({ linkProtocol: NOISE_LINK_PROTOCOL, mode: 'link', pairingId: null }));
-    const handshake = ikInitiator(opts.localKey, Buffer.from(opts.remoteKeyHex, 'hex'), prologueFor('link', null));
-    raw.write(encodeFrame(handshake.send()));
-    const message2 = await readMessage(reader, 'link');
-    try {
-      handshake.recv(message2);
-    } catch {
-      throw new ChannelOpenError('identity-refused', `${label} did not prove the pinned machine key`);
-    }
-    return finish(raw, reader, handshake, null, { mode: 'link', remoteKeyHex: opts.remoteKeyHex, pairingId: null });
-  }
-
-  if (opts.mode === 'approval') {
-    raw.write(encodePreamble({ linkProtocol: NOISE_LINK_PROTOCOL, mode: 'approval', pairingId: opts.requestId }));
-    const handshake = xxInitiator(opts.localKey, prologueFor('approval', opts.requestId));
-    raw.write(encodeFrame(handshake.send()));
-    const message2 = await readMessage(reader, 'approval');
-    try {
-      handshake.recv(message2);
-    } catch {
-      throw new ChannelOpenError('protocol', `${label} sent an approval handshake message that did not verify`);
-    }
-    raw.write(encodeFrame(handshake.send()));
-    const remoteKeyHex = Buffer.from(handshake.remoteKey()).toString('hex');
-    // Commit-then-reveal (D-2356-10 amended): commit to our nonce, take the responder's, reveal ours.
-    const hash = handshake.result().hash;
-    const nonce = approvalNonce(nodeCrypto);
-    raw.write(encodeFrame(approvalCommitment(nodeCrypto, hash, nonce)));
-    const responderNonce = await readMessage(reader, 'approval');
-    if (responderNonce.length !== APPROVAL_NONCE_BYTES) {
-      throw new ChannelOpenError('protocol', `${label} sent an approval nonce of ${responderNonce.length} bytes`);
-    }
-    const sas = approvalSas(nodeCrypto, hash, nonce, responderNonce);
-    return finish(raw, reader, handshake, nonce, { mode: 'approval', remoteKeyHex, pairingId: null, requestId: opts.requestId, approvalSas: sas });
-  }
-
-  const { psk, pairingId } = pairingSecrets(nodeCrypto, opts.pairingCode);
-  raw.write(encodePreamble({ linkProtocol: NOISE_LINK_PROTOCOL, mode: 'pairing', pairingId }));
-  const handshake = xxPskInitiator(opts.localKey, psk, prologueFor('pairing', pairingId));
-  raw.write(encodeFrame(handshake.send()));
-  const message2 = await readMessage(reader, 'pairing');
-  try {
-    handshake.recv(message2);
-  } catch {
-    throw new ChannelOpenError('pairing-refused', `${label} did not accept the pairing code`);
-  }
-  const message3 = handshake.send();
-  const remoteKeyHex = Buffer.from(handshake.remoteKey()).toString('hex');
-  return finish(raw, reader, handshake, message3, { mode: 'pairing', remoteKeyHex, pairingId });
-}
-
-function finish(
-  raw: Duplex,
-  reader: FrameReader,
-  handshake: Handshake,
-  finalMessage: Uint8Array | null,
-  channel: ChannelMarker,
-): ChannelSocket {
-  const leftover = reader.detach();
-  if (finalMessage) raw.write(encodeFrame(finalMessage));
-  return createChannelSocket({ raw, initiator: true, handshake: handshake.result(), channel, leftover });
-}
-
-async function readMessage(reader: FrameReader, mode: ChannelMode): Promise<Uint8Array> {
-  let frame;
-  try {
-    frame = await reader.readFrame();
-  } catch (error) {
-    if (error instanceof WireError && error.code === 'closed') {
-      // The responder dropped us without a refusal: in link mode it could not
-      // decrypt message 1 (it does not hold the key we pinned).
-      if (mode === 'link') {
-        throw new ChannelOpenError('identity-refused', 'Responder closed the connection before proving the pinned machine key');
-      }
-      throw new ChannelOpenError('pairing-refused', `Responder closed the connection during ${mode === 'approval' ? 'approval' : 'pairing'}`);
-    }
-    throw error;
-  }
-  if (frame.kind === 'refusal') {
-    if (mode === 'approval' && frame.refusal.code === REFUSAL_CODES.pairingRefused) {
-      throw new ChannelOpenError('pairing-refused', 'Responder has no live approval request with this id');
-    }
-    throw refusalToError(frame.refusal);
-  }
-  return frame.payload;
-}
-
-function refusalToError(refusal: Refusal): ChannelOpenError {
-  switch (refusal.code) {
-    case REFUSAL_CODES.unknownPeer:
-      return new ChannelOpenError('unknown-peer', 'Responder does not hold a machine token for this machine key');
-    case REFUSAL_CODES.unsupported:
-      return new ChannelOpenError(
-        'unsupported',
-        `Responder speaks link protocol ${refusal.linkProtocol} (Overdeck ${refusal.serverVersion || 'unknown version'})`,
-        { linkProtocol: refusal.linkProtocol, serverVersion: refusal.serverVersion },
-      );
-    case REFUSAL_CODES.pairingRefused:
-      return new ChannelOpenError('pairing-refused', 'Responder refused the pairing id or code');
-    case REFUSAL_CODES.busy:
-      return new ChannelOpenError('busy', 'Responder has too many handshakes pending');
-  }
-}
-
-function toOpenError(error: unknown, url: string): ChannelOpenError {
-  if (error instanceof ChannelOpenError) return error;
-  if (error instanceof WireError) {
-    return new ChannelOpenError('protocol', `${url}: ${error.message}`, { cause: error.code });
-  }
-  return new ChannelOpenError('unreachable', `${url}: ${(error as Error)?.message ?? String(error)}`);
 }
 
 type TransportTarget =
