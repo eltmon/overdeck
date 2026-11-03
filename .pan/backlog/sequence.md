@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T14:19:15Z · model: claude-opus-5-5 · open: 868_
+_Last sequenced: 2026-11-03T14:20:21Z · model: claude-opus-5-5 · open: 867_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -821,7 +821,6 @@ _Last sequenced: 2026-11-03T14:19:15Z · model: claude-opus-5-5 · open: 868_
 | 826 | PAN-2775 | S | low | needs-refinement |  |  | Stale: targets boot-correlated reaping (boot reconciliation) deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 827 | PAN-4834 | M | medium | ok |  |  | Phone app W-WEB2: HTTP/1.1 and WebSocket clients inside the channel plus fetch/WS shims; PAN-4833 done, now unblocked. |
 | 829 | PAN-3505 | XS | low | needs-refinement |  |  | Stale: targets the flywheel state write door deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 831 | PAN-4836 | S | medium | ok |  |  | Phone app W-MAC2: "Overdeck app" pairing QR tab in Settings > Anywhere with paired-phone list; needs PAN-4835. |
 | 832 | PAN-3321 | XS | low | stale |  |  | Stale: targets pan unstick deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 833 | PAN-736 | M | low | stale |  |  | Retired: work-types.ts, WorkTypeRouter and models.overrides are all gone (#4174); per-subagent routing needs a fresh roles.* design |
 | 834 | PAN-762 | M | low | stale |  |  | Premise gone: models.overrides is a retired, ignored key since #4174, so there are no overrides left to warn about |
@@ -1203,10 +1202,10 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T14:19:15Z",
+  "generatedAt": "2026-11-03T14:20:21Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 868,
+  "openCount": 867,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -11350,19 +11349,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-4836",
-      "rank": 831,
-      "size": "S",
-      "importance": "medium",
-      "score": 30,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Phone app W-MAC2: \"Overdeck app\" pairing QR tab in Settings > Anywhere with paired-phone list; needs PAN-4835.",
-      "rationale": "PAN-4774 (Anywhere release AC run) closed as completed, so that dependency is removed; rank held because the phone-app epic is feature work that still ranks below substrate items.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3321",
       "rank": 832,
       "size": "XS",
@@ -13212,13 +13198,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     {
       "from": "PAN-4823",
       "to": "PAN-4834",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4823",
-      "to": "PAN-4836",
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
