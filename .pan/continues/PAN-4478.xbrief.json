@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4478",
   "created": "2026-11-03T17:36:37.149Z",
-  "updated": "2026-11-03T18:35:48.433Z",
+  "updated": "2026-11-03T18:36:15.847Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -150,6 +150,10 @@
     "viewer-peer.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T18:35:48.432Z"
+    },
+    "viewer-hook.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:36:15.847Z"
     }
   }
 }
