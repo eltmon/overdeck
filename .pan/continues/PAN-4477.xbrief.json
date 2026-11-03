@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4477",
   "created": "2026-11-03T15:02:33.095Z",
-  "updated": "2026-11-03T16:29:01.188Z",
+  "updated": "2026-11-03T16:29:16.691Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -106,6 +106,10 @@
     "pty-hub-listeners.ac5": {
       "status": "completed",
       "doneAt": "2026-11-03T16:29:01.187Z"
+    },
+    "hub-pty-attach-extract.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:29:16.691Z"
     }
   }
 }
