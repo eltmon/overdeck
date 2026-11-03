@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4475",
   "created": "2026-11-03T09:11:44.436Z",
-  "updated": "2026-11-03T13:56:07.477Z",
+  "updated": "2026-11-03T13:56:20.217Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -308,6 +308,10 @@
     "user-docs.ac4": {
       "status": "completed",
       "doneAt": "2026-11-03T13:56:07.477Z"
+    },
+    "dev-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:56:20.217Z"
     }
   },
   "agentModel": "claude-opus-5-5"
