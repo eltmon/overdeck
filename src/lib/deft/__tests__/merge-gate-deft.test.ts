@@ -7,6 +7,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { evaluateIssueMergeGate, type MergeGateDeps } from '../../cloister/merge-gate.js';
 import { emptyPrFacts, type PrFacts } from '../../cloister/pr-facts.js';
 
+// PAN-4852: the SageOx merge guard reads git and projects.yaml; these tests judge
+// forge facts and the Deft guard only (repo-merge-guards.test.ts covers SageOx).
+vi.mock('../../sageox/merge-guard.js', () => ({ sageoxMergeGuardForIssue: vi.fn(async () => ({ ok: true })) }));
+
 const HEAD = 'dddd444400000000000000000000000000000000';
 
 /** Open, green and mergeable, with no approval anywhere. */

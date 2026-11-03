@@ -13,6 +13,8 @@
  * Every merge door asks this one function: the merge-ready set
  * (`getMergeReadyIssues`), the dashboard Merge button and the auto-merge
  * executor (both through `triggerMerge`), and the per-project merge queue.
+ * PAN-4852 (AD-21): it runs the repository merge guards (Deft, SageOx) through
+ * one `evaluateRepoMergeGuards` call.
  * Nothing is stored: each input is read from the forge, `projects.yaml`, the
  * tracker's labels, or the global setting at the moment it is asked.
  */
@@ -20,6 +22,7 @@ import { isDeftPipelineIssue } from '../deft/issue-pipeline.js';
 import { type DeftGuardVerdict, deftMergeGuardForIssue } from '../deft/merge-guard.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
 import { issueHoldsForUat } from './auto-merge-eligibility.js';
+import { DEFT_NO_HEAD_REASON, evaluateRepoMergeGuards, type RepoGuardFacts, type RepoGuardVerdict } from './repo-merge-guards.js';
 import {
   evaluateMergeReadiness,
   forgeApprovalAtHead,
@@ -47,6 +50,8 @@ export interface MergeGateDeps {
   isDeftPipeline?: (issueId: string) => Promise<boolean>;
   /** PAN-4820: the Deft merge guard for the issue's PR at a head. */
   deftGuard?: (issueId: string, headSha: string | null) => Promise<DeftGuardVerdict & { drifted: string[] }>;
+  /** PAN-4852: the repository merge guards; by default Deft (from the two deps above) then SageOx. */
+  repoGuards?: (issueId: string, facts: RepoGuardFacts) => Promise<RepoGuardVerdict>;
 }
 
 /**
@@ -159,14 +164,27 @@ export async function evaluateIssueMergeGate(
   const readiness = evaluateMergeReadiness(facts, {
     ciTestsRequired, uatRequired, requireApprovalAtHead, requireApproval: requireApprovalAtHead,
   });
-  if (deft) {
-    // The guard judges the PR's diff at a head; with no head (a GitLab read can
-    // lack one) there is nothing to judge, so a Deft PR is refused, not waved through.
-    if (!facts.headSha) {
-      return { ...readiness, ready: false, reason: 'the Deft merge guard needs the PR head, and the forge reported none', facts };
+  // The Deft guard runs for every Deft issue (PAN-4820); SageOx only when the
+  // PR is otherwise ready (AD-19). A non-Deft PR that is not ready runs neither.
+  if (readiness.ready || deft) {
+    const repoGuards = deps.repoGuards
+      ?? ((id: string, guardFacts: RepoGuardFacts) => evaluateRepoMergeGuards(id, guardFacts, {
+        deft: async (guardId, headSha) => {
+          if (!deft) return null;
+          // The guard judges the PR's diff at a head; with no head (a GitLab read can
+          // lack one) there is nothing to judge, so a Deft PR is refused, not waved through.
+          if (!headSha) return { ok: false, reason: DEFT_NO_HEAD_REASON };
+          return (deps.deftGuard ?? deftMergeGuardForIssue)(guardId, headSha);
+        },
+      }));
+    const verdict = await repoGuards(issueId, {
+      headSha: facts.headSha,
+      headBranch: facts.headBranch,
+      otherwiseReady: readiness.ready,
+    });
+    if (!verdict.ok) {
+      return { ...readiness, ready: false, reason: verdict.reason, facts, ...(verdict.deftDrift ? { deftDrift: verdict.deftDrift } : {}) };
     }
-    const verdict = await (deps.deftGuard ?? deftMergeGuardForIssue)(issueId, facts.headSha);
-    if (!verdict.ok) return { ...readiness, ready: false, reason: verdict.reason, facts, deftDrift: verdict.drifted };
   }
   return { ...readiness, facts };
 }

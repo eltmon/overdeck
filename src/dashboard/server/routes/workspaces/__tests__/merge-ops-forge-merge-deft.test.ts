@@ -1,8 +1,9 @@
 /**
- * PAN-4820 WI-6: POST /api/issues/:id/forge-merge bypasses the merge gate,
- * so it runs the Deft merge guard itself and refuses a Deft PR the guard
- * refuses, before any repo merges. The mocks match
- * merge-ops-polyrepo-completeness.test.ts, which loads the same module.
+ * PAN-4820 WI-6, PAN-4852 WI-16: POST /api/issues/:id/forge-merge bypasses
+ * the merge gate, so it runs the repository merge guards (Deft, SageOx) itself
+ * on the PR's current head and refuses a PR either guard refuses, before any
+ * repo merges. The mocks match merge-ops-polyrepo-completeness.test.ts, which
+ * loads the same module.
  */
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
@@ -20,7 +21,11 @@ const mocks = vi.hoisted(() => ({
   upsertMergeSet: vi.fn(),
   isDeft: vi.fn(async () => true),
   deftGuard: vi.fn(),
+  sageoxGuard: vi.fn(),
+  getPrFacts: vi.fn(),
 }));
+
+const HEAD = 'dddd444400000000000000000000000000000000';
 
 // PAN-3917: config-yaml's defaults import lib/agents/tier-table, which still
 // reaches the record plane W3 is deleting. Stub the one constant it needs.
@@ -179,6 +184,16 @@ vi.mock('../../../../../lib/deft/merge-guard.js', () => ({
   deftMergeGuardForIssue: (issueId: string, headSha: string | null) => mocks.deftGuard(issueId, headSha),
 }));
 
+vi.mock('../../../../../lib/sageox/merge-guard.js', () => ({
+  sageoxMergeGuardForIssue: (issueId: string, headSha: string | null, headBranch: string | null) =>
+    mocks.sageoxGuard(issueId, headSha, headBranch),
+}));
+
+vi.mock('../../../../../lib/cloister/pr-facts.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../../../../lib/cloister/pr-facts.js')>(),
+  getPrFacts: (issueId: string) => mocks.getPrFacts(issueId),
+}));
+
 import { mergeOpsRouteLayer } from '../merge-ops.js';
 
 async function forgeMerge(issueId: string): Promise<{ status: number; body: any }> {
@@ -220,6 +235,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.mergeSet = structuredClone(set);
   mocks.isDeft.mockResolvedValue(true);
+  mocks.sageoxGuard.mockResolvedValue({ ok: true });
+  mocks.getPrFacts.mockResolvedValue({ headSha: HEAD, headBranch: 'feature/pan-1' });
   mocks.mergeReviewArtifact.mockResolvedValue(undefined);
 });
 
@@ -233,6 +250,18 @@ describe('POST /api/issues/:issueId/forge-merge for a Deft issue', () => {
       status: 409,
       body: { error: 'Cannot merge: PR contains Deft install paths: .githooks/pre-push', refused: true },
     });
+    expect(mocks.deftGuard).toHaveBeenCalledWith('PAN-1', HEAD);
+    expect(mocks.sageoxGuard).not.toHaveBeenCalled();
+    expect(mocks.mergeReviewArtifact).not.toHaveBeenCalled();
+  });
+
+  it('passes a null head to the Deft guard, which resolves it itself, when the forge reports none', async () => {
+    mocks.getPrFacts.mockResolvedValue({ headSha: null, headBranch: null });
+    mocks.deftGuard.mockResolvedValue({ ok: false, reason: "merge guard could not read the PR's changed files: no PR head", paths: [], drifted: [] });
+
+    const result = await forgeMerge('PAN-1');
+
+    expect(result.status).toBe(409);
     expect(mocks.deftGuard).toHaveBeenCalledWith('PAN-1', null);
     expect(mocks.mergeReviewArtifact).not.toHaveBeenCalled();
   });
@@ -251,6 +280,30 @@ describe('POST /api/issues/:issueId/forge-merge for a Deft issue', () => {
     await forgeMerge('PAN-1');
 
     expect(mocks.deftGuard).not.toHaveBeenCalled();
+    expect(mocks.mergeReviewArtifact).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('POST /api/issues/:issueId/forge-merge and the SageOx guard', () => {
+  beforeEach(() => {
+    mocks.isDeft.mockResolvedValue(false);
+  });
+
+  it('refuses with 409 when the PR carries .sageox/ link files the project has not opted in to, and merges nothing', async () => {
+    const reason = 'PR changes SageOx link files (.sageox/) but overdeck has not opted in to committing them; remove them from the PR or run pan skills pack sageox commit --project overdeck';
+    mocks.sageoxGuard.mockResolvedValue({ ok: false, reason, paths: ['.sageox/config.json'] });
+
+    const result = await forgeMerge('PAN-1');
+
+    expect(result).toEqual({ status: 409, body: { error: `Cannot merge: ${reason}`, refused: true } });
+    expect(mocks.sageoxGuard).toHaveBeenCalledWith('PAN-1', HEAD, 'feature/pan-1');
+    expect(mocks.mergeReviewArtifact).not.toHaveBeenCalled();
+  });
+
+  it('merges when the SageOx guard passes', async () => {
+    await forgeMerge('PAN-1');
+
+    expect(mocks.sageoxGuard).toHaveBeenCalledTimes(1);
     expect(mocks.mergeReviewArtifact).toHaveBeenCalledTimes(1);
   });
 });
