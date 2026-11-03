@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4905",
   "created": "2026-11-03T15:51:11.476Z",
-  "updated": "2026-11-03T16:47:59.679Z",
+  "updated": "2026-11-03T16:48:14.629Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -150,6 +150,10 @@
     "dialog-turn-on-remote.ac2": {
       "status": "completed",
       "doneAt": "2026-11-03T16:47:59.679Z"
+    },
+    "dialog-turn-on-remote.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:48:14.629Z"
     }
   }
 }
