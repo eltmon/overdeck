@@ -4,7 +4,7 @@
  * Order per request: match path → 404; match method → 405 with Allow; config gate → 503 for
  * everything but /healthz; handler.
  */
-import { verifyIdentity } from './account.ts';
+import { directoryToken, verifyIdentity } from './account.ts';
 import type { Config, Deps, Env } from './env.ts';
 import { HDR_IDENTITY, INTERNAL, parseConfig, parseTurnConfig } from './env.ts';
 import { isWebSocketUpgrade, json, matchPattern, withSecurityHeaders } from './http.ts';
@@ -37,12 +37,15 @@ export function directoryStub(env: Env, userId: string): DurableObjectStub {
 }
 
 /**
- * GET /v1/directory: a machine's directory socket, authorised by its device token. The verified
- * identity reaches the Durable Object in `X-Connect-Identity`; anything but 101 is passed back as is.
+ * GET /v1/directory: a machine's or phone's directory socket, authorised by its device token from
+ * `Authorization` (machines) or the `overdeck.bearer.<token>` subprotocol (phones, PAN-4829). The
+ * verified identity reaches the Durable Object in `X-Connect-Identity`; the token never does.
+ * Anything but 101 is passed back as is.
  */
 const directorySocket: Handler = async (req, rc) => {
   if (!isWebSocketUpgrade(req)) return json({ error: 'upgrade_required' }, 426, { Upgrade: 'websocket' });
-  const verified = await verifyIdentity(rc.env, req.headers.get('Authorization'));
+  const { authorization, protocol } = directoryToken(req.headers);
+  const verified = await verifyIdentity(rc.env, authorization);
   if (!verified.ok) return json({ error: verified.error }, verified.status);
   const identity = verified.identity;
 
@@ -51,9 +54,12 @@ const directorySocket: Handler = async (req, rc) => {
     if (!success) return json({ error: 'rate_limited' }, 429, { 'Retry-After': '60' });
   }
 
-  return directoryStub(rc.env, identity.userId).fetch('https://directory' + INTERNAL.socket, {
+  const res = await directoryStub(rc.env, identity.userId).fetch('https://directory' + INTERNAL.socket, {
     headers: { Upgrade: 'websocket', [HDR_IDENTITY]: JSON.stringify(identity) },
   });
+  // A browser drops a socket whose server did not choose its offered subprotocol (D-3).
+  if (protocol === null || res.status !== 101 || !res.webSocket) return res;
+  return new Response(null, { status: 101, webSocket: res.webSocket, headers: { 'Sec-WebSocket-Protocol': protocol } });
 };
 
 const ROUTES: Route[] = [

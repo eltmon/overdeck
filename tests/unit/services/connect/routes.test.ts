@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { AccountBinding, AccountVerifyResult } from '../../../../services/connect/src/account.ts';
-import { verifyIdentity } from '../../../../services/connect/src/account.ts';
+import { directoryToken, verifyIdentity } from '../../../../services/connect/src/account.ts';
 import type { ConnectIdentity, Deps, Env } from '../../../../services/connect/src/env.ts';
 import { HDR_IDENTITY, parseConfig } from '../../../../services/connect/src/env.ts';
 import { handle } from '../../../../services/connect/src/routes.ts';
 
 const BASE = 'https://connect.test';
 const TOKEN = `odd_${'a'.repeat(64)}`;
+const OTHER_TOKEN = `odd_${'b'.repeat(64)}`;
 const deps: Deps = {
   now: () => 1_700_000_000_000,
   fetch: () => Promise.reject(new Error('unexpected outbound fetch')),
@@ -117,6 +118,89 @@ describe('connect routes (PAN-2356 WI-3)', () => {
     const limiter = { limit: async ({ key }: { key: string }) => ({ success: key !== 'd-1' }) } as unknown as RateLimit;
     const res = await handle(new Request(`${BASE}/v1/directory`, upgrade(`Bearer ${TOKEN}`)), envWith({ CONNECT_LIMIT: limiter }), deps);
     expect(res.status).toBe(429);
+  });
+});
+
+describe('directory bearer subprotocol (PAN-4829 WI-1)', () => {
+  /** An account binding that records every token it was asked to verify. */
+  function recordingAccount() {
+    const tokens: string[] = [];
+    const binding: AccountBinding = {
+      verifyDevice: async (token) => {
+        tokens.push(token);
+        return TESTER;
+      },
+    };
+    return { binding, tokens };
+  }
+
+  const withHeaders = (headers: Record<string, string>): RequestInit => ({ headers: { Upgrade: 'websocket', ...headers } });
+
+  it('accepts the device token as the overdeck.bearer subprotocol', async () => {
+    const dir = fakeDirectory();
+    const acc = recordingAccount();
+    const req = new Request(`${BASE}/v1/directory`, withHeaders({ 'Sec-WebSocket-Protocol': `overdeck.bearer.${TOKEN}` }));
+    const res = await handle(req, envWith({ DIRECTORY: dir.ns, ACCOUNT: acc.binding }), deps);
+    expect(res.status).toBe(204);
+    expect(acc.tokens).toEqual([TOKEN]);
+    expect(dir.calls).toHaveLength(1);
+    const identity = JSON.parse(dir.calls[0]?.headers.get(HDR_IDENTITY) ?? '{}') as ConnectIdentity;
+    expect(identity.userId).toBe('u-1');
+    // The token never reaches the Durable Object (NFR-4).
+    expect([...(dir.calls[0]?.headers.entries() ?? [])].some(([, v]) => v.includes(TOKEN))).toBe(false);
+  });
+
+  it('prefers Authorization over the subprotocol', async () => {
+    const dir = fakeDirectory();
+    const acc = recordingAccount();
+    const req = new Request(
+      `${BASE}/v1/directory`,
+      withHeaders({ Authorization: `Bearer ${TOKEN}`, 'Sec-WebSocket-Protocol': `overdeck.bearer.${OTHER_TOKEN}` }),
+    );
+    const res = await handle(req, envWith({ DIRECTORY: dir.ns, ACCOUNT: acc.binding }), deps);
+    expect(res.status).toBe(204);
+    expect(acc.tokens).toEqual([TOKEN]);
+  });
+
+  it('refuses a malformed bearer subprotocol with 401', async () => {
+    for (const offered of ['overdeck.bearer.odd_short', 'overdeck.bearer.']) {
+      const dir = fakeDirectory();
+      const acc = recordingAccount();
+      const req = new Request(`${BASE}/v1/directory`, withHeaders({ 'Sec-WebSocket-Protocol': offered }));
+      const res = await handle(req, envWith({ DIRECTORY: dir.ns, ACCOUNT: acc.binding }), deps);
+      expect(res.status).toBe(401);
+      expect(await res.json()).toEqual({ error: 'invalid_token' });
+      expect(dir.calls).toHaveLength(0);
+      expect(acc.tokens).toEqual([]);
+    }
+  });
+
+  it('takes the bearer entry from a list', async () => {
+    const dir = fakeDirectory();
+    const acc = recordingAccount();
+    const req = new Request(`${BASE}/v1/directory`, withHeaders({ 'Sec-WebSocket-Protocol': `chat, overdeck.bearer.${TOKEN}` }));
+    const res = await handle(req, envWith({ DIRECTORY: dir.ns, ACCOUNT: acc.binding }), deps);
+    expect(res.status).toBe(204);
+    expect(dir.calls).toHaveLength(1);
+    expect(acc.tokens).toEqual([TOKEN]);
+  });
+
+  it('directoryToken reads Authorization first, then the first bearer subprotocol entry', () => {
+    const headers = (h: Record<string, string>) => new Headers(h);
+    expect(directoryToken(headers({ 'Sec-WebSocket-Protocol': `overdeck.bearer.${TOKEN}` }))).toEqual({
+      authorization: `Bearer ${TOKEN}`,
+      protocol: `overdeck.bearer.${TOKEN}`,
+    });
+    expect(
+      directoryToken(headers({ Authorization: `Bearer ${TOKEN}`, 'Sec-WebSocket-Protocol': `overdeck.bearer.${OTHER_TOKEN}` })),
+    ).toEqual({ authorization: `Bearer ${TOKEN}`, protocol: null });
+    expect(directoryToken(headers({ 'Sec-WebSocket-Protocol': 'overdeck.bearer.odd_short' }))).toEqual({ authorization: null, protocol: null });
+    expect(directoryToken(headers({ 'Sec-WebSocket-Protocol': 'overdeck.bearer.' }))).toEqual({ authorization: null, protocol: null });
+    expect(directoryToken(headers({ 'Sec-WebSocket-Protocol': `chat, overdeck.bearer.${TOKEN}` }))).toEqual({
+      authorization: `Bearer ${TOKEN}`,
+      protocol: `overdeck.bearer.${TOKEN}`,
+    });
+    expect(directoryToken(headers({}))).toEqual({ authorization: null, protocol: null });
   });
 });
 

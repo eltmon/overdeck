@@ -204,6 +204,17 @@ async function openSocket(token: string): Promise<Peer> {
   return new Peer(res.webSocket as WebSocket);
 }
 
+/** A phone's socket (PAN-4829): the token rides the bearer subprotocol, which the 101 must echo. */
+async function openClientSocket(token: string): Promise<Peer> {
+  const protocol = `overdeck.bearer.${token}`;
+  const res = (await req('/v1/directory', { headers: { Upgrade: 'websocket', 'Sec-WebSocket-Protocol': protocol } })) as Response & {
+    webSocket: WebSocket | null;
+  };
+  expect(res.status).toBe(101);
+  expect(res.headers.get('Sec-WebSocket-Protocol')).toBe(protocol);
+  return new Peer(res.webSocket as WebSocket);
+}
+
 const isType = (type: string) => (f: Frame) => f['type'] === type;
 const envId = (n: number) => `00000000-0000-4000-8000-${n.toString(16).padStart(12, '0')}`;
 const hello = (n: number, label = `machine-${n}`, publicKeyHex = n.toString(16).padStart(2, '0').repeat(32)): Frame => ({
@@ -235,6 +246,18 @@ describe('connect service on real workerd (PAN-2356 WI-3)', () => {
   it('answers 401 to a directory socket the account service rejects', async () => {
     const res = await req('/v1/directory', { headers: { Upgrade: 'websocket', Authorization: `Bearer odd_${'b'.repeat(64)}` } });
     expect(res.status).toBe(401);
+  }, SLOW);
+
+  it('echoes the bearer subprotocol on the 101 and leaves header-auth machines without one (PAN-4829 WI-1)', async () => {
+    const phone = await openClientSocket(TESTER_TOKEN);
+    phone.close();
+
+    const res = (await req('/v1/directory', { headers: { Upgrade: 'websocket', Authorization: `Bearer ${TESTER_TOKEN}` } })) as Response & {
+      webSocket: WebSocket | null;
+    };
+    expect(res.status).toBe(101);
+    expect(res.headers.get('Sec-WebSocket-Protocol')).toBeNull();
+    new Peer(res.webSocket as WebSocket).close();
   }, SLOW);
 
   it('refuses a fourth free-plan machine with the exact message and close 4009 (WI-5)', async () => {
