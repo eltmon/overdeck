@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4837",
   "created": "2026-11-03T16:16:59.604Z",
-  "updated": "2026-11-03T19:21:46.364Z",
+  "updated": "2026-11-03T19:22:12.794Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -500,6 +500,10 @@
     "cp1-ios-simulator.ac2": {
       "status": "completed",
       "doneAt": "2026-11-03T19:21:46.363Z"
+    },
+    "ci-android.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T19:22:12.793Z"
     }
   }
 }
