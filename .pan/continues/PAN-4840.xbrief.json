@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4840",
   "created": "2026-11-03T20:58:06.302Z",
-  "updated": "2026-11-03T20:58:06.303Z",
+  "updated": "2026-11-03T20:58:12.998Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -12,6 +12,11 @@
     "fixture": {
       "status": "completed",
       "doneAt": "2026-11-03T20:58:06.302Z"
+    },
+    "push-handler": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4840",
+      "claimedAt": "2026-11-03T20:58:12.998Z"
     }
   }
 }
