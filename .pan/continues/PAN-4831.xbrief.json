@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4831",
   "created": "2026-11-03T04:00:12.397Z",
-  "updated": "2026-11-03T05:07:09.551Z",
+  "updated": "2026-11-03T05:09:33.949Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,10 @@
       "claimedBy": "agent-pan-4831",
       "claimedAt": "2026-11-03T05:05:17.021Z",
       "doneAt": "2026-11-03T05:07:09.550Z"
+    },
+    "native-redirect.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:09:33.949Z"
     }
   }
 }
