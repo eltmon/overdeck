@@ -415,8 +415,11 @@ function body(props: SharedJoin & { code: string }): ReactNode {
   if (props.phase === 'confirm' && (!state || state === 'left')) return confirmScreen(props);
   switch (state) {
     case undefined:
-    case 'connecting':
       return <Panel><Note>Connecting…</Note></Panel>;
+    case 'connecting':
+      // History means a restart of an admitted join (an automatic or manual retry keeps it, PAN-4479
+      // D-8): keep the admitted screen and its surface instead of blanking to "Connecting…".
+      return props.hasHistory ? <AdmittedScreen {...props} /> : <Panel><Note>Connecting…</Note></Panel>;
     case 'lobby':
       return (
         <Panel heading="Waiting for the host to let you in">

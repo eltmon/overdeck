@@ -203,6 +203,22 @@ describe('SharedConversationView (PAN-4475 WI-9)', () => {
     expect(screen.queryByText('Connecting to the host…')).toBeNull();
   });
 
+  it('connecting with history keeps the timeline during an automatic retry', () => {
+    render(<SharedConversationView {...live('connecting', { peerPhase: 'lost', messages: MESSAGES, hasHistory: true })} />);
+    expect(document.querySelector('[data-testid="shared-conversation-timeline"]')?.textContent).toContain('Please fix the flaky test');
+    expect(screen.queryByText('Connecting…')).toBeNull();
+    expect(button('Leave')).toBeTruthy();
+  });
+
+  it('keeps the Terminal surface when a retry passes through connecting', () => {
+    const p = live('admitted', { peerPhase: 'connected', messages: MESSAGES, hasHistory: true });
+    const { rerender } = render(<SharedConversationView {...p} />);
+    fireEvent.click(button('Terminal'));
+    rerender(<SharedConversationView {...live('connecting', { peerPhase: 'connected', messages: MESSAGES, hasHistory: true })} />);
+    rerender(<SharedConversationView {...live('admitted', { peerPhase: 'connected', messages: MESSAGES, hasHistory: true })} />);
+    expect(button('Terminal').getAttribute('aria-pressed')).toBe('true');
+  });
+
   it('reconnecting takes precedence over the lost banner', () => {
     render(<SharedConversationView {...live('reconnecting', { peerPhase: 'lost', messages: MESSAGES, hasHistory: true })} />);
     expect(screen.getByText('Reconnecting to the share service…')).toBeTruthy();

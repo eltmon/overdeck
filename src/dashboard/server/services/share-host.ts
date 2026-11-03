@@ -314,8 +314,9 @@ export class ShareManager {
         this.openHost(base.url, code, records[code] as ShareRecord, true);
         opened.push(code);
       } catch {
-        // openSocket threw synchronously (for example a malformed URL): forget this entry, keep the record.
-        this.dropHost(code, 'none');
+        // openSocket or createHub threw synchronously: forget this entry and shut any socket it
+        // opened (it has no listeners yet), keep the record.
+        this.dropHost(code, 'terminate');
       }
     }
     return opened;

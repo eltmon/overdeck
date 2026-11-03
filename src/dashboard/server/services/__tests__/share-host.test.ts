@@ -521,6 +521,16 @@ describe('ShareManager', () => {
     expect(unreadable.sockets).toHaveLength(0);
   });
 
+  it('resume terminates the socket and keeps the record when building the hub throws', async () => {
+    const h = harness({ createHub: () => { throw new Error('hub failed'); } });
+    h.store.VWXZ2345 = storedRecord('VWXZ2345', 7, 'conv-z');
+    expect(await h.manager.resume()).toEqual([]);
+    expect(h.sockets).toHaveLength(1);
+    expect(h.sockets[0]?.terminated).toBe(true);
+    expect(Object.keys(h.store)).toEqual(['VWXZ2345']);
+    expect(await h.manager.list()).toMatchObject([{ shortCode: 'VWXZ2345', connection: 'disconnected' }]);
+  });
+
   it('a re-parked share is connecting, then connected after its room frame', async () => {
     const h = harness();
     h.store.VWXZ2345 = storedRecord('VWXZ2345', 7, 'conv-z');
