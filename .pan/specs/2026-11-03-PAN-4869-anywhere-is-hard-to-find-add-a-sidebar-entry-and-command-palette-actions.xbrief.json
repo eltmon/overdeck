@@ -4,17 +4,17 @@
     "created": "2026-11-03T03:19:16Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4869: Anywhere is hard to find: add a sidebar entry and command-palette actions",
-    "updated": "2026-11-03T03:23:00.474Z"
+    "updated": "2026-11-03T03:24:03.723Z"
   },
   "plan": {
     "id": "pan-4869",
     "title": "Anywhere is hard to find: add a sidebar entry and command-palette actions",
-    "status": "proposed",
+    "status": "running",
     "uid": "fa14a334-285d-4f5c-9667-8558eb8b88eb",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-03T03:19:16Z",
-    "updated": "2026-11-03T03:23:00.474Z",
+    "updated": "2026-11-03T03:24:03.723Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4869",
@@ -538,5 +538,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
