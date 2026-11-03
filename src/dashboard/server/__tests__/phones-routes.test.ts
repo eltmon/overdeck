@@ -81,7 +81,7 @@ describe('POST /api/phones/exchange (PAN-4835 WI-7)', () => {
       id: json.tokenId, kind: 'phone', phoneKey: KEY_A, clientId: CLIENT_ID, pushKey: 'c3'.repeat(32), name: 'iris',
     });
     expect(verified.record.scopes).toEqual([...PHONE_TOKEN_SCOPES]);
-    expect((json.descriptor as { capabilities: Record<string, unknown> }).capabilities).toBeTruthy();
+    expect((json.descriptor as { capabilities: { phoneApp: boolean } }).capabilities.phoneApp).toBe(true);
   });
 
   it('ac7: without a pairing channel marker the route answers 403, link channels included; no marker also 403', async () => {
@@ -192,5 +192,19 @@ describe('DELETE /api/phones/self and PUT /api/phones/self/push-key (PAN-4835 WI
     expect(listActiveRecordsOfKind('phone')[0]?.pushKey).toBe(newKey);
 
     expect((await read(await handlePhonesPushKey(asPhone, JSON.stringify({ pushKeyHex: 'not-hex' })))).status).toBe(400);
+  });
+});
+
+describe('capabilities.phoneApp (PAN-4835 WI-11)', () => {
+  it('buildEnvironmentDescriptor reports phoneApp: true, and a descriptor without it still decodes', async () => {
+    const { buildEnvironmentDescriptor } = await import('../routes/environment.js');
+    const descriptor = await buildEnvironmentDescriptor();
+    expect(descriptor.capabilities.phoneApp).toBe(true);
+
+    const { EnvironmentDescriptor } = await import('@overdeck/contracts');
+    const { Schema } = await import('effect');
+    const legacy = { ...descriptor, capabilities: { ...descriptor.capabilities, phoneApp: undefined } };
+    delete (legacy.capabilities as { phoneApp?: boolean }).phoneApp;
+    expect(() => Schema.decodeUnknownSync(EnvironmentDescriptor)(legacy)).not.toThrow();
   });
 });
