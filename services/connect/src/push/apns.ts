@@ -11,8 +11,7 @@
  * notification service extension opens the blob. Never log the token, the JWT, the key or `sealed`.
  */
 import { p256 } from '@noble/curves/nist.js';
-import type { PushUrgency } from '../../../../packages/contracts/src/connect.ts';
-import type { ApnsConfig, PushRegistration, SendResult } from './config.ts';
+import type { ApnsConfig, PushRequest, SendResult } from './config.ts';
 import { fetchWithTimeout } from './http.ts';
 import { base64UrlBytes, base64UrlToBytes, pemToDer, signingInput } from './jwt.ts';
 
@@ -69,13 +68,6 @@ export function apnsBody(sealed: string, collapseId: string) {
     },
     s: sealed,
   };
-}
-
-export interface PushRequest {
-  registration: PushRegistration;
-  sealed: string;
-  urgency: PushUrgency;
-  collapseId: string;
 }
 
 async function reasonOf(res: Response): Promise<string | null> {
