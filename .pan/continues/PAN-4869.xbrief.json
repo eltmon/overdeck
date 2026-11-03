@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4869",
   "created": "2026-11-03T03:24:34.404Z",
-  "updated": "2026-11-03T03:45:40.046Z",
+  "updated": "2026-11-03T03:48:15.014Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,11 @@
       "claimedBy": "agent-pan-4869",
       "claimedAt": "2026-11-03T03:44:07.516Z",
       "doneAt": "2026-11-03T03:45:40.045Z"
+    },
+    "anywhere-dialog-host.ac1": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4869",
+      "claimedAt": "2026-11-03T03:48:15.013Z"
     }
   }
 }
