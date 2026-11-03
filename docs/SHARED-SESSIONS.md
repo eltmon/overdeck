@@ -123,8 +123,62 @@ Facts verified against the Cloudflare docs on 2026-10-02:
 | `ROOMS` | Durable Object binding | class `ShareRoom`, migration `v1` (`new_sqlite_classes`) |
 | `ACCOUNT` | service binding | `overdeck-account`, entrypoint `AccountRpc` (PAN-4293) |
 | `ROOM_CREATE_LIMIT` | rate-limit binding | 10 room creations per 60 s per GitHub id; unbound in tests, which means no limit |
+| `anywhere.share_url` | the host's `${OVERDECK_HOME}/config.yaml` (dashboard side, not the Worker) | the share service the dashboard talks to. Default `https://share.overdeck.ai`; `https:`, or `http:` to a loopback host for local development; no query, fragment or credentials |
 
 Local development reads the same names from `services/share/.dev.vars` (gitignored); `.dev.vars.example` holds placeholders.
+
+## Host side in the dashboard (slice 2, PAN-4473)
+
+The host side lives in the local dashboard server. The browser never talks to the share service and never sees a host token.
+
+**Share record file.** `${OVERDECK_HOME}/shared-sessions.json`, mode 0600, written atomically (temp file, then rename) through `src/lib/sharing/share-record.ts`. It is the host's memory of its rooms:
+
+```json
+{
+  "version": 1,
+  "rooms": {
+    "BCDFGHJK": {
+      "scopeKind": "conversation",
+      "scopeId": "<conversation name>",
+      "hostToken": "odh_<64 hex>",
+      "joinUrl": "https://share.overdeck.ai/s/BCDFGHJK",
+      "createdAt": "2026-11-02T00:00:00.000Z"
+    }
+  }
+}
+```
+
+A conversation has at most one share. An entry is removed when the operator ends the share, when the host socket closes with 4004 (room ended), or when the host-socket upgrade answers 404 or 401. A corrupt file is never replaced silently: reads fail with a message naming the file, and deleting it forgets the local shares.
+
+**Share service URL.** `anywhere.share_url` in `${OVERDECK_HOME}/config.yaml` (see the Configuration table), read on every share creation and every end. `src/lib/sharing/share-service.ts` holds the HTTP client: `POST /v1/rooms` with the device token from `account.json`, `DELETE /v1/rooms/:code` with the host token, 10 s timeouts.
+
+**Host socket.** `src/dashboard/server/services/share-host.ts` (`ShareManager`) writes the record, then opens `GET /v1/rooms/:code/host?v=1` with `Authorization: Bearer <hostToken>` and keeps the latest `room` snapshot and the latest `error` frame in memory. It sends a WebSocket protocol ping every 30 s and drops the socket after 75 s without a pong. Any close other than 4004 leaves the share `disconnected` with its record kept.
+
+**Routes.** All four are behind the dashboard's auth at the default `admin` scope and answer `Cache-Control: no-store`. Short codes are normalized like the Worker (uppercase, spaces and dashes stripped).
+
+| Route | Answers |
+| --- | --- |
+| `GET /api/shares` | 200 `{ shares: ShareView[] }`, live and stale shares, oldest first; 500 `share_record_unreadable` |
+| `POST /api/shares` | body `{ conversationName }`. 201 `ShareView` for a new room; 200 with the existing view when the conversation's share is already live; 400 `invalid_request`; 404 `conversation_not_found` (not a local conversation); 409 for a vault browse copy or a released conversation; 412 `not_signed_in`; 409 `account_rejected` / `account_expired`; 429 `rate_limited`; 500 `account_unreadable` / `share_url_invalid` / `share_record_unreadable`; 502 `share_service_unreachable` / `share_service_error` |
+| `POST /api/shares/:code/commands` | body is one share command. 202 `{ ok: true }` once the frame is sent; 400 `invalid_command`; 404 `share_not_found`; 409 `share_not_connected` |
+| `DELETE /api/shares/:code` | 204 after `DELETE /v1/rooms/:code` succeeds (404 from the service counts as gone); 404 `share_not_found`; 500 `share_url_invalid`; 502 `share_service_error` with the record kept |
+
+A stale record (no host socket, for example after a dashboard restart) is still listed and can still be ended. Creating a share for a conversation whose record is stale ends the old room best-effort and creates a new one.
+
+**Signed out.** Without `${OVERDECK_HOME}/account.json`, `POST /api/shares` answers 412 `{ "error": "not_signed_in", "message": "Sign in with pan account login to share conversations." }`, and the dialog shows a signed-out panel naming `pan account login`.
+
+**Lobby actions.** The conversation's ⋮ menu has **Share this conversation** for conversations that run on this machine. The share dialog shows the join link with **Copy**, the connection state, the lobby panel and **End share**, and polls `GET /api/shares` once a second while open. Each lobby button sends one host frame:
+
+| Button | Who | Host frame |
+| --- | --- | --- |
+| **Admit** | waiting | `{ "type": "admit", "githubId": N }` |
+| **Admit as contributor** | waiting | `{ "type": "admit", "githubId": N, "contributor": true }` (one click, one frame) |
+| **Revoke** | waiting or in the room | `{ "type": "revoke", "githubId": N }` |
+| **Grant contributor** / **Remove contributor** | in the room | `{ "type": "set-contributor", "githubId": N, "contributor": true / false }` |
+| **Kick** | in the room | `{ "type": "kick", "githubId": N }` |
+| **Un-revoke** | blocked | `{ "type": "unrevoke", "githubId": N }` |
+
+**Not done yet.** No content flows: WebRTC, the content wire format and the conversation bridge are slice 3 ([PAN-4474](https://github.com/eltmon/overdeck/issues/4474)), and `signal` and `ice-servers` frames from the service are ignored. The host socket is not reconnected after a network drop and not re-parked after a dashboard restart: that is slice 8 ([PAN-4479](https://github.com/eltmon/overdeck/issues/4479)), which reads the same record file.
 
 ## Local development
 
