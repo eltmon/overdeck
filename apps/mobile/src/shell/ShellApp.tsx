@@ -11,6 +11,7 @@ import { resetTransport } from '../../../../src/dashboard/frontend/src/lib/wsTra
 import { installResumeHandler } from './lifecycle';
 import { MachinesScreen } from './MachinesScreen';
 import { MachineView } from './MachineView';
+import { NOTIFICATION_LINK_PREFIX, type NotificationOpen, parseNotificationLink } from './notificationLink';
 import { PairScreen } from './PairScreen';
 import { pairMachine } from './pairing';
 import { shellPlatform } from './platform';
@@ -67,6 +68,8 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
   const [pushEpoch] = useState(0);
   /** A pair link that arrived before sign-in; it opens the pair screen once signed in. */
   const [pendingPairLink, setPendingPairLink] = useState<string | null>(null);
+  /** A notification tap (PAN-4840 FR-6); it opens its machine once signed in. */
+  const [pendingOpen, setPendingOpen] = useState<NotificationOpen | null>(null);
   const account = useShellStore((s) => s.account);
   const paired = useShellStore((s) => s.machines);
   const setAccount = useShellStore((s) => s.setAccount);
@@ -74,6 +77,12 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
 
   const handleUrl = useCallback(
     async (url: string) => {
+      // Every link is unique by its timestamp, so the guard only stops a reload re-handling it. An
+      // unparseable link matches no paired machine and shows the machine list.
+      if (url.startsWith(NOTIFICATION_LINK_PREFIX)) {
+        if (takeLaunchUrl(url)) setPendingOpen(parseNotificationLink(url) ?? { environmentId: '', path: '' });
+        return;
+      }
       if (url.startsWith(PHONE_PAIR_LINK_PREFIX)) {
         setPendingPairLink(url);
         return;
@@ -100,7 +109,9 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
         setMachines(machines);
         setBoot({ kind: 'ready', identity });
         const launch = await App.getLaunchUrl();
-        if (!cancelled && launch?.url && takeLaunchUrl(launch.url)) await handleUrl(launch.url);
+        // A notification link passes through takeLaunchUrl once, inside handleUrl.
+        const url = launch?.url;
+        if (!cancelled && url && (url.startsWith(NOTIFICATION_LINK_PREFIX) || takeLaunchUrl(url))) await handleUrl(url);
       } catch (e) {
         if (!cancelled) setBoot({ kind: 'failed', message: errorText(e) });
       }
@@ -120,6 +131,19 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
     setView({ kind: 'pair', link: pendingPairLink });
     setPendingPairLink(null);
   }, [account, pendingPairLink]);
+
+  useEffect(() => {
+    if (account === null || pendingOpen === null) return;
+    setPendingOpen(null);
+    if (paired.some((m) => m.environmentId === pendingOpen.environmentId)) {
+      setCurrentMachineId(pendingOpen.environmentId);
+      navigate(pendingOpen.path);
+    } else {
+      setCurrentMachineId(null);
+      if (location.pathname !== '/') history.replaceState(null, '', '/');
+      setView({ kind: 'machines' });
+    }
+  }, [account, pendingOpen, paired, navigate]);
 
   const identity = boot.kind === 'ready' ? boot.identity : null;
   useEffect(() => {

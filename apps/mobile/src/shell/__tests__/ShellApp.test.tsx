@@ -62,7 +62,7 @@ vi.mock('../MachineView', async () => {
 });
 
 import ShellApp from '../ShellApp';
-import { CURRENT_MACHINE_KEY, readMachines, useShellStore, writeAccount, writeMachines } from '../store';
+import { CURRENT_MACHINE_KEY, readMachines, removeAccount, useShellStore, writeAccount, writeMachines } from '../store';
 import type { PairedMachine } from '../types';
 
 const PAIR_LINK = buildPhonePairLink({
@@ -145,5 +145,59 @@ describe('ShellApp machine view', () => {
     render(<ShellApp navigate={() => undefined} />);
     expect(await screen.findByText('Machines')).toBeTruthy();
     expect(screen.queryByPlaceholderText('ai.overdeck.app:/pair#…')).toBeNull();
+  });
+});
+
+describe('ShellApp notification taps', () => {
+  const OTHER = 'e91ffda1-431a-483d-a6e4-a72079516ea4';
+  const openLink = (environmentId: string, t: string) =>
+    `ai.overdeck.app:/open#v=1&e=${environmentId}&p=%2Fm%3Fsubject%3Dpan-4840-conv&t=${t}`;
+  const tap = async (url: string) =>
+    act(async () => {
+      for (const listener of harness.urlListeners) listener({ url });
+    });
+
+  beforeEach(() => {
+    localStorage.removeItem(CURRENT_MACHINE_KEY);
+    history.replaceState(null, '', '/');
+  });
+
+  it('opens the paired machine at the notification path, once per link', async () => {
+    const navigate = vi.fn();
+    render(<ShellApp navigate={navigate} />);
+    await screen.findByText('Machines');
+    await tap(openLink(MACHINE.environmentId, '1'));
+    expect(navigate).toHaveBeenCalledWith('/m?subject=pan-4840-conv');
+    expect(localStorage.getItem(CURRENT_MACHINE_KEY)).toBe(MACHINE.environmentId);
+    await tap(openLink(MACHINE.environmentId, '1'));
+    expect(navigate).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the machine list for a machine this phone is not paired with', async () => {
+    const navigate = vi.fn();
+    render(<ShellApp navigate={navigate} />);
+    await screen.findByText('Machines');
+    await tap(openLink(OTHER, '2'));
+    expect(navigate).not.toHaveBeenCalled();
+    expect(screen.getByText('Machines')).toBeTruthy();
+    expect(localStorage.getItem(CURRENT_MACHINE_KEY)).toBeNull();
+  });
+
+  it('opens the paired machine from a cold launch', async () => {
+    const navigate = vi.fn();
+    harness.launchUrl = openLink(MACHINE.environmentId, '3');
+    render(<ShellApp navigate={navigate} />);
+    await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith('/m?subject=pan-4840-conv'));
+    expect(navigate).toHaveBeenCalledTimes(1);
+  });
+
+  it('does nothing while signed out', async () => {
+    await removeAccount();
+    const navigate = vi.fn();
+    render(<ShellApp navigate={navigate} />);
+    await screen.findByText('Sign in');
+    await tap(openLink(MACHINE.environmentId, '4'));
+    expect(navigate).not.toHaveBeenCalled();
+    expect(localStorage.getItem(CURRENT_MACHINE_KEY)).toBeNull();
   });
 });
