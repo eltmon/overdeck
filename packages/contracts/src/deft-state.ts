@@ -140,3 +140,63 @@ export interface DeftIssueSummary {
   handoffState: string | null;
   openEscalations: number;
 }
+
+/** One exit-predicate field of Deft's review cycle. */
+export type DeftExitField = 'met' | 'unmet' | 'unknown';
+/** Deft's own verdict names (`pr-watch/constants.ts`). */
+export type DeftReviewVerdict = 'CLEAN' | 'NEW_P0_P1' | 'PENDING' | 'NO_REVIEWER_INSTALLED';
+
+export interface DeftSeverityCounts {
+  p0: number;
+  p1: number;
+  p2: number;
+}
+
+export interface DeftReviewRound {
+  /** 1-based. */
+  index: number;
+  findings: DeftSeverityCounts;
+  commentCount: number;
+  fixCommit: { sha: string; subject: string; committedAt: string } | null;
+  startedAt: string | null;
+}
+
+/** Deft's review cycle for one PR, reconstructed from PR data (PAN-4849 WI-20). */
+export interface DeftReviewCycle {
+  issueId: string;
+  prNumber: number | null;
+  headSha: string | null;
+  reviewer: {
+    present: boolean;
+    name: 'greptile' | null;
+    source: 'policy' | 'comment' | 'check_run' | 'config' | 'none';
+    unsupported: string[];
+  };
+  verdict: DeftReviewVerdict;
+  exit: {
+    checkRun: DeftExitField;
+    headSha: DeftExitField;
+    lastReviewedCommit: DeftExitField;
+    confidence: DeftExitField;
+    noBlocking: DeftExitField;
+    confidenceScore: number | null;
+    minConfidence: number;
+    lastReviewedSha: string | null;
+    p0p1Remaining: number | null;
+  };
+  rounds: DeftReviewRound[];
+  roundsReconstructed: true;
+  lease: {
+    owner: string;
+    monitorAgentId: string;
+    headSha: string | null;
+    startedAt: string;
+    expiresAt: string;
+    endedAt: string | null;
+    active: boolean;
+  } | null;
+  /** `pr-watch-*` heartbeats and those in phase polling or fixing. */
+  heartbeats: DeftHeartbeat[];
+  cleanRecords: DeftCleanRecord[];
+  errors: string[];
+}
