@@ -148,10 +148,24 @@ export interface SharedHello {
 
 export type SharedHelloError = 'invalid_hello' | 'version_unsupported' | 'scope_kind_unsupported';
 
-/** `control` payloads in slice 3. Later slices add variants (drafts pick, handoff, …). */
+/** `control` payloads. Slice 6 adds the viewer's terminal watch; later slices add more (drafts pick, handoff, …). */
 export type ControlPayload =
   | { readonly kind: 'hello'; readonly hello: SharedHello }
-  | { readonly kind: 'error'; readonly code: SharedHelloError };
+  | { readonly kind: 'error'; readonly code: SharedHelloError }
+  /** Viewer → host: start (`true`) or stop (`false`) the read-only terminal stream (slice 6). */
+  | { readonly kind: 'terminal-watch'; readonly watch: boolean };
+
+export type TerminalUnavailableReason = 'terminal_not_found' | 'terminal_ended';
+
+/**
+ * `terminal` payloads (slice 6), host → viewer only. A watch starts with `snapshot`; `data` is raw
+ * terminal output (escape sequences included). The host reads nothing on this channel.
+ */
+export type TerminalPayload =
+  | { readonly kind: 'snapshot'; readonly cols: number; readonly rows: number; readonly data: string }
+  | { readonly kind: 'output'; readonly data: string }
+  | { readonly kind: 'size'; readonly cols: number; readonly rows: number }
+  | { readonly kind: 'unavailable'; readonly reason: TerminalUnavailableReason };
 
 /** The allow-listed subset of the internal ChatMessage that may cross to a viewer. */
 export interface SharedMessage {
