@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T21:43:28.665739Z · model: claude-opus-5-5 · open: 895_
+_Last sequenced: 2026-11-03T21:45:23.962064Z · model: claude-opus-5-5 · open: 895_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1230,7 +1230,7 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T21:43:28.665739Z",
+  "generatedAt": "2026-11-03T21:45:23.962064Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 895,
@@ -11905,7 +11905,7 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "condition": "ok",
       "dependsOn": [],
       "why": "Phone app W-REL1: Apple/Firebase/Play/Cloudflare setup and first store builds; operator approves purchases.",
-      "rationale": "PAN-4774 (Anywhere release AC run) closed as completed, so that dependency is removed; rank held because the phone-app epic is feature work that still ranks below substrate items.",
+      "rationale": "Rank held: new comments from PAN-4838 and PAN-4839 add device checks (AC-11, AC-12) to this run; feature work, still below substrate.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -14215,6 +14215,13 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-4839",
+      "to": "PAN-4841",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.8
     }
   ]
 }
