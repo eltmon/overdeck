@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4852",
   "created": "2026-11-03T02:45:30.764Z",
-  "updated": "2026-11-03T04:41:33.474Z",
+  "updated": "2026-11-03T04:42:01.580Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -94,9 +94,10 @@
       "doneAt": "2026-11-03T04:41:33.474Z"
     },
     "link-command": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4852",
-      "claimedAt": "2026-11-03T03:49:03.677Z"
+      "claimedAt": "2026-11-03T03:49:03.677Z",
+      "doneAt": "2026-11-03T04:42:01.580Z"
     },
     "fork-rebase.ac1": {
       "status": "completed",
