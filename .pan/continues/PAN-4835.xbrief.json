@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4835",
   "created": "2026-11-03T07:59:34.235Z",
-  "updated": "2026-11-03T09:55:37.032Z",
+  "updated": "2026-11-03T09:57:29.232Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -84,6 +84,10 @@
     "phone-token-kind.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T09:55:37.032Z"
+    },
+    "phone-token-kind.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:57:29.231Z"
     }
   }
 }
