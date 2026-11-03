@@ -47,6 +47,10 @@ running dashboard.
 
 With no access tokens: `` `No access tokens. Create one with `pan token create`.` ``
 
+Agent tokens appear in the list too, named `agent:<role>:<agentId>`. Overdeck mints one for each
+managed agent or conversation, revokes it automatically when the agent stops, and removes it from
+the list 7 days after it was revoked.
+
 ## revoke
 
 ```bash

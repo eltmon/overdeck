@@ -669,3 +669,10 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   use the PID as data, but none were audited.
 <!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4925) -->
 <!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4929) -->
+- **The access-token snapshot is per process** (PAN-4930 planning) — `verifyAccessToken` and
+  `listActiveRecordsOfKind` (`src/lib/access-tokens.ts`) read an in-memory snapshot that only the dashboard
+  fills (`startAccessTokenRefresh`, every 5 s). A CLI process (`pan kill`, `pan start`) sees zero records
+  unless it calls `refreshAccessTokens()` first (as `pan mcp serve` does) or reads the file with
+  `listAccessTokens()`. `verifyAccessToken` also writes `lastUsedAt`, and `mutate` serializes writes only
+  within one process, so a CLI write and a dashboard `lastUsedAt` write can lose each other.
+<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4930) -->

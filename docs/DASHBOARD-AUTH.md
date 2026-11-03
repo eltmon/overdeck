@@ -48,6 +48,8 @@ defend, and what they do not. User-facing guide:
   resolved shape is `{ kind: 'phone', tokenId, clientId, phoneKey, scopes }`.
   Carries `PHONE_TOKEN_SCOPES` (eight scopes, never `admin` or `forward`).
   See "Phone credentials (PAN-4835)" below.
+- **Agent token** (PAN-4927) — a managed agent's or conversation's own
+  `odk_<64 hex>` token; see "Agent tokens (PAN-4927)" below.
 - **CSRF token** — an HMAC token returned by the session mint and sent back on
   mutating requests as `x-overdeck-csrf-token`. Only checked for mutations
   (`rejectUnsafeDashboardMutationRequest`); WebSocket upgrades never carry it.
@@ -76,6 +78,46 @@ credentials and the record's scopes otherwise.
 null`. Every gate in this document reuses it — there is no second credential
 check anywhere in the server.
 
+### Agent tokens (PAN-4927)
+
+An agent token is a `kind: 'token'` record that also carries `agentId` (an
+agent id such as `agent-pan-1`, or a conversation name), `agentKind`
+(`'agent'` or `'conversation'`) and `role` (the agent's role, or
+`'conversation'`). The three fields are valid only on `kind: 'token'` and only
+all together; on any other kind, or incomplete, they make the registry file
+corrupt. An agent token never carries `admin` or `forward`, and its scopes come
+only from `AGENT_TOKEN_SCOPES` (table under "Scopes"). A Bearer agent token
+resolves to `{ kind: 'token', tokenId, scopes, agentId, agentKind, role }`; a
+plain token's credential has none of the three keys.
+
+`src/lib/mcp/agent-token.ts` owns the lifecycle. It reads the registry file
+fresh (`readActiveAccessTokenRecord`, `revokeAccessTokensMatching`), never the
+in-memory snapshot, so it works in CLI processes too.
+
+- **Token file.** `ensureAgentMcpToken(owner)` writes the plaintext to
+  `<owner dir>/mcp-token`, mode `0600`, by temp file plus rename. The owner
+  directory is `~/.overdeck/agents/<agentId>/` for agents and
+  `~/.overdeck/conversations/conv-<name>/` (`conversationStateDir`) for
+  conversations. It reuses the file's token while that token is active, names
+  the same owner and role, and has exactly the role's scopes; otherwise it
+  revokes the owner's tokens and mints one. A mint the registry lost to another
+  process's write is minted once more, then the call throws.
+- **Revoke on stop.** The owner's tokens are revoked and its file unlinked by
+  `stopAgent` (`pan kill`, the dashboard stop route, the spawn failure catch),
+  `stopAgentSync` (fire and forget), the supervisor `exited` event (agents and
+  conversations), issue close-out, and `stopConversationRuntime` (conversation
+  stop, archive, restart-all, lanes, the Flywheel). Every revoke logs one
+  warning on failure and never fails the stop.
+- **Sweep.** The primary dashboard runs `agent-token-sweep.ts` 60 s after boot,
+  then 10 minutes after each run ends. It revokes the tokens of agents with no
+  state, agents the liveness oracle confirms dead (after a 10-minute grace from
+  mint, start or resume), and conversations whose row is missing, archived, or
+  ended. It then removes agent-token records revoked more than 7 days ago
+  (`pruneEndedAccessTokens`); other records are never pruned.
+- **Older versions.** An Overdeck that predates PAN-4927 ignores the extra
+  fields and reads an agent token as a plain token, so a downgrade keeps the
+  file valid.
+
 ## Scopes
 
 Every registry credential (device or token) carries scopes from
@@ -90,6 +132,16 @@ Every registry credential (device or token) carries scopes from
   approvals and agent questions. Only `admin` implies it; `operate` does not.
 - An unknown scope string in the registry file parses but satisfies nothing
   (`scopeSatisfies`), so a hand-edited record fails closed.
+
+An agent token (PAN-4927 D-8) carries `AGENT_TOKEN_SCOPES[role]`
+(`src/lib/mcp/agent-token.ts`), never `admin`, `forward`, `read:settings` or
+`read:costs`:
+
+| Role | Scopes |
+| --- | --- |
+| `work`, `worker`, `plan`, `strike`, `sequencer`, `knowledge`, `flywheel` | `read:events`, `read:state`, `read:conversations`, `tell`, `operate` |
+| `review`, `test`, `ship` | `read:events`, `read:state`, `read:conversations`, `tell` |
+| `conversation` | `read:events`, `read:state`, `read:conversations`, `tell`, `operate`, `approve` |
 
 Pairing always grants a device `['admin']`; a hand-edited device record with
 narrower scopes is honored as narrower. The one table of which scope each route
