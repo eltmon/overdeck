@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CLIENT_LIMIT_MESSAGE, RELAY_MONTHLY_CAP_BYTES } from '../../../../packages/contracts/src/connect.ts';
+import { CLIENT_LIMIT_MESSAGE, CONNECTOR_LIMIT_MESSAGE, RELAY_MONTHLY_CAP_BYTES } from '../../../../packages/contracts/src/connect.ts';
 import type { ClientToDirectoryFrame, MachineToDirectoryFrame } from '../../../../packages/contracts/src/connect.ts';
 import { reduceClient } from '../../../../services/connect/src/client-state.ts';
 import type { ClientEvent } from '../../../../services/connect/src/client-state.ts';
@@ -51,6 +51,21 @@ function helloClient(state: DirectoryState, n: number, identity = FREE, over: Pa
 function phones(state: DirectoryState, count: number, identity = FREE): DirectoryState {
   let next = state;
   for (let n = 1; n <= count; n++) next = helloClient(next, n, identity).state;
+  return next;
+}
+
+function nodeHelloFrame(n: number): Extract<ClientToDirectoryFrame, { type: 'hello-client' }> {
+  return { ...helloClientFrame(n), platform: 'node' };
+}
+
+function helloNode(state: DirectoryState, n: number, identity = FREE, over: Partial<ReduceContext> = {}) {
+  const event: ClientEvent = { kind: 'hello-client', registeredAs: null, identity, frame: nodeHelloFrame(n) };
+  return reduceClient(state, event, ctx(over));
+}
+
+function connectors(state: DirectoryState, count: number, identity = FREE): DirectoryState {
+  let next = state;
+  for (let n = 101; n <= 100 + count; n++) next = helloNode(next, n, identity).state;
   return next;
 }
 
@@ -168,6 +183,51 @@ describe('client reducer: registration and the 5-phone cap (PAN-4829 WI-3)', () 
     expect(JSON.stringify(logged)).not.toContain(LABEL_MARKER);
     expect(JSON.stringify(logged)).not.toContain(PHONE_KEY);
     for (const entry of logged) expect(entry).toMatchObject({ environmentId: null, clientId: expect.any(String) });
+  });
+});
+
+describe('client reducer: connector cap, counted apart from phones (PAN-4927 D-18)', () => {
+  it('registers 10 connectors alongside 3 machines and 5 phones; the 11th connector is refused, a 6th phone separately', () => {
+    const state = connectors(phones(machines(3), 5), 10);
+    expect(state.machines).toHaveLength(3);
+    expect(state.clients).toHaveLength(15);
+
+    const { effects: connectorEffects } = helloNode(state, 111);
+    expect(sends(connectorEffects)).toEqual([{ kind: 'send', to: 'self', frame: { type: 'error', code: 'client_limit', message: CONNECTOR_LIMIT_MESSAGE } }]);
+    expect(closes(connectorEffects)).toEqual([{ kind: 'close', to: 'self', code: 4013, reason: 'client limit' }]);
+
+    const { effects: phoneEffects } = helloClient(state, 6);
+    expect(sends(phoneEffects)).toEqual([{ kind: 'send', to: 'self', frame: { type: 'error', code: 'client_limit', message: CLIENT_LIMIT_MESSAGE } }]);
+    expect(closes(phoneEffects)).toEqual([{ kind: 'close', to: 'self', code: 4013, reason: 'client limit' }]);
+  });
+
+  it('never gives a connector hello a machine slot, and keeps it out of machine frames', () => {
+    const { effects } = helloNode(machines(3), 101);
+    expect(effects.some((e) => e.kind === 'put-machine' || e.kind === 'register')).toBe(false);
+
+    const state = connectors(machines(3), 10);
+    const { effects: endpointsEffects } = reduce(state, { kind: 'frame', registeredAs: env(1), frame: { type: 'endpoints', endpoints: [] } }, ctx());
+    const directoryFrames = sends(endpointsEffects).filter((e) => e.frame.type === 'welcome' || (e.frame.type === 'directory' && e.to !== 'clients'));
+    expect(directoryFrames.length).toBeGreaterThan(0);
+    for (const f of directoryFrames) {
+      const machineIds = (f.frame as { machines: Array<{ environmentId: string }> }).machines.map((m) => m.environmentId);
+      expect(machineIds).toEqual([env(1), env(2), env(3)]);
+      expect(JSON.stringify(f.frame)).not.toContain(cid(101));
+    }
+  });
+
+  it('recounts and clears push on a family change (D-2)', () => {
+    const withPush = pushFrame(phones(EMPTY_DIRECTORY, 1), cid(1), { type: 'push-register', platform: 'ios', token: PUSH_TOKEN }).state;
+
+    const full = connectors(withPush, 10);
+    const { effects: refused } = helloNode(full, 1);
+    expect(sends(refused)).toEqual([{ kind: 'send', to: 'self', frame: { type: 'error', code: 'client_limit', message: CONNECTOR_LIMIT_MESSAGE } }]);
+    expect(closes(refused)).toEqual([{ kind: 'close', to: 'self', code: 4013, reason: 'client limit' }]);
+
+    const withRoom = connectors(withPush, 9);
+    const { state: next, effects: accepted } = helloNode(withRoom, 1);
+    expect(next.clients.find((c) => c.clientId === cid(1))).toMatchObject({ platform: 'node', push: null });
+    expect(accepted.find((e) => e.kind === 'put-client')).toMatchObject({ row: { clientId: cid(1), platform: 'node', push: null } });
   });
 });
 

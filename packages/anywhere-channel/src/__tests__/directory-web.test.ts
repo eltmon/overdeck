@@ -1,5 +1,5 @@
 /** PAN-4833 WI-7: the phone's directory socket, on a fake WebSocket and fake timers. */
-import { CLIENT_LIMIT_MESSAGE, CONNECT_PROTOCOL_VERSION, type DirectoryMachine } from '@overdeck/contracts';
+import { CLIENT_LIMIT_MESSAGE, CONNECT_PROTOCOL_VERSION, CONNECTOR_LIMIT_MESSAGE, type DirectoryMachine } from '@overdeck/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DirectoryWebClient, type DirectoryWebDeps } from '../directory-web.js';
@@ -179,6 +179,17 @@ describe('DirectoryWebClient', () => {
     socket.serverClose(4013);
     expect(c.state).toBe('refused');
     expect(c.refusal).toBe(CLIENT_LIMIT_MESSAGE);
+    await vi.advanceTimersByTimeAsync(600_000);
+    expect(FakeSocket.instances).toHaveLength(1);
+  });
+
+  it('sends hello-client with platform node and stops retrying on 4013 with the connector message (PAN-4927 D-18)', async () => {
+    const c = client({ platform: 'node' });
+    const socket = await online(c);
+    expect(socket.frames()[0]).toMatchObject({ type: 'hello-client', platform: 'node' });
+    socket.serverClose(4013);
+    expect(c.state).toBe('refused');
+    expect(c.refusal).toBe(CONNECTOR_LIMIT_MESSAGE);
     await vi.advanceTimersByTimeAsync(600_000);
     expect(FakeSocket.instances).toHaveLength(1);
   });

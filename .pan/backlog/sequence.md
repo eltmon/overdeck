@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T23:29:34.927893Z · model: claude-opus-5-5 · open: 893_
+_Last sequenced: 2026-11-03T23:56:45.789276Z · model: claude-opus-5-5 · open: 892_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -8,7 +8,7 @@ _Last sequenced: 2026-11-03T23:29:34.927893Z · model: claude-opus-5-5 · open: 
 | 1 | PAN-4702 | S | critical | ok |  |  | Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs. |
 | 2 | PAN-4961 | M | critical | ok |  |  | Disk floor checked once per creation; 6 concurrent starts took 15 GB to 4.9 GB, near the point where SQLite/git writes fail for every agent. |
 | 4 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
-| 5 | PAN-4553 | S | critical | ok |  | PAN-4929 | Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges. |
+| 5 | PAN-4553 | S | critical | ok |  |  | Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges. |
 | 6 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
 | 7 | PAN-4690 | S | critical | ok |  |  | Review dispatch rewrites the tracked continue file uncommitted, so the dirty-tree gate blocks the review it dispatched |
 | 8 | PAN-4710 | S | high | ok |  |  | Deferred plan hand-off retries omit the guardrail ack, so they're refused at 'agent count high' and give up silently; needs handoff |
@@ -327,7 +327,6 @@ _Last sequenced: 2026-11-03T23:29:34.927893Z · model: claude-opus-5-5 · open: 
 | 322 | PAN-1451 | M | high | needs-refinement |  |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
 | 323 | PAN-1452 | M | high | ok |  |  | PAN-1381 follow-up: per-reviewer restart with model override (architectural mismatch with PAN-1048) |
 | 324 | PAN-4927 | XL | medium | ok | ✓ |  | Epic: Overdeck MCP in every managed agent, OAuth /mcp, Hermes/OpenClaw/Grok plugins; PRD written, 29 children filed. |
-| 325 | PAN-4929 | S | medium | ok |  |  | Likely duplicate of PAN-4553 (polyrepo root npm install aborts pan start; MIN-1135 repro). Close when PAN-4553 lands. |
 | 326 | PAN-1553 | M | high | ok |  |  | Investigate Claude Code Fast mode support (and fast-tier pricing) |
 | 327 | PAN-1504 | M | high | ok |  |  | pan hygiene |
 | 328 | PAN-1480 | L | high | ok |  |  | TLDR: 93% bypass rate |
@@ -1228,10 +1227,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T23:29:34.927893Z",
+  "generatedAt": "2026-11-03T23:56:45.789276Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 893,
+  "openCount": 892,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -1266,9 +1265,7 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "importance": "critical",
       "score": 90,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4929"
-      ],
+      "dependsOn": [],
       "why": "Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges.",
       "rationale": "Rank unchanged; its duplicate PAN-4929 entered the pipeline with an open PR, so this issue now waits on that PR instead of being picked up separately.",
       "gate": "auto",
@@ -11935,19 +11932,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "isEpic": true
     },
     {
-      "issue": "PAN-4929",
-      "rank": 325,
-      "size": "S",
-      "importance": "medium",
-      "score": 40,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Likely duplicate of PAN-4553 (polyrepo root npm install aborts pan start; MIN-1135 repro). Close when PAN-4553 lands.",
-      "rationale": "New since the prior run: it reports the same root-level npm install failure as PAN-4553 on a fresh MIN-1135 start, so it waits behind PAN-4553 at a free mid rank instead of competing for pickup.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4930",
       "rank": 331,
       "size": "L",
@@ -14124,7 +14108,7 @@ New this pass. The test role evaluates the workspace working tree rather than th
     {
       "from": "PAN-4294",
       "to": "PAN-4959",
-      "type": "unblocks",
+      "type": "informs",
       "source": "github-ref",
       "confidence": 1
     },
@@ -14155,13 +14139,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "type": "informs",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-4929",
-      "to": "PAN-4553",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.95
     }
   ]
 }

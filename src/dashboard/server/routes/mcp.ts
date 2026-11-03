@@ -23,7 +23,7 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstab
 import { getDashboardLoopbackApiUrl } from '../../../lib/config.js';
 import { getInternalToken } from '../../../lib/internal-token.js';
 import { createFetchDashboardApi, type DashboardApi } from '../../../lib/mcp/dashboard-api.js';
-import { createOverdeckMcpServer } from '../../../lib/mcp/server.js';
+import { createOverdeckMcpServer, hasAgentId } from '../../../lib/mcp/server.js';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import { credentialScopes, dashboardDeviceTokenFromHeaders, resolveDashboardCredential } from './dashboard-auth.js';
@@ -46,9 +46,16 @@ function headersOf(request: HttpServerRequest.HttpServerRequest): Headers {
 }
 
 /** Serve one stateless MCP request: a fresh server and transport, closed after the response body is read. */
-async function serveMcpRequest(deps: McpRouteDeps, token: string, scopes: readonly string[], headers: Headers, body: string) {
+async function serveMcpRequest(
+  deps: McpRouteDeps,
+  token: string,
+  scopes: readonly string[],
+  isAgent: boolean,
+  headers: Headers,
+  body: string,
+) {
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
-  const server = createOverdeckMcpServer({ api: deps.makeApi(token), scopes });
+  const server = createOverdeckMcpServer({ api: deps.makeApi(token), scopes, isAgent });
   try {
     await server.connect(transport);
     const webResponse = await transport.handleRequest(new Request('http://localhost/mcp', { method: 'POST', headers, body }));
@@ -89,7 +96,7 @@ export function makeMcpRouteLayer(deps: McpRouteDeps) {
         return jsonResponse({ error: FENCED_ERROR }, { status: 403, headers: NO_STORE });
       }
       const body = yield* request.text;
-      return yield* Effect.promise(() => serveMcpRequest(deps, token, credential.scopes, headersOf(request), body));
+      return yield* Effect.promise(() => serveMcpRequest(deps, token, credential.scopes, hasAgentId(credential), headersOf(request), body));
     })),
   );
 

@@ -43,6 +43,8 @@ function copyOptionalStrings(args: Record<string, unknown>, fields: readonly str
 const sendMessage: OverdeckTool = {
   name: 'send_message',
   description: 'Send a message to a running conversation, as if typed in the dashboard composer.',
+  scope: 'tell',
+  audience: 'any',
   inputSchema: {
     type: 'object',
     properties: {
@@ -64,6 +66,8 @@ const sendMessage: OverdeckTool = {
 const startConversation: OverdeckTool = {
   name: 'start_conversation',
   description: 'Start a new conversation with a first message, on this machine or a linked one.',
+  scope: 'operate',
+  audience: 'any',
   inputSchema: {
     type: 'object',
     properties: {
@@ -93,6 +97,8 @@ const startConversation: OverdeckTool = {
 const startWorker: OverdeckTool = {
   name: 'start_worker',
   description: 'Start a registered worker agent on an issue whose workspace exists on the chosen machine (this one by default).',
+  scope: 'operate',
+  audience: 'any',
   inputSchema: {
     type: 'object',
     properties: {

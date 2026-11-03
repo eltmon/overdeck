@@ -74,7 +74,7 @@ describe('MCP write tools (PAN-4649 W-6)', () => {
 
   it('a 403 from the start route is a tool error naming the missing scope', async () => {
     const api = fakeApi({ 'POST /api/fleet/conversations': { status: 403, json: { error: 'insufficient_scope', missingScope: 'operate' } } });
-    const client = await connectClient(api, ['read:conversations', 'tell']);
+    const client = await connectClient(api, ['read:conversations', 'operate']);
     const result = await callTool(client, 'start_conversation', { message: 'start' });
     expect(result.isError).toBe(true);
     expect(resultText(result)).toContain('missingScope: operate');

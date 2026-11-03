@@ -44,6 +44,8 @@ function stringArray(value: unknown): string[] | null {
 const listPendingInput: OverdeckTool = {
   name: 'list_pending_input',
   description: 'List conversations waiting on input: questions, permission prompts, plan approvals and menus.',
+  scope: 'read:conversations',
+  audience: 'any',
   inputSchema: { type: 'object', properties: {} },
   async run(_args, ctx) {
     return routeResult(await ctx.api.request('GET', '/api/conversations/pending-input'));
@@ -53,6 +55,8 @@ const listPendingInput: OverdeckTool = {
 const answerQuestion: OverdeckTool = {
   name: 'answer_question',
   description: 'Answer the pending question of a Claude Code conversation. Needs the approve scope.',
+  scope: 'approve',
+  audience: 'any',
   inputSchema: {
     type: 'object',
     properties: {
@@ -84,6 +88,8 @@ const answerQuestion: OverdeckTool = {
 const answerPermission: OverdeckTool = {
   name: 'answer_permission',
   description: 'Answer a Claude Code permission prompt shown in a conversation. Needs the approve scope.',
+  scope: 'approve',
+  audience: 'any',
   inputSchema: {
     type: 'object',
     properties: {

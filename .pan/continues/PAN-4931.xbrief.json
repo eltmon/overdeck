@@ -1,0 +1,120 @@
+{
+  "version": "1",
+  "issueId": "PAN-4931",
+  "created": "2026-11-03T21:41:36.078Z",
+  "updated": "2026-11-03T23:15:15.914Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "tool-scope-audience": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4931",
+      "claimedAt": "2026-11-03T21:41:36.078Z",
+      "doneAt": "2026-11-03T21:56:09.782Z"
+    },
+    "visible-tools-filter": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4931",
+      "claimedAt": "2026-11-03T21:56:31.232Z",
+      "doneAt": "2026-11-03T22:00:30.595Z"
+    },
+    "dashboard-api-methods": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4931",
+      "claimedAt": "2026-11-03T22:00:36.183Z",
+      "doneAt": "2026-11-03T22:02:48.265Z"
+    },
+    "serve-token-file": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4931",
+      "claimedAt": "2026-11-03T22:02:54.553Z",
+      "doneAt": "2026-11-03T22:07:07.112Z"
+    },
+    "mcp-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4931",
+      "claimedAt": "2026-11-03T22:07:12.081Z",
+      "doneAt": "2026-11-03T22:08:42.174Z"
+    },
+    "tool-scope-audience.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:05:37.279Z"
+    },
+    "tool-scope-audience.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:05:54.909Z"
+    },
+    "tool-scope-audience.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:06:11.969Z"
+    },
+    "tool-scope-audience.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:06:28.667Z"
+    },
+    "visible-tools-filter.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:06:47.704Z"
+    },
+    "visible-tools-filter.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:07:03.490Z"
+    },
+    "visible-tools-filter.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:07:19.481Z"
+    },
+    "visible-tools-filter.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:07:36.039Z"
+    },
+    "dashboard-api-methods.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:07:57.485Z"
+    },
+    "dashboard-api-methods.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:08:15.404Z"
+    },
+    "dashboard-api-methods.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:08:32.023Z"
+    },
+    "serve-token-file.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:08:55.227Z"
+    },
+    "serve-token-file.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:09:12.968Z"
+    },
+    "serve-token-file.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:09:29.852Z"
+    },
+    "serve-token-file.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:09:46.633Z"
+    },
+    "serve-token-file.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:10:04.881Z"
+    },
+    "mcp-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:10:29.031Z"
+    },
+    "mcp-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:10:46.655Z"
+    },
+    "mcp-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:11:03.749Z"
+    }
+  },
+  "feedback": []
+}

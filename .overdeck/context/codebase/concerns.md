@@ -669,4 +669,5 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   use the PID as data, but none were audited.
 <!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4925) -->
 <!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917) -->
+<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4931) -->
 <!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4929) -->

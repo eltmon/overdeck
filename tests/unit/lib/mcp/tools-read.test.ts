@@ -13,7 +13,7 @@ const SCOPES = ['read:state', 'read:conversations', 'operate'];
 describe('MCP read tools (PAN-4649 W-5)', () => {
   it('the read tools are exactly the four FR-5 read rows, listed first by tools/list', async () => {
     expect(READ_TOOLS.map((tool) => tool.name)).toEqual(['list_machines', 'list_conversations', 'search_conversations', 'read_conversation']);
-    const client = await connectClient(fakeApi({}), SCOPES);
+    const client = await connectClient(fakeApi({}), [...SCOPES, 'approve']);
     const { tools } = await client.listTools();
     expect(tools.map((tool) => tool.name)).toEqual(ALL_TOOLS.map((tool) => tool.name));
     expect(tools.slice(0, READ_TOOLS.length).map((tool) => tool.name)).toEqual(READ_TOOLS.map((tool) => tool.name));
@@ -53,7 +53,7 @@ describe('MCP read tools (PAN-4649 W-5)', () => {
 
   it('turns a 403 route answer into a tool error naming the missing scope', async () => {
     const api = fakeApi({ 'GET /api/conversations?limit=50': { status: 403, json: { error: 'insufficient_scope', missingScope: 'read:conversations' } } });
-    const client = await connectClient(api, ['read:state']);
+    const client = await connectClient(api, ['read:conversations']);
     const result = await callTool(client, 'list_conversations');
     expect(result.isError).toBe(true);
     expect(resultText(result)).toContain('HTTP 403: insufficient_scope');

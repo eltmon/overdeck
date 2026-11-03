@@ -23,6 +23,11 @@ export interface Env {
    * Typed structurally: `Service<T>` requires the entrypoint class, which lives in the vault Worker.
    */
   VAULT?: AccountDataHolder;
+  /**
+   * Cross-script binding to overdeck-connect's AccountDirectory (PAN-4959 D-2).
+   * Absent in tests and local dev: the page shows machines as unavailable.
+   */
+  DIRECTORY?: DurableObjectNamespace;
 }
 
 /** Time and outbound HTTP are injected so tests control both without waiting (D-24). */

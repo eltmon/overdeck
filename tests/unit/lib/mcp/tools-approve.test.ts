@@ -27,10 +27,19 @@ describe('MCP approval tools (PAN-4649 W-7)', () => {
     expect(resultJson(await callTool(client, 'list_pending_input'))).toEqual([{ name: 'conv-a', pendingInputKinds: ['askUserQuestion'] }]);
   });
 
-  it('answer_question without approve is refused and makes no request', async () => {
+  it('answer_question without approve is hidden, so tools/call answers like an unknown tool', async () => {
     const api = fakeApi({});
     const client = await connectClient(api, ['read:conversations', 'operate']);
     const result = await callTool(client, 'answer_question', { conversation: 'conv-a', answers: ['Yes'] });
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toBe('Unknown tool answer_question');
+    expect(api.calls).toEqual([]);
+  });
+
+  it('answer_question still checks approve itself when called directly, as defense in depth (D-3)', async () => {
+    const api = fakeApi({});
+    const answerQuestion = APPROVE_TOOLS.find((tool) => tool.name === 'answer_question')!;
+    const result = await answerQuestion.run({ conversation: 'conv-a', answers: ['Yes'] }, { api, scopes: ['read:conversations', 'operate'], isAgent: false });
     expect(result.isError).toBe(true);
     expect(resultText(result)).toBe(MISSING_APPROVE_TEXT);
     expect(api.calls).toEqual([]);

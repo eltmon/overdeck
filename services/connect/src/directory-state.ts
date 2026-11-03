@@ -45,7 +45,7 @@ export interface MachineRow {
   readonly lastSeenAt: number;
 }
 
-/** One registered phone: a row of the `clients` table (PAN-4829). Never a machine. */
+/** One registered client: a phone or a connector (PAN-4829, PAN-4927 D-18). Never a machine. */
 export interface ClientRow {
   readonly clientId: string;
   readonly label: string;
@@ -77,7 +77,7 @@ export interface DirectoryState {
   readonly plan: ConnectPlan | null;
   /** In registration order. */
   readonly machines: readonly MachineRow[];
-  /** Registered phones in registration order (PAN-4829); they never count as machines. */
+  /** Registered clients (phones and connectors) in registration order (PAN-4829); they never count as machines. */
   readonly clients: readonly ClientRow[];
   /** Pending approvals, oldest first. Expired rows are dropped lazily on every event. */
   readonly approvals: readonly ApprovalRow[];
@@ -108,7 +108,9 @@ export type DirectoryEvent =
   | { readonly kind: 'hello'; readonly registeredAs: string | null; readonly identity: SocketIdentity; readonly frame: HelloFrame; readonly fingerprint: string }
   | { readonly kind: 'frame'; readonly registeredAs: string | null; readonly frame: LaterFrame }
   | { readonly kind: 'bad-frame'; readonly registeredAs: string | null; readonly reason: 'bad_frame' | 'unsupported' }
-  | { readonly kind: 'socket-gone'; readonly registeredAs: string };
+  | { readonly kind: 'socket-gone'; readonly registeredAs: string }
+  /** The account page removes a machine (PAN-4959 D-5). No socket made the request, so nothing goes to `self`. */
+  | { readonly kind: 'remove-machine'; readonly environmentId: string };
 
 export interface ReduceContext {
   /** Unix milliseconds. */
@@ -525,6 +527,31 @@ export function reduce(state: DirectoryState, event: DirectoryEvent, ctx: Reduce
   return pruned.effects.length === 0 ? result : { state: result.state, effects: [...pruned.effects, ...result.effects] };
 }
 
+/** `forget` without a calling socket: every other machine and phone hears the new directory, the target closes 4012. */
+function removeMachine(state: DirectoryState, event: Extract<DirectoryEvent, { kind: 'remove-machine' }>, ctx: ReduceContext): ReduceResult {
+  const target = event.environmentId;
+  if (!state.machines.some((m) => m.environmentId === target)) {
+    return { state, effects: [{ kind: 'log', type: 'remove-machine', environmentId: target, outcome: 'unknown_machine' }] };
+  }
+  const dropped = state.approvals.filter((r) => r.fromEnv === target || r.toEnv === target);
+  const next: DirectoryState = {
+    ...state,
+    machines: state.machines.filter((m) => m.environmentId !== target),
+    approvals: state.approvals.filter((r) => !dropped.includes(r)),
+  };
+  return {
+    state: next,
+    effects: [
+      { kind: 'delete-machine', environmentId: target },
+      ...dropped.map((r) => ({ kind: 'delete-approval', requestId: r.requestId }) as const),
+      { kind: 'inbox-forget', environmentId: target },
+      ...broadcastDirectory(toDirectoryMachines(next.machines, withOnline(ctx.online, null, target))),
+      { kind: 'close', to: { environmentId: target }, code: CONNECT_CLOSE_CODES.forgotten, reason: 'forgotten' },
+      { kind: 'log', type: 'remove-machine', environmentId: target, outcome: 'ok' },
+    ],
+  };
+}
+
 function reduceLive(state: DirectoryState, event: DirectoryEvent, ctx: ReduceContext): ReduceResult {
   switch (event.kind) {
     case 'hello':
@@ -558,5 +585,7 @@ function reduceLive(state: DirectoryState, event: DirectoryEvent, ctx: ReduceCon
         ],
       };
     }
+    case 'remove-machine':
+      return removeMachine(state, event, ctx);
   }
 }
