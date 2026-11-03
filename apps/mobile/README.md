@@ -155,7 +155,8 @@ These are read at build time.
   restart, the placeholder shows.
 - **Tap:** tapping a decrypted notification opens its machine at the screen it names (`/m…`),
   also from a cold launch. A machine that is not paired opens the machine list. Only same-origin
-  `/m` paths are followed.
+  `/m` paths are followed. The cold-launch tap is not yet verified on a device; it is first
+  checked on the PAN-4841 TestFlight install (`ACCEPTANCE.md`, "PAN-4838 iOS notifications").
 - **Android:** push is gated to iOS (`pushSupported()`). Android needs Firebase first, which is
   PAN-4840.
 
