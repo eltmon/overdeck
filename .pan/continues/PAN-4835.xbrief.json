@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4835",
   "created": "2026-11-03T07:59:34.235Z",
-  "updated": "2026-11-03T10:11:29.973Z",
+  "updated": "2026-11-03T10:11:57.572Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -204,6 +204,10 @@
     "devices-route-phones.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T10:11:29.973Z"
+    },
+    "devices-route-phones.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T10:11:57.572Z"
     }
   }
 }
