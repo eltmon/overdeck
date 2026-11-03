@@ -144,6 +144,9 @@ CI test-job classification (`verification.tests: ci`, PAN-3965) lives in
 (`cloister/pr-facts.ts`), the default-branch baseline
 (`cloister/ci-default-branch-tests.ts`) and the `check_run`/`status` webhooks
 (`webhook-handlers.ts` → `cloister/ci-failure-feedback.ts`) all filter through it.
+Per-check failures on a PR head (`listFailedChecks`, `listFailedTestChecks`,
+`FailedCheck`) live in `cloister/check-failures.ts` and are re-exported from
+`pr-facts.ts` (PAN-4917).
 
 ## Spawn sites (harness decision points)
 

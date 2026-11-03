@@ -1011,7 +1011,19 @@ A conflicting PR gets no `pull_request` CI, because GitHub builds no merge ref
 for it, so its head can never get a test result (PAN-4451). The predicate
 therefore accepts `pending` or `none` checks and a missing or skipped CI test
 job, and only red checks disqualify it; a red head stays on the CI-failure
-feedback path. The merge gate is unchanged, so the repaired head still needs
+feedback path.
+
+A red head whose failing checks all concluded `CANCELLED`, `TIMED_OUT` or
+`STALE` does not disqualify it either (PAN-4917): those checks stopped before
+they judged the code, and GitHub reports a job that hit its own
+`timeout-minutes` as `CANCELLED`, the same as a run a newer push superseded.
+Any other failing conclusion, or a commit status in `FAILURE` or `ERROR`,
+still disqualifies it. The per-check list is `PrFacts.checkFailures`
+(`cloister/check-failures.ts`, GitHub only), so a red GitLab head still
+disqualifies. Before PAN-4917 a timed-out trailer gate left PR #4911 and PR
+#4915 approved and CONFLICTING.
+
+The merge gate is unchanged, so the repaired head still needs
 green CI and, in `verification.tests: ci` projects, a passed CI test job
 before anything merges. Before PAN-4451 the predicate demanded that CI too,
 and PR #4440 sat approved and CONFLICTING for about 19 hours. A verdict
@@ -1030,7 +1042,9 @@ asked.
 **Declined heads are logged.** When the gate declines a candidate whose open
 PR the forge calls `mergeable: false`, the patrol logs
 `[conflict-repair] <ISSUE>: conflicting head <head8> not repaired: <reason>`
-once per issue and head in each dashboard process.
+once per issue and head in each dashboard process. A red-head reason names
+each failing check with its conclusion, for example "CI checks failing on PR
+HEAD <sha>: test (FAILURE)".
 
 **The patrol.** `startConflictRepairPatrol`
 (`dashboard/server/services/conflict-repair-patrol.ts`) runs
