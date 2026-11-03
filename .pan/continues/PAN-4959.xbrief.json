@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4959",
+  "created": "2026-11-03T21:54:38.804Z",
+  "updated": "2026-11-03T21:54:38.804Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "connect-account-view": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4959",
+      "claimedAt": "2026-11-03T21:54:38.804Z"
+    }
+  }
+}
