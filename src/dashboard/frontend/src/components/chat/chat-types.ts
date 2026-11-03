@@ -60,6 +60,8 @@ export interface ChatMessage {
   commandResult?: ComposerCommandResult;
   /** Exact command text that produced commandResult, used for confirmations. */
   commandText?: string;
+  /** Which human sent a shared prompt (Shared Sessions viewer timeline, PAN-4476). */
+  author?: { login: string; avatarUrl: string };
 }
 
 /** A user message or portable command whose send POST failed — held in the retry outbox. */
