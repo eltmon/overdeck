@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4840",
   "created": "2026-11-03T20:58:06.302Z",
-  "updated": "2026-11-03T21:08:02.557Z",
+  "updated": "2026-11-03T21:08:08.185Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,11 @@
       "claimedBy": "agent-pan-4840",
       "claimedAt": "2026-11-03T21:07:24.771Z",
       "doneAt": "2026-11-03T21:08:02.557Z"
+    },
+    "ci-android-unit-tests": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4840",
+      "claimedAt": "2026-11-03T21:08:08.184Z"
     }
   }
 }
