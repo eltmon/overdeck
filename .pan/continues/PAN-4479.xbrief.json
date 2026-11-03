@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4479",
   "created": "2026-11-03T15:06:40.232Z",
-  "updated": "2026-11-03T15:47:11.553Z",
+  "updated": "2026-11-03T15:47:26.777Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -164,6 +164,10 @@
       "claimedBy": "agent-pan-4479",
       "claimedAt": "2026-11-03T15:43:07.922Z",
       "doneAt": "2026-11-03T15:47:11.553Z"
+    },
+    "viewer-peer-auto-reconnect.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:47:26.777Z"
     }
   }
 }
