@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T13:35:29.738434Z · model: claude-opus-5-5 · open: 871_
+_Last sequenced: 2026-11-03T13:36:31.606391Z · model: claude-opus-5-5 · open: 870_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -330,12 +330,11 @@ _Last sequenced: 2026-11-03T13:35:29.738434Z · model: claude-opus-5-5 · open: 
 | 328 | PAN-1480 | L | high | ok |  |  | TLDR: 93% bypass rate |
 | 329 | PAN-1479 | M | high | ok |  |  | RTK: Add telemetry to measure token savings from bash output compression |
 | 330 | PAN-2950 | L | high | ok |  |  | Refactor god files back under file-size ceilings after the UX overhaul |
-| 331 | PAN-4474 | L | medium | ok |  |  | Shared Sessions slice 3: host WebRTC hub, content wire format and conversation bridge (werift spike first) |
 | 332 | PAN-2720 | M | high | ok |  |  | File-size ratchet counts lines, so it rewards line-packing on the god files it means to improve |
 | 333 | PAN-2650 | S | high | ok |  |  | Shed-stack half is moot (slot merges verify on host); remaining: pan swarm recover path for a stuck ready-to-merge slot. |
 | 334 | PAN-2358 | M | high | ok |  |  | PAN-2145 follow-up: restore PAN-1535 hardening in transformMessageForHarness (rewritten during conversations.ts decomposition) |
 | 335 | PAN-2334 | XS | high | ok |  |  | write a Definition of Ready (DoR) |
-| 336 | PAN-4475 | M | medium | ok |  | PAN-4474 | Shared Sessions slice 4: viewer surface, join intent and localhost-detect; gates slices 5-10 |
+| 336 | PAN-4475 | M | medium | ok |  |  | Shared Sessions slice 4: viewer surface, join intent and localhost-detect; gates slices 5-10 |
 | 337 | PAN-2193 | S | high | ok |  |  | Held issues (objection/parked/vetoed/needs-handoff) are invisible in the Command Deck tree |
 | 338 | PAN-1984 | XS | high | ok |  |  | Migrate or delete the 18 dead panopticon.db modules referenced by ~30 test files (#1983 follow-up) |
 | 339 | PAN-1913 | XS | high | ok |  |  | Project description: show on click, edit in dashboard, mirror into the project layer (and document what's in .pan and ~/.panopticon) |
@@ -450,7 +449,7 @@ _Last sequenced: 2026-11-03T13:35:29.738434Z · model: claude-opus-5-5 · open: 
 | 448 | PAN-4151 | L | medium | needs-refinement |  | PAN-3822 | Deferred remainder of PAN-3822/#4067: GitLab MR sync, PR page + search, handoff link copy, diffstat, link-dialog a11y, sync throttle |
 | 449 | PAN-1330 | S | medium | ok |  |  | CLI cannot address planning-*/specialist-* sessions |
 | 450 | PAN-4481 | M | medium | needs-refinement |  | PAN-4475 | Shared Sessions slice 10: hosted web join page; awaits operator decision OD-1 on sign-in without a local install |
-| 451 | PAN-4482 | S | medium | ok |  | PAN-4474, PAN-4475, PAN-4476, PAN-4477, PAN-4478, PAN-4479, PAN-4480, PAN-4481 | Shared Sessions slice 11: signaling-privacy e2e, forced-TURN check (operator checkpoint) and full AC sweep |
+| 451 | PAN-4482 | S | medium | ok |  | PAN-4475, PAN-4476, PAN-4477, PAN-4478, PAN-4479, PAN-4480, PAN-4481 | Shared Sessions slice 11: signaling-privacy e2e, forced-TURN check (operator checkpoint) and full AC sweep |
 | 452 | PAN-1226 | L | medium | ok |  |  | PAN-1148 unified-dashboard redesign |
 | 453 | PAN-1173 | S | medium | ok |  |  | pan show <bare-number> derives wrong agent ID for PAN-prefixed issues |
 | 454 | PAN-1154 | M | medium | ok |  |  | pan up does not kill existing port holders |
@@ -1206,10 +1205,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T13:35:29.738434Z",
+  "generatedAt": "2026-11-03T13:36:31.606391Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 871,
+  "openCount": 870,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -5285,18 +5284,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "planning": "interactive"
     },
     {
-      "issue": "PAN-4474",
-      "rank": 331,
-      "size": "L",
-      "importance": "medium",
-      "score": 60,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Shared Sessions slice 3: host WebRTC hub, content wire format and conversation bridge (werift spike first)",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2720",
       "rank": 332,
       "size": "M",
@@ -5352,9 +5339,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "importance": "medium",
       "score": 60,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4474"
-      ],
+      "dependsOn": [],
       "why": "Shared Sessions slice 4: viewer surface, join intent and localhost-detect; gates slices 5-10",
       "gate": "auto",
       "planning": "auto"
@@ -6770,7 +6755,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "score": 50,
       "condition": "ok",
       "dependsOn": [
-        "PAN-4474",
         "PAN-4475",
         "PAN-4476",
         "PAN-4477",
@@ -6780,6 +6764,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
         "PAN-4481"
       ],
       "why": "Shared Sessions slice 11: signaling-privacy e2e, forced-TURN check (operator checkpoint) and full AC sweep",
+      "rationale": "Rank held; dependency PAN-4474 (slice 3) closed completed, remaining slices 4-10 still gate this sweep.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12904,13 +12889,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "confidence": 1
     },
     {
-      "from": "PAN-4474",
-      "to": "PAN-4475",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4475",
       "to": "PAN-4476",
       "type": "unblocks",
@@ -12955,13 +12933,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     {
       "from": "PAN-4409",
       "to": "PAN-4410",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4474",
-      "to": "PAN-4482",
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
