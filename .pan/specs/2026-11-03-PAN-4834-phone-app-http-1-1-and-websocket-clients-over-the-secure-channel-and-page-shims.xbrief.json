@@ -4,17 +4,17 @@
     "created": "2026-11-03T14:15:22Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4834: Phone app: HTTP/1.1 and WebSocket clients over the secure channel, and page shims",
-    "updated": "2026-11-03T14:26:09.279Z"
+    "updated": "2026-11-03T14:27:24.083Z"
   },
   "plan": {
     "id": "pan-4834",
     "title": "Phone app: HTTP/1.1 and WebSocket clients over the secure channel, and page shims",
-    "status": "proposed",
+    "status": "running",
     "uid": "8f55c275-9d5d-48f1-99d7-e509bf3c3dc3",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-03T14:15:22Z",
-    "updated": "2026-11-03T14:26:09.279Z",
+    "updated": "2026-11-03T14:27:24.083Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4834",
@@ -743,5 +743,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
