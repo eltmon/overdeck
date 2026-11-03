@@ -122,14 +122,23 @@ iOS 26.5, deleted afterwards.
   ([pan-4838-simctl](acceptance/pan-4838-simctl.png)). The Simulator log shows SpringBoard adding
   the request with no service-extension step, and no `NotificationService` process started.
   So `simctl push` on Xcode 26.6 does not run Notification Service Extensions, and the placeholder
-  is what iOS shows without the extension (FR-6). The wrong-key push (step 4) therefore proves
-  nothing more here and was not kept.
+  is what iOS shows without the extension (FR-6).
+- **Wrong key (step 4): no screenshot recorded.** A push whose `s` was the fixture's
+  `wrongKey.sealed` was sent 8 s later. Its screenshot, taken 3 s after the push, showed no banner;
+  the cause was not determined. Because the extension does not run under `simctl push`, a
+  wrong-key banner would only repeat the screenshot above. The wrong-key rejection itself is
+  covered by the Swift test `testRejectsAnotherKeyTamperingBadBase64AndShortKeys`.
+- **Cold-launch tap (CP-3): not run.** The rig has no way to tap a notification (see the
+  permission bullet). The code uses the primary path: `installNotificationTap` runs after boot, and
+  the plugin hands over the retained cold-launch action when the listener is added. The fallback
+  path (installing before boot and queueing) was not needed by any test and is not built.
 - **Not verified here:** the extension reading the push key from the shared Keychain group and
-  rewriting a real notification, and a tap from a cold launch (CP-3), which needs a tap the rig
-  cannot send. Both are first exercised by the TestFlight install in PAN-4841.
+  rewriting a real notification, and the cold-launch tap. Both are first exercised by the
+  TestFlight install in PAN-4841.
 - **Real APNs (step 6):** `curl -s https://connect.overdeck.ai/healthz` returned
   `{"ok":true,"configured":true,"turn":true,"apns":false,"fcm":false}`, so the directory cannot
   reach APNs yet. PAN-4841 sets the APNs secrets; its first TestFlight install runs epic AC-11:
   pair the phone, terminate the app, raise a question on the desktop, and check that the
   notification shows the question's title within 10 s, that tapping it opens the Needs-you card,
-  and that `npx wrangler tail overdeck-connect --format json` shows no title text.
+  and that `npx wrangler tail overdeck-connect --format json` shows no title text. Those steps
+  are in the [PAN-4841 comment](https://github.com/eltmon/overdeck/issues/4841#issuecomment-6615975677).
