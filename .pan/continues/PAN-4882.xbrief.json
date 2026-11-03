@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4882",
   "created": "2026-11-03T06:27:51.535Z",
-  "updated": "2026-11-03T07:55:29.670Z",
+  "updated": "2026-11-03T07:55:50.658Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -220,6 +220,10 @@
     "ac06-remove-managed.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T07:55:29.670Z"
+    },
+    "ac06-remove-managed.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:55:50.657Z"
     }
   }
 }
