@@ -4,17 +4,17 @@
     "created": "2026-11-03T21:36:04Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4931: Agent MCP and bots (W-MCP1): Tool module: visibility, methods, token file",
-    "updated": "2026-11-03T21:39:53.501Z"
+    "updated": "2026-11-03T21:41:08.691Z"
   },
   "plan": {
     "id": "pan-4931",
     "title": "Agent MCP and bots (W-MCP1): Tool module: visibility, methods, token file",
-    "status": "proposed",
+    "status": "running",
     "uid": "a6a2a122-cd51-4d4d-964d-e5306e7ef938",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-03T21:36:04Z",
-    "updated": "2026-11-03T21:39:53.501Z",
+    "updated": "2026-11-03T21:41:08.691Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4931",
@@ -470,5 +470,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
