@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4882",
   "created": "2026-11-03T06:27:51.535Z",
-  "updated": "2026-11-03T07:45:19.228Z",
+  "updated": "2026-11-03T07:45:38.427Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -108,6 +108,10 @@
     "preflight.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T07:45:19.228Z"
+    },
+    "preflight.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:45:38.426Z"
     }
   }
 }
