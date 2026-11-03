@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4828",
   "created": "2026-11-03T04:08:00.094Z",
-  "updated": "2026-11-03T04:31:04.796Z",
+  "updated": "2026-11-03T04:31:28.183Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,6 +50,10 @@
     "contract-frames.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T04:31:04.796Z"
+    },
+    "contract-frames.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:31:28.183Z"
     }
   }
 }
