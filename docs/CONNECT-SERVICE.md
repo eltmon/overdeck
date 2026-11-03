@@ -23,6 +23,8 @@ The overdeck.ai directory, the WebRTC introduction, the relay add-on's credentia
 
 The wire protocol is `packages/contracts/src/connect.ts` (runtime-import-free so the Worker imports it by relative path); the dashboard's `GET /api/directory` view is `packages/contracts/src/connect-view.ts`.
 
+`connect.ts` also carries the phone app's frames (PAN-4823): `ClientToDirectoryFrame`, `DirectoryToClientFrame`, the machine's `push` and the directory's `push-result`, with `CLIENT_LIMIT`, `PUSH_RATE_PER_MINUTE` and `PUSH_SEALED_MAX_CHARS`. The service does not serve them yet: the decoder refuses each one as `bad_frame` until the client role (PAN-4829) and push delivery (PAN-4830) land.
+
 ## Endpoints
 
 | Method | Path | Auth | Answer |
