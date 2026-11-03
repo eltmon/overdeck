@@ -220,6 +220,7 @@ src/lib/__tests__/uiTokenStyles.test.ts
 src/lib/__tests__/useChannelMediaSrc.test.tsx
 src/lib/__tests__/useDecisions.fleet.test.tsx
 src/lib/__tests__/useDecisions.test.ts
+src/lib/__tests__/wsTransport-native.test.ts
 src/lib/__tests__/wsTransport-pairing.test.ts
 src/lib/decisionContext.test.ts
 src/lib/pipeline-state.test.ts
