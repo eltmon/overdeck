@@ -2,6 +2,9 @@
  * PAN-4773: CodeRabbit findings reach the work agent through the feedback
  * door, once per review, and nothing happens when CodeRabbit posted none.
  */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -167,33 +170,59 @@ describe('maybeRelayCodeRabbitReview', () => {
   });
 });
 
-describe('CodeRabbit thread parsing', () => {
-  it('reads severity and title from a CodeRabbit comment body', () => {
-    const body = [
-      '_⚠️ Potential issue_ | _🟠 Major_',
-      '',
-      '**Guard the null case before reading `head.sha`.**',
-      '',
-      'The webhook payload can omit the head sha.',
-    ].join('\n');
+describe('CodeRabbit thread parsing (real comments from #4667 and #4716)', () => {
+  const FIXTURES = join(__dirname, '../../../fixtures/coderabbit');
+  const fixtureRows = (pr: number) => readFileSync(join(FIXTURES, `pr-${pr}-comments.jsonl`), 'utf-8')
+    .split('\n').filter(Boolean).map((line) => JSON.parse(line) as { pull_request_review_id: number; body: string });
 
-    expect(parseCodeRabbitComment(body)).toEqual({ severity: 'Major', title: 'Guard the null case before reading `head.sha`.' });
-    expect(parseCodeRabbitComment('Consider a shorter name here.\n\nMore text.')).toEqual({ title: 'Consider a shorter name here.' });
+  /** Plays `gh api --paginate pulls/<n>/comments --jq 'select(.pull_request_review_id == <id>)'` over a fixture. */
+  const ghOver = (pr: number) => vi.fn(async (args: string[]) => {
+    const reviewId = Number(/pull_request_review_id == (\d+)/.exec(args.join(' '))?.[1]);
+    return fixtureRows(pr).filter((row) => row.pull_request_review_id === reviewId).map((row) => JSON.stringify(row)).join('\n');
   });
 
-  it('keeps top-level comments across pages and drops replies', async () => {
-    const gh = vi.fn(async () => [
-      JSON.stringify({ id: 1, in_reply_to_id: null, body: '**First**', path: 'a.ts', line: 3, html_url: 'u1' }),
-      JSON.stringify({ id: 2, in_reply_to_id: 1, body: 'a reply [x][y]', path: 'a.ts', line: 3 }),
-      JSON.stringify({ id: 3, body: '**Outdated**', path: 'b.ts', line: null, original_line: 9 }),
-    ].join('\n'));
+  it('reads severity and title from the current header format, not the icon markup', () => {
+    const [first, second] = fixtureRows(4667);
 
-    const threads = await fetchCodeRabbitReviewThreads('eltmon/overdeck', 42, 900, gh);
+    expect(parseCodeRabbitComment(first.body)).toEqual({
+      severity: 'Minor', title: 'Register `messageRows.test.tsx` in `test:frontend-subset`.',
+    });
+    expect(parseCodeRabbitComment(second.body)).toEqual({
+      severity: 'Minor', title: 'Gate `citationsEnabled` on the composer actually being mounted.',
+    });
+  });
 
-    expect(gh).toHaveBeenCalledWith(expect.arrayContaining(['--paginate', 'repos/eltmon/overdeck/pulls/42/reviews/900/comments?per_page=100']));
+  it('falls back to the first plain line of a body in no known shape', () => {
+    expect(parseCodeRabbitComment('<!-- x -->\nConsider a shorter name here.\n\nMore text.')).toEqual({ title: 'Consider a shorter name here.' });
+  });
+
+  it('reads one review\'s threads from the PR comment list, with path and line', async () => {
+    const gh = ghOver(4667);
+
+    const threads = await fetchCodeRabbitReviewThreads('eltmon/overdeck', 4667, 5726882852, gh);
+
+    expect(gh).toHaveBeenCalledWith(expect.arrayContaining(['--paginate', 'repos/eltmon/overdeck/pulls/4667/comments?per_page=100']));
     expect(threads).toEqual([
-      { id: 1, path: 'a.ts', line: 3, title: 'First', url: 'u1' },
-      { id: 3, path: 'b.ts', line: 9, title: 'Outdated' },
+      {
+        id: 4434689071, path: 'package.json', line: 141, severity: 'Minor',
+        title: 'Register `messageRows.test.tsx` in `test:frontend-subset`.',
+        url: 'https://github.com/eltmon/overdeck/pull/4667#discussion_r4434689071',
+      },
+      {
+        id: 4434689073, path: 'src/dashboard/frontend/src/components/chat/ConversationPanel.tsx', line: 1471, severity: 'Minor',
+        title: 'Gate `citationsEnabled` on the composer actually being mounted.',
+        url: 'https://github.com/eltmon/overdeck/pull/4667#discussion_r4434689073',
+      },
     ]);
+  });
+
+  it('leaves out CodeRabbit\'s replies, and a review with only replies routes nothing', async () => {
+    const findings = await fetchCodeRabbitReviewThreads('eltmon/overdeck', 4716, 5728212281, ghOver(4716));
+    expect(findings).toEqual([expect.objectContaining({
+      id: 4435754182, line: 42, severity: 'Minor', title: 'Do not intercept links for issues absent from the dashboard snapshot.',
+    })]);
+
+    // CodeRabbit's later reply (in_reply_to_id set) is its own review.
+    await expect(fetchCodeRabbitReviewThreads('eltmon/overdeck', 4716, 5728694109, ghOver(4716))).resolves.toEqual([]);
   });
 });

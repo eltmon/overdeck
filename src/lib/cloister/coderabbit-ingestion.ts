@@ -129,17 +129,25 @@ export interface CodeRabbitThread {
 }
 
 /**
- * Severity and title from a CodeRabbit comment body. CodeRabbit opens with
- * `_⚠️ Potential issue_ | _🟠 Major_` and then a `**Title**` line; anything
- * else falls back to the first non-empty line.
+ * Severity and title from a CodeRabbit inline comment body. The current format
+ * (2026-11) opens with a bold header, an icon `<picture>` then the severity and
+ * labels joined by ` · `:
+ *   `**<picture><img …></picture> Minor** · **Functional Correctness** · **Quick win**`
+ * and then the title on its own bold line. HTML comments and `<details>`
+ * blocks (analysis scripts, agent prompts) are skipped. A body in no known
+ * shape falls back to its first plain line.
  */
 export function parseCodeRabbitComment(body: string): { severity?: string; title: string } {
-  const lines = body.split('\n').map((line) => line.trim()).filter(Boolean);
-  const labels = [...(lines[0] ?? '').matchAll(/_([^_]+)_/g)].map((m) => m[1].replace(/^[^\p{L}\p{N}]+/u, '').trim());
-  const severity = labels.length > 1 ? labels[labels.length - 1] : labels[0];
-  const bold = lines.find((line) => /^\*\*.+\*\*$/.test(line));
-  const fallback = lines.find((line) => !/^_[^_]+_/.test(line)) ?? lines[0] ?? '(no text)';
-  const title = (bold ? bold.slice(2, -2) : fallback).trim();
+  const visible = body
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<details>[\s\S]*?<\/details>/g, '');
+  const plain = (text: string) => text.replace(/<[^>]+>/g, '').replace(/\*\*/g, '').replace(/\s+/g, ' ').trim();
+  const lines = visible.split('\n').map((line) => line.trim()).filter((line) => plain(line));
+  const headerIndex = lines.findIndex((line) => line.startsWith('**') && (line.includes('<picture>') || line.includes(' · ')));
+  const severity = headerIndex >= 0 ? plain(lines[headerIndex].split(' · ')[0]) : undefined;
+  const rest = lines.filter((_, index) => index !== headerIndex);
+  const bold = rest.find((line) => /^\*\*[^*].*\*\*$/.test(line));
+  const title = plain(bold ?? rest[0] ?? '') || '(no text)';
   return { ...(severity ? { severity } : {}), title: title.length > 160 ? `${title.slice(0, 157)}...` : title };
 }
 
@@ -150,6 +158,10 @@ export type GhRunner = (args: string[]) => Promise<string>;
  * The top-level inline threads of one CodeRabbit review: replies are left
  * out. An empty array means the review has no inline findings (a summary
  * review, or "no actionable comments"). A read failure rejects.
+ *
+ * The PR's comment list is read and filtered to the review, because the
+ * per-review endpoint (`reviews/<id>/comments`) returns neither `line` nor
+ * `in_reply_to_id`.
  */
 export async function fetchCodeRabbitReviewThreads(
   repo: string,
@@ -158,8 +170,8 @@ export async function fetchCodeRabbitReviewThreads(
   gh: GhRunner,
 ): Promise<CodeRabbitThread[]> {
   const stdout = await gh([
-    'api', '--paginate', `repos/${repo}/pulls/${prNumber}/reviews/${reviewId}/comments?per_page=100`,
-    '--jq', '.[] | {id, in_reply_to_id, body, path, line, original_line, html_url}',
+    'api', '--paginate', `repos/${repo}/pulls/${prNumber}/comments?per_page=100`,
+    '--jq', `.[] | select(.pull_request_review_id == ${reviewId}) | {id, in_reply_to_id, body, path, line, original_line, html_url}`,
   ]);
   const rows = stdout.split('\n').filter((line) => line.trim()).map((line) => JSON.parse(line) as {
     id?: number;
