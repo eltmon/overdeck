@@ -1,13 +1,13 @@
 /**
  * PAN-4852 WI-11: placing a SageOx binding into a worktree or the primary
  * checkout, hidden from `git status`, and leaving tracked or hand-made
- * `.sageox/` folders alone.
+ * `.sageox/` folders alone. WI-12: removing a placed binding at switch-off.
  *
  * A fresh scratch repo with two linked worktrees per test, an isolated global
  * git config, and the binding store under a temp OVERDECK_HOME.
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -22,7 +22,7 @@ const { overdeckHome } = await vi.hoisted(async () => {
 });
 
 import { bindingDir } from '../binding.js';
-import { ensureSageoxPlaced, PLACEMENT_MARKER, sageoxDirState } from '../placement.js';
+import { ensureSageoxPlaced, PLACEMENT_MARKER, removeSageoxPlacement, sageoxDirState } from '../placement.js';
 
 const FIVE_FILES = ['.gitignore', '.repo_0a1b2c3d-1111-2222-3333-444455556666', 'README.md', 'config.json', 'skills.lock.json'];
 const savedEnv = {
@@ -104,6 +104,11 @@ describe('sageoxDirState', () => {
     expect(await sageoxDirState(wt)).toBe('hand-made');
     write(wt, `.sageox/${PLACEMENT_MARKER}`, '{}\n');
     expect(await sageoxDirState(wt)).toBe('placed');
+  });
+
+  it('reports absent for a .sageox/ holding only runtime leftovers (no marker, no config.json)', async () => {
+    write(wt, '.sageox/logs/x.log', 'runtime\n');
+    expect(await sageoxDirState(wt)).toBe('absent');
   });
 
   it('reports tracked when git tracks .sageox/config.json', async () => {
@@ -205,6 +210,19 @@ describe('ensureSageoxPlaced', () => {
     expect(readFileSync(join(wt, '.sageox', PLACEMENT_MARKER), 'utf8')).toBe(before);
   });
 
+  it('does not delete a stale marker entry through a symlinked folder inside .sageox/', async () => {
+    storeBinding('app', fiveFileBinding());
+    const elsewhere = mkdtempSync(join(scratch, 'elsewhere-'));
+    write(elsewhere, 'victim', 'keep me\n');
+    mkdirSync(join(wt, '.sageox'), { recursive: true });
+    symlinkSync(elsewhere, join(wt, '.sageox', 'link'));
+    write(wt, `.sageox/${PLACEMENT_MARKER}`, JSON.stringify({ version: 1, projectKey: 'app', files: ['link/victim'] }));
+
+    expect(await ensureSageoxPlaced(wt, 'app')).toEqual({ ok: true, state: 'placed' });
+
+    expect(readFileSync(join(elsewhere, 'victim'), 'utf8')).toBe('keep me\n');
+  });
+
   it('never deletes a marker entry that escapes .sageox/ or resolves to a binding file', async () => {
     storeBinding('app', fiveFileBinding());
     write(wt, 'outside', 'keep me\n');
@@ -215,5 +233,75 @@ describe('ensureSageoxPlaced', () => {
     expect(readFileSync(join(wt, 'outside'), 'utf8')).toBe('keep me\n');
     expect(existsSync(join(wt, '.sageox', 'config.json'))).toBe(true);
     expect(readMarker(wt).files).toEqual([...FIVE_FILES].sort());
+  });
+});
+
+describe('removeSageoxPlacement', () => {
+  it('returns at once when no marker exists', async () => {
+    expect(await removeSageoxPlacement(wt)).toEqual({ removed: [] });
+    write(wt, '.sageox/config.json', '{"hand":true}\n');
+    expect(await removeSageoxPlacement(wt)).toEqual({ removed: [] });
+    expect(readFileSync(join(wt, '.sageox', 'config.json'), 'utf8')).toBe('{"hand":true}\n');
+  });
+
+  it('deletes the placed files and the marker, and keeps the hide and runtime files', async () => {
+    storeBinding('app', fiveFileBinding());
+    await ensureSageoxPlaced(wt, 'app');
+    write(wt, '.sageox/logs/x.log', 'runtime\n');
+    write(wt, '.sageox/cache/y', 'cache\n');
+
+    const result = await removeSageoxPlacement(wt);
+
+    expect(result.removed.sort()).toEqual([...FIVE_FILES].sort());
+    for (const file of FIVE_FILES) expect(existsSync(join(wt, '.sageox', file))).toBe(false);
+    expect(existsSync(join(wt, '.sageox', PLACEMENT_MARKER))).toBe(false);
+    expect(readFileSync(join(wt, '.sageox', 'logs', 'x.log'), 'utf8')).toBe('runtime\n');
+    expect(readFileSync(join(wt, '.sageox', 'cache', 'y'), 'utf8')).toBe('cache\n');
+    expect(git(wt, 'status', '--porcelain')).toBe('');
+  });
+
+  it('places the binding again after switch-off left only runtime files', async () => {
+    storeBinding('app', fiveFileBinding());
+    await ensureSageoxPlaced(wt, 'app');
+    write(wt, '.sageox/logs/x.log', 'runtime\n');
+    await removeSageoxPlacement(wt);
+
+    expect(await ensureSageoxPlaced(wt, 'app')).toEqual({ ok: true, state: 'placed' });
+
+    for (const file of FIVE_FILES) expect(existsSync(join(wt, '.sageox', file))).toBe(true);
+    expect(readFileSync(join(wt, '.sageox', 'logs', 'x.log'), 'utf8')).toBe('runtime\n');
+    expect(git(wt, 'status', '--porcelain')).toBe('');
+  });
+
+  it('keeps a file git tracks even when a stale marker lists it', async () => {
+    makeRepo(true);
+    write(wt, '.sageox/README.md', 'placed\n');
+    write(wt, `.sageox/${PLACEMENT_MARKER}`, JSON.stringify({ version: 1, projectKey: 'app', files: ['config.json', 'README.md'] }));
+
+    expect(await removeSageoxPlacement(wt)).toEqual({ removed: ['README.md'] });
+
+    expect(readFileSync(join(wt, '.sageox', 'config.json'), 'utf8')).toBe('{"tracked":true}\n');
+    expect(existsSync(join(wt, '.sageox', 'README.md'))).toBe(false);
+    expect(existsSync(join(wt, '.sageox', PLACEMENT_MARKER))).toBe(false);
+    expect(git(wt, 'status', '--porcelain')).toBe('');
+  });
+
+  it('deletes nothing outside .sageox/', async () => {
+    write(wt, 'outside', 'keep me\n');
+    const elsewhere = mkdtempSync(join(scratch, 'elsewhere-'));
+    write(elsewhere, 'victim', 'keep me too\n');
+    mkdirSync(join(wt, '.sageox'), { recursive: true });
+    symlinkSync(elsewhere, join(wt, '.sageox', 'link'));
+    write(
+      wt,
+      `.sageox/${PLACEMENT_MARKER}`,
+      JSON.stringify({ version: 1, projectKey: 'app', files: ['../outside', join(wt, 'outside'), 'link/victim', 'link'] }),
+    );
+
+    expect(await removeSageoxPlacement(wt)).toEqual({ removed: ['link'] });
+
+    expect(readFileSync(join(wt, 'outside'), 'utf8')).toBe('keep me\n');
+    expect(readFileSync(join(elsewhere, 'victim'), 'utf8')).toBe('keep me too\n');
+    expect(existsSync(join(wt, '.sageox', PLACEMENT_MARKER))).toBe(false);
   });
 });

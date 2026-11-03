@@ -7,13 +7,20 @@
  * - **tracked**: git tracks `.sageox/config.json`. Overdeck never writes there.
  * - **placed**: `.sageox/.overdeck-placed` exists. Overdeck owns the files the
  *   marker lists.
- * - **hand-made**: an untracked `.sageox/` without a marker. Overdeck uses it
- *   and never changes it.
- * - **absent**: no `.sageox/`. Overdeck places the binding when one exists.
+ * - **hand-made**: an untracked `.sageox/` without a marker that holds a
+ *   `config.json` (or is a symlink). Overdeck uses it and never changes it.
+ * - **absent**: no `.sageox/`, or a real untracked `.sageox/` with neither a
+ *   marker nor a `config.json` — what switch-off leaves behind (`ox`'s
+ *   `logs/`, `cache/`, …). Overdeck places the binding when one exists, so
+ *   switching SageOx off and on again restores it.
  *
  * Placement order (AD-16): hide first, then copy, then write the marker, so a
  * half-placed `.sageox/` never shows in `git status`. Copies are atomic (temp
  * file + rename) and skip files whose bytes already match.
+ *
+ * Switch-off (AD-17, WI-12): when SageOx resolves off, the launch removes the
+ * marker-listed files git does not track, then the marker. It keeps the hide
+ * and everything `ox` wrote at run time (`logs/`, `cache/`, `sessions/`, …).
  *
  * The marker lives in the worktree and is untrusted: every path it names is
  * resolved inside `<root>/.sageox/` before Overdeck deletes it.
@@ -22,7 +29,7 @@
  */
 import { execFile } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { copyFile, lstat, mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { copyFile, lstat, mkdir, readFile, realpath, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { setExcludeBlock } from '../git/worktree-exclude.js';
@@ -81,9 +88,27 @@ export async function sageoxDirState(root: string): Promise<SageoxDirState> {
   const dir = join(root, SAGEOX_DIR);
   // The marker counts only inside a real directory; a symlinked `.sageox/`
   // is the operator's, so it is hand-made and never written through.
-  if ((await exists(lstat(dir), 'dir')) && (await exists(lstat(join(dir, PLACEMENT_MARKER)), 'file'))) return 'placed';
+  const realDir = await exists(lstat(dir), 'dir');
+  if (realDir && (await exists(lstat(join(dir, PLACEMENT_MARKER)), 'file'))) return 'placed';
+  // No marker and no config.json: only runtime leftovers, nothing hand-made to protect.
+  if (realDir && !(await exists(lstat(join(dir, 'config.json')), 'file'))) return 'absent';
   if (await exists(stat(dir), 'dir')) return 'hand-made';
   return 'absent';
+}
+
+/**
+ * True when `target`'s real parent folder is still inside `<root>/.sageox/`.
+ * A symlinked folder inside `.sageox/` could point anywhere, so a delete
+ * through it is refused.
+ */
+async function realParentInsideSageox(root: string, target: string): Promise<boolean> {
+  const [realBase, realParent] = await Promise.all([
+    realpath(resolve(root, SAGEOX_DIR)).catch(() => null),
+    realpath(dirname(target)).catch(() => null),
+  ]);
+  if (!realBase || !realParent) return false;
+  const rel = relative(realBase, realParent);
+  return !rel.startsWith('..') && !isAbsolute(rel);
 }
 
 /** The marker's project key and file list; an empty list when it is missing or invalid. */
@@ -165,6 +190,7 @@ export async function ensureSageoxPlaced(
     for (const file of previous.files) {
       const target = insideSageox(root, file);
       if (!target || keep.has(target)) continue;
+      if (!(await realParentInsideSageox(root, target))) continue;
       const rel = relative(resolve(root, SAGEOX_DIR), target).split('\\').join('/');
       if (await isTracked(root, rel)) continue;
       // Only files: a marker entry naming a directory deletes nothing.
@@ -181,4 +207,35 @@ export async function ensureSageoxPlaced(
   const marker: PlacementMarker = { version: 1, projectKey, files, placedAt: new Date().toISOString() };
   await writeAtomic(join(root, SAGEOX_DIR, PLACEMENT_MARKER), temp => writeFile(temp, `${JSON.stringify(marker, null, 2)}\n`, 'utf8'));
   return { ok: true, state: 'placed' };
+}
+
+/**
+ * Remove a placed SageOx binding from `root` (AD-17). Without a marker this
+ * returns at once and runs no git command, so launches that never used SageOx
+ * pay one `lstat`. Otherwise it deletes each marker-listed file that resolves
+ * inside `<root>/.sageox/` and that git does not track, then the marker. The
+ * exclude block and every other file stay.
+ */
+export async function removeSageoxPlacement(root: string): Promise<{ removed: string[] }> {
+  const dir = join(root, SAGEOX_DIR);
+  const markerPath = join(dir, PLACEMENT_MARKER);
+  // Same rule as sageoxDirState: a symlinked `.sageox/` is never placed, so nothing to remove.
+  if (!(await exists(lstat(dir), 'dir')) || !(await exists(lstat(markerPath), 'file'))) return { removed: [] };
+
+  const { files } = await readMarker(root);
+  const base = resolve(root, SAGEOX_DIR);
+  const removed: string[] = [];
+  for (const file of files) {
+    const target = insideSageox(root, file);
+    if (!target || !(await realParentInsideSageox(root, target))) continue;
+    const rel = relative(base, target).split('\\').join('/');
+    if (await isTracked(root, rel)) continue;
+    // Only files: a marker entry naming a directory deletes nothing.
+    const stats = await lstat(target).catch(() => null);
+    if (!stats || stats.isDirectory()) continue;
+    await rm(target, { force: true });
+    removed.push(rel);
+  }
+  if (!(await isTracked(root, PLACEMENT_MARKER))) await rm(markerPath, { force: true });
+  return { removed };
 }
