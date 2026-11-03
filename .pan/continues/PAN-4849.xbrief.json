@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4849",
   "created": "2026-11-03T03:09:47.454Z",
-  "updated": "2026-11-03T05:08:28.766Z",
+  "updated": "2026-11-03T05:08:49.140Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -316,6 +316,10 @@
     "scope-dag.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T05:08:28.765Z"
+    },
+    "gates-panel.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:08:49.140Z"
     }
   }
 }
