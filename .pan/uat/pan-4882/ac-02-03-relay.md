@@ -88,3 +88,46 @@ Not run. No relay channel ever opened, so there was no relay traffic to capture.
 `/root/tls-keys.log` never left the VM and is destroyed with it in "Cleanup".
 
 AC-2 relay half: not-run — device code not approved after 57 min
+
+## TCP 443 only
+
+Not run, for the same reason as "UDP blocked": without a sign-in there is no link to reconnect over a TCP-443-only
+firewall. No firewall rule was applied.
+
+TCP 443 only: not-run — device code not approved after 57 min
+
+## Cleanup
+
+```
+$ fly ssh console … -C "sh -c 'pkill -f \"pan account login\"; HOME=/root pan account logout'"
+Error: ssh shell: Process exited with status 4294967295
+```
+
+`pkill -f` matched its own `sh -c` command line and ended the session before `pan account logout` ran. The VM was
+never signed in (`pan account status` → `Not signed in` at 07:34), so it held no account credentials, and it was
+destroyed next. Home never linked to it, so `pan machines unlink` and `pan machines forget` had nothing to act on.
+
+```
+$ pan machines list --json | jq -c '{links: [.links[].label], inbound: [.inbound[]?.label]}'
+{"links":[],"inbound":[]}
+$ fly machine destroy 874235c0e259e8 -a pan-workspaces --force
+874235c0e259e8 has been destroyed
+$ fly machines list -a pan-workspaces
+No machines are available on this app pan-workspaces
+$ fly volumes list -a pan-workspaces
+ ID │ STATE │ NAME │ SIZE │ REGION │ ZONE │ ENCRYPTED │ ATTACHED VM │ CREATED AT       # empty
+$ pan machines directory --json | jq -c '{plan, machines: [.machines[].label]}'
+{"plan":"tester","machines":["eltmon-z790"]}
+```
+
+The TLS key log and the VM's internal token were destroyed with the VM; neither was copied off it.
+
+## Result
+
+The PAN-4862 live relay check did not run for the second time. Its fix (`04f8bccc9df`) is in the deployed build and
+the published 0.73.0, and is covered by unit tests only. To replay it, run the Setup above on a fresh VM while the
+operator is available to approve the code within its ~14 min life, then follow PRD `.pan/drafts/PAN-4882.md`
+WI-3 to WI-5.
+
+Status: not-run — AC-2 relay half: device code not approved after 57 min (three codes expired)
+Status: not-run — AC-3 relay: device code not approved after 57 min (three codes expired)
