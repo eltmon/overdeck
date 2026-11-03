@@ -5,6 +5,7 @@ import { addClientToHub, addHubListener, notifyHubSize, type PtyHub } from '../p
 import {
   attachHubPty,
   parseTmuxClientSize,
+  snapshotLines,
   subscribeToTmuxHub,
   type TmuxHubDeps,
 } from '../pty-hub-attach.js';
@@ -127,6 +128,14 @@ describe('parseTmuxClientSize', () => {
   });
 });
 
+describe('snapshotLines', () => {
+  it('turns capture-pane LFs into CRLFs and drops the final LF', () => {
+    expect(snapshotLines('one\ntwo\n\nfour\n')).toBe('one\r\ntwo\r\n\r\nfour');
+    expect(snapshotLines('a\r\nb')).toBe('a\r\nb');
+    expect(snapshotLines('')).toBe('');
+  });
+});
+
 describe('subscribeToTmuxHub', () => {
   let hubs: Map<string, PtyHub>;
   const allPtys: Array<ReturnType<typeof makeFakePty>> = [];
@@ -237,6 +246,13 @@ describe('subscribeToTmuxHub', () => {
       { kind: 'output', data: 'ab' },
       { kind: 'output', data: 'c' },
     ]);
+  });
+
+  it('sends the captured lines with CRLF endings', async () => {
+    existingHub();
+    const frames: TerminalFrame[] = [];
+    await subscribeToTmuxHub('sess', (f) => frames.push(f), makeDeps({ captureViewport: async () => 'top\n  indented\n' }));
+    expect(frames).toEqual([{ kind: 'snapshot', cols: 120, rows: 40, data: 'top\r\n  indented' }]);
   });
 
   it('forwards a hub resize after the snapshot as a size frame', async () => {

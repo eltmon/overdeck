@@ -123,6 +123,15 @@ export const productionTmuxHubDeps: TmuxHubDeps = {
   spawn: spawnTmuxAttachPty,
 };
 
+/**
+ * `capture-pane -p` ends every line with a bare LF. A terminal without convertEol moves down a row
+ * but keeps the column, so each line would start where the last one ended: use CRLF instead, and
+ * drop the final line's LF so a full screen does not scroll its top row away.
+ */
+export function snapshotLines(capture: string): string {
+  return capture.replace(/\r?\n$/, '').replace(/\r?\n/g, '\r\n');
+}
+
 /** Streams a tmux session's hub as TerminalFrames; null when the session does not exist. The subscription has no write method. */
 export async function subscribeToTmuxHub(
   sessionName: string,
@@ -195,7 +204,7 @@ export async function subscribeToTmuxHub(
     },
   };
 
-  const data = await deps.captureViewport(sessionName).catch(() => '');
+  const data = snapshotLines(await deps.captureViewport(sessionName).catch(() => ''));
   if (closed) return subscription;
   snapshotSent = true;
   onFrame({ kind: 'snapshot', cols: subscribedHub.cols, rows: subscribedHub.rows, data });
