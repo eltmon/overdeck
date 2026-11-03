@@ -4,17 +4,17 @@
     "created": "2026-11-03T20:53:31Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4839: Phone app (iOS): counts-only Live Activity",
-    "updated": "2026-11-03T20:59:52.635Z"
+    "updated": "2026-11-03T21:00:56.439Z"
   },
   "plan": {
     "id": "pan-4839",
     "title": "Phone app (iOS): counts-only Live Activity",
-    "status": "proposed",
+    "status": "running",
     "uid": "7073e889-ba77-4a0f-8ee2-782e089e61ce",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-03T20:53:31Z",
-    "updated": "2026-11-03T20:59:52.635Z",
+    "updated": "2026-11-03T21:00:56.439Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4839",
@@ -1096,5 +1096,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
