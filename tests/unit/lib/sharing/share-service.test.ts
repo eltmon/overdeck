@@ -9,9 +9,11 @@ import {
   DEFAULT_SHARE_URL,
   deleteRoom,
   hostSocketUrl,
+  joinSocketUrl,
   parseShareUrl,
   readShareUrl,
   SHARE_HTTP_TIMEOUT_MS,
+  shareOrigin,
 } from '../../../../src/lib/sharing/share-service.js';
 
 const originalHome = process.env.OVERDECK_HOME;
@@ -82,6 +84,16 @@ describe('anywhere.share_url', () => {
   it('hostSocketUrl maps https to wss and http to ws (ac1)', () => {
     expect(hostSocketUrl('https://share.overdeck.ai', 'BCDFGHJK')).toBe('wss://share.overdeck.ai/v1/rooms/BCDFGHJK/host?v=1');
     expect(hostSocketUrl('http://127.0.0.1:8787', 'BCDFGHJK')).toBe('ws://127.0.0.1:8787/v1/rooms/BCDFGHJK/host?v=1');
+  });
+
+  it('joinSocketUrl maps https to wss and http to ws', () => {
+    expect(joinSocketUrl('https://share.overdeck.ai', 'BCDFGHJK')).toBe('wss://share.overdeck.ai/v1/rooms/BCDFGHJK/join?v=1');
+    expect(joinSocketUrl('http://127.0.0.1:8787', 'BCDFGHJK')).toBe('ws://127.0.0.1:8787/v1/rooms/BCDFGHJK/join?v=1');
+  });
+
+  it('shareOrigin returns the origin of a parsed share URL', () => {
+    expect(shareOrigin('https://share.overdeck.ai')).toBe('https://share.overdeck.ai');
+    expect(shareOrigin('http://127.0.0.1:8787')).toBe('http://127.0.0.1:8787');
   });
 });
 
