@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4869",
+  "created": "2026-11-03T03:24:34.404Z",
+  "updated": "2026-11-03T03:24:34.404Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "anywhere-dialog-host": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4869",
+      "claimedAt": "2026-11-03T03:24:34.404Z"
+    }
+  }
+}
