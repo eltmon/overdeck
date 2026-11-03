@@ -19,12 +19,12 @@ export function LimitResetNotice({ limit, onSchedule, disabled }: {
     : 'This conversation hit a usage limit; the reset time is unknown.';
   return (
     <div className={styles.composerBox} role="status" data-testid="limit-reset-notice">
-      <p className="text-muted-foreground">{label}</p>
-      <p>
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-3 py-2 text-[13px]">
+        <p className="text-muted-foreground">{label}</p>
         <button type="button" className={BUTTON} onClick={onSchedule} disabled={disabled}>
           Send when limits reset
         </button>
-      </p>
+      </div>
     </div>
   );
 }

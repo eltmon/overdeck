@@ -6545,8 +6545,12 @@
 .headerMachineChip {
   font-family: var(--font-mono-ui);
   font-size: 11px;
-  padding: 1px 7px;
+  padding: 2px 8px;
   font-weight: 400;
+  gap: 5px;
+  /* One line: long hostnames ellipsis inside the chip (full label in the tooltip). */
+  max-width: 280px;
+  white-space: nowrap;
 }
 
 .machineBanner {

@@ -9,6 +9,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { ArrowDownToLine, ArrowUpRight, CloudOff, ExternalLink, FileText, Loader2, MonitorSmartphone, RefreshCw } from 'lucide-react';
 
 import type { Conversation } from '../CommandDeck/ConversationList';
+import { chipMachineLabel } from '../CommandDeck/LinkedConversationRow';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 import { reconnectMachine } from '../Settings/anywhere/machinesApi';
 import { MenuItemButton } from '../shared/ContextMenu';
@@ -161,8 +162,8 @@ export function ConversationMachineChip({ conversation }: { conversation: Conver
       title={online ? `Remote control: this conversation runs on ${label}` : `${label} is offline`}
       data-testid="machine-chip"
     >
-      <MonitorSmartphone size={12} />
-      on {label}
+      <MonitorSmartphone size={12} className="shrink-0" />
+      <span className={styles.conversationBranchChipText}>on {chipMachineLabel(label)}</span>
     </span>
   );
 }
