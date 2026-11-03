@@ -141,6 +141,44 @@ describe('MobileApp', () => {
 
 const CODE = `odp_${'ab12'.repeat(16)}`;
 
+describe('MobileApp in the phone app (PAN-4837)', () => {
+  const register = vi.fn(async () => ({}) as ServiceWorkerRegistration);
+  const native = globalThis as { __OVERDECK_NATIVE__?: boolean };
+
+  beforeEach(() => {
+    window.history.replaceState(null, '', '/m');
+    native.__OVERDECK_NATIVE__ = true;
+    Object.defineProperty(window, 'isSecureContext', { configurable: true, value: true });
+    Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: { register } });
+    register.mockClear();
+    vi.stubEnv('DEV', false);
+  });
+
+  afterEach(() => {
+    delete native.__OVERDECK_NATIVE__;
+    vi.unstubAllEnvs();
+    useConnectionState.setState({ sessionAuthFailed: false });
+  });
+
+  it('never shows the PWA pair screen, even when the session mint failed', () => {
+    useConnectionState.setState({ sessionAuthFailed: true });
+    render(<MobileApp />);
+    expect(screen.queryByRole('heading', { name: 'Pair this phone' })).not.toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'Phone sections' })).toBeInTheDocument();
+  });
+
+  it('renders headerSlot in place of the install control and registers no service worker', () => {
+    render(<MobileApp headerSlot={<button type="button">desk ▾</button>} />);
+    const event = Object.assign(new Event('beforeinstallprompt', { cancelable: true }), { prompt: vi.fn(async () => {}) });
+    act(() => {
+      window.dispatchEvent(event);
+    });
+    expect(screen.getByRole('button', { name: 'desk ▾' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Install app' })).not.toBeInTheDocument();
+    expect(register).not.toHaveBeenCalled();
+  });
+});
+
 describe('parsePairingInput', () => {
   const origin = 'https://desk.ts.net';
 

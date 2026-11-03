@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { buildPhonePairLink, PHONE_PAIR_LINK_PREFIX } from "../index"
+import { buildPhonePairLink, parsePhonePairLink, PHONE_PAIR_LINK_PREFIX } from "../index"
 
 const ENV = "0b5c6c1e-3f2a-4d8e-9a7b-1c2d3e4f5a6b"
 const KEY = "ab".repeat(32)
@@ -38,5 +38,30 @@ describe("buildPhonePairLink", () => {
     expect(buildPhonePairLink).toBeDefined()
     expect(PHONE_PAIR_LINK_PREFIX).toBeDefined()
     expect(PHONE_PAIR_LINK_PREFIX).toBe("ai.overdeck.app:/pair#")
+  })
+})
+
+describe("parsePhonePairLink", () => {
+  const input = { environmentId: ENV, machineKeyHex: KEY, code: CODE }
+  const link = buildPhonePairLink(input)
+
+  it("round-trips buildPhonePairLink", () => {
+    expect(parsePhonePairLink(link)).toEqual(input)
+  })
+
+  it("accepts surrounding whitespace", () => {
+    expect(parsePhonePairLink(`  ${link}\n`)).toEqual(input)
+  })
+
+  it.each([
+    ["the :// form", link.replace("ai.overdeck.app:/pair#", "ai.overdeck.app://pair#")],
+    ["version 2", link.replace("v=1", "v=2")],
+    ["an uppercase machine key", link.replace(KEY, KEY.toUpperCase())],
+    ["a missing code", link.replace(`&c=${CODE}`, "")],
+    ["an https URL", `https://overdeck.ai/pair#v=1&e=${ENV}&k=${KEY}&c=${CODE}`],
+    ["a non-v4 environment id", link.replace(ENV, "0b5c6c1e-3f2a-1d8e-9a7b-1c2d3e4f5a6b")],
+    ["empty text", ""],
+  ])("returns null for %s", (_name, text) => {
+    expect(parsePhonePairLink(text)).toBeNull()
   })
 })

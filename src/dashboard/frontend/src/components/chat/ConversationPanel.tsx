@@ -40,6 +40,7 @@ import { ConversationBookmarksProvider } from './bookmarks/ConversationBookmarks
 import { BookmarksToggle, BookmarksDrawer } from './bookmarks/BookmarksDrawer';
 import { PullRequestMenuItems } from '../CommandDeck/PullRequestMenuItems';
 import { parseDiffRouteSearch } from '../../lib/diffRouteSearch';
+import { isNativeShell } from '../../lib/nativeShell';
 import { useConfirm } from '../DialogProvider';
 import { useConversationMutations } from '../CommandDeck/useConversationMutations';
 import { ForkModal } from '../CommandDeck/ForkModal';
@@ -572,6 +573,7 @@ export function ConversationPanel({
   }, [resumeMutation]);
 
   const archivePending = convMutations.isArchivePending(conversation.name);
+  const native = isNativeShell(); // The phone app (PAN-4837): hide what its phone token cannot do.
   const handleArchive = useCallback(() => {
     convMutations.archive(conversation.name, { onSuccess: onArchived });
   }, [convMutations, conversation.name, onArchived]);
@@ -735,7 +737,7 @@ export function ConversationPanel({
                     </span>
                   )}
                   <button
-                    className={styles.conversationTitleEditBtn} hidden={!isLiveMachineState(machineState)}
+                    className={styles.conversationTitleEditBtn} hidden={native || !isLiveMachineState(machineState)}
                     onClick={startEditingTitle}
                     title="Rename conversation"
                     aria-label={`Rename ${conversation.name}`}
@@ -847,6 +849,7 @@ export function ConversationPanel({
                       returnFocusRef={menuTriggerRef}
                       className="absolute right-0 top-full z-[1000] mt-1 min-w-[220px]"
                     >
+                      {!native && (<>
                       <MenuItemButton
                         active={conversation.isFavorited}
                         onClick={() => { convMutations.toggleFavorite({ name: conversation.name, favorited: !!conversation.isFavorited }); setMenuOpen(false); }}
@@ -935,6 +938,7 @@ export function ConversationPanel({
                           Open handoff target
                         </MenuItemButton>
                       )}
+                      </>)}
 
                       {(conversation.sessionAlive || onArchived) && (
                         <MenuSeparator />
@@ -947,7 +951,7 @@ export function ConversationPanel({
                           Stop agent
                         </MenuItemButton>
                       )}
-                      {onArchived && (
+                      {onArchived && !native && (
                         <MenuItemButton
                           destructive
                           disabled={archivePending}
@@ -984,8 +988,7 @@ export function ConversationPanel({
             </span>
             <ConversationBranchMeta conversation={conversation} />
             <ConversationMachineChip conversation={conversation} />
-            <span className={styles.conversationMetaSep} aria-hidden>·</span>
-            <PanOpenInPicker openInCwd={conversation.cwd} remote={conversation.origin === 'linked' ? { conversation: conversation.name } : undefined} />
+            {!native && <><span className={styles.conversationMetaSep} aria-hidden>·</span><PanOpenInPicker openInCwd={conversation.cwd} remote={conversation.origin === 'linked' ? { conversation: conversation.name } : undefined} /></>}
             {conversation.totalCost !== undefined && conversation.totalCost > 0 && (
               <>
                 <span className={styles.conversationMetaSep} aria-hidden>·</span>
@@ -1037,7 +1040,7 @@ export function ConversationPanel({
             <ConversationView
               conversation={conversation}
               onResume={!acceptsInput(conversation) ? undefined : onEmbeddedResume ?? (!embedded && !showTerminal && !isSpawningHeader ? handleResume : undefined)}
-              onArchive={!embedded ? handleArchive : undefined}
+              onArchive={!embedded && !native ? handleArchive : undefined}
               archivePending={archivePending}
               resumePending={resumeMutation.isPending}
               resumeLabel={embeddedResumeLabel}
@@ -1064,7 +1067,7 @@ export function ConversationPanel({
               targetMessageIndex={mainTarget ? targetMessageIndex : undefined}
               targetMessageNonce={mainTarget ? targetMessageNonce : undefined}
               onTargetMessageHandled={mainTarget ? onTargetMessageHandled : undefined}
-              modelPicker={!embedded ? (
+              modelPicker={!embedded && !native ? (
                 <ModelPicker
                   value={selectedModel}
                   harness={selectedHarness}
@@ -1367,7 +1370,7 @@ function ConversationView({ conversation, onResume, onArchive, archivePending = 
           <p className={styles.conversationEmptyStateTitle}>Failed to start</p>
           <p className={styles.conversationEmptyStateSubtitle}>{conversation.spawnError}</p>
           <div style={{ display: 'flex', gap: 8, marginTop: 12, alignItems: 'center' }}>
-            <button className={styles.conversationArchiveBtnLarge} onClick={() => onArchive?.()} disabled={archivePending}>
+            <button className={styles.conversationArchiveBtnLarge} hidden={isNativeShell()} onClick={() => onArchive?.()} disabled={archivePending}>
               {archivePending ? 'Archiving…' : 'Archive'}
             </button>
           </div>
@@ -1424,7 +1427,7 @@ function ConversationView({ conversation, onResume, onArchive, archivePending = 
                 className={styles.conversationResumeControls}
               />
             )}
-            <button className={styles.conversationArchiveBtnLarge} onClick={() => onArchive?.()} disabled={archivePending}>
+            <button className={styles.conversationArchiveBtnLarge} hidden={isNativeShell()} onClick={() => onArchive?.()} disabled={archivePending}>
               {archivePending ? 'Archiving…' : 'Archive'}
             </button>
           </div>

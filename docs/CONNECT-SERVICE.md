@@ -33,6 +33,7 @@ The wire protocol is `packages/contracts/src/connect.ts` (runtime-import-free so
 ## Phone clients (PAN-4829)
 
 - **Role.** A socket's first valid hello fixes its role: `hello` makes it a machine, `hello-client` a phone. The decoder then accepts only that role's frames; a cross-role frame is `bad_frame`.
+- **Phone key.** A phone's `hello-client.publicKeyHex` is its install-level push public key (PAN-4837 C-2). Link keys are per machine and never reach the directory.
 - **Welcome.** `welcome-client` carries the protocol, the plan, `relayAllowed` and the account's machines with their online state.
 - **Broadcasts.** Phones receive every `directory` frame machines receive and every `relay-status`, but never approvals or inbox frames. No machine frame ever lists a phone.
 - **Signals.** A phone signals an online machine with `purpose: 'link'` only, and the machine sees `from` = the phone's `clientId`. A machine's `link` signal to an online phone arrives with `from` = its environment id. Phone to phone is `bad_frame`; an offline target is `peer_offline`.
