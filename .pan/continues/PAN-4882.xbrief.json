@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4882",
+  "created": "2026-11-03T06:27:51.535Z",
+  "updated": "2026-11-03T06:27:51.536Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "preflight": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4882",
+      "claimedAt": "2026-11-03T06:27:51.535Z"
+    }
+  }
+}
