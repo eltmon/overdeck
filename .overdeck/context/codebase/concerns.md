@@ -636,4 +636,9 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   `version-mismatch`. Both pin to home's version, not npm `latest`, so a newer `latest` is harmless (PAN-4882
   ran on home 0.73.0 with `latest` 0.73.1). Only a deployed version not yet on npm breaks both until it is
   published; live checks then need a branch image built from the deployed commit.
+- **`npx @overdeck/core <verb>` depends on bin aliasing** (PAN-4480) — npm's
+  `get-bin-from-manifest.js` runs a multi-bin package only when every `bin` value is the same file
+  (or one bin is named `core`). `package.json` maps `overdeck` and `pan` to `./dist/cli/index.js`, so
+  the zero-install `npx @overdeck/core join <CODE>` on the share invite page works. A bin with a
+  different target breaks it with "could not determine executable to run".
 <!-- last-verified: 2026-11-03 -->
