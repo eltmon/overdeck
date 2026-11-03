@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T21:34:41.316843Z · model: claude-opus-5-5 · open: 895_
+_Last sequenced: 2026-11-03T21:37:10.377622Z · model: claude-opus-5-5 · open: 895_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -682,7 +682,7 @@ _Last sequenced: 2026-11-03T21:34:41.316843Z · model: claude-opus-5-5 · open: 
 | 683 | PAN-1983 | L | low | ok |  |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
 | 684 | PAN-2672 | S | low | needs-refinement |  |  | Transcript half reported fixed; parent-stays-ended half moved to PAN-4485. Verify on current build, then close. |
 | 685 | PAN-1958 | M | low | ok |  |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
-| 686 | PAN-4959 | L | medium | needs-refinement |  | PAN-4294 | Anywhere account page (plan, relay allowance, machines, Creem portal, delete) + dashboard card; waits on PAN-4294 billing and OD. |
+| 686 | PAN-4959 | L | medium | ok |  |  | Anywhere account page (plan, relay allowance, machines, Creem portal, delete) + dashboard card; waits on PAN-4294 billing and OD. |
 | 687 | PAN-1907 | M | low | ok |  |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every… |
 | 688 | PAN-1895 | M | low | ok |  |  | Spawn work agents from issue workspace slide-out |
 | 689 | PAN-1878 | M | low | ok |  |  | process: bake 'docs updated' into acceptance criteria / definition-of-done in role + planning prompts |
@@ -1230,7 +1230,7 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T21:34:41.316843Z",
+  "generatedAt": "2026-11-03T21:37:10.377622Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 895,
@@ -12457,10 +12457,8 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "size": "L",
       "importance": "medium",
       "score": 24,
-      "condition": "needs-refinement",
-      "dependsOn": [
-        "PAN-4294"
-      ],
+      "condition": "ok",
+      "dependsOn": [],
       "why": "Anywhere account page (plan, relay allowance, machines, Creem portal, delete) + dashboard card; waits on PAN-4294 billing and OD.",
       "rationale": "New child of PAN-2350 filed 2026-11-03; it depends on PAN-4294 billing (rank 663) so it takes the free slot after it, and stays needs-refinement until the operator decides whether it ships with billing or read-only first.",
       "gate": "auto",
