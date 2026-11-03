@@ -192,6 +192,18 @@ export function errorFrame(code: ConnectErrorCode, message: string, extra?: { re
   return { type: 'error', code, message, ...extra };
 }
 
+/**
+ * A `directory` frame for the other machines and every phone (PAN-4829 FR-5). Approvals and inbox
+ * frames never use this: `others` stays machine-only, so phones never receive them.
+ */
+function broadcastDirectory(machines: DirectoryMachine[]): DirectoryEffect[] {
+  const frame = { type: 'directory', machines } as const;
+  return [
+    { kind: 'send', to: 'others', frame },
+    { kind: 'send', to: 'clients', frame },
+  ];
+}
+
 /** True when a live approval lets `a` and `b` exchange approval signals, in either direction. */
 function approvalBetween(approvals: readonly ApprovalRow[], a: string, b: string): boolean {
   const pairs = (from: string, to: string) => (r: ApprovalRow) => r.fromEnv === from && (r.toEnv === null || r.toEnv === to);
@@ -297,7 +309,7 @@ function hello(state: DirectoryState, event: Extract<DirectoryEvent, { kind: 'he
         machines,
       },
     },
-    { kind: 'send', to: 'others', frame: { type: 'directory', machines } },
+    ...broadcastDirectory(machines),
   );
   for (const approval of next.approvals) {
     if (approval.fromEnv === env || (approval.toEnv !== null && approval.toEnv !== env)) continue;
@@ -332,7 +344,7 @@ function frame(state: DirectoryState, event: Extract<DirectoryEvent, { kind: 'fr
         state: next,
         effects: [
           { kind: 'put-machine', row: updated },
-          { kind: 'send', to: 'others', frame: { type: 'directory', machines: toDirectoryMachines(next.machines, withOnline(ctx.online, self)) } },
+          ...broadcastDirectory(toDirectoryMachines(next.machines, withOnline(ctx.online, self))),
           { kind: 'log', type: f.type, environmentId: self, outcome: 'ok' },
         ],
       };
@@ -355,7 +367,7 @@ function frame(state: DirectoryState, event: Extract<DirectoryEvent, { kind: 'fr
           { kind: 'delete-machine', environmentId: target },
           ...dropped.map((r) => ({ kind: 'delete-approval', requestId: r.requestId }) as const),
           { kind: 'inbox-forget', environmentId: target },
-          { kind: 'send', to: 'others', frame: { type: 'directory', machines: toDirectoryMachines(next.machines, online) } },
+          ...broadcastDirectory(toDirectoryMachines(next.machines, online)),
           ...(self === target
             ? []
             : [{ kind: 'send', to: 'self', frame: { type: 'directory', machines: toDirectoryMachines(next.machines, online) } } as const]),
@@ -528,7 +540,7 @@ function reduceLive(state: DirectoryState, event: DirectoryEvent, ctx: ReduceCon
         state: next,
         effects: [
           { kind: 'put-machine', row: updated },
-          { kind: 'send', to: 'others', frame: { type: 'directory', machines: toDirectoryMachines(next.machines, ctx.online) } },
+          ...broadcastDirectory(toDirectoryMachines(next.machines, ctx.online)),
           { kind: 'log', type: 'close', environmentId: event.registeredAs, outcome: 'offline' },
         ],
       };

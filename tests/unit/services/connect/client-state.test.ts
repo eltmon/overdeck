@@ -269,3 +269,63 @@ describe('client reducer: signals, ICE servers and relay metering (PAN-4829 WI-4
     ]);
   });
 });
+
+describe('directory reducer: machine changes reach phones (PAN-4829 WI-5)', () => {
+  const withPhone = () => phones(machines(3), 1);
+  const toClients = (effects: DirectoryEffect[]) => sends(effects).filter((e) => e.to === 'clients' || (typeof e.to === 'object' && 'clientId' in e.to));
+  const machineFrames = (effects: DirectoryEffect[]) =>
+    sends(effects).filter((e) => e.frame.type === 'welcome' || (e.frame.type === 'directory' && e.to !== 'clients'));
+
+  function expectOneDirectoryToClients(effects: DirectoryEffect[]) {
+    const out = toClients(effects);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ to: 'clients', frame: { type: 'directory' } });
+    const others = sends(effects).find((e) => e.to === 'others' && e.frame.type === 'directory');
+    expect(out[0]?.frame).toEqual(others?.frame);
+  }
+
+  function expectNoClientIn(effects: DirectoryEffect[]) {
+    const text = JSON.stringify(machineFrames(effects));
+    expect(text).not.toContain(cid(1));
+    expect(text).not.toContain(LABEL_MARKER);
+  }
+
+  it('sends one directory frame to phones on a new and an updated machine hello', () => {
+    for (const n of [4, 2]) {
+      const { effects } = reduce(withPhone(), { kind: 'hello', registeredAs: null, identity: TESTER, frame: machineHello(n), fingerprint: `fp-${n}` }, ctx());
+      expectOneDirectoryToClients(effects);
+      expectNoClientIn(effects);
+    }
+  });
+
+  it('sends one directory frame to phones on endpoints, forget and socket-gone', () => {
+    const endpoints = reduce(withPhone(), { kind: 'frame', registeredAs: env(1), frame: { type: 'endpoints', endpoints: [] } }, ctx());
+    expectOneDirectoryToClients(endpoints.effects);
+    expectNoClientIn(endpoints.effects);
+
+    const forget = reduce(withPhone(), { kind: 'frame', registeredAs: env(1), frame: { type: 'forget', environmentId: env(3) } }, ctx());
+    expectOneDirectoryToClients(forget.effects);
+    expectNoClientIn(forget.effects);
+
+    const gone = reduce(withPhone(), { kind: 'socket-gone', registeredAs: env(2) }, ctx());
+    expectOneDirectoryToClients(gone.effects);
+  });
+
+  it('never sends approvals to phones', () => {
+    const request = reduce(
+      withPhone(),
+      { kind: 'frame', registeredAs: env(1), frame: { type: 'approval-request', requestId: 'd'.repeat(32), to: null } },
+      ctx({ onlineClients: new Set([cid(1)]) }),
+    );
+    expect(sends(request.effects).some((e) => e.frame.type === 'approval-request')).toBe(true);
+    expect(toClients(request.effects)).toEqual([]);
+
+    const cancel = reduce(
+      request.state,
+      { kind: 'frame', registeredAs: env(1), frame: { type: 'approval-cancel', requestId: 'd'.repeat(32) } },
+      ctx({ onlineClients: new Set([cid(1)]) }),
+    );
+    expect(sends(cancel.effects).some((e) => e.frame.type === 'approval-cancel')).toBe(true);
+    expect(toClients(cancel.effects)).toEqual([]);
+  });
+});
