@@ -32,8 +32,8 @@ export function fakeApi(routes: Record<string, DashboardApiResponse>): FakeApi {
   };
 }
 
-export async function connectClient(api: DashboardApi, scopes: readonly string[]): Promise<Client> {
-  const server = createOverdeckMcpServer({ api, scopes });
+export async function connectClient(api: DashboardApi, scopes: readonly string[], isAgent = false): Promise<Client> {
+  const server = createOverdeckMcpServer({ api, scopes, isAgent });
   const client = new Client({ name: 'test', version: '0.0.0' });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   await server.connect(serverTransport);

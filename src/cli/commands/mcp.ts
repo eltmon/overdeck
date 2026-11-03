@@ -52,7 +52,7 @@ export async function runMcpServe(deps: McpServeDeps): Promise<number> {
     return 1;
   }
 
-  const [{ StdioServerTransport }, { getDashboardApiUrl }, { createFetchDashboardApi }, { createOverdeckMcpServer }] = await Promise.all([
+  const [{ StdioServerTransport }, { getDashboardApiUrl }, { createFetchDashboardApi }, { createOverdeckMcpServer, hasAgentId }] = await Promise.all([
     import('@modelcontextprotocol/sdk/server/stdio.js'),
     import('../../lib/config.js'),
     import('../../lib/mcp/dashboard-api.js'),
@@ -61,6 +61,7 @@ export async function runMcpServe(deps: McpServeDeps): Promise<number> {
   const server = createOverdeckMcpServer({
     api: createFetchDashboardApi({ baseUrl: getDashboardApiUrl(), token }),
     scopes: record.scopes,
+    isAgent: hasAgentId(record),
   });
   const closed = new Promise<void>((resolve) => {
     deps.stdin.once('end', resolve);

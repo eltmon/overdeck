@@ -22,7 +22,7 @@ import { READ_TOOLS } from './tools-read.js';
 import { WRITE_TOOLS } from './tools-write.js';
 
 export type { McpToolContext, OverdeckTool } from './tool.js';
-export { routeErrorResult } from './tool.js';
+export { hasAgentId, routeErrorResult } from './tool.js';
 
 export const MCP_SERVER_NAME = 'overdeck';
 /** The server reports a fixed version; `list_machines` carries the real `serverVersion`. */
