@@ -215,6 +215,10 @@ export const MachinesResponse = Schema.Struct({
     load: Schema.optional(Schema.NullOr(LoadSample)),
     tags: Schema.optional(Schema.Array(Schema.String)),
     placement: Schema.optional(MachinePlacementMode),
+    /** PAN-4905: config.toml `[remote] enabled`; the Add a Fly machine dialog reads it before the click. */
+    remoteEnabled: Schema.optional(Schema.Boolean),
+    /** PAN-4905: config.toml as a display path (`~/.overdeck/config.toml`). */
+    remoteConfigFile: Schema.optional(Schema.String),
   }),
   links: Schema.Array(MachineLinkView),
   inbound: Schema.Array(InboundMachineView),
