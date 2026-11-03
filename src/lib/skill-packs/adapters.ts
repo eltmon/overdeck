@@ -90,6 +90,8 @@ export const KNOWN_PACKS: Readonly<Record<string, KnownPack>> = {
     url: 'https://github.com/eltmon/ox',
     adapter: 'plain',
     skillsRoot: 'extensions/skills',
+    // eltmon/ox overdeck/host-managed-v0.25.0 (PAN-4852); see docs/SAGEOX-FORK.md
+    ref: '0e6c7e2df8fd89638a2d40db08cc45d4cff05fdc',
     optIn: [
       'ox-cli-init',
       'ox-cli-attest',
