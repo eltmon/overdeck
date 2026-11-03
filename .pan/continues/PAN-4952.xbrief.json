@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-4952",
   "created": "2026-11-03T21:44:01.651Z",
-  "updated": "2026-11-03T22:17:21.172Z",
+  "updated": "2026-11-03T23:11:16.511Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-03T23:11Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-03T23:11:16.511Z"
+    }
+  ],
   "items": {
     "skill-text": {
       "status": "completed",
@@ -97,5 +103,14 @@
       "status": "completed",
       "doneAt": "2026-11-03T22:17:21.171Z"
     }
-  }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-03T23:11:15Z",
+      "markdownBody": "# CI Failure Feedback for PAN-4952\n\nPull request: https://github.com/eltmon/overdeck/pull/4965 (head `29f79144`)\n\nSource: check_run:test-shard (1/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-shard (1/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/126266323902/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/41736319925/job/126266323902  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/lib/vault/two-machine.e2e.test.ts\u001b[2m > \u001b[22mSession Vault two-machine end-to-end\u001b[2m > \u001b[22mrotation: A rotates, B is refused, B re-joins and resumes pre-rotation history\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/lib/vault/two-machine.e2e.test.ts\u001b[2m > \u001b[22mSession Vault two-machine end-to-end\u001b[2m > \u001b[22mrotation: A rotates, B is refused, B re-joins and resumes pre-rotation history\n\u001b[31m\u001b[1mError\u001b[22m: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m tests/unit/lib/vault/two-machine.e2e.test.ts:\u001b[2m256:3\u001b[22m\u001b[39m\n    \u001b[90m254|\u001b[39m   })\u001b[33m;\u001b[39m\n    \u001b[90m255|\u001b[39m\n    \u001b[90m256|\u001b[39m   it('rotation: A rotates, B is refused, B re-joins and resumes pre-ro…\n    \u001b[90m   |\u001b[39m   \u001b[31m^\u001b[39m\n    \u001b[90m257|\u001b[39m     \u001b[35mconst\u001b[39m \u001b[33mSESSION_B\u001b[39m \u001b[33m=\u001b[39m \u001b[32m'e2eb0000-0000-4000-8000-000000000000'\u001b[39m\u001b[33m;\u001b[39m\n    \u001b[90m258|\u001b[39m     \u001b[35mconst\u001b[39m \u001b[33mB_TEXT\u001b[39m \u001b[33m=\u001b[39m \u001b[32m'a saffron kite over the breakwater'\u001b[39m\u001b[33m;\u001b[39m\n\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m582 passed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[33m2 skipped\u001b[39m\u001b[90m (585)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ]
 }
