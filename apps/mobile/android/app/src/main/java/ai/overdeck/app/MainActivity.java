@@ -9,6 +9,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         // App-local plugins register before the bridge starts in super.onCreate.
         registerPlugin(OverdeckKeysPlugin.class);
+        registerPlugin(OverdeckPushPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }
