@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4931",
   "created": "2026-11-03T21:41:36.078Z",
-  "updated": "2026-11-03T23:10:04.881Z",
+  "updated": "2026-11-03T23:10:29.032Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -102,6 +102,10 @@
     "serve-token-file.ac5": {
       "status": "completed",
       "doneAt": "2026-11-03T23:10:04.881Z"
+    },
+    "mcp-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:10:29.031Z"
     }
   }
 }
