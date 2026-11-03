@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4835",
   "created": "2026-11-03T07:59:34.235Z",
-  "updated": "2026-11-03T09:18:51.447Z",
+  "updated": "2026-11-03T09:19:17.244Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -43,6 +43,11 @@
       "claimedBy": "agent-pan-4835",
       "claimedAt": "2026-11-03T09:04:10.547Z",
       "doneAt": "2026-11-03T09:18:51.447Z"
+    },
+    "phones-self-routes": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4835",
+      "claimedAt": "2026-11-03T09:19:17.244Z"
     }
   }
 }
