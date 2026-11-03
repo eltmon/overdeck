@@ -4,6 +4,7 @@ import { PHONE_PAIR_LINK_PREFIX, parsePhonePairLink } from '@overdeck/contracts'
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 
 import { type DeviceIdentity, loadIdentity } from '../native/keys';
+import { startPushRegistration, unregisterPush } from '../native/push';
 import { type Connection, createConnection } from './connection';
 import { createDirectory, type ShellDirectory } from './directory';
 import { resetTransport } from '../../../../src/dashboard/frontend/src/lib/wsTransport';
@@ -62,6 +63,8 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
   const [signInError, setSignInError] = useState<string | null>(null);
   const [view, setView] = useState<View>({ kind: 'machines' });
   const [services, setServices] = useState<Services | null>(null);
+  // Bumped to restart push registration (PAN-4840 WI-7).
+  const [pushEpoch] = useState(0);
   /** A pair link that arrived before sign-in; it opens the pair screen once signed in. */
   const [pendingPairLink, setPendingPairLink] = useState<string | null>(null);
   const account = useShellStore((s) => s.account);
@@ -141,6 +144,17 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
     };
   }, [identity, account]);
 
+  useEffect(() => {
+    if (!services) return;
+    let stop: (() => void) | null = null;
+    let cancelled = false;
+    void startPushRegistration(services.directory.client).then((s) => (cancelled ? s() : (stop = s)));
+    return () => {
+      cancelled = true;
+      stop?.();
+    };
+  }, [services, pushEpoch]);
+
   const labelFor = useCallback(
     (link: string) => {
       const environmentId = parsePhonePairLink(link)?.environmentId;
@@ -203,6 +217,7 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
         removeSelf: services ? removeSelfOver(services.connection) : () => Promise.reject(new Error('no connection')),
         directory: services?.directory.client ?? null,
         deleteDevice: (record) => deleteAccountDevice(record),
+        unregisterPush,
         resetKeys: resetAllKeys,
         clearStorage: () => localStorage.clear(),
         reload: () => navigate('/'),
