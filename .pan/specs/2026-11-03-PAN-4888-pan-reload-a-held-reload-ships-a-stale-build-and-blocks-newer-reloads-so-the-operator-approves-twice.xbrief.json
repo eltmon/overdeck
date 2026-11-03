@@ -4,17 +4,17 @@
     "created": "2026-11-03T08:06:35Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4888: pan reload: a held reload ships a stale build and blocks newer reloads, so the operator approves twice",
-    "updated": "2026-11-03T08:23:39.692Z"
+    "updated": "2026-11-03T08:25:15.537Z"
   },
   "plan": {
     "id": "pan-4888",
     "title": "pan reload: a held reload ships a stale build and blocks newer reloads, so the operator approves twice",
-    "status": "proposed",
+    "status": "running",
     "uid": "7b98a68d-c6d4-4c73-91d6-fbf4e0890a5b",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-03T08:06:35Z",
-    "updated": "2026-11-03T08:23:39.692Z",
+    "updated": "2026-11-03T08:25:15.537Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4888",
@@ -847,5 +847,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
