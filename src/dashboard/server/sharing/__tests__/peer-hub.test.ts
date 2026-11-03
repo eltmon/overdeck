@@ -550,7 +550,7 @@ describe('PeerHub hello and conversation content', () => {
     expect(detach).toHaveBeenCalledTimes(1);
   });
 
-  it('never writes to or reads from drafts and terminal', async () => {
+  it('never writes to or reads from terminal', async () => {
     const s = setup();
     const peer = await connected(s);
     for (const channel of peer.channels) channel.open();
@@ -561,10 +561,23 @@ describe('PeerHub hello and conversation content', () => {
     expect(peer.channels.map((c) => [c.label, c.onMessage.subscriptions])).toEqual([
       ['control', 1],
       ['conversation', 0],
-      ['drafts', 0],
+      ['drafts', 1],
       ['terminal', 0],
       ['presence', 0],
     ]);
+  });
+
+  it('ignores a control message over the 64 Ki inbound cap (NFR-3)', async () => {
+    const s = setup();
+    const peer = await connected(s);
+    peer.channel('control').open();
+    peer.channel('conversation').open();
+    const big = viewerHello({ padding: 'x'.repeat(70_000) });
+    expect(big.length).toBeGreaterThan(70_000);
+    peer.channel('control').onMessage.emit(big);
+    await settle();
+    expect(s.bridge.attach).not.toHaveBeenCalled();
+    expect(peer.channel('control').sent).toHaveLength(1);
   });
 });
 
@@ -631,5 +644,102 @@ describe('PeerHub presence', () => {
     const peer = await negotiatedWithPresence(s);
     const payload = envelopes(peer.channel('presence'))[0]?.payload as { streams: unknown };
     expect(payload.streams).toEqual([{ streamId: 'conv-a', label: 'conv-a', kind: 'conversation' }]);
+  });
+});
+
+function viewerDraft(payload: Record<string, unknown>, seq = 1): string {
+  return JSON.stringify({ v: 1, ch: 'drafts', streamId: 'conv-a', seq, t: 1, payload });
+}
+
+const draftsSent = (peer: FakePeer) => envelopes(peer.channel('drafts')).map((e) => e.payload as Record<string, unknown>);
+
+describe('PeerHub drafts', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** Admits viewers 7 and 8 and brings both peers to a sent offer. */
+  async function twoViewers(s: ReturnType<typeof setup>): Promise<[FakePeer, FakePeer]> {
+    s.hub.admit(7);
+    s.hub.admit(8);
+    s.hub.onSnapshot(snapshot(participant(7, 'admitted'), participant(8, 'admitted')));
+    await settle();
+    s.hub.onIceServers([]);
+    await settle();
+    const [seven, eight] = s.peers;
+    if (!seven || !eight) throw new Error('no peers');
+    return [seven, eight];
+  }
+
+  function negotiate(peer: FakePeer): void {
+    peer.channel('control').open();
+    peer.channel('control').onMessage.emit(viewerHello());
+  }
+
+  function ready(peer: FakePeer): void {
+    negotiate(peer);
+    peer.channel('drafts').open();
+  }
+
+  it('relays a draft to the other viewers with the sender\'s identity, never to the sender (FR-1)', async () => {
+    const s = setup();
+    const [seven, eight] = await twoViewers(s);
+    ready(seven);
+    ready(eight);
+    seven.channel('drafts').onMessage.emit(viewerDraft({ text: 'hi', authorGithubId: 999, authorLogin: 'mallory' }));
+    expect(draftsSent(eight)).toEqual([{ authorGithubId: 7, authorLogin: 'user7', text: 'hi', updatedAt: expect.any(Number) }]);
+    expect(envelopes(eight.channel('drafts'))[0]?.seq).toBe(1);
+    expect(seven.channel('drafts').sent).toEqual([]);
+    expect(s.hub.draftsView()).toEqual([
+      expect.objectContaining({ githubId: 7, login: 'user7', avatarUrl: 'https://a/7', text: 'hi' }),
+    ]);
+  });
+
+  it('reads no draft before the hello negotiates', async () => {
+    const s = setup();
+    const [seven, eight] = await twoViewers(s);
+    seven.channel('drafts').open();
+    ready(eight);
+    seven.channel('drafts').onMessage.emit(viewerDraft({ text: 'early' }));
+    expect(s.hub.draftsView()).toEqual([]);
+    expect(eight.channel('drafts').sent).toEqual([]);
+  });
+
+  it('sends a later viewer the existing drafts, minus its own, once', async () => {
+    const s = setup();
+    const [seven, eight] = await twoViewers(s);
+    ready(seven);
+    seven.channel('drafts').onMessage.emit(viewerDraft({ text: 'from seven' }));
+    negotiate(eight);
+    eight.channel('drafts').onMessage.emit(viewerDraft({ text: 'mine' }));
+    expect(draftsSent(seven).map((p) => p.text)).toEqual(['mine']);
+    eight.channel('drafts').open();
+    s.hub.onSnapshot(snapshot(participant(7, 'admitted'), participant(8, 'admitted')));
+    expect(draftsSent(eight).map((p) => [p.authorGithubId, p.text])).toEqual([[7, 'from seven']]);
+  });
+
+  it('relays the deletion of a draft whose author left the admitted set', async () => {
+    const s = setup();
+    const [seven, eight] = await twoViewers(s);
+    ready(seven);
+    ready(eight);
+    seven.channel('drafts').onMessage.emit(viewerDraft({ text: 'hi' }));
+    await vi.advanceTimersByTimeAsync(500);
+    s.hub.onSnapshot(snapshot(participant(8, 'admitted')));
+    expect(draftsSent(eight).map((p) => [p.authorGithubId, p.text])).toEqual([[7, 'hi'], [7, '']]);
+    expect(s.hub.draftsView()).toEqual([]);
+  });
+
+  it('ignores a draft payload without a string text', async () => {
+    const s = setup();
+    const [seven] = await twoViewers(s);
+    ready(seven);
+    seven.channel('drafts').onMessage.emit(viewerDraft({ text: 5 }));
+    seven.channel('drafts').onMessage.emit(Buffer.from(viewerDraft({ text: 'binary' })));
+    expect(s.hub.draftsView()).toEqual([]);
   });
 });
