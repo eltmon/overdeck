@@ -343,6 +343,10 @@ When a link drops, the row says why. **froze** means the other dashboard's event
 stalled (it reports its own stalls in the next heartbeat, so a frozen machine is told
 apart from a dead network); **network** means nothing arrived.
 
+Each row in **Settings → Anywhere → Machines** shows the machine's name and state, then
+two lines: the route in use and the access level, then the machine's Overdeck version,
+last heartbeat, load and tags.
+
 ## Sharing conversations
 
 Once two machines are linked, each lists the other's conversations next to its own.
@@ -379,6 +383,9 @@ tones, never status colors.
 
 In the three non-live states the composer is read-only and the conversation cannot be
 renamed.
+
+Machine chips, in the title bar and on conversation rows, drop the `.local` suffix macOS
+adds to hostnames (`studio-mbp.local` shows as "on studio-mbp"); hover a chip for the full name.
 
 ## Remote control
 
