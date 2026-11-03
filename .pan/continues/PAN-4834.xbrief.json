@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4834",
   "created": "2026-11-03T14:27:37.940Z",
-  "updated": "2026-11-03T15:14:30.964Z",
+  "updated": "2026-11-03T15:14:54.242Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -156,6 +156,10 @@
     "cp2-attachment-images.ac2": {
       "status": "completed",
       "doneAt": "2026-11-03T15:14:30.964Z"
+    },
+    "cp2-attachment-images.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:14:54.241Z"
     }
   }
 }
