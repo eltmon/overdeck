@@ -6,6 +6,8 @@
  * the `admit`, `kick` and `revoke` frames this host process sent. A room snapshot can remove an id
  * (the viewer is no longer listed) but never add one. An eligible viewer is in that set and listed
  * as `admitted` and `connected` in the latest snapshot; only eligible viewers get a peer connection.
+ * One exception (PAN-4479 D-4): after a dashboard restart, `ShareManager.resume()` seeds the set once
+ * from the first snapshot's admitted participants.
  *
  * Signaling (D-13, D-14, D-16): the host always offers. Each peer connection carries the five
  * labeled channels, ordered and reliable, created before the offer. ICE servers come from the share
@@ -42,6 +44,14 @@
  * first), the controller and the stream when it opens, and again after every snapshot that changes
  * them. The block list and `connected` never cross the wire.
  *
+ * Control (PRD PAN-4478 FR-2..FR-10, D-2, D-3): the hub keeps the host's own controller appointment,
+ * changed only by a `set-controller` this host sent. The effective controller is the appointed viewer
+ * once the snapshot confirms it, and the data owner otherwise; presence carries the effective
+ * controller, never the raw snapshot value. After a hello negotiates, the host sends the peer its own
+ * `identity`. A negotiated, eligible viewer that is the effective controller may send `command` (a
+ * share command, checked by `controlRefusal` and relayed as a host frame) and `controller-send` (a
+ * prompt queued as a controller send credited to that viewer); each is answered with a `command-ack`.
+ *
  * Plain async class with injected seams (slice 2's D-8). Nothing here logs signaling data, ICE
  * credentials or content.
  */
@@ -59,12 +69,14 @@ import {
   type HostFrame,
   type IceServer,
   type PresencePayload,
+  type RoomParticipant,
   type RoomSnapshot,
   type ShareDraftView,
   type ShareIdentity,
   type ShareQueueView,
   type ShareScope,
   type SharedSubmitReason,
+  type SharedCommandRefusal,
   type SharedChannel,
   type SharedHello,
   type SignalData,
@@ -73,6 +85,7 @@ import {
 import { RTCPeerConnection } from 'werift';
 
 import { ChannelWriter, type WritableDataChannel } from './channel-writer.js';
+import { ControllerState, controlRefusal, readControllerCommand } from './controller.js';
 import {
   ConversationBridge,
   conversationLabel,
@@ -138,6 +151,11 @@ export interface HostHub {
   queueView(): ShareQueueView;
   /** Queues a controller send; `draftGithubId` credits and clears that viewer's draft (D-1). */
   sendFromController(input: SendSharePromptRequest, controller: ShareIdentity | null): ControllerSendResult;
+  /** The host's effective controller (D-2); null before the first snapshot. */
+  controllerGithubId(): number | null;
+  isHostAdmitted(githubId: number): boolean;
+  /** Records a set-controller this host sent (FR-2). */
+  appoint(githubId: number): void;
   close(): void;
 }
 
@@ -198,6 +216,7 @@ interface PendingIce {
 
 export class PeerHub implements HostHub {
   private readonly hostAdmitted = new Set<number>();
+  private readonly controller = new ControllerState();
   private readonly peers = new Map<number, PeerEntry>();
   private snapshot: RoomSnapshot | null = null;
   private closed = false;
@@ -251,6 +270,7 @@ export class PeerHub implements HostHub {
     if (this.closed) return;
     const previous = this.snapshot;
     this.snapshot = snapshot;
+    this.controller.onSnapshot(snapshot);
     const listed = new Set(snapshot.participants.map((participant) => participant.githubId));
     for (const githubId of [...this.hostAdmitted]) {
       if (!listed.has(githubId)) this.hostAdmitted.delete(githubId);
@@ -302,6 +322,22 @@ export class PeerHub implements HostHub {
       if (entry) this.sendEnvelope(entry, 'control', { kind: 'draft-sent' });
     }
     return { ok: true, position: result.position };
+  }
+
+  controllerGithubId(): number | null {
+    return this.controller.current(this.snapshot);
+  }
+
+  isHostAdmitted(githubId: number): boolean {
+    return this.hostAdmitted.has(githubId);
+  }
+
+  appoint(githubId: number): void {
+    if (this.closed || this.snapshot === null) return;
+    const owner = this.snapshot.dataOwner.githubId;
+    this.controller.appoint(githubId, owner);
+    // A handoff to a viewer shows once the snapshot confirms it; a reclaim shows at once (D-9).
+    if (githubId === owner) for (const entry of [...this.peers.values()]) this.maybeSendPresence(entry);
   }
 
   close(): void {
@@ -497,7 +533,7 @@ export class PeerHub implements HostHub {
     const result = entry.reader.read(data);
     if (result.kind !== 'envelope' || result.envelope.ch !== 'control') return;
     const payload = result.envelope.payload as {
-      kind?: unknown; hello?: unknown; clientId?: unknown; text?: unknown; watch?: unknown;
+      kind?: unknown; hello?: unknown; clientId?: unknown; text?: unknown; watch?: unknown; command?: unknown; draftGithubId?: unknown;
     } | null;
     if (typeof payload !== 'object' || payload === null) return;
     if (payload.kind === 'submit') {
@@ -509,10 +545,19 @@ export class PeerHub implements HostHub {
       this.setTerminalWatch(entry, payload.watch);
       return;
     }
+    if (payload.kind === 'command') {
+      if (entry.helloState === 'negotiated') this.onCommand(entry, payload.clientId, payload.command);
+      return;
+    }
+    if (payload.kind === 'controller-send') {
+      if (entry.helloState === 'negotiated') this.onControllerSend(entry, payload.clientId, payload.text, payload.draftGithubId);
+      return;
+    }
     if (payload.kind !== 'hello' || entry.helloState !== 'waiting') return;
     const negotiated = negotiateHello(this.hostHello, payload.hello);
     if (negotiated.ok) {
       entry.helloState = 'negotiated';
+      this.sendEnvelope(entry, 'control', { kind: 'identity', githubId: entry.githubId });
       this.queue.setWatching(true);
       this.maybeAttachConversation(entry);
       this.maybeSendPresence(entry);
@@ -526,10 +571,8 @@ export class PeerHub implements HostHub {
   private onSubmit(entry: PeerEntry, clientId: unknown, text: unknown): void {
     if (typeof clientId !== 'string' || !CLIENT_ID.test(clientId) || typeof text !== 'string') return;
     if (entry.pendingAcks.has(clientId)) return;
-    const participant = this.snapshot?.participants.find((p) => p.githubId === entry.githubId);
-    const eligible = participant !== undefined && this.hostAdmitted.has(participant.githubId)
-      && participant.state === 'admitted' && participant.connected;
-    if (!eligible || !participant.contributor) {
+    const participant = this.eligibleParticipant(entry.githubId);
+    if (!participant || !participant.contributor) {
       this.sendAck(entry, { kind: 'submit-ack', clientId, status: 'rejected', reason: 'not_contributor' });
       return;
     }
@@ -541,6 +584,63 @@ export class PeerHub implements HostHub {
     } else {
       this.sendAck(entry, { kind: 'submit-ack', clientId, status: 'rejected', reason: result.reason });
     }
+  }
+
+  /** A viewer-controller's share command (FR-6, FR-8): checked, relayed as a host frame, mirrored, acked. */
+  private onCommand(entry: PeerEntry, clientId: unknown, raw: unknown): void {
+    if (typeof clientId !== 'string' || !CLIENT_ID.test(clientId)) return;
+    const command = readControllerCommand(raw);
+    if (!command) return this.sendCommandAck(entry, clientId, 'invalid_command');
+    const snapshot = this.snapshot;
+    if (snapshot === null || !this.eligibleParticipant(entry.githubId)) return this.sendCommandAck(entry, clientId, 'not_controller');
+    const refusal = controlRefusal({
+      snapshot,
+      controllerGithubId: this.controller.current(snapshot) ?? snapshot.dataOwner.githubId,
+      actor: { kind: 'viewer', githubId: entry.githubId },
+      command,
+      isHostAdmitted: (githubId) => this.hostAdmitted.has(githubId),
+    });
+    if (refusal) return this.sendCommandAck(entry, clientId, refusal);
+    if (!this.ctx.sendFrame(command)) return this.sendCommandAck(entry, clientId, 'not_connected');
+    if (command.type === 'admit') this.admit(command.githubId);
+    else if (command.type === 'kick' || command.type === 'revoke') this.remove(command.githubId);
+    else if (command.type === 'set-controller') this.appoint(command.githubId);
+    this.sendCommandAck(entry, clientId, null);
+  }
+
+  /** A viewer-controller's prompt (FR-7, D-11): queued as a controller send credited to that viewer. */
+  private onControllerSend(entry: PeerEntry, clientId: unknown, text: unknown, draftGithubId: unknown): void {
+    if (typeof clientId !== 'string' || !CLIENT_ID.test(clientId)) return;
+    if (typeof text !== 'string') return this.sendCommandAck(entry, clientId, 'invalid_prompt');
+    const validDraft = draftGithubId === undefined
+      || (typeof draftGithubId === 'number' && Number.isSafeInteger(draftGithubId) && draftGithubId > 0);
+    if (!validDraft) return this.sendCommandAck(entry, clientId, 'invalid_command');
+    const participant = this.eligibleParticipant(entry.githubId);
+    if (!participant || this.controller.current(this.snapshot) !== entry.githubId) {
+      return this.sendCommandAck(entry, clientId, 'not_controller');
+    }
+    const author = { githubId: participant.githubId, login: participant.login, avatarUrl: participant.avatarUrl };
+    const result = this.sendFromController(draftGithubId === undefined ? { text } : { text, draftGithubId }, author);
+    if (result.ok) this.sendCommandAck(entry, clientId, null, result.position);
+    else this.sendCommandAck(entry, clientId, result.reason);
+  }
+
+  /** The snapshot participant for a viewer that is host-admitted, admitted and connected, else null. */
+  private eligibleParticipant(githubId: number): RoomParticipant | null {
+    const participant = this.snapshot?.participants.find((p) => p.githubId === githubId);
+    if (!participant || !this.hostAdmitted.has(githubId) || participant.state !== 'admitted' || !participant.connected) return null;
+    return participant;
+  }
+
+  /** Answers a `command` or `controller-send`: `reason` null = accepted. */
+  private sendCommandAck(entry: PeerEntry, clientId: string, reason: SharedCommandRefusal | null, position?: number): void {
+    if (entry.closed) return;
+    const ack: Extract<ControlPayload, { kind: 'command-ack' }> = reason === null
+      ? position === undefined
+        ? { kind: 'command-ack', clientId, status: 'accepted' }
+        : { kind: 'command-ack', clientId, status: 'accepted', position }
+      : { kind: 'command-ack', clientId, status: 'rejected', reason };
+    this.sendEnvelope(entry, 'control', ack);
   }
 
   private onOutcome(item: QueuedPrompt, outcome: 'sent' | SharedSubmitReason): void {
@@ -642,7 +742,8 @@ export class PeerHub implements HostHub {
   private maybeSendPresence(entry: PeerEntry): void {
     if (entry.closed || entry.helloState !== 'negotiated' || !entry.open.has('presence')) return;
     if (this.snapshot === null || this.labelValue === null) return;
-    const presence = presenceOf(this.snapshot, this.ctx.scope, this.labelValue, this.queueStatus);
+    const controllerGithubId = this.controller.current(this.snapshot) ?? this.snapshot.dataOwner.githubId;
+    const presence = presenceOf(this.snapshot, this.ctx.scope, this.labelValue, this.queueStatus, controllerGithubId);
     const json = JSON.stringify(presence);
     if (json === entry.presenceSent) return;
     entry.presenceSent = json;
@@ -704,10 +805,11 @@ export function presenceOf(
   scope: ShareScope,
   label: string,
   status: { agentWorking: boolean; queued: number } = { agentWorking: false, queued: 0 },
+  controllerGithubId: number = snapshot.controllerGithubId,
 ): PresencePayload {
   const owner = snapshot.dataOwner;
   return {
-    controllerGithubId: snapshot.controllerGithubId,
+    controllerGithubId,
     participants: [
       {
         githubId: owner.githubId,

@@ -4,6 +4,7 @@ import { WebSocket } from 'ws';
 import type {
   CreateRoomResponse,
   IceServer,
+  RoomParticipant,
   RoomSnapshot,
   SendSharePromptRequest,
   ServiceToHostFrame,
@@ -20,6 +21,7 @@ import type { ControllerSendResult, HostHub, PeerHubContext } from '../../sharin
 import {
   PING_INTERVAL_MS,
   PONG_TIMEOUT_MS,
+  SHARE_RECONNECT_DELAYS_MS,
   ShareManager,
   type ShareManagerDeps,
   type ShareSocket,
@@ -158,6 +160,14 @@ function harness(overrides: Partial<ShareManagerDeps> = {}): Harness {
   return { manager: new ShareManager(deps), deps, store, sockets, events, createRoom, deleteRoom };
 }
 
+function storedRecord(code: string, n: number, conversationId: string): ShareRecord {
+  return { scopeKind: 'conversation', scopeId: conversationId, hostToken: hostToken(n), joinUrl: `${BASE}/s/${code}`, createdAt: `2026-11-01T00:00:0${n}.000Z` };
+}
+
+function participant(githubId: number, state: RoomParticipant['state']): RoomParticipant {
+  return { githubId, login: `u${githubId}`, avatarUrl: `https://avatars.githubusercontent.com/u/${githubId}`, state, contributor: false, connected: true };
+}
+
 async function createConnected(h: Harness): Promise<FakeSocket> {
   const outcome = await h.manager.create(SCOPE);
   expect(outcome.kind).toBe('created');
@@ -284,17 +294,25 @@ describe('ShareManager', () => {
     expect(view?.lastError).toEqual({ code: 'unknown_participant', githubId: 7, at: '2026-11-02T00:00:00.000Z' });
   });
 
-  it('close 4004 removes the record; close 1006 keeps it disconnected (ac3)', async () => {
+  it('close 4004 removes the record; close 1006 reconnects after 1 s (ac3)', async () => {
     const ended = harness();
     (await createConnected(ended)).drop(4004);
     expect(await ended.manager.list()).toEqual([]);
     expect(ended.store).toEqual({});
 
     const dropped = harness();
-    (await createConnected(dropped)).drop(1006);
+    const first = await createConnected(dropped);
+    first.drop(1006);
     const [view] = await dropped.manager.list();
-    expect(view).toMatchObject({ shortCode: 'BCDFGHJK', connection: 'disconnected' });
+    expect(view).toMatchObject({ shortCode: 'BCDFGHJK', connection: 'reconnecting' });
     expect(Object.keys(dropped.store)).toEqual(['BCDFGHJK']);
+    await vi.advanceTimersByTimeAsync(999);
+    expect(dropped.sockets).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(dropped.sockets).toHaveLength(2);
+    const second = dropped.sockets[1] as FakeSocket;
+    expect(second.url).toBe(first.url);
+    expect(second.headers).toEqual({ Authorization: `Bearer ${hostToken(1)}` });
   });
 
   it('close 4008 records lastError replaced and keeps the record', async () => {
@@ -305,7 +323,15 @@ describe('ShareManager', () => {
     expect(Object.keys(h.store)).toEqual(['BCDFGHJK']);
   });
 
-  it('an unexpected 404 at the upgrade removes the record; a 500 keeps it', async () => {
+  it('close 4008 does not reconnect', async () => {
+    const h = harness();
+    (await createConnected(h)).drop(4008);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(h.sockets).toHaveLength(1);
+    expect((await h.manager.list())[0]?.connection).toBe('disconnected');
+  });
+
+  it('an unexpected 404 at the upgrade removes the record; a 500 reconnects', async () => {
     const gone = harness();
     await gone.manager.create(SCOPE);
     (gone.sockets[0] as FakeSocket).emit('unexpected-response', {}, { statusCode: 404 });
@@ -315,7 +341,78 @@ describe('ShareManager', () => {
     const flaky = harness();
     await flaky.manager.create(SCOPE);
     (flaky.sockets[0] as FakeSocket).emit('unexpected-response', {}, { statusCode: 500 });
-    expect(await flaky.manager.list()).toMatchObject([{ connection: 'disconnected' }]);
+    expect(await flaky.manager.list()).toMatchObject([{ connection: 'reconnecting' }]);
+    expect((flaky.sockets[0] as FakeSocket).terminated).toBe(true);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(flaky.sockets).toHaveLength(2);
+  });
+
+  it('backs off 1, 2, 4, 8, 15, 30, 30 s and resets after a room frame', async () => {
+    const h = harness();
+    await createConnected(h);
+    const schedule = [1_000, 2_000, 4_000, 8_000, 15_000, 30_000, 30_000];
+    expect(SHARE_RECONNECT_DELAYS_MS).toEqual(schedule.slice(0, 6));
+    for (const [i, delay] of schedule.entries()) {
+      (h.sockets.at(-1) as FakeSocket).drop(1006);
+      await vi.advanceTimersByTimeAsync(delay - 1);
+      expect(h.sockets).toHaveLength(i + 1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(h.sockets).toHaveLength(i + 2);
+    }
+    const newest = h.sockets.at(-1) as FakeSocket;
+    newest.open();
+    newest.deliver({ type: 'room', snapshot: snapshot('BCDFGHJK') });
+    expect((await h.manager.list())[0]?.connection).toBe('connected');
+    newest.drop(1006);
+    await vi.advanceTimersByTimeAsync(999);
+    expect(h.sockets).toHaveLength(8);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(h.sockets).toHaveLength(9);
+  });
+
+  it('a 404 on a reconnect attempt removes the record and stops', async () => {
+    const h = harness();
+    (await createConnected(h)).drop(1006);
+    await vi.advanceTimersByTimeAsync(1000);
+    (h.sockets[1] as FakeSocket).emit('unexpected-response', {}, { statusCode: 404 });
+    expect(await h.manager.list()).toEqual([]);
+    expect(h.store).toEqual({});
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(h.sockets).toHaveLength(2);
+  });
+
+  it('end and stop cancel a pending reconnect', async () => {
+    const ended = harness();
+    (await createConnected(ended)).drop(1006);
+    expect(await ended.manager.end('BCDFGHJK')).toEqual({ status: 204 });
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(ended.sockets).toHaveLength(1);
+
+    const stopped = harness();
+    (await createConnected(stopped)).drop(1006);
+    stopped.manager.stop();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(stopped.sockets).toHaveLength(1);
+    expect(Object.keys(stopped.store)).toEqual(['BCDFGHJK']);
+  });
+
+  it('late events from a replaced socket change nothing', async () => {
+    const h = harness();
+    const old = await createConnected(h);
+    old.drop(1006);
+    await vi.advanceTimersByTimeAsync(1000);
+    const fresh = h.sockets[1] as FakeSocket;
+    fresh.open();
+    fresh.deliver({ type: 'room', snapshot: snapshot('BCDFGHJK') });
+
+    old.drop(4004);
+    old.emit('error', new Error('late'));
+    old.deliver({ type: 'room', snapshot: snapshot('BCDFGHJK', { hostConnected: false }) });
+
+    expect(await h.manager.list()).toMatchObject([{ connection: 'connected', snapshot: snapshot('BCDFGHJK') }]);
+    expect(Object.keys(h.store)).toEqual(['BCDFGHJK']);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(h.sockets).toHaveLength(2);
   });
 
   it('pings every 30 s and terminates after 75 s without a pong (ac4)', async () => {
@@ -330,7 +427,7 @@ describe('ShareManager', () => {
     await vi.advanceTimersByTimeAsync(1);
     expect(socket.terminated).toBe(true);
     const [view] = await h.manager.list();
-    expect(view?.connection).toBe('disconnected');
+    expect(view?.connection).toBe('reconnecting');
     expect(Object.keys(h.store)).toEqual(['BCDFGHJK']);
   });
 
@@ -350,6 +447,25 @@ describe('ShareManager', () => {
     h.deleteRoom.mockResolvedValueOnce({ ok: false, status: 503, error: 'internal_error' } as never);
     expect(await h.manager.end('BCDFGHJK')).toEqual({ status: 502, body: { error: 'share_service_error', message: 'internal_error' } });
     expect(Object.keys(h.store)).toEqual(['BCDFGHJK']);
+  });
+
+  it('end forgets a reconnecting share locally when the share service fails', async () => {
+    const h = harness();
+    (await createConnected(h)).drop(1006);
+    h.deleteRoom.mockResolvedValueOnce({ ok: false, status: 503, error: 'internal_error' } as never);
+    expect(await h.manager.end('BCDFGHJK')).toEqual({ status: 204 });
+    expect(h.store).toEqual({});
+    expect(await h.manager.list()).toEqual([]);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(h.sockets).toHaveLength(1);
+  });
+
+  it('end forgets a stale record locally when the share URL is invalid', async () => {
+    const h = harness({ readShareUrl: async () => ({ error: 'bad' }) });
+    h.store.VWXZ2345 = storedRecord('VWXZ2345', 9, 'conv-z');
+    expect(await h.manager.end('VWXZ2345')).toEqual({ status: 204 });
+    expect(h.store).toEqual({});
+    expect(h.deleteRoom).not.toHaveBeenCalled();
   });
 
   it('end works on a stale record with no host socket', async () => {
@@ -372,6 +488,60 @@ describe('ShareManager', () => {
     expect(h.store).toEqual({});
   });
 
+  it('resume opens one host socket per record with that record\'s host token and answers their codes', async () => {
+    const readAccount = vi.fn(async () => ACCOUNT);
+    const h = harness({ readAccount });
+    h.store.VWXZ2345 = storedRecord('VWXZ2345', 7, 'conv-z');
+    h.store.LMNPQRST = storedRecord('LMNPQRST', 8, 'conv-y');
+
+    expect((await h.manager.resume()).sort()).toEqual(['LMNPQRST', 'VWXZ2345']);
+    expect(h.sockets.map((socket) => [socket.url, socket.headers.Authorization]).sort()).toEqual([
+      ['wss://share.overdeck.ai/v1/rooms/LMNPQRST/host?v=1', `Bearer ${hostToken(8)}`],
+      ['wss://share.overdeck.ai/v1/rooms/VWXZ2345/host?v=1', `Bearer ${hostToken(7)}`],
+    ]);
+    expect(readAccount).not.toHaveBeenCalled();
+  });
+
+  it('resume skips codes this process already hosts', async () => {
+    const h = harness();
+    await createConnected(h);
+    expect(await h.manager.resume()).toEqual([]);
+    expect(h.sockets).toHaveLength(1);
+  });
+
+  it('resume answers [] and opens nothing for an invalid share URL or an unreadable record file', async () => {
+    const badUrl = harness({ readShareUrl: async () => ({ error: 'anywhere.share_url is not a URL' }) });
+    badUrl.store.VWXZ2345 = storedRecord('VWXZ2345', 7, 'conv-z');
+    expect(await badUrl.manager.resume()).toEqual([]);
+    expect(badUrl.sockets).toHaveLength(0);
+
+    const unreadable = harness();
+    unreadable.deps.records.read = async () => { throw new Error('EACCES'); };
+    expect(await unreadable.manager.resume()).toEqual([]);
+    expect(unreadable.sockets).toHaveLength(0);
+  });
+
+  it('resume terminates the socket and keeps the record when building the hub throws', async () => {
+    const h = harness({ createHub: () => { throw new Error('hub failed'); } });
+    h.store.VWXZ2345 = storedRecord('VWXZ2345', 7, 'conv-z');
+    expect(await h.manager.resume()).toEqual([]);
+    expect(h.sockets).toHaveLength(1);
+    expect(h.sockets[0]?.terminated).toBe(true);
+    expect(Object.keys(h.store)).toEqual(['VWXZ2345']);
+    expect(await h.manager.list()).toMatchObject([{ shortCode: 'VWXZ2345', connection: 'disconnected' }]);
+  });
+
+  it('a re-parked share is connecting, then connected after its room frame', async () => {
+    const h = harness();
+    h.store.VWXZ2345 = storedRecord('VWXZ2345', 7, 'conv-z');
+    await h.manager.resume();
+    expect(await h.manager.list()).toMatchObject([{ shortCode: 'VWXZ2345', connection: 'connecting' }]);
+    const socket = h.sockets[0] as FakeSocket;
+    socket.open();
+    socket.deliver({ type: 'room', snapshot: snapshot('VWXZ2345') });
+    expect(await h.manager.list()).toMatchObject([{ shortCode: 'VWXZ2345', connection: 'connected', snapshot: snapshot('VWXZ2345') }]);
+  });
+
   it('list never contains a host token (ac5)', async () => {
     const h = harness();
     await createConnected(h);
@@ -390,6 +560,9 @@ class FakeHub implements HostHub {
   drafts: ShareDraftView[] = [];
   queue: ShareQueueView = { agentWorking: false, delivering: false, items: [] };
   sendResult: ControllerSendResult = { ok: true, position: 1 };
+  /** The effective controller the hub reports; null = before the first snapshot (PAN-4478). */
+  controller: number | null = null;
+  readonly admitted = new Set<number>();
   constructor(readonly ctx: PeerHubContext, private readonly socketSent: () => number) {}
   admit(githubId: number): void {
     this.calls.push(['admit', githubId, this.socketSent()]);
@@ -418,6 +591,15 @@ class FakeHub implements HostHub {
   sendFromController(input: SendSharePromptRequest, controller: ShareIdentity | null): ControllerSendResult {
     this.calls.push(['sendFromController', input, controller]);
     return this.sendResult;
+  }
+  controllerGithubId(): number | null {
+    return this.controller;
+  }
+  isHostAdmitted(githubId: number): boolean {
+    return this.admitted.has(githubId);
+  }
+  appoint(githubId: number): void {
+    this.calls.push(['appoint', githubId]);
   }
   close(): void {
     this.calls.push(['close']);
@@ -519,6 +701,65 @@ describe('ShareManager WebRTC hub wiring (PAN-4474)', () => {
     expect(second.hub().count('close')).toBe(1);
   });
 
+  it('keeps one hub across a reconnect and routes the new socket\'s room frame to it', async () => {
+    const { h, hubs, hub } = hubHarness();
+    (await createConnected(h)).drop(1006);
+    await vi.advanceTimersByTimeAsync(1000);
+    const fresh = h.sockets[1] as FakeSocket;
+    fresh.open();
+    fresh.deliver({ type: 'room', snapshot: snapshot('BCDFGHJK', { participants: [] }) });
+    expect(hubs).toHaveLength(1);
+    expect(hub().count('close')).toBe(0);
+    expect(hub().count('onSnapshot')).toBe(2);
+  });
+
+  it('sends hub frames on the new socket after a reconnect', async () => {
+    const { h, hub } = hubHarness();
+    const old = await createConnected(h);
+    old.drop(1006);
+    expect(hub().ctx.sendFrame({ type: 'ice-servers' })).toBe(false);
+    await vi.advanceTimersByTimeAsync(1000);
+    const fresh = h.sockets[1] as FakeSocket;
+    fresh.open();
+    fresh.deliver({ type: 'room', snapshot: snapshot('BCDFGHJK') });
+    expect(hub().ctx.sendFrame({ type: 'ice-servers' })).toBe(true);
+    expect(fresh.sent).toEqual([JSON.stringify({ type: 'ice-servers' })]);
+    expect(old.sent).toEqual([]);
+  });
+
+  it('the first room frame after resume admits every admitted participant once before onSnapshot', async () => {
+    const { h, hub } = hubHarness();
+    h.store.VWXZ2345 = storedRecord('VWXZ2345', 7, 'conv-z');
+    await h.manager.resume();
+    const socket = h.sockets[0] as FakeSocket;
+    socket.open();
+    const room = snapshot('VWXZ2345', { participants: [participant(100, 'admitted'), participant(101, 'admitted'), participant(102, 'lobby')] });
+    socket.deliver({ type: 'room', snapshot: room });
+    socket.deliver({ type: 'room', snapshot: room });
+    expect(hub().calls.map(([name, id]) => (name === 'admit' ? `admit:${String(id)}` : name))).toEqual([
+      'admit:100',
+      'admit:101',
+      'onSnapshot',
+      'onSnapshot',
+    ]);
+  });
+
+  it('a created share and a same-process reconnect never seed the hub', async () => {
+    const { h, hub } = hubHarness();
+    await h.manager.create(SCOPE);
+    const first = h.sockets[0] as FakeSocket;
+    first.open();
+    const room = snapshot('BCDFGHJK', { participants: [participant(100, 'admitted')] });
+    first.deliver({ type: 'room', snapshot: room });
+    first.drop(1006);
+    await vi.advanceTimersByTimeAsync(1000);
+    const second = h.sockets[1] as FakeSocket;
+    second.open();
+    second.deliver({ type: 'room', snapshot: room });
+    expect(hub().count('admit')).toBe(0);
+    expect(hub().count('onSnapshot')).toBe(2);
+  });
+
   it('closes the hub once on end and on stop', async () => {
     const ended = hubHarness();
     await createConnected(ended.h);
@@ -594,5 +835,91 @@ describe('ShareManager prompts (PAN-4476)', () => {
     expect(await h.manager.sendPrompt('BCDFGHJK', { text: 'Go' })).toEqual({ status: 404, body: { error: 'share_not_found' } });
     h.store.VWXZ2345 = { scopeKind: 'conversation', scopeId: 'conv-z', hostToken: hostToken(9), joinUrl: `${BASE}/s/VWXZ2345`, createdAt: '2026-11-01T00:00:00.000Z' };
     expect(await h.manager.sendPrompt('VWXZ2345', { text: 'Go' })).toEqual({ status: 409, body: { error: 'share_not_live' } });
+  });
+});
+
+describe('ShareManager controller gate (PAN-4478)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const BOB = { githubId: 200, login: 'bob', avatarUrl: 'https://a/200' };
+  const bobAdmitted = { ...BOB, state: 'admitted' as const, contributor: false, connected: true };
+
+  function gateHarness() {
+    const hubs: FakeHub[] = [];
+    const h = harness({
+      createHub: (ctx) => {
+        const hub = new FakeHub(ctx, () => 0);
+        hubs.push(hub);
+        return hub;
+      },
+    });
+    return { h, hub: () => hubs.at(-1) as FakeHub };
+  }
+
+  /** A connected share whose snapshot lists bob as admitted and controller, and whose hub agrees. */
+  async function bobControls() {
+    const g = gateHarness();
+    const socket = await createConnected(g.h);
+    socket.deliver({ type: 'room', snapshot: snapshot('BCDFGHJK', { participants: [bobAdmitted], controllerGithubId: BOB.githubId }) });
+    g.hub().admitted.add(BOB.githubId);
+    g.hub().controller = BOB.githubId;
+    return { ...g, socket };
+  }
+
+  it('answers 409 not_controller for owner commands and prompts while a viewer controls', async () => {
+    const { h, hub, socket } = await bobControls();
+    const sent = socket.sent.length;
+    const refused = { status: 409, body: { error: 'not_controller', message: 'Another participant has control. Reclaim control first.' } };
+    expect(await h.manager.command('BCDFGHJK', { type: 'kick', githubId: BOB.githubId })).toEqual(refused);
+    expect(await h.manager.command('BCDFGHJK', { type: 'unrevoke', githubId: 9 })).toEqual(refused);
+    expect(await h.manager.sendPrompt('BCDFGHJK', { text: 'Go' })).toEqual(refused);
+    expect(socket.sent).toHaveLength(sent);
+    expect(hub().count('remove')).toBe(0);
+    expect(hub().count('sendFromController')).toBe(0);
+  });
+
+  it('always accepts reclaim and mirrors it to hub.appoint', async () => {
+    const { h, hub, socket } = await bobControls();
+    expect(await h.manager.command('BCDFGHJK', { type: 'set-controller', githubId: OWNER.githubId })).toEqual({ status: 202, body: { ok: true } });
+    expect(JSON.parse(socket.sent.at(-1) as string)).toEqual({ type: 'set-controller', githubId: OWNER.githubId });
+    expect(hub().calls.at(-1)).toEqual(['appoint', OWNER.githubId]);
+  });
+
+  it('hands control to a host-admitted participant and mirrors it to hub.appoint', async () => {
+    const g = gateHarness();
+    const socket = await createConnected(g.h);
+    socket.deliver({ type: 'room', snapshot: snapshot('BCDFGHJK', { participants: [bobAdmitted] }) });
+    g.hub().admitted.add(BOB.githubId);
+    g.hub().controller = OWNER.githubId;
+    expect(await g.h.manager.command('BCDFGHJK', { type: 'set-controller', githubId: BOB.githubId })).toEqual({ status: 202, body: { ok: true } });
+    expect(JSON.parse(socket.sent.at(-1) as string)).toEqual({ type: 'set-controller', githubId: BOB.githubId });
+    expect(g.hub().calls.at(-1)).toEqual(['appoint', BOB.githubId]);
+  });
+
+  it('refuses set-controller to a participant the hub never admitted with unknown_participant', async () => {
+    const g = gateHarness();
+    const socket = await createConnected(g.h);
+    socket.deliver({ type: 'room', snapshot: snapshot('BCDFGHJK', { participants: [bobAdmitted] }) });
+    g.hub().controller = OWNER.githubId;
+    const sent = socket.sent.length;
+    expect(await g.h.manager.command('BCDFGHJK', { type: 'set-controller', githubId: BOB.githubId })).toEqual({
+      status: 409,
+      body: { error: 'unknown_participant', message: 'That person is not in the room.' },
+    });
+    expect(socket.sent).toHaveLength(sent);
+    expect(g.hub().count('appoint')).toBe(0);
+  });
+
+  it('views carry the hub\'s controllerGithubId', async () => {
+    const { h, hub } = await bobControls();
+    expect((await h.manager.list())[0]?.controllerGithubId).toBe(BOB.githubId);
+    hub().controller = OWNER.githubId;
+    expect((await h.manager.list())[0]?.controllerGithubId).toBe(OWNER.githubId);
   });
 });

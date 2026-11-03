@@ -7,13 +7,12 @@
  * keeps the latest `room` snapshot in memory, and relays the browser's share commands as host
  * frames. The browser only ever sees `ShareView`s, which have no host token by construction.
  *
- * Lifecycle (D-1): the host socket opens right after the room is created and its record written.
- * It is never reconnected and never re-parked on boot; a closed socket leaves the share
- * `disconnected` with its record kept (slice 8, PAN-4479, re-parks it). A close with 4004 (room
- * ended) or a 404/401 at the upgrade removes the record.
+ * Lifecycle: the host socket opens right after the room is created and its record written, and
+ * `resume()` re-parks every record on boot (PAN-4479). An unexpected loss reconnects on `SHARE_RECONNECT_DELAYS_MS` and keeps the hub (PAN-4479); close
+ * 4004 or a 404/401 upgrade removes the record; close 4008 stops (another host socket holds the room).
  *
  * Keepalive (D-11): a WebSocket protocol ping every 30 s; 75 s without a pong terminates the
- * socket and marks the share `disconnected`.
+ * socket and reconnects.
  *
  * WebRTC (PAN-4474): each live host gets a `PeerHub` (`../sharing/peer-hub.ts`). The manager routes
  * `signal`, `ice-servers` and `error turn_unavailable` frames to it, tells it about every `admit`,
@@ -22,6 +21,10 @@
  *
  * Prompts (PAN-4476): every view carries the hub's drafts and queue, and `sendPrompt` queues a
  * controller send through the live hub (D-1).
+ *
+ * Control (PAN-4478): `command` and `sendPrompt` pass the data owner through `controlRefusal`; while a
+ * viewer controls, everything except reclaim answers 409 `not_controller`. `set-controller` is
+ * mirrored to the hub's appointment, and every view carries the hub's effective controller.
  *
  * Plain async class with injected seams, like `directory-client.ts` (D-8). Nothing here logs.
  */
@@ -52,10 +55,13 @@ import {
   readShareUrl,
   type ShareUrlResult,
 } from '../../../lib/sharing/share-service.js';
+import { controlRefusal, type ControlRefusal } from '../sharing/controller.js';
 import { PeerHub, productionPeerHubDeps, type HostHub, type PeerHubContext } from '../sharing/peer-hub.js';
 
 export const PING_INTERVAL_MS = 30_000;
 export const PONG_TIMEOUT_MS = 75_000;
+/** Reconnect backoff (PAN-4479 D-2): attempt n waits table[min(n, last)]; a `room` frame resets n. */
+export const SHARE_RECONNECT_DELAYS_MS: readonly number[] = [1_000, 2_000, 4_000, 8_000, 15_000, 30_000];
 
 /** The part of a `ws` WebSocket the host uses; tests supply a fake. */
 export interface ShareSocket {
@@ -82,6 +88,8 @@ export interface ShareManagerDeps {
   now(): Date;
   /** Builds the share's WebRTC hub (PAN-4474). Absent: no hub, signaling frames are ignored. */
   createHub?(ctx: PeerHubContext): HostHub;
+  /** Reconnect backoff (D-2); tests pass [0]. Default SHARE_RECONNECT_DELAYS_MS. */
+  reconnectDelaysMs?: readonly number[];
 }
 
 export type CreateShareOutcome =
@@ -89,20 +97,40 @@ export type CreateShareOutcome =
   | { kind: 'existing'; view: ShareView }
   | { kind: 'error'; status: number; body: { error: string; message?: string } };
 
-/** One host socket for one room in this process. */
+/** One host socket; `done` is set once the manager stops listening to it. */
+interface HostConnection {
+  readonly socket: ShareSocket;
+  done: boolean;
+}
+
+/** One room hosted by this process, across host-socket reconnects. */
 interface ShareHost {
   readonly shortCode: string;
   readonly record: ShareRecord;
-  readonly socket: ShareSocket;
+  /** Share service URL used for every (re)connect. */
+  readonly base: string;
+  conn: HostConnection;
   connection: ShareConnection;
   snapshot: RoomSnapshot | null;
   lastError: ShareLastError | null;
   pingTimer: NodeJS.Timeout | null;
   pongTimer: NodeJS.Timeout | null;
+  retryTimer: NodeJS.Timeout | null;
+  /** Failed connects since the last `room` frame; indexes the backoff table. */
+  attempt: number;
+  /** Re-parked by resume() and no `room` frame yet: the first one seeds the hub (D-4). */
+  restoring: boolean;
   hub: HostHub | null;
 }
 
 const CLOSE_ROOM_ENDED = 4004;
+/** The 409 messages of a controller-gate refusal (PRD PAN-4478 D-12). */
+const REFUSAL_MESSAGES: Record<ControlRefusal, string> = {
+  not_controller: 'Another participant has control. Reclaim control first.',
+  unknown_participant: 'That person is not in the room.',
+  invalid_target: 'The host refused that action.',
+  invalid_command: 'The host refused that action.',
+};
 const CLOSE_REPLACED = 4008;
 
 function scopeKey(kind: string, id: string): string {
@@ -115,6 +143,7 @@ function isLive(host: ShareHost | undefined): host is ShareHost {
 
 /** Builds a view field by field; a record is never spread into it (NFR-1). */
 function viewOf(shortCode: string, record: ShareRecord, host: ShareHost | undefined): ShareView {
+  const controllerGithubId = host?.hub?.controllerGithubId() ?? host?.snapshot?.controllerGithubId;
   return {
     shortCode,
     joinUrl: record.joinUrl,
@@ -125,6 +154,7 @@ function viewOf(shortCode: string, record: ShareRecord, host: ShareHost | undefi
     lastError: host ? host.lastError : null,
     drafts: host?.hub?.draftsView() ?? [],
     queue: host?.hub?.queueView() ?? { agentWorking: false, delivering: false, items: [] },
+    ...(controllerGithubId === undefined || controllerGithubId === null ? {} : { controllerGithubId }),
   };
 }
 
@@ -143,6 +173,8 @@ function frameOf(command: ShareCommand): ShareCommand {
       return { type: 'unrevoke', githubId: command.githubId };
     case 'set-contributor':
       return { type: 'set-contributor', githubId: command.githubId, contributor: command.contributor };
+    case 'set-controller':
+      return { type: 'set-controller', githubId: command.githubId };
   }
 }
 
@@ -190,13 +222,24 @@ export class ShareManager {
     if (!(shortCode in records)) return { status: 404, body: { error: 'share_not_found' } };
     const host = this.hosts.get(shortCode);
     if (!host || host.connection !== 'connected') return { status: 409, body: { error: 'share_not_connected' } };
+    const snapshot = host.snapshot;
+    if (!snapshot) return { status: 409, body: { error: 'share_not_connected' } };
+    const refusal = controlRefusal({
+      snapshot,
+      controllerGithubId: host.hub?.controllerGithubId() ?? snapshot.controllerGithubId,
+      actor: { kind: 'owner' },
+      command,
+      isHostAdmitted: (githubId) => host.hub?.isHostAdmitted(githubId) ?? true,
+    });
+    if (refusal) return { status: 409, body: { error: refusal, message: REFUSAL_MESSAGES[refusal] } };
     try {
-      host.socket.send(JSON.stringify(frameOf(command)));
+      host.conn.socket.send(JSON.stringify(frameOf(command)));
     } catch {
       return { status: 409, body: { error: 'share_not_connected' } };
     }
     if (command.type === 'admit') host.hub?.admit(command.githubId);
     else if (command.type === 'kick' || command.type === 'revoke') host.hub?.remove(command.githubId);
+    else if (command.type === 'set-controller') host.hub?.appoint(command.githubId);
     return { status: 202, body: { ok: true } };
   }
 
@@ -209,6 +252,11 @@ export class ShareManager {
     if (!(shortCode in records)) return { status: 404, body: { error: 'share_not_found' } };
     const host = this.hosts.get(shortCode);
     if (!host?.hub) return { status: 409, body: { error: 'share_not_live' } };
+    const controller = host.hub.controllerGithubId();
+    const owner = host.snapshot?.dataOwner ?? null;
+    if (controller !== null && owner !== null && controller !== owner.githubId) {
+      return { status: 409, body: { error: 'not_controller', message: REFUSAL_MESSAGES.not_controller } };
+    }
     const result = host.hub.sendFromController(body, host.snapshot?.dataOwner ?? null);
     if (result.ok) return { status: 202, body: { ok: true, position: result.position } };
     return { status: result.reason === 'queue_full' ? 429 : 400, body: { error: result.reason } };
@@ -218,13 +266,60 @@ export class ShareManager {
     const records = await this.deps.records.read();
     const record = records[shortCode];
     if (!record) return { status: 404, body: { error: 'share_not_found' } };
+    // A share that is not connected is forgotten locally when the service cannot be reached; the
+    // room, if it still exists, ends on the service's 5-minute alarm (D-12).
+    const offline = this.hosts.get(shortCode)?.connection !== 'connected';
     const base = await this.deps.readShareUrl();
-    if ('error' in base) return { status: 500, body: { error: 'share_url_invalid', message: base.error } };
+    if ('error' in base) {
+      if (offline) return this.forget(shortCode);
+      return { status: 500, body: { error: 'share_url_invalid', message: base.error } };
+    }
     const deleted = await this.deps.deleteRoom(base.url, shortCode, record.hostToken);
-    if (!deleted.ok) return { status: 502, body: { error: 'share_service_error', message: deleted.error } };
+    if (!deleted.ok) {
+      if (offline) return this.forget(shortCode);
+      return { status: 502, body: { error: 'share_service_error', message: deleted.error } };
+    }
+    return this.forget(shortCode);
+  }
+
+  private async forget(shortCode: string): Promise<{ status: 204 }> {
     this.dropHost(shortCode, 'close');
     await this.deps.records.remove(shortCode);
     return { status: 204 };
+  }
+
+  /**
+   * Re-parks every recorded share this process does not host yet (D-3). Reads the record file and
+   * anywhere.share_url only; never throws. Returns the short codes it opened.
+   */
+  async resume(): Promise<string[]> {
+    let records: Record<string, ShareRecord>;
+    try {
+      records = await this.deps.records.read();
+    } catch {
+      return [];
+    }
+    const codes = Object.keys(records).filter((code) => !this.hosts.has(code));
+    if (codes.length === 0) return [];
+    let base: ShareUrlResult;
+    try {
+      base = await this.deps.readShareUrl();
+    } catch {
+      return [];
+    }
+    if ('error' in base) return [];
+    const opened: string[] = [];
+    for (const code of codes) {
+      try {
+        this.openHost(base.url, code, records[code] as ShareRecord, true);
+        opened.push(code);
+      } catch {
+        // openSocket or createHub threw synchronously: forget this entry and shut any socket it
+        // opened (it has no listeners yet), keep the record.
+        this.dropHost(code, 'terminate');
+      }
+    }
+    return opened;
   }
 
   /** Closes every host socket (tests and shutdown). Records stay on disk. */
@@ -285,22 +380,25 @@ export class ShareManager {
       return { kind: 'error', status: 500, body: { error: 'share_record_unwritable', message: (error as Error).message } };
     }
 
-    const host = this.openHost(base.url, room.shortCode, record);
+    const host = this.openHost(base.url, room.shortCode, record, false);
     host.snapshot = room.snapshot;
     return { kind: 'created', view: viewOf(room.shortCode, record, host) };
   }
 
-  private openHost(base: string, shortCode: string, record: ShareRecord): ShareHost {
-    const socket = this.deps.openSocket(hostSocketUrl(base, shortCode), { Authorization: `Bearer ${record.hostToken}` });
+  private openHost(base: string, shortCode: string, record: ShareRecord, restoring: boolean): ShareHost {
     const host: ShareHost = {
       shortCode,
       record,
-      socket,
+      base,
+      conn: this.openConnection(base, shortCode, record),
       connection: 'connecting',
       snapshot: null,
       lastError: null,
       pingTimer: null,
       pongTimer: null,
+      retryTimer: null,
+      attempt: 0,
+      restoring,
       hub: null,
     };
     this.hosts.set(shortCode, host);
@@ -309,16 +407,35 @@ export class ShareManager {
       scope: { kind: 'conversation', conversationId: record.scopeId },
       sendFrame: (frame) => this.sendHostFrame(host, frame),
     }) ?? null;
-    const current = () => this.hosts.get(shortCode) === host && host.connection !== 'disconnected';
+    this.listen(host, host.conn);
+    return host;
+  }
+
+  private openConnection(base: string, shortCode: string, record: ShareRecord): HostConnection {
+    const socket = this.deps.openSocket(hostSocketUrl(base, shortCode), { Authorization: `Bearer ${record.hostToken}` });
+    return { socket, done: false };
+  }
+
+  /** Opens the next host socket for an existing entry; the hub and snapshot are kept (D-1). */
+  private connect(host: ShareHost): void {
+    host.conn = this.openConnection(host.base, host.shortCode, host.record);
+    this.listen(host, host.conn);
+  }
+
+  private listen(host: ShareHost, conn: HostConnection): void {
+    const { shortCode } = host;
+    // A replaced or abandoned socket's late events change nothing (H-1).
+    const current = () => !conn.done && host.conn === conn && this.hosts.get(shortCode) === host;
+    const { socket } = conn;
 
     socket.on('open', () => {
-      if (current()) this.startKeepalive(host);
+      if (current()) this.startKeepalive(host, conn);
     });
     socket.on('message', (data, isBinary) => {
       if (current() && !isBinary) this.onFrame(host, data.toString());
     });
     socket.on('pong', () => {
-      if (current()) this.armPongDeadline(host);
+      if (current()) this.armPongDeadline(host, conn);
     });
     socket.on('unexpected-response', (_req, res) => {
       if (!current()) return;
@@ -328,7 +445,7 @@ export class ShareManager {
         this.dropHost(shortCode, 'terminate');
         this.removeRecord(shortCode);
       } else {
-        this.disconnect(host, 'terminate');
+        this.lose(host, 'terminate');
       }
     });
     socket.on('close', (code) => {
@@ -336,15 +453,19 @@ export class ShareManager {
       if (code === CLOSE_ROOM_ENDED) {
         this.dropHost(shortCode, 'none');
         this.removeRecord(shortCode);
-        return;
+      } else if (code === CLOSE_REPLACED) {
+        // Another host socket holds the room; retrying would replace it back (D-5).
+        conn.done = true;
+        this.stopKeepalive(host);
+        host.connection = 'disconnected';
+        host.lastError = { code: 'replaced', at: this.deps.now().toISOString() };
+      } else {
+        this.lose(host, 'none');
       }
-      if (code === CLOSE_REPLACED) host.lastError = { code: 'replaced', at: this.deps.now().toISOString() };
-      this.disconnect(host, 'none');
     });
     socket.on('error', () => {
-      if (current()) this.disconnect(host, 'terminate');
+      if (current()) this.lose(host, 'terminate');
     });
-    return host;
   }
 
   private onFrame(host: ShareHost, text: string): void {
@@ -359,6 +480,15 @@ export class ShareManager {
     if (frame.type === 'room' && typeof frame.snapshot === 'object' && frame.snapshot !== null) {
       host.snapshot = frame.snapshot;
       host.connection = 'connected';
+      host.attempt = 0;
+      if (host.restoring) {
+        // First snapshot after a re-park: the service's admitted list is this host's own earlier
+        // admissions, so it seeds the hub's content gate exactly once (D-4).
+        host.restoring = false;
+        for (const p of frame.snapshot.participants) {
+          if (p.state === 'admitted') host.hub?.admit(p.githubId);
+        }
+      }
       host.hub?.onSnapshot(frame.snapshot);
     } else if (frame.type === 'signal' && typeof frame.githubId === 'number' && typeof frame.data === 'object' && frame.data !== null) {
       host.hub?.onSignal(frame.githubId, frame.data);
@@ -375,31 +505,33 @@ export class ShareManager {
 
   /** Sends one host frame for the hub; false when this host's socket cannot send. */
   private sendHostFrame(host: ShareHost, frame: HostFrame): boolean {
-    if (this.hosts.get(host.shortCode) !== host || host.connection === 'disconnected') return false;
-    if (host.socket.readyState !== WebSocket.OPEN) return false;
+    if (this.hosts.get(host.shortCode) !== host || host.conn.done || host.connection !== 'connected') return false;
+    if (host.conn.socket.readyState !== WebSocket.OPEN) return false;
     try {
-      host.socket.send(JSON.stringify(frame));
+      host.conn.socket.send(JSON.stringify(frame));
       return true;
     } catch {
       return false;
     }
   }
 
-  private startKeepalive(host: ShareHost): void {
-    this.armPongDeadline(host);
+  private startKeepalive(host: ShareHost, conn: HostConnection): void {
+    this.armPongDeadline(host, conn);
     host.pingTimer = setInterval(() => {
       try {
-        host.socket.ping();
+        conn.socket.ping();
       } catch {
-        // The close handler marks the share disconnected.
+        // The close handler reconnects.
       }
     }, PING_INTERVAL_MS);
     host.pingTimer.unref?.();
   }
 
-  private armPongDeadline(host: ShareHost): void {
+  private armPongDeadline(host: ShareHost, conn: HostConnection): void {
     if (host.pongTimer) clearTimeout(host.pongTimer);
-    host.pongTimer = setTimeout(() => this.disconnect(host, 'terminate'), PONG_TIMEOUT_MS);
+    host.pongTimer = setTimeout(() => {
+      if (!conn.done && host.conn === conn) this.lose(host, 'terminate');
+    }, PONG_TIMEOUT_MS);
     host.pongTimer.unref?.();
   }
 
@@ -410,11 +542,30 @@ export class ShareManager {
     host.pongTimer = null;
   }
 
-  /** Marks the share disconnected and keeps both the host entry (for `lastError`) and the record. */
-  private disconnect(host: ShareHost, how: 'terminate' | 'none'): void {
-    host.connection = 'disconnected';
+  /** Abandons the current socket, keeps the entry, its hub and the record, and retries on the backoff (D-1, D-2). */
+  private lose(host: ShareHost, how: 'terminate' | 'none'): void {
+    host.conn.done = true;
     this.stopKeepalive(host);
-    if (how === 'terminate') this.shut(host.socket, 'terminate');
+    if (how === 'terminate') this.shut(host.conn.socket, 'terminate');
+    host.connection = 'reconnecting';
+    this.scheduleRetry(host);
+  }
+
+  private scheduleRetry(host: ShareHost): void {
+    const delays = this.deps.reconnectDelaysMs ?? SHARE_RECONNECT_DELAYS_MS;
+    const delay = delays[Math.min(host.attempt, delays.length - 1)] ?? 0;
+    host.attempt += 1;
+    host.retryTimer = setTimeout(() => {
+      host.retryTimer = null;
+      if (this.hosts.get(host.shortCode) !== host || host.connection !== 'reconnecting') return;
+      try {
+        this.connect(host);
+      } catch {
+        // openSocket threw synchronously: wait for the next slot.
+        this.scheduleRetry(host);
+      }
+    }, delay);
+    host.retryTimer.unref?.();
   }
 
   /** Forgets the host entry for `shortCode` and shuts its socket. */
@@ -423,9 +574,12 @@ export class ShareManager {
     if (!host) return;
     this.hosts.delete(shortCode);
     host.connection = 'disconnected';
+    host.conn.done = true;
     this.stopKeepalive(host);
+    if (host.retryTimer) clearTimeout(host.retryTimer);
+    host.retryTimer = null;
     host.hub?.close();
-    if (how !== 'none') this.shut(host.socket, how);
+    if (how !== 'none') this.shut(host.conn.socket, how);
   }
 
   private shut(socket: ShareSocket, how: 'close' | 'terminate'): void {

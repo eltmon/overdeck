@@ -2,7 +2,8 @@
  * The viewer page's join state (PAN-4475 WI-9): reads the join on mount, posts the join intent on
  * **Join** (D-1), subscribes to the join's event stream, and feeds `signal` events to one
  * `WebRtcViewer`. A join that leaves the live states closes the peer and the stream (D-10). A join
- * the server closed as `away` resumes without a second click (D-7).
+ * the server closed as `away` resumes without a second click (D-7). A peer that becomes `lost` while
+ * the join is `admitted` gets a new event stream after 5 s, at most 3 times in a row (PAN-4479 D-8).
  *
  * Drafts and prompts (PAN-4476 WI-13): `drafts` holds the other participants' drafts by author;
  * `setMyDraft` sends the viewer's own draft at most every DRAFT_SEND_MS (trailing); `submitPrompt`
@@ -12,6 +13,11 @@
  * `watchTerminal` (PAN-4477) registers the one terminal listener and turns the peer's terminal watch
  * on; terminal payloads go straight to that listener, never through React state (D-12). A peer
  * created while a listener is registered starts with the watch on.
+ *
+ * Control (PAN-4478 WI-6): the host's `identity` sets `selfGithubId`, and `isController` is true while
+ * presence names this viewer as controller. `sendCommand` and `sendControllerPrompt` resolve on the
+ * host's `command-ack`, reject with the refusal text, after COMMAND_ACK_TIMEOUT_MS without an ack, or
+ * when the peer is reset.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -21,6 +27,8 @@ import {
   type JoinState,
   type JoinView,
   type PresencePayload,
+  type SharedCommandRefusal,
+  type SharedControllerCommand,
   type SharedMessage,
   type TerminalPayload,
 } from '@overdeck/contracts';
@@ -29,6 +37,7 @@ import * as joinApi from './joinApi';
 import { JoinApiError } from './joinApi';
 import {
   WebRtcViewer,
+  type CommandAck,
   type SubmitAck,
   type ViewerNotice,
   type ViewerPeerPhase,
@@ -40,6 +49,8 @@ export type SharedJoinPhase = 'checking' | 'confirm' | 'joining' | 'live' | 'rep
 
 /** The longest wait between a keystroke and the draft snapshot it produces (D-11). */
 export const DRAFT_SEND_MS = 150;
+/** How long a controller command or send waits for the host's ack (D-13). */
+export const COMMAND_ACK_TIMEOUT_MS = 10_000;
 
 export interface SharedJoin {
   phase: SharedJoinPhase;
@@ -60,6 +71,14 @@ export interface SharedJoin {
   submitStatus: SubmitAck | null;
   /** The host sent this viewer's suggestion. */
   draftSentNotice: boolean;
+  /** This viewer's GitHub id, from the host's identity; null until it arrives. */
+  selfGithubId: number | null;
+  /** Presence names this viewer as the controller. */
+  isController: boolean;
+  /** Resolves when the host accepted the command; rejects with the reason text. */
+  sendCommand(command: SharedControllerCommand): Promise<void>;
+  /** Resolves to the 1-based queue position (0 when the host sent none). */
+  sendControllerPrompt(text: string, draftGithubId?: number): Promise<number>;
   join(): void;
   leave(): void;
   reconnect(): void;
@@ -68,10 +87,18 @@ export interface SharedJoin {
 }
 
 export type JoinApi = Pick<typeof joinApi, 'getJoin' | 'createJoin' | 'postSignal' | 'fetchJoinIceServers' | 'leaveJoin' | 'openJoinEvents'>;
-export type ViewerPeer = Pick<WebRtcViewer, 'onSignal' | 'close' | 'sendDraft' | 'submit' | 'setTerminalWatch'>;
+export type ViewerPeer = Pick<
+  WebRtcViewer,
+  'onSignal' | 'close' | 'sendDraft' | 'submit' | 'setTerminalWatch' | 'command' | 'controllerSend'
+>;
 export type ViewerFactory = (deps: WebRtcViewerDeps, callbacks: WebRtcViewerCallbacks) => ViewerPeer;
 
-export const LIVE_JOIN_STATES: ReadonlySet<JoinState> = new Set(['connecting', 'lobby', 'admitted', 'host-disconnected']);
+/** PAN-4479 D-8: a lost peer while admitted reopens the event stream after this delay… */
+export const PEER_AUTO_RECONNECT_DELAY_MS = 5_000;
+/** …at most this many times in a row; a connected peer resets the count. */
+export const PEER_AUTO_RECONNECT_MAX = 3;
+
+export const LIVE_JOIN_STATES: ReadonlySet<JoinState> = new Set(['connecting', 'lobby', 'admitted', 'host-disconnected', 'reconnecting']);
 
 const defaultViewer: ViewerFactory = (deps, callbacks) => new WebRtcViewer(deps, callbacks);
 
@@ -79,6 +106,38 @@ function asApiError(error: unknown): JoinApiError {
   if (error instanceof JoinApiError) return error;
   return new JoinApiError(0, 'join_failed', error instanceof Error ? error.message : String(error));
 }
+
+/** The message a rejected controller command or send shows. */
+export function commandRefusalText(reason: SharedCommandRefusal | undefined): string {
+  switch (reason) {
+    case 'not_controller':
+      return 'You no longer have control.';
+    case 'unknown_participant':
+      return 'That person is no longer in the room.';
+    case 'invalid_target':
+      return 'You cannot do that to yourself.';
+    case 'invalid_command':
+      return 'The host did not accept that action.';
+    case 'not_connected':
+      return 'The host is not connected to the share service.';
+    case 'invalid_prompt':
+      return 'Prompts cannot be empty or start with /, ! or #.';
+    case 'too_long':
+      return 'Prompts can be at most 8,000 characters.';
+    case 'queue_full':
+      return 'The queue is full. Try again later.';
+    default:
+      return 'The host did not accept that action.';
+  }
+}
+
+interface PendingCommand {
+  resolve(ack: CommandAck): void;
+  reject(error: Error): void;
+  timer: ReturnType<typeof setTimeout>;
+}
+
+const CONNECTION_LOST = 'Connection to the host was lost.';
 
 function sameNotice(a: ViewerNotice, b: ViewerNotice): boolean {
   return a.kind === b.kind && (a.kind !== 'hello_failed' || (b.kind === 'hello_failed' && a.code === b.code));
@@ -100,10 +159,15 @@ export function useSharedJoin(code: string, deps: { api?: JoinApi; viewer?: View
   const [hasHistory, setHasHistory] = useState(false);
   const [presence, setPresence] = useState<PresencePayload | null>(null);
   const [notices, setNotices] = useState<readonly ViewerNotice[]>([]);
+  /** Bumped by each automatic try so the effect re-arms while the peer stays `lost`. */
+  const [autoTick, setAutoTick] = useState(0);
+  const autoTries = useRef(0);
   const [drafts, setDrafts] = useState<readonly DraftPayload[]>([]);
   const [myDraft, setMyDraftState] = useState('');
   const [submitStatus, setSubmitStatus] = useState<SubmitAck | null>(null);
   const [draftSentNotice, setDraftSentNotice] = useState(false);
+  const [selfGithubId, setSelfGithubId] = useState<number | null>(null);
+  const pendingRef = useRef(new Map<string, PendingCommand>());
   const myDraftRef = useRef('');
   const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const contributorRef = useRef(false);
@@ -114,10 +178,21 @@ export function useSharedJoin(code: string, deps: { api?: JoinApi; viewer?: View
   const terminalListenerRef = useRef<((payload: TerminalPayload) => void) | null>(null);
   const aliveRef = useRef(true);
 
+  /** Rejects and forgets every command still waiting for its ack. */
+  const failPending = useCallback((message: string) => {
+    const pending = [...pendingRef.current.values()];
+    pendingRef.current.clear();
+    for (const entry of pending) {
+      clearTimeout(entry.timer);
+      entry.reject(new Error(message));
+    }
+  }, []);
+
   const closeViewer = useCallback(() => {
     viewerRef.current?.close();
     viewerRef.current = null;
-  }, []);
+    failPending(CONNECTION_LOST);
+  }, [failPending]);
 
   const closeLive = useCallback(() => {
     closeViewer();
@@ -146,7 +221,9 @@ export function useSharedJoin(code: string, deps: { api?: JoinApi; viewer?: View
     setDrafts([]);
     setSubmitStatus(null);
     setDraftSentNotice(false);
-  }, []);
+    setSelfGithubId(null);
+    failPending(CONNECTION_LOST);
+  }, [failPending]);
 
   const ensureViewer = useCallback((): ViewerPeer => {
     if (viewerRef.current) return viewerRef.current;
@@ -165,7 +242,9 @@ export function useSharedJoin(code: string, deps: { api?: JoinApi; viewer?: View
           if (viewerRef.current === created && aliveRef.current) setPresence(next);
         },
         onPhase: (next) => {
-          if (viewerRef.current === created && aliveRef.current) setPeerPhase(next);
+          if (viewerRef.current !== created || !aliveRef.current) return;
+          if (next === 'connected') autoTries.current = 0;
+          setPeerPhase(next);
         },
         onNotice: (notice) => {
           if (viewerRef.current !== created || !aliveRef.current) return;
@@ -194,6 +273,18 @@ export function useSharedJoin(code: string, deps: { api?: JoinApi; viewer?: View
         },
         onTerminal: (payload) => {
           if (viewerRef.current === created && aliveRef.current) terminalListenerRef.current?.(payload);
+        },
+        onIdentity: (githubId) => {
+          if (viewerRef.current === created && aliveRef.current) setSelfGithubId(githubId);
+        },
+        onCommandAck: (ack) => {
+          if (viewerRef.current !== created) return;
+          const entry = pendingRef.current.get(ack.clientId);
+          if (!entry) return;
+          pendingRef.current.delete(ack.clientId);
+          clearTimeout(entry.timer);
+          if (ack.status === 'accepted') entry.resolve(ack);
+          else entry.reject(new Error(commandRefusalText(ack.reason)));
         },
       },
     );
@@ -228,6 +319,31 @@ export function useSharedJoin(code: string, deps: { api?: JoinApi; viewer?: View
     viewer.sendDraft('');
   }, [clearMyDraft]);
 
+  /** Sends one controller message and waits for its ack. */
+  const awaitAck = useCallback((send: (viewer: ViewerPeer, clientId: string) => boolean): Promise<CommandAck> => {
+    const viewer = viewerRef.current;
+    const clientId = crypto.randomUUID();
+    if (!viewer || !send(viewer, clientId)) return Promise.reject(new Error('Not connected to the host.'));
+    return new Promise<CommandAck>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        pendingRef.current.delete(clientId);
+        reject(new Error('The host did not answer.'));
+      }, COMMAND_ACK_TIMEOUT_MS);
+      pendingRef.current.set(clientId, { resolve, reject, timer });
+    });
+  }, []);
+
+  const sendCommand = useCallback(
+    (command: SharedControllerCommand) => awaitAck((viewer, clientId) => viewer.command(clientId, command)).then(() => undefined),
+    [awaitAck],
+  );
+
+  const sendControllerPrompt = useCallback(
+    (text: string, draftGithubId?: number) =>
+      awaitAck((viewer, clientId) => viewer.controllerSend(clientId, text, draftGithubId)).then((ack) => ack.position ?? 0),
+    [awaitAck],
+  );
+
   const subscribe = useCallback(() => {
     closeLive();
     const stream = apiRef.current.openJoinEvents(code, {
@@ -258,6 +374,7 @@ export function useSharedJoin(code: string, deps: { api?: JoinApi; viewer?: View
   const join = useCallback(() => {
     closeLive();
     resetContent();
+    autoTries.current = 0;
     setApiError(null);
     setPhase('joining');
     apiRef.current.createJoin(code).then(
@@ -295,6 +412,7 @@ export function useSharedJoin(code: string, deps: { api?: JoinApi; viewer?: View
   const reconnect = useCallback(() => {
     // A new event stream is a new subscriber; the viewer server restarts the socket so the host
     // offers again (D-5, D-11).
+    autoTries.current = 0;
     resetContent();
     subscribe();
   }, [resetContent, subscribe]);
@@ -309,6 +427,20 @@ export function useSharedJoin(code: string, deps: { api?: JoinApi; viewer?: View
       viewerRef.current?.setTerminalWatch(false);
     };
   }, []);
+
+  // D-8: the same restart as reconnect(), but automatic and bounded, and it keeps the messages so
+  // the timeline does not blank. Host-disconnected and reconnecting recover through the host.
+  const joinState = view?.state;
+  useEffect(() => {
+    if (phase !== 'live' || joinState !== 'admitted' || peerPhase !== 'lost') return;
+    if (autoTries.current >= PEER_AUTO_RECONNECT_MAX) return;
+    const timer = setTimeout(() => {
+      autoTries.current += 1;
+      setAutoTick((n) => n + 1);
+      subscribe();
+    }, PEER_AUTO_RECONNECT_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [phase, joinState, peerPhase, autoTick, subscribe]);
 
   useEffect(() => {
     aliveRef.current = true;
@@ -352,6 +484,10 @@ export function useSharedJoin(code: string, deps: { api?: JoinApi; viewer?: View
     submitPrompt,
     submitStatus,
     draftSentNotice,
+    selfGithubId,
+    isController: selfGithubId !== null && presence?.controllerGithubId === selfGithubId,
+    sendCommand,
+    sendControllerPrompt,
     join,
     leave,
     reconnect,

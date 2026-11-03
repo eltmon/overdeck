@@ -11,6 +11,7 @@ import {
   ContextMenuTrigger,
 } from '../shared/ContextMenu';
 import { TranscriptIssueLink } from './TranscriptIssueLink';
+import { isNativeShell } from '../../lib/nativeShell';
 
 /**
  * PAN-3822 WI-7 / PAN-4714: inside a conversation transcript, PR/MR URLs get a
@@ -51,7 +52,8 @@ export function TranscriptLink({ href, className, children }: { href: string | u
       {children}
     </a>
   );
-  if (!context || !ref) return anchor;
+  // The phone app (PAN-4837) cannot link or unlink: the link only opens.
+  if (!context || !ref || isNativeShell()) return anchor;
   return <PullRequestLinkMenu context={context} prRef={ref} anchor={anchor} />;
 }
 

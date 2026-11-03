@@ -15,6 +15,7 @@ terminal backend (Herdr by default, tmux when `terminal.backend: tmux`).
 | `src/dashboard/frontend/` | React + Zustand + Vite SPA. Components under `src/components/`. |
 | `packages/contracts/` | Shared types/schemas (`@overdeck/contracts`) used by server + frontend (e.g. `Harness` union at `src/types.ts:49`). |
 | `packages/anywhere-channel/` | `@overdeck/anywhere-channel` (PAN-4833): the secure-channel protocol (`noise.ts`, `wire.ts`, `initiator.ts`) for server and phone, behind a crypto port. Entries `.` (core), `./node` (`nodeCrypto`), `./web` (`webCrypto`, `openSecureChannel`, `RtcDuplexWeb`, `DirectoryWebClient`, `createMachineDialer`, `createChannelPool`, `ChannelWebSocket`, `installChannelShims`). Source exports, bundled into the server; own `typecheck:anywhere-channel` lane; CP-1 harness under `cp1/`. See its `README.md`. |
+| `apps/mobile/` | `@overdeck/mobile` (PAN-4837): the Capacitor 8 phone app (`ai.overdeck.app`). A Vite web build that renders the frontend's `/m` screens over `@overdeck/anywhere-channel/web` shims; shell screens in `src/shell/`, the `OverdeckKeys` native plugin in `android/` and `ios/`. Own `typecheck:mobile` lane and Vitest config; CI job `mobile-android`. See its `README.md`. |
 | `sync-sources/skills/` | Bundled wrapper skills for `pan` verbs, one `<name>/SKILL.md` each (lint-enforced vs `--help` by `scripts/lint-skills.sh`). Exception: `okf/` is canonical in `eltmon/okf` (since 2026-09-29; the old subtree mirror was deleted in `abaeeab9647`) and is vendored here from a release tag — never edit it in place (PAN-4408). |
 | `roles/` | Prompt sources for pipeline roles (plan/work/review/test + review sub-roles). |
 | `sync-sources/rules/` | Bundled context rules distributed by `pan sync`. |
@@ -144,6 +145,9 @@ CI test-job classification (`verification.tests: ci`, PAN-3965) lives in
 (`cloister/pr-facts.ts`), the default-branch baseline
 (`cloister/ci-default-branch-tests.ts`) and the `check_run`/`status` webhooks
 (`webhook-handlers.ts` → `cloister/ci-failure-feedback.ts`) all filter through it.
+Per-check failures on a PR head (`listFailedChecks`, `listFailedTestChecks`,
+`FailedCheck`) live in `cloister/check-failures.ts` and are re-exported from
+`pr-facts.ts` (PAN-4917).
 
 ## Spawn sites (harness decision points)
 

@@ -147,8 +147,9 @@ export default defineConfig(async () => {
         '@parcel/watcher',
         'ssh2',
         // PAN-4645 (D-4645-2): the Noise stack resolves `sodium-native` prebuilds via
-        // `require-addon`; bundling any of the four breaks that lookup.
-        'noise-handshake',
+        // `require-addon`; bundling any of the four breaks that lookup. The pattern
+        // also keeps subpaths such as `noise-handshake/dh` (PAN-4837) external.
+        /^noise-handshake(\/.*)?$/,
         '@hyperswarm/secret-stream',
         'sodium-universal',
         'sodium-native',

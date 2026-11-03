@@ -16,6 +16,7 @@ import type { ClipboardEvent, ChangeEvent, DragEvent } from 'react';
 import { toast } from 'sonner';
 import { getHarnessBehavior } from '@overdeck/contracts';
 import { isServerWriteBlocked } from '../../lib/connectionState';
+import { isNativeShell } from '../../lib/nativeShell';
 import type { LexicalEditor } from 'lexical';
 import { $createParagraphNode, $createTextNode, $getRoot } from 'lexical';
 import { ComposerPromptEditor, loadDraft } from './ComposerPromptEditor';
@@ -179,6 +180,8 @@ function ComposerFooterInput({
   const showDeliverySelector = steerKind === 'send-now-keys' || (steerKind === 'control-channel' && !agentId);
   const steerOptionLabel = navigator.platform.toLowerCase().includes('mac') ? 'Steer (⌘+Enter)' : 'Steer (Ctrl+Enter)';
   const isDisabled = !conversation.sessionAlive || sending;
+  // The phone app (PAN-4837): no model picker (admin reads) and no voice input (its own session mint).
+  const native = isNativeShell();
   const canEditModelBeforeStart = !agentId && !conversation.sessionAlive && !conversation.claudeSessionId;
   const isEmpty = text.trim() === '';
 
@@ -683,7 +686,7 @@ function ComposerFooterInput({
       const isMac = navigator.platform.toLowerCase().includes('mac');
       const usesModifier = isMac ? event.metaKey : event.ctrlKey;
       if (!usesModifier || !event.shiftKey || event.altKey || event.key.toLowerCase() !== 'm') return;
-      if (isDisabled) return;
+      if (isDisabled || native) return;
       event.preventDefault();
       setIsVoiceWidgetOpen(true);
       setVoiceAutoStartToken((token) => token + 1);
@@ -691,7 +694,7 @@ function ComposerFooterInput({
 
     window.addEventListener('keydown', handleVoiceShortcut);
     return () => window.removeEventListener('keydown', handleVoiceShortcut);
-  }, [isDisabled]);
+  }, [isDisabled, native]);
 
   // PAN-4493 D10: if the attachment that opened the lightbox is gone (removed
   // or finished uploading away its preview), close it — but never a lightbox
@@ -776,15 +779,17 @@ function ComposerFooterInput({
 
         {/* Toolbar inside the box */}
         <div className={styles.composerToolbar}>
-          <ModelPicker
-            value={model}
-            onChange={handleModelChange}
-            onComboChange={handleComboChange}
-            disabled={isDisabled || !canEditModelBeforeStart}
-            harness={harness}
-            onHarnessChange={handleHarnessChange}
-            liveConversation={conversation.sessionAlive}
-          />
+          {!native && (
+            <ModelPicker
+              value={model}
+              onChange={handleModelChange}
+              onComboChange={handleComboChange}
+              disabled={isDisabled || !canEditModelBeforeStart}
+              harness={harness}
+              onHarnessChange={handleHarnessChange}
+              liveConversation={conversation.sessionAlive}
+            />
+          )}
           {/*
             Model drift indicator. The picker holds the model that the
             *next* message will be sent with; if the running session's last
@@ -835,15 +840,17 @@ function ComposerFooterInput({
             <Paperclip size={16} />
           </button>
 
-          <button
-            className={isVoiceWidgetOpen ? styles.voiceToolbarButtonActive : styles.voiceToolbarButton}
-            onClick={() => setIsVoiceWidgetOpen((open) => !open)}
-            disabled={isDisabled}
-            type="button"
-            title={voiceState.error ? `Voice error: ${voiceState.error}` : voiceState.isListening ? 'Voice input listening' : 'Toggle voice input (Ctrl+Shift+M)'}
-          >
-            {voiceState.error ? <AlertCircle size={16} /> : voiceState.isListening ? <MicOff size={16} /> : <Mic size={16} />}
-          </button>
+          {!native && (
+            <button
+              className={isVoiceWidgetOpen ? styles.voiceToolbarButtonActive : styles.voiceToolbarButton}
+              onClick={() => setIsVoiceWidgetOpen((open) => !open)}
+              disabled={isDisabled}
+              type="button"
+              title={voiceState.error ? `Voice error: ${voiceState.error}` : voiceState.isListening ? 'Voice input listening' : 'Toggle voice input (Ctrl+Shift+M)'}
+            >
+              {voiceState.error ? <AlertCircle size={16} /> : voiceState.isListening ? <MicOff size={16} /> : <Mic size={16} />}
+            </button>
+          )}
 
           <ContextWindowMeter usage={contextWindowUsage} />
 

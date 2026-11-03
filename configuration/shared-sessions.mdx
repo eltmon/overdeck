@@ -55,6 +55,9 @@ person you can:
 
 **End share** closes the room for everyone. The link stops working.
 
+If your network drops or your dashboard restarts, Overdeck reconnects the share on its own.
+People you admitted come back without the lobby if you return within 5 minutes.
+
 From a terminal, run `pan share <conversation>`; it prints the link and the join code. See
 [`pan share and pan join`](/cli/share).
 
@@ -105,13 +108,11 @@ sign this browser out of overdeck.ai.
 
 - **Host**: the person who shared the conversation. The conversation runs on the host's
   machine, and the host admits, kicks and revokes people.
-- **Controller**: the person who drives the conversation. In this release this is always
-  the host.
+- **Controller**: the person who drives the conversation and runs the lobby. The host
+  starts as controller and can hand control to a viewer.
 - **Viewer**: a person the host admitted. Viewers watch the conversation live and can
   suggest prompts.
 - **Contributor**: a viewer who can also send prompts straight to the conversation.
-
-Handing control to another person comes in a later release.
 
 ## Suggestions and contributor prompts
 
@@ -131,6 +132,21 @@ Handing control to another person comes in a later release.
 **Only make someone a contributor if you trust them to prompt your agent as you.** Their
 prompts run on your machine, with your agent's permissions.
 
+## Hand over control
+
+1. In the share dialog, click **Hand control to @name** next to a person in the room.
+2. That person's page shows **You have control**. They can now admit, kick and revoke
+   people, grant or remove contributor, send prompts with **Send prompt**, pick and send
+   suggestions, and hand control to someone else or back to you.
+3. While someone else has control, your share dialog says "@name has control." and shows
+   only **Reclaim control**. Click it to take control back at once. It always works.
+
+Only the host can un-revoke a blocked person or end the share. Reclaim control first to
+un-revoke; **End share** works whoever has control.
+
+**Only hand control to someone you trust to prompt your agent as you.** The controller's
+prompts run on your machine, with your agent's permissions.
+
 ## What viewers see
 
 - **Join a shared conversation**: the confirmation before you join.
@@ -143,9 +159,13 @@ prompts run on your machine, with your agent's permissions.
   host's machine. **The host's terminal is not running.** means the conversation has no live
   terminal; **The host's terminal session ended.** means it stopped while you watched.
 - **Host disconnected — reconnecting…**: the host's machine lost its connection to the
-  share service. You keep the messages you already have.
-- **Connection to the host was lost.**: the direct connection to the host dropped. Click
-  **Reconnect** to get the conversation again.
+  share service. You keep the messages you already have. If the host comes back within
+  5 minutes, the conversation returns on its own and you do not wait in the lobby again.
+- **Reconnecting to the share service…**: your own machine lost its connection to the share
+  service. Overdeck reconnects on its own, and you keep your place in the room.
+- **Connection to the host was lost.**: the direct connection to the host dropped. Overdeck
+  tries to reconnect on its own, up to three times. If that does not work, click
+  **Reconnect**.
 - **Removed by host**: the host kicked you, and you can ask to join again, or the host
   revoked you, and you cannot.
 - **This share has ended.**: the host ended the share.
@@ -165,6 +185,7 @@ prompts run on your machine, with your agent's permissions.
 - A room holds at most 50 people, of whom at most 20 can wait in the lobby at once.
 - The link works as long as the share exists.
 - If the host's machine stays away from the share service for more than 5 minutes, the
-  room ends.
+  room ends and the link stops working. Share again to get a new link, and everyone joins
+  through the lobby.
 - A queue holds at most 20 prompts, at most 3 from one contributor, each up to 8,000
   characters.

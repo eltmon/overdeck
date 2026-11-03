@@ -61,6 +61,9 @@ function liveMessage(state: JoinState, code: string): string | null {
       return `You are in (${code}).`;
     case 'host-disconnected':
       return 'You are in, but the host is disconnected. The page reconnects when the host returns.';
+    case 'reconnecting':
+      // A live join whose socket dropped; the viewer server reconnects it on its own (PAN-4479).
+      return `Reconnecting to the share service (${code}). The page shows the conversation when it reconnects.`;
     case 'connecting':
       return 'Still connecting to the share service. The page shows the lobby when it connects.';
     default:

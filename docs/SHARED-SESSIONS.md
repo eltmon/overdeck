@@ -23,7 +23,7 @@ Runtime code uses Web APIs only; `src/index.ts` is the only module that imports 
 | 5 | [PAN-4476](https://github.com/eltmon/overdeck/issues/4476) | Drafts, contributor direct-submit, FIFO queue |
 | 6 | [PAN-4477](https://github.com/eltmon/overdeck/issues/4477) | Read-only terminal channel |
 | 7 | [PAN-4478](https://github.com/eltmon/overdeck/issues/4478) | Controller handoff and reclaim (host enforcement and UI) |
-| 8 | [PAN-4479](https://github.com/eltmon/overdeck/issues/4479) | Host reconnect and viewer auto-restore on the host side |
+| 8 | [PAN-4479](https://github.com/eltmon/overdeck/issues/4479) | Host reconnect and re-park, viewer auto-restore |
 | 9 | [PAN-4480](https://github.com/eltmon/overdeck/issues/4480) | `pan share` / `pan join` CLI |
 | 10 | [PAN-4481](https://github.com/eltmon/overdeck/issues/4481) | Hosted web join page (operator decision OD-1) |
 | 11 | [PAN-4482](https://github.com/eltmon/overdeck/issues/4482) | Signaling-privacy e2e, forced-TURN verification, full acceptance sweep |
@@ -163,7 +163,7 @@ A conversation has at most one share. An entry is removed when the operator ends
 
 **Share service URL.** `anywhere.share_url` in `${OVERDECK_HOME}/config.yaml` (see the Configuration table), read on every share creation and every end. `src/lib/sharing/share-service.ts` holds the HTTP client: `POST /v1/rooms` with the device token from `account.json`, `DELETE /v1/rooms/:code` with the host token, 10 s timeouts.
 
-**Host socket.** `src/dashboard/server/services/share-host.ts` (`ShareManager`) writes the record, then opens `GET /v1/rooms/:code/host?v=1` with `Authorization: Bearer <hostToken>` and keeps the latest `room` snapshot and the latest `error` frame in memory. It sends a WebSocket protocol ping every 30 s and drops the socket after 75 s without a pong. Any close other than 4004 leaves the share `disconnected` with its record kept.
+**Host socket.** `src/dashboard/server/services/share-host.ts` (`ShareManager`) writes the record, then opens `GET /v1/rooms/:code/host?v=1` with `Authorization: Bearer <hostToken>` and keeps the latest `room` snapshot and the latest `error` frame in memory. It sends a WebSocket protocol ping every 30 s and drops the socket after 75 s without a pong. An unexpected loss reconnects with the record kept (see *Reconnect and restore*); close 4004 removes the record.
 
 **Routes.** All four are behind the dashboard's auth at the default `admin` scope and answer `Cache-Control: no-store`. Short codes are normalized like the Worker (uppercase, spaces and dashes stripped).
 
@@ -172,9 +172,9 @@ A conversation has at most one share. An entry is removed when the operator ends
 | `GET /api/shares` | 200 `{ shares: ShareView[] }`, live and stale shares, oldest first; 500 `share_record_unreadable` |
 | `POST /api/shares` | body `{ conversationName }`. 201 `ShareView` for a new room; 200 with the existing view when the conversation's share is already live; 400 `invalid_request`; 404 `conversation_not_found` (not a local conversation); 409 for a vault browse copy or a released conversation; 412 `not_signed_in`; 409 `account_rejected` / `account_expired`; 429 `rate_limited`; 500 `account_unreadable` / `share_url_invalid` / `share_record_unreadable`; 502 `share_service_unreachable` / `share_service_error` |
 | `POST /api/shares/:code/commands` | body is one share command. 202 `{ ok: true }` once the frame is sent; 400 `invalid_command`; 404 `share_not_found`; 409 `share_not_connected` |
-| `DELETE /api/shares/:code` | 204 after `DELETE /v1/rooms/:code` succeeds (404 from the service counts as gone); 404 `share_not_found`; 500 `share_url_invalid`; 502 `share_service_error` with the record kept |
+| `DELETE /api/shares/:code` | 204 after `DELETE /v1/rooms/:code` succeeds (404 from the service counts as gone); 404 `share_not_found`; 500 `share_url_invalid`; 502 `share_service_error` with the record kept. A share that is not connected is forgotten locally instead (204) |
 
-A stale record (no host socket, for example after a dashboard restart) is still listed and can still be ended. Creating a share for a conversation whose record is stale ends the old room best-effort and creates a new one.
+A stale record (no host socket, for example on a peer dashboard that does not re-park) is still listed and can still be ended. Creating a share for a conversation whose record is stale ends the old room best-effort and creates a new one.
 
 **Signed out.** Without `${OVERDECK_HOME}/account.json`, `POST /api/shares` answers 412 `{ "error": "not_signed_in", "message": "Sign in with pan account login to share conversations." }`, and the dialog shows a signed-out panel naming `pan account login`.
 
@@ -189,7 +189,7 @@ A stale record (no host socket, for example after a dashboard restart) is still 
 | **Kick** | in the room | `{ "type": "kick", "githubId": N }` |
 | **Un-revoke** | blocked | `{ "type": "unrevoke", "githubId": N }` |
 
-**Not done yet.** The host socket is not reconnected after a network drop and not re-parked after a dashboard restart: that is slice 8 ([PAN-4479](https://github.com/eltmon/overdeck/issues/4479)), which reads the same record file. Content (WebRTC) is described in the next section.
+Reconnect and re-park are described in *Reconnect and restore* below. Content (WebRTC) is described in the next section.
 
 ## Host WebRTC hub and content wire format (slice 3, PAN-4474)
 
@@ -199,7 +199,7 @@ Content travels peer-to-peer over WebRTC data channels between the host's dashbo
 
 **Peer hub.** `src/dashboard/server/sharing/peer-hub.ts` (`PeerHub`), one per live share, holds one `RTCPeerConnection` per eligible viewer. The host always offers: it creates the five channels below, ordered and reliable, before its offer, and sends the offer and its ICE candidates as `signal` host frames. An inbound offer is ignored. ICE servers come from the share service's `ice-servers` frame; `error turn_unavailable`, or no answer within 5 s, falls back to an empty list (host candidates only). A successful list is cached for 50 minutes and shared by every viewer that starts while the request is in flight.
 
-**Content gate.** The hub keeps its own **host-admitted set**: GitHub ids this host process admitted by sending an `admit` frame. Only the host's own `admit` adds an id; `kick` and `revoke` remove one, and so does a snapshot that no longer lists the id at all. A room snapshot never adds an id. An **eligible viewer** is in the host-admitted set and listed in the latest snapshot as `admitted` and `connected`. Only eligible viewers get a peer connection, a `signal` frame or any content, whatever a snapshot claims.
+**Content gate.** The hub keeps its own **host-admitted set**: GitHub ids this host process admitted by sending an `admit` frame. Only the host's own `admit` adds an id; `kick` and `revoke` remove one, and so does a snapshot that no longer lists the id at all. A room snapshot never adds an id. An **eligible viewer** is in the host-admitted set and listed in the latest snapshot as `admitted` and `connected`. Only eligible viewers get a peer connection, a `signal` frame or any content, whatever a snapshot claims. After a dashboard restart, the re-parked host seeds the set once from the first snapshot's admitted participants (slice 8).
 
 **Peer lifetime.** Every snapshot reconciles: an eligible viewer without a peer gets a new offer, and a peer whose viewer is no longer eligible is closed. Kick and revoke close the viewer's peer connection at once. A peer whose connection fails is removed, and the next snapshot that still shows the viewer eligible offers a new one with a fresh history. To ask for a fresh offer (for example after a browser reload), a viewer closes its join socket, waits for that socket's `close` event, and only then opens a new one, so the snapshot flips `connected` false then true. Opening the new socket first does not work: the service replaces the old socket with close 4008 and never marks the viewer disconnected. A dropped host socket keeps established peers; the hub closes only when the share's host entry is dropped (end, close 4004, a 404/401 upgrade, a replaced stale record, or shutdown).
 
@@ -207,9 +207,9 @@ Content travels peer-to-peer over WebRTC data channels between the host's dashbo
 
 | Channel | Carries |
 | --- | --- |
-| `control` | The hello exchange and hello errors; slice 5 adds `submit` (viewer → host), `submit-ack` and `draft-sent` (host → viewer), and slice 6 the viewer's `terminal-watch`. The host reads it with the 64 Ki inbound cap. |
+| `control` | The hello exchange and hello errors; slice 5 adds `submit` (viewer → host), `submit-ack` and `draft-sent` (host → viewer), slice 6 the viewer's `terminal-watch`, and slice 7 `identity` and `command-ack` (host → viewer), `command` and `controller-send` (viewer → host). The host reads it with the 64 Ki inbound cap. |
 | `conversation` | `history` (the stream's full message list, which replaces what the viewer has), then `append` for a new message, `update` for a changed one, or `unavailable` (`transcript_not_found`, `history_too_large`) |
-| `presence` | The roster: the data owner first (`isHost: true`), then every lobby and admitted participant, the controller and the stream list. Sent when the channel opens and again when a snapshot changes it. The block list and `connected` are never sent. |
+| `presence` | The roster: the data owner first (`isHost: true`), then every lobby and admitted participant, the host's effective controller (slice 7) and the stream list. Sent when the channel opens and again when a snapshot changes it. The block list and `connected` are never sent. |
 | `drafts` | Draft snapshots both ways (slice 5): viewer → host `DraftUpdate { text }`, host → viewer `DraftPayload` |
 | `terminal` | A watched viewer's read-only terminal (slice 6), host → viewer only |
 
@@ -238,11 +238,11 @@ The viewer is the joiner's own dashboard: its server holds the device token and 
 | close 4003 or 4011 | `revoked` |
 | close 4004 / 4008 / 4009 / 4010 / 4013 | `ended` / `replaced` / `is-host` / `kicked` / `full` |
 | close after the grace timer | `away` |
-| any other close, or 75 s without a pong | `disconnected` (`connection_lost`) |
-| upgrade 404 / 401 or 403 / other | `ended` / `rejected` / `disconnected` (`http_<status>`) |
-| socket `error` | `disconnected` (`unreachable`) |
+| any other close, or 75 s without a pong | `reconnecting` (`connection_lost`) for a seated join, `disconnected` otherwise |
+| upgrade 404 / 401 or 403 / other | `ended` / `rejected` / `reconnecting` (`http_<status>`) for a seated join, `disconnected` otherwise |
+| socket `error` | `reconnecting` (`unreachable`) for a seated join, `disconnected` otherwise |
 
-`connecting`, `lobby`, `admitted` and `host-disconnected` are live. An unexpected close is never reconnected here: the page offers **Rejoin**, and the service restores an admitted viewer without the lobby. Automatic restore is slice 8 ([PAN-4479](https://github.com/eltmon/overdeck/issues/4479)).
+`connecting`, `lobby`, `admitted`, `host-disconnected` and `reconnecting` are live. A seated join reconnects on its own; a join that never got a status frame becomes `disconnected` and the page offers **Rejoin**.
 
 **Routes** (`src/dashboard/server/routes/joins.ts`, every answer `Cache-Control: no-store`):
 
@@ -273,7 +273,31 @@ Mutations need the dashboard CSRF token; the two `GET /api/joins` routes need a 
 
 **Route and screens.** `App.tsx` renders `SharedConversationRoute` when the hash matches `#/shared/<code>`, before the deck; a same-tab hash change into it reloads the page. `useSharedJoin` reads the join on mount (minting the dashboard session first), shows **Join** for a new or finished join, resumes an `away` join, and subscribes to a live one. `SharedConversationView` shows one screen per state: the confirmation, the lobby, "Connecting to the host…", the conversation through `MessagesTimeline` with an empty work log, the "Host disconnected — reconnecting…" banner, "Connection to the host was lost." with **Reconnect**, and the terminal screens ("Removed by host", "This share has ended.", and the others). The timeline mounts only when admitted and a history arrived, so a lobby viewer never renders host content.
 
-**Teardown.** Join-socket close 4004 closes the browser peer, because the host may keep streaming after the room ends. `host-disconnected` keeps the peer and shows the banner; `host-reconnected` removes it. Kick, revoke, blocked, replaced, is-host, full, rejected and disconnected close the peer and the event stream. A peer that fails on its own shows **Reconnect**, which opens a new event stream; the restart rule above makes the host offer again.
+**Teardown.** Join-socket close 4004 closes the browser peer, because the host may keep streaming after the room ends. `host-disconnected` keeps the peer and shows the banner; `host-reconnected` removes it. Kick, revoke, blocked, replaced, is-host, full, rejected and disconnected close the peer and the event stream. A peer that fails on its own while admitted gets up to three automatic tries (see *Reconnect and restore*), then shows **Reconnect**, which opens a new event stream; the restart rule above makes the host offer again.
+
+## Reconnect and restore (slice 8, PAN-4479)
+
+Inside the share service's 5-minute window, a host network drop, a host dashboard restart or a viewer network drop restores on its own. Admitted viewers get a new offer and a fresh history and never pass through the lobby again.
+
+**Backoff.** Every automatic reconnect waits on `SHARE_RECONNECT_DELAYS_MS` (`share-host.ts`): 1, 2, 4, 8, 15 and 30 s, and 30 s for every attempt after that. There is no attempt limit, because the host cannot tell from its own clock when the service's alarm fires; only the service's answer ends the loop. The host resets the count on a `room` frame, and the viewer server resets it on any `status` frame.
+
+**Host reconnect.** A host-socket close other than 4004 or 4008, a socket `error`, 75 s without a pong, or an upgrade answered with anything but 404 or 401 makes the share `reconnecting`. `ShareManager` keeps the host entry, its peer hub and the record, and opens a new host socket on the backoff. Keeping the hub is safe: nothing can admit a viewer while the host socket is down. The next `room` frame reconciles, so peers that died during the outage get a new offer and live peers are untouched. Every socket listener checks that its socket is still the current one, so late events from an abandoned socket change nothing.
+
+**Terminal answers.** Upgrade 404 or 401 and close 4004 drop the host entry and remove the record. Close 4008 means another host socket holds the room (for example a second dashboard on the same home): the share becomes `disconnected` with `lastError.code` `replaced`, keeps its record, and is not retried.
+
+**End share while offline.** **End share** on a share that is not `connected` forgets it locally when the share service cannot be reached: an invalid `anywhere.share_url` or a failed `DELETE /v1/rooms/:code` drops the host entry, removes the record and answers 204. The room, if it still exists, ends on the service's alarm because no host returns. A `connected` share keeps the 500 and 502 answers and its record.
+
+**Re-park on boot.** `ShareManager.resume()` opens a host socket for every share record this process does not host yet, with that record's host token. `main.ts` calls it once on boot of the primary dashboard (`hostsMachineLinks()`). A peer dashboard on the same `~/.overdeck` never re-parks, because two host sockets for one room replace each other with close 4008. `resume()` reads only the record file and `anywhere.share_url`; it needs no account, never throws, and does not block boot.
+
+**Seeding the content gate.** A new process starts with an empty host-admitted set, and a snapshot never adds an id. So the first `room` frame a re-parked host receives seeds its hub with every participant whose `state` is `admitted`, exactly once, before the hub reconciles. This is safe because the service admits a viewer only on an `admit` frame from the host socket: the snapshot's admitted list is this host's own earlier decisions, kept by the service. A share created or reconnected in the same process is never seeded.
+
+**Viewer server reconnect.** A seated join (one that received at least one `status` frame) whose join socket closes unexpectedly, errors, misses its pong or gets an upgrade answer other than 404, 401 or 403 becomes `reconnecting` with `error` `connection_lost`, `unreachable` or `http_<status>`. `JoinManager` opens a new join socket on the backoff and stays `reconnecting` until the next `status` frame. The service restores an admitted viewer as `admitted` and a lobby viewer to `lobby`. **Leave**, `stop()` and the 60 s grace timer cancel a pending retry; the grace timer turns a join waiting between attempts into `away`. A join that never got a `status` frame becomes `disconnected`, and the page offers **Rejoin**.
+
+**Viewer page.** `reconnecting` is live on the page: **Leave** stays, the browser peer is kept, and the page shows "Reconnecting to the share service…" above the kept timeline, or as a panel when no history arrived yet. The timeline also stays visible while a new host offer negotiates. When the browser peer becomes `lost` while the join is `admitted`, `useSharedJoin` opens a new event stream after 5 s (`PEER_AUTO_RECONNECT_DELAY_MS`) without clearing the messages, at most 3 times in a row (`PEER_AUTO_RECONNECT_MAX`); a `connected` peer resets the count. After the third try the **Reconnect** banner stays. No automatic try runs while the join is `host-disconnected` or `reconnecting`, because the host's own re-offer restores those.
+
+**After the window.** If the host stays away from the share service for more than 5 minutes, the service deletes the room and its short code answers 404. The next reconnect or re-park removes the record, and the share disappears from `GET /api/shares`. Sharing again creates a new link, and everyone joins through the lobby.
+
+The Miniflare tests `tests/integration/services/share/join-manager.test.ts` (a dropped join socket) and `tests/integration/services/share/host-repark.test.ts` (a host restart inside the window, and a room that is gone) cover these paths on real workerd.
 
 ## Hosted web join (slice 10, PAN-4481)
 
@@ -349,7 +373,7 @@ Limits: 20 items in total (including the one being delivered), 3 queued items pe
 
 **Attribution.** Right before a delivery the hub calls `bridge.expectAuthor(text, author)`. The conversation bridge stamps `SharedMessage.author` (`{ login, avatarUrl }`) on the first appended user message whose trimmed text equals the delivered text, and keeps the stamp in later `history` payloads; viewers show `@login` and the avatar on that message. A rejected delivery cancels the expectation, at most 20 wait at once, and a prompt delivered while no viewer is attached (the bridge is stopped) stays unattributed. If Claude Code stores the prompt with different text, the message has no author; the prompt is never prefixed.
 
-**Host API.** `POST /api/shares/:code/prompts` `{ text, draftGithubId? }` queues a controller send behind the dashboard mutation gate: 202 `{ ok: true, position }`; 400 `invalid_request`, `invalid_prompt` or `too_long`; 404 `share_not_found`; 409 `share_not_live`; 429 `queue_full`. With `draftGithubId` the draft's author is credited and the draft is taken only after the send is queued; otherwise the data owner is. `GET /api/shares` views carry `drafts` (`ShareDraftView[]`, oldest started first) and `queue` (`ShareQueueView`: `agentWorking`, `delivering`, `items`). The share dialog polls them every second and shows the drafts in a controller-mode `SuggestionList` (**Use**, edit, **Send**).
+**Host API.** `POST /api/shares/:code/prompts` `{ text, draftGithubId? }` queues a controller send behind the dashboard mutation gate: 202 `{ ok: true, position }`; 400 `invalid_request`, `invalid_prompt` or `too_long`; 404 `share_not_found`; 409 `share_not_live`; 409 `not_controller` while a viewer controls (slice 7); 429 `queue_full`. With `draftGithubId` the draft's author is credited and the draft is taken only after the send is queued; otherwise the data owner is. `GET /api/shares` views carry `drafts` (`ShareDraftView[]`, oldest started first) and `queue` (`ShareQueueView`: `agentWorking`, `delivering`, `items`). The share dialog polls them every second and shows the drafts in a controller-mode `SuggestionList` (**Use**, edit, **Send**).
 
 Drafts and the queue are memory only. A host restart or a share end drops them, and items still queued when the hub closes are dropped.
 
@@ -371,6 +395,31 @@ Once the peer is connected, the viewer page shows a **Conversation** / **Termina
 **Overflow.** The terminal channel uses the same writer rule as the others: a peer whose queued content passes 64 Mi characters is closed, and the viewer sees "Connection to the host was lost." with **Reconnect**.
 
 **Version skew.** The change is additive and the wire version stays 1. An older host ignores `terminal-watch` (it acts only on `hello` and, from slice 5, `submit` on `control`), so its viewer's terminal view stays empty. An older viewer never sends a watch and has no `terminal` listener, so it receives nothing.
+
+## Controller handoff and reclaim (slice 7, PAN-4478)
+
+Slice 7 lets the data owner hand control to an admitted viewer. The **controller** is the one participant whose share commands (admit, kick, revoke, un-revoke, contributor grants, handoff) and prompt sends the host accepts. The data owner starts as controller.
+
+**The appointment.** The host does not take the controller from the share service. The `PeerHub` keeps its own appointment (`ControllerState` in `src/dashboard/server/sharing/controller.ts`): the viewer this host process last made controller with a `set-controller` it sent itself. The **effective controller** is that viewer when the latest room snapshot's `controllerGithubId` names the same viewer, and the data owner otherwise. So a handoff takes effect when the next snapshot confirms it, a reclaim takes effect on the host at once, and a share service that names a controller the host never appointed only produces "the data owner controls". A snapshot that no longer lists the appointed viewer as `admitted` clears the appointment; an admitted controller who goes offline keeps control. The appointment is memory only, so a host restart starts with the data owner in control.
+
+**The gate.** `controlRefusal` decides every share command, from the data owner's browser and from a viewer-controller alike. A command from anyone who is not the effective controller is refused `not_controller`. The one exception is **reclaim**: the data owner's `set-controller` with its own id is always accepted. A `set-controller` target must be the data owner, or a participant listed as `admitted` in the snapshot and admitted by this host. For the data owner, other targets go to the share service unchecked as before; a viewer-controller's targets are checked on the host (`admit` needs a lobby participant, `kick` and `revoke` any listed participant, `set-contributor` an admitted one). **End share** (`DELETE /api/shares/:code`) is never gated. A viewer-controller cannot un-revoke (presence never carries the block list) or end the share; the data owner reclaims first.
+
+**New `control` payloads.**
+
+| Payload | Direction | Fields |
+| --- | --- | --- |
+| `identity` | host → viewer | `githubId`: the viewer's own id, sent right after its hello negotiates and before any presence |
+| `command` | viewer → host | `clientId`, `command`: one of `admit`, `kick`, `revoke`, `set-contributor`, `set-controller` (`SharedControllerCommand`) |
+| `controller-send` | viewer → host | `clientId`, `text`, optional `draftGithubId`: a prompt queued as a controller send, credited to the viewer-controller (or to the picked draft's author) |
+| `command-ack` | host → viewer | `clientId`, `status` (`accepted` or `rejected`), `position` (with an accepted `controller-send`), `reason` (with `rejected`) |
+
+The host rebuilds each command from its known keys only, relays it through the host socket, and updates its host-admitted set and appointment exactly as for the data owner's own commands. Ack reasons: `not_controller`, `unknown_participant`, `invalid_target` (the viewer named itself), `invalid_command` (malformed, or `unrevoke`), `not_connected` (the host socket cannot send), and the queue's `invalid_prompt`, `too_long` and `queue_full`. The viewer fails a command that gets no ack within 10 s (`COMMAND_ACK_TIMEOUT_MS`) with "The host did not answer.". All four payloads are additive: an older viewer ignores `identity` and `command-ack`, and an older host ignores `command` and `controller-send`, so the viewer's call times out.
+
+**Presence.** Presence `controllerGithubId` is the host's effective controller, never the raw snapshot value. A reclaim, or a viewer handing control back, refreshes presence on every peer at once; a handoff to a viewer shows once the snapshot confirms it.
+
+**Host API.** `POST /api/shares/:code/commands` accepts `{ type: 'set-controller', githubId }`. While a viewer controls, every command except reclaim answers 409 `{ error: 'not_controller', message }`, and a `set-controller` target nobody admitted answers 409 `unknown_participant`. `POST /api/shares/:code/prompts` answers 409 `not_controller` while a viewer controls. `ShareView.controllerGithubId` carries the effective controller.
+
+**UI.** The share dialog's lobby offers **Hand control** on each admitted row while the data owner controls. While a viewer controls it shows "@login has control.", one **Reclaim control** button, no other lobby actions, and read-only suggestions. The viewer-controller's page shows **You have control** with **Hand control back to @owner**, the lobby roster (no Blocked section), a **Send prompt** button and the suggestions in controller mode. Every viewer's header shows "@login has control" while a viewer controls.
 
 ## CLI: pan share and pan join (slice 9, PAN-4480)
 

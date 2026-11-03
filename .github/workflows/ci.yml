@@ -147,15 +147,18 @@ jobs:
   prompt-gate:
     runs-on: ubuntu-latest
     name: Prompt change trailer gate
-    timeout-minutes: 5
+    # PAN-1651: cap wall-clock. PAN-4917: 5 minutes was too tight once the
+    # full-history checkout below got slow; 20 matches build and lint-group.
+    timeout-minutes: 20
 
     steps:
+      # PAN-4917: a one-commit checkout. The script's --fetch then fetches
+      # only main and HEAD, blobless, never every branch (fetch-depth: 0 also
+      # pulled the archived overdeck-state branch and timed the job out).
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Check Prompt-Change trailer for roles/ and docs/flywheel-brief.md
-        run: bash scripts/check-prompt-change-trailer.sh
+      - name: Check Prompt-Change trailer for roles/ and the flywheel skill
+        run: bash scripts/check-prompt-change-trailer.sh --fetch
 
   # The root vitest suite (~1,300 files) is split across four parallel jobs.
   # Each shard runs four workers on the runner's four cores. Most of the
@@ -277,21 +280,74 @@ jobs:
           DASHBOARD_URL: http://localhost:3011
         run: cd src/dashboard/frontend && npm run test:playwright
 
+  # PAN-4837 FR-15, D-10: the phone app (apps/mobile) builds its web bundle,
+  # passes its unit tests, and assembles the Android debug APK. It feeds the
+  # `test` aggregator below, so a broken app build blocks merge.
+  mobile-android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: App unit tests
+        run: npm --prefix apps/mobile test
+
+      - name: Build the web bundle
+        run: npm --prefix apps/mobile run build
+
+      # The package script runs the workspace's own Capacitor CLI; `npx cap`
+      # does not resolve it in bun's isolated layout.
+      - name: Sync Capacitor (Android)
+        run: npm --prefix apps/mobile run cap:sync -- android
+
+      - name: Assemble the debug APK
+        working-directory: apps/mobile/android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Upload the debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 7
+
   # `test` is the check name the close-out gate requires on main
   # (DEFAULT_MAIN_VERIFY_REQUIRED_CHECKS in src/lib/lifecycle/dod-gate.ts), so
-  # it stays one job: green only when every shard and test-e2e passed.
+  # it stays one job: green only when every shard, test-e2e and mobile-android passed.
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [test-shard, test-e2e]
+    needs: [test-shard, test-e2e, mobile-android]
     if: always()
     steps:
       - name: All test jobs passed
         run: |
-          echo "test-shard: ${{ needs.test-shard.result }}"
-          echo "test-e2e:   ${{ needs.test-e2e.result }}"
+          echo "test-shard:     ${{ needs.test-shard.result }}"
+          echo "test-e2e:       ${{ needs.test-e2e.result }}"
+          echo "mobile-android: ${{ needs.mobile-android.result }}"
           test "${{ needs.test-shard.result }}" = success
           test "${{ needs.test-e2e.result }}" = success
+          test "${{ needs.mobile-android.result }}" = success
 
   flake-lane:
     runs-on: ubuntu-latest

@@ -9,7 +9,7 @@ interface ConversationSearchBannerProps {
 }
 
 const actionClass =
-  'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-warning/40 bg-background px-3 text-xs font-medium text-foreground shadow-xs transition-colors hover:bg-warning/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning/50';
+  'inline-flex h-6 shrink-0 items-center gap-1.5 rounded-md border border-warning/40 bg-background px-2.5 text-xs font-medium text-foreground shadow-xs transition-colors hover:bg-warning/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning/50';
 
 /**
  * Shown when conversation search is enabled but cannot actually serve queries —
@@ -57,36 +57,40 @@ export function ConversationSearchBanner({ onOpenSettings }: ConversationSearchB
     onOpenSettings?.();
   };
 
+  const suffix = watcherFailed
+    ? '— new transcripts are not indexed. Restart the dashboard or save the conversation-search settings to retry.'
+    : watcherOnly
+      ? '— new transcripts are not indexed until the watcher is back.'
+      : '— Ctrl+K conversation hits and transcript indexing are unavailable until this is fixed.';
+  const detail = missingKey
+    ? "Ctrl+K can't find past conversations, and new transcripts aren't indexed. Setting OPENAI_API_KEY on the server works too."
+    : `${reason} ${suffix}`;
+
+  // One slim line in the system-notices row (PAN-2908), so it sits beside
+  // other notices instead of stacking a two-line block above the page.
   return (
     <div
       role="status"
-      className="flex w-full shrink-0 items-center gap-3 bg-warning/10 px-4 py-2"
+      className="flex min-w-0 flex-1 items-center gap-2 bg-warning/10 px-4 py-1"
       data-testid="conversation-search-banner"
     >
-      <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-warning/15">
-        <AlertTriangle className="size-4 text-warning-foreground" aria-hidden="true" />
-      </span>
-      <div className="min-w-0 flex-1 text-xs leading-snug">
-        <p className="text-sm font-semibold text-foreground">{title}</p>
+      <AlertTriangle className="size-3.5 shrink-0 text-warning-foreground" aria-hidden="true" />
+      <p className="min-w-0 flex-1 truncate text-xs text-warning-foreground" title={`${title}. ${detail}`}>
+        <span className="font-medium">{title}</span>
+        <span className="text-muted-foreground">{' · '}</span>
         {missingKey ? (
-          <p className="text-muted-foreground">
+          <span className="text-muted-foreground">
             Ctrl+K can&apos;t find past conversations, and new transcripts aren&apos;t indexed. Setting{' '}
-            <code className="rounded bg-warning/15 px-1 font-mono text-[11px] text-foreground">OPENAI_API_KEY</code>{' '}
+            <code className="font-mono text-[11px] text-foreground">OPENAI_API_KEY</code>{' '}
             on the server works too.
-          </p>
+          </span>
         ) : (
-          <p className="break-words text-muted-foreground">
+          <span className="text-muted-foreground">
             <span>{reason}</span>{' '}
-            <span>
-              {watcherFailed
-                ? '— new transcripts are not indexed. Restart the dashboard or save the conversation-search settings to retry.'
-                : watcherOnly
-                  ? '— new transcripts are not indexed until the watcher is back.'
-                  : '— Ctrl+K conversation hits and transcript indexing are unavailable until this is fixed.'}
-            </span>
-          </p>
+            <span>{suffix}</span>
+          </span>
         )}
-      </div>
+      </p>
       {missingKey && (
         <button type="button" onClick={openKeySettings} className={actionClass}>
           <KeyRound className="size-3.5 text-warning-foreground" aria-hidden="true" />

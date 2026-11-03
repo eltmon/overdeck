@@ -14,6 +14,7 @@ import * as Socket from 'effect/unstable/socket/Socket'
 import { PanRpcGroup } from '@overdeck/contracts'
 import { useConnectionState } from './connectionState'
 import { DashboardSessionUnauthorizedError } from './dashboardSessionError'
+import { isNativeShell } from './nativeShell'
 
 // ─── Protocol setup ───────────────────────────────────────────────────────────
 
@@ -130,7 +131,8 @@ async function exchangePairingCredential(url: string | undefined, credential: st
 }
 
 export function ensureDashboardSession(url?: string): Promise<void> {
-  if (typeof window === 'undefined') return Promise.resolve()
+  // The phone app authenticates every request with its phone token inside the channel (PAN-4837).
+  if (typeof window === 'undefined' || isNativeShell()) return Promise.resolve()
   const token = consumeDashboardBootstrapToken()
   const pairingCredential = consumePairingCredential()
   dashboardSessionPromise ??= (pairingCredential
@@ -160,6 +162,8 @@ export function ensureDashboardSession(url?: string): Promise<void> {
 }
 
 export async function dashboardMutationJsonHeaders(url?: string): Promise<Record<string, string>> {
+  // A phone credential needs no CSRF token (PAN-4837 FR-9).
+  if (isNativeShell()) return { 'Content-Type': 'application/json' }
   await ensureDashboardSession(url)
   if (!dashboardCsrfToken) throw new Error('Dashboard CSRF token unavailable')
   return {

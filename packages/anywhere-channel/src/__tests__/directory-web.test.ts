@@ -236,4 +236,60 @@ describe('DirectoryWebClient', () => {
     expect(FakeSocket.instances).toHaveLength(0);
     expect(c.send({ type: 'forget-client' })).toBe(false);
   });
+
+  describe('onStateChange', () => {
+    it('hears connecting, then online after welcome-client', async () => {
+      const c = client();
+      const states: string[] = [];
+      c.onStateChange((state) => states.push(state));
+      await online(c);
+      expect(states).toEqual(['connecting', 'online']);
+      expect(c.machines).toEqual([MACHINE]);
+    });
+
+    it('hears refused with the refusal set on close 4013', async () => {
+      const c = client();
+      const socket = await online(c);
+      const seen: Array<[string, string | null]> = [];
+      c.onStateChange((state) => seen.push([state, c.refusal]));
+      socket.serverClose(4013);
+      expect(seen).toEqual([['refused', CLIENT_LIMIT_MESSAGE]]);
+    });
+
+    it('is called with the unchanged state when a directory frame updates the machines', async () => {
+      const c = client();
+      const socket = await online(c);
+      const listener = vi.fn();
+      c.onStateChange(listener);
+      const offline = { ...MACHINE, online: false };
+      socket.receive({ type: 'directory', machines: [offline] });
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(listener).toHaveBeenCalledWith('online');
+      expect(c.machines).toEqual([offline]);
+    });
+
+    it('stops calling after unsubscribe', async () => {
+      const c = client();
+      const listener = vi.fn();
+      const off = c.onStateChange(listener);
+      off();
+      const socket = await online(c);
+      socket.receive({ type: 'directory', machines: [] });
+      c.stop();
+      expect(listener).not.toHaveBeenCalled();
+    });
+
+    it('hears connecting again when a dropped socket schedules a reconnect', async () => {
+      const c = client();
+      const socket = await online(c);
+      const states: string[] = [];
+      c.onStateChange((state) => states.push(state));
+      socket.serverClose(1006);
+      expect(states).toEqual(['connecting']);
+      await vi.advanceTimersByTimeAsync(1_000);
+      latest().open();
+      latest().receive(WELCOME);
+      expect(states).toEqual(['connecting', 'online']);
+    });
+  });
 });

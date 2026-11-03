@@ -95,10 +95,12 @@ src/components/__tests__/palette-fleet-hits.test.tsx
 src/components/chat/__tests__/ChatMarkdown.issue-links.test.tsx
 src/components/chat/__tests__/ChatMarkdown.pull-request-links.test.tsx
 src/components/chat/__tests__/ComposerFooter.citations.test.tsx
+src/components/chat/__tests__/ComposerFooter.native.test.tsx
 src/components/chat/__tests__/ComposerFooter.schedule.test.tsx
 src/components/chat/__tests__/ComposerFooter.streaming-render-count.test.tsx
 src/components/chat/__tests__/ConversationAboutDrawer.test.tsx
 src/components/chat/__tests__/ConversationMachineBanner.test.tsx
+src/components/chat/__tests__/ConversationPanel.native.test.tsx
 src/components/chat/__tests__/ConversationPanel.test.tsx
 src/components/chat/__tests__/ConversationScheduleDialog.test.tsx
 src/components/chat/__tests__/EffortPicker.test.tsx
@@ -208,6 +210,7 @@ src/lib/__tests__/issueActions.no-actions-lost.test.ts
 src/lib/__tests__/issueActions.parity.test.tsx
 src/lib/__tests__/issueActions.test.ts
 src/lib/__tests__/linkedConversation.test.ts
+src/lib/__tests__/nativeQuietReads.test.tsx
 src/lib/__tests__/pendingInput.test.ts
 src/lib/__tests__/pendingInputAnswer.test.ts
 src/lib/__tests__/selectBackendPanes.render-count.test.tsx
@@ -220,6 +223,7 @@ src/lib/__tests__/uiTokenStyles.test.ts
 src/lib/__tests__/useChannelMediaSrc.test.tsx
 src/lib/__tests__/useDecisions.fleet.test.tsx
 src/lib/__tests__/useDecisions.test.ts
+src/lib/__tests__/wsTransport-native.test.ts
 src/lib/__tests__/wsTransport-pairing.test.ts
 src/lib/decisionContext.test.ts
 src/lib/pipeline-state.test.ts

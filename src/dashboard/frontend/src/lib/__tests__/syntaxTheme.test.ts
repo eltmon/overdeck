@@ -18,8 +18,12 @@ function theme(overrides: Partial<ColorTheme> & { id: string; type: 'light' | 'd
 }
 
 describe('syntaxThemeName', () => {
-  it('ac2: returns github-light for a theme with no syntax group', () => {
-    expect(syntaxThemeName(theme({ id: 'overdeck-dark', type: 'dark' }))).toBe('github-light');
+  it('ac2: returns github-light for a light theme with no syntax group', () => {
+    expect(syntaxThemeName(theme({ id: 'overdeck-light', type: 'light' }))).toBe('github-light');
+  });
+
+  it('PAN-4906: returns github-dark for a dark theme with no syntax group', () => {
+    expect(syntaxThemeName(theme({ id: 'overdeck-dark', type: 'dark' }))).toBe('github-dark');
   });
 
   it('returns a name starting overdeck-<id>- for a theme with a syntax group', () => {

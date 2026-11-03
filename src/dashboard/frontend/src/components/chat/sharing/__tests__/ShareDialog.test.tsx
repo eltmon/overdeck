@@ -117,6 +117,17 @@ describe('ShareDialog (PAN-4473 WI-8)', () => {
     expect(screen.getByText('Disconnected from the share service. End this share and create a new link.')).toBeTruthy();
   });
 
+  it('shows a reconnecting share as reconnecting with the lobby actions disabled (PAN-4479)', () => {
+    const base = SHARE.snapshot!;
+    const lobby = { githubId: 100, login: 'alice', avatarUrl: 'https://avatars.githubusercontent.com/u/100', state: 'lobby' as const, contributor: false, connected: true };
+    api.shares = { data: [{ ...SHARE, connection: 'reconnecting', snapshot: { ...base, participants: [lobby] } }], isLoading: false, error: null };
+    const { container } = wrap(<ShareDialog target={{ name: 'conv-a' }} onClose={vi.fn()} />);
+    const line = screen.getByText('Reconnecting to the share service…');
+    expect(line.getAttribute('data-connection')).toBe('reconnecting');
+    expect(container.textContent).not.toContain('End this share and create a new link');
+    expect((screen.getByRole('button', { name: 'Admit @alice' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
   it('relays a lobby command for this share', async () => {
     const base = SHARE.snapshot!;
     const lobby = { githubId: 100, login: 'alice', avatarUrl: 'https://avatars.githubusercontent.com/u/100', state: 'lobby' as const, contributor: false, connected: true };
@@ -216,5 +227,36 @@ describe('ShareDialog suggestions and queue (PAN-4476 WI-14)', () => {
     wrap(<ShareDialog target={{ name: 'conv-a' }} onClose={vi.fn()} />);
     expect(screen.queryByRole('heading', { name: /Suggestions/ })).toBeNull();
     expect(document.querySelector('[data-component="share-queue"]')).toBeNull();
+  });
+});
+
+describe('ShareDialog controller handoff (PAN-4478 WI-8)', () => {
+  it('shows suggestions read-only while a viewer controls', () => {
+    const avatar = (id: number) => `https://avatars.githubusercontent.com/u/${id}`;
+    const snapshot = SHARE.snapshot;
+    if (!snapshot) throw new Error('no snapshot');
+    api.shares = {
+      data: [{
+        ...SHARE,
+        controllerGithubId: 200,
+        snapshot: {
+          ...snapshot,
+          controllerGithubId: 200,
+          participants: [
+            { githubId: 100, login: 'alice', avatarUrl: avatar(100), state: 'lobby', contributor: false, connected: true },
+            { githubId: 200, login: 'bob', avatarUrl: avatar(200), state: 'admitted', contributor: false, connected: true },
+          ],
+        },
+        drafts: [{ githubId: 200, login: 'bob', avatarUrl: avatar(200), text: 'Lint it', startedAt: '2026-11-03T00:00:00.000Z', updatedAt: '2026-11-03T00:00:01.000Z' }],
+      }],
+      isLoading: false,
+      error: null,
+    };
+    wrap(<ShareDialog target={{ name: 'conv-a' }} onClose={vi.fn()} />);
+    expect(screen.getByText('@bob has control.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Reclaim control' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Admit @alice' })).toBeNull();
+    expect(screen.getByText('Lint it')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Use suggestion from @bob' })).toBeNull();
   });
 });

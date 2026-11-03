@@ -20,9 +20,10 @@
  *     the shell. PAN-2354's notifications control registers the same script
  *     and scope, so the two registrations stay idempotent.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { EventRouter } from '../EventRouter';
 import { useConnectionState } from '../../lib/connectionState';
+import { isNativeShell } from '../../lib/nativeShell';
 import { TurnOnNotificationsButton } from '../push/TurnOnNotificationsButton';
 import { MobileNeedsYou } from './MobileNeedsYou';
 import { MobileConversations } from './MobileConversations';
@@ -82,7 +83,8 @@ function useMobileRoute(): MobileRoute {
 
 function useServiceWorkerRegistration(): void {
   useEffect(() => {
-    if (!window.isSecureContext || !('serviceWorker' in navigator) || import.meta.env.DEV) return;
+    // The phone app (PAN-4837) is a native shell: no service worker.
+    if (isNativeShell() || !window.isSecureContext || !('serviceWorker' in navigator) || import.meta.env.DEV) return;
     navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch((err: unknown) => {
       console.warn('[mobile] service worker registration failed', err);
     });
@@ -150,7 +152,12 @@ const TABS: ReadonlyArray<{ tab: MobileTab; label: string }> = [
   { tab: 'pipeline', label: 'Pipeline' },
 ];
 
-export default function MobileApp() {
+/**
+ * `headerSlot`: in the phone app (PAN-4837 D-9) the header renders it in place
+ * of the install and notifications controls; the PWA ignores it.
+ */
+export default function MobileApp({ headerSlot }: { headerSlot?: ReactNode } = {}) {
+  const native = isNativeShell();
   const route = useMobileRoute();
   const sessionAuthFailed = useConnectionState((s) => s.sessionAuthFailed);
   useServiceWorkerRegistration();
@@ -177,7 +184,7 @@ export default function MobileApp() {
     // fixed: the shell never makes the document overflow, so a phone never pans or zooms the page.
     <div data-component="mobile-app" className="fixed inset-0 flex flex-col bg-background text-foreground">
       <EventRouter />
-      {sessionAuthFailed ? (
+      {sessionAuthFailed && !native ? (
         <MobilePairScreen />
       ) : (
         <>
@@ -186,8 +193,7 @@ export default function MobileApp() {
               <h1 className="text-base font-medium">Overdeck</h1>
               {/* PAN-2354's control, sized up to the phone's 44 px tap target from here. */}
               <div className="flex items-center gap-2 [&_button]:min-h-11 [&_button]:min-w-11">
-                <InstallAffordance />
-                <TurnOnNotificationsButton compact />
+                {native ? headerSlot : <><InstallAffordance /><TurnOnNotificationsButton compact /></>}
               </div>
             </header>
           )}

@@ -30,6 +30,15 @@ export function isOfflineLinked(conv: Pick<LinkedRow, 'origin' | 'machineState'>
   return conv.origin === 'linked' && conv.machineState !== 'online';
 }
 
+/**
+ * A machine label short enough for a chip: the mDNS `.local` suffix macOS adds
+ * to every hostname carries no information, so chips drop it. Tooltips keep
+ * the full label.
+ */
+export function chipMachineLabel(label: string): string {
+  return label.replace(/\.local$/i, '');
+}
+
 /** The machine a linked row runs on: a tinted chip when online, a hairline outline when offline. */
 export function LinkedMachineChip({ conv }: { conv: LinkedRow }) {
   const label = conv.machineLabel ?? 'another machine';
@@ -41,7 +50,7 @@ export function LinkedMachineChip({ conv }: { conv: LinkedRow }) {
       data-testid="linked-machine-chip"
     >
       <MonitorSmartphone size={10} />
-      <span className={styles.conversationBranchChipText}>{label}</span>
+      <span className={styles.conversationBranchChipText}>{chipMachineLabel(label)}</span>
     </span>
   );
 }

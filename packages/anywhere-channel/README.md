@@ -6,13 +6,17 @@ handshakes, the refusals and the initiator sequence exist once, here, so the two
 drift apart (pan-4823 D-7). Private workspace package, MIT, source exports, no build step. The
 server bundles inline it through the workspace symlink (tsdown `alwaysBundle: /^@overdeck\//`).
 
+Used by the phone app: `apps/mobile` (PAN-4837) imports `./web` for its directory socket, dial
+policy, pairing and link channels, and page shims, and copies no protocol code. See
+[`apps/mobile/README.md`](../../apps/mobile/README.md).
+
 ## Entry points
 
 | Import | Runs on | Exports |
 | --- | --- | --- |
-| `@overdeck/anywhere-channel` | anywhere | The protocol core: `noise.ts` (`pairingSecrets`, `prologueFor`, `approvalNonce`, `approvalCommitment`, `approvalSas`, the IK/XX/XXpsk0 constructors, `StaticKeyPair`), `wire.ts` (preamble, frames, refusals, `FrameReader`, `RawDuplex`), `initiator.ts` (`runInitiatorHandshake`, `withDeadline`, `ChannelOpenError`, `ChannelMarker`), and `type CryptoPort`. |
+| `@overdeck/anywhere-channel` | anywhere | The protocol core: `noise.ts` (`pairingSecrets`, `prologueFor`, `approvalNonce`, `approvalCommitment`, `approvalSas`, the IK/XX/XXpsk0 constructors, `StaticKeyPair`, `generateStaticKeyPair`), `wire.ts` (preamble, frames, refusals, `FrameReader`, `RawDuplex`), `initiator.ts` (`runInitiatorHandshake`, `withDeadline`, `ChannelOpenError`, `ChannelMarker`), and `type CryptoPort`. |
 | `@overdeck/anywhere-channel/node` | Node | The core plus `nodeCrypto` (`node:crypto`). The server imports this. |
-| `@overdeck/anywhere-channel/web` | browser | The core plus `webCrypto`, `openSecureChannel`, `RtcDuplexWeb` (and `RTC_MAX_MESSAGE_BYTES`, `RTC_HIGH_WATER_BYTES`, `RTC_LOW_WATER_BYTES`), `DirectoryWebClient`, `createMachineDialer`; HTTP over a channel (`serializeRequest`, `ResponseParser`, `HttpParseError`, `CHANNEL_HOST`, `MAX_RESPONSE_BODY_BYTES`, `requestOnChannel`, `createChannelPool`, `ChannelHttpError`, `CHANNEL_POOL_MAX`, `CHANNEL_POOL_IDLE_MS`); `ChannelWebSocket` with `ChannelMessageEvent` and `ChannelCloseEvent`; and the page shims (`installChannelShims`, `channelPathFor`). No file under `src/` (the server) imports it. |
+| `@overdeck/anywhere-channel/web` | browser | The core plus `webCrypto`, `openSecureChannel`, `RtcDuplexWeb` (and `RTC_MAX_MESSAGE_BYTES`, `RTC_HIGH_WATER_BYTES`, `RTC_LOW_WATER_BYTES`), `DirectoryWebClient` (`DirectoryWebClient.onStateChange` hears state changes and machine-list updates), `createMachineDialer`; HTTP over a channel (`serializeRequest`, `ResponseParser`, `HttpParseError`, `CHANNEL_HOST`, `MAX_RESPONSE_BODY_BYTES`, `requestOnChannel`, `createChannelPool`, `ChannelHttpError`, `CHANNEL_POOL_MAX`, `CHANNEL_POOL_IDLE_MS`); `ChannelWebSocket` with `ChannelMessageEvent` and `ChannelCloseEvent`; and the page shims (`installChannelShims`, `channelPathFor`). No file under `src/` (the server) imports it. |
 
 Nothing outside `crypto-node.ts`, `node.ts` and `__tests__/` imports `node:*`, calls `require(`
 or names the global `Buffer`. Signatures use `Uint8Array`; the code uses `b4a` at runtime, which

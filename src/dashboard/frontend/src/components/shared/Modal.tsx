@@ -21,6 +21,8 @@ export interface ModalProps {
   /** Non-scrolling region above the footer, e.g. an error alert. */
   pinned?: ReactNode;
   footer?: ReactNode;
+  /** Widens the panel for tabular content (760px instead of 600px). */
+  wide?: boolean;
   children: ReactNode;
 }
 
@@ -33,7 +35,7 @@ function focusableElements(container: HTMLElement): HTMLElement[] {
   );
 }
 
-export function Modal({ title, description, onClose, dismissible = true, onSubmit, pinned, footer, children }: ModalProps): ReactPortal {
+export function Modal({ title, description, onClose, dismissible = true, onSubmit, pinned, footer, wide = false, children }: ModalProps): ReactPortal {
   const titleId = useId();
   const descriptionId = useId();
   // Cast keeps the element polymorphic (form when a submit handler is given,
@@ -98,7 +100,7 @@ export function Modal({ title, description, onClose, dismissible = true, onSubmi
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
         tabIndex={-1}
-        className={styles.panel}
+        className={wide ? `${styles.panel} ${styles.wide}` : styles.panel}
         data-component="modal"
         onKeyDown={onKeyDown}
         onSubmit={onSubmit}

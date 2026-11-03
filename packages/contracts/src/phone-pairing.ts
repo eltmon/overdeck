@@ -24,3 +24,18 @@ export function buildPhonePairLink(input: PhonePairLinkInput): string {
   if (!PHONE_PAIR_CODE_RE.test(input.code)) throw new Error("code must be an odp_ pairing code")
   return `${PHONE_PAIR_LINK_PREFIX}v=${PHONE_PAIR_LINK_VERSION}&e=${input.environmentId}&k=${input.machineKeyHex}&c=${input.code}`
 }
+
+/** The inverse of `buildPhonePairLink`: the link's fields, or null unless every part is well formed. Surrounding whitespace is ignored. */
+export function parsePhonePairLink(text: string): PhonePairLinkInput | null {
+  const link = text.trim()
+  if (!link.startsWith(PHONE_PAIR_LINK_PREFIX)) return null
+  const params = new URLSearchParams(link.slice(PHONE_PAIR_LINK_PREFIX.length))
+  const environmentId = params.get("e")
+  const machineKeyHex = params.get("k")
+  const code = params.get("c")
+  if (params.get("v") !== String(PHONE_PAIR_LINK_VERSION)) return null
+  if (environmentId === null || !PHONE_PAIR_ENVIRONMENT_ID_RE.test(environmentId)) return null
+  if (machineKeyHex === null || !PHONE_PAIR_MACHINE_KEY_RE.test(machineKeyHex)) return null
+  if (code === null || !PHONE_PAIR_CODE_RE.test(code)) return null
+  return { environmentId, machineKeyHex, code }
+}

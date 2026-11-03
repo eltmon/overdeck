@@ -10,6 +10,7 @@
 // PAN-4475 (slice 4) adds the viewer dashboard API types at the end: the shapes the viewer browser
 // exchanges with its own dashboard server.
 // PAN-4476 (slice 5) adds drafts, contributor submits and the queue indicator.
+// PAN-4478 (slice 7) adds set-controller to ShareCommand, the controller commands and their acks, and the identity payload.
 
 export type ShareProtocolVersion = 1;
 export type ShareScope = { readonly kind: 'conversation'; readonly conversationId: string };
@@ -92,11 +93,26 @@ export type ShareCloseCode =
 // ── Host dashboard API (PAN-4473, slice 2): the browser ⇄ local dashboard server. ──
 // The host token never appears in these types (NFR-1).
 
-/** The host socket's state in this dashboard process. A stale record (no socket) is 'disconnected'. */
-export type ShareConnection = 'connecting' | 'connected' | 'disconnected';
+/**
+ * The host socket's state in this dashboard process. 'reconnecting': the socket dropped and the
+ * manager retries on a backoff (PAN-4479). 'disconnected': a stale record that was not re-parked,
+ * or a socket replaced by another host (close 4008).
+ */
+export type ShareConnection = 'connecting' | 'connected' | 'reconnecting' | 'disconnected';
 
-/** The host frames the browser may request in slice 2. */
-export type ShareCommand = Extract<HostFrame, { readonly type: 'admit' | 'kick' | 'revoke' | 'unrevoke' | 'set-contributor' }>;
+/** The host frames the data owner's browser may request. Slice 7 adds set-controller (handoff; the data owner's id = reclaim). */
+export type ShareCommand = Extract<
+  HostFrame,
+  { readonly type: 'admit' | 'kick' | 'revoke' | 'unrevoke' | 'set-contributor' | 'set-controller' }
+>;
+
+/** The share commands a viewer-controller may send on `control` (slice 7). Un-revoke stays with the data owner (D-7). */
+export type SharedControllerCommand = Exclude<ShareCommand, { readonly type: 'unrevoke' }>;
+
+/** Why the host refused a controller command or a controller send (slice 7). */
+export type SharedCommandRefusal =
+  | 'not_controller' | 'unknown_participant' | 'invalid_target' | 'invalid_command' | 'not_connected'
+  | 'invalid_prompt' | 'too_long' | 'queue_full';
 
 export interface CreateShareRequest { readonly conversationName: string }
 
@@ -114,6 +130,8 @@ export interface ShareView {
   readonly drafts?: readonly ShareDraftView[];
   /** Slice 5: the share's prompt queue. Optional so older fixtures compile (D-13). */
   readonly queue?: ShareQueueView;
+  /** Slice 7: the host's effective controller (D-2). Optional so older fixtures compile. */
+  readonly controllerGithubId?: number;
 }
 
 /** One viewer's current draft, as the host browser sees it. */
@@ -189,7 +207,8 @@ export type SharedSubmitReason =
 
 /**
  * `control` payloads. Slice 5 adds submit (viewer → host), submit-ack and draft-sent (host → viewer);
- * slice 6 adds the viewer's terminal watch.
+ * slice 6 adds the viewer's terminal watch. Slice 7 adds identity and command-ack (host → viewer),
+ * command and controller-send (viewer → host).
  */
 export type ControlPayload =
   | { readonly kind: 'hello'; readonly hello: SharedHello }
@@ -204,7 +223,17 @@ export type ControlPayload =
     }
   | { readonly kind: 'draft-sent' }
   /** Viewer → host: start (`true`) or stop (`false`) the read-only terminal stream (slice 6). */
-  | { readonly kind: 'terminal-watch'; readonly watch: boolean };
+  | { readonly kind: 'terminal-watch'; readonly watch: boolean }
+  | { readonly kind: 'identity'; readonly githubId: number }
+  | { readonly kind: 'command'; readonly clientId: string; readonly command: SharedControllerCommand }
+  | { readonly kind: 'controller-send'; readonly clientId: string; readonly text: string; readonly draftGithubId?: number }
+  | {
+      readonly kind: 'command-ack';
+      readonly clientId: string;
+      readonly status: 'accepted' | 'rejected';
+      readonly position?: number;              // 1-based, with an accepted controller-send
+      readonly reason?: SharedCommandRefusal;  // with 'rejected'
+    };
 
 export type TerminalUnavailableReason = 'terminal_not_found' | 'terminal_ended';
 
@@ -279,11 +308,12 @@ export interface DraftUpdate { readonly text: string }
 // ── Viewer dashboard API (PAN-4475, slice 4): the viewer browser ⇄ its own dashboard server. ──
 // The device token never appears in these types.
 
-/** A join's state on the viewer server. Live: connecting, lobby, admitted, host-disconnected. */
+/** A join's state on the viewer server. Live: connecting, lobby, admitted, host-disconnected, reconnecting. */
 export type JoinState =
   | 'connecting' | 'lobby' | 'admitted' | 'host-disconnected'
+  | 'reconnecting'  // a seated join lost its socket; the viewer server retries on a backoff (PAN-4479)
   | 'away'          // closed by the viewer server's grace timer; POST /api/joins reopens it
-  | 'disconnected'  // unexpected close or network error; POST /api/joins reopens it
+  | 'disconnected'  // a join that was never seated failed to connect; POST /api/joins reopens it
   | 'left' | 'kicked' | 'revoked' | 'ended' | 'is-host' | 'full' | 'replaced' | 'rejected';
 
 export interface JoinView {

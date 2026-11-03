@@ -4,10 +4,18 @@
  * representative admin-only sample the phone must never reach. Table C
  * (fleet and linked-machine reach) belongs to PAN-4887 and is not asserted
  * here.
+ *
+ * PAN-4837 WI-23: the phone app's logged run (`apps/mobile/request-log.json`,
+ * recorded on the Android emulator against a real machine) must stay inside
+ * the phone token's scopes, request by request.
  */
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
 
 import { PHONE_TOKEN_SCOPES, scopeSatisfies } from '../../../lib/access-tokens.js';
+import { REMOTE_GATE_ALLOWLIST } from '../remote-request-gate.js';
 import { allowedRpcTags, requiredScopeFor, WS_RPC_UPGRADE_SCOPES } from '../route-scopes.js';
 
 const PHONE_SURFACE_HTTP: ReadonlyArray<[string, string]> = [
@@ -82,5 +90,47 @@ describe('phone surface inventory (PAN-4835 WI-6)', () => {
     expect(PHONE_TOKEN_SCOPES).not.toContain('admin');
     expect(PHONE_TOKEN_SCOPES).not.toContain('forward');
     expect(WS_RPC_UPGRADE_SCOPES.some((scope) => PHONE_TOKEN_SCOPES.includes(scope))).toBe(true);
+  });
+});
+
+interface PhoneRequestLog {
+  http: Array<{ method: string; path: string; status: number }>;
+  rpc: string[];
+}
+
+/** Throws, naming the first entry, unless every logged request is one the phone token may make. */
+function assertPhoneRequests(log: PhoneRequestLog): void {
+  const allowed = allowedRpcTags([...PHONE_TOKEN_SCOPES]);
+  for (const { method, path } of log.http) {
+    if (REMOTE_GATE_ALLOWLIST.has(`${method} ${path}`)) continue;
+    const required = requiredScopeFor(method, path);
+    if (!scopeSatisfies(PHONE_TOKEN_SCOPES, required)) {
+      throw new Error(`${method} ${path} needs ${required}, which the phone token does not have`);
+    }
+  }
+  for (const tag of log.rpc) {
+    if (!allowed.includes(tag)) throw new Error(`RPC ${tag} is not allowed for the phone token`);
+  }
+}
+
+const PHONE_APP_REQUEST_LOG = JSON.parse(
+  readFileSync(fileURLToPath(new URL('../../../../apps/mobile/request-log.json', import.meta.url)), 'utf8'),
+) as PhoneRequestLog;
+
+describe('phone app logged requests (PAN-4837 WI-23)', () => {
+  it('the log covers HTTP and RPC traffic', () => {
+    expect(PHONE_APP_REQUEST_LOG.http.length).toBeGreaterThan(0);
+    expect(PHONE_APP_REQUEST_LOG.rpc.length).toBeGreaterThan(0);
+  });
+
+  it('every logged request is credential-free or within PHONE_TOKEN_SCOPES', () => {
+    expect(() => assertPhoneRequests(PHONE_APP_REQUEST_LOG)).not.toThrow();
+  });
+
+  it('names the entry when a logged request needs a scope the phone lacks', () => {
+    expect(() => assertPhoneRequests({ http: [{ method: 'GET', path: '/api/settings', status: 403 }], rpc: [] })).toThrow(
+      'GET /api/settings needs admin',
+    );
+    expect(() => assertPhoneRequests({ http: [], rpc: ['pan.getAvailableEditors'] })).toThrow('RPC pan.getAvailableEditors');
   });
 });
