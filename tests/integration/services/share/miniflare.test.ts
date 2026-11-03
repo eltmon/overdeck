@@ -44,9 +44,20 @@ export class AccountRpc extends WorkerEntrypoint {
     if (!user) return { ok: false, error: 'invalid_token' };
     return { ok: true, userId: 'u' + user.githubId, githubId: user.githubId, githubLogin: user.githubLogin, deviceId: 'd' + user.githubId };
   }
+  // PAN-4481 browser sign-in: the code odc_test redeems to viewer A's device token.
+  async redeemWebCode(input) {
+    if (input.code !== 'odc_test') return { ok: false, error: 'invalid_grant' };
+    return { ok: true, accessToken: ${JSON.stringify(tokenFor(VIEWER_A.id))}, deviceId: 'd${VIEWER_A.id}', label: 'Web browser' };
+  }
+  async signOutDevice() {
+    return { ok: true };
+  }
 }
 export default { fetch() { return new Response('account stub'); } };
 `;
+
+const ACCOUNT_BASE = 'https://account.test';
+const WEB_SESSION_KEY = 'ab'.repeat(32);
 
 const TURN_KEY_ID = 'turn-key-test';
 const TURN_API_TOKEN = 'turn-api-token-test';
@@ -83,6 +94,8 @@ beforeAll(async () => {
             PUBLIC_BASE_URL: { type: 'text', value: BASE },
             TURN_KEY_ID: { type: 'text', value: TURN_KEY_ID },
             TURN_KEY_API_TOKEN: { type: 'text', value: TURN_API_TOKEN }, // a Worker secret in production; same string binding at runtime
+            ACCOUNT_BASE_URL: { type: 'text', value: ACCOUNT_BASE },
+            WEB_SESSION_KEY: { type: 'text', value: WEB_SESSION_KEY }, // a Worker secret in production
           },
           exports: { ShareRoom: { type: 'durable-object', storage: 'sqlite' } },
         },
@@ -129,12 +142,16 @@ type Frame = Record<string, unknown>;
 /** One client socket: records every frame and the close, and resolves waits on events only. */
 class Peer {
   readonly frames: Frame[] = [];
+  /** Every message as received, including non-JSON text such as the `pong` auto-response. */
+  readonly texts: string[] = [];
   closed: { code: number; reason: string } | null = null;
   private wake: Array<() => void> = [];
 
   constructor(private readonly ws: WebSocket) {
     ws.addEventListener('message', (event) => {
-      this.frames.push(JSON.parse(String(event.data)) as Frame);
+      const text = String(event.data);
+      this.texts.push(text);
+      if (text.startsWith('{')) this.frames.push(JSON.parse(text) as Frame);
       this.notify();
     });
     ws.addEventListener('close', (event) => {
@@ -156,6 +173,17 @@ class Peer {
 
   send(frame: Frame): void {
     this.ws.send(JSON.stringify(frame));
+  }
+
+  sendText(text: string): void {
+    this.ws.send(text);
+  }
+
+  /** Waits until at least `count` messages have arrived (JSON or not). */
+  async waitForTexts(count: number): Promise<string[]> {
+    await this.until(() => this.texts.length >= count || this.closed !== null);
+    if (this.texts.length < count) throw new Error(`socket closed (${JSON.stringify(this.closed)}) after ${JSON.stringify(this.texts)}`);
+    return this.texts;
   }
 
   /** Waits for the first frame from index `from` matching `match`, and returns it. */
@@ -186,6 +214,12 @@ async function openSocket(path: string, authorization: string): Promise<Peer> {
   return new Peer(res.webSocket as WebSocket);
 }
 
+/** The `name=value` part of the response's Set-Cookie for `name`. */
+function cookiePair(res: Response, name: string): string {
+  const header = res.headers.getSetCookie().find((c) => c.startsWith(`${name}=`)) ?? '';
+  return header.split(';')[0] ?? '';
+}
+
 const isType = (type: string) => (f: Frame) => f['type'] === type;
 const status = (value: string) => (f: Frame) => f['type'] === 'status' && f['status'] === value;
 type Snapshot = { participants: Array<{ githubId: number; state: string; contributor: boolean; connected: boolean }>; blocked: Array<{ githubId: number }> };
@@ -194,10 +228,10 @@ const offer = { sdp: { type: 'offer', sdp: 'v=0' } };
 const answer = { sdp: { type: 'answer', sdp: 'v=0' } };
 
 describe('share service on real workerd (PAN-658 share-room-do)', () => {
-  it('GET /healthz reports configured: true and turn: true', async () => {
+  it('GET /healthz reports configured: true, turn: true and web: true', async () => {
     const res = await req('/healthz');
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true, configured: true, turn: true });
+    expect(await res.json()).toEqual({ ok: true, configured: true, turn: true, web: true });
   }, SLOW);
 
   it('refuses a non-upgrade request with 426 and an unknown protocol version with 400', async () => {
@@ -261,9 +295,17 @@ describe('share service on real workerd (PAN-658 share-room-do)', () => {
     a.send({ type: 'signal', data: answer, extra: 'dropped' });
     expect(await host.waitFor(isType('signal'), mark)).toEqual({ type: 'signal', githubId: VIEWER_A.id, data: answer });
 
-    // Once admitted, A gets ICE servers too.
+    // A `ping` text frame is answered `pong` by the runtime and never reaches the frame decoder (PAN-4481 FR-10).
+    const before = a.texts.length;
+    a.sendText('ping');
+    expect((await a.waitForTexts(before + 1)).slice(before)).toEqual(['pong']);
+
+    // Once admitted, A gets ICE servers too; the frame after the ping decodes normally and no invalid_frame arrives.
     a.send({ type: 'ice-servers' });
     expect(await a.waitFor(isType('ice-servers'))).toEqual({ type: 'ice-servers', iceServers: STUB_ICE_SERVERS });
+    expect(a.texts.slice(before)).toHaveLength(2);
+    expect(a.texts[before]).toBe('pong');
+    expect(a.frames.filter(isType('error'))).toEqual([{ type: 'error', code: 'not_admitted' }]);
     expect(turnRequests).toHaveLength(2);
 
     // Kick: A's socket closes 4010 and a rejoin lands in the lobby.
@@ -294,6 +336,56 @@ describe('share service on real workerd (PAN-658 share-room-do)', () => {
     expect((await host.waitClose()).code).toBe(4004);
     expect((await req(`/s/${shortCode}`)).status).toBe(404);
 
+    expect(unexpectedOutbound).toEqual([]);
+  }, 120_000);
+});
+
+describe('hosted web join on real workerd (PAN-4481 share-web-join-route)', () => {
+  it('signs a browser in, opens the web-join socket with the session cookie and lands in the lobby', async () => {
+    const created = await req('/v1/rooms', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${tokenFor(OWNER.id)}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scope: { kind: 'conversation', conversationId: 'conv-web' } }),
+    });
+    expect(created.status).toBe(201);
+    const { shortCode, hostToken } = (await created.json()) as { shortCode: string; hostToken: string };
+    const host = await openSocket(`/v1/rooms/${shortCode}/host?v=1`, `Bearer ${hostToken}`);
+    await host.waitFor(isType('room'));
+
+    // Sign-in: a sealed sign-in cookie and a 302 to the account Worker with the share redirect.
+    const signin = await req(`/auth/signin?code=${shortCode}`, { redirect: 'manual' });
+    expect(signin.status).toBe(302);
+    const start = new URL(signin.headers.get('Location') ?? '');
+    expect(start.origin + start.pathname).toBe(`${ACCOUNT_BASE}/auth/start`);
+    expect(start.searchParams.get('redirect_uri')).toBe(`${BASE}/auth/callback`);
+    expect(start.searchParams.get('platform')).toBe('web');
+    const signinCookie = cookiePair(signin, '__Host-ods_signin');
+
+    // Callback: the code is redeemed over the service binding and the session cookie is set.
+    const callback = await req(`/auth/callback?code=odc_test&state=${start.searchParams.get('state')}`, { redirect: 'manual', headers: { Cookie: signinCookie } });
+    expect(callback.status).toBe(303);
+    expect(callback.headers.get('Location')).toBe(`/s/${shortCode}`);
+    const session = cookiePair(callback, '__Host-ods_session');
+    expect(session).toMatch(/^__Host-ods_session=[A-Za-z0-9_-]+$/);
+
+    const me = await req('/v1/web/session', { headers: { Cookie: session } });
+    expect(await me.json()).toEqual({ signedIn: true, githubId: VIEWER_A.id, login: VIEWER_A.login, avatarUrl: `https://avatars.githubusercontent.com/u/${VIEWER_A.id}` });
+
+    // A foreign Origin is refused before any upgrade.
+    const evil = await req(`/v1/rooms/${shortCode}/web-join?v=1`, { headers: { Upgrade: 'websocket', Origin: 'https://evil.test', Cookie: session } });
+    expect(evil.status).toBe(403);
+
+    // The browser's socket lands in the lobby, and the host sees the viewer.
+    const res = (await req(`/v1/rooms/${shortCode}/web-join?v=1`, { headers: { Upgrade: 'websocket', Origin: BASE, Cookie: session } })) as Response & { webSocket: WebSocket | null };
+    expect(res.status).toBe(101);
+    const browser = new Peer(res.webSocket as WebSocket);
+    await browser.waitFor(status('lobby'));
+    const snap = await host.waitFor((f) => f['type'] === 'room' && snapshotOf(f).participants.length === 1);
+    expect(snapshotOf(snap).participants[0]).toMatchObject({ githubId: VIEWER_A.id, state: 'lobby', connected: true });
+
+    const deleted = await req(`/v1/rooms/${shortCode}`, { method: 'DELETE', headers: { Authorization: `Bearer ${hostToken}` } });
+    expect(deleted.status).toBe(204);
+    expect((await browser.waitClose()).code).toBe(4004);
     expect(unexpectedOutbound).toEqual([]);
   }, 120_000);
 });

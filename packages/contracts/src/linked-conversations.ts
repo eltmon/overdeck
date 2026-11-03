@@ -39,6 +39,12 @@ export interface SharedConversationRow {
    * owners older than PAN-4650 WI-11.
    */
   pulledFrom?: { environmentId: string; nativeSessionId: string } | null
+  /**
+   * Why the owner's launch failed (its `spawn_error`), so the viewer shows the
+   * failure instead of an empty composer (PAN-4903). Sent only when set; absent
+   * from older owners.
+   */
+  spawnError?: string | null
 }
 
 /** The owner's answer to `GET /api/machines/conversations`. */

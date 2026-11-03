@@ -13,7 +13,7 @@ const REJECT_AT = Math.floor(256 / SHORT_CODE_ALPHABET.length) * SHORT_CODE_ALPH
 
 const HEX = '0123456789abcdef';
 
-function toHex(bytes: Uint8Array): string {
+export function toHex(bytes: Uint8Array): string {
   let out = '';
   for (const b of bytes) out += (HEX[b >> 4] as string) + (HEX[b & 15] as string);
   return out;

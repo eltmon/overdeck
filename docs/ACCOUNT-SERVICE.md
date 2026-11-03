@@ -18,11 +18,11 @@ Runtime code uses Web APIs only; `src/index.ts` is the only module that imports 
 
 Both flows share the **GitHub leg**: `startGitHubLeg()` writes an `auth_requests` row keyed by `sha256(state)` (10-minute expiry) and sets `__Host-od_state=<state>`; `GET /auth/github/callback` requires cookie = `state`, consumes the row (single use), exchanges the code, reads `GET /user`, and dispatches to the flow. Then `resolveSignIn()` is the allowlist gate: not allowed → pending attempt and no `users` row; allowed → the user row is created or its login refreshed.
 
-**PKCE flow** (local dashboard: loopback redirect, client in PAN-4330; phone app: native redirect, PAN-4823). `GET /auth/start?redirect_uri&state&code_challenge&code_challenge_method=S256&platform&environment_id`. `redirect_uri` must be `http:` with host exactly `127.0.0.1`, `localhost` or `[::1]`, any port, no userinfo, no fragment; anything else is a 400 page with no redirect. The one other accepted `redirect_uri` is the phone app's private-use scheme redirect `ai.overdeck.app:/oauth/callback` (RFC 8252 §7.1), matched as the exact string: `ai.overdeck.app://oauth/callback`, another path, a query string or a different case is a 400. After the GitHub leg the browser is sent back to `redirect_uri` with `code=odc_…&state=…`, or with `error=access_denied&error_description=invite_only|account_deleting|github_denied&state=…`. The client posts `grant_type=authorization_code&code&code_verifier&redirect_uri` to `/oauth/token`. Codes are single use (consumed before any check), expire after 5 minutes, and require the identical `redirect_uri` and a matching S256 verifier; the allowlist is re-checked before minting.
+**PKCE flow** (local dashboard: loopback redirect, client in PAN-4330; phone app: native redirect, PAN-4823; hosted share page: share redirect, PAN-4481). `GET /auth/start?redirect_uri&state&code_challenge&code_challenge_method=S256&platform&environment_id`. `redirect_uri` must be `http:` with host exactly `127.0.0.1`, `localhost` or `[::1]`, any port, no userinfo, no fragment; anything else is a 400 page with no redirect. The one other accepted `redirect_uri` is the phone app's private-use scheme redirect `ai.overdeck.app:/oauth/callback` (RFC 8252 §7.1), matched as the exact string: `ai.overdeck.app://oauth/callback`, another path, a query string or a different case is a 400. The third accepted `redirect_uri` is the hosted share page's callback `<SHARE_BASE_URL>/auth/callback` (for example `https://share.overdeck.ai/auth/callback`), also matched as the exact string, so another path, a query string or `http:` is a 400; with `SHARE_BASE_URL` unset it is refused. Each rule is its own function in `src/pkce.ts` (`validateLoopbackRedirect`, `NATIVE_APP_REDIRECT`, `validateShareRedirect`). The share redirect and `platform=web` come only as a pair: the share redirect with any other platform, or `platform=web` with any other redirect, is a 400 naming `platform`. The share Worker redeems the code over the service binding with `AccountRpc.redeemWebCode` instead of `/oauth/token`, because this service sends no CORS headers. After the GitHub leg the browser is sent back to `redirect_uri` with `code=odc_…&state=…`, or with `error=access_denied&error_description=invite_only|account_deleting|github_denied&state=…`. The client posts `grant_type=authorization_code&code&code_verifier&redirect_uri` to `/oauth/token`. Codes are single use (consumed before any check), expire after 5 minutes, and require the identical `redirect_uri` and a matching S256 verifier; the allowlist is re-checked before minting.
 
 The service sends no `Access-Control-*` headers, so the phone app calls `/oauth/token` and `/v1/*` with native HTTP, not WebView `fetch`.
 
-**Device flow** (CLI, SSH, headless; RFC 8628). `POST /oauth/device/code` with `platform` and `environment_id` returns `device_code` (`oddc_…`), `user_code` (`BCDF-GHJK`, 8 letters from `BCDFGHJKLMNPQRSTVWXZ`), `verification_uri` (`<base>/activate`), `verification_uri_complete`, `expires_in` 900 and `interval` 5. The person opens `/activate`, types the code (case, dashes and spaces are ignored), confirms the device type, and completes the GitHub leg. Both `POST /activate` and `POST /activate/confirm` require an `Origin` header equal to `PUBLIC_BASE_URL`, so a cross-site form post cannot walk a signed-in browser through the confirm step and approve someone else's device code. The CLI polls `/oauth/token` with `grant_type=urn:ietf:params:oauth:grant-type:device_code&device_code`:
+**Device flow** (CLI, SSH, headless; RFC 8628). `POST /oauth/device/code` with `platform` and `environment_id` (any valid platform except `web`, which is 400 `invalid_request`) returns `device_code` (`oddc_…`), `user_code` (`BCDF-GHJK`, 8 letters from `BCDFGHJKLMNPQRSTVWXZ`), `verification_uri` (`<base>/activate`), `verification_uri_complete`, `expires_in` 900 and `interval` 5. The person opens `/activate`, types the code (case, dashes and spaces are ignored), confirms the device type, and completes the GitHub leg. Both `POST /activate` and `POST /activate/confirm` require an `Origin` header equal to `PUBLIC_BASE_URL`, so a cross-site form post cannot walk a signed-in browser through the confirm step and approve someone else's device code. The CLI polls `/oauth/token` with `grant_type=urn:ietf:params:oauth:grant-type:device_code&device_code`:
 
 | Poll result | Meaning |
 | --- | --- |
@@ -38,7 +38,7 @@ Clients read `verification_uri` from the response; the host is never hardcoded.
 
 A device token is `odd_` + 64 lowercase hex characters (256 random bits). Only its SHA-256 hex hash is stored, in `devices.token_hash`; the plaintext exists only in the token response. The token response is `{"access_token","token_type":"Bearer","device_id","label"}`.
 
-Each row carries a server-minted `device_id` (UUID v4), `platform` (`^((linux|darwin|win32)-(x64|arm64)|(ios|android)-arm64)$`), a label (default "Linux device" / "macOS device" / "Windows device" / "iPhone" / "Android phone", never the hostname; renamable, 1–64 characters, no control characters) and the client's opaque `environment_id` (lowercase UUID v4 from `${OVERDECK_HOME}/environment-id.json`). Signing in again from the same `(user, environment_id)` rotates that row's token in place: same `device_id`, same label, old token dead. `last_used_at` is written at most once per device per 5 minutes.
+Each row carries a server-minted `device_id` (UUID v4), `platform` (`^((linux|darwin|win32)-(x64|arm64)|(ios|android)-arm64|web)$`; `web` is a browser signed in on the hosted share page, PAN-4481), a label (default "Linux device" / "macOS device" / "Windows device" / "iPhone" / "Android phone" / "Web browser", never the hostname; renamable, 1–64 characters, no control characters) and the client's opaque `environment_id` (lowercase UUID v4 from `${OVERDECK_HOME}/environment-id.json`). Signing in again from the same `(user, environment_id)` rotates that row's token in place: same `device_id`, same label, old token dead. `last_used_at` is written at most once per device per 5 minutes.
 
 Revocation is a column write (`revoked_at`, `revoked_by` ∈ `user | operator | account-deletion`); verification is one D1 lookup with no cache in front of it, so a revoked token is refused on the next request.
 
@@ -88,14 +88,21 @@ Bearer failures: `invalid_token`, `device_revoked` and `account_deleted` → 401
 
 ## RPC contract
 
-`src/index.ts` exports `class AccountRpc extends WorkerEntrypoint<Env>` with `verifyDevice(token: string): Promise<VerifyResult>`. Other Workers reach it through a service binding (`"services": [{ "binding": "ACCOUNT", "service": "overdeck-account", "entrypoint": "AccountRpc" }]`), never over the public internet. Types live in `src/contract.ts`:
+`src/index.ts` exports `class AccountRpc extends WorkerEntrypoint<Env>` with `verifyDevice(token: string): Promise<VerifyResult>`, and, for the share Worker's browser sign-in (PAN-4481), `redeemWebCode(input: RedeemWebCodeInput): Promise<RedeemResult>` and `signOutDevice(token: string): Promise<SignOutResult>`. Other Workers reach it through a service binding (`"services": [{ "binding": "ACCOUNT", "service": "overdeck-account", "entrypoint": "AccountRpc" }]`), never over the public internet. Types live in `src/contract.ts`:
 
 ```ts
 type VerifyResult =
   | { ok: true; userId: string; githubId: number; githubLogin: string; deviceId: string; entitlement: Entitlement }
   | { ok: false; error: 'invalid_token' | 'device_revoked' | 'grant_expired' | 'account_deleted' };
 interface AccountDataHolder { deleteAccountData(userId: string): Promise<{ deleted: true }> }
+interface RedeemWebCodeInput { code: string; codeVerifier: string; redirectUri: string }
+type RedeemResult =
+  | { ok: true; accessToken: string; deviceId: string; label: string }
+  | { ok: false; error: 'invalid_request' | 'invalid_grant' | 'access_denied' };
+type SignOutResult = { ok: true } | { ok: false; error: VerifyError };
 ```
+
+`redeemWebCode` applies exactly the rules of `POST /oauth/token` (single use, 5-minute expiry, identical redirect, S256 verifier, allowlist re-check) and refuses with `invalid_request` any `redirectUri` that is not the share redirect. `signOutDevice` revokes the token's own device with `revoked_by = 'user'`; a device whose grant lapsed still signs out.
 
 `verifyDevice` is one D1 lookup per call (no cache), so revocation is immediate. `entitlement` comes from `entitlementFor(grant)`: a grant whose `entitlement` column is `free` gives `{ plan: 'free', storageBytesCap, maxDevices: 3 }`; any other grant, and the owner, gives `{ plan: 'tester', storageBytesCap, maxDevices: null }`. The owner gets the default cap.
 
@@ -149,6 +156,7 @@ Sections, top to bottom:
 | Name | Where | Meaning |
 | --- | --- | --- |
 | `PUBLIC_BASE_URL` | `wrangler.jsonc` `vars` (committed) | `https://account.overdeck.ai`; used for redirect URIs, `verification_uri` and the admin `Origin` check |
+| `SHARE_BASE_URL` | `wrangler.jsonc` `vars` (committed) | `https://share.overdeck.ai`; its `/auth/callback` is the third accepted PKCE `redirect_uri` (PAN-4481). Optional: unset refuses the share redirect |
 | `GITHUB_CLIENT_ID` | secret (`wrangler secret put`) | the GitHub OAuth App's client id |
 | `GITHUB_CLIENT_SECRET` | secret | the OAuth App's client secret |
 | `OWNER_GITHUB_ID` | secret | the operator's numeric GitHub id; unset or non-numeric disables the admin screen (503) and the owner bypass |
