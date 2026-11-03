@@ -4,7 +4,7 @@ import { PHONE_PAIR_LINK_PREFIX, parsePhonePairLink } from '@overdeck/contracts'
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 import { type DeviceIdentity, loadIdentity } from '../native/keys';
-import { type PushController, pushSupported, startPush } from '../native/push';
+import { type PushController, pushSupported, startPush, usePushState } from '../native/push';
 import { type Connection, createConnection } from './connection';
 import { createDirectory, type ShellDirectory } from './directory';
 import { resetTransport } from '../../../../src/dashboard/frontend/src/lib/wsTransport';
@@ -209,6 +209,9 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
     };
   }, [inMachineView, current, connection]);
 
+  const push = services?.push ?? null;
+  const pushState = usePushState(push);
+
   const leaveMachine = useCallback((next: View) => {
     setCurrentMachineId(null);
     history.replaceState(null, '', '/');
@@ -307,6 +310,11 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
           onForget={(environmentId) => void forget(environmentId, { kind: 'settings' })}
           onSignOut={runSignOut}
           onBack={() => setView({ kind: 'machines' })}
+          notifications={
+            push && pushState
+              ? { ...pushState, onChange: (on) => (on ? void push.enable() : push.disable()) }
+              : undefined
+          }
         />
       )}
     </div>

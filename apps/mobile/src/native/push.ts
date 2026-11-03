@@ -10,6 +10,7 @@ import { Capacitor, type PermissionState, type PluginListenerHandle } from '@cap
 import { PushNotifications, type PushNotificationsPlugin } from '@capacitor/push-notifications';
 import type { DirectoryWebState } from '@overdeck/anywhere-channel/web';
 import type { ApsEnvironment, ClientPlatform, ClientToDirectoryFrame } from '@overdeck/contracts';
+import { useCallback, useSyncExternalStore } from 'react';
 
 import { OverdeckKeys, type OverdeckKeysPlugin } from './keys';
 
@@ -174,7 +175,9 @@ export function startPush({
     },
     onChange(listener) {
       changeListeners.add(listener);
-      return () => changeListeners.delete(listener);
+      return () => {
+        changeListeners.delete(listener);
+      };
     },
     // R7
     async enable() {
@@ -203,4 +206,14 @@ export function startPush({
       changeListeners.clear();
     },
   };
+}
+
+const noSubscription = () => () => {};
+
+/** The controller's switch and permission, re-rendering on every change, or null without a controller (PAN-4838 WI-9). */
+export function usePushState(controller: PushController | null): { enabled: boolean; permission: PushPermission } | null {
+  const subscribe = useCallback((onChange: () => void) => (controller ? controller.onChange(onChange) : noSubscription()), [controller]);
+  const enabled = useSyncExternalStore(subscribe, () => controller?.enabled ?? false);
+  const permission = useSyncExternalStore(subscribe, () => controller?.permission ?? 'unknown');
+  return controller ? { enabled, permission } : null;
 }
