@@ -47,9 +47,9 @@ running dashboard.
 
 With no access tokens: `` `No access tokens. Create one with `pan token create`.` ``
 
-Agent tokens appear in the list too, named `agent:<role>:<agentId>`. Overdeck mints one for each
-managed agent or conversation, revokes it automatically when the agent stops, and removes it from
-the list 7 days after it was revoked.
+Agent tokens appear in the list too, named `agent:<role>:<agentId>`. Once launch injection
+(PAN-4927 W-INJ1) lands, Overdeck mints one for each managed agent or conversation. A token is
+revoked automatically when its agent stops, and removed from the list 7 days after it was revoked.
 
 ## revoke
 

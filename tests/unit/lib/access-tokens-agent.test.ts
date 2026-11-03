@@ -60,6 +60,8 @@ describe('agent tokens in the access-token registry (PAN-4930)', () => {
     const other = await freshModule();
     await expect(other.refreshAccessTokens()).resolves.toBeUndefined();
     expect(other.verifyAccessToken(token).ok).toBe(true);
+    // verifyAccessToken queues a lastUsedAt write on `other`'s own queue; settle it before the temp home is removed.
+    await other._settleAccessTokenWritesForTests();
     other._resetAccessTokensForTests();
   });
 
