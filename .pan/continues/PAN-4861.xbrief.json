@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4861",
   "created": "2026-11-02T23:50:27.148Z",
-  "updated": "2026-11-02T23:58:29.416Z",
+  "updated": "2026-11-03T00:00:23.423Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-11-02T23:58:21.669Z"
     },
     "stop-timeout-60s": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4861",
-      "claimedAt": "2026-11-02T23:58:29.416Z"
+      "claimedAt": "2026-11-02T23:58:29.416Z",
+      "doneAt": "2026-11-03T00:00:23.423Z"
     }
   }
 }
