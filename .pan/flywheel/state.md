@@ -548,3 +548,8 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
 - PAN-4774 posted AC-1..AC-15: 7 passed, 5 failed, 3 approximated. Defects filed: PAN-4859 (Open in editor targets ssh-remote+127.0.0.1), PAN-4860 (issue prefix with digits), PAN-4861 (removed SSH host's dashboard restarted by pan up supervisor), PAN-4862 (relay uses only UDP TURN URL), PAN-4863 (AC-10 needs a real VPS after a release that ships connect). Started 4859/4860/4861/4862; 4863 is operator/infra.
 - AC-3 Tailscale-on-this-host is blocked on the operator decision (Flywheel declined to install system software / sign into the tailnet without authorization).
 - Release still gated: PAN-4823 phone app and Shared Sessions slices stay held until the Anywhere release ships.
+
+## 2026-11-03 02:28Z — Anywhere fixes deployed and closed
+- Build 530ee175e8c is live and includes all PAN-4774 fixes: PAN-4774 (#4864), 4859 (#4867), 4860 (#4865), 4861 (#4866), 4862 (#4868). All five closed out; close-out PR lookup worked first try (PAN-4821 fix live).
+- Deploy note: a reload started by another session held the restart lock ~2h with a pre-merge build; after the operator approved it, a second reload was needed. Starting a reload while another is pending is refused ("restart in progress"), so check the lock holder's build before telling the operator one approval ships everything.
+- Release gate remaining (operator): AC-3 Tailscale on this host, AC-10 real VPS (PAN-4863), PAN-4862 live Fly relay check (device code needs operator OK), then `pan release stable`. PAN-4823 phone app and Shared Sessions slices start after the release ships.
