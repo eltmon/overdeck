@@ -20,6 +20,16 @@ export interface SuggestionListProps {
   onSend?: (item: SuggestionItem, text: string) => Promise<void>;
 }
 
+/** The queue line both the viewer page and the share dialog show (FR-10); null when there is nothing to say. */
+export function queueStatusText(status: { agentWorking?: boolean; queued?: number } | undefined): string | null {
+  const working = status?.agentWorking === true;
+  const queued = status?.queued ?? 0;
+  if (working && queued > 0) return `Agent is working · ${queued} queued`;
+  if (working) return 'Agent is working';
+  if (queued > 0) return `${queued} queued`;
+  return null;
+}
+
 const NEUTRAL_BUTTON =
   'rounded-md border border-border px-2 py-0.5 text-xs font-medium text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50';
 
