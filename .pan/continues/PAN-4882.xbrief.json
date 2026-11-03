@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4882",
   "created": "2026-11-03T06:27:51.535Z",
-  "updated": "2026-11-03T08:02:26.270Z",
+  "updated": "2026-11-03T08:02:49.972Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -288,6 +288,9 @@
       "status": "cancelled"
     },
     "relay-vm-signin.ac3": {
+      "status": "cancelled"
+    },
+    "relay-udp-blocked.ac1": {
       "status": "cancelled"
     }
   }
