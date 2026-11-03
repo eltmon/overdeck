@@ -210,6 +210,7 @@ src/lib/__tests__/issueActions.no-actions-lost.test.ts
 src/lib/__tests__/issueActions.parity.test.tsx
 src/lib/__tests__/issueActions.test.ts
 src/lib/__tests__/linkedConversation.test.ts
+src/lib/__tests__/nativeQuietReads.test.tsx
 src/lib/__tests__/pendingInput.test.ts
 src/lib/__tests__/pendingInputAnswer.test.ts
 src/lib/__tests__/selectBackendPanes.render-count.test.tsx

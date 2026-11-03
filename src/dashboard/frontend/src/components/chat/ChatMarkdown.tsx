@@ -37,6 +37,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useColorTheme } from '../../hooks/useColorTheme';
 import { LRUCache } from '../../lib/lruCache';
 import { fnv1a32 } from '../../lib/diffRendering';
+import { isNativeShell } from '../../lib/nativeShell';
 import { ensureSyntaxTheme, highlight, syntaxThemeName } from '../../lib/syntaxTheme';
 import { TranscriptLink } from './TranscriptPullRequestLink';
 import styles from '../CommandDeck/styles/command-deck.module.css';
@@ -260,6 +261,8 @@ export function ChatMarkdownSettingsProvider({ children }: { children: ReactNode
   const { data: settings } = useQuery({
     queryKey: ['settings'],
     queryFn: fetchChatMarkdownSettings,
+    // The phone app (PAN-4837) cannot read settings; the defaults apply.
+    enabled: !isNativeShell(),
     retry: false,
   });
 

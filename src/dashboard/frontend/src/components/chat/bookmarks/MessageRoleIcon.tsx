@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Bot, Bookmark, User } from 'lucide-react';
 import type { ChatMessage } from '../chat-types';
 import { defaultBookmarkLabel, useConversationBookmarks, type ConversationBookmark } from './ConversationBookmarks';
+import { isNativeShell } from '../../../lib/nativeShell';
 
 function BookmarkEditPopover({ bookmark, onSave, onRemove, onClose }: {
   bookmark: ConversationBookmark;
@@ -79,7 +80,8 @@ export function MessageRoleIcon({ message, role, bookmarkable, className }: {
 
   const RoleGlyph = role === 'assistant' ? Bot : User;
 
-  if (!bookmarkable || !ctx) {
+  // The phone app (PAN-4837) cannot add, rename or remove bookmarks.
+  if (!bookmarkable || !ctx || isNativeShell()) {
     return <RoleGlyph size={14} className={className} aria-hidden="true" />;
   }
 
