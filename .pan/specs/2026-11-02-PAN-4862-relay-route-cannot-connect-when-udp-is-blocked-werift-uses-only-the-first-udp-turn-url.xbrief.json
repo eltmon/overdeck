@@ -4,17 +4,17 @@
     "created": "2026-11-02T23:42:35Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4862: Relay route cannot connect when UDP is blocked: werift uses only the first (UDP) TURN URL",
-    "updated": "2026-11-02T23:47:10.345Z"
+    "updated": "2026-11-02T23:48:28.925Z"
   },
   "plan": {
     "id": "pan-4862",
     "title": "Relay route cannot connect when UDP is blocked: werift uses only the first (UDP) TURN URL",
-    "status": "proposed",
+    "status": "running",
     "uid": "4d4e0141-66c1-41ff-9846-f44bd26b993d",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-02T23:42:35Z",
-    "updated": "2026-11-02T23:47:10.345Z",
+    "updated": "2026-11-02T23:48:28.925Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4862",
@@ -381,5 +381,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
