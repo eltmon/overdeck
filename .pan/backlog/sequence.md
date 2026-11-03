@@ -1,11 +1,12 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T21:51:44.602643Z · model: claude-opus-5-5 · open: 896_
+_Last sequenced: 2026-11-03T21:55:02.942551Z · model: claude-opus-5-5 · open: 897_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4702 | S | critical | ok |  |  | Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs. |
+| 2 | PAN-4961 | M | critical | ok |  |  | Disk floor checked once per creation; 6 concurrent starts took 15 GB to 4.9 GB, near the point where SQLite/git writes fail for every agent. |
 | 3 | PAN-4925 | M | critical | ok |  |  | CI shard 3/4 worker exits with all tests passing; each flake turns main red and holds every merge and deploy |
 | 4 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 5 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install aborts workspace creation (since #4163); reproduced 2026-11-02 on botland too, so every polyrepo start fails. |
@@ -908,6 +909,10 @@ _Last sequenced: 2026-11-03T21:51:44.602643Z · model: claude-opus-5-5 · open: 
 
 New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.
 
+### PAN-4961 (rank 2)
+
+New substrate-improvement bug reproduced 2026-11-03: checkDiskFloor in workspace-manager/create.ts runs before bun install, the Docker stack and its ~1.94 GB node_modules volume, so six Flywheel starts in a few minutes each passed the 10 GiB floor and together drove free space from 15 GB to 4.9 GB. Below about 2 GB every agent hits ENOSPC (the PAN-1674 failure the floor exists to prevent), so this threatens the whole pipeline and takes the free rank 2 without moving any other node. The fix and its acceptance test are concrete, so condition is ok.
+
 ### PAN-4925 (rank 3)
 
 New since the prior run and already in the pipeline. An intermittent vitest worker exit on shard 3/4 turns main red on roughly 1 in 4 runs, and a red main silently empties the merge gate and holds post-merge deploys until someone re-runs the shard. Fixing the root cause (not quarantining) restores trust in main's CI signal, so it sits beside PAN-4917 at the top of the CI-substrate tier.
@@ -1220,10 +1225,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 
 New this pass. shouldHoldForUat is consulted on exactly one merge path, so every other path merges a ready issue without asking whether its project holds for UAT — verified at code level on a real MIN-901 merge. This defeats the batch-train model directly: issues merge one at a time before a generation can assemble them.
 
-### PAN-3100 (rank 81)
-
-New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1231,10 +1232,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T21:51:44.602643Z",
+  "generatedAt": "2026-11-03T21:55:02.942551Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 896,
+  "openCount": 897,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -12475,6 +12476,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "dependsOn": [],
       "why": "Dashboard Settings → Anywhere Account card with PKCE sign-in; no code deps, so it ranks ahead of the PAN-4959 page it links to.",
       "rationale": "New child of PAN-2350, split from PAN-4959 on 2026-11-03. It needs no billing work, so it takes the free slot at 603, ahead of PAN-4959 (686), which waits on PAN-4294.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4961",
+      "rank": 2,
+      "size": "M",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Disk floor checked once per creation; 6 concurrent starts took 15 GB to 4.9 GB, near the point where SQLite/git writes fail for every agent.",
+      "rationale": "New substrate-improvement bug reproduced 2026-11-03: checkDiskFloor in workspace-manager/create.ts runs before bun install, the Docker stack and its ~1.94 GB node_modules volume, so six Flywheel starts in a few minutes each passed the 10 GiB floor and together drove free space from 15 GB to 4.9 GB. Below about 2 GB every agent hits ENOSPC (the PAN-1674 failure the floor exists to prevent), so this threatens the whole pipeline and takes the free rank 2 without moving any other node. The fix and its acceptance test are concrete, so condition is ok.",
       "gate": "auto",
       "planning": "auto"
     }
