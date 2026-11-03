@@ -1,0 +1,958 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-03T17:30:39Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4478: Shared Sessions v0 (slice 7): controller handoff and reclaim",
+    "updated": "2026-11-03T17:35:12.351Z"
+  },
+  "plan": {
+    "id": "pan-4478",
+    "title": "Shared Sessions v0 (slice 7): controller handoff and reclaim",
+    "status": "proposed",
+    "uid": "70e5bb71-3cdb-4f71-9f32-eb36ba1dd2fd",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-03T17:30:39Z",
+    "updated": "2026-11-03T17:35:12.351Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4478",
+        "label": "PAN-4478",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4478.md",
+        "label": "PRD",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/pan-658.md",
+        "label": "Parent PRD (rev 3)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "shared-sessions",
+      "sharing",
+      "webrtc",
+      "controller",
+      "security",
+      "dashboard"
+    ],
+    "metadata": {
+      "sizeJustification": "22 files across the contracts package, the dashboard server, the dashboard frontend, one e2e spec and two doc files. The slice is one vertical feature the issue scopes as slice 7: host enforcement is meaningless without a way for a viewer-controller to send commands, and the viewer controls are unsafe without host enforcement. Every module ships with its own test file. Slices 2-5 shipped with the same shape.",
+      "canonicalFilename": "2026-11-03-PAN-4478-shared-sessions-v0-slice-7-controller-handoff-and-reclaim.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The share service tracks a controller (slice 1) but nothing on the host or viewer uses it: ShareCommand lacks set-controller, ShareManager accepts every data-owner command whoever the room says controls, PeerHub reads only hello and submit on control, presence copies the share service's controller verbatim, and a viewer cannot tell whether it is the controller. The user docs say handoff comes in a later release.",
+      "Proposal": "Add set-controller to ShareCommand and four control payloads (identity, command, controller-send, command-ack). A pure controller module holds the host's own appointment (effective controller = appointed viewer once the snapshot confirms it, else the data owner) and one gate function used by ShareManager for the data owner and by PeerHub for viewer-controllers. While a viewer controls, the owner's commands and prompts answer 409 not_controller except reclaim; End share is never gated. The viewer learns its id from identity, shows a You have control panel with the lobby roster, a controller-mode suggestion list and Send prompt, and every command waits for an ack with a 10 s timeout. The share dialog gets Hand control and Reclaim control. A three-dashboard Playwright spec proves A hands to B, B admits C, A reclaims; unit tests prove non-controller commands are rejected.",
+      "NonGoals": "- Un-revoke or End share by a viewer-controller; widening presence with the block list or connected flags\n- Any change under services/share/ (Worker, reducer, protocol)\n- New HTTP routes or no-loss-matrix.ts rows\n- Restoring a viewer-controller after a host dashboard restart (slice 8, PAN-4479); a fresh hub starts with the data owner as controller\n- Automatic reclaim when the controller goes offline\n- Rate limiting a viewer-controller's commands\n- Showing queued items (beyond the count) to a viewer-controller\n- Handing control to a lobby participant or to a participant the host never admitted\n- Persisting the controller appointment on the host's disk\n- Changing JoinView or the viewer dashboard server share-join.ts\n- Terminal channel (slice 6), pan share/pan join CLI (slice 9), hosted web join (slice 10)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "While a viewer controls, the data owner's share commands and prompt sends answer 409 not_controller; reclaim and End share are always allowed.",
+        "rationale": "Parent PRD Host Role & Handoff: the host accepts control commands only from the current controller and exactly one controller exists; reclaim is one click, so the owner is never locked out."
+      },
+      {
+        "summary": "The host enforces only a controller it appointed itself: effective controller = appointed viewer when the snapshot confirms it, else the data owner.",
+        "rationale": "Parent NFR-4 and D-R3-3: the share service must never be the sole authority; mirrors slice 3's host-admitted set, which a snapshot can shrink but never grow."
+      },
+      {
+        "summary": "The viewer learns its own GitHub id from a new host control payload identity { githubId }, not from JoinView.",
+        "rationale": "Host-authoritative, needs no viewer-server change, and works when account.json has githubId null; avoids another conflict with PAN-4479 in share-join.ts."
+      },
+      {
+        "summary": "The data owner's commands keep slice-2 target semantics (the share service validates); only set-controller targets and viewer-controller commands are validated on the host.",
+        "rationale": "Keeps slice-2 behavior and tests intact while remote viewer commands get host-side validation and an immediate ack."
+      },
+      {
+        "summary": "A viewer-controller cannot un-revoke or end the share.",
+        "rationale": "Presence never carries the block list (slice 3 D-17/D-18); the owner reclaims in one click to do either."
+      },
+      {
+        "summary": "A handoff target must be admitted and host-admitted but need not be connected; a disconnected controller keeps control.",
+        "rationale": "Matches the share service reducer (room-state.ts) and viewers cannot see connected flags."
+      },
+      {
+        "summary": "Presence carries the host's effective controller and refreshes at once on reclaim; a handoff to a viewer shows when the snapshot confirms it.",
+        "rationale": "Avoids a flash of the data owner between two viewer-controllers while keeping reclaim instant."
+      },
+      {
+        "summary": "Viewer-controller prompts go through the slice-5 sendFromController queue door credited to the viewer, acked accepted with the queue position.",
+        "rationale": "One FIFO queue and one attribution path for every controller send (parent FR-14)."
+      },
+      {
+        "summary": "A viewer command with no ack fails after 10 s (COMMAND_ACK_TIMEOUT_MS) with 'The host did not answer.'",
+        "rationale": "An older host ignores the new payloads (NFR-2), so the viewer needs a bounded wait; tests use fake timers."
+      },
+      {
+        "summary": "The end-to-end proof runs three isolated dashboards (owner, alice, bob).",
+        "rationale": "The issue's acceptance chain needs three identities: A hands to B, B admits C, A reclaims."
+      }
+    ],
+    "items": [
+      {
+        "id": "wire-types",
+        "title": "Add set-controller, controller commands, acks and identity to the sharing contracts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T17:30:39Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4478",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/sharing.ts",
+            "src/dashboard/server/services/share-host.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "! grep -q '^import' packages/contracts/src/sharing.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "grep finds no import line in sharing.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-6",
+            "FR-7",
+            "FR-9",
+            "FR-11",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "controller-gate",
+            "hub-control",
+            "host-gate",
+            "viewer-peer",
+            "viewer-hook",
+            "lobby-roster",
+            "host-dialog",
+            "viewer-controller-ui"
+          ]
+        },
+        "narrative": {
+          "Action": "Edit packages/contracts/src/sharing.ts exactly as PRD .pan/drafts/PAN-4478.md section 'Wire format changes': widen ShareCommand (line 99) with 'set-controller'; add SharedControllerCommand (= Exclude<ShareCommand, unrevoke>) and SharedCommandRefusal (8 reasons); add optional ShareView.controllerGithubId; add ControlPayload members identity, command, controller-send, command-ack; update the header and ControlPayload doc comments. The file stays type-only with no import. Because frameOf in src/dashboard/server/services/share-host.ts (lines 132-147) switches exhaustively over ShareCommand, add its `case 'set-controller': return { type: 'set-controller', githubId: command.githubId };` in the same commit so typecheck stays green; that is the only share-host.ts change in this item."
+        },
+        "items": [
+          {
+            "id": "wire-types.ac1",
+            "title": "Given the edited contracts, when `npm run typecheck` runs, then it exits 0 and packages/contracts/src/sharing.ts contains no line starting with `import`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-types.ac2",
+            "title": "ShareCommand accepts `{ type: 'set-controller', githubId }` and SharedControllerCommand rejects `{ type: 'unrevoke', githubId }` at the type level.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-types.ac3",
+            "title": "ControlPayload contains the kinds identity, command, controller-send and command-ack with the fields listed in the PRD, and ShareView contains an optional numeric controllerGithubId.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "controller-gate",
+        "title": "Create the pure controller module: appointment state, gate and command decoder",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T17:30:39Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4478",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/dashboard/server/sharing/controller.ts",
+            "src/dashboard/server/sharing/__tests__/controller.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/sharing/__tests__/controller.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "controller.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-8",
+            "NFR-1",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "hub-control",
+            "host-gate"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/sharing/controller.ts and src/dashboard/server/sharing/__tests__/controller.test.ts per PRD section 'Controller module': ControllerState (current/appoint/onSnapshot, effective controller = appointed only when snapshot.controllerGithubId equals it, else the data owner), controlRefusal with the eight ordered rules (reclaim always allowed; not_controller; viewer unrevoke invalid_command; viewer self target invalid_target; set-controller target must be owner or admitted+host-admitted; owner actor otherwise allowed; viewer targets lobby/listed/admitted), and readControllerCommand rebuilding a command from known keys only and refusing unrevoke. No I/O, no timers."
+        },
+        "items": [
+          {
+            "id": "controller-gate.ac1",
+            "title": "Given a snapshot whose controllerGithubId is 100 and no appointment, when ControllerState.current runs, then it returns the data owner's id; after appoint(100) it returns 100.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "controller-gate.ac2",
+            "title": "Given a viewer controls, when controlRefusal runs for the owner actor with set-controller naming the owner, then it returns null, and for the owner actor with kick it returns 'not_controller'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "controller-gate.ac3",
+            "title": "controlRefusal returns 'invalid_command' for a viewer unrevoke, 'invalid_target' for a viewer targeting itself, and 'unknown_participant' for set-controller naming a lobby participant or one isHostAdmitted rejects.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "controller-gate.ac4",
+            "title": "readControllerCommand returns null for unrevoke, a non-integer githubId or a non-boolean contributor, and never copies an unknown key into its result.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "hub-control",
+        "title": "Enforce the controller in PeerHub and accept viewer-controller commands over control",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T17:30:39Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4478",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/dashboard/server/sharing/peer-hub.ts",
+            "src/dashboard/server/sharing/__tests__/peer-hub.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/sharing/__tests__/peer-hub.test.ts src/dashboard/server/sharing/__tests__/peer-hub-loopback.test.ts",
+            "npm run typecheck",
+            "wc -l src/dashboard/server/sharing/peer-hub.ts"
+          ],
+          "expected_outputs": [
+            "peer-hub.test.ts and peer-hub-loopback.test.ts pass",
+            "typecheck completes without errors",
+            "peer-hub.ts is under 1000 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "FR-10",
+            "NFR-1",
+            "NFR-3",
+            "NFR-5"
+          ],
+          "foundationFor": [
+            "host-gate",
+            "e2e"
+          ],
+          "parallelSafeReason": "Touches only peer-hub.ts and its test; no other ready item edits those files, and its blockers (wire-types, controller-gate) are its only inputs."
+        },
+        "narrative": {
+          "Action": "Edit src/dashboard/server/sharing/peer-hub.ts and append describe('PeerHub controller handoff (PAN-4478)') to src/dashboard/server/sharing/__tests__/peer-hub.test.ts per PRD section 'Peer hub': own a ControllerState; implement the new HostHub methods controllerGithubId/isHostAdmitted/appoint (appoint refreshes presence only when the new appointment is the data owner); call controller.onSnapshot in onSnapshot before reconcile; pass the effective controller into presenceOf (new optional fifth parameter); send control identity { githubId } right after a hello negotiates; dispatch control 'command' to onCommand and 'controller-send' to onControllerSend with the PRD's step lists; extract eligibleParticipant from onSubmit; answer command-ack. Update the controlPayloads helper (line 771) to drop identity payloads. Run the loopback and integration peer-hub tests too and filter identity there if they assert exact control payload lists. Keep peer-hub.ts under 1000 lines."
+        },
+        "items": [
+          {
+            "id": "hub-control.ac1",
+            "title": "Given B (100) is appointed and the snapshot confirms it, when B sends control command admit 200, then ctx.sendFrame receives exactly { type: 'admit', githubId: 200 }, B gets command-ack accepted, and a peer for 200 starts once a snapshot shows 200 admitted and connected.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hub-control.ac2",
+            "title": "Given the data owner reclaims with appoint(1), when B then sends command kick 200, then B gets command-ack rejected not_controller and no frame is sent, and B's presence shows controllerGithubId 1 before any new snapshot.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hub-control.ac3",
+            "title": "Given a snapshot names 100 as controller without a host appointment, when 100 sends any command, then the hub rejects it not_controller and presence shows the data owner's id.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hub-control.ac4",
+            "title": "After a peer's hello negotiates, the hub sends control identity with that peer's githubId before the first presence envelope.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hub-control.ac5",
+            "title": "Given B is the effective controller, when B sends controller-send with text 'Go', then the prompt is queued credited to B's login and B gets command-ack accepted with position 1.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "host-gate",
+        "title": "Gate the data owner's share commands and prompts on the controller and accept set-controller on the route",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T17:30:39Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4478",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/share-host.ts",
+            "src/dashboard/server/routes/shares.ts",
+            "src/dashboard/server/services/__tests__/share-host.test.ts",
+            "tests/unit/dashboard/server/routes/shares.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/share-host.test.ts tests/unit/dashboard/server/routes/shares.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "share-host.test.ts and shares.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-11",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Edit src/dashboard/server/services/share-host.ts, src/dashboard/server/routes/shares.ts, src/dashboard/server/services/__tests__/share-host.test.ts and tests/unit/dashboard/server/routes/shares.test.ts per PRD section 'Share manager and route': ShareManager.command calls controlRefusal with the owner actor (controller from host.hub.controllerGithubId(), falling back to snapshot.controllerGithubId; isHostAdmitted from the hub, falling back to true) and answers 409 { error, message } on refusal; mirror set-controller to hub.appoint after the frame is sent; sendPrompt answers 409 not_controller while a viewer controls; viewOf adds controllerGithubId without spreading undefined; add REFUSAL_MESSAGES; update header comments. routes/shares.ts: COMMAND_TYPES and parseShareCommand accept set-controller; route table comment lists the new 409s. Update FakeHub (share-host.test.ts line 388) and stubHub (shares.test.ts line 248) with the three new HostHub methods. End share stays ungated."
+        },
+        "items": [
+          {
+            "id": "host-gate.ac1",
+            "title": "Given the hub reports a viewer (100) as controller, when the owner calls ShareManager.command with kick or ShareManager.sendPrompt, then each returns status 409 with error 'not_controller' and no frame is sent on the host socket.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-gate.ac2",
+            "title": "Given a viewer controls, when the owner calls ShareManager.command with { type: 'set-controller', githubId: <owner id> }, then it returns 202, the host socket receives that frame, and hub.appoint is called with the owner's id.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-gate.ac3",
+            "title": "Given the hub has not host-admitted 300, when the owner hands control to 300, then the manager returns 409 'unknown_participant' and sends nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-gate.ac4",
+            "title": "parseShareCommand returns { type: 'set-controller', githubId: 7 } for that body and null when githubId is missing, and GET /api/shares views carry the hub's controllerGithubId.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "viewer-peer",
+        "title": "Read identity and command acks and send controller commands in the viewer's WebRTC peer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T17:30:39Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4478",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/sharing/webrtc-viewer.ts",
+            "src/dashboard/frontend/src/components/chat/sharing/__tests__/webrtc-viewer.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/sharing/__tests__/webrtc-viewer.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "webrtc-viewer.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "FR-9",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Edit src/dashboard/frontend/src/components/chat/sharing/webrtc-viewer.ts and __tests__/webrtc-viewer.test.ts per PRD section 'Browser peer': callbacks onIdentity and onCommandAck; exported CommandAck and readCommandAck (known keys, COMMAND_REFUSALS set of the eight reasons); onControl handles identity (positive safe integer githubId) and command-ack; new methods command(clientId, command) and controllerSend(clientId, text, draftGithubId?) that use sendOn('control', ...). Update the header comment."
+        },
+        "items": [
+          {
+            "id": "viewer-peer.ac1",
+            "title": "Given the host sends control identity { githubId: 100 }, when the viewer reads it, then onIdentity is called with 100; a non-integer githubId calls nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-peer.ac2",
+            "title": "Given the host sends command-ack with an unknown reason, when the viewer reads it, then onCommandAck receives the ack without a reason field.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-peer.ac3",
+            "title": "After the hello reply, command() and controllerSend() each send one control envelope with the next seq (2, then 3) and the method returns true; before the hello reply the method returns false.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "viewer-hook",
+        "title": "Expose controller state, sendCommand and sendControllerPrompt with ack timeouts in useSharedJoin",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T17:30:39Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4478",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/sharing/useSharedJoin.ts",
+            "src/dashboard/frontend/src/components/chat/sharing/__tests__/useSharedJoin.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/sharing/__tests__/useSharedJoin.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "useSharedJoin.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12",
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "Edit src/dashboard/frontend/src/components/chat/sharing/useSharedJoin.ts and __tests__/useSharedJoin.test.tsx per PRD section 'Join hook': selfGithubId from onIdentity (cleared in resetContent); isController = selfGithubId !== null && presence.controllerGithubId === selfGithubId; COMMAND_ACK_TIMEOUT_MS = 10_000; pending ack map with timers; sendCommand and sendControllerPrompt promises; failPending('Connection to the host was lost.') on resetContent and closeViewer; exported commandRefusalText with the PRD's messages; extend ViewerPeer Pick and SharedJoin. Tests use vi.useFakeTimers and vi.advanceTimersByTimeAsync, never real waits."
+        },
+        "items": [
+          {
+            "id": "viewer-hook.ac1",
+            "title": "Given identity 100 and presence controllerGithubId 100, when the hook renders, then isController is true; with presence controllerGithubId 1 it is false.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-hook.ac2",
+            "title": "Given a sent command, when the host acks accepted, then sendCommand resolves; when it acks rejected not_controller, then sendCommand rejects with 'You no longer have control.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-hook.ac3",
+            "title": "Given a sent command and no ack, when 10,000 ms of fake time pass, then sendCommand rejects with 'The host did not answer.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-hook.ac4",
+            "title": "Given a pending command, when reconnect() runs, then the command rejects with 'Connection to the host was lost.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lobby-roster",
+        "title": "Split SharingLobbyPanel into LobbyRoster and add Hand control and Reclaim control",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T17:30:39Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4478",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/sharing/SharingLobbyPanel.tsx",
+            "src/dashboard/frontend/src/components/chat/sharing/__tests__/SharingLobbyPanel.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/sharing/__tests__/SharingLobbyPanel.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "SharingLobbyPanel.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Edit src/dashboard/frontend/src/components/chat/sharing/SharingLobbyPanel.tsx and __tests__/SharingLobbyPanel.test.tsx per PRD section 'Lobby panel': export LobbyPerson and LobbyRoster (props people, blocked or null, controllerGithubId, selfGithubId, canAct, disabled, onCommand); add a Hand control button (aria-label 'Hand control to @<login>', command set-controller) on admitted rows except selfGithubId; no buttons on selfGithubId rows; offline marker only when connected === false. Keep SharingLobbyPanel({ share, onCommand, pending }) as the host wrapper: controller = share.controllerGithubId ?? snapshot.controllerGithubId; when a viewer controls, render '@<login> has control.' and a Reclaim control button and pass canAct false. Follow the pan-style-guide skill."
+        },
+        "items": [
+          {
+            "id": "lobby-roster.ac1",
+            "title": "Given the data owner controls, when the panel renders, then each admitted row has a 'Hand control to @<login>' button and clicking it calls onCommand with { type: 'set-controller', githubId }.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lobby-roster.ac2",
+            "title": "Given share.controllerGithubId is bob's id, when the panel renders, then it shows '@bob has control.' and a 'Reclaim control' button that sends set-controller with the owner's id, and renders no Admit, Kick, Revoke or Un-revoke button.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lobby-roster.ac3",
+            "title": "Given LobbyRoster with blocked null and selfGithubId 100, when it renders, then there is no Blocked section and the row for 100 has no buttons.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "host-dialog",
+        "title": "Show suggestions read-only in the share dialog while a viewer controls",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T17:30:39Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4478",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/sharing/ShareDialog.tsx",
+            "src/dashboard/frontend/src/components/chat/sharing/__tests__/ShareDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/sharing/__tests__/ShareDialog.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ShareDialog.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Edit src/dashboard/frontend/src/components/chat/sharing/ShareDialog.tsx and __tests__/ShareDialog.test.tsx per PRD section 'Share dialog': compute ownerControls from share.controllerGithubId ?? share.snapshot.controllerGithubId against share.snapshot.dataOwner.githubId (true when either is missing); SuggestionList mode is 'controller' only when ownerControls; PROMPT_ERRORS adds not_controller 'Someone else has control. Reclaim control first.'; update the header comment."
+        },
+        "items": [
+          {
+            "id": "host-dialog.ac1",
+            "title": "Given a share whose controllerGithubId is a viewer's id and one draft, when the dialog renders, then the suggestion row shows no 'Use suggestion from @<login>' button.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-dialog.ac2",
+            "title": "Given the data owner controls, when the dialog renders the same draft, then the 'Use suggestion from @<login>' button is present.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "viewer-controller-ui",
+        "title": "Render the You have control panel, controller composer and control marker on the viewer page",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T17:30:39Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4478",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/sharing/SharedConversationView.tsx",
+            "src/dashboard/frontend/src/components/chat/sharing/__tests__/SharedConversationView.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/sharing/__tests__/SharedConversationView.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "SharedConversationView.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Edit src/dashboard/frontend/src/components/chat/sharing/SharedConversationView.tsx and __tests__/SharedConversationView.test.tsx per PRD section 'Viewer page': in-file SharedControllerPanel (data-component 'shared-controller', heading 'You have control', 'Hand control back to @<owner>' button, LobbyRoster from presence participants minus the host with blocked null, error alert from rejected commands) rendered between the timeline and the composer only when isController; SharedComposer for the controller uses sendControllerPrompt for Send prompt and Ctrl/Cmd+Enter, clears the box on success, and switches SuggestionList to controller mode with onSend calling sendControllerPrompt(text, item.githubId); Header shows '@<login> has control' when presence's controller is not the host. Non-controller behavior from slice 5 stays unchanged."
+        },
+        "items": [
+          {
+            "id": "viewer-controller-ui.ac1",
+            "title": "Given isController is false, when the page renders an admitted viewer, then no [data-component=\"shared-controller\"] element exists; given isController is true it exists with 'You have control'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-controller-ui.ac2",
+            "title": "Given the controller panel lists carol in the lobby, when the viewer clicks 'Admit @carol' (exact), then sendCommand is called with { type: 'admit', githubId: <carol id> }; 'Hand control back to @owner' calls sendCommand with set-controller and the host's id.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-controller-ui.ac3",
+            "title": "Given isController, when the viewer types 'Go' and clicks 'Send prompt', then sendControllerPrompt is called with 'Go' and the box is empty after it resolves; a rejection shows its message and keeps the text.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-controller-ui.ac4",
+            "title": "Given presence names alice as controller, when any viewer's page renders, then the header shows '@alice has control'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "e2e",
+        "title": "Prove the handoff chain end to end on three isolated dashboards",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T17:30:39Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-4478",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-4478-controller-handoff.spec.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npm run build && npx playwright test tests/pan-4478-controller-handoff.spec.ts"
+          ],
+          "expected_outputs": [
+            "the Playwright spec passes",
+            "test-results/pan-4478/ contains viewer-controller-light.png, viewer-controller-dark.png, host-reclaim-light.png and host-reclaim-dark.png"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-6",
+            "FR-11",
+            "FR-12"
+          ],
+          "parallelSafeReason": "Creates one new spec file that no other item edits; it runs after every code item it exercises."
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/tests/pan-4478-controller-handoff.spec.ts per PRD section 'End-to-end test', copying the harness of tests/pan-4476-shared-input.spec.ts (Miniflare share Worker, ACCOUNT_STUB with owner 1, alice 100 and bob 200, three startIsolatedDashboard children, dead-loopback account.json and directory_url, local avatar PNG, never port 3011). Flow: owner admits alice; owner hands control to alice; bob joins; alice admits bob from her controller panel; owner reclaims. Write the four screenshots under test-results/pan-4478/ and open them to inspect. Not added to test:playwright. Use an isolated browser instance and profile; never another agent's Playwright session."
+        },
+        "items": [
+          {
+            "id": "e2e.ac1",
+            "title": "Given the owner admitted alice, when the owner clicks 'Hand control to @alice', then alice's page shows [data-component=\"shared-controller\"] and the owner's dialog shows '@alice has control.' within 10 s.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2e.ac2",
+            "title": "Given bob waits in the lobby, when alice clicks 'Admit @bob' (exact) in her controller panel, then bob's page stops showing 'Waiting for the host to let you in' within 10 s.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2e.ac3",
+            "title": "When the owner clicks 'Reclaim control', then alice's [data-component=\"shared-controller\"] disappears and the owner's dialog shows 'Hand control to @bob' within 10 s, and the four screenshots are written.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document controller handoff and reclaim in the developer and user docs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T17:30:39Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4478",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/SHARED-SESSIONS.md",
+            "configuration/shared-sessions.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -c 'Controller handoff and reclaim (slice 7, PAN-4478)' docs/SHARED-SESSIONS.md",
+            "! grep -q 'comes in a later release' configuration/shared-sessions.mdx",
+            "grep -c '^## Hand over control' configuration/shared-sessions.mdx"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "the slice-7 heading count is 1",
+            "the 'comes in a later release' sentence is gone",
+            "the '## Hand over control' heading count is 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-9",
+            "FR-10",
+            "FR-11",
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Edit docs/SHARED-SESSIONS.md and configuration/shared-sessions.mdx per PRD work item WI-11: add the section '## Controller handoff and reclaim (slice 7, PAN-4478)' before '## Local development' (appointment and effective-controller rule, the gate and the reclaim exception, End share never gated, the four new control payloads, ack reasons, set-controller on /commands with 409 not_controller and unknown_participant, ShareView.controllerGithubId, viewer-controller cannot un-revoke or end); change the presence row (line 201) to name the host's effective controller; add '409 not_controller while a viewer controls (slice 7)' to the slice-5 host API paragraph. In the mdx, replace the Controller bullet in '## Roles', delete 'Handing control to another person comes in a later release.', and add '## Hand over control' after '## Suggestions and contributor prompts'."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "docs/SHARED-SESSIONS.md contains the heading 'Controller handoff and reclaim (slice 7, PAN-4478)' and that section names the payload kinds identity, command, controller-send and command-ack and the HTTP 409 code not_controller.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "configuration/shared-sessions.mdx contains '## Hand over control', describes the 'Reclaim control' button, states that only the host can un-revoke and end the share, and no longer contains 'comes in a later release'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "Given the edited docs, when `npm run lint:docs` runs, then it exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wire-types",
+        "to": "controller-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-types",
+        "to": "hub-control",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-types",
+        "to": "host-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-types",
+        "to": "viewer-peer",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-types",
+        "to": "lobby-roster",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-types",
+        "to": "host-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-types",
+        "to": "viewer-controller-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "controller-gate",
+        "to": "hub-control",
+        "type": "blocks"
+      },
+      {
+        "from": "controller-gate",
+        "to": "host-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "hub-control",
+        "to": "host-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "viewer-peer",
+        "to": "viewer-hook",
+        "type": "blocks"
+      },
+      {
+        "from": "viewer-hook",
+        "to": "viewer-controller-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "lobby-roster",
+        "to": "viewer-controller-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "host-gate",
+        "to": "e2e",
+        "type": "blocks"
+      },
+      {
+        "from": "hub-control",
+        "to": "e2e",
+        "type": "blocks"
+      },
+      {
+        "from": "lobby-roster",
+        "to": "e2e",
+        "type": "blocks"
+      },
+      {
+        "from": "host-dialog",
+        "to": "e2e",
+        "type": "blocks"
+      },
+      {
+        "from": "viewer-controller-ui",
+        "to": "e2e",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
