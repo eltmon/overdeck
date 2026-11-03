@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4852",
   "created": "2026-11-03T02:45:30.764Z",
-  "updated": "2026-11-03T05:53:01.474Z",
+  "updated": "2026-11-03T05:53:22.502Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -214,6 +214,10 @@
     "ox-binary.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T05:53:01.473Z"
+    },
+    "launch-uses-built-ox.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:53:22.502Z"
     }
   }
 }
