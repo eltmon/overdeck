@@ -32,6 +32,7 @@ describe('readMobileRoute', () => {
     expect(readMobileRoute('?subject=conv.with.dots')).toEqual({ tab: 'needs-you', subjectId: 'conv.with.dots', conversationId: null, issueId: null });
     expect(readMobileRoute('?tab=conversations')).toEqual({ tab: 'conversations', subjectId: null, conversationId: null, issueId: null });
     expect(readMobileRoute('?conversation=42')).toEqual({ tab: 'conversations', subjectId: null, conversationId: '42', issueId: null });
+    expect(readMobileRoute('?conversation=%40env-a%2Fconv-9')).toEqual({ tab: 'conversations', subjectId: null, conversationId: '@env-a/conv-9', issueId: null });
   });
 
   it('reads the D-4661-3 pipeline path, with the pipeline tab taking precedence over every other query parameter', () => {

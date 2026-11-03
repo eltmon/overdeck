@@ -23,7 +23,7 @@ import { ConversationSkillsField, summarizeSkills, useConversationSkillGroups } 
 import { IssuePickerField } from './IssuePickerField';
 import { buildNewConversationPayload, createConversationWithOptions, createFleetConversation, fetchEffortDefault } from './newConversationApi';
 import { useNewConversationDialogStore } from './newConversationDialogStore';
-import { MachineField, type MachineChoice, parseNeedsInput, THIS_MACHINE } from './MachineField';
+import { MachineField, type MachineChoice, parseNeedsInput, THIS_MACHINE, useMachineCwdHint } from './MachineField';
 import styles from './NewConversationDialog.module.css';
 
 /** D7: match the preset by yaml key, then by display name. */
@@ -88,6 +88,7 @@ export function NewConversationDialog({ presetProject, onClose }: { presetProjec
   const skillsPanelId = useId();
 
   const project = useMemo(() => projects?.find((p) => p.key === projectKey), [projects, projectKey]);
+  const cwdHint = useMachineCwdHint(machine, project ? (project.name ?? project.key) : null);
 
   const skillsQuery = useConversationSkillGroups(projectKey ?? undefined, issueId ?? undefined);
   const [skillsOpen, setSkillsOpen] = useState(() => Object.keys(skillOverrides).length > 0);
@@ -225,9 +226,10 @@ export function NewConversationDialog({ presetProject, onClose }: { presetProjec
               id={cwdId}
               className={cn(styles.input, styles.mono)}
               spellCheck={false}
-              value={cwd}
-              disabled={!projectKey || machine.machine !== ''}
-              placeholder={projectKey ? '' : 'Default working directory'}
+              value={cwdHint === null ? cwd : ''}
+              disabled={!projectKey || cwdHint !== null}
+              placeholder={cwdHint ?? (projectKey ? '' : 'Default working directory')}
+              title={cwdHint ?? undefined}
               onChange={(e) => setCwd(e.target.value)}
             />
           </div>

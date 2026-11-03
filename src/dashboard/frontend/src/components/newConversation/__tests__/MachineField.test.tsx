@@ -22,6 +22,7 @@ vi.mock('../../chat/ModelPicker', () => ({
 
 import { toast } from 'sonner';
 import { NewConversationDialog } from '../NewConversationDialog';
+import { machineCwdHint } from '../MachineField';
 
 const LINK = {
   id: 'link-1', environmentId: 'env-desk', label: 'desk', fingerprint: 'f', access: 'operator', state: 'online', stateDetail: null,
@@ -109,5 +110,63 @@ describe('Machine field (PAN-4651 WI-11)', () => {
     await waitFor(() => expect(pushState).toHaveBeenCalledWith({}, '', '/conv/@env-desk/conv-9'));
     expect(toast).toHaveBeenCalledWith('Auto → desk (CPU pressure 3%, 41 GB free, 2 agents)');
     pushState.mockRestore();
+  });
+});
+
+describe('Working directory on another machine (PAN-4872)', () => {
+  it('a linked machine empties the field and names it', async () => {
+    renderDialog();
+    const select = screen.getByLabelText('Machine') as HTMLSelectElement;
+    await waitFor(() => expect(within(select).getByRole('option', { name: 'desk' })).toBeTruthy());
+    fireEvent.change(screen.getByLabelText('Project'), { target: { value: 'overdeck' } });
+    fireEvent.change(select, { target: { value: 'env-desk' } });
+    const cwdInput = screen.getByLabelText('Working directory') as HTMLInputElement;
+    expect(cwdInput.value).toBe('');
+    expect(cwdInput.placeholder).toBe('Set by desk: its copy of Overdeck');
+    expect(cwdInput.disabled).toBe(true);
+  });
+
+  it('switching back restores the edited path', async () => {
+    renderDialog();
+    const select = screen.getByLabelText('Machine') as HTMLSelectElement;
+    await waitFor(() => expect(within(select).getByRole('option', { name: 'desk' })).toBeTruthy());
+    fireEvent.change(screen.getByLabelText('Project'), { target: { value: 'overdeck' } });
+    const cwdInput = screen.getByLabelText('Working directory') as HTMLInputElement;
+    fireEvent.change(cwdInput, { target: { value: '/p/overdeck/packages/web' } });
+    fireEvent.change(select, { target: { value: 'env-desk' } });
+    fireEvent.change(select, { target: { value: '' } });
+    expect(cwdInput.value).toBe('/p/overdeck/packages/web');
+    expect(cwdInput.disabled).toBe(false);
+  });
+
+  it('Auto and Fly name who sets it', async () => {
+    renderDialog();
+    const select = screen.getByLabelText('Machine') as HTMLSelectElement;
+    await waitFor(() => expect(within(select).getByRole('option', { name: 'desk' })).toBeTruthy());
+    const cwdInput = screen.getByLabelText('Working directory') as HTMLInputElement;
+    fireEvent.change(select, { target: { value: 'auto' } });
+    expect(cwdInput.placeholder).toBe('Set by the machine Auto picks: its default working directory');
+    fireEvent.change(screen.getByLabelText('Project'), { target: { value: 'overdeck' } });
+    fireEvent.change(select, { target: { value: 'fly' } });
+    expect(cwdInput.placeholder).toBe('Set by the new Fly machine: its copy of Overdeck');
+  });
+
+  it('a remote create never sends cwd', async () => {
+    renderDialog();
+    const select = screen.getByLabelText('Machine') as HTMLSelectElement;
+    await waitFor(() => expect(within(select).getByRole('option', { name: 'desk' })).toBeTruthy());
+    fireEvent.change(screen.getByLabelText('Project'), { target: { value: 'overdeck' } });
+    fireEvent.change(screen.getByLabelText('Working directory'), { target: { value: '/p/overdeck/packages/web' } });
+    fireEvent.change(select, { target: { value: 'env-desk' } });
+    fireEvent.change(screen.getByLabelText('First message'), { target: { value: 'hello' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create conversation' }));
+    await waitFor(() => expect(fleetPosts).toHaveLength(1));
+    expect('cwd' in fleetPosts[0]).toBe(false);
+    expect(fleetPosts[0]).toMatchObject({ machine: 'env-desk', projectKey: 'overdeck' });
+  });
+
+  it('machineCwdHint: fallback label and this-machine null', () => {
+    expect(machineCwdHint('env-gone', null, 'Overdeck')).toBe('Set by the chosen machine: its copy of Overdeck');
+    expect(machineCwdHint('', 'x', 'y')).toBe(null);
   });
 });

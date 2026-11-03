@@ -12,8 +12,8 @@
  * names a repository, and this machine decides where that repository lives.
  *
  * - `POST /api/machines/work/conversations { gitOrigin, message, model?, harness?, effort?, issueId? }`
- *   → `handleConversationCreate` in the matched project (or the home directory
- *   when `gitOrigin` is null) → `markConversationStartedBy`. Answers 201 `{ name }`.
+ *   → `handleConversationCreate` in the matched project (or the default working
+ *   directory, `getDefaultCwd`, when `gitOrigin` is null) → `markConversationStartedBy`. Answers 201 `{ name }`.
  * - `POST /api/machines/work/workers { gitOrigin, issueId, prompt, model?, harness?, effort?, readOnly?, name?, parentId? }`
  *   → project from the issue prefix, origin check → `startWorker` with
  *   `parentId: null` and `startedBy: { environmentId, parentId }` (the caller's

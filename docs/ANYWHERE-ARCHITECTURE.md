@@ -926,6 +926,12 @@ dashboard's own fetches). The viewer's own writes (`POST /api/linked-conversatio
 use `rejectUnsafeDashboardMutationRequest`: JSON only, plus a trusted Origin and the CSRF
 token unless a header-borne credential is present.
 
+The phone app (`/m`) opens a linked row by its linked name and takes the row from the
+merged `GET /api/conversations` list, never from `GET /api/conversations/@<machine>/<name>`.
+The proxy above returns the owner's own row (positive id, local name), which would make
+the panel subscribe on this machine's `/ws/rpc` and stay on "Discovering conversation…"
+(PAN-4871).
+
 ### The agent fence (D-4650-7)
 
 On the owner, a `machine` credential whose actor is an agent (an `agent-fenced` link's
@@ -974,7 +980,10 @@ Owner routes under `/api/machines/work/*` (`routes/machines-work.ts`) are the on
 linked machine starts work here. Each takes exactly a `machine` credential (403
 `machine-only`), resolves the project on this machine, and compares the caller's git
 origin slug with that project's (case-insensitive; 404 `project-missing` naming this
-machine otherwise). The caller never names a path. `conversations` runs
+machine otherwise). The caller never names a path. The new-conversation dialog follows
+this: `createFleetConversation` never sends `cwd`, and with another machine chosen the
+Working directory field shows `machineCwdHint` (`newConversation/MachineField.tsx`)
+instead of this machine's path (PAN-4872). `conversations` runs
 `handleConversationCreate`; `workers` runs `startWorker` with `startedBy` written into
 `worker.json`; `issues/:id/start` runs `spawnIssueAgentForRoute`
 (`routes/agents/spawn-issue.ts`, the extracted body of `POST /api/agents`); `projects`

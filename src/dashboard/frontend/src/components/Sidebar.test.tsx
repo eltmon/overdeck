@@ -98,6 +98,11 @@ describe('Sidebar navigation', () => {
     expect(onTabChange).toHaveBeenCalledWith('command-deck');
   });
 
+  it('places Machines after Order Book (PAN-4869)', () => {
+    renderSidebar({ activeTab: 'command-deck' });
+    expect(screen.getByTestId('sidebar-orders').nextElementSibling).toBe(screen.getByTestId('sidebar-machines'));
+  });
+
   it('marks Flywheel live only while the derived run is running (PAN-3964)', async () => {
     const { unmount, fetchMock } = renderSidebar({ activeTab: 'home', flywheelRun: 'paused' });
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/flywheel/status'));

@@ -39,6 +39,7 @@ import {
 } from 'lucide-react';
 import { openNewConversationDialog } from './newConversation/newConversationDialogStore';
 import { useFleetSearchActions } from './palette-fleet-hits';
+import { anywherePaletteActions, ANYWHERE_PALETTE_GROUP } from './palette-anywhere-actions';
 import { rememberRunSession } from './workspace/WorkspaceActionBand';
 import { isAgentRunningStatus } from '../lib/pipeline-state';
 import { useDashboardStore, selectAgents, selectIssues } from '../lib/store';
@@ -563,6 +564,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
       keywords: ['agents', 'workers'],
       onSelect: () => onNavigate('agents'),
     },
+    ...anywherePaletteActions(onNavigate),
   ], [onNavigate, onNewWorkspace]);
 
   // ─── Dynamic: issues + agents ─────────────────────────────────────────────
@@ -847,7 +849,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
   const groupOrder = useMemo(() => {
     const seen = new Set(filtered.map((a) => a.group));
     const ordered: string[] = [];
-    const preferred = ['Actions', 'Orchestration', 'Navigation', 'Workspaces', 'Active Workspaces', 'Issues', 'Running Agents'];
+    const preferred = ['Actions', 'Orchestration', 'Navigation', ANYWHERE_PALETTE_GROUP, 'Workspaces', 'Active Workspaces', 'Issues', 'Running Agents'];
     for (const g of preferred) if (seen.has(g)) { ordered.push(g); seen.delete(g); }
     const commandGroups = [...seen].filter((g) => g.startsWith('Commands · ')).sort();
     for (const g of commandGroups) { ordered.push(g); seen.delete(g); }
