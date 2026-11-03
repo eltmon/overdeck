@@ -1385,7 +1385,8 @@ one dispatcher from four sources:
    approvals and permission prompts.
 2. The conversation pending-input feed (`getConversationsPendingInputFeed`),
    scanned every 5 s, but only while a push target exists (a Web Push
-   subscription or a ready ntfy topic). With no target nothing is scanned.
+   subscription, a ready ntfy topic, or a phone with a push key while the
+   directory is online). With no target nothing is scanned.
 3. The wake path. The AskUserQuestion PreToolUse hook's
    `ask_user_question_blocked` heartbeat (`routes/agents/runtime-events.ts`)
    and a waiting `conversation.permission_changed` event call
@@ -1425,6 +1426,23 @@ or "a conversation", `body`, `url`, `tag`). `webpush-provider.ts` and
 Both use a 5 s timeout and one retry after 5 s for network errors, 429 and 5xx.
 A Web Push 404/410 deletes the subscription, and a subscription whose paired
 device is revoked is deleted before sending.
+
+**Native provider (PAN-4843).** `src/lib/push/native-provider.ts` is the third
+provider, `native`, for the Overdeck phone app. For each active `phone` access
+token with a `pushKey` it seals the payload with `crypto_box_seal` to that key
+and sends a `push` frame to the overdeck.ai directory. It reaches the directory
+through a lazy `directory: () => PushDirectoryPort | null` getter
+(`currentDirectoryClient`), because `main.ts` starts the push service before
+`startAnywhere` has called `setDirectoryClient`: a captured client would stay
+`null`. The plaintext is `PhonePushPayload` (`packages/contracts/src/connect.ts`):
+`{ v, machine, kind, title, body, url, tag, issueId, ts }` with the full title,
+since only the phone can read it. It is trimmed to `PUSH_PLAINTEXT_MAX_BYTES`
+(2,256 bytes, which seal to exactly `PUSH_SEALED_MAX_CHARS` base64 characters),
+body first and then title, on code-point boundaries. Each phone's send waits up
+to 10 s for the `push-result` with its `requestId`: `ok` maps to success,
+`no_registration` and `unknown_client` to `skipped`, `rate_limited`,
+`delivery_failed`, a timeout or an offline directory to `transient`, and a
+payload that cannot fit to `rejected`.
 
 **Files under `<OVERDECK_HOME>/push/`** (directory 0700):
 

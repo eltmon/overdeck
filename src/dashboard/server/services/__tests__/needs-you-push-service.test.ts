@@ -1,3 +1,5 @@
+import { createRequire } from 'node:module';
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../agent-enrichment-service.js', () => ({ pollEnrichmentNow: vi.fn() }));
@@ -13,6 +15,10 @@ const {
   wakeNeedsYouPush,
 } = await import('../needs-you-push-service.js');
 
+import type { MachineToDirectoryFrame } from '@overdeck/contracts';
+import type { MachineKeyPair } from '../../../../lib/anywhere/machine-key.js';
+import { openSealed } from '../../../../lib/anywhere/sealed-box.js';
+import { createNativePushProvider, type PushDirectoryPort } from '../../../../lib/push/native-provider.js';
 import type { NeedsYouNotification, PushProvider } from '../../../../lib/push/types.js';
 import type { StoredEvent } from '../../event-store.js';
 
@@ -57,6 +63,17 @@ function feedWithQuestion() {
       pendingAskUserQuestion: { toolUseId: 'toolu_feed', askedAt: new Date().toISOString(), questions: [{ question: 'Q?' }] },
     }],
   }));
+}
+
+const sodium = createRequire(import.meta.url)('sodium-native') as {
+  crypto_box_seed_keypair(pk: Buffer, sk: Buffer, seed: Buffer): void;
+};
+
+function seededKeyPair(fill: number): MachineKeyPair {
+  const publicKey = Buffer.alloc(32);
+  const secretKey = Buffer.alloc(32);
+  sodium.crypto_box_seed_keypair(publicKey, secretKey, Buffer.alloc(32, fill));
+  return { publicKey, secretKey };
 }
 
 describe('needs-you push service (PAN-2354)', () => {
@@ -139,5 +156,45 @@ describe('needs-you push service (PAN-2354)', () => {
     expect(events.unsubscribe).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(20_000);
     expect(feed.mock.calls.length).toBe(calls);
+  });
+
+  it('seals one push frame per phone for a needs-you event (PAN-4843 AC-9)', async () => {
+    const phones = [
+      { clientId: 'aaaaaaaa-0000-4000-8000-000000000001', keys: seededKeyPair(0x11) },
+      { clientId: 'bbbbbbbb-0000-4000-8000-000000000002', keys: seededKeyPair(0x22) },
+    ];
+    const frames: Array<Extract<MachineToDirectoryFrame, { type: 'push' }>> = [];
+    const handlers = new Set<Parameters<PushDirectoryPort['on']>[1]>();
+    const port: PushDirectoryPort = {
+      isOnline: () => true,
+      on: (_type, handler) => {
+        handlers.add(handler);
+        return () => handlers.delete(handler);
+      },
+      send: (frame) => {
+        if (frame.type !== 'push') return true;
+        frames.push(frame);
+        for (const handler of [...handlers]) handler({ type: 'push-result', requestId: frame.requestId, ok: true });
+        return true;
+      },
+    };
+    const provider = createNativePushProvider({
+      directory: () => port,
+      listPhones: () => phones.map(({ clientId, keys }) => ({ clientId, pushKey: keys.publicKey.toString('hex') })),
+      environmentId: async () => 'env-1',
+    });
+    const events = fakeStore();
+    startNeedsYouPushService({ readConversationFeed: vi.fn(async () => ({ body: [] })), store: events.store, providers: [provider] });
+    events.emit({
+      type: 'agent.enrichment_changed',
+      payload: { agentId: 'agent-pan-9', issueId: 'PAN-9', pendingAskUserQuestion: { toolUseId: 'toolu_n', askedAt: new Date().toISOString(), questions: [] } },
+    });
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(frames.map((frame) => frame.to)).toEqual(phones.map((phone) => phone.clientId));
+    frames.forEach((frame, index) => {
+      const opened = openSealed(Buffer.from(frame.sealed, 'base64'), (phones[index] as (typeof phones)[number]).keys);
+      expect(JSON.parse(opened?.toString('utf8') ?? 'null')).toMatchObject({ v: 1, machine: 'env-1', kind: 'question' });
+    });
   });
 });
