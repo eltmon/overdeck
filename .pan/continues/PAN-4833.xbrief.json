@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4833",
   "created": "2026-11-03T04:52:36.921Z",
-  "updated": "2026-11-03T06:12:02.712Z",
+  "updated": "2026-11-03T06:12:24.556Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -114,6 +114,10 @@
     "move-protocol.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T06:12:02.711Z"
+    },
+    "move-protocol.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:12:24.555Z"
     }
   }
 }
