@@ -236,7 +236,10 @@ export type ClientToDirectoryFrame =
     readonly clientId: string
     /** At most 64 characters. */
     readonly label: string
-    /** X25519 link public key, 64 lowercase hex. */
+    /**
+     * The phone's install-level X25519 public key: its push public key (PAN-4837 C-2), 64 lowercase
+     * hex. Link keys are per machine.
+     */
     readonly publicKeyHex: string
     /** At most 32 characters. */
     readonly appVersion: string
