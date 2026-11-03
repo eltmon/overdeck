@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T16:52:00.723978Z · model: claude-opus-5-5 · open: 868_
+_Last sequenced: 2026-11-03T16:57:48.379579Z · model: claude-opus-5-5 · open: 867_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -325,7 +325,6 @@ _Last sequenced: 2026-11-03T16:52:00.723978Z · model: claude-opus-5-5 · open: 
 | 321 | PAN-1219 | M | high | needs-refinement |  |  | Promote across-cycle review state to first-class data (cycle SHA, prior findings) instead of prompt-derived |
 | 322 | PAN-1451 | M | high | needs-refinement |  |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
 | 323 | PAN-1452 | M | high | ok |  |  | PAN-1381 follow-up: per-reviewer restart with model override (architectural mismatch with PAN-1048) |
-| 324 | PAN-4904 | S | medium | ok |  |  | Pull here on a Codex conv titles it from the injected <recommended_plugins> block; derive the title from the operator's first message. |
 | 326 | PAN-1553 | M | high | ok |  |  | Investigate Claude Code Fast mode support (and fast-tier pricing) |
 | 327 | PAN-1504 | M | high | ok |  |  | pan hygiene |
 | 328 | PAN-1480 | L | high | ok |  |  | TLDR: 93% bypass rate |
@@ -1203,10 +1202,10 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T16:52:00.723978Z",
+  "generatedAt": "2026-11-03T16:57:48.379579Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 868,
+  "openCount": 867,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -11955,19 +11954,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "dependsOn": [],
       "why": "Codex conv on a Herdr host loses its first message: spawn pastes it via tmux, no target; silent. needs-handoff (TENET-10).",
       "rationale": "New since the prior run. The first-message path for a Codex app-server conversation on a Herdr host still pastes through tmux, so the prompt is dropped with no dashboard error while pan tell works; it takes the free rank 224 so no other node moves, and its needs-handoff label means a supervised strike, never an autonomous pickup.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4904",
-      "rank": 324,
-      "size": "S",
-      "importance": "medium",
-      "score": 50,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Pull here on a Codex conv titles it from the injected <recommended_plugins> block; derive the title from the operator's first message.",
-      "rationale": "New in-pipeline Anywhere bug found while filming the Anywhere video: an adopted Codex conversation shows injected context as its title in the list, tab and title bar. Transcript and changes transfer correctly, so it is a visible-but-contained defect; it takes the free rank 324 with no other node moving.",
       "gate": "auto",
       "planning": "auto"
     },
