@@ -23,9 +23,9 @@ function SwitchRow({ testId, title, hint, checked, onChange }: { testId: string;
   };
   return (
     <div className="flex items-start justify-between gap-4 px-4 mb-3" data-testid={testId}>
-      <div>
-        <p className="text-xs text-foreground">{title}</p>
-        <p className="text-xs text-muted-foreground">{hint}</p>
+      <div className="min-w-0">
+        <p className="text-[13px] text-foreground">{title}</p>
+        <p className="text-[13px] leading-relaxed text-muted-foreground">{hint}</p>
       </div>
       <Toggle checked={checked} onChange={(next) => void change(next)} disabled={saving} />
     </div>

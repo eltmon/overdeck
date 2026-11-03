@@ -107,7 +107,7 @@ export function formatMachineLoad(load: LoadSample | null | undefined): string |
   if (!load) return null
   const cpu = load.cpuPsiSomeAvg10 === null ? "n/a" : `${Math.round(load.cpuPsiSomeAvg10)}%`
   const memory = load.memAvailableBytes === null ? "n/a" : `${Math.floor(load.memAvailableBytes / 2 ** 30)}`
-  return `CPU ${cpu} · ${memory} GB · ${load.workingAgents} agents`
+  return `CPU ${cpu} · ${memory} GB · ${load.workingAgents} ${load.workingAgents === 1 ? "agent" : "agents"}`
 }
 
 /** PAN-4651 FR-7: `tags: docker, linux · reserved`; null when there is neither. */

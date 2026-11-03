@@ -75,8 +75,8 @@ const ROUTE_STATUS_LABEL = {
   unreachable: 'unreachable',
 } as const;
 
-const buttonClass = 'shrink-0 rounded-md border border-border px-2.5 py-1 text-xs text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50';
-const destructiveButtonClass = 'shrink-0 rounded-md border border-border px-2.5 py-1 text-xs text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50';
+const buttonClass = 'shrink-0 h-8 rounded-md border border-border px-3 text-[13px] text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50';
+const destructiveButtonClass = 'shrink-0 h-8 rounded-md border border-border px-3 text-[13px] text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50';
 
 export function LinkStateBadge({ state }: { state: LinkState }) {
   return (
@@ -106,9 +106,13 @@ export function sshLine(ssh: SshLinkInfo): string {
 }
 
 /** PAN-4651 FR-6/FR-7: ` · CPU 3% · 41 GB · 2 agents · tags: docker, linux · reserved` (muted, part of the meta line). */
-function MachineLoadText({ view }: { view: Pick<MachineLinkView, 'load' | 'tags' | 'placement'> }) {
-  const text = [formatMachineLoad(view.load), formatMachineProfile(view.tags, view.placement)].filter(Boolean).join(' · ');
-  return text ? <span data-testid="machine-load">{' · '}{text}</span> : null;
+function machineLoadText(view: Pick<MachineLinkView, 'load' | 'tags' | 'placement'>): string {
+  return [formatMachineLoad(view.load), formatMachineProfile(view.tags, view.placement)].filter(Boolean).join(' · ');
+}
+
+function MachineLoadText({ view, lead = true }: { view: Pick<MachineLinkView, 'load' | 'tags' | 'placement'>; lead?: boolean }) {
+  const text = machineLoadText(view);
+  return text ? <span data-testid="machine-load">{lead ? ' · ' : ''}{text}</span> : null;
 }
 
 function MachineLinkRow({ link, onChanged, thisLabel }: { link: MachineLinkView; onChanged: () => Promise<void>; thisLabel: string }) {
@@ -178,29 +182,19 @@ function MachineLinkRow({ link, onChanged, thisLabel }: { link: MachineLinkView;
 
   const showReconnect = link.state === 'offline' || link.state === 'unsupported' || ssh?.forward === 'down' || ssh?.forward === 'attention';
   const incident = incidentText(link);
+  const health = [
+    link.peerVersion ? `Overdeck ${link.peerVersion}` : null,
+    link.lastHeartbeatAt ? `heartbeat ${formatRelativeTime(link.lastHeartbeatAt)}` : null,
+  ].filter(Boolean).join(' · ');
 
   return (
     <li data-testid={`machine-link-${link.id}`} data-link-id={link.id} className="px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="text-sm font-medium text-foreground truncate">{link.label}</span>
-            <LinkStateBadge state={link.state} />
-          </div>
-          <p className="text-xs text-muted-foreground mt-0.5 truncate">
-            {link.currentRoute ? (
-              <>via {link.routes.find((route) => route.url === link.currentRoute)?.kind ?? 'route'} · <span className="font-mono">{link.currentRoute}</span></>
-            ) : 'no route in use'}
-            {' · '}{ACCESS_LABEL[link.access]}
-            {link.peerVersion ? <>{' · '}Overdeck {link.peerVersion}</> : null}
-            {link.lastHeartbeatAt ? <>{' · '}heartbeat {formatRelativeTime(link.lastHeartbeatAt)}</> : null}
-            <MachineLoadText view={link} />
-          </p>
-          {ssh && <p className="text-xs text-muted-foreground mt-0.5 truncate" data-testid={`machine-ssh-${link.id}`}>{sshLine(ssh)}</p>}
-          {link.stateDetail && <p className="text-xs text-muted-foreground mt-0.5">{link.stateDetail}</p>}
-          {incident && <p className="text-xs text-muted-foreground mt-0.5">{incident}</p>}
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-sm font-medium text-foreground truncate" title={link.label}>{link.label}</span>
+          <LinkStateBadge state={link.state} />
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <button type="button" onClick={() => setRoutesOpen((open) => !open)} aria-expanded={routesOpen} className={buttonClass}>
             {routesOpen ? 'Hide routes' : `Routes (${link.routes.length})`}
           </button>
@@ -224,16 +218,33 @@ function MachineLinkRow({ link, onChanged, thisLabel }: { link: MachineLinkView;
           </button>
         </div>
       </div>
+      <div className="mt-1.5 space-y-0.5 text-[13px] leading-relaxed text-muted-foreground min-w-0">
+        <p className="truncate">
+          {link.currentRoute ? (
+            <>via {link.routes.find((route) => route.url === link.currentRoute)?.kind ?? 'route'} · <span className="font-mono text-xs text-body-foreground" title={link.currentRoute}>{link.currentRoute}</span></>
+          ) : 'no route in use'}
+          {' · '}{ACCESS_LABEL[link.access]}
+        </p>
+        {(health || machineLoadText(link)) && (
+          <p>
+            {health}
+            <MachineLoadText view={link} lead={health !== ''} />
+          </p>
+        )}
+        {ssh && <p className="truncate" data-testid={`machine-ssh-${link.id}`}>{sshLine(ssh)}</p>}
+        {link.stateDetail && <p>{link.stateDetail}</p>}
+        {incident && <p>{incident}</p>}
+      </div>
 
       {routesOpen && (
         <div className="mt-3 space-y-2" data-testid={`machine-routes-${link.id}`}>
           {link.routes.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No routes yet.</p>
+            <p className="text-[13px] text-muted-foreground">No routes yet.</p>
           ) : (
             <ul className="space-y-1">
               {link.routes.map((route) => (
-                <li key={route.url} className="flex items-center justify-between gap-3 text-xs">
-                  <span className="font-mono text-foreground truncate">{route.url}</span>
+                <li key={route.url} className="flex items-center justify-between gap-3 text-[13px]">
+                  <span className="font-mono text-xs text-foreground truncate">{route.url}</span>
                   <span className="text-muted-foreground shrink-0">{route.kind} · {route.source} · {ROUTE_STATUS_LABEL[route.status]}</span>
                 </li>
               ))}
@@ -249,13 +260,13 @@ function MachineLinkRow({ link, onChanged, thisLabel }: { link: MachineLinkView;
                 setRouteUrl(e.target.value);
                 setRouteError(null);
               }}
-              className="flex-1 min-w-0 bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground font-mono focus:ring-1 focus:ring-primary"
+              className="flex-1 min-w-0 h-8 bg-background border border-border rounded-md px-2.5 text-[13px] text-foreground font-mono focus:ring-1 focus:ring-primary"
             />
             <button type="button" disabled={busy || routeUrl.trim() === ''} onClick={() => void handleAddRoute()} className={buttonClass}>
               Add route
             </button>
           </div>
-          {routeError && <p className="text-xs text-destructive">{routeError}</p>}
+          {routeError && <p className="text-[13px] text-destructive">{routeError}</p>}
         </div>
       )}
       {removeOpen && ssh && (
@@ -297,8 +308,8 @@ function InboundRow({ inbound, onChanged }: { inbound: InboundMachineView; onCha
     <li data-testid={`machine-inbound-${inbound.tokenId}`} className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
       <div className="min-w-0">
         <span className="text-sm font-medium text-foreground">{inbound.label}</span>
-        <p className="text-xs text-muted-foreground mt-0.5 truncate">
-          <span className="font-mono">{inbound.fingerprint}</span>
+        <p className="text-[13px] text-muted-foreground mt-0.5 truncate">
+          <span className="font-mono text-xs">{inbound.fingerprint}</span>
           {' · '}{ACCESS_LABEL[inbound.access]}
           {' · '}last used {inbound.lastUsedAt ? formatRelativeTime(inbound.lastUsedAt) : '—'}
         </p>
@@ -331,9 +342,9 @@ export function MachinesPanel() {
 
   return (
     <div data-component="anywhere-machines-panel" data-testid="machines-panel">
-      <div className="flex items-center justify-between gap-4 mb-2">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 mb-3">
         <h3 className="text-sm font-medium text-foreground">Machines</h3>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button type="button" onClick={() => setFlyOpen(true)} className={buttonClass}>
             {data?.self.remoteEnabled === false ? 'Add a Fly machine (remote off)' : 'Add a Fly machine'}
           </button>
@@ -346,18 +357,21 @@ export function MachinesPanel() {
         </div>
       </div>
       {data && (
-        <p className="text-xs text-muted-foreground px-4 mb-2">
-          This machine: {data.self.label} · fingerprint <span className="font-mono">{data.self.fingerprint}</span>
-          <MachineLoadText view={data.self} />
+        <p className="text-[13px] leading-relaxed text-muted-foreground px-4 mb-3">
+          This machine: {data.self.label}
+          <span className="block">
+            fingerprint <span className="font-mono text-xs">{data.self.fingerprint}</span>
+            <MachineLoadText view={data.self} />
+          </span>
         </p>
       )}
       {data && <SharingSwitches self={data.self} onChanged={refresh} />}
       {isLoading ? (
-        <p className="text-xs text-muted-foreground px-4 py-3">Loading machines…</p>
+        <p className="text-[13px] text-muted-foreground px-4 py-3">Loading machines…</p>
       ) : error ? (
-        <p className="text-xs text-destructive px-4 py-3">Could not load machines: {(error as Error).message}</p>
+        <p className="text-[13px] text-destructive px-4 py-3">Could not load machines: {(error as Error).message}</p>
       ) : !data || data.links.length === 0 ? (
-        <p className="text-xs text-muted-foreground px-4 py-3">No machines are linked yet. Pair another Overdeck machine and paste its pairing link here.</p>
+        <p className="text-[13px] text-muted-foreground px-4 py-3">No machines are linked yet. Pair another Overdeck machine and paste its pairing link here.</p>
       ) : (
         <ul className="space-y-1">
           {data.links.map((link) => <MachineLinkRow key={link.id} link={link} onChanged={refresh} thisLabel={data.self.label} />)}
@@ -366,9 +380,9 @@ export function MachinesPanel() {
 
       {data && (
         <div className="mt-4">
-          <h4 className="text-xs text-muted-foreground px-4 mb-1">Inbound</h4>
+          <h4 className="text-[13px] font-medium text-muted-foreground px-4 mb-1">Inbound</h4>
           {data.inbound.length === 0 ? (
-            <p className="text-xs text-muted-foreground px-4 py-2">No other machine has access to this one.</p>
+            <p className="text-[13px] text-muted-foreground px-4 py-2">No other machine has access to this one.</p>
           ) : (
             <ul className="space-y-1">
               {data.inbound.map((inbound) => <InboundRow key={inbound.tokenId} inbound={inbound} onChanged={refresh} />)}

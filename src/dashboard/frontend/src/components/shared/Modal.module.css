@@ -24,6 +24,9 @@
   animation: rise 220ms cubic-bezier(.16, 1, .3, 1);
   outline: none;
 }
+.wide {
+  max-width: 760px;
+}
 @keyframes scrim-in {
   from { opacity: 0; }
 }
