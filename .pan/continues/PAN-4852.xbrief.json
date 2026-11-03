@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4852",
   "created": "2026-11-03T02:45:30.764Z",
-  "updated": "2026-11-03T05:47:05.507Z",
+  "updated": "2026-11-03T05:47:35.296Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -170,6 +170,10 @@
     "pack-builds-ox.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T05:47:05.507Z"
+    },
+    "pack-builds-ox.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:47:35.296Z"
     }
   }
 }
