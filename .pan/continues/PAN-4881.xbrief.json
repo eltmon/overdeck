@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4881",
   "created": "2026-11-03T06:05:06.618Z",
-  "updated": "2026-11-03T06:11:43.643Z",
+  "updated": "2026-11-03T06:12:56.098Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-11-03T06:11:35.135Z"
     },
     "setup-clears-worker-token": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4881",
-      "claimedAt": "2026-11-03T06:11:43.643Z"
+      "claimedAt": "2026-11-03T06:11:43.643Z",
+      "doneAt": "2026-11-03T06:12:56.097Z"
     }
   }
 }
