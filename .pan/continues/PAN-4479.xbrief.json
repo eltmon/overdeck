@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4479",
   "created": "2026-11-03T15:06:40.232Z",
-  "updated": "2026-11-03T15:48:34.186Z",
+  "updated": "2026-11-03T15:49:31.078Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -182,9 +182,10 @@
       "doneAt": "2026-11-03T15:48:17.693Z"
     },
     "join-restore-integration": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4479",
-      "claimedAt": "2026-11-03T15:48:34.186Z"
+      "claimedAt": "2026-11-03T15:48:34.186Z",
+      "doneAt": "2026-11-03T15:49:31.077Z"
     }
   }
 }
