@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../../lib/pipeline-notifier.js', () => ({ notifyPipeline: vi.fn() }));
+vi.mock('../../../../lib/deft/issue-pipeline.js', () => ({ isDeftPipelineIssue: async () => false }));
 vi.mock('../../../../lib/agents.js', () => ({
   deliverAgentMessage: mocks.deliverAgentMessage,
   deliverAgentPermissionDecision: vi.fn(),
@@ -110,6 +111,28 @@ describe('handlePostAgentAnswerQuestion for an operator decision', () => {
       body: { error: 'This decision was already answered or withdrawn', code: 'decision-closed' },
       status: 409,
     });
+    expect(mocks.deliverAgentMessage).not.toHaveBeenCalled();
+  });
+});
+
+describe('handlePostAgentAnswerQuestion for a Deft escalation (PAN-4849)', () => {
+  const toolUseId = 'deft-escalation:esc-20261102120000-aaaaaa';
+
+  it('returns 409 decision-closed when the escalation is no longer pending', async () => {
+    mocks.getAgentPendingQuestions.mockResolvedValue([]);
+    const result = await handlePostAgentAnswerQuestion(agentId, { answers: ['Approve'], toolUseId });
+    expect(result).toMatchObject({ status: 409, body: { code: 'decision-closed' } });
+  });
+
+  it('routes a pending escalation to the Deft answer branch, not prose delivery', async () => {
+    mocks.getAgentPendingQuestions.mockResolvedValue([{
+      toolId: toolUseId,
+      timestamp: '2026-11-02T12:00:00Z',
+      questions: [{ question: 'Run it?', header: 'cmd_approval', multiSelect: false, options: [{ label: 'Approve', description: '' }] }],
+    }]);
+    // The agent is not a Deft work agent here, so the Deft branch answers 404 itself.
+    const result = await handlePostAgentAnswerQuestion(agentId, { answers: ['Approve'], toolUseId });
+    expect(result.status).toBe(404);
     expect(mocks.deliverAgentMessage).not.toHaveBeenCalled();
   });
 });
