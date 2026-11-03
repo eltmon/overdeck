@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4959",
   "created": "2026-11-03T21:54:38.804Z",
-  "updated": "2026-11-03T23:24:04.166Z",
+  "updated": "2026-11-03T23:24:22.677Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -160,6 +160,10 @@
     "account-page.ac5": {
       "status": "completed",
       "doneAt": "2026-11-03T23:24:04.166Z"
+    },
+    "account-remove-machine.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:24:22.677Z"
     }
   }
 }
