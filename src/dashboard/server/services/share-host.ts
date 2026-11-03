@@ -23,6 +23,10 @@
  * Prompts (PAN-4476): every view carries the hub's drafts and queue, and `sendPrompt` queues a
  * controller send through the live hub (D-1).
  *
+ * Control (PAN-4478): `command` and `sendPrompt` pass the data owner through `controlRefusal`; while a
+ * viewer controls, everything except reclaim answers 409 `not_controller`. `set-controller` is
+ * mirrored to the hub's appointment, and every view carries the hub's effective controller.
+ *
  * Plain async class with injected seams, like `directory-client.ts` (D-8). Nothing here logs.
  */
 import type {
@@ -52,6 +56,7 @@ import {
   readShareUrl,
   type ShareUrlResult,
 } from '../../../lib/sharing/share-service.js';
+import { controlRefusal, type ControlRefusal } from '../sharing/controller.js';
 import { PeerHub, productionPeerHubDeps, type HostHub, type PeerHubContext } from '../sharing/peer-hub.js';
 
 export const PING_INTERVAL_MS = 30_000;
@@ -103,6 +108,13 @@ interface ShareHost {
 }
 
 const CLOSE_ROOM_ENDED = 4004;
+/** The 409 messages of a controller-gate refusal (PRD PAN-4478 D-12). */
+const REFUSAL_MESSAGES: Record<ControlRefusal, string> = {
+  not_controller: 'Another participant has control. Reclaim control first.',
+  unknown_participant: 'That person is not in the room.',
+  invalid_target: 'The host refused that action.',
+  invalid_command: 'The host refused that action.',
+};
 const CLOSE_REPLACED = 4008;
 
 function scopeKey(kind: string, id: string): string {
@@ -115,6 +127,7 @@ function isLive(host: ShareHost | undefined): host is ShareHost {
 
 /** Builds a view field by field; a record is never spread into it (NFR-1). */
 function viewOf(shortCode: string, record: ShareRecord, host: ShareHost | undefined): ShareView {
+  const controllerGithubId = host?.hub?.controllerGithubId() ?? host?.snapshot?.controllerGithubId;
   return {
     shortCode,
     joinUrl: record.joinUrl,
@@ -125,6 +138,7 @@ function viewOf(shortCode: string, record: ShareRecord, host: ShareHost | undefi
     lastError: host ? host.lastError : null,
     drafts: host?.hub?.draftsView() ?? [],
     queue: host?.hub?.queueView() ?? { agentWorking: false, delivering: false, items: [] },
+    ...(controllerGithubId === undefined || controllerGithubId === null ? {} : { controllerGithubId }),
   };
 }
 
@@ -192,6 +206,16 @@ export class ShareManager {
     if (!(shortCode in records)) return { status: 404, body: { error: 'share_not_found' } };
     const host = this.hosts.get(shortCode);
     if (!host || host.connection !== 'connected') return { status: 409, body: { error: 'share_not_connected' } };
+    const snapshot = host.snapshot;
+    if (!snapshot) return { status: 409, body: { error: 'share_not_connected' } };
+    const refusal = controlRefusal({
+      snapshot,
+      controllerGithubId: host.hub?.controllerGithubId() ?? snapshot.controllerGithubId,
+      actor: { kind: 'owner' },
+      command,
+      isHostAdmitted: (githubId) => host.hub?.isHostAdmitted(githubId) ?? true,
+    });
+    if (refusal) return { status: 409, body: { error: refusal, message: REFUSAL_MESSAGES[refusal] } };
     try {
       host.socket.send(JSON.stringify(frameOf(command)));
     } catch {
@@ -199,6 +223,7 @@ export class ShareManager {
     }
     if (command.type === 'admit') host.hub?.admit(command.githubId);
     else if (command.type === 'kick' || command.type === 'revoke') host.hub?.remove(command.githubId);
+    else if (command.type === 'set-controller') host.hub?.appoint(command.githubId);
     return { status: 202, body: { ok: true } };
   }
 
@@ -211,6 +236,11 @@ export class ShareManager {
     if (!(shortCode in records)) return { status: 404, body: { error: 'share_not_found' } };
     const host = this.hosts.get(shortCode);
     if (!host?.hub) return { status: 409, body: { error: 'share_not_live' } };
+    const controller = host.hub.controllerGithubId();
+    const owner = host.snapshot?.dataOwner ?? null;
+    if (controller !== null && owner !== null && controller !== owner.githubId) {
+      return { status: 409, body: { error: 'not_controller', message: REFUSAL_MESSAGES.not_controller } };
+    }
     const result = host.hub.sendFromController(body, host.snapshot?.dataOwner ?? null);
     if (result.ok) return { status: 202, body: { ok: true, position: result.position } };
     return { status: result.reason === 'queue_full' ? 429 : 400, body: { error: result.reason } };

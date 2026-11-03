@@ -187,7 +187,7 @@ describe('/api/shares (PAN-4473)', () => {
     for (const bad of [
       { type: 'end' },
       { type: 'signal', githubId: 5, data: {} },
-      { type: 'set-controller', githubId: 5 },
+      { type: 'set-controller' },
       { type: 'admit', githubId: 0 },
       { type: 'admit', githubId: 1.5 },
       { type: 'admit', githubId: 5, contributor: 'yes' },
@@ -206,6 +206,15 @@ describe('/api/shares (PAN-4473)', () => {
     expect((sockets[0] as FakeSocket).sent).toEqual(['{"type":"admit","githubId":5,"contributor":true}']);
     expect(await call('POST', '/api/shares/LMNPQRST/commands', { type: 'kick', githubId: 5 })).toMatchObject({ status: 404 });
     expect(await call('POST', '/api/shares/nope/commands', { type: 'kick', githubId: 5 })).toMatchObject({ status: 404, body: { error: 'share_not_found' } });
+  });
+
+  it('relays set-controller with the data owner\'s id (reclaim) and refuses a target nobody admitted (PAN-4478)', async () => {
+    await call('POST', '/api/shares', { conversationName: 'conv-a' });
+    await connect();
+    expect(await call('POST', '/api/shares/BCDFGHJK/commands', { type: 'set-controller', githubId: 1, extra: true })).toMatchObject({ status: 202, body: { ok: true } });
+    expect((sockets[0] as FakeSocket).sent).toEqual(['{"type":"set-controller","githubId":1}']);
+    expect(await call('POST', '/api/shares/BCDFGHJK/commands', { type: 'set-controller', githubId: 7 })).toMatchObject({ status: 409, body: { error: 'unknown_participant' } });
+    expect((sockets[0] as FakeSocket).sent).toHaveLength(1);
   });
 
   it('ends a share with 204 and no body, then 404s', async () => {
@@ -259,6 +268,9 @@ function stubHub(sent: unknown[]): HostHub {
       sent.push(input);
       return { ok: true, position: 1 };
     },
+    controllerGithubId: () => null,
+    isHostAdmitted: () => true,
+    appoint: () => undefined,
     close: () => undefined,
   };
 }
