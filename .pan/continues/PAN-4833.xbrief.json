@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4833",
   "created": "2026-11-03T04:52:36.921Z",
-  "updated": "2026-11-03T06:12:44.543Z",
+  "updated": "2026-11-03T06:13:03.839Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -122,6 +122,10 @@
     "move-protocol.ac5": {
       "status": "completed",
       "doneAt": "2026-11-03T06:12:44.542Z"
+    },
+    "shared-initiator.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:13:03.838Z"
     }
   }
 }
