@@ -174,7 +174,7 @@ function AdmittedScreen(props: SharedJoin) {
   const showToggle = props.peerPhase === 'connected' || (hostDisconnected && props.hasHistory);
   const messages = props.messages.map(toChatMessage);
   const toggle = (value: 'conversation' | 'terminal', label: string) => (
-    <button type="button" className={NEUTRAL_BUTTON} aria-pressed={surface === value} onClick={() => setSurface(value)}>
+    <button type="button" className={`${NEUTRAL_BUTTON} aria-pressed:bg-accent`} aria-pressed={surface === value} onClick={() => setSurface(value)}>
       {label}
     </button>
   );
