@@ -46,6 +46,7 @@ export interface EnrichedConversationInput {
   createdAt: string;
   archivedAt: string | null;
   origin: 'local' | 'vault';
+  spawnError?: string | null;
 }
 
 export interface SharedConversationsDeps {
@@ -119,6 +120,8 @@ async function buildRows(deps: SharedConversationsDeps): Promise<SharedConversat
       pullable: row.harness !== null && isResumableHarness(row.harness),
       vaultId: vaultIdForConversation(row, vaultLookup),
       pulledFrom: pulledFrom.get(row.name) ?? null,
+      // Only when set, so a healthy row's list hash does not change (PAN-4903).
+      ...(row.spawnError ? { spawnError: row.spawnError } : {}),
     });
   }
   return shared;

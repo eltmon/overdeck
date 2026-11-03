@@ -103,6 +103,7 @@ function linkedListRow(
     /** When the saved copy was last settled (the row shows "offline · saved HH:MM"). */
     savedCopyAt: (savedCopy?.endedAt as string | null | undefined) ?? null,
     releasedTo: row.releasedTo,
+    spawnError: row.spawnError ?? null,
   };
 }
 
