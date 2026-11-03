@@ -45,7 +45,7 @@ export interface MachineRow {
   readonly lastSeenAt: number;
 }
 
-/** One registered phone: a row of the `clients` table (PAN-4829). Never a machine. */
+/** One registered client: a phone or a connector (PAN-4829, PAN-4927 D-18). Never a machine. */
 export interface ClientRow {
   readonly clientId: string;
   readonly label: string;
@@ -77,7 +77,7 @@ export interface DirectoryState {
   readonly plan: ConnectPlan | null;
   /** In registration order. */
   readonly machines: readonly MachineRow[];
-  /** Registered phones in registration order (PAN-4829); they never count as machines. */
+  /** Registered clients (phones and connectors) in registration order (PAN-4829); they never count as machines. */
   readonly clients: readonly ClientRow[];
   /** Pending approvals, oldest first. Expired rows are dropped lazily on every event. */
   readonly approvals: readonly ApprovalRow[];

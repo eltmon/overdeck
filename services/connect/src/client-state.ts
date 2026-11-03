@@ -1,18 +1,21 @@
 /**
- * The directory's rules for phone clients as a pure reducer (PAN-4829, PAN-4823 W-CON2).
+ * The directory's rules for clients as a pure reducer (PAN-4829, PAN-4823 W-CON2, PAN-4927 D-18).
  *
- * A phone registers with `hello-client` and never counts as a machine: its row lives in
- * `state.clients`, capped at `CLIENT_LIMIT` on every plan, and it never touches `state.machines`.
- * This module imports from directory-state.ts and is never imported by it (PAN-4829 D-5), so the
- * graph stays acyclic. The Durable Object glue picks this reducer for client events.
+ * A client registers with `hello-client` and never counts as a machine: its row lives in
+ * `state.clients`, and it never touches `state.machines`. Phones are capped at `CLIENT_LIMIT` and
+ * connectors (`platform: "node"`) at `CONNECTOR_LIMIT`, on every plan, counted apart from each
+ * other. This module imports from directory-state.ts and is never imported by it (PAN-4829 D-5), so
+ * the graph stays acyclic. The Durable Object glue picks this reducer for client events.
  */
 import {
   CLIENT_LIMIT,
   CLIENT_LIMIT_MESSAGE,
   CONNECT_CLOSE_CODES,
   CONNECT_PROTOCOL_VERSION,
+  CONNECTOR_LIMIT,
+  CONNECTOR_LIMIT_MESSAGE,
 } from '../../../packages/contracts/src/connect.ts';
-import type { ClientToDirectoryFrame } from '../../../packages/contracts/src/connect.ts';
+import type { ClientPlatform, ClientToDirectoryFrame } from '../../../packages/contracts/src/connect.ts';
 import { errorFrame, onlineClientsOf, toDirectoryMachines } from './directory-state.ts';
 import type { ClientRow, DirectoryEffect, DirectoryState, ReduceContext, ReduceResult, SocketIdentity } from './directory-state.ts';
 import { iceServersAnswer, relayUsageAnswer } from './ice-relay.ts';
@@ -39,6 +42,11 @@ function replaceClient(clients: readonly ClientRow[], row: ClientRow): ClientRow
   return clients.map((c, i) => (i === index ? row : c));
 }
 
+/** PAN-4927 D-18: phones and connectors have separate caps. */
+function familyOf(platform: ClientPlatform): 'phone' | 'connector' {
+  return platform === 'node' ? 'connector' : 'phone';
+}
+
 function helloClient(state: DirectoryState, event: Extract<ClientEvent, { kind: 'hello-client' }>, ctx: ReduceContext): ReduceResult {
   const { frame, identity } = event;
   const clientId = frame.clientId;
@@ -57,10 +65,15 @@ function helloClient(state: DirectoryState, event: Extract<ClientEvent, { kind: 
   const planned: DirectoryState = state.plan === identity.plan ? state : { ...state, plan: identity.plan };
   if (planned !== state) effects.push({ kind: 'put-plan', plan: identity.plan });
 
+  const family = familyOf(frame.platform);
   const existing = state.clients.find((c) => c.clientId === clientId);
-  if (!existing && state.clients.length >= CLIENT_LIMIT) {
+  // D-2: a row that changes family counts as new for the other family's cap and drops its push.
+  const kept = existing !== undefined && familyOf(existing.platform) === family ? existing : undefined;
+  const limit = family === 'connector' ? CONNECTOR_LIMIT : CLIENT_LIMIT;
+  if (!kept && state.clients.filter((c) => familyOf(c.platform) === family).length >= limit) {
+    const message = family === 'connector' ? CONNECTOR_LIMIT_MESSAGE : CLIENT_LIMIT_MESSAGE;
     effects.push(
-      { kind: 'send', to: 'self', frame: errorFrame('client_limit', CLIENT_LIMIT_MESSAGE) },
+      { kind: 'send', to: 'self', frame: errorFrame('client_limit', message) },
       { kind: 'close', to: 'self', code: CONNECT_CLOSE_CODES.clientLimit, reason: 'client limit' },
       log(frame.type, clientId, 'client_limit'),
     );
@@ -77,7 +90,7 @@ function helloClient(state: DirectoryState, event: Extract<ClientEvent, { kind: 
     registeredAt: existing?.registeredAt ?? ctx.now,
     lastSeenAt: ctx.now,
     // A re-hello keeps the push registration; only push-register and push-unregister change it.
-    push: existing?.push ?? null,
+    push: kept?.push ?? null,
   };
   const next: DirectoryState = { ...planned, clients: replaceClient(planned.clients, row) };
   effects.push({ kind: 'put-client', row });
