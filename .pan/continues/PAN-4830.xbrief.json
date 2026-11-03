@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4830",
   "created": "2026-11-03T14:25:43.002Z",
-  "updated": "2026-11-03T14:27:34.005Z",
+  "updated": "2026-11-03T14:28:06.697Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -18,6 +18,10 @@
     "store-extract.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T14:27:34.004Z"
+    },
+    "store-extract.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:28:06.697Z"
     }
   }
 }
