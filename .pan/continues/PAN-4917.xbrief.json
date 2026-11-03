@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4917",
   "created": "2026-11-03T18:32:48.231Z",
-  "updated": "2026-11-03T18:50:17.167Z",
+  "updated": "2026-11-03T18:50:34.005Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,11 @@
       "claimedBy": "agent-pan-4917",
       "claimedAt": "2026-11-03T18:47:57.245Z",
       "doneAt": "2026-11-03T18:50:17.166Z"
+    },
+    "docs-ci-gate-and-repair": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4917",
+      "claimedAt": "2026-11-03T18:50:34.005Z"
     }
   }
 }
