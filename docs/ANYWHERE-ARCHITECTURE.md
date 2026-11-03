@@ -636,7 +636,13 @@ service, lingering, then one pairing link (`.pan/drafts/PAN-4656.md`).
 - **D-10 macOS.** `src/lib/launchd.ts` writes `~/Library/LaunchAgents/ai.overdeck.supervisor.plist`
   (`RunAtLoad`, `KeepAlive`) and bootstraps it into `gui/<uid>`, falling back to
   `user/<uid>`; a changed plist is booted out first. The agent starts at login only. `pan up`
-  on a Mac with the agent loaded does not start a second supervisor.
+  on a Mac with the agent loaded does not start a second supervisor. macOS 15+'s Local
+  Network privacy then applies to that launch agent (PAN-4897): the link supervisor
+  (`src/dashboard/server/services/link-supervisor.ts`) names the denial only when every LAN
+  `tcp://` route failed with `EHOSTUNREACH` (classified by `src/lib/anywhere/local-network.ts`)
+  **and** a gateway probe (`src/lib/anywhere/local-network-probe.ts`) confirms this process's
+  own access is denied; the probe is injected into `LinkSupervisorDeps.localNetworkAccess`
+  only on darwin, so linux and the phone build never run it.
 
 Update all, the update dialog and `pan update` reinstall into the same runtime (PAN-4722).
 
