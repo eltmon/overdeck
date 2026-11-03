@@ -109,6 +109,45 @@ describe('PKCE loopback flow (PAN-4293 account-pkce-flow)', () => {
     expect(validateClientRedirect(null)).toBeNull();
   });
 
+  it('native sign-in: ai.overdeck.app:/oauth/callback with ios-arm64 mints a device labelled iPhone', async () => {
+    const { env, deps, rc } = setup();
+    const back = await signIn(env, deps, { redirect_uri: NATIVE_APP_REDIRECT, platform: 'ios-arm64' });
+    expect(back.protocol + back.pathname).toBe(NATIVE_APP_REDIRECT);
+    expect(back.searchParams.get('state')).toBe('client-state-123');
+    const code = back.searchParams.get('code') ?? '';
+    expect(code).toMatch(/^odc_[0-9a-f]{64}$/);
+    expect(back.searchParams.get('error')).toBeNull();
+
+    const res = await exchange(env, deps, { code, redirect_uri: NATIVE_APP_REDIRECT });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { access_token: string; label: string };
+    expect(body.label).toBe('iPhone');
+    expect(body.access_token).toMatch(/^odd_[0-9a-f]{64}$/);
+    expect(await verifyDeviceToken(rc, body.access_token)).toMatchObject({ ok: true });
+    expect(await dbOf(env).prepare('SELECT platform FROM devices').first()).toEqual({ platform: 'ios-arm64' });
+
+    const code2 = (await signIn(env, deps, { redirect_uri: NATIVE_APP_REDIRECT, platform: 'ios-arm64' })).searchParams.get('code') ?? '';
+    expect(await (await exchange(env, deps, { code: code2, redirect_uri: REDIRECT })).json()).toEqual({ error: 'invalid_grant' });
+  });
+
+  it('native sign-in with android-arm64 mints a device labelled Android phone', async () => {
+    const { env, deps, rc } = setup();
+    const back = await signIn(env, deps, { redirect_uri: NATIVE_APP_REDIRECT, platform: 'android-arm64' });
+    expect(back.protocol + back.pathname).toBe(NATIVE_APP_REDIRECT);
+    expect(back.searchParams.get('state')).toBe('client-state-123');
+    const code = back.searchParams.get('code') ?? '';
+    expect(code).toMatch(/^odc_[0-9a-f]{64}$/);
+    expect(back.searchParams.get('error')).toBeNull();
+
+    const res = await exchange(env, deps, { code, redirect_uri: NATIVE_APP_REDIRECT });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { access_token: string; label: string };
+    expect(body.label).toBe('Android phone');
+    expect(body.access_token).toMatch(/^odd_[0-9a-f]{64}$/);
+    expect(await verifyDeviceToken(rc, body.access_token)).toMatchObject({ ok: true });
+    expect(await dbOf(env).prepare('SELECT platform FROM devices').first()).toEqual({ platform: 'android-arm64' });
+  });
+
   it('rejects code_challenge_method=plain, a bad challenge, a missing state, a bad platform and a bad environment_id', async () => {
     const { env, deps } = setup();
     const cases: Array<[Record<string, string | null>, string]> = [
