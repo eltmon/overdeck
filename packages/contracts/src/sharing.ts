@@ -91,8 +91,12 @@ export type ShareCloseCode =
 // ── Host dashboard API (PAN-4473, slice 2): the browser ⇄ local dashboard server. ──
 // The host token never appears in these types (NFR-1).
 
-/** The host socket's state in this dashboard process. A stale record (no socket) is 'disconnected'. */
-export type ShareConnection = 'connecting' | 'connected' | 'disconnected';
+/**
+ * The host socket's state in this dashboard process. 'reconnecting': the socket dropped and the
+ * manager retries on a backoff (PAN-4479). 'disconnected': a stale record that was not re-parked,
+ * or a socket replaced by another host (close 4008).
+ */
+export type ShareConnection = 'connecting' | 'connected' | 'reconnecting' | 'disconnected';
 
 /** The host frames the browser may request in slice 2. */
 export type ShareCommand = Extract<HostFrame, { readonly type: 'admit' | 'kick' | 'revoke' | 'unrevoke' | 'set-contributor' }>;
@@ -203,11 +207,12 @@ export interface DraftPayload {
 // ── Viewer dashboard API (PAN-4475, slice 4): the viewer browser ⇄ its own dashboard server. ──
 // The device token never appears in these types.
 
-/** A join's state on the viewer server. Live: connecting, lobby, admitted, host-disconnected. */
+/** A join's state on the viewer server. Live: connecting, lobby, admitted, host-disconnected, reconnecting. */
 export type JoinState =
   | 'connecting' | 'lobby' | 'admitted' | 'host-disconnected'
+  | 'reconnecting'  // a seated join lost its socket; the viewer server retries on a backoff (PAN-4479)
   | 'away'          // closed by the viewer server's grace timer; POST /api/joins reopens it
-  | 'disconnected'  // unexpected close or network error; POST /api/joins reopens it
+  | 'disconnected'  // a join that was never seated failed to connect; POST /api/joins reopens it
   | 'left' | 'kicked' | 'revoked' | 'ended' | 'is-host' | 'full' | 'replaced' | 'rejected';
 
 export interface JoinView {
