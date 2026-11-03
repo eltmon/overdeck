@@ -62,8 +62,11 @@ beforeEach(() => {
   mockExecAsync.mockImplementation(async (command: string, args?: string[]) => {
     if (isWorktreeAddCall(command, args)) {
       // Real git is not run here; stand in for the worktree it would create.
+      // A real monorepo checkout has a root package.json (PAN-4929: createWorkspace
+      // now skips the install entirely when it's missing), so the stand-in needs one too.
       mkdirSync(workspacePath, { recursive: true });
       writeFileSync(join(workspacePath, '.git'), 'gitdir: elsewhere\n');
+      writeFileSync(join(workspacePath, 'package.json'), JSON.stringify({ name: 'test', private: true }), 'utf8');
     }
     if (isInstallCall(command) && installShouldFail) {
       throw new Error('npm ERR! network unreachable');

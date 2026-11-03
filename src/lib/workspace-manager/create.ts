@@ -32,6 +32,7 @@ import {
   validateFeatureName,
 } from './worktree-ops.js';
 import { checkDiskFloor } from '../disk-floor.js';
+import { hasPackageJson, installCommandFor } from './dependency-install.js';
 import type { WorkspaceCreateOptions, WorkspaceCreateResult } from './types.js';
 import {
   clearWorkspaceSetupIncomplete,
@@ -448,32 +449,63 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
   // Docker init containers fail with ERR_MODULE_NOT_FOUND. Wipe any existing node_modules
   // before installing so bun always starts from a clean slate.
   progress('Installing dependencies', projectConfig.package_manager || 'detecting...');
-  const pkgManager = projectConfig.package_manager || (existsSync(join(workspacePath, 'bun.lock')) ? 'bun' : 'npm');
+  if (!hasPackageJson(workspacePath)) {
+    // PAN-4929: a polyrepo container root has no package.json; npm would walk up to an
+    // ancestor, fail, and leave a stray lockfile there.
+    result.steps.push('No root package.json; skipped root install');
+    progress('Installing dependencies', 'No root package.json — skipped', 'complete');
+  } else {
+    const pkgManager = projectConfig.package_manager || (existsSync(join(workspacePath, 'bun.lock')) ? 'bun' : 'npm');
 
-  // Remove stale node_modules directories (root + nested workspace packages) before install
-  const staleModulesDirs = [
-    join(workspacePath, 'node_modules'),
-    ...(projectConfig.workspace_packages ?? []).map(p => join(workspacePath, p.path, 'node_modules')),
-  ];
-  for (const dir of staleModulesDirs) {
-    if (existsSync(dir)) {
-      await execAsync(`rm -rf "${dir}"`);
+    // Remove stale node_modules directories (root + nested workspace packages) before install
+    const staleModulesDirs = [
+      join(workspacePath, 'node_modules'),
+      ...(projectConfig.workspace_packages ?? []).map(p => join(workspacePath, p.path, 'node_modules')),
+    ];
+    for (const dir of staleModulesDirs) {
+      if (existsSync(dir)) {
+        await execAsync(`rm -rf "${dir}"`);
+      }
+    }
+
+    const installCmd = installCommandFor(pkgManager);
+    try {
+      // No timeout — cold installs on fresh machines can take several minutes.
+      // A failed install leaves a broken workspace; treat it as fatal.
+      await execAsync(installCmd, { cwd: workspacePath, encoding: 'utf-8' });
+      result.steps.push(`Installed dependencies (${pkgManager})`);
+      progress('Installing dependencies', `${pkgManager} — done`, 'complete');
+    } catch (installErr: any) {
+      const msg = `Dependency install failed (${pkgManager}): ${installErr.message?.slice(0, 200)}`;
+      result.errors.push(msg);
+      result.success = false;
+      progress('Installing dependencies', 'Failed — workspace creation aborted', 'error');
+      return result;
     }
   }
 
-  const installCmd = pkgManager === 'bun' ? 'bun install' : `${pkgManager} install`;
-  try {
-    // No timeout — cold installs on fresh machines can take several minutes.
-    // A failed install leaves a broken workspace; treat it as fatal.
-    await execAsync(installCmd, { cwd: workspacePath, encoding: 'utf-8' });
-    result.steps.push(`Installed dependencies (${pkgManager})`);
-    progress('Installing dependencies', `${pkgManager} — done`, 'complete');
-  } catch (installErr: any) {
-    const msg = `Dependency install failed (${pkgManager}): ${installErr.message?.slice(0, 200)}`;
-    result.errors.push(msg);
-    result.success = false;
-    progress('Installing dependencies', 'Failed — workspace creation aborted', 'error');
-    return result;
+  // Opt-in per-repo installs for polyrepo repos that set package_manager (PAN-4929).
+  // Unset means a container or the quality gates own that repo's dependencies.
+  if (workspaceConfig.type === 'polyrepo' && workspaceConfig.repos) {
+    for (const repo of workspaceConfig.repos) {
+      if (repo.link_type === 'symlink' || !repo.package_manager) continue;
+      const repoDir = join(workspacePath, repo.name);
+      if (!existsSync(repoDir)) continue; // progressive mode: repo not added yet
+      if (!hasPackageJson(repoDir)) {
+        result.steps.push(`${repo.name}: no package.json; skipped install`);
+        continue;
+      }
+      progress('Installing dependencies', `${repo.name} (${repo.package_manager})`);
+      try {
+        await execAsync(installCommandFor(repo.package_manager), { cwd: repoDir, encoding: 'utf-8' });
+        result.steps.push(`Installed dependencies in ${repo.name} (${repo.package_manager})`);
+      } catch (installErr: any) {
+        result.errors.push(`Dependency install failed in ${repo.name} (${repo.package_manager}): ${installErr.message?.slice(0, 200)}`);
+        result.success = false;
+        progress('Installing dependencies', `Failed in ${repo.name} — workspace creation aborted`, 'error');
+        return result;
+      }
+    }
   }
 
   // Package installers such as Husky regenerate the resolved hooks directory.

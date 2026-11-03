@@ -23,6 +23,12 @@ export interface RepoConfig {
   readonly?: boolean;
   /** How to include this repo in workspace: 'worktree' (default) or 'symlink' */
   link_type?: 'worktree' | 'symlink';
+  /**
+   * Package manager for a host-side install inside this repo at workspace creation (PAN-4929).
+   * Opt-in: unset means Overdeck runs no install in this repo (a container or the
+   * quality gates own its dependencies). Runs only when the repo directory has a package.json.
+   */
+  package_manager?: 'bun' | 'npm' | 'pnpm';
 }
 
 export interface DnsConfig {
