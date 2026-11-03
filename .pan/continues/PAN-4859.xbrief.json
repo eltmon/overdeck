@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4859",
   "created": "2026-11-02T23:46:32.176Z",
-  "updated": "2026-11-03T00:12:43.598Z",
+  "updated": "2026-11-03T00:12:57.873Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -62,6 +62,10 @@
     "remote-authority.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T00:12:43.597Z"
+    },
+    "resolver-uses-destination.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:12:57.872Z"
     }
   }
 }
