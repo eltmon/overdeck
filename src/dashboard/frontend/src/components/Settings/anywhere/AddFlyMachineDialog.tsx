@@ -7,6 +7,11 @@
  * new VM is started from the new-conversation dialog's Fly (new VM) choice
  * instead. The request is synchronous and can take minutes, longer with a
  * project to clone.
+ *
+ * PAN-4905: the dialog stays openable when remote is off. It reads
+ * `self.remoteEnabled` from the shared `GET /api/machines` query and shows a
+ * "Remote is off" notice with the hint before any click on Add, disabling Add
+ * until remote is on.
  */
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -15,7 +20,7 @@ import { toast } from 'sonner';
 
 import { fetchRegisteredProjects } from '../../CommandDeck/UnknownProjectState';
 import { ANYWHERE_STATUS_QUERY_KEY, apiError, isOk } from './anywhereApi';
-import { addFlyMachine, MACHINES_QUERY_KEY } from './machinesApi';
+import { addFlyMachine, loadMachines, MACHINES_QUERY_KEY } from './machinesApi';
 
 interface AddFlyMachineDialogProps {
   open: boolean;
@@ -35,6 +40,8 @@ function AddFlyMachineDialogBody({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState<string | null>(null);
 
   const { data: projects } = useQuery({ queryKey: ['registered-projects'], queryFn: fetchRegisteredProjects });
+  const { data: machines } = useQuery({ queryKey: MACHINES_QUERY_KEY, queryFn: loadMachines });
+  const remoteOff = machines?.self.remoteEnabled === false;
 
   const trimmedRegion = region.trim();
 
@@ -88,6 +95,12 @@ function AddFlyMachineDialogBody({ onClose }: { onClose: () => void }) {
             void handleAdd();
           }}
         >
+          {remoteOff && (
+            <div role="status" data-testid="fly-remote-off" className="rounded-md border border-border px-3 py-2 text-xs text-foreground">
+              Remote is off. Fly machines need <code>enabled = true</code> under <code>[remote]</code> in {machines?.self.remoteConfigFile ?? '~/.overdeck/config.toml'}.
+            </div>
+          )}
+
           <div className="space-y-2">
             <label htmlFor="add-fly-project" className="text-xs text-muted-foreground">Project</label>
             <select
@@ -102,7 +115,7 @@ function AddFlyMachineDialogBody({ onClose }: { onClose: () => void }) {
             </select>
             <p className="text-xs text-muted-foreground">
               Starts a Fly.io VM that runs Overdeck and links it to this machine. With a project, the VM clones it.
-              Needs remote.enabled and a Fly token; see Fly machines in the docs.
+              Needs remote turned on (<code>[remote] enabled = true</code> in config.toml) and a Fly token; see Fly machines in the docs.
             </p>
           </div>
 
@@ -136,7 +149,7 @@ function AddFlyMachineDialogBody({ onClose }: { onClose: () => void }) {
             </button>
             <button
               type="submit"
-              disabled={busy}
+              disabled={busy || remoteOff}
               className="rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
             >
               {busy ? 'Adding…' : 'Add'}

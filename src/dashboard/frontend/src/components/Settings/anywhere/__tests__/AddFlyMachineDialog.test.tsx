@@ -85,4 +85,19 @@ describe('AddFlyMachineDialog (PAN-4743 WI-9)', () => {
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(toast.success).toHaveBeenCalledWith('Linked fly-m1 (Fly app pan-workspaces, region iad)');
   });
+
+  it('PAN-4905: shows the remote-off notice and disables Add when self.remoteEnabled is false', async () => {
+    routes['GET /api/machines'] = () => ({ status: 200, body: { self: { remoteEnabled: false, remoteConfigFile: '~/.overdeck/config.toml' }, links: [], inbound: [] } });
+    renderWithProviders(<AddFlyMachineDialog open onClose={vi.fn()} />);
+    expect(await screen.findByTestId('fly-remote-off')).toHaveTextContent('~/.overdeck/config.toml');
+    expect(screen.getByRole('button', { name: 'Add' })).toBeDisabled();
+  });
+
+  it('PAN-4905: shows no notice and Add is enabled when self.remoteEnabled is true', async () => {
+    routes['GET /api/machines'] = () => ({ status: 200, body: { self: { remoteEnabled: true, remoteConfigFile: '~/.overdeck/config.toml' }, links: [], inbound: [] } });
+    renderWithProviders(<AddFlyMachineDialog open onClose={vi.fn()} />);
+    await waitFor(() => expect(callsTo('/api/machines').length).toBeGreaterThan(0));
+    expect(screen.queryByTestId('fly-remote-off')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add' })).not.toBeDisabled();
+  });
 });
