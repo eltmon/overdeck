@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4834",
   "created": "2026-11-03T14:27:37.940Z",
-  "updated": "2026-11-03T15:09:27.014Z",
+  "updated": "2026-11-03T15:09:44.802Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -88,6 +88,10 @@
     "channel-pool.ac4": {
       "status": "completed",
       "doneAt": "2026-11-03T15:09:27.013Z"
+    },
+    "ws-framing.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:09:44.802Z"
     }
   }
 }
