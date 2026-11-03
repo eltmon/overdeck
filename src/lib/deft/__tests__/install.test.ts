@@ -147,7 +147,7 @@ describe('installDeftIntoWorktree', () => {
 
     expect(git(wt, 'config', '--worktree', '--get', 'core.excludesFile').trim()).toBe(snapshot?.excludeFile);
     expect(text).toContain('*.globalpattern');
-    expect(text).toContain('# overdeck:deft TST-1');
+    expect(text).toContain('# overdeck:deft begin');
     expect(text).toContain('/.overdeck/deft-install.json');
     expect(text).toContain('/.githooks/');
     write(wt, 'notes.globalpattern', 'x');

@@ -6,8 +6,9 @@
  * their pre-install content, created paths are deleted, pre-existing
  * untracked or ignored files get their pre-install bytes, and only the
  * `@deftai` package leaves a pre-existing `node_modules/`. The worktree
- * hooks path and exclude file go away; `extensions.worktreeConfig` stays on
- * (AD-17). The snapshot is deleted last, so an interrupted undo can run again.
+ * hooks path and the `deft` exclude block go away (the exclude file and
+ * `core.excludesFile` stay while another owner, such as SageOx, still has a
+ * block); `extensions.worktreeConfig` stays on (AD-17). The snapshot is deleted last, so an interrupted undo can run again.
  *
  * Every path comes from a file inside the worktree, so none is trusted: each
  * one must resolve inside the worktree by realpath (a symlinked directory
@@ -25,11 +26,12 @@ import { execFile } from 'node:child_process';
 import { lstat, mkdir, realpath, rm, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { promisify } from 'node:util';
+import { readExcludeBlock, removeExcludeBlock } from '../git/worktree-exclude.js';
 import { installPreRebaseHook } from '../workspace-manager/worktree-ops.js';
 import {
   type DeftInstallSnapshot,
-  deftExcludeFilePath,
   deftSnapshotPath,
+  legacyDeftExcludeFilePath,
   readDeftSnapshot,
   touchedDeftDir,
 } from './install-snapshot.js';
@@ -135,12 +137,15 @@ async function removePath(worktree: string, path: string, result: DeftRemoveResu
   result.removed.push(path);
 }
 
-/** Drop the worktree hooks path and exclude file, and point the rebase guard back at the normal hooks path. */
+/** Drop the worktree hooks path and the `deft` exclude block, and point the rebase guard back at the normal hooks path. */
 async function clearWorktreeWiring(worktree: string): Promise<void> {
   await unsetWorktreeConfig(worktree, 'core.hooksPath');
-  await unsetWorktreeConfig(worktree, 'core.excludesFile');
-  // The exclude file install writes, never a recorded path: the snapshot sits in the worktree, so its paths are not trusted.
-  await rm(await deftExcludeFilePath(worktree), { force: true });
+  await removeExcludeBlock(worktree, 'deft');
+  // An install from before PAN-4852 wrote its own file. Its computed path, never
+  // a recorded one: the snapshot sits in the worktree, so its paths are not trusted.
+  const legacy = await legacyDeftExcludeFilePath(worktree);
+  if ((await worktreeConfig(worktree, 'core.excludesFile')) === legacy) await unsetWorktreeConfig(worktree, 'core.excludesFile');
+  await rm(legacy, { force: true });
   await installPreRebaseHook(worktree);
 }
 
@@ -188,7 +193,10 @@ async function recoverWithoutSnapshot(worktree: string): Promise<DeftRemoveResul
   // Only Deft's own wiring proves an install; a user's unrelated skip-worktree files are left alone otherwise.
   const hooksPath = await worktreeConfig(worktree, 'core.hooksPath');
   const excludesFile = await worktreeConfig(worktree, 'core.excludesFile');
-  const wired = hooksPath === '.githooks' || excludesFile === (await deftExcludeFilePath(worktree));
+  const wired =
+    hooksPath === '.githooks' ||
+    excludesFile === (await legacyDeftExcludeFilePath(worktree)) ||
+    (await readExcludeBlock(worktree, 'deft')) !== null;
   if (!wired) return null;
   const unhidden = await skipWorktreePaths(worktree);
   if (unhidden.length > 0) await git(worktree, ['update-index', '--no-skip-worktree', '--', ...unhidden]);
