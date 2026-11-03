@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4831",
   "created": "2026-11-03T04:00:12.397Z",
-  "updated": "2026-11-03T05:13:28.602Z",
+  "updated": "2026-11-03T05:13:47.697Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,6 +80,10 @@
     "account-docs.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T05:13:28.601Z"
+    },
+    "account-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:13:47.696Z"
     }
   }
 }
