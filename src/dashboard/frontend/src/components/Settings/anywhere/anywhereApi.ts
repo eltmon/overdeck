@@ -13,6 +13,8 @@ import { AccessTokensForbiddenError, type AccessTokenRecord } from '../sections/
 export interface DeviceRow {
   id: string;
   name: string;
+  /** 'phone' for a paired phone app record (PAN-4835); absent on an older server. */
+  kind?: 'device' | 'phone';
   scopes: string[];
   createdAt: string;
   lastUsedAt: string | null;

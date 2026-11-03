@@ -22,6 +22,7 @@ import {
   ACCESS_TOKEN_REFRESH_MS,
   createAccessToken,
   MACHINE_TOKEN_SCOPES,
+  PHONE_TOKEN_SCOPES,
   revokeAccessToken,
   startAccessTokenRefresh,
   stopAccessTokenRefresh,
@@ -30,6 +31,7 @@ import { openChannel } from '../../../lib/anywhere/channel/open.js';
 import type { MachineKeyPair } from '../../../lib/anywhere/machine-key.js';
 import { _resetInternalTokenCacheForTests } from '../../../lib/internal-token.js';
 import { _resetChannelListenerForTests, installChannelListener, liveChannelCount } from '../channel-listener.js';
+import { revocableCredentialId } from '../device-connections.js';
 import { jsonResponse } from '../http-helpers.js';
 import { _resetDashboardSessionTokenForTests } from '../routes/dashboard-auth.js';
 import { _resetTrustedOriginsForTests } from '../routes/origin-validation.js';
@@ -172,6 +174,76 @@ describe('/ws/rpc revocation (PAN-4645 WI-7)', () => {
     const channelClosed = new Promise<void>((resolve) => channel.once('close', resolve));
 
     await revokeAccessToken(record.id);
+    await channelClosed;
+    expect(liveChannelCount()).toBe(0);
+  });
+
+  it('ac4: revoking a phone record destroys every channel bound to its key (PAN-4835 WI-4)', async () => {
+    const serverKey = dh.generateKeyPair();
+    const phoneKey = dh.generateKeyPair();
+    const phoneHex = phoneKey.publicKey.toString('hex');
+    expect(revocableCredentialId({ kind: 'phone', tokenId: 'phone-1', clientId: 'c1', phoneKey: phoneHex, scopes: [...PHONE_TOKEN_SCOPES] })).toBe('phone-1');
+    const { record } = await createAccessToken({
+      name: 'phone:iris', kind: 'phone', scopes: [...PHONE_TOKEN_SCOPES],
+      phoneKey: phoneHex, clientId: '11111111-1111-4111-8111-111111111111',
+    });
+    const http = createServer((_req, res) => res.end('ok'));
+    installChannelListener(http, {
+      primary: true,
+      localKey: async () => serverKey,
+      isPinnedPeer: (key) => key === phoneHex,
+      takePairing: () => 'unknown',
+      onPairingFailure: () => undefined,
+      log: () => undefined,
+    });
+    await new Promise<void>((resolve) => http.listen(0, '127.0.0.1', resolve));
+    cleanups.push(() => new Promise<void>((resolve) => http.close(() => resolve())));
+    const channelPort = (http.address() as { port: number }).port;
+
+    const channel = await openChannel(`tcp://127.0.0.1:${channelPort}`, { mode: 'link', localKey: phoneKey, remoteKeyHex: serverKey.publicKey.toString('hex') });
+    cleanups.push(() => channel.destroy());
+    expect(liveChannelCount()).toBe(1);
+    const channelClosed = new Promise<void>((resolve) => channel.once('close', resolve));
+
+    await revokeAccessToken(record.id);
+    await channelClosed;
+    expect(liveChannelCount()).toBe(0);
+  });
+
+  it('ac5: a phone-revoke written by another process closes its channel after one refresh tick', async () => {
+    const serverKey = dh.generateKeyPair();
+    const phoneKey = dh.generateKeyPair();
+    const phoneHex = phoneKey.publicKey.toString('hex');
+    const { record } = await createAccessToken({
+      name: 'phone:iris', kind: 'phone', scopes: [...PHONE_TOKEN_SCOPES],
+      phoneKey: phoneHex, clientId: '11111111-1111-4111-8111-111111111111',
+    });
+    const http = createServer((_req, res) => res.end('ok'));
+    installChannelListener(http, {
+      primary: true,
+      localKey: async () => serverKey,
+      isPinnedPeer: (key) => key === phoneHex,
+      takePairing: () => 'unknown',
+      onPairingFailure: () => undefined,
+      log: () => undefined,
+    });
+    await new Promise<void>((resolve) => http.listen(0, '127.0.0.1', resolve));
+    cleanups.push(() => new Promise<void>((resolve) => http.close(() => resolve())));
+    const channelPort = (http.address() as { port: number }).port;
+
+    const channel = await openChannel(`tcp://127.0.0.1:${channelPort}`, { mode: 'link', localKey: phoneKey, remoteKeyHex: serverKey.publicKey.toString('hex') });
+    cleanups.push(() => channel.destroy());
+    expect(liveChannelCount()).toBe(1);
+    const channelClosed = new Promise<void>((resolve) => channel.once('close', resolve));
+
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    startAccessTokenRefresh();
+    const path = join(home, 'access-tokens.json');
+    const file = JSON.parse(await readFile(path, 'utf8')) as { tokens: Array<Record<string, unknown>> };
+    file.tokens = file.tokens.map((entry) => (entry.id === record.id ? { ...entry, revokedAt: new Date().toISOString() } : entry));
+    await writeFile(path, JSON.stringify(file), 'utf8');
+
+    await vi.advanceTimersByTimeAsync(ACCESS_TOKEN_REFRESH_MS);
     await channelClosed;
     expect(liveChannelCount()).toBe(0);
   });

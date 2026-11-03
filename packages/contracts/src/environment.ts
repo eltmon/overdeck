@@ -25,6 +25,8 @@ export const EnvironmentCapabilities = Schema.Struct({
   terminalAuth: Schema.Boolean,
   /** Secure machine links are accepted (PAN-4645). Absent on older servers ⇒ `unsupported`. */
   machineLinks: Schema.optional(Schema.Boolean),
+  /** The phone app can pair and use this machine (PAN-4835). Absent on older servers ⇒ unsupported. */
+  phoneApp: Schema.optional(Schema.Boolean),
 })
 export type EnvironmentCapabilities = typeof EnvironmentCapabilities.Type
 

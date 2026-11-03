@@ -158,20 +158,26 @@ describe('scoped /ws/rpc method groups (PAN-4645 WI-6)', () => {
     return credential;
   }
 
-  it('a machine credential may call exactly subscribeConversationMessages and subscribeDomainEvents', async () => {
-    expect(allowedRpcTags(MACHINE_TOKEN_SCOPES('operator'))).toEqual([WS_METHODS.subscribeConversationMessages, WS_METHODS.subscribeDomainEvents]);
-    expect(allowedRpcTags(['read:events'])).toEqual([WS_METHODS.subscribeDomainEvents]);
+  it('a machine credential may call exactly getSnapshot, replayEvents, subscribeConversationMessages and subscribeDomainEvents', async () => {
+    // PAN-4835: getSnapshot and replayEvents joined the table as the boot surfaces
+    // every dashboard client (phone app included) needs.
+    expect(allowedRpcTags(MACHINE_TOKEN_SCOPES('operator'))).toEqual(
+      [WS_METHODS.getSnapshot, WS_METHODS.replayEvents, WS_METHODS.subscribeConversationMessages, WS_METHODS.subscribeDomainEvents].sort(),
+    );
+    expect(allowedRpcTags(['read:events'])).toEqual([WS_METHODS.replayEvents, WS_METHODS.subscribeDomainEvents].sort());
     expect(allowedRpcTags(['admin'])).toEqual([...PanRpcGroup.requests.keys()].sort());
     expect(Object.keys(RPC_METHOD_SCOPES).every((tag) => PanRpcGroup.requests.has(tag))).toBe(true);
 
     const credential = await machineCredential();
     const omit = omittedRpcTags(credential);
     const restricted = restrictedRpcGroup(omit);
-    expect([...restricted.requests.keys()].sort()).toEqual([WS_METHODS.subscribeConversationMessages, WS_METHODS.subscribeDomainEvents]);
+    expect([...restricted.requests.keys()].sort()).toEqual(
+      [WS_METHODS.getSnapshot, WS_METHODS.replayEvents, WS_METHODS.subscribeConversationMessages, WS_METHODS.subscribeDomainEvents].sort(),
+    );
     // pan.deepWipe has no handler on the restricted group: a call cannot reach one.
     expect(restricted.requests.has(WS_METHODS.deepWipe)).toBe(false);
     expect(PanRpcGroup.requests.has(WS_METHODS.deepWipe)).toBe(true);
-    expect(omit).toHaveLength(PanRpcGroup.requests.size - 2);
+    expect(omit).toHaveLength(PanRpcGroup.requests.size - 4);
   });
 
   it('admin credentials get the full group; others get one memoised restricted handler per allowed set', async () => {
@@ -187,12 +193,14 @@ describe('scoped /ws/rpc method groups (PAN-4645 WI-6)', () => {
     const credential = await machineCredential();
     const first = await Effect.runPromise(selectRpcHandler(credential, source));
     const second = await Effect.runPromise(selectRpcHandler(credential, source));
-    expect(first).toBe(`RESTRICTED:${PanRpcGroup.requests.size - 2}`);
+    // PAN-4835: getSnapshot and replayEvents joined the table, so a machine
+    // credential now allows 4 tags (was 2).
+    expect(first).toBe(`RESTRICTED:${PanRpcGroup.requests.size - 4}`);
     expect(second).toBe(first);
     expect(builds).toHaveLength(1);
 
     const eventsOnly = await Effect.runPromise(selectRpcHandler({ kind: 'token', tokenId: 't', scopes: ['read:events'] }, source));
-    expect(eventsOnly).toBe(`RESTRICTED:${PanRpcGroup.requests.size - 1}`);
+    expect(eventsOnly).toBe(`RESTRICTED:${PanRpcGroup.requests.size - 2}`);
     expect(builds).toHaveLength(2);
   });
 });

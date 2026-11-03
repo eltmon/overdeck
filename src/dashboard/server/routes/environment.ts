@@ -41,6 +41,7 @@ export async function buildEnvironmentDescriptor(): Promise<EnvironmentDescripto
       deviceSessions: true,
       terminalAuth: WS_UPGRADE_REQUIRES_CREDENTIAL,
       machineLinks: true,
+      phoneApp: true,
     },
     machineKey: publicKeyHex(machineKey),
     linkProtocol: LINK_PROTOCOL_VERSION,

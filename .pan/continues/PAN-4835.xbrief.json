@@ -1,0 +1,287 @@
+{
+  "version": "1",
+  "issueId": "PAN-4835",
+  "created": "2026-11-03T07:59:34.235Z",
+  "updated": "2026-11-03T13:34:42.220Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-03T10:23Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-03T10:23:32.760Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-03T10:29Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-11-03T10:29:49.819Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-03T10:30:12.933Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-03T10:39Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-03T10:39:17.832Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-5",
+      "timestamp": "2026-11-03T10:39:20.318Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-5",
+      "timestamp": "2026-11-03T13:32:53.388Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-03T13:34:42.219Z"
+    }
+  ],
+  "items": {
+    "phone-token-kind": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4835",
+      "claimedAt": "2026-11-03T07:59:34.235Z",
+      "doneAt": "2026-11-03T08:24:00.969Z"
+    },
+    "phone-credential-resolve": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4835",
+      "claimedAt": "2026-11-03T08:25:08.251Z",
+      "doneAt": "2026-11-03T08:47:47.015Z"
+    },
+    "phone-key-pinned": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4835",
+      "claimedAt": "2026-11-03T08:48:13.259Z",
+      "doneAt": "2026-11-03T08:56:46.640Z"
+    },
+    "phone-revocation-closes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4835",
+      "claimedAt": "2026-11-03T08:57:15.334Z",
+      "doneAt": "2026-11-03T09:00:46.210Z"
+    },
+    "phone-scope-rows": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4835",
+      "claimedAt": "2026-11-03T09:01:13.877Z",
+      "doneAt": "2026-11-03T09:27:04.919Z"
+    },
+    "phones-exchange-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4835",
+      "claimedAt": "2026-11-03T09:04:10.547Z",
+      "doneAt": "2026-11-03T09:18:51.447Z"
+    },
+    "phones-self-routes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4835",
+      "claimedAt": "2026-11-03T09:19:17.244Z",
+      "doneAt": "2026-11-03T09:24:38.329Z"
+    },
+    "phone-app-capability": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4835",
+      "claimedAt": "2026-11-03T09:27:34.246Z",
+      "doneAt": "2026-11-03T09:29:36.743Z"
+    },
+    "phone-surface-test": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4835",
+      "claimedAt": "2026-11-03T09:30:09.489Z",
+      "doneAt": "2026-11-03T09:33:22.262Z"
+    },
+    "devices-route-phones": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4835",
+      "claimedAt": "2026-11-03T09:33:52.939Z",
+      "doneAt": "2026-11-03T09:39:02.380Z"
+    },
+    "devices-panel-phones": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4835",
+      "claimedAt": "2026-11-03T09:39:41.747Z",
+      "doneAt": "2026-11-03T09:47:02.628Z"
+    },
+    "phone-credential-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4835",
+      "claimedAt": "2026-11-03T09:47:57.587Z",
+      "doneAt": "2026-11-03T09:52:00.328Z"
+    },
+    "phone-token-kind.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:55:37.032Z"
+    },
+    "phone-token-kind.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:57:29.231Z"
+    },
+    "phone-token-kind.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:57:50.085Z"
+    },
+    "phone-token-kind.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:58:12.679Z"
+    },
+    "phone-token-kind.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:58:38.325Z"
+    },
+    "phone-credential-resolve.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:59:02.470Z"
+    },
+    "phone-credential-resolve.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:59:23.840Z"
+    },
+    "phone-credential-resolve.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:59:45.913Z"
+    },
+    "phone-credential-resolve.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T10:00:07.774Z"
+    },
+    "phone-key-pinned.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T10:00:30.808Z"
+    },
+    "phone-key-pinned.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T10:01:00.872Z"
+    },
+    "phone-key-pinned.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T10:01:27.189Z"
+    },
+    "phone-revocation-closes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T10:01:55.316Z"
+    },
+    "phone-revocation-closes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T10:02:24.186Z"
+    },
+    "phone-revocation-closes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T10:02:50.270Z"
+    },
+    "phone-scope-rows.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T10:03:21.502Z"
+    },
+    "phone-scope-rows.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T10:03:48.570Z"
+    },
+    "phone-scope-rows.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T10:04:22.566Z"
+    },
+    "phone-surface-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T10:04:47.279Z"
+    },
+    "phone-surface-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T10:05:23.829Z"
+    },
+    "phone-surface-test.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T10:06:02.642Z"
+    },
+    "phone-surface-test.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T10:06:58.289Z"
+    },
+    "phones-exchange-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T10:07:28.537Z"
+    },
+    "phones-exchange-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T10:08:00.301Z"
+    },
+    "phones-exchange-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T10:08:35.182Z"
+    },
+    "phones-exchange-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T10:09:12.364Z"
+    },
+    "phones-exchange-route.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T10:09:45.326Z"
+    },
+    "phones-self-routes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T10:10:09.275Z"
+    },
+    "phones-self-routes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T10:10:40.448Z"
+    },
+    "phones-self-routes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T10:11:05.014Z"
+    },
+    "devices-route-phones.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T10:11:29.973Z"
+    },
+    "devices-route-phones.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T10:11:57.572Z"
+    },
+    "devices-route-phones.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T10:12:18.713Z"
+    },
+    "devices-panel-phones.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T10:12:39.496Z"
+    },
+    "devices-panel-phones.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T10:12:59.575Z"
+    },
+    "devices-panel-phones.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T10:13:19.745Z"
+    },
+    "phone-app-capability.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T10:13:40.289Z"
+    },
+    "phone-app-capability.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T10:14:00.516Z"
+    },
+    "phone-credential-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T10:14:20.637Z"
+    },
+    "phone-credential-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T10:14:41.120Z"
+    },
+    "phone-credential-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T10:15:03.474Z"
+    }
+  },
+  "feedback": [],
+  "agentModel": "claude-opus-5-5"
+}

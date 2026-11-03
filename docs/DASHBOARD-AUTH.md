@@ -40,6 +40,14 @@ defend, and what they do not. User-facing guide:
   opened, resolves to `null`. Scopes come from `MACHINE_TOKEN_SCOPES(access)`.
   Revocable per machine (`DELETE /api/machines/inbound/:tokenId`); revoking
   closes that machine's channels. See `docs/ANYWHERE-ARCHITECTURE.md`.
+- **Phone credential** (PAN-4835) — the phone app's `odk_<64 hex>` token: a
+  `kind: 'phone'` record bound to the phone's link key (`phoneKey`), its
+  directory client id (`clientId`) and an optional push key, minted by
+  `POST /api/phones/exchange`. It authenticates only from `Authorization:
+  Bearer odk_…` inside a secure channel whose handshake proved `phoneKey`; the
+  resolved shape is `{ kind: 'phone', tokenId, clientId, phoneKey, scopes }`.
+  Carries `PHONE_TOKEN_SCOPES` (eight scopes, never `admin` or `forward`).
+  See "Phone credentials (PAN-4835)" below.
 - **CSRF token** — an HMAC token returned by the session mint and sent back on
   mutating requests as `x-overdeck-csrf-token`. Only checked for mutations
   (`rejectUnsafeDashboardMutationRequest`); WebSocket upgrades never carry it.
@@ -51,9 +59,12 @@ credential check; `channel` is the secure-channel marker of the connection the
 request arrived on (`channelOfRequest`, `channel-peer.ts`) or `null`. It returns
 `{ kind: 'internal-token' }`, `{ kind: 'root-session' }`,
 `{ kind: 'device', deviceId, scopes }`, `{ kind: 'token', tokenId, scopes }`,
-`{ kind: 'machine', tokenId, machineKey, environmentId, access, scopes }`, or
-`null`, in that precedence. A `machine` record needs `channel.mode === 'link'`
-and `channel.remoteKeyHex === record.machineKey`. Channel requests are never
+`{ kind: 'machine', tokenId, machineKey, environmentId, access, scopes }`,
+`{ kind: 'phone', tokenId, clientId, phoneKey, scopes }`, or `null`, in that
+precedence. A `machine` record needs `channel.mode === 'link'` and
+`channel.remoteKeyHex === record.machineKey`; a `phone` record (PAN-4835)
+needs the same channel mode and `channel.remoteKeyHex === record.phoneKey`.
+Channel requests are never
 loopback peers (`remoteAddress` is `link:<key>`), so the session mint answers
 401 to them and the remote request gate treats them as remote. The `odk_` value is read from the
 `overdeck_device` cookie first, else the Bearer header. A `kind: 'token'`
@@ -87,13 +98,19 @@ does not list needs `admin` (D-6):
 
 | Scope | `METHOD path` |
 | --- | --- |
-| `read:events` | `GET /events/stream`, `GET /events/version` |
-| `read:state` | `GET /api/issues`, `GET /api/agents`, `GET /api/agent-directory`, `GET /api/flywheel/status`, `GET /api/pipeline/membership`, `GET /api/versions/self` |
-| `read:conversations` | `GET /api/conversations`, `GET /api/conversations/:id`, `GET /api/conversations/:name/messages`, `GET /api/conversations/:name/about`, `GET /api/palette/search` |
-| `tell` | `POST /api/agents/:id/message`, `POST /api/agents/:id/tell`, `POST /api/conversations/:name/message` |
+| `read:events` | `GET /events/stream`, `GET /events/version`, RPC `pan.replayEvents` (PAN-4835) |
+| `read:state` | `GET /api/issues`, `GET /api/agents`, `GET /api/agent-directory`, `GET /api/flywheel/status`, `GET /api/pipeline/membership`, `GET /api/versions/self`, `GET /api/activity` (PAN-4835), RPC `pan.getSnapshot` (PAN-4835) |
+| `read:conversations` | `GET /api/conversations`, `GET /api/conversations/:id`, `GET /api/conversations/:name/messages`, `GET /api/conversations/:name/about`, `GET /api/palette/search`, `GET /api/conversations/pending-input` (explicit row, PAN-4835) |
+| `tell` | `POST /api/agents/:id/message`, `POST /api/agents/:id/tell`, `POST /api/conversations/:name/message`, `POST /api/conversations/:name/delete-image` (the undo of `upload-image`, PAN-4835), `PUT /api/phones/self/push-key`, `DELETE /api/phones/self` (PAN-4835) |
 | `operate` | WebSocket `/ws/terminal` (`WS_TERMINAL_SCOPE`), `POST /api/conversations`, `POST /api/workers`, `POST /api/versions/self/update`, `DELETE /api/versions/self/update` |
 | `approve` | `POST /api/conversations/:id/permission`, `POST /api/conversations/:id/pane-choice`, `POST /api/conversations/:id/pi-ask-answer`, `POST /api/conversations/:id/codex-approval`, `POST /api/conversations/:name/plan-action`, `POST /api/agents/:id/answer-question`, `POST /api/agents/:id/plan-action`, `POST /api/agents/:id/permissions/:requestId/respond` |
 | `admin` | everything else, including `/ws/rpc`, `/ws/voice`, `/ws/autopreso` |
+
+The rows PAN-4835 added are not phone-exclusive (D-8): they widen the same
+scope for a linked machine's operator token and any API token holding that
+scope too, since those credentials already hold the scope as part of their
+own grant. `POST /api/conversations/:name/delete-image` pairs with
+`upload-image`, already `tell`.
 
 A `:param` segment matches exactly one non-empty segment; matching is exact and
 case-sensitive on the normalized path, so any mismatch needs `admin`. Three
@@ -406,6 +423,63 @@ Machines and `pan machines`. Rules:
   `require_token_mint` on (`src/lib/remote-access/config.ts`, D-4645-12); a
   plain-HTTP browser on another device gets the Use HTTPS page
   (`plain-http-guard.ts`, D-4645-13).
+
+## Phone credentials (PAN-4835)
+
+`routes/phones.ts` serves the phone app's machine-side identity: a new access-
+token kind `kind: 'phone'`, carrying `phoneKey` (the phone's link public key,
+64 lowercase hex), `clientId` (the phone app's directory client id, a UUID v4)
+and an optional `pushKey` (64 hex, for a later notification-delivery feature).
+A phone record always carries `PHONE_TOKEN_SCOPES` — `read:events,
+read:state, read:conversations, read:costs, read:settings, tell, operate,
+approve` — and `createAccessToken` refuses `admin` or `forward` on a phone
+record. A malformed phone record (missing `phoneKey` or `clientId`) makes the
+registry corrupt, exactly like an incomplete `machine` record (H-1).
+
+- **Channel binding.** A phone credential resolves only inside a link-mode
+  channel whose `remoteKeyHex` equals the record's `phoneKey`; it resolves to
+  `null` in a pairing or approval channel, in a link channel opened by another
+  key, and on a plain socket (FR-3). `findActiveChannelTokenByKey(keyHex)`
+  returns the active `machine` or `phone` record pinned to a key, and
+  `server.ts` wires it into `isPinnedPeer`, so the link-mode handshake accepts
+  a phone's key the same way it accepts a machine's.
+- **No CSRF, no Origin.** A phone credential is header-borne and channel-
+  bound, so it joins the same skip list as `token` and `internal-token` in
+  `rejectUnsafeDashboardMutationRequest` (D-5); there is no ambient cookie to
+  abuse.
+- **`POST /api/phones/exchange`** is reachable only through a pairing-mode
+  channel (`PAIRING_CHANNEL_ALLOWLIST`, same allowlist the machine exchange
+  uses). It takes `{ v: 1, clientId, label, pushKeyHex }`, mints the phone
+  record bound to the channel's key, then revokes every other active phone
+  record with the same `clientId` (one active record per `clientId`). A key
+  already held by an active phone record answers **409**
+  `{ error, code: 'link-key-in-use' }` rather than revoking its own pairing
+  channel's record (D-2) — the phone app must generate a fresh link key for
+  every pairing.
+- **`DELETE /api/phones/self`** and **`PUT /api/phones/self/push-key`** are
+  the phone's own self-service routes: the scope table admits them with
+  `tell`, and the handler then requires `credential.kind === 'phone'` (403
+  otherwise). Self-revoke may drop the response before it arrives (the
+  caller's own channel closes first); the app treats a dropped connection
+  after the DELETE as success.
+- **Revocation.** Revoking a phone record (by the operator, by
+  `DELETE /api/phones/self`, or by another process) closes its `/ws/rpc`
+  sockets with 4401 and destroys every channel bound to its `phoneKey` within
+  one registry refresh (5 s) — the same `onAccessTokensRevoked` listener that
+  already does this for `machine` records.
+- **Device list.** `GET /api/devices` returns phone records next to device
+  records, each row carrying `kind: 'device' | 'phone'` and no key material;
+  `DELETE /api/devices/:id` revokes a phone record the same way.
+- **`capabilities.phoneApp`** on `GET /api/environment` tells a phone app the
+  machine supports pairing; absent on an older server, which it reads as
+  unsupported.
+- **No Origin or Referer.** The phone's HTTP and WebSocket client sends
+  neither header; `validateOriginHeaders` would otherwise reject a present,
+  untrusted `Origin` before any credential check runs (H-2).
+- **Out of scope (PAN-4887).** A phone reaches only its paired machine's own
+  data. `GET /api/fleet/needs-you`, the `/api/conversations/@<env>/...`
+  linked-conversation proxy and the `/ws/linked/:env/rpc` upgrade all still
+  refuse every channel caller (the no-chained-hops rule), phone included.
 
 ## Remote request gate
 

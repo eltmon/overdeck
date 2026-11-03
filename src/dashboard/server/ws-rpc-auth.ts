@@ -19,8 +19,8 @@
  *
  * `registerRevocationClosers` (D-4645-16) is the one dashboard listener on
  * `onAccessTokensRevoked`: it closes the record's live device connections and,
- * for a machine record, every secure channel bound to its key, so a revoke
- * written by another process lands within one refresh (5 s).
+ * for a machine or phone record (PAN-4835), every secure channel bound to its
+ * key, so a revoke written by another process lands within one refresh (5 s).
  */
 import { Deferred, Effect } from 'effect';
 import { HttpServerResponse, type HttpServerRequest } from 'effect/unstable/http';
@@ -161,6 +161,7 @@ export function registerRevocationClosers(): () => void {
   return onAccessTokensRevoked((record) => {
     closeDeviceConnections(record.id);
     if (record.kind === 'machine' && record.machineKey) closeChannelsForPeer(record.machineKey);
+    if (record.kind === 'phone' && record.phoneKey) closeChannelsForPeer(record.phoneKey);
   });
 }
 

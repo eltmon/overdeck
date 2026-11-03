@@ -7,11 +7,22 @@
 import { createRequire } from 'node:module';
 import http from 'node:http';
 import { connect, type Socket } from 'node:net';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import { FrameReader } from '@overdeck/anywhere-channel';
 import { createWebSocketStream, WebSocket as WsClient, WebSocketServer } from 'ws';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import {
+  _resetAccessTokensForTests,
+  _settleAccessTokenWritesForTests,
+  createAccessToken,
+  findActiveChannelTokenByKey,
+  PHONE_TOKEN_SCOPES,
+  revokeAccessToken,
+} from '../../../lib/access-tokens.js';
 import type { MachineKeyPair } from '../../../lib/anywhere/machine-key.js';
 import type { ChannelSocket } from '../../../lib/anywhere/channel/channel-socket.js';
 import { openChannel, openChannelOverTransport } from '../../../lib/anywhere/channel/open.js';
@@ -227,6 +238,52 @@ describe('channel listener (PAN-4645 WI-3)', () => {
       .rejects.toMatchObject({ code: expect.stringMatching(/^(protocol|identity-refused|timeout)$/) });
     expect(liveChannelCount()).toBe(0);
     expect((await get('/still-http')).text).toBe('ok /still-http');
+  });
+});
+
+describe('isPinnedPeer via findActiveChannelTokenByKey (PAN-4835 WI-3)', () => {
+  const originalHome = process.env.OVERDECK_HOME;
+  let home: string;
+  const phoneKeyPair = dh.generateKeyPair();
+
+  beforeEach(async () => {
+    home = await mkdtemp(join(tmpdir(), 'pan-4835-channel-listener-'));
+    process.env.OVERDECK_HOME = home;
+    _resetAccessTokensForTests();
+  });
+
+  afterEach(async () => {
+    await _settleAccessTokenWritesForTests();
+    _resetAccessTokensForTests();
+    if (originalHome === undefined) delete process.env.OVERDECK_HOME;
+    else process.env.OVERDECK_HOME = originalHome;
+    await rm(home, { recursive: true, force: true });
+  });
+
+  it('accepts a link-mode handshake from a key an active phone record pins', async () => {
+    await createAccessToken({
+      name: 'phone:iris', kind: 'phone', scopes: [...PHONE_TOKEN_SCOPES],
+      phoneKey: hex(phoneKeyPair), clientId: '11111111-1111-4111-8111-111111111111',
+    });
+    await start(deps({ isPinnedPeer: (key) => findActiveChannelTokenByKey(key) !== null }));
+
+    const channel = await openChannel(`tcp://127.0.0.1:${port}`, { mode: 'link', localKey: phoneKeyPair, remoteKeyHex: hex(serverKey) });
+    cleanups.push(() => channel.destroy());
+    expect(liveChannelCount()).toBe(1);
+    expect(await requestOverChannel(channel, '/api/environment')).toBe('ok /api/environment');
+  });
+
+  it('refuses the handshake with unknown-peer once the phone record is revoked', async () => {
+    const { record } = await createAccessToken({
+      name: 'phone:iris', kind: 'phone', scopes: [...PHONE_TOKEN_SCOPES],
+      phoneKey: hex(phoneKeyPair), clientId: '11111111-1111-4111-8111-111111111111',
+    });
+    await revokeAccessToken(record.id);
+    await start(deps({ isPinnedPeer: (key) => findActiveChannelTokenByKey(key) !== null }));
+
+    await expect(openChannel(`tcp://127.0.0.1:${port}`, { mode: 'link', localKey: phoneKeyPair, remoteKeyHex: hex(serverKey), timeoutMs: 2_000 }))
+      .rejects.toMatchObject({ code: 'unknown-peer' });
+    expect(liveChannelCount()).toBe(0);
   });
 });
 
