@@ -6,6 +6,10 @@ handshakes, the refusals and the initiator sequence exist once, here, so the two
 drift apart (pan-4823 D-7). Private workspace package, MIT, source exports, no build step. The
 server bundles inline it through the workspace symlink (tsdown `alwaysBundle: /^@overdeck\//`).
 
+Used by the phone app: `apps/mobile` (PAN-4837) imports `./web` for its directory socket, dial
+policy, pairing and link channels, and page shims, and copies no protocol code. See
+[`apps/mobile/README.md`](../../apps/mobile/README.md).
+
 ## Entry points
 
 | Import | Runs on | Exports |

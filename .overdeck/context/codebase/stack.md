@@ -3,9 +3,9 @@
 - **Language:** TypeScript (strict), ESM throughout.
 - **Runtime:** Node.js 22 for everything that ships (CLI, dashboard server,
   PTY supervisor). Bun is the *package manager / dev scratchpad* only
-  (`bun install`; root plus 13 bun workspaces: `packages/{contracts,effect-acp,
+  (`bun install`; root plus 14 bun workspaces: `packages/{contracts,effect-acp,
   anywhere-channel,moonshine-linux-x64,qwen-tts-linux-x64,pi-extension,ohmypi-extension}`,
-  `src/dashboard/server`, `src/dashboard/frontend`, `apps/desktop`,
+  `src/dashboard/server`, `src/dashboard/frontend`, `apps/desktop`, `apps/mobile`,
   `services/{account,share,connect}`).
 - **Build:** tsdown (rolldown) for CLI / server / contracts (`tsdown.config.ts`
   at root, `src/dashboard/server/`, `packages/contracts/`, `scripts/`); Vite for
@@ -24,6 +24,9 @@
   `prepare-server-resources.mjs` stages the embedded server and rebuilds
   node-pty for Electron's ABI; macOS notarization runs in the `afterSign`
   hook `scripts/notarize.cjs` with `mac.notarize: false`. See `docs/BUILD.md`.
+- **Phone app:** `apps/mobile` — Capacitor 8 (iOS SPM project, Android
+  Gradle 8.14 / JDK 21), a Vite build of the frontend's `/m` screens. See
+  `apps/mobile/README.md`.
 - **CLI:** commander (`src/cli/index.ts`), self-documenting `--help`.
 - **Dependency bundling:** the root tsdown build keeps root `dependencies`
   external (`lint:dist-externals` fails a bare import that is not declared);
