@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4831",
   "created": "2026-11-03T04:00:12.397Z",
-  "updated": "2026-11-03T05:11:39.389Z",
+  "updated": "2026-11-03T05:12:02.393Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -60,6 +60,10 @@
     "phone-platforms.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T05:11:39.389Z"
+    },
+    "native-signin-e2e.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:12:02.392Z"
     }
   }
 }
