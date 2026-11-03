@@ -26,7 +26,9 @@ export function DevicesPanel() {
   const handleRevoke = async (device: DeviceRow) => {
     const confirmed = await confirm({
       title: `Revoke ${device.name}?`,
-      message: 'The device is signed out on its next request and its open connections close now.',
+      message: device.kind === 'phone'
+        ? 'The phone app is signed out of this machine and its open connections close now.'
+        : 'The device is signed out on its next request and its open connections close now.',
       confirmLabel: 'Revoke',
       variant: 'destructive',
     });
@@ -65,6 +67,7 @@ export function DevicesPanel() {
                   {device.name}
                 </span>
                 <p className="text-xs text-muted-foreground mt-0.5">
+                  {device.kind === 'phone' ? 'Phone app · ' : ''}
                   {device.scopes.length > 0 ? device.scopes.join(', ') : 'No scopes'}
                   {' · '}paired {formatRelativeTime(device.createdAt)}
                   {' · '}last seen {device.lastUsedAt ? formatRelativeTime(device.lastUsedAt) : '—'}
