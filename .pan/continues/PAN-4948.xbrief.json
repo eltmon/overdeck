@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4948",
   "created": "2026-11-03T21:39:04.258Z",
-  "updated": "2026-11-03T22:01:12.639Z",
+  "updated": "2026-11-03T22:01:18.222Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-4948",
       "claimedAt": "2026-11-03T21:58:36.228Z",
       "doneAt": "2026-11-03T22:01:12.638Z"
+    },
+    "store-reload-node": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4948",
+      "claimedAt": "2026-11-03T22:01:18.222Z"
     }
   }
 }
