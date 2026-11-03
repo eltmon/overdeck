@@ -525,6 +525,18 @@ describe('CommandPalette navigation actions', () => {
       expect(onNavigate).toHaveBeenCalledWith('context');
     });
   });
+
+  it('shows the Anywhere actions when searching "machine" (PAN-4869)', async () => {
+    const user = userEvent.setup();
+    renderPalette();
+
+    await user.type(screen.getByPlaceholderText('Search commands, issues, conversations, memory…'), 'machine');
+
+    expect(screen.getByText('Anywhere')).toBeInTheDocument();
+    expect(getOptionByValue('anywhere-link-machine')).toBeInTheDocument();
+    expect(getOptionByValue('anywhere-add-fly-machine')).toBeInTheDocument();
+    expect(getOptionByValue('anywhere-add-ssh-machine')).toBeInTheDocument();
+  });
 });
 
 describe('CommandPalette workspaces switcher (PAN-1990)', () => {
