@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4473",
   "created": "2026-11-03T04:12:49.385Z",
-  "updated": "2026-11-03T05:25:07.717Z",
+  "updated": "2026-11-03T05:25:31.026Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -88,6 +88,10 @@
     "share-record-door.ac2": {
       "status": "completed",
       "doneAt": "2026-11-03T05:25:07.716Z"
+    },
+    "share-record-door.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:25:31.026Z"
     }
   }
 }
