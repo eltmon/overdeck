@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4839",
   "created": "2026-11-03T21:01:30.274Z",
-  "updated": "2026-11-03T22:17:57.420Z",
+  "updated": "2026-11-03T22:18:13.071Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -260,6 +260,10 @@
     "machine-service.ac2": {
       "status": "completed",
       "doneAt": "2026-11-03T22:17:57.419Z"
+    },
+    "machine-service.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:18:13.071Z"
     }
   }
 }
