@@ -90,3 +90,46 @@ for this measurement (`cp3-cp4-checkpoints.ac1`) was cancelled, not marked done.
   `MobileApp` scanner tests. The pair link path (AC-10 step 2) needs no camera. The
   `@capacitor/camera` fallback was not needed.
 - **iOS:** not testable in the Simulator, which has no camera. Covered by the store build (PAN-4841).
+
+## PAN-4838 iOS notifications
+
+**Result: the build, key storage and registration code pass; on-device decryption is not yet
+verified end to end. The real-APNs run (epic AC-11) moves to PAN-4841's first TestFlight install.**
+
+Run on 2026-11-03 on the Mac rig: Xcode 26.6 (17F113), a dedicated iPhone 17 Pro Simulator on
+iOS 26.5, deleted afterwards.
+
+- **Swift package (`ios/OverdeckPush`):** `swift test` runs 7 tests, 0 failures. They open every
+  case of `tests/fixtures/phone-push/sealed-push.json` (sealed by sodium-native, as the machine
+  does), reject the wrong key, a changed base64 character, bad base64, a 31-byte key and a v2
+  payload, open a box sealed to a CryptoKit key, and check the content rewrite. These tests do not
+  touch the Keychain.
+- **Builds:** the ad-hoc build (`CODE_SIGN_IDENTITY=-`) and the team build
+  (`DEVELOPMENT_TEAM=KUU2VM9GB9 -allowProvisioningUpdates`) both exit 0, and
+  `App.app/PlugIns/NotificationService.appex` is in both. Both launch to the sign-in screen and log
+  `[OverdeckKeys] push public key <hex>` with no "shared keychain group unavailable" line, so the
+  app wrote the push key to the shared group in both.
+- **Notification permission (hazard H-7):** the app asks only after sign-in, and a GitHub sign-in
+  cannot run unattended on the rig. `xcrun simctl privacy` has no notifications service on this
+  Xcode. Clicking the iOS alert with UI scripting failed: SSH has no assistive access, and a
+  Terminal `.command` stopped at the macOS automation consent prompt, which was not approved and
+  was withdrawn by ending the process. What worked: Wix `applesimutils` 0.9.12 (Homebrew, only
+  that formula trusted; uninstalled and untapped afterwards),
+  `applesimutils --byId <udid> --bundle ai.overdeck.app --setPermissions notifications=YES`.
+- **`simctl push` (CP-4):** the app was terminated and the output of
+  `seal-apns.mjs --key <the logged key> --title 'Agent asks: deploy now?'` was pushed. The banner
+  shows the placeholder **Overdeck · Something needs you**
+  ([pan-4838-simctl](acceptance/pan-4838-simctl.png)). The Simulator log shows SpringBoard adding
+  the request with no service-extension step, and no `NotificationService` process started.
+  So `simctl push` on Xcode 26.6 does not run Notification Service Extensions, and the placeholder
+  is what iOS shows without the extension (FR-6). The wrong-key push (step 4) therefore proves
+  nothing more here and was not kept.
+- **Not verified here:** the extension reading the push key from the shared Keychain group and
+  rewriting a real notification, and a tap from a cold launch (CP-3), which needs a tap the rig
+  cannot send. Both are first exercised by the TestFlight install in PAN-4841.
+- **Real APNs (step 6):** `curl -s https://connect.overdeck.ai/healthz` returned
+  `{"ok":true,"configured":true,"turn":true,"apns":false,"fcm":false}`, so the directory cannot
+  reach APNs yet. PAN-4841 sets the APNs secrets; its first TestFlight install runs epic AC-11:
+  pair the phone, terminate the app, raise a question on the desktop, and check that the
+  notification shows the question's title within 10 s, that tapping it opens the Needs-you card,
+  and that `npx wrangler tail overdeck-connect --format json` shows no title text.
