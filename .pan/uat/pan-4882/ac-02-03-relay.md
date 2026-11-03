@@ -80,3 +80,11 @@ on the VM, so no D-9 revert timer exists. No reconnect was posted, no relay dial
 `ac-03-using-relay.png` was taken.
 
 UDP blocked: not-run — device code not approved after 57 min
+
+## AC-2 relay half
+
+Not run. No relay channel ever opened, so there was no relay traffic to capture. No `tcpdump` ran, no
+`/root/relay.pcap` exists, and no conversation carrying the marker was created on the VM. The TLS key log
+`/root/tls-keys.log` never left the VM and is destroyed with it in "Cleanup".
+
+AC-2 relay half: not-run — device code not approved after 57 min
