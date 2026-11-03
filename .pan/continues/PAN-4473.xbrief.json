@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4473",
   "created": "2026-11-03T04:12:49.385Z",
-  "updated": "2026-11-03T05:32:10.517Z",
+  "updated": "2026-11-03T05:32:31.850Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -160,6 +160,10 @@
     "shares-routes.ac5": {
       "status": "completed",
       "doneAt": "2026-11-03T05:32:10.517Z"
+    },
+    "host-manager-miniflare-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:32:31.849Z"
     }
   }
 }
