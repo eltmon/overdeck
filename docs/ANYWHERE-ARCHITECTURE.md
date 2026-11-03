@@ -974,7 +974,10 @@ Owner routes under `/api/machines/work/*` (`routes/machines-work.ts`) are the on
 linked machine starts work here. Each takes exactly a `machine` credential (403
 `machine-only`), resolves the project on this machine, and compares the caller's git
 origin slug with that project's (case-insensitive; 404 `project-missing` naming this
-machine otherwise). The caller never names a path. `conversations` runs
+machine otherwise). The caller never names a path. The new-conversation dialog follows
+this: `createFleetConversation` never sends `cwd`, and with another machine chosen the
+Working directory field shows `machineCwdHint` (`newConversation/MachineField.tsx`)
+instead of this machine's path (PAN-4872). `conversations` runs
 `handleConversationCreate`; `workers` runs `startWorker` with `startedBy` written into
 `worker.json`; `issues/:id/start` runs `spawnIssueAgentForRoute`
 (`routes/agents/spawn-issue.ts`, the extracted body of `POST /api/agents`); `projects`
