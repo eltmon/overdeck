@@ -1,0 +1,727 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-03T15:44:06Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4905: Add a Fly machine error says remote.enabled must be set 'in the Overdeck config' but only config.toml works",
+    "updated": "2026-11-03T15:49:15.949Z"
+  },
+  "plan": {
+    "id": "pan-4905",
+    "title": "Add a Fly machine error says remote.enabled must be set 'in the Overdeck config' but only config.toml works",
+    "status": "proposed",
+    "uid": "3b66af81-e0a3-480b-a738-a35265923d13",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-03T15:44:06Z",
+    "updated": "2026-11-03T15:49:15.949Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4905",
+        "label": "PAN-4905",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4905.md",
+        "label": "PRD",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4908",
+        "label": "PAN-4908 (follow-up: sibling messages)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "anywhere",
+      "fly",
+      "config",
+      "dashboard",
+      "ux"
+    ],
+    "narratives": {
+      "Problem": "The Add a Fly machine refusal says remote.enabled must be set 'in the Overdeck config'. config.yaml has a remote: section, so operators set it there, but remote.enabled is read only from ~/.overdeck/config.toml [remote]. pan admin config set remote.enabled true also writes config.yaml and silently does nothing. The dialog only fails after the Add click, and sibling messages name no file or a dead verb (pan remote setup).",
+      "Proposal": "Keep config.toml as the only home of remote.enabled. Add src/lib/remote-enabled.ts with a shared hint ('add `enabled = true` under `[remote]` in ~/.overdeck/config.toml'), a config.yaml probe, and a targeted atomic config.toml writer. Use the hint in the Fly refusal (plus a note when config.yaml sets remote.enabled) ; refuse pan admin config set remote.enabled; expose self.remoteEnabled on GET /api/machines; show a remote-off notice and a Turn on remote button (POST /api/machines/fly/enable-remote) in the dialog; document it.",
+      "NonGoals": "- Making config.yaml accept or override remote.enabled\n- A new pan admin remote enable CLI verb\n- A remote toggle in Settings → Remote (RemoteSection.tsx)\n- Turning remote off from the dashboard\n- Pre-click remote state in the new-conversation dialog's Fly (new VM) choice\n- Changing pan admin remote setup behaviour or what it writes\n- Fly token (no-fly-token) UX changes\n- Touching src/lib/settings-api.ts, src/dashboard/server/routes/settings.ts or src/lib/config-yaml/schema.ts, or raising any file-size allowlist cap\n- Rewording the other remote-not-enabled messages (start.ts, workspace-migrate.ts, remote/*.ts, spawn-issue.ts, routes/remote.ts, remote-workspace.ts); that is follow-up PAN-4908"
+    },
+    "autoDecisions": [
+      {
+        "summary": "config.toml stays the only home of remote.enabled; config.yaml is not taught to accept it",
+        "rationale": "Docs, pan admin remote setup and doctor-fly already treat config.toml as the home; a second home for a spend gate recreates the two-homes confusion this issue reports; settings-api.ts and routes/settings.ts have 5 and 0 lines of file-size headroom."
+      },
+      {
+        "summary": "Ship Turn on remote as a targeted atomic edit of only [remote] enabled in config.toml",
+        "rationale": "The issue says the dialog should ideally offer it; saveConfig is sync and rewrites the whole file, and pan admin remote setup also flips default_location, so neither is reused."
+      },
+      {
+        "summary": "Pre-click state comes from optional MachinesResponse.self.remoteEnabled/remoteConfigFile on GET /api/machines",
+        "rationale": "The panel already polls that query and the dialog shares the cache key; no new read route or no-loss row is needed, and optional fields keep older peers decoding."
+      },
+      {
+        "summary": "The dialog stays openable when remote is off, shows a notice and disables Add; the panel button reads 'Add a Fly machine (remote off)'",
+        "rationale": "Matches the issue's 'say up front that remote is off' while keeping the Turn on remote action one click away."
+      },
+      {
+        "summary": "pan admin config set remote.enabled refuses with exit 1 and prints the hint",
+        "rationale": "A successful-looking no-op write to config.yaml is the same trap the issue reports."
+      },
+      {
+        "summary": "No new CLI verb for enabling remote",
+        "rationale": "The CLI message names the exact file and line, which is what the issue asks; a new verb also needs a wrapper skill."
+      },
+      {
+        "summary": "Split the eight sibling remote-not-enabled messages into follow-up PAN-4908",
+        "rationale": "They are a separate bug (dead verb, no file named), touch 10 files nothing else here touches, and kept this plan over the 25-file finalize surface limit."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "21 files is under the file limit; the subsystem count exceeds 6 only because each top-level doc file (configuration/linked-machines.mdx, docs/fly-provider.md, docs/ANYWHERE-ARCHITECTURE.md) counts as its own subsystem. The code is one inseparable feature for one dialog: the refusal text, the pre-click state on GET /api/machines, and the Turn on remote door share the new src/lib/remote-enabled.ts helper and ship together; the separable part (sibling messages) is already split to PAN-4908.",
+      "canonicalFilename": "2026-11-03-PAN-4905-add-a-fly-machine-error-says-remote-enabled-must-be-set-in-the-overdeck-config-but-only-config-toml-works.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "remote-hint-module",
+        "title": "Create remote-enabled helper module with hint and yaml probe",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T15:44:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4905",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/remote-enabled.ts",
+            "src/lib/__tests__/remote-enabled.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/remote-enabled.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "remote-enabled.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4905.md WI-1. Create src/lib/remote-enabled.ts exporting displayPath(path), remoteEnabledHint(path = CONFIG_FILE) and async configYamlSetsRemoteEnabled(path = getGlobalConfigPath()) exactly as the PRD snippet shows; async fs only. Add src/lib/__tests__/remote-enabled.test.ts with temp-dir fixtures."
+        },
+        "items": [
+          {
+            "id": "remote-hint-module.ac1",
+            "title": "Given path /x/config.toml, remoteEnabledHint returns exactly: add `enabled = true` under `[remote]` in /x/config.toml",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remote-hint-module.ac2",
+            "title": "Given a path under the home directory, displayPath returns it with the home prefix replaced by ~",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remote-hint-module.ac3",
+            "title": "Given a config.yaml containing remote.enabled: true, configYamlSetsRemoteEnabled returns true; given only remote.resiliency_tier, a missing file, or unparseable YAML it returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "toml-enable-writer",
+        "title": "Add enableRemoteInConfigToml targeted config.toml writer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T15:44:06Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4905",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/remote-enabled.ts",
+            "src/lib/__tests__/remote-enabled.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/remote-enabled.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "remote-enabled.test.ts passes including the writer cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1"
+          ],
+          "foundationFor": [
+            "enable-remote-route",
+            "dialog-turn-on-remote"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4905.md WI-2. Add RemoteEnableError and enableRemoteInConfigToml(path = CONFIG_FILE) to src/lib/remote-enabled.ts following the 7-step algorithm in the PRD (parse, idempotent early return, replace-or-insert the enabled line in the [remote] table or append a [remote] table, re-parse and require remote.enabled === true, atomic write via writeFileAtomic from src/lib/model-presets/state.ts with mode 0o644). Never call saveConfig. Extend the test file."
+        },
+        "items": [
+          {
+            "id": "toml-enable-writer.ac1",
+            "title": "Given [remote] with enabled = false and comment lines elsewhere, the writer replaces only the enabled line and preserves every other line byte-for-byte",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "toml-enable-writer.ac2",
+            "title": "Given a config.toml whose remote.enabled is already true, the writer returns changed: false and leaves the file text unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "toml-enable-writer.ac3",
+            "title": "Given a missing config.toml, the writer creates a file that parses with remote.enabled === true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "toml-enable-writer.ac4",
+            "title": "Given an inline remote = { enabled = false } table or unparseable TOML, the writer rejects with RemoteEnableError and leaves the file unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fly-refusal-message",
+        "title": "Name config.toml and the yaml trap in the remote-disabled Fly refusal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T15:44:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4905",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/fly-machine-service.ts",
+            "src/dashboard/server/services/__tests__/fly-machine-service.test.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/AddFlyMachineDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/fly-machine-service.test.ts src/dashboard/frontend/src/components/Settings/anywhere/__tests__/AddFlyMachineDialog.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4905.md WI-3. In src/dashboard/server/services/fly-machine-service.ts add yamlSetsRemoteEnabled to FlyMachineServiceDeps and defaultDeps, and replace the line-177 message with the PRD's after-snippet. Update fly-machine-service.test.ts fakes and add two message tests; update the fixture text in AddFlyMachineDialog.test.tsx lines 72 and 76."
+        },
+        "items": [
+          {
+            "id": "fly-refusal-message.ac1",
+            "title": "Given remote.enabled is not true, addFlyMachine rejects with code remote-disabled and a message containing `enabled = true`, `[remote]` and config.toml",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fly-refusal-message.ac2",
+            "title": "Given config.yaml sets remote.enabled, the remote-disabled message also contains 'config.yaml sets remote.enabled, but that file does not hold this setting'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fly-refusal-message.ac3",
+            "title": "Given remote is off, addFlyMachine still rejects before provision is called (the existing it.each row keeps passing)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "machines-response-remote-enabled",
+        "title": "Report remoteEnabled and remoteConfigFile on GET /api/machines",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T15:44:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4905",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/machines.ts",
+            "src/dashboard/server/routes/machines.ts",
+            "src/dashboard/server/routes/__tests__/machines-remote-enabled.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/machines-remote-enabled.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "machines-remote-enabled.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ],
+          "foundationFor": [
+            "dialog-remote-off-notice",
+            "dialog-turn-on-remote"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4905.md WI-6. Add optional remoteEnabled (Boolean) and remoteConfigFile (String) to MachinesResponse.self in packages/contracts/src/machines.ts; fill them in buildMachinesResponse() in src/dashboard/server/routes/machines.ts from async loadConfig() and displayPath(CONFIG_FILE). Add a route test."
+        },
+        "items": [
+          {
+            "id": "machines-response-remote-enabled.ac1",
+            "title": "Given config.toml without [remote] enabled = true, GET /api/machines returns self.remoteEnabled false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "machines-response-remote-enabled.ac2",
+            "title": "Given config.toml with [remote] enabled = true, GET /api/machines returns self.remoteEnabled true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "machines-response-remote-enabled.ac3",
+            "title": "GET /api/machines returns self.remoteConfigFile ending in config.toml, and a MachinesResponse without either field still decodes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "enable-remote-route",
+        "title": "Add POST /api/machines/fly/enable-remote",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T15:44:06Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4905",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/machines-fly.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/routes/__tests__/machines-fly.test.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/machines-fly.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "NFR-3",
+            "NFR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4905.md WI-7. Add machinesFlyEnableRemoteRouteLayer in src/dashboard/server/routes/machines-fly.ts (channel 403, rejectUnsafeDashboardMutationRequest, enableRemoteInConfigToml, 200/409/500 bodies, activity entry when changed), register it in src/dashboard/server/server.ts next to machinesFlyRouteLayer, add the no-loss-matrix row, and add route tests."
+        },
+        "items": [
+          {
+            "id": "enable-remote-route.ac1",
+            "title": "Given remote off, POST /api/machines/fly/enable-remote returns 200 { ok: true, changed: true } and config.toml then parses with remote.enabled true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "enable-remote-route.ac2",
+            "title": "Given a request through a secure channel, the route returns 403 and writes nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "enable-remote-route.ac3",
+            "title": "Given the writer throws RemoteEnableError, the route returns 409 { error: 'remote-enable-failed', message }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "enable-remote-route.ac4",
+            "title": "The no-loss matrix test accepts the new route because its row exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dialog-remote-off-notice",
+        "title": "Show remote-off notice in the Add a Fly machine dialog before the click",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T15:44:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4905",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/AddFlyMachineDialog.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/MachinesPanel.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/AddFlyMachineDialog.test.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/MachinesPanel.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/Settings/anywhere/__tests__/AddFlyMachineDialog.test.tsx src/dashboard/frontend/src/components/Settings/anywhere/__tests__/MachinesPanel.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4905.md WI-8. In AddFlyMachineDialog.tsx query MACHINES_QUERY_KEY via loadMachines, render the data-testid=fly-remote-off notice and disable Add when self.remoteEnabled === false, rewrite the line-105 helper text and module header; in MachinesPanel.tsx show 'Add a Fly machine (remote off)' while off. Follow the pan-style-guide skill. Add tests. Browser verification (test/UAT) runs in an isolated Playwright profile against a dashboard started with a throwaway OVERDECK_HOME, never the operator's :3011 dashboard, because Turn on remote writes the real config.toml."
+        },
+        "items": [
+          {
+            "id": "dialog-remote-off-notice.ac1",
+            "title": "Given GET /api/machines returns self.remoteEnabled false, the dialog renders data-testid=fly-remote-off naming config.toml and the Add button is disabled before any click",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-remote-off-notice.ac2",
+            "title": "Given self.remoteEnabled true or absent, the dialog renders no remote-off notice and Add is enabled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-remote-off-notice.ac3",
+            "title": "Given self.remoteEnabled false, the Machines panel button text reads 'Add a Fly machine (remote off)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dialog-turn-on-remote",
+        "title": "Add Turn on remote button to the Add a Fly machine dialog",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T15:44:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4905",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/AddFlyMachineDialog.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/machinesApi.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/AddFlyMachineDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/Settings/anywhere/__tests__/AddFlyMachineDialog.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "AddFlyMachineDialog.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4905.md WI-9. Add enableRemote() to machinesApi.ts; render a Turn on remote button inside the remote-off notice and whenever a POST /api/machines/fly returns error remote-disabled; on success toast, clear the error and invalidate MACHINES_QUERY_KEY; on failure show body.message in the role=alert element. Add tests. Browser verification (test/UAT) runs in an isolated Playwright profile against a dashboard started with a throwaway OVERDECK_HOME, never the operator's :3011 dashboard, because Turn on remote writes the real config.toml."
+        },
+        "items": [
+          {
+            "id": "dialog-turn-on-remote.ac1",
+            "title": "When the operator clicks Turn on remote, the dialog POSTs /api/machines/fly/enable-remote and refetches /api/machines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-turn-on-remote.ac2",
+            "title": "Given the refetch returns self.remoteEnabled true, the remote-off notice disappears and Add becomes enabled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-turn-on-remote.ac3",
+            "title": "Given the enable route returns 409 with a message, the dialog renders that message in its role=alert element",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-turn-on-remote.ac4",
+            "title": "Given POST /api/machines/fly returns 409 remote-disabled, the dialog renders the Turn on remote button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "config-set-remote-enabled-guard",
+        "title": "Refuse pan admin config set remote.enabled",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T15:44:06Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-4905",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/config-set.ts",
+            "tests/unit/cli/config-set.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/config-set.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "config-set.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4905.md WI-10. In src/cli/commands/config-set.ts configSetCommand, after the key-pattern check, refuse key remote.enabled with exit 1 and the stderr text from the PRD; add a header comment line and a test in tests/unit/cli/config-set.test.ts."
+        },
+        "items": [
+          {
+            "id": "config-set-remote-enabled-guard.ac1",
+            "title": "Given key remote.enabled, configSetCommand returns 1 and stderr contains config.toml and `enabled = true`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-set-remote-enabled-guard.ac2",
+            "title": "Given key remote.enabled and no config.yaml, configSetCommand does not create config.yaml",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-remote-enabled-home",
+        "title": "Document config.toml as the only home of remote.enabled and the Turn on remote button",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T15:44:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4905",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/linked-machines.mdx",
+            "docs/fly-provider.md",
+            "docs/ANYWHERE-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"enabled = true\" configuration/linked-machines.mdx",
+            "grep -n \"enable-remote\" docs/ANYWHERE-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "linked-machines.mdx shows the [remote] / enabled = true TOML lines",
+            "ANYWHERE-ARCHITECTURE.md names POST /api/machines/fly/enable-remote"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4905.md WI-11. Update configuration/linked-machines.mdx Setup section, docs/fly-provider.md Config field reference, and docs/ANYWHERE-ARCHITECTURE.md 'Adding (addFlyMachine)' section with the content listed in the PRD."
+        },
+        "items": [
+          {
+            "id": "docs-remote-enabled-home.ac1",
+            "title": "configuration/linked-machines.mdx Setup shows the TOML lines [remote] and enabled = true and states that config.yaml's remote: section does not turn remote on",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-remote-enabled-home.ac2",
+            "title": "configuration/linked-machines.mdx describes the dialog's Remote is off notice and Turn on remote button, and that pan admin config set remote.enabled refuses",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-remote-enabled-home.ac3",
+            "title": "docs/fly-provider.md contains a note under its field table saying every remote.* key in the table lives in config.toml",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-remote-enabled-home.ac4",
+            "title": "docs/ANYWHERE-ARCHITECTURE.md contains a paragraph for POST /api/machines/fly/enable-remote and shows MachinesResponse.self.remoteEnabled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "remote-hint-module",
+        "to": "toml-enable-writer",
+        "type": "blocks"
+      },
+      {
+        "from": "remote-hint-module",
+        "to": "fly-refusal-message",
+        "type": "blocks"
+      },
+      {
+        "from": "remote-hint-module",
+        "to": "config-set-remote-enabled-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "remote-hint-module",
+        "to": "machines-response-remote-enabled",
+        "type": "blocks"
+      },
+      {
+        "from": "toml-enable-writer",
+        "to": "enable-remote-route",
+        "type": "blocks"
+      },
+      {
+        "from": "machines-response-remote-enabled",
+        "to": "dialog-remote-off-notice",
+        "type": "blocks"
+      },
+      {
+        "from": "fly-refusal-message",
+        "to": "dialog-remote-off-notice",
+        "type": "blocks"
+      },
+      {
+        "from": "dialog-remote-off-notice",
+        "to": "dialog-turn-on-remote",
+        "type": "blocks"
+      },
+      {
+        "from": "enable-remote-route",
+        "to": "dialog-turn-on-remote",
+        "type": "blocks"
+      },
+      {
+        "from": "fly-refusal-message",
+        "to": "dialog-turn-on-remote",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
