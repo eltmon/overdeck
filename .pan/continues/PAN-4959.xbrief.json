@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4959",
   "created": "2026-11-03T21:54:38.804Z",
-  "updated": "2026-11-03T23:25:43.989Z",
+  "updated": "2026-11-03T23:26:03.691Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -180,6 +180,10 @@
     "account-delete.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T23:25:43.989Z"
+    },
+    "account-delete.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:26:03.690Z"
     }
   }
 }
