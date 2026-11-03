@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4882",
   "created": "2026-11-03T06:27:51.535Z",
-  "updated": "2026-11-03T06:31:29.521Z",
+  "updated": "2026-11-03T06:32:46.264Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -19,6 +19,11 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-4882",
       "claimedAt": "2026-11-03T06:31:29.520Z"
+    },
+    "ssh-vm-setup": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4882",
+      "claimedAt": "2026-11-03T06:32:46.264Z"
     }
   }
 }
