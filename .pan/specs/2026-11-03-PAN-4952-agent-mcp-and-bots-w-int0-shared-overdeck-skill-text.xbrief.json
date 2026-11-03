@@ -1,0 +1,380 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-03T21:37:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4952: Agent MCP and bots (W-INT0): Shared Overdeck skill text",
+    "updated": "2026-11-03T21:40:41.621Z"
+  },
+  "plan": {
+    "id": "pan-4952",
+    "title": "Agent MCP and bots (W-INT0): Shared Overdeck skill text",
+    "status": "proposed",
+    "uid": "9e85dfdb-0184-42ea-a227-f5756bc7a4f2",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-03T21:37:00Z",
+    "updated": "2026-11-03T21:40:41.621Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4952",
+        "label": "PAN-4952",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4927",
+        "label": "PAN-4927 (epic)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-4952.md",
+        "label": "PRD",
+        "type": "document"
+      },
+      {
+        "uri": ".pan/drafts/pan-4927.md",
+        "label": "Epic PRD, work item W-INT0",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "integrations",
+      "mcp",
+      "bots",
+      "skill",
+      "pan-4927"
+    ],
+    "narratives": {
+      "Problem": "The PAN-4927 epic ships four outside-bot plugins (Hermes, OpenClaw, Grok Build, Grok Bot). Each bundles a skill that tells the bot what Overdeck is, which tools to call and which safety rules to follow. Four hand-written skills would drift apart, and integrations/ does not exist yet.",
+      "Proposal": "Write the skill once in integrations/shared/SKILL.md (exact text in the PRD section 'The skill text'), add integrations/shared/sync-skill.mjs that copies it byte-for-byte to integrations/<platform>/skills/overdeck/SKILL.md for hermes, openclaw, grok-build and grok-bot and, with --check, exits 1 when a copy differs or is missing. Commit the four generated copies, guard them with tests/unit/integrations/sync-skill.test.ts (runs in the existing CI vitest shards), and add integrations/README.md and integrations/LICENSE (byte copy of the root MIT LICENSE).",
+      "NonGoals": "- No edit to .github/workflows/ (the integrations CI job is W-CI1)\n- No plugin manifest, plugin code, per-package README, PUBLISHING.md, CHANGELOG.md or per-package LICENSE (W-INT1 to W-INT4)\n- No change to src/lib/mcp/ tools or their descriptions\n- No change to package.json files or Bun workspaces; integrations/ is not part of @overdeck/core\n- No generated-file banner in the skill or its copies, and no frontmatter keys beyond single-line name and description\n- No edit to the epic PRD .pan/drafts/pan-4927.md\n- No npm dependency for the sync script; Node built-ins only\n- Nothing is published to any registry"
+    },
+    "autoDecisions": [
+      {
+        "summary": "The skill names only the ten MCP tools that exist today (list_machines, list_conversations, search_conversations, read_conversation, send_message, start_conversation, start_worker, list_pending_input, answer_question, answer_permission), describes later tools by capability, and says the client's tool list is authoritative.",
+        "rationale": "W-INT0 has no dependency in the epic, so it can land before W-DEL1, W-SCHED1, W-APPR1 and W-PR1 add their tools; naming tools that do not exist would mislead a bot."
+      },
+      {
+        "summary": "The epic's 'never poll, use the wait tools' rule is rephrased as: do not call a read tool in a loop; when a tool answer has a next field, call that tool with those arguments.",
+        "rationale": "Every wait tool in the epic is audience 'agent', so a bot never sees one; the rephrased rule is true for every caller."
+      },
+      {
+        "summary": "Frontmatter is single-line name and description only.",
+        "rationale": "The same bytes go to four loaders; OpenClaw's embedded parser reads single-line keys only and every loader requires exactly these two keys."
+      },
+      {
+        "summary": "The sync script takes --root <dir> to run against a temp fixture.",
+        "rationale": "Lets the test prove the fail path without touching the real copies; same pattern as scripts/lint-dist-externals.mjs and its test."
+      },
+      {
+        "summary": "A missing copy counts as drift (exit 1, 'is missing'); bad usage exits 2.",
+        "rationale": "AC-24 requires --check to fail whenever a copy does not match, and a missing copy cannot match."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Four small items in one new directory plus one new test file; one subsystem (integrations).",
+      "canonicalFilename": "2026-11-03-PAN-4952-agent-mcp-and-bots-w-int0-shared-overdeck-skill-text.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "skill-text",
+        "title": "Write integrations/shared/SKILL.md with the exact skill text from the PRD",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T21:37:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4952",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "integrations/shared/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "head -4 integrations/shared/SKILL.md",
+            "wc -l -c integrations/shared/SKILL.md"
+          ],
+          "expected_outputs": [
+            "first four lines are ---, name: overdeck, a description: line, ---",
+            "wc reports at most 100 lines and at most 6000 bytes (the PRD text is 76 lines, 3622 bytes)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create integrations/shared/SKILL.md containing exactly the text between the four-backtick fences in the PRD section 'The skill text' (.pan/drafts/pan-4952.md), ending with one newline, LF line endings. Do not reword, trim, add frontmatter keys, add a banner, or add a references/ folder."
+        },
+        "items": [
+          {
+            "id": "skill-text.ac1",
+            "title": "Given the new file, when its first four lines are read, then they are '---', 'name: overdeck', a line starting 'description: Watch and steer Overdeck', and '---'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-text.ac2",
+            "title": "The file contains the headings '## Tool names and access', '## Tool groups' and '## Safety rules', and the safety section has six numbered rules matching the PRD text byte-for-byte",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-text.ac3",
+            "title": "When wc -l -c runs on the file, then it prints at most 100 lines and at most 6000 bytes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sync-script",
+        "title": "Add integrations/shared/sync-skill.mjs with fixture tests",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T21:37:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-4952",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "integrations/shared/sync-skill.mjs",
+            "tests/unit/integrations/sync-skill.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/integrations/sync-skill.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "tests/unit/integrations/sync-skill.test.ts: 5 tests pass",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Write integrations/shared/sync-skill.mjs to the PRD section 'The sync script contract' (ES module, Node built-ins only, top-level await, process.exitCode; PLATFORMS = hermes, openclaw, grok-build, grok-bot; --check and --root <dir>; exit 0/1/2 and the exact messages listed there; Buffer.equals comparison; mkdir recursive before each write). chmod +x it. Write tests/unit/integrations/sync-skill.test.ts per PRD W-2 steps 2-3: spawnSync(process.execPath, [SCRIPT, ...args]) against mkdtemp fixture roots, five tests in describe('sync-skill.mjs (fixture root)'): writes four byte-identical copies; check passes after sync; check fails and names only the edited openclaw copy and leaves it unmodified; check fails on a deleted grok-bot copy with 'is missing'; unknown flag exits 2 with 'usage:'. Clean every fixture root in afterEach."
+        },
+        "items": [
+          {
+            "id": "sync-script.ac1",
+            "title": "Given a fixture root holding only integrations/shared/SKILL.md, when 'node sync-skill.mjs --root <root>' runs, then it exits 0, prints 'skill copies: 4 updated, 0 unchanged' and creates the four copies byte-identical to the source",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-script.ac2",
+            "title": "Given a synced fixture root with one appended byte in the openclaw copy, when '--check --root <root>' runs, then it exits 1, stderr names integrations/openclaw/skills/overdeck/SKILL.md as differing and no other copy, and the edited copy is unchanged afterwards",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-script.ac3",
+            "title": "Given a synced fixture root with the grok-bot copy deleted, when '--check --root <root>' runs, then it exits 1 and stderr contains 'integrations/grok-bot/skills/overdeck/SKILL.md is missing'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-script.ac4",
+            "title": "When the script runs with an unknown flag, then it exits 2 and stderr contains 'usage:'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-script.ac5",
+            "title": "The script imports only node: built-in modules (grep -E \"from '\" integrations/shared/sync-skill.mjs shows only node: specifiers)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skill-copies",
+        "title": "Generate and commit the four skill copies with a real-repo guard test",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T21:37:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4952",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "integrations/hermes/skills/overdeck/SKILL.md",
+            "integrations/openclaw/skills/overdeck/SKILL.md",
+            "integrations/grok-build/skills/overdeck/SKILL.md",
+            "integrations/grok-bot/skills/overdeck/SKILL.md",
+            "tests/unit/integrations/sync-skill.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node integrations/shared/sync-skill.mjs --check",
+            "npx vitest run tests/unit/integrations/sync-skill.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "prints '✓ 4 skill copies match integrations/shared/SKILL.md' and exits 0",
+            "tests/unit/integrations/sync-skill.test.ts: 8 tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "From the repo root run 'node integrations/shared/sync-skill.mjs' and commit the four generated copies unchanged. Extend tests/unit/integrations/sync-skill.test.ts with describe('integrations/ in this repository') holding three tests (PRD W-3 step 2): run(['--check']) with no --root exits 0; the shared skill's first four lines are '---', 'name: overdeck', a 'description: ' line with no further ': ', '---'; the shared skill is at most 100 lines and 6000 bytes. Then prove the fail half of AC-24 by hand: append a byte to one copy, confirm --check exits 1, and restore it by re-running the sync script (never git checkout or git stash). git status --short integrations/ must be clean before committing."
+        },
+        "items": [
+          {
+            "id": "skill-copies.ac1",
+            "title": "Given the committed tree, when 'node integrations/shared/sync-skill.mjs --check' runs from the repo root, then it exits 0 and prints '✓ 4 skill copies match integrations/shared/SKILL.md'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-copies.ac2",
+            "title": "Given one committed copy with an appended byte, when --check runs, then it exits 1 and names that copy; re-running the sync script restores it and --check exits 0 again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-copies.ac3",
+            "title": "cmp integrations/shared/SKILL.md integrations/<platform>/skills/overdeck/SKILL.md exits 0 for each of hermes, openclaw, grok-build and grok-bot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-copies.ac4",
+            "title": "When npx vitest run tests/unit/integrations/sync-skill.test.ts runs, then it prints 8 passed tests, including the three real-repository tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "integrations-readme",
+        "title": "Add integrations/README.md and integrations/LICENSE",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T21:37:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4952",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "integrations/README.md",
+            "integrations/LICENSE*"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cmp LICENSE integrations/LICENSE",
+            "grep -c 'node integrations/shared/sync-skill.mjs' integrations/README.md"
+          ],
+          "expected_outputs": [
+            "cmp exits 0 with no output",
+            "grep prints 2 or more"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Run 'cp LICENSE integrations/LICENSE' (no edits). Write integrations/README.md with exactly the content between the four-backtick fences in PRD W-4 step 2: the directory table (hermes, openclaw, grok-build, grok-bot, shared), 'The shared skill' section (edit only shared/SKILL.md, run node integrations/shared/sync-skill.mjs, never edit a copy, --check exits 1 on drift and tests/unit/integrations/sync-skill.test.ts runs it in CI, single-line frontmatter and the 100-line/6000-byte budget), and 'Publishing' (operator-approved step, PAN-4927 D-5)."
+        },
+        "items": [
+          {
+            "id": "integrations-readme.ac1",
+            "title": "cmp LICENSE integrations/LICENSE exits 0 (byte copy of the root MIT license)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "integrations-readme.ac2",
+            "title": "integrations/README.md renders a table naming the hermes/, openclaw/, grok-build/, grok-bot/ and shared/ directories",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "integrations-readme.ac3",
+            "title": "integrations/README.md contains 'shared/SKILL.md' as the only file to edit, and contains both 'node integrations/shared/sync-skill.mjs' and its '--check' form",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "integrations-readme.ac4",
+            "title": "integrations/README.md contains a Publishing section saying publishing is a separate operator-approved step, citing PAN-4927 decision D-5",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "skill-text",
+        "to": "skill-copies",
+        "type": "blocks"
+      },
+      {
+        "from": "sync-script",
+        "to": "skill-copies",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
