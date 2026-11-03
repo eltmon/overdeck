@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4837",
   "created": "2026-11-03T16:16:59.604Z",
-  "updated": "2026-11-03T18:37:28.158Z",
+  "updated": "2026-11-03T18:37:29.512Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -164,6 +164,11 @@
       "claimedBy": "agent-pan-4837",
       "claimedAt": "2026-11-03T17:48:24.314Z",
       "doneAt": "2026-11-03T17:49:51.836Z"
+    },
+    "cp3-cp4-checkpoints": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4837",
+      "claimedAt": "2026-11-03T18:37:29.512Z"
     }
   }
 }
