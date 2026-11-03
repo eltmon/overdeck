@@ -4,17 +4,17 @@
     "created": "2026-11-03T17:30:39Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4478: Shared Sessions v0 (slice 7): controller handoff and reclaim",
-    "updated": "2026-11-03T17:35:12.351Z"
+    "updated": "2026-11-03T17:36:18.573Z"
   },
   "plan": {
     "id": "pan-4478",
     "title": "Shared Sessions v0 (slice 7): controller handoff and reclaim",
-    "status": "proposed",
+    "status": "running",
     "uid": "70e5bb71-3cdb-4f71-9f32-eb36ba1dd2fd",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-03T17:30:39Z",
-    "updated": "2026-11-03T17:35:12.351Z",
+    "updated": "2026-11-03T17:36:18.573Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4478",
@@ -954,5 +954,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
