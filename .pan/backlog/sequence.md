@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T17:10:59.371941Z · model: claude-opus-5-5 · open: 867_
+_Last sequenced: 2026-11-03T17:15:41.029063Z · model: claude-opus-5-5 · open: 866_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -393,7 +393,6 @@ _Last sequenced: 2026-11-03T17:10:59.371941Z · model: claude-opus-5-5 · open: 
 | 393 | PAN-3014 | XS | medium | ok |  |  | Background title/about spawns use --bare, which now skips credential reads, so every one fails 'Not logged in' with empty stderr. |
 | 394 | PAN-3944 | S | medium | needs-refinement |  |  | Main fix landed (host-backed targets skip Herdr agent.prompt); remaining: buffer bracketed paste in the app-server host, placeholder guard |
 | 395 | PAN-4208 | M | medium | ok |  |  | #4205 follow-ups: Effect-free config read for telemetry to hit <100ms pan --version; CI import test for lazy command targets |
-| 396 | PAN-4476 | M | medium | ok |  |  | Shared Sessions slice 5: prompt drafts, contributor direct-submit and host FIFO submit queue |
 | 397 | PAN-3829 | L | medium | ok |  |  | Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main) |
 | 398 | PAN-2280 | M | medium | ok |  |  | Resumed conversations wedge without writing transcripts when dashboard is black-holed |
 | 399 | PAN-2197 | S | medium | ok |  |  | work agents skip `pan done` (manual push instead) |
@@ -417,7 +416,7 @@ _Last sequenced: 2026-11-03T17:10:59.371941Z · model: claude-opus-5-5 · open: 
 | 417 | PAN-3890 | S | medium | ok |  |  | opencode provider stream errors (rate limit) are invisible in the feed and never retried; first message dies silently |
 | 418 | PAN-3822 | L | medium | ok |  |  | PRD landed (12 items, FR-1..14): link PRs to conversations via branch detection + explicit override; unblocks PAN-3920 |
 | 419 | PAN-4479 | M | medium | ok |  |  | Shared Sessions slice 8: host reconnect inside the 5-minute window and viewer auto-restore |
-| 420 | PAN-4478 | S | medium | ok |  | PAN-4476 | Shared Sessions slice 7: controller handoff and data-owner reclaim, enforced host-side |
+| 420 | PAN-4478 | S | medium | ok |  |  | Shared Sessions slice 7: controller handoff and data-owner reclaim, enforced host-side |
 | 421 | PAN-1673 | S | medium | ok |  |  | Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
 | 422 | PAN-1669 | S | medium | ok |  |  | restart-with-model doesn't emit a live event |
 | 423 | PAN-1668 | S | medium | ok |  |  | right-click 'restart with <model>' carries model only, never harness |
@@ -448,7 +447,7 @@ _Last sequenced: 2026-11-03T17:10:59.371941Z · model: claude-opus-5-5 · open: 
 | 448 | PAN-4151 | L | medium | needs-refinement |  | PAN-3822 | Deferred remainder of PAN-3822/#4067: GitLab MR sync, PR page + search, handoff link copy, diffstat, link-dialog a11y, sync throttle |
 | 449 | PAN-1330 | S | medium | ok |  |  | CLI cannot address planning-*/specialist-* sessions |
 | 450 | PAN-4481 | M | medium | ok |  |  | Shared Sessions slice 10: hosted web join page; awaits operator decision OD-1 on sign-in without a local install |
-| 451 | PAN-4482 | S | medium | ok |  | PAN-4476, PAN-4477, PAN-4478, PAN-4479, PAN-4480, PAN-4481 | Shared Sessions slice 11: signaling-privacy e2e, forced-TURN check (operator checkpoint) and full AC sweep |
+| 451 | PAN-4482 | S | medium | ok |  | PAN-4477, PAN-4478, PAN-4479, PAN-4480, PAN-4481 | Shared Sessions slice 11: signaling-privacy e2e, forced-TURN check (operator checkpoint) and full AC sweep |
 | 452 | PAN-1226 | L | medium | ok |  |  | PAN-1148 unified-dashboard redesign |
 | 453 | PAN-1173 | S | medium | ok |  |  | pan show <bare-number> derives wrong agent ID for PAN-prefixed issues |
 | 454 | PAN-1154 | M | medium | ok |  |  | pan up does not kill existing port holders |
@@ -1202,10 +1201,10 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T17:10:59.371941Z",
+  "generatedAt": "2026-11-03T17:15:41.029063Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 867,
+  "openCount": 866,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -6073,18 +6072,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-4476",
-      "rank": 396,
-      "size": "M",
-      "importance": "medium",
-      "score": 56,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Shared Sessions slice 5: prompt drafts, contributor direct-submit and host FIFO submit queue",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3829",
       "rank": 397,
       "size": "L",
@@ -6371,9 +6358,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "importance": "medium",
       "score": 52,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4476"
-      ],
+      "dependsOn": [],
       "why": "Shared Sessions slice 7: controller handoff and data-owner reclaim, enforced host-side",
       "gate": "auto",
       "planning": "auto"
@@ -6757,7 +6742,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "score": 50,
       "condition": "ok",
       "dependsOn": [
-        "PAN-4476",
         "PAN-4477",
         "PAN-4478",
         "PAN-4479",
@@ -12825,22 +12809,8 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "confidence": 1
     },
     {
-      "from": "PAN-4476",
-      "to": "PAN-4478",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4409",
       "to": "PAN-4410",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4476",
-      "to": "PAN-4482",
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
