@@ -12,9 +12,11 @@
  * `pan conv reclaim` does (NFR-2).
  *
  * The transfer settles with an empty in-memory vault index, so it carries the
- * whole transcript and never moves this machine's real vault tail. Transfer
- * directories live under `${OVERDECK_HOME}/pull-transfers/<transferId>/` and
- * are deleted on complete, on undo, or 15 minutes after creation.
+ * whole transcript and never moves this machine's real vault tail. It is
+ * titled with the owner's conversation title, so the adopted conversation
+ * keeps it. Transfer directories live under
+ * `${OVERDECK_HOME}/pull-transfers/<transferId>/` and are deleted on
+ * complete, on undo, or 15 minutes after creation.
  */
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
@@ -197,6 +199,8 @@ async function buildTransfer(
     keys: deriveSubkeys(key),
     wip: 'force',
     index: memoryIndex(),
+    // The adopted conversation takes the record title; keep the owner's (PAN-4904).
+    ...(conv.title ? { recordTitle: conv.title } : {}),
   });
   if (result.verdict !== 'append') {
     const detail = result.verdict === 'blocked'
