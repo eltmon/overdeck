@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4959",
   "created": "2026-11-03T21:54:38.804Z",
-  "updated": "2026-11-03T23:22:24.095Z",
+  "updated": "2026-11-03T23:22:40.376Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -140,6 +140,10 @@
     "account-directory-client.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T23:22:24.094Z"
+    },
+    "account-directory-client.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:22:40.376Z"
     }
   }
 }
