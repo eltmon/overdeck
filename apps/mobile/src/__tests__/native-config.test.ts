@@ -39,4 +39,22 @@ describe('native project config', () => {
     expect(read('ios/App/App/SceneDelegate.swift')).toContain('window?.rootViewController = MainViewController()');
     expect(read('ios/App/App.xcodeproj/project.pbxproj')).toContain('/* MainViewController.swift in Sources */,');
   });
+
+  it('signs the App with the push entitlement and the private then shared Keychain groups (PAN-4838 WI-3)', () => {
+    const entitlements = read('ios/App/App/App.entitlements');
+    expect(entitlements).toContain('<key>aps-environment</key>');
+    const privateGroup = entitlements.indexOf('<string>$(AppIdentifierPrefix)ai.overdeck.app</string>');
+    const sharedGroup = entitlements.indexOf('<string>$(AppIdentifierPrefix)ai.overdeck.shared</string>');
+    expect(privateGroup).toBeGreaterThan(-1);
+    expect(sharedGroup).toBeGreaterThan(privateGroup);
+
+    expect(read('ios/App/App/Info.plist')).toMatch(
+      /<key>OverdeckSharedKeychainGroup<\/key>\s*<string>\$\(AppIdentifierPrefix\)ai\.overdeck\.shared<\/string>/,
+    );
+
+    const pbxproj = read('ios/App/App.xcodeproj/project.pbxproj');
+    expect(pbxproj.split('CODE_SIGN_ENTITLEMENTS = App/App.entitlements;')).toHaveLength(3);
+    expect(pbxproj).toContain('relativePath = ../OverdeckPush;');
+    expect(pbxproj).not.toContain('KeychainStore.swift in Sources');
+  });
 });
