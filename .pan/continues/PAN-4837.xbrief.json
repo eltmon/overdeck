@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4837",
   "created": "2026-11-03T16:16:59.604Z",
-  "updated": "2026-11-03T19:04:55.551Z",
+  "updated": "2026-11-03T19:05:29.601Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -336,6 +336,10 @@
     "qr-scanner-extract.ac2": {
       "status": "completed",
       "doneAt": "2026-11-03T19:04:55.550Z"
+    },
+    "pairing-flow.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T19:05:29.601Z"
     }
   }
 }
