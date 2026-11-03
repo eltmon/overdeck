@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4882",
   "created": "2026-11-03T06:27:51.535Z",
-  "updated": "2026-11-03T07:36:03.809Z",
+  "updated": "2026-11-03T07:36:05.884Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,6 +74,11 @@
       "claimedBy": "agent-pan-4882",
       "claimedAt": "2026-11-03T07:35:41.894Z",
       "doneAt": "2026-11-03T07:36:03.809Z"
+    },
+    "relay-tcp443-variant": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4882",
+      "claimedAt": "2026-11-03T07:36:05.883Z"
     }
   }
 }
