@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4481",
   "created": "2026-11-03T15:57:16.582Z",
-  "updated": "2026-11-03T16:48:19.618Z",
+  "updated": "2026-11-03T16:50:57.378Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -68,6 +68,10 @@
       "claimedBy": "agent-pan-4481",
       "claimedAt": "2026-11-03T16:46:10.962Z",
       "doneAt": "2026-11-03T16:48:19.618Z"
+    },
+    "account-share-redirect.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:50:57.377Z"
     }
   }
 }
