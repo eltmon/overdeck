@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4474",
   "created": "2026-11-03T06:56:27.161Z",
-  "updated": "2026-11-03T07:59:15.378Z",
+  "updated": "2026-11-03T07:59:40.826Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -226,6 +226,10 @@
     "share-manager-wiring.ac4": {
       "status": "completed",
       "doneAt": "2026-11-03T07:59:15.378Z"
+    },
+    "share-worker-e2e.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:59:40.825Z"
     }
   }
 }
