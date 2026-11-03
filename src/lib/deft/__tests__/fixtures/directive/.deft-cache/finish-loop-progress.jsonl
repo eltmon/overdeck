@@ -1,0 +1,3 @@
+{"schemaVersion":1,"ts":"2026-11-02T15:00:00Z","phase":"pr-open","iteration":1,"haltReason":null,"message":"opened PR #12","prNumber":12,"exitCode":null}
+{"schemaVersion":1,"ts":"2026-11-02T15:30:00Z","phase":"pr-watch","iteration":1,"haltReason":null,"message":"pr:watch verdict=NEW_P0_P1","prNumber":12,"exitCode":1}
+{"schemaVersion":1,"ts":"2026-11-02T16:10:00Z","phase":"address","iteration":2,"haltReason":null,"message":"addressed 2 findings","prNumber":12,"exitCode":0}

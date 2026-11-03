@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "esc-20261102120000-aaaaaa",
+  "agentId": "impl-1",
+  "type": "cmd_approval",
+  "title": "Run the database migration",
+  "body": "npm run migrate drops the old table.",
+  "contextRefs": [],
+  "createdAt": "2026-11-02T12:00:00Z",
+  "slaHours": 1,
+  "status": "open",
+  "dangerous": true,
+  "resolution": null
+}
