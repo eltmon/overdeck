@@ -12,6 +12,9 @@
  * draft on `drafts` and `submit` writes a contributor prompt on `control`, each with that channel's
  * next seq. A message keeps `author` only when it has a string login and an https avatar URL.
  *
+ * Control (PAN-4478): the host's `identity` (this viewer's own id) and `command-ack` come in on
+ * `control`; a viewer-controller's `command` and `controller-send` go out on it.
+ *
  * A new offer closes the old peer first (D-11). A peer that fails or closes on its own reports
  * phase `lost`; `close()` stops every callback.
  */
@@ -29,6 +32,8 @@ import {
   type PresenceParticipant,
   type PresencePayload,
   type SharedChannel,
+  type SharedCommandRefusal,
+  type SharedControllerCommand,
   type SharedEnvelope,
   type SharedHello,
   type SharedMessage,
@@ -56,6 +61,14 @@ export interface SubmitAck {
   readonly reason?: SharedSubmitReason;
 }
 
+/** A host `command-ack`, rebuilt from known keys (PAN-4478). */
+export interface CommandAck {
+  readonly clientId: string;
+  readonly status: 'accepted' | 'rejected';
+  readonly position?: number;
+  readonly reason?: SharedCommandRefusal;
+}
+
 export interface WebRtcViewerCallbacks {
   /** The full list after every change. */
   onMessages(messages: readonly SharedMessage[]): void;
@@ -69,6 +82,9 @@ export interface WebRtcViewerCallbacks {
   onDraftSent?(): void;
   /** Once per negotiation, right after the hello reply: `sendDraft` and `submit` now work. */
   onReady?(): void;
+  /** The host told this viewer its own GitHub id (PAN-4478). */
+  onIdentity?(githubId: number): void;
+  onCommandAck?(ack: CommandAck): void;
 }
 
 type Candidate = NonNullable<SignalData['candidate']>;
@@ -77,6 +93,11 @@ const ROLES: ReadonlySet<string> = new Set(['user', 'assistant', 'system']);
 const ACK_STATUSES: ReadonlySet<string> = new Set(['queued', 'sent', 'rejected']);
 const SUBMIT_REASONS: ReadonlySet<string> = new Set([
   'not_contributor', 'invalid_prompt', 'too_long', 'queue_full', 'grant_revoked', 'delivery_refused', 'delivery_unknown',
+]);
+const COMMAND_ACK_STATUSES: ReadonlySet<string> = new Set(['accepted', 'rejected']);
+const COMMAND_REFUSALS: ReadonlySet<string> = new Set([
+  'not_controller', 'unknown_participant', 'invalid_target', 'invalid_command', 'not_connected',
+  'invalid_prompt', 'too_long', 'queue_full',
 ]);
 
 /** One answered offer: its peer connection, channels and decoding state. */
@@ -135,6 +156,17 @@ function readSubmitAck(raw: Record<string, unknown>): SubmitAck | null {
   };
   if (typeof raw.position === 'number' && Number.isSafeInteger(raw.position) && raw.position > 0) ack.position = raw.position;
   if (typeof raw.reason === 'string' && SUBMIT_REASONS.has(raw.reason)) ack.reason = raw.reason as SharedSubmitReason;
+  return ack;
+}
+
+function readCommandAck(raw: Record<string, unknown>): CommandAck | null {
+  if (typeof raw.clientId !== 'string' || typeof raw.status !== 'string' || !COMMAND_ACK_STATUSES.has(raw.status)) return null;
+  const ack: { clientId: string; status: CommandAck['status']; position?: number; reason?: SharedCommandRefusal } = {
+    clientId: raw.clientId,
+    status: raw.status as CommandAck['status'],
+  };
+  if (typeof raw.position === 'number' && Number.isSafeInteger(raw.position) && raw.position > 0) ack.position = raw.position;
+  if (typeof raw.reason === 'string' && COMMAND_REFUSALS.has(raw.reason)) ack.reason = raw.reason as SharedCommandRefusal;
   return ack;
 }
 
@@ -198,6 +230,18 @@ export class WebRtcViewer {
   /** Sends a contributor prompt on `control`; false before the hello reply or when the channel is not open. */
   submit(clientId: string, text: string): boolean {
     return this.sendOn('control', { kind: 'submit', clientId, text });
+  }
+
+  /** Sends a controller command on `control`; false before the hello reply or when the channel is not open. */
+  command(clientId: string, command: SharedControllerCommand): boolean {
+    return this.sendOn('control', { kind: 'command', clientId, command });
+  }
+
+  /** Sends a controller prompt on `control`; same conditions as `command`. */
+  controllerSend(clientId: string, text: string, draftGithubId?: number): boolean {
+    return this.sendOn('control', draftGithubId === undefined
+      ? { kind: 'controller-send', clientId, text }
+      : { kind: 'controller-send', clientId, text, draftGithubId });
   }
 
   close(): void {
@@ -315,8 +359,18 @@ export class WebRtcViewer {
   }
 
   private onControl(negotiation: Negotiation, channel: RTCDataChannel, envelope: SharedEnvelope): void {
-    const payload = envelope.payload as { kind?: unknown; hello?: unknown; code?: unknown } | null;
+    const payload = envelope.payload as { kind?: unknown; hello?: unknown; code?: unknown; githubId?: unknown } | null;
     if (typeof payload !== 'object' || payload === null) return;
+    if (payload.kind === 'identity') {
+      const githubId = payload.githubId;
+      if (typeof githubId === 'number' && Number.isSafeInteger(githubId) && githubId > 0) this.callbacks.onIdentity?.(githubId);
+      return;
+    }
+    if (payload.kind === 'command-ack') {
+      const ack = readCommandAck(payload as Record<string, unknown>);
+      if (ack) this.callbacks.onCommandAck?.(ack);
+      return;
+    }
     if (payload.kind === 'submit-ack') {
       const ack = readSubmitAck(payload as Record<string, unknown>);
       if (ack) this.callbacks.onSubmitAck?.(ack);

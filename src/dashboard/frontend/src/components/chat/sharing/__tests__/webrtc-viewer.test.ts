@@ -6,6 +6,7 @@ import {
   readPresence,
   readSharedMessage,
   WebRtcViewer,
+  type CommandAck,
   type SubmitAck,
   type ViewerNotice,
   type ViewerPeerPhase,
@@ -418,6 +419,51 @@ describe('WebRtcViewer drafts and submits (PAN-4476 WI-10)', () => {
     expect(readPresence({ controllerGithubId: 1, participants: [], streams: [stream] })?.streams).toEqual([stream]);
     expect(readPresence({ controllerGithubId: 1, participants: [], streams: [{ ...stream, agentWorking: 'yes', queued: -1 }] })?.streams).toEqual([
       { streamId: 'conv-a', label: 'Fix it', kind: 'conversation' },
+    ]);
+  });
+});
+
+describe('WebRtcViewer controller commands (PAN-4478 WI-5)', () => {
+  const sentEnvelopes = (channel: FakeChannel) => channel.sent.map((part) => JSON.parse(part) as SharedEnvelope);
+
+  it('reports the host identity and command acks, dropping unknown reasons', async () => {
+    const h = harness();
+    const identities: number[] = [];
+    const acks: CommandAck[] = [];
+    h.callbacks.onIdentity = (githubId) => identities.push(githubId);
+    h.callbacks.onCommandAck = (ack) => acks.push(ack);
+    const { control } = await helloDone(h);
+    control.receive(envelope('control', 2, { kind: 'identity', githubId: 100 }));
+    control.receive(envelope('control', 3, { kind: 'identity', githubId: -1 }));
+    control.receive(envelope('control', 4, { kind: 'identity', githubId: '100' }));
+    control.receive(envelope('control', 5, { kind: 'command-ack', clientId: 'k1', status: 'accepted', extra: 'x' }));
+    control.receive(envelope('control', 6, { kind: 'command-ack', clientId: 's1', status: 'accepted', position: 2 }));
+    control.receive(envelope('control', 7, { kind: 'command-ack', clientId: 'k2', status: 'rejected', reason: 'not_controller' }));
+    control.receive(envelope('control', 8, { kind: 'command-ack', clientId: 'k3', status: 'rejected', reason: 'made_up' }));
+    control.receive(envelope('control', 9, { kind: 'command-ack', clientId: 'k4', status: 'maybe' }));
+    expect(identities).toEqual([100]);
+    expect(acks).toEqual([
+      { clientId: 'k1', status: 'accepted' },
+      { clientId: 's1', status: 'accepted', position: 2 },
+      { clientId: 'k2', status: 'rejected', reason: 'not_controller' },
+      { clientId: 'k3', status: 'rejected' },
+    ]);
+  });
+
+  it('sends command and controller-send on control with the next seq after the hello reply', async () => {
+    const h = harness();
+    const peer = await offered(h);
+    const control = peer.fireDataChannel('control');
+    expect(h.viewer.command('k0', { type: 'kick', githubId: 200 })).toBe(false);
+    expect(h.viewer.controllerSend('s0', 'early')).toBe(false);
+    control.receive(envelope('control', 1, { kind: 'hello', hello: { v: 1, scopeKinds: ['conversation'], scope: SCOPE } }));
+    expect(h.viewer.command('k1', { type: 'admit', githubId: 200 })).toBe(true);
+    expect(h.viewer.controllerSend('s1', 'Run it')).toBe(true);
+    expect(h.viewer.controllerSend('s2', 'Edited', 200)).toBe(true);
+    expect(sentEnvelopes(control).slice(1)).toEqual([
+      { v: 1, ch: 'control', streamId: 'conv-a', seq: 2, t: 42, payload: { kind: 'command', clientId: 'k1', command: { type: 'admit', githubId: 200 } } },
+      { v: 1, ch: 'control', streamId: 'conv-a', seq: 3, t: 42, payload: { kind: 'controller-send', clientId: 's1', text: 'Run it' } },
+      { v: 1, ch: 'control', streamId: 'conv-a', seq: 4, t: 42, payload: { kind: 'controller-send', clientId: 's2', text: 'Edited', draftGithubId: 200 } },
     ]);
   });
 });
