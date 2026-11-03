@@ -28,6 +28,7 @@ import { DEVCONTAINER_DIRNAME } from '../workspace/devcontainer-renderer.js';
 import { pruneAgentStateDir } from '../agents/state-dir-removal.js';
 import { reapWorkerWorktrees } from '../workspaces/worker-worktrees.js';
 import { listAgentStatesSync, saveAgentStateSync } from '../agents/agent-state.js';
+import { revokeAgentMcpTokensForIssue } from '../mcp/agent-token.js';
 
 const execAsync = promisify(exec);
 
@@ -55,6 +56,17 @@ export function persistIssueAgentsStopped(issueLower: string): number {
     saveAgentStateSync(state);
     persisted++;
   }
+  return persisted;
+}
+
+/**
+ * Persist the issue's agents stopped, then revoke their MCP tokens (PAN-4927
+ * D-12). Close-out writes `stopped` without `stopAgent`, so it revokes here,
+ * while the agent states still name their issue. Never throws on the revoke.
+ */
+export async function persistIssueAgentsStoppedAndRevoke(issueLower: string): Promise<number> {
+  const persisted = persistIssueAgentsStopped(issueLower);
+  await revokeAgentMcpTokensForIssue(issueLower);
   return persisted;
 }
 
@@ -129,7 +141,7 @@ async function killTmuxSessionsImpl(issueLower: string): Promise<StepResult> {
   // The state directory is durable after close-out. Persist the terminal
   // lifecycle fact before pruning so a closed Session tab never projects a
   // retained agent as writable/live after the terminal has been killed.
-  persistIssueAgentsStopped(issueLower);
+  await persistIssueAgentsStoppedAndRevoke(issueLower);
 
   // NOTE: Per-project ephemeral specialists (specialist-{project}-{type}) are NOT killed here.
   // They belong to the project, not the issue, and accumulate context across issues via --resume.
