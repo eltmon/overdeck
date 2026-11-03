@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4833",
   "created": "2026-11-03T04:52:36.921Z",
-  "updated": "2026-11-03T05:08:25.637Z",
+  "updated": "2026-11-03T05:08:31.348Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-4833",
       "claimedAt": "2026-11-03T04:58:09.296Z",
       "doneAt": "2026-11-03T05:08:25.637Z"
+    },
+    "shared-initiator": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4833",
+      "claimedAt": "2026-11-03T05:08:31.348Z"
     }
   }
 }
