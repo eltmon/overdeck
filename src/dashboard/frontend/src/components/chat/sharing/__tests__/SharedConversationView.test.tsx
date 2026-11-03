@@ -1,0 +1,242 @@
+/** PAN-4475 WI-9: every viewer screen's exact text and controls, and no host content in the lobby. */
+import { fireEvent, render, screen } from '@testing-library/react';
+import type { ReactNode } from 'react';
+import { describe, expect, it, vi } from 'vitest';
+import type { JoinState, JoinView, PresencePayload, SharedMessage } from '@overdeck/contracts';
+
+import { JoinApiError, sharedRouteCode } from '../joinApi';
+import { SharedConversationView } from '../SharedConversationView';
+import type { SharedJoin } from '../useSharedJoin';
+
+vi.mock('../../ChatMarkdown', () => ({
+  ChatMarkdownSettingsProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
+  ChatMarkdown: ({ text }: { text: string }) => <div data-testid="chat-markdown">{text}</div>,
+}));
+
+vi.mock('@tanstack/react-virtual', () => ({
+  useVirtualizer: ({ count, getItemKey, estimateSize }: {
+    count: number;
+    getItemKey?: (index: number) => string;
+    estimateSize?: (index: number) => number;
+  }) => ({
+    getVirtualItems: () => Array.from({ length: count }, (_, index) => ({
+      index,
+      key: getItemKey?.(index) ?? index,
+      start: index * 40,
+      size: estimateSize?.(index) ?? 40,
+    })),
+    getTotalSize: () => count * 40,
+    measure: vi.fn(),
+    measureElement: vi.fn(),
+    scrollToIndex: vi.fn(),
+    resizeItem: vi.fn(),
+    elementsCache: new Map(),
+    indexFromElement: vi.fn(() => -1),
+  }),
+}));
+
+const CODE = 'BCDFGHJK';
+const MESSAGES: SharedMessage[] = [
+  { id: 'm1', role: 'user', text: 'Please fix the flaky test', createdAt: '2026-11-03T00:00:00.000Z' },
+  { id: 'm2', role: 'assistant', text: 'Fixed the race in the retry loop', createdAt: '2026-11-03T00:00:01.000Z', completedAt: '2026-11-03T00:00:02.000Z' },
+];
+const PRESENCE: PresencePayload = {
+  controllerGithubId: 1,
+  participants: [
+    { githubId: 1, login: 'owner', avatarUrl: 'https://avatars.githubusercontent.com/u/1', state: 'admitted', contributor: false, isHost: true },
+    { githubId: 100, login: 'alice', avatarUrl: 'https://avatars.githubusercontent.com/u/100', state: 'admitted', contributor: false, isHost: false },
+    { githubId: 200, login: 'bob', avatarUrl: 'https://avatars.githubusercontent.com/u/200', state: 'lobby', contributor: false, isHost: false },
+  ],
+  streams: [{ streamId: 'conv-a', label: 'Fix the flaky test', kind: 'conversation' }],
+};
+
+function view(state: JoinState): JoinView {
+  return { shortCode: CODE, joinUrl: `https://share.overdeck.ai/s/${CODE}`, state, contributor: false, login: 'alice', closeCode: null, error: null };
+}
+
+function props(overrides: Partial<SharedJoin> = {}): SharedJoin & { code: string } {
+  return {
+    code: CODE,
+    phase: 'live',
+    view: null,
+    apiError: null,
+    peerPhase: 'waiting',
+    messages: [],
+    hasHistory: false,
+    presence: null,
+    notices: [],
+    join: vi.fn(),
+    leave: vi.fn(),
+    reconnect: vi.fn(),
+    ...overrides,
+  };
+}
+
+function live(state: JoinState, overrides: Partial<SharedJoin> = {}) {
+  return props({ view: view(state), ...overrides });
+}
+
+const heading = (name: string) => screen.getByRole('heading', { name });
+const button = (name: string) => screen.getByRole('button', { name });
+
+describe('SharedConversationView (PAN-4475 WI-9)', () => {
+  it('confirm: Join a shared conversation with the identity note and Join', () => {
+    const p = props({ phase: 'confirm' });
+    render(<SharedConversationView {...p} />);
+    expect(heading('Join a shared conversation')).toBeTruthy();
+    expect(screen.getByText('The host will see your GitHub name and avatar before letting you in.')).toBeTruthy();
+    fireEvent.click(button('Join'));
+    expect(p.join).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('BCDF-GHJK')).toBeTruthy();
+  });
+
+  it('error 412: Sign in to join with the login command', () => {
+    render(<SharedConversationView {...props({ phase: 'error', apiError: new JoinApiError(412, 'not_signed_in', 'Sign in') })} />);
+    expect(heading('Sign in to join')).toBeTruthy();
+    expect(screen.getByText('pan account login')).toBeTruthy();
+  });
+
+  it('error events_closed: Lost the connection to your Overdeck with Try again', () => {
+    const p = props({ phase: 'error', apiError: new JoinApiError(0, 'events_closed', 'Lost the connection to your Overdeck.') });
+    render(<SharedConversationView {...p} />);
+    expect(heading('Lost the connection to your Overdeck.')).toBeTruthy();
+    fireEvent.click(button('Try again'));
+    expect(p.join).toHaveBeenCalledTimes(1);
+  });
+
+  it('error other: Could not join with the message and Try again', () => {
+    render(<SharedConversationView {...props({ phase: 'error', apiError: new JoinApiError(500, 'share_url_invalid', 'share_url must be https') })} />);
+    expect(heading('Could not join')).toBeTruthy();
+    expect(screen.getByText('share_url must be https')).toBeTruthy();
+    expect(button('Try again')).toBeTruthy();
+  });
+
+  it('connecting: Connecting… with Leave', () => {
+    const p = live('connecting');
+    render(<SharedConversationView {...p} />);
+    expect(screen.getByText('Connecting…')).toBeTruthy();
+    fireEvent.click(button('Leave'));
+    expect(p.leave).toHaveBeenCalledTimes(1);
+  });
+
+  it('lobby: waiting heading, the login, Leave, and no host content even with messages', () => {
+    render(<SharedConversationView {...live('lobby', { messages: MESSAGES, hasHistory: true, peerPhase: 'connected' })} />);
+    expect(heading('Waiting for the host to let you in')).toBeTruthy();
+    expect(screen.getByText('@alice')).toBeTruthy();
+    expect(button('Leave')).toBeTruthy();
+    expect(document.querySelector('[data-testid="shared-conversation-timeline"]')).toBeNull();
+    expect(document.body.textContent).not.toContain('Please fix the flaky test');
+    expect(document.body.textContent).not.toContain('Fixed the race in the retry loop');
+  });
+
+  it('admitted, peer connecting: header and Connecting to the host…', () => {
+    render(<SharedConversationView {...live('admitted', { peerPhase: 'connecting', presence: PRESENCE })} />);
+    expect(screen.getByText('Connecting to the host…')).toBeTruthy();
+    expect(screen.getByText('Fix the flaky test')).toBeTruthy();
+    expect(screen.getByText('@owner')).toBeTruthy();
+    expect(screen.getByText('1 watching')).toBeTruthy();
+    expect(button('Leave')).toBeTruthy();
+    expect(document.querySelector('[data-testid="shared-conversation-timeline"]')).toBeNull();
+  });
+
+  it('admitted, peer connected: the timeline with both messages', () => {
+    render(<SharedConversationView {...live('admitted', { peerPhase: 'connected', presence: PRESENCE, messages: MESSAGES, hasHistory: true })} />);
+    const timeline = document.querySelector('[data-testid="shared-conversation-timeline"]');
+    expect(timeline).not.toBeNull();
+    expect(timeline?.textContent).toContain('Please fix the flaky test');
+    expect(timeline?.textContent).toContain('Fixed the race in the retry loop');
+    expect(button('Leave')).toBeTruthy();
+  });
+
+  it('host-disconnected: the banner above the last timeline', () => {
+    render(<SharedConversationView {...live('host-disconnected', { peerPhase: 'connected', messages: MESSAGES, hasHistory: true })} />);
+    expect(screen.getByText('Host disconnected — reconnecting…')).toBeTruthy();
+    expect(document.querySelector('[data-testid="shared-conversation-timeline"]')).not.toBeNull();
+    expect(button('Leave')).toBeTruthy();
+  });
+
+  it('peer lost while admitted: the lost banner with Reconnect and Leave', () => {
+    const p = live('admitted', { peerPhase: 'lost', messages: MESSAGES, hasHistory: true });
+    render(<SharedConversationView {...p} />);
+    expect(screen.getByText('Connection to the host was lost.')).toBeTruthy();
+    fireEvent.click(button('Reconnect'));
+    expect(p.reconnect).toHaveBeenCalledTimes(1);
+    expect(button('Leave')).toBeTruthy();
+  });
+
+  it('kicked: Removed by host with Ask to join again', () => {
+    const p = live('kicked');
+    render(<SharedConversationView {...p} />);
+    expect(heading('Removed by host')).toBeTruthy();
+    expect(screen.getByText('You can ask to join again.')).toBeTruthy();
+    fireEvent.click(button('Ask to join again'));
+    expect(p.join).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: 'Leave' })).toBeNull();
+  });
+
+  it('revoked: Removed by host, blocked, no controls', () => {
+    render(<SharedConversationView {...live('revoked')} />);
+    expect(heading('Removed by host')).toBeTruthy();
+    expect(screen.getByText('The host blocked you from this share.')).toBeTruthy();
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
+  });
+
+  it.each([
+    ['ended', 'This share has ended.'],
+    ['full', 'This share is full.'],
+    ['replaced', 'This share is open in another tab or on another device.'],
+  ] as const)('%s: %s with no controls', (state, text) => {
+    render(<SharedConversationView {...live(state)} />);
+    expect(heading(text)).toBeTruthy();
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
+  });
+
+  it.each([
+    ['left', 'You left the shared conversation.'],
+    ['is-host', 'This is your own share.'],
+  ] as const)('%s: %s with a link back to the dashboard', (state, text) => {
+    render(<SharedConversationView {...live(state)} />);
+    expect(heading(text)).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Back to the dashboard' }).getAttribute('href')).toBe('/');
+  });
+
+  it('replaced-here: the other-tab heading', () => {
+    render(<SharedConversationView {...props({ phase: 'replaced-here', view: view('admitted') })} />);
+    expect(heading('This share is open in another tab or on another device.')).toBeTruthy();
+  });
+
+  it('rejected: the sign-in refusal with the login command', () => {
+    render(<SharedConversationView {...live('rejected')} />);
+    expect(heading("overdeck.ai did not accept this machine's sign-in.")).toBeTruthy();
+    expect(screen.getByText('pan account login')).toBeTruthy();
+  });
+
+  it('disconnected: Lost the connection to the share service with Rejoin', () => {
+    const p = live('disconnected');
+    render(<SharedConversationView {...p} />);
+    expect(heading('Lost the connection to the share service.')).toBeTruthy();
+    fireEvent.click(button('Rejoin'));
+    expect(p.join).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders each notice line above the timeline', () => {
+    render(<SharedConversationView {...live('admitted', {
+      peerPhase: 'connected',
+      messages: MESSAGES,
+      hasHistory: true,
+      notices: [{ kind: 'host_newer' }, { kind: 'scope_unsupported' }, { kind: 'hello_failed', code: 'invalid_hello' }, { kind: 'updates_missed' }],
+    })} />);
+    expect(screen.getByText('The host is on a newer Overdeck. Some content may not show.')).toBeTruthy();
+    expect(screen.getByText('Your Overdeck is too old for this share type. Update Overdeck to join.')).toBeTruthy();
+    expect(screen.getByText('Could not start the shared session (invalid_hello).')).toBeTruthy();
+    expect(screen.getByText('Some updates were missed. Reconnect to resync.')).toBeTruthy();
+  });
+
+  it('sharedRouteCode parses the hash route', () => {
+    expect(sharedRouteCode('#/shared/bcdf-ghjk')).toBe(CODE);
+    expect(sharedRouteCode('#/shared/BCDFGHJK')).toBe(CODE);
+    expect(sharedRouteCode('#/shared/nope')).toBeNull();
+    expect(sharedRouteCode('#/conv/BCDFGHJK')).toBeNull();
+    expect(sharedRouteCode('')).toBeNull();
+  });
+});

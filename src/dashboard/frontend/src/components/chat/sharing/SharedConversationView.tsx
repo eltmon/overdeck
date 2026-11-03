@@ -1,0 +1,238 @@
+/**
+ * The viewer page for a Shared Session at `/#/shared/<code>` (PAN-4475 WI-9, FR-7 … FR-10).
+ *
+ * `SharedConversationView` is presentational: one screen per join state, with **Leave** while the
+ * join is live. A lobby viewer never mounts the timeline and never renders host content (FR-9).
+ * Once admitted and a history arrived, the host conversation renders through `MessagesTimeline`
+ * with an empty work log (D-13); the header shows the stream label, the host and the watcher
+ * count (D-19). `SharedConversationRoute` binds it to `useSharedJoin`.
+ */
+import type { PresencePayload, SharedMessage } from '@overdeck/contracts';
+import type { ReactNode } from 'react';
+
+import type { ChatMessage } from '../chat-types';
+import { MessagesTimeline } from '../MessagesTimeline';
+import { LIVE_JOIN_STATES, useSharedJoin, type SharedJoin } from './useSharedJoin';
+import type { ViewerNotice } from './webrtc-viewer';
+
+const NEUTRAL_BUTTON =
+  'rounded-md border border-border px-3 py-1 text-xs font-medium text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50';
+const PRIMARY_BUTTON =
+  'rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50';
+const BANNER = 'flex items-center gap-2 border-b border-border bg-muted px-4 py-2 text-xs text-muted-foreground';
+
+/** Copies the fields the timeline reads, field by field (D-13). `author` is not rendered in slice 4. */
+export function toChatMessage(m: SharedMessage): ChatMessage {
+  const message: ChatMessage = { id: m.id, role: m.role, text: m.text, createdAt: m.createdAt };
+  if (m.turnId !== undefined) message.turnId = m.turnId;
+  if (m.completedAt !== undefined) message.completedAt = m.completedAt;
+  if (m.streaming !== undefined) message.streaming = m.streaming;
+  if (m.sequence !== undefined) message.sequence = m.sequence;
+  return message;
+}
+
+export function formatShareCode(code: string): string {
+  return code.length === 8 ? `${code.slice(0, 4)}-${code.slice(4)}` : code;
+}
+
+export function noticeText(notice: ViewerNotice): string {
+  switch (notice.kind) {
+    case 'host_newer': return 'The host is on a newer Overdeck. Some content may not show.';
+    case 'scope_unsupported': return 'Your Overdeck is too old for this share type. Update Overdeck to join.';
+    case 'hello_failed': return `Could not start the shared session (${notice.code}).`;
+    case 'transcript_unavailable': return "The host's conversation transcript is not available.";
+    case 'history_too_large': return 'This conversation is too long to share.';
+    case 'updates_missed': return 'Some updates were missed. Reconnect to resync.';
+  }
+}
+
+function Panel({ heading, children }: { heading?: string; children?: ReactNode }) {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+      {heading ? <h1 className="text-base font-medium text-foreground">{heading}</h1> : null}
+      {children}
+    </div>
+  );
+}
+
+function Note({ children }: { children: ReactNode }) {
+  return <p className="max-w-md text-sm text-muted-foreground">{children}</p>;
+}
+
+function Command({ children }: { children: string }) {
+  return <code className="rounded-md border border-border px-2 py-1 font-mono text-xs text-foreground">{children}</code>;
+}
+
+function BackLink() {
+  return <a href="/" className="text-sm text-primary underline-offset-2 hover:underline">Back to the dashboard</a>;
+}
+
+function Header({ code, presence, live, onLeave }: { code: string; presence: PresencePayload | null; live: boolean; onLeave: () => void }) {
+  const host = presence?.participants.find((p) => p.isHost) ?? null;
+  const streamLabel = presence?.streams[0]?.label ?? null;
+  const watching = presence ? presence.participants.filter((p) => !p.isHost && p.state === 'admitted').length : 0;
+  return (
+    <header className="flex items-center gap-3 border-b border-border px-4 py-2">
+      <span className="min-w-0 truncate text-sm font-medium text-foreground">{streamLabel ?? 'Shared conversation'}</span>
+      {host ? (
+        <span className="flex shrink-0 items-center gap-1.5">
+          <img src={host.avatarUrl} alt="" width={20} height={20} className="h-5 w-5 rounded-md" />
+          <span className="font-mono text-xs text-muted-foreground">@{host.login}</span>
+        </span>
+      ) : null}
+      {presence ? <span className="shrink-0 text-xs text-muted-foreground">{watching} watching</span> : null}
+      <span className="ml-auto flex shrink-0 items-center gap-2">
+        <span className="font-mono text-xs text-muted-foreground">{formatShareCode(code)}</span>
+        {live ? <button type="button" className={NEUTRAL_BUTTON} onClick={onLeave}>Leave</button> : null}
+      </span>
+    </header>
+  );
+}
+
+function errorScreen(props: SharedJoin): ReactNode {
+  const error = props.apiError;
+  if (error?.status === 412) {
+    return (
+      <Panel heading="Sign in to join">
+        <Command>pan account login</Command>
+      </Panel>
+    );
+  }
+  if (error?.error === 'events_closed') {
+    return (
+      <Panel heading="Lost the connection to your Overdeck.">
+        <button type="button" className={NEUTRAL_BUTTON} onClick={props.join}>Try again</button>
+      </Panel>
+    );
+  }
+  return (
+    <Panel heading="Could not join">
+      <Note>{error?.message ?? 'Something went wrong.'}</Note>
+      <button type="button" className={NEUTRAL_BUTTON} onClick={props.join}>Try again</button>
+    </Panel>
+  );
+}
+
+function confirmScreen(props: SharedJoin): ReactNode {
+  return (
+    <Panel heading="Join a shared conversation">
+      <Note>The host will see your GitHub name and avatar before letting you in.</Note>
+      <button type="button" className={PRIMARY_BUTTON} onClick={props.join}>Join</button>
+    </Panel>
+  );
+}
+
+/** The screen for a join that is no longer live; null for a live state. */
+function terminalScreen(props: SharedJoin): ReactNode {
+  switch (props.view?.state) {
+    case 'kicked':
+      return (
+        <Panel heading="Removed by host">
+          <Note>You can ask to join again.</Note>
+          <button type="button" className={NEUTRAL_BUTTON} onClick={props.join}>Ask to join again</button>
+        </Panel>
+      );
+    case 'revoked':
+      return <Panel heading="Removed by host"><Note>The host blocked you from this share.</Note></Panel>;
+    case 'ended':
+      return <Panel heading="This share has ended." />;
+    case 'left':
+      return <Panel heading="You left the shared conversation."><BackLink /></Panel>;
+    case 'is-host':
+      return <Panel heading="This is your own share."><BackLink /></Panel>;
+    case 'full':
+      return <Panel heading="This share is full." />;
+    case 'replaced':
+      return <Panel heading="This share is open in another tab or on another device." />;
+    case 'rejected':
+      return (
+        <Panel heading="overdeck.ai did not accept this machine's sign-in.">
+          <Command>pan account login</Command>
+        </Panel>
+      );
+    case 'disconnected':
+    case 'away':
+      return (
+        <Panel heading="Lost the connection to the share service.">
+          <button type="button" className={NEUTRAL_BUTTON} onClick={props.join}>Rejoin</button>
+        </Panel>
+      );
+    default:
+      return null;
+  }
+}
+
+function admittedScreen(props: SharedJoin): ReactNode {
+  const hostDisconnected = props.view?.state === 'host-disconnected';
+  const lost = props.peerPhase === 'lost';
+  const showTimeline = props.hasHistory && (props.peerPhase === 'connected' || hostDisconnected || lost);
+  const messages = props.messages.map(toChatMessage);
+  return (
+    <>
+      {hostDisconnected ? <div className={BANNER} role="status">Host disconnected — reconnecting…</div> : null}
+      {lost && !hostDisconnected ? (
+        <div className={BANNER} role="status">
+          <span>Connection to the host was lost.</span>
+          <button type="button" className={NEUTRAL_BUTTON} onClick={props.reconnect}>Reconnect</button>
+        </div>
+      ) : null}
+      {props.notices.map((notice) => (
+        <p key={notice.kind} className="border-b border-border px-4 py-1.5 text-xs text-muted-foreground">{noticeText(notice)}</p>
+      ))}
+      {showTimeline ? (
+        <div data-testid="shared-conversation-timeline" className="flex min-h-0 flex-1 flex-col">
+          <MessagesTimeline
+            messages={messages}
+            workLog={[]}
+            streaming={props.messages.some((m) => m.streaming === true)}
+            conversationName={`shared:${props.view?.shortCode ?? ''}`}
+            cwd=""
+          />
+        </div>
+      ) : lost ? null : (
+        <Panel><Note>Connecting to the host…</Note></Panel>
+      )}
+    </>
+  );
+}
+
+function body(props: SharedJoin & { code: string }): ReactNode {
+  if (props.phase === 'checking') return <Panel><Note>Loading…</Note></Panel>;
+  if (props.phase === 'replaced-here') return <Panel heading="This share is open in another tab or on another device." />;
+  if (props.phase === 'error') return errorScreen(props);
+  if (props.phase === 'joining') return <Panel><Note>Connecting…</Note></Panel>;
+  const state = props.view?.state;
+  if (props.phase === 'confirm' && (!state || state === 'left')) return confirmScreen(props);
+  switch (state) {
+    case undefined:
+    case 'connecting':
+      return <Panel><Note>Connecting…</Note></Panel>;
+    case 'lobby':
+      return (
+        <Panel heading="Waiting for the host to let you in">
+          <Note>You are in the lobby as <span className="font-mono">@{props.view?.login ?? 'you'}</span>.</Note>
+        </Panel>
+      );
+    case 'admitted':
+    case 'host-disconnected':
+      return admittedScreen(props);
+    default:
+      return terminalScreen(props);
+  }
+}
+
+export function SharedConversationView(props: SharedJoin & { code: string }) {
+  const state = props.view?.state;
+  const live = props.phase === 'live' && state !== undefined && LIVE_JOIN_STATES.has(state);
+  const dataState = props.phase === 'live' ? state ?? 'connecting' : props.phase;
+  return (
+    <div data-component="shared-conversation" data-state={dataState} className="flex h-screen flex-col bg-background">
+      <Header code={props.code} presence={live ? props.presence : null} live={live} onLeave={props.leave} />
+      {body(props)}
+    </div>
+  );
+}
+
+export function SharedConversationRoute({ code }: { code: string }) {
+  return <SharedConversationView code={code} {...useSharedJoin(code)} />;
+}
