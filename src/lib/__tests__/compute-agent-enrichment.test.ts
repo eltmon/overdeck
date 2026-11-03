@@ -11,7 +11,10 @@ import * as deftPending from '../deft/pending.js'
 import { answerOperatorDecision, requestOperatorDecision } from '../cloister/operator-decision.js'
 
 vi.mock('../pipeline-notifier.js', () => ({ notifyPipeline: vi.fn() }))
-vi.mock('../deft/pending.js', () => ({ deftEscalationQuestions: vi.fn(async () => ({ questions: [], hasExternal: false })) }))
+vi.mock('../deft/pending.js', () => ({
+  deftEscalationQuestions: vi.fn(async () => ({ questions: [], hasExternal: false })),
+  deftMenuQuestion: vi.fn(async () => null),
+}))
 
 vi.mock('../agents/agent-state.js', async (importOriginal) => {
   const original = await importOriginal<typeof agentState>()

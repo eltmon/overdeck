@@ -2,7 +2,7 @@
  * PAN-4849 WI-4: open Deft escalations become pending questions on the work
  * agent, and the dialog's answer resolves the escalation file (BD-9).
  */
-import { cpSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,8 +12,8 @@ const deliverAgentMessage = vi.hoisted(() => vi.fn());
 vi.mock('../../agents/delivery.js', () => ({ deliverAgentMessage }));
 
 const { readDeftIssueState } = await import('../state-reader.js');
-const { clearDeftPendingCache, deftEscalationQuestions, deftIssueForAgent } = await import('../pending.js');
-const { answerDeftEscalation, mapDeftEscalationAnswer } = await import('../pending-answer.js');
+const { clearDeftPendingCache, deftEscalationQuestions, deftIssueForAgent, deftMenuQuestion } = await import('../pending.js');
+const { answerDeftEscalation, answerDeftMenu, mapDeftEscalationAnswer } = await import('../pending-answer.js');
 
 const FIXTURE_DIR = fileURLToPath(new URL('./fixtures/directive', import.meta.url));
 const NOW = Date.parse('2026-11-02T18:00:00Z');
@@ -145,5 +145,73 @@ describe('answerDeftEscalation', () => {
   it('returns 404 for an unknown escalation', async () => {
     const { deps } = depsFor(copy());
     expect((await answerDeftEscalation('agent-pan-1', 'deft-escalation:esc-20990101000000-ffffff', 'Approve', deps)).status).toBe(404);
+  });
+});
+
+describe('deftMenuQuestion', () => {
+  const deps = { isDeft: async () => true, agentWorkspace: () => FIXTURE_DIR };
+  const menuText = 'How do you want to proceed?\n1. Accept\n2. Approve\n3. Discuss\n4. Back';
+  const assistant = (id: string, content: unknown[], timestamp = '2026-11-02T17:00:00Z') =>
+    JSON.stringify({ type: 'assistant', timestamp, message: { id, role: 'assistant', content } });
+
+  function transcript(lines: string[]): string {
+    const path = join(mkdtempSync(join(scratch, 'jsonl-')), 'session.jsonl');
+    writeFileSync(path, `${lines.join('\n')}\n`);
+    return path;
+  }
+
+  it('offers the menu in the last assistant message with verbatim labels', async () => {
+    const path = transcript([
+      JSON.stringify({ type: 'user', message: { role: 'user', content: 'go' } }),
+      assistant('msg_1', [{ type: 'thinking', thinking: 'hmm' }]),
+      assistant('msg_1', [{ type: 'text', text: menuText }]),
+      JSON.stringify({ type: 'system', subtype: 'turn_duration' }),
+    ]);
+    const question = await deftMenuQuestion('agent-pan-1', path, deps);
+    expect(question).toMatchObject({
+      timestamp: '2026-11-02T17:00:00Z',
+      questions: [{
+        header: 'Deft',
+        question: 'How do you want to proceed?',
+        multiSelect: false,
+        options: ['1. Accept', '2. Approve', '3. Discuss', '4. Back'].map(label => ({ label, description: '' })),
+      }],
+    });
+    expect(question?.toolId).toMatch(/^deft-menu:[0-9a-f]{12}$/);
+  });
+
+  it('returns null when the last message calls a tool, is from the user, or the issue is not on Deft', async () => {
+    const withTool = transcript([assistant('msg_2', [{ type: 'text', text: menuText }, { type: 'tool_use', id: 't', name: 'Bash', input: {} }])]);
+    expect(await deftMenuQuestion('agent-pan-1', withTool, deps)).toBeNull();
+    const userLast = transcript([assistant('msg_3', [{ type: 'text', text: menuText }]), JSON.stringify({ type: 'user', message: { content: '1' } })]);
+    expect(await deftMenuQuestion('agent-pan-1', userLast, deps)).toBeNull();
+    const menuLast = transcript([assistant('msg_4', [{ type: 'text', text: menuText }])]);
+    expect(await deftMenuQuestion('agent-pan-1', menuLast, { ...deps, isDeft: async () => false })).toBeNull();
+  });
+});
+
+describe('answerDeftMenu (BD-10)', () => {
+  const options = ['1. Accept', '2. Approve', '3. Discuss', '4. Back'];
+
+  it('delivers the exact label and drops a note', async () => {
+    expect(await answerDeftMenu('agent-pan-1', 'deft-menu:abc', '2. Approve', options)).toEqual({
+      status: 200,
+      body: { success: true, agentId: 'agent-pan-1', delivered: 1 },
+    });
+    expect(deliverAgentMessage).toHaveBeenLastCalledWith('agent-pan-1', '2. Approve', 'deft-menu-answer');
+    await answerDeftMenu('agent-pan-1', 'deft-menu:abc', '2. Approve\n\nNote: x', options);
+    expect(deliverAgentMessage).toHaveBeenLastCalledWith('agent-pan-1', '2. Approve', 'deft-menu-answer');
+  });
+
+  it('refuses a label without its number, or a bare note, with 400', async () => {
+    const refusal = { status: 400, body: { error: 'Deft menus take one option; reply in the terminal for anything else' } };
+    expect(await answerDeftMenu('agent-pan-1', 'deft-menu:abc', 'Approve', options)).toEqual(refusal);
+    expect(await answerDeftMenu('agent-pan-1', 'deft-menu:abc', 'please wait', options)).toEqual(refusal);
+    expect(deliverAgentMessage).not.toHaveBeenCalled();
+  });
+
+  it('returns 502 when delivery fails', async () => {
+    deliverAgentMessage.mockResolvedValueOnce({ ok: false, path: 'herdr', failure: 'no pane' });
+    expect((await answerDeftMenu('agent-pan-1', 'deft-menu:abc', '1. Accept', options)).status).toBe(502);
   });
 });

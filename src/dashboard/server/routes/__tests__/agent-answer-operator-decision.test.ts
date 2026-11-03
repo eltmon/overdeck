@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../../../../lib/pipeline-notifier.js', () => ({ notifyPipeline: vi.fn() }));
 vi.mock('../../../../lib/deft/issue-pipeline.js', () => ({ isDeftPipelineIssue: async () => false }));
+vi.mock('../../../../lib/agents/delivery.js', () => ({ deliverAgentMessage: mocks.deliverAgentMessage }));
 vi.mock('../../../../lib/agents.js', () => ({
   deliverAgentMessage: mocks.deliverAgentMessage,
   deliverAgentPermissionDecision: vi.fn(),
@@ -134,5 +135,20 @@ describe('handlePostAgentAnswerQuestion for a Deft escalation (PAN-4849)', () =>
     const result = await handlePostAgentAnswerQuestion(agentId, { answers: ['Approve'], toolUseId });
     expect(result.status).toBe(404);
     expect(mocks.deliverAgentMessage).not.toHaveBeenCalled();
+  });
+
+  it('delivers a Deft menu answer as the exact label', async () => {
+    const menuToolId = 'deft-menu:0123456789ab';
+    mocks.getAgentPendingQuestions.mockResolvedValue([{
+      toolId: menuToolId,
+      timestamp: '2026-11-02T12:00:00Z',
+      questions: [{ question: 'Proceed?', header: 'Deft', multiSelect: false, options: ['1. Accept', '2. Discuss', '3. Back'].map(label => ({ label, description: '' })) }],
+    }]);
+    mocks.deliverAgentMessage.mockResolvedValue({ ok: true, path: 'tmux' });
+
+    const result = await handlePostAgentAnswerQuestion(agentId, { answers: ['1. Accept\n\nNote: ok'], toolUseId: menuToolId });
+
+    expect(result).toEqual({ status: 200, body: { success: true, agentId, delivered: 1 } });
+    expect(mocks.deliverAgentMessage).toHaveBeenCalledWith(agentId, '1. Accept', 'deft-menu-answer');
   });
 });

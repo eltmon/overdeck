@@ -2,10 +2,12 @@
  * Answers to Deft's dashboard questions (PAN-4849 WI-4, FR-14).
  *
  * The dialog's answer to a `deft-escalation:<id>` question resolves the
- * escalation file and tells the work agent. Split from `pending.ts` so the
- * enrichment, which imports the read side, does not import agent delivery
- * (an import cycle through `agents/delivery.ts`).
+ * escalation file and tells the work agent; the answer to a `deft-menu:`
+ * question is delivered as the exact option label (WI-5). Split from
+ * `pending.ts` so the enrichment, which imports the read side, does not
+ * import agent delivery (an import cycle through `agents/delivery.ts`).
  */
+import { deliverAgentMessage } from '../agents/delivery.js';
 import { type DeftEscalationDecision, notifyEscalationResolved, resolveDeftEscalation } from './escalations.js';
 import { clearDeftPendingCache, DEFT_ESCALATION_TOOL_ID_PREFIX, type DeftPendingDeps, deftIssueForAgent } from './pending.js';
 
@@ -54,4 +56,25 @@ export async function answerDeftEscalation(
       ...(delivery.failure ? { deliveryError: delivery.failure } : {}),
     },
   };
+}
+
+const MENU_REFUSAL = "Deft menus take one option; reply in the terminal for anything else";
+
+/**
+ * BD-10: a `deft-menu:` answer must be exactly one option label (a trailing
+ * `\n\nNote: …` is dropped). The agent receives the label alone, verbatim,
+ * because Deft accepts only the displayed number or the exact label.
+ */
+export async function answerDeftMenu(
+  agentId: string,
+  _toolId: string,
+  answer: string,
+  options: string[],
+): Promise<{ status: number; body: Record<string, unknown> }> {
+  const match = NOTE_SUFFIX.exec(answer);
+  const label = (match ? answer.slice(0, match.index) : answer).trim();
+  if (!options.includes(label)) return { status: 400, body: { error: MENU_REFUSAL } };
+  const result = await deliverAgentMessage(agentId, label, 'deft-menu-answer');
+  if (!result.ok) return { status: 502, body: { error: result.failure ?? 'delivery failed', code: 'delivery-failed' } };
+  return { status: 200, body: { success: true, agentId, delivered: 1 } };
 }

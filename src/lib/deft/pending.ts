@@ -14,11 +14,14 @@
  * they deliver to the agent, and `agents/delivery.ts` imports back into
  * `agent-enrichment.ts`, which imports this module.
  */
+import { createHash } from 'node:crypto';
+import { open } from 'node:fs/promises';
 import type { DeftIssueState } from '@overdeck/contracts';
 import { getAgentState } from '../agents/agent-state-read.js';
 import { parseIssueId } from '../issue-id.js';
 import { getIssueWorkspacePath } from '../overdeck/issue-projects.js';
 import { isDeftPipelineIssue } from './issue-pipeline.js';
+import { parseDeftMenu } from './menu-parser.js';
 import { readDeftIssueState } from './state-reader.js';
 
 export const DEFT_ESCALATION_TOOL_ID_PREFIX = 'deft-escalation:';
@@ -118,4 +121,80 @@ export async function deftEscalationQuestions(
       };
     });
   return { questions, hasExternal: open.some(escalation => escalation.type === 'external') };
+}
+
+const TRANSCRIPT_TAIL_BYTES = 64 * 1024;
+
+/** The transcript's last 64 KiB as parsed JSONL records, oldest first; the first partial line is dropped. */
+async function readTranscriptTail(jsonlPath: string): Promise<Array<Record<string, unknown>>> {
+  const handle = await open(jsonlPath, 'r');
+  try {
+    const { size } = await handle.stat();
+    const length = Math.min(size, TRANSCRIPT_TAIL_BYTES);
+    const buffer = Buffer.alloc(length);
+    await handle.read(buffer, 0, length, size - length);
+    const lines = buffer.toString('utf8').split('\n');
+    if (length < size) lines.shift();
+    return lines.flatMap(line => {
+      if (!line.trim()) return [];
+      try {
+        const record: unknown = JSON.parse(line);
+        return record && typeof record === 'object' && !Array.isArray(record) ? [record as Record<string, unknown>] : [];
+      } catch {
+        return [];
+      }
+    });
+  } finally {
+    await handle.close();
+  }
+}
+
+type ContentBlock = { type?: unknown; text?: unknown };
+
+function messageOf(record: Record<string, unknown>): { id?: unknown; content: ContentBlock[] } {
+  const message = record.message as { id?: unknown; content?: unknown } | undefined;
+  const content = Array.isArray(message?.content) ? (message!.content as ContentBlock[]) : [];
+  return { id: message?.id, content };
+}
+
+/**
+ * A Deft menu in the agent's last assistant message, as a single-select
+ * pending question (tool id `deft-menu:<sha1(text)[0..12]>`). Null unless the
+ * agent works a Deft issue and its last message is assistant text with no
+ * tool call. Claude Code writes one record per content block, so the trailing
+ * records of one assistant message are read together.
+ */
+export async function deftMenuQuestion(
+  agentId: string,
+  jsonlPath: string | null | (() => Promise<string | null>),
+  deps: DeftPendingDeps = {},
+): Promise<DeftPendingQuestion | null> {
+  if (!(await deftIssueForAgent(agentId, deps))) return null;
+  const path = typeof jsonlPath === 'function' ? await jsonlPath() : jsonlPath;
+  if (!path) return null;
+  const records = (await readTranscriptTail(path)).filter(record => record.type === 'assistant' || record.type === 'user');
+  const last = records.at(-1);
+  if (!last || last.type !== 'assistant') return null;
+  const messageId = messageOf(last).id;
+  const blocks: ContentBlock[] = [];
+  for (let i = records.length - 1; i >= 0; i--) {
+    const record = records[i]!;
+    const message = messageOf(record);
+    if (record.type !== 'assistant' || (i !== records.length - 1 && (messageId === undefined || message.id !== messageId))) break;
+    blocks.unshift(...message.content);
+  }
+  if (blocks.some(block => block.type === 'tool_use')) return null;
+  const text = blocks.flatMap(block => (block.type === 'text' && typeof block.text === 'string' ? [block.text] : [])).join('\n');
+  const menu = parseDeftMenu(text);
+  if (!menu) return null;
+  return {
+    toolId: `${DEFT_MENU_TOOL_ID_PREFIX}${createHash('sha1').update(text).digest('hex').slice(0, 12)}`,
+    timestamp: typeof last.timestamp === 'string' ? last.timestamp : new Date(0).toISOString(),
+    questions: [{
+      header: 'Deft',
+      question: menu.prompt || 'Deft is asking you to choose',
+      multiSelect: false,
+      options: menu.options.map(label => ({ label, description: '' })),
+    }],
+  };
 }

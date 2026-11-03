@@ -12,7 +12,7 @@ import { promisify } from 'util'
 import { exec } from 'child_process'
 import { Effect } from 'effect'
 import { getAgentState } from './agents/agent-state.js'
-import { deftEscalationQuestions } from './deft/pending.js'
+import { deftEscalationQuestions, deftMenuQuestion } from './deft/pending.js'
 import { getAgentRuntimeState } from './agents/runtime-state.js'
 import {
   detectAwaitingInputForAgent,
@@ -679,6 +679,8 @@ function toPendingAskUserQuestion(q: PendingQuestion): PendingAskUserQuestionSna
 export async function getAgentPendingQuestions(agentId: string): Promise<PendingQuestion[]> {
   const jsonlPath = await getAgentJsonlPath(agentId)
   const questions = jsonlPath ? [...(await getPendingQuestions(jsonlPath))] : []
+  const menu = questions.length === 0 ? await deftMenuQuestion(agentId, jsonlPath).catch(() => null) : null
+  if (menu) questions.push(menu)
   const decision = openDecisionForAgent(agentId)
   if (decision) questions.push(operatorDecisionAsPendingQuestion(decision))
   questions.push(...(await deftEscalationQuestions(agentId).catch(() => NO_DEFT_QUESTIONS)).questions)
@@ -729,14 +731,20 @@ export async function computeAgentEnrichment(
   // so its mtime never moves again, and a fabricated "nothing is pending" would
   // latch permanently and strand the operator's dialog.
   let scan: PendingInputsScan = EMPTY_PENDING_INPUTS_SCAN
+  let jsonlPath: string | null | undefined
   if (cachedScan) {
     scan = cachedScan
   } else {
-    const jsonlPath = await getAgentJsonlPath(agentId)
+    jsonlPath = await getAgentJsonlPath(agentId)
     if (jsonlPath) scan = await scanPendingInputs(jsonlPath)
   }
 
   let pendingQuestions: PendingQuestion[] = [...scan.askUserQuestions]
+  // PAN-4849: a Deft menu in the last assistant message, re-read on every call (keyed on the last record).
+  if (pendingQuestions.length === 0) {
+    const menu = await deftMenuQuestion(agentId, jsonlPath ?? (() => getAgentJsonlPath(agentId))).catch(() => null)
+    if (menu) pendingQuestions.push(menu)
+  }
   const enterPlanModeOpen = scan.enterPlanModeOpen
   const exitPlanModePending = scan.exitPlanModePending
   if (pendingQuestions.length > 0 && startedAt) {
