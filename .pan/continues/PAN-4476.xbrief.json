@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4476",
   "created": "2026-11-03T15:05:40.423Z",
-  "updated": "2026-11-03T16:11:17.603Z",
+  "updated": "2026-11-03T16:11:32.628Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -220,6 +220,10 @@
     "host-route.ac2": {
       "status": "completed",
       "doneAt": "2026-11-03T16:11:17.603Z"
+    },
+    "host-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:11:32.628Z"
     }
   }
 }
