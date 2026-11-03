@@ -424,7 +424,7 @@ describe('ssh-helper stop with a supervisor (D-4861-1)', () => {
   });
 
   it('a non-supervisor answer on the supervisor port does not block the stop', async () => {
-    const h = harness({ supervisorRunning: true, supervisorAnswerOk: false });
+    const h = harness({ supervisorRunning: true, supervisorStoppable: false, supervisorAnswerOk: false });
     writeMarker(h, { pid: 4242, startedBy: LINKER });
     h.kill.mockImplementation((pid) => {
       h.alive.delete(pid);
