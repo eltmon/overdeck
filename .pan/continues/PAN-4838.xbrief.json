@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4838",
   "created": "2026-11-03T21:01:46.602Z",
-  "updated": "2026-11-03T22:01:21.040Z",
+  "updated": "2026-11-03T22:01:44.984Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -218,6 +218,9 @@
     "docs.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T22:01:21.040Z"
+    },
+    "ios-acceptance.ac2": {
+      "status": "cancelled"
     }
   }
 }
