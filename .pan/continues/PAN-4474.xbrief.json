@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4474",
   "created": "2026-11-03T06:56:27.161Z",
-  "updated": "2026-11-03T07:23:45.838Z",
+  "updated": "2026-11-03T07:23:51.394Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,11 @@
       "claimedBy": "agent-pan-4474",
       "claimedAt": "2026-11-03T07:22:22.534Z",
       "doneAt": "2026-11-03T07:23:45.837Z"
+    },
+    "share-manager-wiring": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4474",
+      "claimedAt": "2026-11-03T07:23:51.394Z"
     }
   }
 }
