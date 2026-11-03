@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4869",
   "created": "2026-11-03T03:24:34.404Z",
-  "updated": "2026-11-03T03:57:39.220Z",
+  "updated": "2026-11-03T03:57:58.414Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -190,9 +190,10 @@
       "doneAt": "2026-11-03T03:57:39.220Z"
     },
     "docs-anywhere-entry-points.ac3": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4869",
-      "claimedAt": "2026-11-03T03:48:52.277Z"
+      "claimedAt": "2026-11-03T03:48:52.277Z",
+      "doneAt": "2026-11-03T03:57:58.414Z"
     }
   }
 }
