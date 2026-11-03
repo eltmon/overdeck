@@ -32,6 +32,12 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
 - **`postMergeLifecycle` idempotency** — guarded by
   `src/lib/cloister/in-flight-guard.ts` + its test. Weakening it reopens the
   PAN-328 infinite-loop (24k tracker calls). Keep the test green.
+- **Polyrepo workspace roots have no `package.json`** (PAN-4929) — `createWorkspace`
+  (`src/lib/workspace-manager/create.ts`) must never run a package manager in a directory
+  without `package.json`: npm walks up to the nearest ancestor with `node_modules`, fails there,
+  and writes a stray `package-lock.json` into that ancestor. Polyrepo per-repo deps belong to
+  the repo's container or gates (`verification-runner.ts` skips polyrepo installs too); a
+  host install in a repo is opt-in through `repos[].package_manager`.
 - **Polyrepo UAT: never gate on `repos.length`** (PAN-3093) — every generation
   reads back with at least one `repos` entry because monorepo rows synthesize
   one, and a polyrepo project with a single contributing repo still needs the
@@ -663,3 +669,4 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   use the PID as data, but none were audited.
 <!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4925) -->
 <!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917) -->
+<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4929) -->
