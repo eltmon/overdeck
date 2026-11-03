@@ -8,7 +8,7 @@ A Cloudflare Worker at `https://account.overdeck.ai` that is the identity servic
 
 It is **invite-only** until billing (PAN-4294) exists: a GitHub account can sign in only if it is the owner or holds an unexpired grant in the `grants` table. Everyone else sees the invite-only page and leaves one bounded "pending attempt" row that the operator can allow with one click.
 
-What it stores (D1 database `overdeck-account`): users (GitHub numeric id, login, timestamps), grants, pending attempts, device records (SHA-256 hashes of tokens, never the tokens), short-lived sign-in continuations and codes (hashed), admin sessions (hashed), deletion jobs and rate-limit counters (hashed client IPs).
+What it stores (D1 database `overdeck-account`): users (GitHub numeric id, login, timestamps), grants, pending attempts, device records (SHA-256 hashes of tokens, never the tokens), short-lived sign-in continuations and codes (hashed), admin sessions and account-page web sessions (hashed), deletion jobs and rate-limit counters (hashed client IPs).
 
 What it never stores: the GitHub access token (used once per sign-in and discarded), any plaintext token or code, raw client IPs, the vault key, a vault passphrase or any user content. It has no CORS headers: `/v1/*` is called by the local Overdeck server or CLI, never from a browser.
 
@@ -55,6 +55,8 @@ Fixed windows per (bucket, `sha256(CF-Connecting-IP)`) in the `rate_limits` tabl
 | `activate` | `POST /activate`, `POST /activate/confirm` | 30 per 15 min |
 | `activate-fail` | wrong user codes on `POST /activate` | 10 per 15 min |
 | `admin-login` | `POST /admin/login` | 10 per 10 min |
+| `account-login` | `POST /account/login` | 10 per 10 min |
+| `account-action` | `POST /account/logout`, `POST /account/machines/:environmentId/remove`, `POST /account/delete`, `POST /account/delete/confirm` | 30 per 15 min |
 
 `/v1/*` and `GET /admin` are not rate limited (they need a valid token or session).
 
@@ -83,6 +85,12 @@ Every response carries `Cache-Control: no-store` and `X-Content-Type-Options: no
 | POST | `/admin/grants` | owner session + csrf | form `username`, `note`, `expires`, `cap_gb` → 303 `/admin`, or the page with an error |
 | POST | `/admin/grants/:githubId/revoke` | owner session + csrf | → 303 `/admin` |
 | POST | `/admin/pending/:githubId/allow` | owner session + csrf | → 303 `/admin`, or 404 page |
+| GET | `/account` | web session | the account page, or the sign-in page |
+| POST | `/account/login` | same-origin `Origin` | → 302 to GitHub (purpose `account`); 403 page cross-site |
+| POST | `/account/logout` | web session + csrf | → 302 `/account`, cookie cleared |
+| POST | `/account/machines/:environmentId/remove` | web session + csrf | → 303 `/account`; the page with 404 when the machine is not listed, 503 when the directory is unavailable |
+| POST | `/account/delete` | web session + csrf | → the confirm page |
+| POST | `/account/delete/confirm` | web session + csrf | form `confirm` (the GitHub login, any case) → "Your account is being deleted." with the cookie cleared, or the confirm page with 400 |
 
 Bearer failures: `invalid_token`, `device_revoked` and `account_deleted` → 401 `{"error":<code>}` with `WWW-Authenticate: Bearer error="invalid_token"`; an expired grant → 403 `{"error":"grant_expired"}` except where noted.
 
@@ -130,11 +138,28 @@ Fixed here for PAN-4297, which implements it:
 
 ## Account deletion
 
-`DELETE /v1/account` runs one batch: `users.deleted_at` set, every device revoked (`revoked_by = 'account-deletion'`), the grant and pending row deleted, and a `deletion_jobs` row opened listing the bound data holders (`["vault"]` when `VAULT` is bound, else `[]`). The job runs immediately via `ctx.waitUntil` and again every hour (see `src/maintenance.ts`): each pending holder is asked to `deleteAccountData(userId)`; a failure increments `attempts` and stores a 200-character `last_error`; a holder that is no longer bound stays pending with `last_error = 'holder <name> not bound'`. When no holder remains, the user's device and user rows are deleted and `completed_at` is set. With no holders bound the job completes in the same request. Every device token of a deleting account is refused as `account_deleted` until the rows are gone, then as `invalid_token`. The admin screen flags jobs older than 24 hours as overdue.
+`DELETE /v1/account` runs one batch: `users.deleted_at` set, every device revoked (`revoked_by = 'account-deletion'`), the grant and pending row deleted, every web session deleted, and a `deletion_jobs` row opened listing the bound data holders (`vault` when `VAULT` is bound, then `directory` when `DIRECTORY` is bound; `[]` when neither is). The job runs immediately via `ctx.waitUntil` and again every hour (see `src/maintenance.ts`): each pending holder is asked to `deleteAccountData(userId)`; a failure increments `attempts` and stores a 200-character `last_error`; a holder that is no longer bound stays pending with `last_error = 'holder <name> not bound'`. The `directory` holder calls `POST /delete-account` on the account's Directory Durable Object in the connect Worker, which closes every machine and phone socket and empties its tables (machine labels, public keys, phone push tokens, approvals, relay use, sealed inbox events); a non-200 is recorded as `directory delete failed: HTTP <status>`. When no holder remains, the user's device and user rows are deleted and `completed_at` is set. With no holders bound the job completes in the same request. Every device token of a deleting account is refused as `account_deleted` until the rows are gone, then as `invalid_token`. The admin screen flags jobs older than 24 hours as overdue.
 
 Grant expiry, operator revoke and deletion are distinct: an **expired grant** keeps the devices and makes `verifyDevice` answer `grant_expired` (re-allowing restores access without a new sign-in); an **operator revoke** deletes the grant and revokes every device of that account (`revoked_by = 'operator'`), keeping the user row; **deletion** is the above.
 
-The hourly cron (`0 * * * *`) also purges expired `auth_requests`, `auth_codes` and `admin_sessions`; `device_grants` one hour past expiry; `pending_attempts` 30 days after their last attempt; devices revoked 90 days ago; rate-limit windows older than an hour; and deletion jobs completed 30 days ago.
+The hourly cron (`0 * * * *`) also purges expired `auth_requests`, `auth_codes`, `admin_sessions` and `user_sessions`; `device_grants` one hour past expiry; `pending_attempts` 30 days after their last attempt; devices revoked 90 days ago; rate-limit windows older than an hour; and deletion jobs completed 30 days ago.
+
+## Account page
+
+`https://account.overdeck.ai/account` (PAN-4959), server-rendered HTML with no JavaScript, for any allowlisted user. Every value is escaped and no price appears anywhere.
+
+**Sign-in.** Without a valid web session the page shows "Sign in with GitHub", which posts to `/account/login` and runs the GitHub leg with purpose `account`. Then, in order: an account being deleted gets 403 "This account is being deleted."; the owner or an active grant gets a session; an existing user whose grant expired also gets a session (as `GET /v1/me` allows), so they can still see the page and delete the account; anyone else gets the invite-only page and **no** pending-attempt row (invitations keep coming from device and PKCE sign-ins). A session lives in `user_sessions` (SHA-256 of the cookie value, a random csrf token, 12 hours), cookie `__Host-od_account` (`HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=43200`). A session of a user whose grant the operator revoked renders "Access to this account was removed." and is deleted. Every POST except `/account/login` must carry the session's `csrf` field and an `Origin` equal to `PUBLIC_BASE_URL`, else 403 "Request rejected."; `/account/login` checks the `Origin` only.
+
+Sections, top to bottom:
+
+1. "Your Overdeck account", "Signed in as <login> (GitHub id <id>)" and **Sign out**.
+2. **Plan:** "Free account" or "Tester", from `entitlementFor` of the grant row whether or not it expired (the owner, with no row, is Tester); access "No expiry", "Expires on <date>" or "Expired on <date>"; "Paid plans are invite-only for now."
+3. **Relay:** for Tester, "<used> of <cap> GB relay traffic this month" (decimal GB) and "Resets on <first of next month> (UTC).", plus "Relay allowance used; it resets on <date>." when the relay is stopped; for Free, "The relay is not included in the free account."
+4. **Machines:** "<n> of 3 machines" (Free) or "<n> machines" (Tester), and a table of the account's directory machines oldest first (label, Online/Offline, last seen, Overdeck version, **Remove**). Remove revokes that machine's device token, then forgets it in the Directory DO: its open socket closes with 4012, the other machines and phones get the updated directory, and on a free account the slot is free again. "Sign in on it again to add it back."
+5. **Billing:** "Billing is not available yet. Paid plans are invite-only for now."
+6. **Delete account:** a two-step delete. The confirm page asks for the GitHub login (any letter case); a match runs the same deletion as `DELETE /v1/account`, ends every web session and clears the cookie; a mismatch answers 400 "Type your GitHub login to confirm."
+
+Machines and relay use come from the account's Directory Durable Object in the connect Worker, through the `DIRECTORY` binding (`src/directory-view.ts`); the plan comes from D1, never from the directory. When `DIRECTORY` is unbound, or the call throws or answers non-200, the page still renders, Relay and Machines say "Machines and relay use are unavailable right now." and no Remove button is shown; a Remove in that state answers 503.
 
 ## Admin screen
 
@@ -162,6 +187,7 @@ Sections, top to bottom:
 | `OWNER_GITHUB_ID` | secret | the operator's numeric GitHub id; unset or non-numeric disables the admin screen (503) and the owner bypass |
 | `DB` | D1 binding | database `overdeck-account`, migrations in `services/account/migrations/` |
 | `VAULT` | optional service binding | the hosted vault's RPC entrypoint; added by PAN-4297 |
+| `DIRECTORY` | optional cross-script Durable Object binding (`wrangler.jsonc` `durable_objects`) | class `AccountDirectory` with `script_name` `overdeck-connect`: the account page reads machines and relay use from it, Remove forgets a machine in it, and deletion empties it (PAN-4959). Absent in unit tests and local dev, where the page says machines are unavailable |
 
 No value has a hardcoded default. Local development reads the same names from `services/account/.dev.vars` (gitignored); `.dev.vars.example` holds placeholders.
 
@@ -188,9 +214,9 @@ Operator-only. No agent runs any of the commands below; the custom-domain route 
 1. Create a GitHub OAuth App (GitHub → Settings → Developer settings → OAuth Apps): homepage `https://account.overdeck.ai`, authorization callback URL `https://account.overdeck.ai/auth/github/callback`. Leave **Enable Device Flow** off: `pan account login` runs this service's own device flow, which uses GitHub's ordinary web callback. Note the client id and generate a client secret.
 2. `cd services/account && npx wrangler login` (opens the browser for the Cloudflare account that owns the `overdeck.ai` zone). On an account that has never had a Worker, open **Workers & Pages** in the Cloudflare dashboard once first: that creates the account's `workers.dev` subdomain, without which `wrangler deploy` fails with code 10063.
 3. `npx wrangler d1 create overdeck-account`, paste the printed `database_id` into `wrangler.jsonc` (replacing the all-zero placeholder), and commit that change.
-4. `npx wrangler d1 migrations apply overdeck-account --remote` (applies `migrations/0001_init.sql` to the production database).
+4. `npx wrangler d1 migrations apply overdeck-account --remote` (applies every pending file in `migrations/`: `0001_init.sql`, then `0002_account_page.sql`, which adds `user_sessions` and rebuilds `auth_requests` for the `account` purpose). An existing deployment runs the same command to apply `0002_account_page.sql`.
 5. `npx wrangler secret put GITHUB_CLIENT_ID` (it reads the value from stdin, so `printf %s <value> | npx wrangler secret put …` works too), then `npx wrangler secret put GITHUB_CLIENT_SECRET`, then `npx wrangler secret put OWNER_GITHUB_ID` (your numeric GitHub id, from `https://api.github.com/users/<login>` → `id`).
-6. `npx wrangler deploy` (uploads the Worker, binds D1, registers the hourly cron and the `account.overdeck.ai` custom domain).
+6. Deploy `overdeck-connect` first (`docs/CONNECT-SERVICE.md` "Deploy"): this Worker's `DIRECTORY` binding names its `AccountDirectory` class and the internal paths the account page calls. Then `npx wrangler deploy` (uploads the Worker, binds D1 and `DIRECTORY`, registers the hourly cron and the `account.overdeck.ai` custom domain).
 7. Smoke test: `curl -s https://account.overdeck.ai/healthz` shows `"configured":true` (after the connect Worker is deployed too, `node scripts/anywhere/smoke-hosted.mjs` checks both services and starts one device sign-in); `pan account login` then `pan account status` shows your GitHub login; open `https://account.overdeck.ai/admin`, sign in with GitHub as the owner, add one tester by username, and have them sign in.
 8. Rollback: `npx wrangler rollback` returns to the previous Worker version (the D1 schema is additive and stays).
 

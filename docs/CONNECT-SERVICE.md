@@ -25,6 +25,7 @@ The overdeck.ai directory, the WebRTC introduction, the relay add-on's credentia
 | `src/relay-meter.ts`, `src/turn.ts` | Monthly relay usage; Cloudflare Realtime TURN credentials (600 s TTL) |
 | `src/inbox.ts`, `src/inbox-intake.ts`, `src/seal.ts` | Inbox store, the public `POST /h/:id` route, `crypto_box_seal` in pure JS |
 | `src/log.ts` | The only logger: frame type, environment id or client id, outcome; never a label, key or payload |
+| `src/account-view.ts` | The account page's internal paths (PAN-4959): `ACCOUNT_PATHS`, `ACCOUNT_TABLES` and the `/account-view` builder |
 
 The wire protocol is `packages/contracts/src/connect.ts` (runtime-import-free so the Worker imports it by relative path); the dashboard's `GET /api/directory` view is `packages/contracts/src/connect-view.ts`.
 
@@ -61,6 +62,18 @@ The wire protocol is `packages/contracts/src/connect.ts` (runtime-import-free so
 | GET | `/healthz` | none | `{ ok, configured, turn, apns, fcm }` (reveals no value) |
 | GET | `/v1/directory` | `Bearer odd_…` device token, or the subprotocol `overdeck.bearer.odd_…` (echoed on the 101); WebSocket upgrade | 101 to the account's Durable Object; 401 / 403 / 426 / 429 / 503 otherwise |
 | POST | `/h/<doId>.<secret>` | the secret in the URL | `202 { queued: true }`; `404 { error: "not found" }`, `413`, `403` (free plan), `429` (full or rate-limited) |
+
+## Account service paths (PAN-4959)
+
+The account page at `https://account.overdeck.ai/account` reads and changes an account's Directory Durable Object through the account Worker's cross-script `DIRECTORY` binding (`docs/ACCOUNT-SERVICE.md`, "Account page"). These are internal DO paths: no public route forwards to them, so only a Durable Object stub reaches them, and the DO trusts every request on them.
+
+| Method | Path | Body | Answer |
+| --- | --- | --- | --- |
+| GET | `/account-view` | — | `200 { machines: [{ environmentId, label, online, lastSeenAt, serverVersion, deviceId }], relay: { month, bytesUsed, capBytes, stopped } }`; machines oldest first, `online` true while a registered socket is open, relay for the current UTC month |
+| POST | `/remove-machine` | JSON `{ "environmentId" }` (string, 1–64 characters) | `200 { removed: true }`; `400 { error: "bad_request" }`; `404 { error: "unknown_machine" }`. The machine, its approvals and its inbox rows are deleted, every other machine and phone gets the new `directory` frame, and its open socket closes with 4012 (`forgotten`). Nothing is sent to a calling socket, because there is none |
+| POST | `/delete-account` | — | `200 { deleted: true }`, also when already empty. Every machine and phone socket closes with 4001 (`account deleted`), every table in `ACCOUNT_TABLES` is emptied (the schema stays), the alarm is cleared |
+
+The page revokes a machine's device token before calling `/remove-machine`, so an offline machine cannot register again on its next `hello`. Account deletion calls `/delete-account` as the `directory` data holder and completes only after a 200.
 
 ## Limits
 
@@ -112,7 +125,7 @@ An older deployed directory refuses `hello-client` with `platform: node` as `bad
 3. Reuse the share service's Realtime TURN key, or create one in the Cloudflare dashboard (Realtime → TURN Server). An account without Realtime must first add the Realtime subscription, which needs a payment method (1,000 GB a month free, then billed per GB).
 4. `cd services/connect && npx wrangler secret put TURN_KEY_ID`, then `npx wrangler secret put TURN_KEY_API_TOKEN`.
 5. `npx wrangler secret put` for each of the five push secrets (`APNS_KEY_P8`, `APNS_KEY_ID`, `APNS_TEAM_ID`, `FCM_SERVICE_ACCOUNT_JSON`, `FCM_PROJECT_ID`; values from W-REL1, PAN-4841). `/healthz` then reports `apns: true, fcm: true`.
-6. `npx wrangler deploy` (uploads the Worker, creates the `AccountDirectory` Durable Object from migration `v1`, binds `ACCOUNT` and both rate limiters, and registers `connect.overdeck.ai`).
+6. `npx wrangler deploy` (uploads the Worker, creates the `AccountDirectory` Durable Object from migration `v1`, binds `ACCOUNT` and both rate limiters, and registers `connect.overdeck.ai`). On an existing deployment, deploy this Worker **before** `overdeck-account` whenever the account Worker starts calling new internal paths (PAN-4959 added `/account-view`, `/remove-machine` and `/delete-account`). On a brand-new environment the two bindings point at each other: if the first `overdeck-account` deploy refuses its `DIRECTORY` binding because `overdeck-connect` does not exist yet, deploy it once with the `durable_objects` block commented out, deploy this Worker, then restore the block and deploy `overdeck-account` again.
 7. Smoke test: `node scripts/anywhere/smoke-hosted.mjs` exits 0 (both Workers' `/healthz`, plus one account device-code start), and on a signed-in machine `pan machines directory` lists it `online` within a minute.
 8. Run the two live checks of D-2356-21 on real machines: two machines on different networks without Tailscale link by approval and reach each other over `rtc://`; with UDP blocked on both, a relay-plan account links over `rtc+turn://` and the card shows **Using relay**. To block UDP, run these rules with both `iptables` and `ip6tables`; they drop all UDP except DNS on port 53: `-A OUTPUT -p udp --dport 53 -j ACCEPT`, `-A INPUT -p udp --sport 53 -j ACCEPT`, `-A OUTPUT -p udp -j DROP`, `-A INPUT -p udp -j DROP`. Start the server with `DEBUG=werift*`. When the relay picks the right TURN URL, its `iceOptions` log line shows `turnTransport: 'tls'` and port 443.
 9. Rollback: `npx wrangler rollback` returns to the previous Worker version.

@@ -11,6 +11,7 @@ const TABLES = [
   'grants',
   'pending_attempts',
   'rate_limits',
+  'user_sessions',
   'users',
 ];
 
@@ -36,10 +37,10 @@ function deviceInsert(db: ReturnType<typeof createTestD1>, id: string, user: str
 describe('account service schema (PAN-4293 account-schema)', () => {
   it('applies the migrations on an empty database', () => {
     const { files } = migrated();
-    expect(files).toEqual(['0001_init.sql']);
+    expect(files).toEqual(['0001_init.sql', '0002_account_page.sql']);
   });
 
-  it('creates all ten tables', () => {
+  it('creates all eleven tables', () => {
     const { db } = migrated();
     expect(listTables(db)).toEqual(TABLES);
   });
@@ -68,6 +69,15 @@ describe('account service schema (PAN-4293 account-schema)', () => {
     await db.prepare('INSERT INTO grants (github_id, github_login, granted_at, granted_via) VALUES (?, ?, ?, ?)').bind(1, 'a', 1, 'admin-add').run();
     const row = await db.prepare('SELECT entitlement, storage_cap_bytes, expires_at FROM grants WHERE github_id = ?').bind(1).first();
     expect(row).toEqual({ entitlement: 'tester', storage_cap_bytes: null, expires_at: null });
+  });
+
+  it('auth_requests accepts the account purpose after the 0002 rebuild and still refuses an unknown one (PAN-4959)', async () => {
+    const { db } = migrated();
+    const insert = (hash: string, purpose: string) =>
+      db.prepare('INSERT INTO auth_requests (state_hash, purpose, payload, created_at, expires_at) VALUES (?, ?, ?, ?, ?)').bind(hash, purpose, '{}', 1, 2).run();
+    await insert('h-account', 'account');
+    await expect(insert('h-bogus', 'bogus')).rejects.toThrow(/CHECK constraint failed/);
+    expect((await db.prepare('SELECT purpose FROM auth_requests').all()).results).toEqual([{ purpose: 'account' }]);
   });
 
   it('a failing statement inside batch rolls back the earlier ones', async () => {
