@@ -424,6 +424,17 @@ describe('SharedConversationView controller (PAN-4478 WI-9)', () => {
     expect(screen.getByText('Queued (#2)')).toBeTruthy();
   });
 
+  it('a rejected controller send shows its message and keeps the text', async () => {
+    const sendControllerPrompt = vi.fn(async () => { throw new Error('The queue is full. Try again later.'); });
+    const setMyDraft = vi.fn();
+    render(<SharedConversationView {...controller({ myDraft: 'Go', sendControllerPrompt, setMyDraft })} />);
+    await act(async () => { fireEvent.click(button('Send prompt')); });
+    expect(sendControllerPrompt).toHaveBeenCalledWith('Go');
+    expect(screen.getByText('The queue is full. Try again later.')).toBeTruthy();
+    expect(setMyDraft).not.toHaveBeenCalled();
+    expect((screen.getByRole('textbox', { name: 'Write a prompt' }) as HTMLTextAreaElement).value).toBe('Go');
+  });
+
   it('the controller can pick a suggestion and send it for its author', async () => {
     const sendControllerPrompt = vi.fn(async () => 1);
     render(<SharedConversationView {...controller({
