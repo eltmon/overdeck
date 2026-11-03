@@ -246,3 +246,30 @@ describe('POST /api/issues/:id/deft/escalations/:escId/resolve', () => {
     expect(res.json).toEqual({ resolved: true, delivered: false, deliveryError: 'no pane' });
   });
 });
+
+describe('POST /api/issues/:id/deft/scopes/signoff', () => {
+  const body = { scopePath: 'xbrief/active/ui.xbrief.json', itemId: 'u2' };
+  let copy: string;
+
+  beforeEach(() => {
+    copy = mkdtempSync(join(scratch, 'wt-'));
+    cpSync(FIXTURE_DIR, copy, { recursive: true });
+    mocks.getIssueWorkspacePath.mockReturnValue(copy);
+  });
+
+  it('signs the agent disposition once, then reports not-needed', async () => {
+    const first = await call('POST', '/api/issues/PAN-1/deft/scopes/signoff', { body });
+    expect(first).toEqual({ status: 200, json: { result: 'signed' } });
+    const scope = JSON.parse(readFileSync(join(copy, body.scopePath), 'utf8'));
+    expect(scope.plan.items[1]['x-directive/disposition'].provenance).toEqual({ kind: 'human-event', actor: 'overdeck:dashboard' });
+    expect((await call('POST', '/api/issues/PAN-1/deft/scopes/signoff', { body })).json).toEqual({ result: 'not-needed' });
+  });
+
+  it('refuses a bad body, a missing origin, an unsafe path and a non-Deft issue', async () => {
+    expect((await call('POST', '/api/issues/PAN-1/deft/scopes/signoff', { body: { scopePath: 'x' } })).status).toBe(400);
+    expect((await call('POST', '/api/issues/PAN-1/deft/scopes/signoff', { body, origin: null })).status).toBe(403);
+    expect((await call('POST', '/api/issues/PAN-1/deft/scopes/signoff', { body: { ...body, scopePath: 'xbrief/../x.json' } })).status).toBe(404);
+    mocks.isDeftPipelineIssue.mockResolvedValue(false);
+    expect((await call('POST', '/api/issues/PAN-1/deft/scopes/signoff', { body })).status).toBe(404);
+  });
+});

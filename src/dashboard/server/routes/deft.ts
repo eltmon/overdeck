@@ -11,6 +11,8 @@
  *   in the activity feed when the child exits.
  * - `POST /api/issues/:id/deft/escalations/:escId/resolve` — answer a Deft
  *   escalation file (`resolveDeftEscalation`) and tell the work agent.
+ * - `POST /api/issues/:id/deft/scopes/signoff` — sign off a scope item's
+ *   disposition as a human event (`signOffDisposition`).
  */
 import { spawn as nodeSpawn, type ChildProcess } from 'node:child_process';
 import { readdir } from 'node:fs/promises';
@@ -23,6 +25,7 @@ import { emitActivityEntry } from '../../../lib/activity-logger.js';
 import { buildChildEnvWithoutTmux } from '../../../lib/child-env.js';
 import { DEFT_ESCALATION_DECISIONS, notifyEscalationResolved, resolveDeftEscalation } from '../../../lib/deft/escalations.js';
 import { isDeftPipelineIssue } from '../../../lib/deft/issue-pipeline.js';
+import { signOffDisposition } from '../../../lib/deft/signoff.js';
 import { readDeftIssueState, summarizeDeftIssueState } from '../../../lib/deft/state-reader.js';
 import { parseIssueId } from '../../../lib/issue-id.js';
 import { getIssueWorkspacePath } from '../../../lib/overdeck/issue-projects.js';
@@ -237,4 +240,43 @@ const postResolveEscalationRoute = HttpRouter.add(
   }),
 );
 
-export const deftRouteLayer = Layer.mergeAll(getDeftIssueRoute, getDeftIssuesRoute, postPipelineRoute, postResolveEscalationRoute);
+const postScopeSignoffRoute = HttpRouter.add(
+  'POST',
+  '/api/issues/:id/deft/scopes/signoff',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) return jsonResponse({ error: originCheck.error }, { status: 403 });
+
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    if (!parseIssueId(id)) return jsonResponse({ error: 'Invalid issue ID' }, { status: 400 });
+    const issueId = id.toUpperCase();
+
+    const body = parseBody(yield* request.text);
+    if (typeof body === 'string') return jsonResponse({ error: body }, { status: 400 });
+    const { scopePath, itemId } = body;
+    if (typeof scopePath !== 'string' || typeof itemId !== 'string' || !itemId) {
+      return jsonResponse({ error: 'scopePath and itemId are required' }, { status: 400 });
+    }
+
+    return yield* Effect.promise(async () => {
+      if (!(await isDeftPipelineIssue(issueId))) {
+        return jsonResponse({ error: `${issueId} does not run on Deft` }, { status: 404 });
+      }
+      const worktree = getIssueWorkspacePath(issueId);
+      if (!worktree) return jsonResponse({ error: 'no workspace' }, { status: 404 });
+      const result = await signOffDisposition(worktree, scopePath, itemId, 'overdeck:dashboard');
+      if (result === 'not-found') return jsonResponse({ error: `no disposition for ${itemId} in ${scopePath}` }, { status: 404 });
+      return jsonResponse({ result });
+    });
+  }),
+);
+
+export const deftRouteLayer = Layer.mergeAll(
+  getDeftIssueRoute,
+  getDeftIssuesRoute,
+  postPipelineRoute,
+  postResolveEscalationRoute,
+  postScopeSignoffRoute,
+);
