@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4481",
   "created": "2026-11-03T15:57:16.582Z",
-  "updated": "2026-11-03T16:58:55.904Z",
+  "updated": "2026-11-03T16:59:12.318Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -192,6 +192,10 @@
     "web-viewer-ui.ac4": {
       "status": "completed",
       "doneAt": "2026-11-03T16:58:55.903Z"
+    },
+    "share-invite-page-hosted.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:59:12.318Z"
     }
   }
 }
