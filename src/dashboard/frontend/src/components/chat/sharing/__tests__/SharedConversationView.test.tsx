@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { JoinState, JoinView, PresencePayload, SharedMessage } from '@overdeck/contracts';
 
 import { JoinApiError, sharedRouteCode } from '../joinApi';
-import { SharedConversationView } from '../SharedConversationView';
+import { SharedConversationView, toChatMessage } from '../SharedConversationView';
 import type { SharedJoin } from '../useSharedJoin';
 
 vi.mock('../../ChatMarkdown', () => ({
@@ -73,6 +73,12 @@ function props(overrides: Partial<SharedJoin> = {}): SharedJoin & { code: string
     hasHistory: false,
     presence: null,
     notices: [],
+    drafts: [],
+    myDraft: '',
+    setMyDraft: vi.fn(),
+    submitPrompt: vi.fn(),
+    submitStatus: null,
+    draftSentNotice: false,
     join: vi.fn(),
     leave: vi.fn(),
     reconnect: vi.fn(),
@@ -284,5 +290,86 @@ describe('SharedConversationView terminal toggle (PAN-4477 WI-9)', () => {
     unmount();
     render(<SharedConversationView {...live('admitted', { peerPhase: 'connecting' })} />);
     expect(screen.queryByTestId('shared-view-toggle')).toBeNull();
+  });
+});
+
+describe('SharedConversationView composer (PAN-4476 WI-13)', () => {
+  const connected = (overrides: Partial<SharedJoin> = {}, contributor = false) =>
+    props({
+      view: { ...view('admitted'), contributor },
+      peerPhase: 'connected',
+      presence: PRESENCE,
+      messages: MESSAGES,
+      hasHistory: true,
+      ...overrides,
+    });
+
+  it('a contributor sees Write a prompt and Send prompt, which submits', () => {
+    const submitPrompt = vi.fn();
+    render(<SharedConversationView {...connected({ myDraft: 'Run the tests', submitPrompt }, true)} />);
+    expect(screen.getByRole('textbox', { name: 'Write a prompt' })).toBeTruthy();
+    fireEvent.click(button('Send prompt'));
+    expect(submitPrompt).toHaveBeenCalledTimes(1);
+  });
+
+  it('a contributor sends with Ctrl+Enter and cannot send a command prefix', () => {
+    const submitPrompt = vi.fn();
+    const { rerender } = render(<SharedConversationView {...connected({ myDraft: 'Run it', submitPrompt }, true)} />);
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Write a prompt' }), { key: 'Enter', ctrlKey: true });
+    expect(submitPrompt).toHaveBeenCalledTimes(1);
+    rerender(<SharedConversationView {...connected({ myDraft: '/clear', submitPrompt }, true)} />);
+    expect((button('Send prompt') as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText('Prompts cannot start with /, ! or #.')).toBeTruthy();
+  });
+
+  it('shows no prefix hint for a blank box and a plain failure line for a rejected status without a reason', () => {
+    render(<SharedConversationView {...connected({ myDraft: '   ', submitStatus: { clientId: 'c1', status: 'rejected' } }, true)} />);
+    expect((button('Send prompt') as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByText('Prompts cannot start with /, ! or #.')).toBeNull();
+    expect(screen.getByText('Your prompt was not sent.')).toBeTruthy();
+  });
+
+  it('a non-contributor gets a suggestion box and no Send prompt', () => {
+    const setMyDraft = vi.fn();
+    render(<SharedConversationView {...connected({ setMyDraft })} />);
+    expect(screen.queryByRole('button', { name: 'Send prompt' })).toBeNull();
+    expect(screen.getByText('The host can pick your suggestion and send it.')).toBeTruthy();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Suggest a prompt' }), { target: { value: 'idea' } });
+    expect(setMyDraft).toHaveBeenCalledWith('idea');
+  });
+
+  it('shows the queue line from presence', () => {
+    const presence = { ...PRESENCE, streams: [{ ...PRESENCE.streams[0]!, agentWorking: true, queued: 2 }] };
+    render(<SharedConversationView {...connected({ presence })} />);
+    expect(screen.getByText('Agent is working · 2 queued')).toBeTruthy();
+  });
+
+  it('shows the other drafts with their avatars, the ack and the draft-sent notice', () => {
+    render(<SharedConversationView {...connected({
+      drafts: [{ authorGithubId: 100, authorLogin: 'alice', text: 'Try the fix', updatedAt: 1 }],
+      submitStatus: { clientId: 'c1', status: 'rejected', reason: 'grant_revoked' },
+      draftSentNotice: true,
+    })} />);
+    const row = screen.getByRole('listitem', { name: 'Suggestion from @alice' });
+    expect(row.textContent).toContain('Try the fix');
+    expect(row.querySelector('img')?.getAttribute('src')).toBe('https://avatars.githubusercontent.com/u/100');
+    expect(screen.getByText('You can no longer send prompts directly.')).toBeTruthy();
+    expect(screen.getByText('The host sent your suggestion.')).toBeTruthy();
+  });
+
+  it('shows Queued (#N) for a queued ack', () => {
+    render(<SharedConversationView {...connected({ submitStatus: { clientId: 'c1', status: 'queued', position: 3 } }, true)} />);
+    expect(screen.getByText('Queued (#3)')).toBeTruthy();
+  });
+
+  it('a lobby view renders no textarea', () => {
+    render(<SharedConversationView {...props({ view: view('lobby'), messages: MESSAGES, hasHistory: true })} />);
+    expect(screen.queryByRole('textbox')).toBeNull();
+  });
+
+  it('toChatMessage copies author', () => {
+    const author = { login: 'alice', avatarUrl: 'https://avatars.githubusercontent.com/u/100' };
+    expect(toChatMessage({ ...MESSAGES[0]!, author }).author).toEqual(author);
+    expect(toChatMessage(MESSAGES[0]!)).not.toHaveProperty('author');
   });
 });

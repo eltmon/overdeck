@@ -262,6 +262,11 @@ describe('PeerHub through the share service on real workerd (PAN-4474)', () => {
               return { stop: () => undefined };
             },
           }),
+          queue: {
+            deliver: async () => ({ status: 200, body: {} }),
+            activity: async () => ({ working: false, lastMessageId: null }),
+            now: () => Date.now(),
+          },
           terminal: { attach: async () => () => undefined, close: () => undefined },
           streamLabel: async () => 'Fixture',
           now: () => Date.now(),

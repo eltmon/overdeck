@@ -7,17 +7,22 @@
  * with an empty work log (D-13); the header shows the stream label, the host and the watcher
  * count (D-19). `SharedConversationRoute` binds it to `useSharedJoin`.
  *
+ * Under the timeline, `SharedComposer` (PAN-4476 WI-13) shows the queue line, the other
+ * participants' drafts and the viewer's own draft box. A contributor also gets **Send prompt**
+ * (and Ctrl/Cmd+Enter); everyone else's box is a suggestion the host can pick.
+ *
  * Once the peer is connected, a **Conversation** / **Terminal** toggle switches the admitted screen
  * to `SharedTerminalView`, the host's read-only terminal (PAN-4477). Conversation is the default.
  */
-import type { PresencePayload, SharedMessage } from '@overdeck/contracts';
+import { sharedPromptRefusal, type PresencePayload, type SharedMessage, type SharedSubmitReason } from '@overdeck/contracts';
 import { useState, type ReactNode } from 'react';
 
 import type { ChatMessage } from '../chat-types';
 import { MessagesTimeline } from '../MessagesTimeline';
 import { SharedTerminalView } from './SharedTerminalView';
+import { queueStatusText, SuggestionList, type SuggestionItem } from './SuggestionList';
 import { LIVE_JOIN_STATES, useSharedJoin, type SharedJoin } from './useSharedJoin';
-import type { ViewerNotice } from './webrtc-viewer';
+import type { SubmitAck, ViewerNotice } from './webrtc-viewer';
 
 const NEUTRAL_BUTTON =
   'rounded-md border border-border px-3 py-1 text-xs font-medium text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50';
@@ -25,14 +30,82 @@ const PRIMARY_BUTTON =
   'rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50';
 const BANNER = 'flex items-center gap-2 border-b border-border bg-muted px-4 py-2 text-xs text-muted-foreground';
 
-/** Copies the fields the timeline reads, field by field (D-13). `author` is not rendered in slice 4. */
+/** Copies the fields the timeline reads, field by field (D-13), including a shared prompt's `author`. */
 export function toChatMessage(m: SharedMessage): ChatMessage {
   const message: ChatMessage = { id: m.id, role: m.role, text: m.text, createdAt: m.createdAt };
   if (m.turnId !== undefined) message.turnId = m.turnId;
   if (m.completedAt !== undefined) message.completedAt = m.completedAt;
   if (m.streaming !== undefined) message.streaming = m.streaming;
   if (m.sequence !== undefined) message.sequence = m.sequence;
+  if (m.author !== undefined) message.author = { login: m.author.login, avatarUrl: m.author.avatarUrl };
   return message;
+}
+
+export function submitReasonText(reason: SharedSubmitReason | undefined): string {
+  switch (reason) {
+    case 'not_contributor':
+    case 'grant_revoked':
+      return 'You can no longer send prompts directly.';
+    case 'queue_full': return 'The queue is full. Try again later.';
+    case 'invalid_prompt': return 'Prompts cannot be empty or start with /, ! or #.';
+    case 'too_long': return 'Prompts can be at most 8,000 characters.';
+    case 'delivery_refused': return 'The host could not deliver your prompt.';
+    case 'delivery_unknown': return 'The host may not have delivered your prompt.';
+    default: return 'Your prompt was not sent.';
+  }
+}
+
+function submitStatusText(status: SubmitAck): string {
+  if (status.status === 'queued') return status.position ? `Queued (#${status.position})` : 'Queued';
+  if (status.status === 'sent') return 'Sent';
+  return submitReasonText(status.reason);
+}
+
+function SharedComposer(props: SharedJoin) {
+  const contributor = props.view?.contributor === true;
+  const queueLine = queueStatusText(props.presence?.streams[0]);
+  const participants = props.presence?.participants ?? [];
+  const suggestions: SuggestionItem[] = props.drafts.map((draft) => ({
+    githubId: draft.authorGithubId,
+    login: draft.authorLogin,
+    avatarUrl: participants.find((p) => p.githubId === draft.authorGithubId)?.avatarUrl ?? null,
+    text: draft.text,
+  }));
+  // The prefix hint is only for a prefix; an empty or blank box just disables Send.
+  const refusal = props.myDraft.trim() === '' ? null : sharedPromptRefusal(props.myDraft);
+  const canSend = contributor && sharedPromptRefusal(props.myDraft) === null;
+  return (
+    <div data-component="shared-composer" className="space-y-2 border-t border-border px-4 py-3">
+      {queueLine ? <p role="status" className="text-xs text-muted-foreground">{queueLine}</p> : null}
+      <SuggestionList items={suggestions} mode="view" />
+      <textarea
+        aria-label={contributor ? 'Write a prompt' : 'Suggest a prompt'}
+        className="w-full resize-y rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground"
+        rows={3}
+        maxLength={8000}
+        value={props.myDraft}
+        onChange={(event) => props.setMyDraft(event.target.value)}
+        onKeyDown={(event) => {
+          if (contributor && event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+            event.preventDefault();
+            props.submitPrompt();
+          }
+        }}
+      />
+      <div className="flex items-center gap-2">
+        {contributor ? (
+          <button type="button" className={NEUTRAL_BUTTON} aria-label="Send prompt" disabled={!canSend} onClick={props.submitPrompt}>
+            Send
+          </button>
+        ) : (
+          <p className="text-xs text-muted-foreground">The host can pick your suggestion and send it.</p>
+        )}
+        {props.submitStatus ? <p role="status" className="text-xs text-muted-foreground">{submitStatusText(props.submitStatus)}</p> : null}
+      </div>
+      {contributor && refusal === 'invalid_prompt' ? <p className="text-xs text-muted-foreground">Prompts cannot start with /, ! or #.</p> : null}
+      {props.draftSentNotice ? <p role="status" className="text-xs text-muted-foreground">The host sent your suggestion.</p> : null}
+    </div>
+  );
 }
 
 export function formatShareCode(code: string): string {
@@ -214,6 +287,7 @@ function AdmittedScreen(props: SharedJoin) {
       ) : lost ? null : (
         <Panel><Note>Connecting to the host…</Note></Panel>
       )}
+      {showTimeline ? <SharedComposer {...props} /> : null}
     </>
   );
 }

@@ -20,7 +20,8 @@ In this release:
 - Only Claude Code conversations can be shared.
 - Viewers see the messages. Tool calls, thinking, the work log, cost and context usage are
   not shared.
-- Viewers are read-only. They cannot send prompts.
+- Viewers can suggest prompts. Contributors can also send prompts straight to the
+  conversation.
 
 ## Before you start
 
@@ -41,8 +42,8 @@ The share dialog lists the people waiting to join and the people in the room. Fo
 person you can:
 
 - **Admit** them, so they start to see the conversation.
-- **Admit as contributor**, so they are marked as a contributor. Contributors get extra
-  powers in a later release.
+- **Admit as contributor**, so they can also send prompts straight to the conversation.
+- **Grant contributor** / **Remove contributor** for someone already in the room.
 - **Kick** them out. They can ask to join again.
 - **Revoke** them. They are blocked from this share and cannot ask again.
 - **Un-revoke** a blocked person, so they can ask to join again.
@@ -69,12 +70,29 @@ Click **Leave** at any time to leave the shared conversation.
   machine, and the host admits, kicks and revokes people.
 - **Controller**: the person who drives the conversation. In this release this is always
   the host.
-- **Viewer**: a person the host admitted. Viewers watch the conversation live and are
-  read-only.
-- **Contributor**: a viewer the host marked as a contributor. In this release a
-  contributor sees the same thing as any other viewer.
+- **Viewer**: a person the host admitted. Viewers watch the conversation live and can
+  suggest prompts.
+- **Contributor**: a viewer who can also send prompts straight to the conversation.
 
-Contributor prompts and handing control to another person come in a later release.
+Handing control to another person comes in a later release.
+
+## Suggestions and contributor prompts
+
+- Every viewer gets a box under the conversation. What they type is a **suggestion**, and
+  every other participant sees it live.
+- The host sees the suggestions in the share dialog. Click **Use** on one, edit it if you
+  want, and click **Send**. The person who suggested it sees "The host sent your
+  suggestion."
+- A contributor also gets **Send prompt** (or Ctrl/Cmd+Enter), which sends the prompt
+  straight to the conversation.
+- Every prompt waits its turn: the agent finishes the current turn first, and the line
+  **Agent is working · N queued** shows the wait.
+- Prompts cannot start with `/`, `!` or `#`, so nobody can run a slash command, a shell
+  command or a memory note through a shared session.
+- The conversation shows who sent each shared prompt.
+
+**Only make someone a contributor if you trust them to prompt your agent as you.** Their
+prompts run on your machine, with your agent's permissions.
 
 ## What viewers see
 
@@ -99,6 +117,11 @@ Contributor prompts and handing control to another person come in a later releas
 - **This share is open in another tab or on another device.**: you joined the same share
   somewhere else. Only one place at a time can watch.
 - **Sign in to join**: run `pan account login` first.
+- **Agent is working · N queued**: the host's agent is busy and N shared prompts wait for
+  their turn.
+- **Queued (#N)**: your prompt is number N in the queue.
+- **The host sent your suggestion.**: the host picked your suggestion and sent it.
+- **You can no longer send prompts directly.**: the host removed your contributor role.
 
 ## Limits
 
@@ -106,3 +129,5 @@ Contributor prompts and handing control to another person come in a later releas
 - The link works as long as the share exists.
 - If the host's machine stays away from the share service for more than 5 minutes, the
   room ends.
+- A queue holds at most 20 prompts, at most 3 from one contributor, each up to 8,000
+  characters.

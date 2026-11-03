@@ -9,6 +9,7 @@
 // browser exchanges with its local dashboard server to create, list and manage shares.
 // PAN-4475 (slice 4) adds the viewer dashboard API types at the end: the shapes the viewer browser
 // exchanges with its own dashboard server.
+// PAN-4476 (slice 5) adds drafts, contributor submits and the queue indicator.
 
 export type ShareProtocolVersion = 1;
 export type ShareScope = { readonly kind: 'conversation'; readonly conversationId: string };
@@ -109,7 +110,40 @@ export interface ShareView {
   readonly connection: ShareConnection;
   readonly snapshot: RoomSnapshot | null; // null for a stale record
   readonly lastError: ShareLastError | null;
+  /** Slice 5: the viewers' current drafts, oldest started first. Optional so older fixtures compile (D-13). */
+  readonly drafts?: readonly ShareDraftView[];
+  /** Slice 5: the share's prompt queue. Optional so older fixtures compile (D-13). */
+  readonly queue?: ShareQueueView;
 }
+
+/** One viewer's current draft, as the host browser sees it. */
+export interface ShareDraftView {
+  readonly githubId: number;
+  readonly login: string;
+  readonly avatarUrl: string;
+  readonly text: string;
+  readonly startedAt: string; // ISO
+  readonly updatedAt: string; // ISO
+}
+
+/** One prompt waiting in (or being delivered from) the host's queue. */
+export interface ShareQueueItemView {
+  readonly id: string;
+  readonly login: string;
+  readonly avatarUrl: string;
+  readonly source: 'contributor' | 'controller';
+  readonly text: string;
+  readonly enqueuedAt: string; // ISO
+}
+
+export interface ShareQueueView {
+  readonly agentWorking: boolean;
+  readonly delivering: boolean;
+  readonly items: readonly ShareQueueItemView[];
+}
+
+/** POST /api/shares/:code/prompts: a controller send; `draftGithubId` names the picked draft. */
+export interface SendSharePromptRequest { readonly text: string; readonly draftGithubId?: number }
 
 export interface ListSharesResponse { readonly shares: readonly ShareView[] }
 
@@ -148,10 +182,27 @@ export interface SharedHello {
 
 export type SharedHelloError = 'invalid_hello' | 'version_unsupported' | 'scope_kind_unsupported';
 
-/** `control` payloads. Slice 6 adds the viewer's terminal watch; later slices add more (drafts pick, handoff, …). */
+/** Why a shared prompt was not (or will not be) delivered. */
+export type SharedSubmitReason =
+  | 'not_contributor' | 'invalid_prompt' | 'too_long' | 'queue_full'
+  | 'grant_revoked' | 'delivery_refused' | 'delivery_unknown';
+
+/**
+ * `control` payloads. Slice 5 adds submit (viewer → host), submit-ack and draft-sent (host → viewer);
+ * slice 6 adds the viewer's terminal watch.
+ */
 export type ControlPayload =
   | { readonly kind: 'hello'; readonly hello: SharedHello }
   | { readonly kind: 'error'; readonly code: SharedHelloError }
+  | { readonly kind: 'submit'; readonly clientId: string; readonly text: string }
+  | {
+      readonly kind: 'submit-ack';
+      readonly clientId: string;
+      readonly status: 'queued' | 'sent' | 'rejected';
+      readonly position?: number;           // 1-based, with 'queued'
+      readonly reason?: SharedSubmitReason; // with 'rejected'
+    }
+  | { readonly kind: 'draft-sent' }
   /** Viewer → host: start (`true`) or stop (`false`) the read-only terminal stream (slice 6). */
   | { readonly kind: 'terminal-watch'; readonly watch: boolean };
 
@@ -188,7 +239,15 @@ export type ConversationPayload =
   | { readonly kind: 'update'; readonly message: SharedMessage }
   | { readonly kind: 'unavailable'; readonly reason: 'transcript_not_found' | 'history_too_large' };
 
-export interface SharedStream { readonly streamId: string; readonly label: string; readonly kind: 'conversation' }
+export interface SharedStream {
+  readonly streamId: string;
+  readonly label: string;
+  readonly kind: 'conversation';
+  /** Slice 5: the stream's agent is mid-turn. Absent from older hosts. */
+  readonly agentWorking?: boolean;
+  /** Slice 5: shared prompts waiting in the host's queue. Absent from older hosts. */
+  readonly queued?: number;
+}
 
 export interface PresenceParticipant {
   readonly githubId: number;
@@ -206,13 +265,16 @@ export interface PresencePayload {
   readonly streams: readonly SharedStream[];
 }
 
-/** `drafts` payload (slice 5 sends it): a full snapshot, last write wins per author. */
+/** Host → viewer on `drafts`: another participant's whole draft; an empty `text` deletes it. */
 export interface DraftPayload {
   readonly authorGithubId: number;
   readonly authorLogin: string;
   readonly text: string;
   readonly updatedAt: number;
 }
+
+/** Viewer → host on `drafts`: the author's whole draft. The host ignores every other key. */
+export interface DraftUpdate { readonly text: string }
 
 // ── Viewer dashboard API (PAN-4475, slice 4): the viewer browser ⇄ its own dashboard server. ──
 // The device token never appears in these types.

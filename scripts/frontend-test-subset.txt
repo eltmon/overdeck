@@ -136,6 +136,7 @@ src/components/chat/sharing/__tests__/ShareDialog.test.tsx
 src/components/chat/sharing/__tests__/SharedConversationView.test.tsx
 src/components/chat/sharing/__tests__/SharedTerminalView.test.tsx
 src/components/chat/sharing/__tests__/SharingLobbyPanel.test.tsx
+src/components/chat/sharing/__tests__/SuggestionList.test.tsx
 src/components/chat/sharing/__tests__/useSharedJoin.test.tsx
 src/components/chat/sharing/__tests__/webrtc-viewer.test.ts
 src/components/costs/__tests__/FleetUsagePanel.test.tsx

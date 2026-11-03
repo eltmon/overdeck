@@ -183,6 +183,12 @@ export function UserMessageRow({ message, cwd, issueId, bookmarkable, citeConver
         )}
         <AttachmentThumbnails text={message.text} />
         <span className={styles.messageTimestamp}>
+          {message.author && (
+            <span data-testid="user-message-author" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginRight: '6px' }}>
+              <img src={message.author.avatarUrl} alt="" width={16} height={16} style={{ width: '16px', height: '16px', borderRadius: '2px' }} />
+              <span className="font-mono">@{message.author.login}</span>
+            </span>
+          )}
           {isPending ? (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
               <svg style={{ width: '10px', height: '10px', animation: 'spin 1s linear infinite', color: 'var(--primary)' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
