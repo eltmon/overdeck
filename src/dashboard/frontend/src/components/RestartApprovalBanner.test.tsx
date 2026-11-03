@@ -88,6 +88,31 @@ describe('RestartApprovalBanner', () => {
     });
   });
 
+  it('shows the build SHA an approval will ship', () => {
+    seed({
+      status: 'pending',
+      pending: [{
+        requesterId: 'reload:22',
+        kind: 'reload',
+        reason: 'pan reload',
+        builtSha: '530ee175e8c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5',
+        requestedAt: '2026-08-14T12:00:01.000Z',
+      }],
+    });
+    renderBanner();
+
+    expect(bannerText()).toContain('pan reload · build 530ee175e8c1');
+    expect(bannerText()).not.toContain('530ee175e8c1d');
+  });
+
+  it('omits the build label for a request without builtSha', () => {
+    seed(TWO_PENDING);
+    renderBanner();
+
+    expect(bannerText()).toContain('post-merge deploy PAN-3724; pan reload');
+    expect(bannerText()).not.toContain('· build');
+  });
+
   it('names who still has to restart once the approval lands (FR-1)', () => {
     seed({ ...TWO_PENDING, status: 'approved' });
     renderBanner();

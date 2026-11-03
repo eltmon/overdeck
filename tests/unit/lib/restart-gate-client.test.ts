@@ -46,7 +46,7 @@ function request(overrides: Partial<RestartGateRequest> = {}): RestartGateReques
  * report status, approve opens one epoch, claim is granted exactly once, and a
  * completed restart marks that epoch's requesters satisfied.
  */
-function createGate() {
+function createGate(options: { withdrawRoute?: boolean } = {}) {
   const state = {
     pending: new Set<string>(),
     approved: false,
@@ -81,6 +81,13 @@ function createGate() {
         granted: state.claimedBy === requesterId,
         status: 'claimed',
       });
+    }
+
+    if (url.endsWith('/api/restart-gate/withdraw')) {
+      if (options.withdrawRoute === false) return jsonResponse(404, {});
+      const withdrawn = !state.approved;
+      if (withdrawn) state.pending.delete(String(body.requesterId));
+      return jsonResponse(200, { withdrawn });
     }
 
     if (url.endsWith('/api/restart-gate/approve')) {
@@ -272,5 +279,139 @@ describe('restart-gate client (PAN-3729)', () => {
     const fetchImpl = vi.fn(async () => jsonResponse(200, snapshot));
 
     await expect(readRestartGate({ dashboardUrl: DASHBOARD_URL, fetchImpl })).resolves.toEqual(snapshot);
+  });
+});
+
+describe('restart-gate wait lines name the build (PAN-4888)', () => {
+  it('names the build it will put live', () => {
+    const lines = restartGateWaitLines(request({ builtSha: '530ee175e8c1d2e3' }), 1);
+    expect(lines[1]).toContain('Approving it puts origin/main build 530ee175e8c1 live.');
+  });
+
+  it('says nothing about a build when the request has none', () => {
+    const lines = restartGateWaitLines(request(), 1);
+    expect(lines.join('\n')).not.toContain('origin/main build');
+  });
+});
+
+describe('restart-gate client step aside (PAN-4888)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.clearAllMocks();
+  });
+
+  function withdrawCalls(fetchImpl: ReturnType<typeof vi.fn>): unknown[] {
+    return fetchImpl.mock.calls.filter(([url]) => String(url).endsWith('/api/restart-gate/withdraw'));
+  }
+
+  it('steps aside before registering without calling withdraw', async () => {
+    const gate = createGate();
+    const shouldYield = vi.fn(async () => 'superseded by a newer pan reload (PID 9) that builds origin/main abc');
+
+    const outcome = await waitForRestartApproval(request(), {
+      dashboardUrl: DASHBOARD_URL,
+      fetchImpl: gate.fetchImpl,
+      log: vi.fn(),
+      shouldYield,
+    });
+
+    expect(outcome).toEqual({
+      proceed: false,
+      reason: 'superseded',
+      detail: 'superseded by a newer pan reload (PID 9) that builds origin/main abc',
+    });
+    expect(gate.fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('steps aside after a pending poll once the gate withdraws the request', async () => {
+    const gate = createGate();
+    const shouldYield = vi.fn<() => Promise<string | null>>()
+      .mockResolvedValueOnce(null)
+      .mockResolvedValue('superseded by a newer pan reload');
+    const log = vi.fn();
+
+    const outcome = waitForRestartApproval(request(), {
+      dashboardUrl: DASHBOARD_URL,
+      fetchImpl: gate.fetchImpl,
+      log,
+      shouldYield,
+    });
+
+    await tickPolls(1);
+
+    await expect(outcome).resolves.toEqual({ proceed: false, reason: 'superseded', detail: 'superseded by a newer pan reload' });
+    expect(withdrawCalls(gate.fetchImpl)).toHaveLength(1);
+    expect(JSON.parse(String((withdrawCalls(gate.fetchImpl)[0] as [string, RequestInit])[1].body))).toEqual({ requesterId: 'reload:1234' });
+    expect(gate.state.pending.has('reload:1234')).toBe(false);
+    expect(log).toHaveBeenCalledWith('Stepping aside — superseded by a newer pan reload.');
+  });
+
+  it('claims an approval that landed between polls instead of stepping aside', async () => {
+    const gate = createGate();
+    const shouldYield = vi.fn<() => Promise<string | null>>()
+      .mockResolvedValueOnce(null)
+      .mockResolvedValue('superseded by a newer pan reload');
+
+    const outcome = waitForRestartApproval(request(), {
+      dashboardUrl: DASHBOARD_URL,
+      fetchImpl: gate.fetchImpl,
+      log: vi.fn(),
+      shouldYield,
+    });
+
+    // The first poll registers the request as pending; the operator approves during the sleep.
+    await vi.advanceTimersByTimeAsync(0);
+    expect(gate.state.pending.has('reload:1234')).toBe(true);
+    gate.state.approved = true;
+    await tickPolls(1);
+
+    await expect(outcome).resolves.toEqual({
+      proceed: true,
+      reason: 'claimed',
+      detail: 'operator approved and this requester holds the claim',
+    });
+    expect(withdrawCalls(gate.fetchImpl)).toHaveLength(1);
+    expect(gate.state.claimedBy).toBe('reload:1234');
+  });
+
+  it('never asks shouldYield once the request is in an epoch', async () => {
+    const gate = createGate();
+    gate.state.claimedBy = 'reload:other';
+    const shouldYield = vi.fn(async () => null);
+
+    void waitForRestartApproval(request(), {
+      dashboardUrl: DASHBOARD_URL,
+      fetchImpl: gate.fetchImpl,
+      log: vi.fn(),
+      shouldYield,
+    });
+
+    await tickPolls(3);
+
+    expect(shouldYield).toHaveBeenCalledTimes(1);
+    expect(withdrawCalls(gate.fetchImpl)).toHaveLength(0);
+  });
+
+  it('steps aside when the gate has no withdraw route', async () => {
+    const gate = createGate({ withdrawRoute: false });
+    const shouldYield = vi.fn<() => Promise<string | null>>()
+      .mockResolvedValueOnce(null)
+      .mockResolvedValue('superseded by a newer pan reload');
+
+    const outcome = waitForRestartApproval(request(), {
+      dashboardUrl: DASHBOARD_URL,
+      fetchImpl: gate.fetchImpl,
+      log: vi.fn(),
+      shouldYield,
+    });
+
+    await tickPolls(1);
+
+    await expect(outcome).resolves.toMatchObject({ proceed: false, reason: 'superseded' });
+    expect(withdrawCalls(gate.fetchImpl)).toHaveLength(1);
   });
 });

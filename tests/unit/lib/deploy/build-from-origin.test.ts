@@ -11,8 +11,10 @@ import {
   activateDashboardDeployment,
   buildDashboardFromOriginMain,
   dashboardDeploymentRoots,
+  isAncestorCommit,
   liveDashboardDeploymentRoots,
   removeDashboardDeployment,
+  resolveOriginMainSha,
   selectDashboardDeploymentRoot,
   sweepDashboardDeployments,
   type BuildFromOriginDeps,
@@ -75,6 +77,18 @@ afterEach(async () => {
 });
 
 describe('buildDashboardFromOriginMain', () => {
+  it('builds the pinned target SHA without fetching', async () => {
+    const pinned = 'feedface'.repeat(5);
+    const { deps, gitCalls } = createDependencies();
+
+    const deployment = await buildDashboardFromOriginMain(REPO_ROOT, { ...deps, targetSha: pinned });
+
+    expect(gitCalls.some((args) => args[0] === 'fetch')).toBe(false);
+    expect(gitCalls).not.toContainEqual(['rev-parse', 'origin/main']);
+    expect(gitCalls).toContainEqual(['worktree', 'add', '--detach', BUILD_WORKTREE, pinned]);
+    expect(deployment.builtSha).toBe(pinned);
+  });
+
   it.each([
     { state: 'clean and equal to origin/main', status: '', headSha: ORIGIN_MAIN_SHA },
     { state: 'dirty and equal to origin/main', status: ' M src/file.ts', headSha: ORIGIN_MAIN_SHA },
@@ -446,5 +460,30 @@ describe('buildDashboardFromOriginMain', () => {
     await expect(fs.access(second)).resolves.toBeUndefined();
     await expect(fs.access(legacyOne)).rejects.toMatchObject({ code: 'ENOENT' });
     await expect(fs.access(legacyTwo)).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+});
+
+describe('origin/main target helpers (PAN-4888)', () => {
+  it('resolveOriginMainSha fetches then returns the trimmed origin/main commit', async () => {
+    const calls: string[] = [];
+    const runGit = vi.fn(async (args: string[]) => {
+      calls.push(args.join(' '));
+      return { stdout: args[0] === 'rev-parse' ? `${ORIGIN_MAIN_SHA}\n` : '', stderr: '' };
+    });
+
+    await expect(resolveOriginMainSha(REPO_ROOT, runGit)).resolves.toBe(ORIGIN_MAIN_SHA);
+    expect(calls).toEqual(['fetch origin main', 'rev-parse origin/main']);
+  });
+
+  it('isAncestorCommit maps exit 0 to true, exit 1 to false, and rethrows other failures', async () => {
+    const ok = vi.fn(async () => ({ stdout: '', stderr: '' }));
+    await expect(isAncestorCommit(REPO_ROOT, 'a', 'b', ok)).resolves.toBe(true);
+    expect(ok).toHaveBeenCalledWith(['merge-base', '--is-ancestor', 'a', 'b'], REPO_ROOT);
+
+    const notAncestor = vi.fn(async () => { throw Object.assign(new Error('exit 1'), { code: 1 }); });
+    await expect(isAncestorCommit(REPO_ROOT, 'a', 'b', notAncestor)).resolves.toBe(false);
+
+    const badObject = vi.fn(async () => { throw Object.assign(new Error('fatal: Not a valid commit name'), { code: 128 }); });
+    await expect(isAncestorCommit(REPO_ROOT, 'a', 'b', badObject)).rejects.toThrow('Not a valid commit name');
   });
 });
