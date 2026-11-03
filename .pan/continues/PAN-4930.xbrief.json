@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4930",
   "created": "2026-11-03T21:47:50.354Z",
-  "updated": "2026-11-03T23:19:32.178Z",
+  "updated": "2026-11-03T23:19:48.479Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,6 +80,10 @@
     "extract-record-leaf.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T23:19:32.178Z"
+    },
+    "agent-record-fields.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:19:48.478Z"
     }
   }
 }
