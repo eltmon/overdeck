@@ -36,6 +36,7 @@ const mockRecordCiTestGatePass = vi.fn(async () => true);
 const mockGetPrFacts = vi.fn();
 const mockAdopt = vi.fn(async (..._args: unknown[]) => ({ kind: 'started', workspacePath: '/tmp/test-project/workspaces/feature-pan-1' }));
 const mockRefreshIssuePullRequestStateNow = vi.fn();
+const mockMaybeRelayCodeRabbitReview = vi.fn((..._args: unknown[]) => null);
 
 vi.mock('../../../src/dashboard/server/services/pr-tab-cache.js', () => ({
   bumpIssuePrTabCacheGeneration: (...args: Parameters<typeof mockBumpIssuePrTabCacheGeneration>) =>
@@ -83,6 +84,10 @@ vi.mock('../../../src/lib/projects.js', () => ({
 vi.mock('../../../src/dashboard/server/services/project-resource-refresh-queue.js', () => ({
   enqueueProjectResourceRefresh: (...args: Parameters<typeof mockEnqueueProjectResourceRefresh>) =>
     mockEnqueueProjectResourceRefresh(...args),
+}));
+
+vi.mock('../../../src/lib/cloister/coderabbit-feedback.js', () => ({
+  maybeRelayCodeRabbitReview: (...args: unknown[]) => mockMaybeRelayCodeRabbitReview(...args),
 }));
 
 vi.mock('../../../src/lib/cloister/pr-adoption-review.js', () => ({
@@ -637,6 +642,28 @@ describe('handlePullRequestReview / ReviewComment / ReviewThread', () => {
 
     expect(mockBumpIssuePrTabCacheGeneration).toHaveBeenCalledTimes(3);
     expect(mockBumpIssuePrTabCacheGeneration).toHaveBeenCalledWith('PAN-123');
+  });
+
+  it('hands a submitted review to the CodeRabbit relay with the issue id (PAN-4773)', async () => {
+    const payload = makePayload({
+      action: 'submitted',
+      pull_request: { number: 9, head: { ref: 'feature/pan-123', sha: 'abc' } },
+      review: { id: 77, state: 'commented', user: { login: 'coderabbitai[bot]' } },
+    });
+
+    await handlePullRequestReview(payload);
+
+    expect(mockMaybeRelayCodeRabbitReview).toHaveBeenCalledWith(payload, 'PAN-123');
+  });
+
+  it('does not reach the CodeRabbit relay for a branch with no issue id', async () => {
+    await handlePullRequestReview(makePayload({
+      action: 'submitted',
+      pull_request: { number: 9, head: { ref: 'some-branch', sha: 'abc' } },
+      review: { id: 77, state: 'commented', user: { login: 'coderabbitai[bot]' } },
+    }));
+
+    expect(mockMaybeRelayCodeRabbitReview).not.toHaveBeenCalled();
   });
 });
 
