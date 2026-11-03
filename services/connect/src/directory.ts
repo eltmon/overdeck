@@ -9,7 +9,7 @@
  * header is trusted here; the public `Authorization` header is never read.
  * This module uses Web APIs only; src/index.ts owns the `cloudflare:workers` import.
  */
-import type { ConnectPlan, DirectoryEndpoint, DirectoryToMachineFrame } from '../../../packages/contracts/src/connect.ts';
+import type { ConnectPlan, DirectoryEndpoint, DirectoryToClientFrame, DirectoryToMachineFrame } from '../../../packages/contracts/src/connect.ts';
 import { EMPTY_DIRECTORY, reduce } from './directory-state.ts';
 import type { ApprovalRow, DirectoryEffect, DirectoryEvent, DirectoryState, MachineRow, Target } from './directory-state.ts';
 import type { ConnectIdentity, Deps, Env } from './env.ts';
@@ -95,7 +95,7 @@ function parseIdentity(raw: string | null): ConnectIdentity | null {
   return { userId, githubId, deviceId, plan, maxDevices };
 }
 
-function safeSend(ws: WebSocket, frame: DirectoryToMachineFrame): void {
+function safeSend(ws: WebSocket, frame: DirectoryToMachineFrame | DirectoryToClientFrame): void {
   try {
     ws.send(JSON.stringify(frame));
   } catch {
@@ -180,7 +180,8 @@ export class DirectoryHost {
       }));
     const relayRow = sql.exec<{ month: string; bytes: number }>('SELECT month, bytes FROM relay_usage ORDER BY month DESC LIMIT 1').toArray()[0];
     const relay: RelayUsage | null = relayRow ? { month: relayRow.month, bytes: relayRow.bytes } : null;
-    return { plan, machines, approvals, relay };
+    // The clients table arrives with the role-aware glue (PAN-4829 WI-6).
+    return { plan, machines, clients: [], approvals, relay };
   }
 
   async fetch(req: Request): Promise<Response> {
@@ -313,6 +314,8 @@ export class DirectoryHost {
     const others = this.registered(self);
     if (to === 'others') return others.map((r) => r.ws);
     if (to === 'all') return [self, ...others.map((r) => r.ws)];
+    // Client sockets are resolved by the role-aware glue (PAN-4829 WI-6).
+    if (to === 'clients' || 'clientId' in to) return [];
     return others.filter((r) => r.environmentId === to.environmentId).map((r) => r.ws);
   }
 
@@ -329,7 +332,10 @@ export class DirectoryHost {
       'inbox-ack': 0,
       'inbox-nack': 0,
       'inbox-forget': 0,
+      'put-client': 0,
+      'delete-client': 0,
       register: 1,
+      'register-client': 1,
       send: 2,
       'fetch-turn': 2,
       'inbox-create': 2,
@@ -432,6 +438,11 @@ export class DirectoryHost {
           );
           break;
         }
+        case 'put-client':
+        case 'delete-client':
+        case 'register-client':
+          // Wired to the clients table and the socket attachment in PAN-4829 WI-6.
+          break;
         case 'register': {
           const attachment = attachmentOf(self);
           if (attachment) self.serializeAttachment({ ...attachment, environmentId: e.environmentId } satisfies Attachment);

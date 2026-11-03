@@ -14,10 +14,12 @@ import {
   RELAY_CAP_MESSAGE,
 } from '../../../packages/contracts/src/connect.ts';
 import type {
+  ClientPlatform,
   ConnectErrorCode,
   ConnectPlan,
   DirectoryEndpoint,
   DirectoryMachine,
+  DirectoryToClientFrame,
   DirectoryToMachineFrame,
   MachineToDirectoryFrame,
 } from '../../../packages/contracts/src/connect.ts';
@@ -32,6 +34,20 @@ export interface MachineRow {
   readonly fingerprint: string;
   readonly endpoints: readonly DirectoryEndpoint[];
   readonly serverVersion: string;
+  readonly deviceId: string;
+  /** Unix milliseconds. */
+  readonly registeredAt: number;
+  /** Unix milliseconds. */
+  readonly lastSeenAt: number;
+}
+
+/** One registered phone: a row of the `clients` table (PAN-4829). Never a machine. */
+export interface ClientRow {
+  readonly clientId: string;
+  readonly label: string;
+  readonly publicKeyHex: string;
+  readonly platform: ClientPlatform;
+  readonly appVersion: string;
   readonly deviceId: string;
   /** Unix milliseconds. */
   readonly registeredAt: number;
@@ -55,6 +71,8 @@ export interface DirectoryState {
   readonly plan: ConnectPlan | null;
   /** In registration order. */
   readonly machines: readonly MachineRow[];
+  /** Registered phones in registration order (PAN-4829); they never count as machines. */
+  readonly clients: readonly ClientRow[];
   /** Pending approvals, oldest first. Expired rows are dropped lazily on every event. */
   readonly approvals: readonly ApprovalRow[];
   /** The latest `relay_usage` row; a row from an earlier month counts as zero. */
@@ -95,13 +113,27 @@ export interface ReduceContext {
   readonly relayCapBytes: number;
   /** Both TURN secrets are set. */
   readonly turnConfigured: boolean;
+  /** Client ids with an open registered socket, not counting the event's own socket; absent ⇒ none (PAN-4829). */
+  readonly onlineClients?: ReadonlySet<string>;
 }
 
+const EMPTY_SET: ReadonlySet<string> = new Set();
+
+export const onlineClientsOf = (ctx: ReduceContext): ReadonlySet<string> => ctx.onlineClients ?? EMPTY_SET;
+
 /**
- * Socket targets. `self` is the event's socket; `others` is every registered socket except it;
- * `{ environmentId }` is that machine's registered sockets except the event's own.
+ * Socket targets. `self` is the event's socket; `others` is every other registered **machine**
+ * socket; `all` is self plus the other machines; `{ environmentId }` is that machine's registered
+ * sockets except the event's own. `clients` is every registered client socket except self, and
+ * `{ clientId }` is that client's sockets except self (PAN-4829).
  */
-export type Target = 'self' | 'others' | 'all' | { readonly environmentId: string };
+export type Target =
+  | 'self'
+  | 'others'
+  | 'all'
+  | 'clients'
+  | { readonly environmentId: string }
+  | { readonly clientId: string };
 
 export type DirectoryEffect =
   | { readonly kind: 'put-plan'; readonly plan: ConnectPlan }
@@ -121,16 +153,27 @@ export type DirectoryEffect =
   | { readonly kind: 'inbox-deliver' }
   | { readonly kind: 'inbox-forget'; readonly environmentId: string }
   | { readonly kind: 'register'; readonly environmentId: string }
-  | { readonly kind: 'send'; readonly to: Target; readonly frame: DirectoryToMachineFrame }
+  /** Phone registry (PAN-4829): upsert or delete a `clients` row, and bind the event's socket to a client. */
+  | { readonly kind: 'put-client'; readonly row: ClientRow }
+  | { readonly kind: 'delete-client'; readonly clientId: string }
+  | { readonly kind: 'register-client'; readonly clientId: string }
+  | { readonly kind: 'send'; readonly to: Target; readonly frame: DirectoryToMachineFrame | DirectoryToClientFrame }
   | { readonly kind: 'close'; readonly to: Target; readonly code: number; readonly reason: string }
-  | { readonly kind: 'log'; readonly type: string; readonly environmentId: string | null; readonly outcome: string };
+  | {
+    readonly kind: 'log';
+    readonly type: string;
+    readonly environmentId: string | null;
+    readonly outcome: string;
+    /** Set for a phone's events; logged beside the frame type, never its label or key. */
+    readonly clientId?: string;
+  };
 
 export interface ReduceResult {
   readonly state: DirectoryState;
   readonly effects: DirectoryEffect[];
 }
 
-export const EMPTY_DIRECTORY: DirectoryState = { plan: null, machines: [], approvals: [], relay: null };
+export const EMPTY_DIRECTORY: DirectoryState = { plan: null, machines: [], clients: [], approvals: [], relay: null };
 
 export function toDirectoryMachines(machines: readonly MachineRow[], online: ReadonlySet<string>): DirectoryMachine[] {
   return machines.map((row) => ({
@@ -145,7 +188,7 @@ export function toDirectoryMachines(machines: readonly MachineRow[], online: Rea
   }));
 }
 
-function errorFrame(code: ConnectErrorCode, message: string, extra?: { requestId?: string; session?: string }): DirectoryToMachineFrame {
+export function errorFrame(code: ConnectErrorCode, message: string, extra?: { requestId?: string; session?: string }): DirectoryToMachineFrame {
   return { type: 'error', code, message, ...extra };
 }
 
