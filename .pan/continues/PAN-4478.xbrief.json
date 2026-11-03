@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4478",
   "created": "2026-11-03T17:36:37.149Z",
-  "updated": "2026-11-03T18:33:10.707Z",
+  "updated": "2026-11-03T18:33:41.734Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -122,6 +122,10 @@
     "hub-control.ac5": {
       "status": "completed",
       "doneAt": "2026-11-03T18:33:10.706Z"
+    },
+    "host-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:33:41.733Z"
     }
   }
 }
