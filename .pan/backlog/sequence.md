@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T18:23:00.130253Z · model: claude-opus-5-5 · open: 866_
+_Last sequenced: 2026-11-03T18:24:36.106356Z · model: claude-opus-5-5 · open: 865_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -597,8 +597,7 @@ _Last sequenced: 2026-11-03T18:23:00.130253Z · model: claude-opus-5-5 · open: 
 | 600 | PAN-958 | M | medium | ok |  |  | Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
 | 601 | PAN-949 | M | medium | ok |  |  | feat: add conversation for project from sidebar |
 | 602 | PAN-3157 | XS | medium | ok |  |  | Rescoped: Awareness rail should show conv-flywheel as the Flywheel with its last tick (derive-status.ts) and link to /flywheel. |
-| 603 | PAN-4905 | XS | low | ok |  |  | Add a Fly machine error says 'the Overdeck config' but remote.enabled is read only from config.toml; name the file and key exactly. |
-| 604 | PAN-4908 | S | low | ok |  | PAN-4905 | Other remote-not-enabled messages name no file and the dead verb 'pan remote setup'; reuse PAN-4905's remoteEnabledHint(). |
+| 604 | PAN-4908 | S | low | ok |  |  | Other remote-not-enabled messages name no file and the dead verb 'pan remote setup'; reuse PAN-4905's remoteEnabledHint(). |
 | 605 | PAN-947 | M | medium | ok |  |  | feat: project management actions in unified sidebar |
 | 606 | PAN-938 | M | medium | ok |  |  | Fizzy visual pipeline |
 | 607 | PAN-903 | M | medium | ok |  |  | Detect ~/.claude.json corruption on startup and surface it in the dashboard |
@@ -1201,10 +1200,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T18:23:00.130253Z",
+  "generatedAt": "2026-11-03T18:24:36.106356Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 866,
+  "openCount": 865,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -11929,18 +11928,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
-      "issue": "PAN-4905",
-      "rank": 603,
-      "size": "XS",
-      "importance": "low",
-      "score": 36,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Add a Fly machine error says 'the Overdeck config' but remote.enabled is read only from config.toml; name the file and key exactly.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4906",
       "rank": 458,
       "size": "S",
@@ -11960,11 +11947,9 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "importance": "low",
       "score": 34,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4905"
-      ],
+      "dependsOn": [],
       "why": "Other remote-not-enabled messages name no file and the dead verb 'pan remote setup'; reuse PAN-4905's remoteEnabledHint().",
-      "rationale": "New follow-up split from PAN-4905; placed directly after it because it is blocked on the helper PAN-4905 adds.",
+      "rationale": "Its blocker PAN-4905 closed on 2026-11-03, so the remoteEnabledHint() helper exists; rank holds at 604 and the issue is now unblocked.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13220,13 +13205,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
-    },
-    {
-      "from": "PAN-4905",
-      "to": "PAN-4908",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
     },
     {
       "from": "PAN-4917",
