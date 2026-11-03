@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4837",
   "created": "2026-11-03T16:16:59.604Z",
-  "updated": "2026-11-03T19:20:40.761Z",
+  "updated": "2026-11-03T19:21:11.847Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -492,6 +492,10 @@
     "phone-request-inventory.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T19:20:40.760Z"
+    },
+    "cp1-ios-simulator.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T19:21:11.847Z"
     }
   }
 }
