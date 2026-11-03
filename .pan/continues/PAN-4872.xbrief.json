@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4872",
   "created": "2026-11-03T03:35:53.319Z",
-  "updated": "2026-11-03T03:50:17.121Z",
+  "updated": "2026-11-03T03:51:30.931Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,10 @@
       "claimedBy": "agent-pan-4872",
       "claimedAt": "2026-11-03T03:47:21.705Z",
       "doneAt": "2026-11-03T03:50:17.121Z"
+    },
+    "cwd-hint.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T03:51:30.930Z"
     }
   }
 }
