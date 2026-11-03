@@ -2,8 +2,9 @@
 // viewer servers over its WebSockets, plus the room HTTP API shapes.
 //
 // Type-only and import-free (D-R3-8): the share Worker imports this file by relative path, so it must
-// never pull a runtime dependency into the Worker bundle. The content wire format (SharedEnvelope and
-// friends) is not here: the share service never carries content. Slice 3 (PAN-4474) adds it.
+// never pull a runtime dependency into the Worker bundle. The content wire format (PAN-4474, slice 3)
+// is at the end of this file; the share service never carries it. Its runtime helpers are in
+// `sharing-wire.ts`, which the Worker never imports.
 // PAN-4473 (slice 2) adds the host dashboard API types at the end of this file: the shapes the
 // browser exchanges with its local dashboard server to create, list and manage shares.
 
@@ -109,3 +110,90 @@ export interface ShareView {
 }
 
 export interface ListSharesResponse { readonly shares: readonly ShareView[] }
+
+// ── Content wire format (PAN-4474, slice 3): host server ⇄ viewer over WebRTC data channels. ──
+// The share service never carries these. Runtime helpers live in ./sharing-wire.ts.
+
+/** The five data channel labels. Every peer connection carries all five, ordered and reliable. */
+export type SharedChannel = 'control' | 'conversation' | 'drafts' | 'terminal' | 'presence';
+
+/** One data-channel message. `v` is 1 in this version; a later host may send more. */
+export interface SharedEnvelope<P = unknown> {
+  readonly v: number;
+  readonly ch: SharedChannel;
+  /** The member session; v0: always the shared conversation's name. */
+  readonly streamId: string;
+  /** Per peer connection, per channel, per stream: 1, 2, 3, … Fragments do not consume one. */
+  readonly seq: number;
+  /** Host epoch ms. */
+  readonly t: number;
+  readonly payload: P;
+}
+
+/** One piece of an encoded envelope longer than SHARE_MAX_MESSAGE_CHARS, sent in order on the same channel. */
+export interface SharedChunk {
+  readonly v: number;
+  readonly chunk: { readonly id: number; readonly index: number; readonly count: number };
+  readonly data: string;
+}
+
+/** The first envelope each side sends on `control`. The viewer copies `scope` from the host's hello. */
+export interface SharedHello {
+  readonly v: number;
+  readonly scopeKinds: readonly ShareScope['kind'][];
+  readonly scope: ShareScope;
+}
+
+export type SharedHelloError = 'invalid_hello' | 'version_unsupported' | 'scope_kind_unsupported';
+
+/** `control` payloads in slice 3. Later slices add variants (drafts pick, handoff, …). */
+export type ControlPayload =
+  | { readonly kind: 'hello'; readonly hello: SharedHello }
+  | { readonly kind: 'error'; readonly code: SharedHelloError };
+
+/** The allow-listed subset of the internal ChatMessage that may cross to a viewer. */
+export interface SharedMessage {
+  readonly id: string;
+  readonly role: 'user' | 'assistant' | 'system';
+  readonly text: string;
+  readonly turnId?: string;
+  /** Which human sent a user message (slice 5 sets it; never mapped from ChatMessage). */
+  readonly author?: { readonly login: string; readonly avatarUrl: string };
+  readonly createdAt: string;
+  readonly completedAt?: string;
+  readonly streaming?: boolean;
+  readonly sequence?: number;
+}
+
+/** `conversation` payloads. `history` replaces the stream's whole list. */
+export type ConversationPayload =
+  | { readonly kind: 'history'; readonly messages: readonly SharedMessage[] }
+  | { readonly kind: 'append'; readonly message: SharedMessage }
+  | { readonly kind: 'update'; readonly message: SharedMessage }
+  | { readonly kind: 'unavailable'; readonly reason: 'transcript_not_found' | 'history_too_large' };
+
+export interface SharedStream { readonly streamId: string; readonly label: string; readonly kind: 'conversation' }
+
+export interface PresenceParticipant {
+  readonly githubId: number;
+  readonly login: string;
+  readonly avatarUrl: string;
+  readonly state: 'lobby' | 'admitted';
+  readonly contributor: boolean;
+  readonly isHost: boolean;
+}
+
+/** `presence` payload: the roster (data owner first), the controller and the stream roster. */
+export interface PresencePayload {
+  readonly controllerGithubId: number;
+  readonly participants: readonly PresenceParticipant[];
+  readonly streams: readonly SharedStream[];
+}
+
+/** `drafts` payload (slice 5 sends it): a full snapshot, last write wins per author. */
+export interface DraftPayload {
+  readonly authorGithubId: number;
+  readonly authorLogin: string;
+  readonly text: string;
+  readonly updatedAt: number;
+}
