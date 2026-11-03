@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4833",
   "created": "2026-11-03T04:52:36.921Z",
-  "updated": "2026-11-03T06:16:15.282Z",
+  "updated": "2026-11-03T06:16:35.839Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -166,6 +166,10 @@
     "web-secure-channel.ac4": {
       "status": "completed",
       "doneAt": "2026-11-03T06:16:15.282Z"
+    },
+    "directory-web.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:16:35.839Z"
     }
   }
 }
