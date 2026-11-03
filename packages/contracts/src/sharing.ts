@@ -10,6 +10,7 @@
 // PAN-4475 (slice 4) adds the viewer dashboard API types at the end: the shapes the viewer browser
 // exchanges with its own dashboard server.
 // PAN-4476 (slice 5) adds drafts, contributor submits and the queue indicator.
+// PAN-4478 (slice 7) adds set-controller to ShareCommand, the controller commands and their acks, and the identity payload.
 
 export type ShareProtocolVersion = 1;
 export type ShareScope = { readonly kind: 'conversation'; readonly conversationId: string };
@@ -95,8 +96,19 @@ export type ShareCloseCode =
 /** The host socket's state in this dashboard process. A stale record (no socket) is 'disconnected'. */
 export type ShareConnection = 'connecting' | 'connected' | 'disconnected';
 
-/** The host frames the browser may request in slice 2. */
-export type ShareCommand = Extract<HostFrame, { readonly type: 'admit' | 'kick' | 'revoke' | 'unrevoke' | 'set-contributor' }>;
+/** The host frames the data owner's browser may request. Slice 7 adds set-controller (handoff; the data owner's id = reclaim). */
+export type ShareCommand = Extract<
+  HostFrame,
+  { readonly type: 'admit' | 'kick' | 'revoke' | 'unrevoke' | 'set-contributor' | 'set-controller' }
+>;
+
+/** The share commands a viewer-controller may send on `control` (slice 7). Un-revoke stays with the data owner (D-7). */
+export type SharedControllerCommand = Exclude<ShareCommand, { readonly type: 'unrevoke' }>;
+
+/** Why the host refused a controller command or a controller send (slice 7). */
+export type SharedCommandRefusal =
+  | 'not_controller' | 'unknown_participant' | 'invalid_target' | 'invalid_command' | 'not_connected'
+  | 'invalid_prompt' | 'too_long' | 'queue_full';
 
 export interface CreateShareRequest { readonly conversationName: string }
 
@@ -114,6 +126,8 @@ export interface ShareView {
   readonly drafts?: readonly ShareDraftView[];
   /** Slice 5: the share's prompt queue. Optional so older fixtures compile (D-13). */
   readonly queue?: ShareQueueView;
+  /** Slice 7: the host's effective controller (D-2). Optional so older fixtures compile. */
+  readonly controllerGithubId?: number;
 }
 
 /** One viewer's current draft, as the host browser sees it. */
@@ -187,7 +201,10 @@ export type SharedSubmitReason =
   | 'not_contributor' | 'invalid_prompt' | 'too_long' | 'queue_full'
   | 'grant_revoked' | 'delivery_refused' | 'delivery_unknown';
 
-/** `control` payloads. Slice 5 adds submit (viewer → host), submit-ack and draft-sent (host → viewer). */
+/**
+ * `control` payloads. Slice 5 adds submit (viewer → host), submit-ack and draft-sent (host → viewer).
+ * Slice 7 adds identity and command-ack (host → viewer), command and controller-send (viewer → host).
+ */
 export type ControlPayload =
   | { readonly kind: 'hello'; readonly hello: SharedHello }
   | { readonly kind: 'error'; readonly code: SharedHelloError }
@@ -199,7 +216,17 @@ export type ControlPayload =
       readonly position?: number;           // 1-based, with 'queued'
       readonly reason?: SharedSubmitReason; // with 'rejected'
     }
-  | { readonly kind: 'draft-sent' };
+  | { readonly kind: 'draft-sent' }
+  | { readonly kind: 'identity'; readonly githubId: number }
+  | { readonly kind: 'command'; readonly clientId: string; readonly command: SharedControllerCommand }
+  | { readonly kind: 'controller-send'; readonly clientId: string; readonly text: string; readonly draftGithubId?: number }
+  | {
+      readonly kind: 'command-ack';
+      readonly clientId: string;
+      readonly status: 'accepted' | 'rejected';
+      readonly position?: number;              // 1-based, with an accepted controller-send
+      readonly reason?: SharedCommandRefusal;  // with 'rejected'
+    };
 
 /** The allow-listed subset of the internal ChatMessage that may cross to a viewer. */
 export interface SharedMessage {

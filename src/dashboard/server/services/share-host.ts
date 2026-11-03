@@ -143,6 +143,8 @@ function frameOf(command: ShareCommand): ShareCommand {
       return { type: 'unrevoke', githubId: command.githubId };
     case 'set-contributor':
       return { type: 'set-contributor', githubId: command.githubId, contributor: command.contributor };
+    case 'set-controller':
+      return { type: 'set-controller', githubId: command.githubId };
   }
 }
 
