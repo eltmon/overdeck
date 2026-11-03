@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4833",
   "created": "2026-11-03T04:52:36.921Z",
-  "updated": "2026-11-03T06:13:03.839Z",
+  "updated": "2026-11-03T06:13:21.685Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -126,6 +126,10 @@
     "shared-initiator.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T06:13:03.838Z"
+    },
+    "shared-initiator.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:13:21.685Z"
     }
   }
 }
