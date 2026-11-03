@@ -4,13 +4,15 @@
  * GET    /api/shares                 → 200 { shares: ShareView[] } | 500 share_record_unreadable
  * POST   /api/shares                 → 201 ShareView (new room) | 200 ShareView (already live) | 400 | 404 | 409 | 412 | 429 | 500 | 502
  * POST   /api/shares/:code/commands  → 202 { ok: true } | 400 invalid_command | 404 | 409 share_not_connected
+ * POST   /api/shares/:code/prompts   → 202 { ok: true, position } | 400 invalid_request | invalid_prompt | too_long
+ *                                       | 404 share_not_found | 409 share_not_live | 429 queue_full (PAN-4476)
  * DELETE /api/shares/:code           → 204 | 404 | 500 | 502
  *
  * The share manager (`services/share-host.ts`) owns the rooms and host sockets; the host token
  * never appears in a response. These stay behind the remote request gate at the default `admin`
  * scope, and every response is `Cache-Control: no-store`.
  */
-import type { ShareCommand } from '@overdeck/contracts';
+import type { SendSharePromptRequest, ShareCommand } from '@overdeck/contracts';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
@@ -70,6 +72,15 @@ export function parseShareCommand(body: Record<string, unknown> | null): ShareCo
   }
 }
 
+/** Validates a controller send; null unless `text` is a string and `draftGithubId` is absent or a positive id. */
+export function parseSendPrompt(body: Record<string, unknown> | null): SendSharePromptRequest | null {
+  if (!body || typeof body.text !== 'string') return null;
+  const draftGithubId = body.draftGithubId;
+  if (draftGithubId === undefined) return { text: body.text };
+  if (typeof draftGithubId !== 'number' || !Number.isSafeInteger(draftGithubId) || draftGithubId <= 0) return null;
+  return { text: body.text, draftGithubId };
+}
+
 export async function listSharesResponse(): Promise<Answer> {
   try {
     return { status: 200, json: { shares: await getShareManager().list() } };
@@ -101,6 +112,19 @@ export async function commandShareFromBody(rawCode: string, body: Record<string,
   if (!code) return { status: 404, json: { error: 'share_not_found' } };
   try {
     const result = await getShareManager().command(code, command);
+    return { status: result.status, json: result.body };
+  } catch (error) {
+    return { status: 500, json: { error: 'share_record_unreadable', message: (error as Error).message } };
+  }
+}
+
+export async function sendPromptFromBody(rawCode: string, body: Record<string, unknown> | null): Promise<Answer> {
+  const request = parseSendPrompt(body);
+  if (!request) return { status: 400, json: { error: 'invalid_request' } };
+  const code = normalizeShareCode(rawCode);
+  if (!code) return { status: 404, json: { error: 'share_not_found' } };
+  try {
+    const result = await getShareManager().sendPrompt(code, request);
     return { status: result.status, json: result.body };
   } catch (error) {
     return { status: 500, json: { error: 'share_record_unreadable', message: (error as Error).message } };
@@ -154,6 +178,19 @@ const commandShareRoute = HttpRouter.add(
   }),
 );
 
+const sendPromptRoute = HttpRouter.add(
+  'POST',
+  '/api/shares/:code/prompts',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return noStore(authError);
+    const code = (yield* HttpRouter.params)['code'] ?? '';
+    const body = yield* readBody(request);
+    return respond(yield* Effect.promise(() => sendPromptFromBody(code, body)));
+  }),
+);
+
 const endShareRoute = HttpRouter.add(
   'DELETE',
   '/api/shares/:code',
@@ -166,4 +203,10 @@ const endShareRoute = HttpRouter.add(
   }),
 );
 
-export const sharesRouteLayer = Layer.mergeAll(listSharesRoute, createShareRoute, commandShareRoute, endShareRoute);
+export const sharesRouteLayer = Layer.mergeAll(
+  listSharesRoute,
+  createShareRoute,
+  commandShareRoute,
+  sendPromptRoute,
+  endShareRoute,
+);

@@ -135,6 +135,7 @@ src/components/chat/messagesTimeline/messageRows.test.tsx
 src/components/chat/sharing/__tests__/ShareDialog.test.tsx
 src/components/chat/sharing/__tests__/SharedConversationView.test.tsx
 src/components/chat/sharing/__tests__/SharingLobbyPanel.test.tsx
+src/components/chat/sharing/__tests__/SuggestionList.test.tsx
 src/components/chat/sharing/__tests__/useSharedJoin.test.tsx
 src/components/chat/sharing/__tests__/webrtc-viewer.test.ts
 src/components/costs/__tests__/FleetUsagePanel.test.tsx
@@ -215,6 +216,7 @@ src/lib/__tests__/simple-feed.test.ts
 src/lib/__tests__/syntaxTheme.test.ts
 src/lib/__tests__/telemetry.test.ts
 src/lib/__tests__/uiTokenStyles.test.ts
+src/lib/__tests__/useChannelMediaSrc.test.tsx
 src/lib/__tests__/useDecisions.fleet.test.tsx
 src/lib/__tests__/useDecisions.test.ts
 src/lib/__tests__/wsTransport-pairing.test.ts

@@ -1,12 +1,14 @@
 /**
  * A werift stand-in for the slice 4 browser viewer (PRD PAN-4474 WI-7): it answers the host's offer,
  * reassembles every channel's envelopes with `SharedChannelReader`, and replies to the host hello
- * with its own hello that echoes the host's scope (D-5). Test helper, not a test.
+ * with its own hello that echoes the host's scope (D-5). `send` writes one envelope on a channel with
+ * that channel's next outbound `seq` (the hello is `control` seq 1; PAN-4476). Test helper, not a test.
  */
 import {
   SHARED_SCOPE_KINDS,
   SHARED_WIRE_VERSION,
   SharedChannelReader,
+  type SharedChannel,
   type SharedEnvelope,
   type SharedHello,
   type SignalData,
@@ -29,6 +31,7 @@ export class LoopbackViewer {
   private readonly waiters = new Set<{ predicate: Predicate; resolve: (envelope: SharedEnvelope) => void }>();
   private readonly pendingRemote: Candidate[] = [];
   private readonly pendingLocal: Candidate[] = [];
+  private readonly outSeq = new Map<string, number>();
   private remoteSet = false;
   private localSent = false;
 
@@ -80,6 +83,17 @@ export class LoopbackViewer {
     return new Promise((resolve) => this.waiters.add({ predicate, resolve }));
   }
 
+  /** Sends one envelope on `ch` with that channel's next seq; throws when the channel is not open. */
+  send(ch: SharedChannel, payload: unknown): void {
+    const channel = this.channels.get(ch);
+    const streamId = this.hostHello?.scope.conversationId;
+    if (!channel || streamId === undefined) throw new Error(`channel ${ch} is not ready`);
+    const seq = (this.outSeq.get(ch) ?? 0) + 1;
+    this.outSeq.set(ch, seq);
+    const envelope: SharedEnvelope = { v: SHARED_WIRE_VERSION, ch, streamId, seq, t: Date.now(), payload };
+    channel.send(JSON.stringify(envelope));
+  }
+
   async close(): Promise<void> {
     await this.pc.close().catch(() => undefined);
   }
@@ -118,6 +132,7 @@ export class LoopbackViewer {
         payload: { kind: 'hello', hello: { v: SHARED_WIRE_VERSION, scopeKinds: SHARED_SCOPE_KINDS, scope: payload.hello.scope } },
       };
       channel.send(JSON.stringify(reply));
+      this.outSeq.set('control', 1);
     }
     for (const waiter of [...this.waiters]) {
       if (!waiter.predicate(channel.label, envelope)) continue;

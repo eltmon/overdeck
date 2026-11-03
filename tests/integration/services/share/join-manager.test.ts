@@ -186,6 +186,11 @@ async function startHost(conversationId: string): Promise<Host> {
           return { stop: () => undefined };
         },
       }),
+      queue: {
+        deliver: async () => ({ status: 200, body: {} }),
+        activity: async () => ({ working: false, lastMessageId: null }),
+        now: () => Date.now(),
+      },
       streamLabel: async () => 'Fixture',
       now: () => Date.now(),
     }),

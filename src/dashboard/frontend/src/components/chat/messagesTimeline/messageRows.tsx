@@ -8,11 +8,12 @@ import { summarizeTurnDiffStats } from '../../../lib/turnDiffTree';
 import styles from '../../CommandDeck/styles/command-deck.module.css';
 import { useComposerStore } from '../../../lib/composerStore';
 import { openImageLightbox } from '../ImageLightbox';
-import { extractAttachmentImageRefs, formatElapsed, formatTimestamp } from './helpers';
+import { type AttachmentImageRef, extractAttachmentImageRefs, formatElapsed, formatTimestamp } from './helpers';
 import { SlashCommandDivider } from './dividers';
 import { MessageRoleIcon } from '../bookmarks/MessageRoleIcon';
 import { ScheduledMessageRow } from './ScheduledMessageRow';
 import { useCitationHighlight } from '../citations/citationHighlight';
+import { useChannelMediaSrc } from '../../../lib/useChannelMediaSrc';
 
 /** PAN-4642 WI-8: wraps a citable row body, painting pending-citation highlights.
  *  A separate component (not a conditional hook call) keeps the hook unconditional. */
@@ -55,23 +56,34 @@ function AttachmentThumbnails({ text }: { text: string }) {
   return (
     <div className="mt-1.5 flex flex-wrap gap-1.5" data-testid="user-message-attachments">
       {visible.map((ref) => (
-        <button
+        <AttachmentThumbnail
           key={ref.url}
-          type="button"
-          className="cursor-zoom-in border-0 bg-transparent p-0"
-          title={`View ${ref.file}`}
-          onClick={() => openImageLightbox(ref.url, ref.file)}
-        >
-          <img
-            src={ref.url}
-            alt={ref.file}
-            loading="lazy"
-            className="h-24 w-24 rounded border border-border object-cover"
-            onError={() => setFailed((prev) => new Set(prev).add(ref.url))}
-          />
-        </button>
+          attachment={ref}
+          onFailed={() => setFailed((prev) => new Set(prev).add(ref.url))}
+        />
       ))}
     </div>
+  );
+}
+
+/** PAN-4834 CP-2: in the phone app the image loads through the channel; the lightbox gets the `/api/…` URL. */
+function AttachmentThumbnail({ attachment, onFailed }: { attachment: AttachmentImageRef; onFailed: () => void }) {
+  const src = useChannelMediaSrc(attachment.url);
+  return (
+    <button
+      type="button"
+      className="cursor-zoom-in border-0 bg-transparent p-0"
+      title={`View ${attachment.file}`}
+      onClick={() => openImageLightbox(attachment.url, attachment.file)}
+    >
+      <img
+        src={src}
+        alt={attachment.file}
+        loading="lazy"
+        className="h-24 w-24 rounded border border-border object-cover"
+        onError={onFailed}
+      />
+    </button>
   );
 }
 
@@ -171,6 +183,12 @@ export function UserMessageRow({ message, cwd, issueId, bookmarkable, citeConver
         )}
         <AttachmentThumbnails text={message.text} />
         <span className={styles.messageTimestamp}>
+          {message.author && (
+            <span data-testid="user-message-author" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginRight: '6px' }}>
+              <img src={message.author.avatarUrl} alt="" width={16} height={16} style={{ width: '16px', height: '16px', borderRadius: '2px' }} />
+              <span className="font-mono">@{message.author.login}</span>
+            </span>
+          )}
           {isPending ? (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
               <svg style={{ width: '10px', height: '10px', animation: 'spin 1s linear infinite', color: 'var(--primary)' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

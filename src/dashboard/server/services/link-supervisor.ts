@@ -45,6 +45,8 @@ import type { ChannelSocket } from '../../../lib/anywhere/channel/channel-socket
 import { ChannelOpenError, openChannel, type TransportUrl } from '../../../lib/anywhere/channel/open.js';
 import type { LinkRouteInfo, LinkRouteSource } from '../../../lib/anywhere/link-client.js';
 import { linksSnapshot, type MachineLink, markLinkRevoked, setLinkRoutes } from '../../../lib/anywhere/link-store.js';
+import { lanHostUnreachableRoutes, localNetworkBlockedDetail } from '../../../lib/anywhere/local-network.js';
+import { checkLocalNetworkAccess, type LocalNetworkAccess } from '../../../lib/anywhere/local-network-probe.js';
 import { ensureMachineKey, type MachineKeyPair } from '../../../lib/anywhere/machine-key.js';
 import { type PeerMachineFacts, peerMachineFacts, UNKNOWN_PEER_MACHINE_FACTS } from '../../../lib/anywhere/machine-capabilities.js';
 import { type LinkRoute, mergeAdvertised, rankRoutes } from '../../../lib/anywhere/routes.js';
@@ -83,6 +85,10 @@ export interface LinkSupervisorDeps {
   dynamicRoutes?: (link: MachineLink) => LinkRoute[];
   /** PAN-2356: whether the account's plan includes the relay. */
   relayEntitled?: () => boolean;
+  /** PAN-4897 D-2/D-3: confirms a LAN `EHOSTUNREACH` against this process's own macOS Local Network access; injected only on darwin. */
+  localNetworkAccess?: () => Promise<LocalNetworkAccess>;
+  /** PAN-4897 D-6: the path named in the Local Network message. */
+  nodePath?: string;
   now: () => number;
   random: () => number;
   log: (message: string) => void;
@@ -97,6 +103,8 @@ export const defaultLinkSupervisorDeps = (serverVersion: string): LinkSupervisor
   markLinkRevoked,
   setLinkRoutes,
   serverVersion,
+  localNetworkAccess: process.platform === 'darwin' ? () => checkLocalNetworkAccess() : undefined,
+  nodePath: process.execPath,
   now: () => Date.now(),
   random: () => Math.random(),
   log: (message) => console.warn(`[anywhere] ${message}`),
@@ -144,12 +152,18 @@ export function unsupportedDetail(install: UnsupportedInstall, peerLabel: string
 type ProbeOutcome =
   | { ok: true; channel: ChannelSocket; route: LinkRoute }
   | { ok: false; failure: 'unsupported'; install: UnsupportedInstall }
-  | { ok: false; failure: 'unreachable' | 'identity-refused' | 'unknown-peer'; detail: string };
+  | {
+    ok: false;
+    failure: 'unreachable' | 'identity-refused' | 'unknown-peer';
+    detail: string;
+    /** `unreachable` only (PAN-4897 D-2): the LAN tcp:// routes that all failed with `EHOSTUNREACH`. */
+    lanBlocked?: string[];
+  };
 
 /** A later phase's failure, prefixed with an earlier phase's detail when both carry one. */
 function joinFailures(earlier: ProbeOutcome | null, later: ProbeOutcome): ProbeOutcome {
   if (!earlier || earlier.ok || earlier.failure === 'unsupported' || later.ok || later.failure === 'unsupported') return later;
-  return { ...later, detail: `${earlier.detail}; ${later.detail}` };
+  return { ...later, detail: `${earlier.detail}; ${later.detail}`, lanBlocked: later.lanBlocked ?? earlier.lanBlocked };
 }
 
 interface Entry {
@@ -365,7 +379,7 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
       return joinFailures(outcome, third);
     }
     if (direct.length > 0 && this.deps.relayEntitled?.() === false && outcome && !outcome.ok && outcome.failure === 'unreachable') {
-      return { ok: false, failure: 'unreachable', detail: NO_DIRECT_PATH_MESSAGE };
+      return { ok: false, failure: 'unreachable', detail: NO_DIRECT_PATH_MESSAGE, lanBlocked: outcome.lanBlocked };
     }
     return outcome ?? { ok: false, failure: 'unreachable', detail: 'no routes' };
   }
@@ -548,7 +562,16 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
     if (failures.length > 0 && failures.every((failure) => codeOf(failure.error) === 'identity-refused')) {
       return { ok: false, failure: 'identity-refused', detail: `${failures.map((failure) => failure.route.url).join(', ')} closed the connection before proving the pinned machine key` };
     }
-    return { ok: false, failure: 'unreachable', detail: failures.map((failure) => `${failure.route.url}: ${failure.error.message}`).join('; ') || 'no route answered' };
+    const lanBlocked = lanHostUnreachableRoutes(failures.map((failure) => ({
+      url: failure.route.url,
+      cause: failure.error instanceof ChannelOpenError ? failure.error.detail.cause : undefined,
+    })));
+    return {
+      ok: false,
+      failure: 'unreachable',
+      detail: failures.map((failure) => `${failure.route.url}: ${failure.error.message}`).join('; ') || 'no route answered',
+      lanBlocked: lanBlocked.length > 0 ? lanBlocked : undefined,
+    };
   }
 
   private async connect(entry: Entry, opts: { keepChannel?: boolean } = {}): Promise<void> {
@@ -569,10 +592,23 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
     if (!outcome.ok) {
       if (outcome.failure === 'unknown-peer') return this.markRevoked(entry, outcome.detail);
       if (outcome.failure === 'unsupported') return this.markUnsupported(entry, outcome.install);
+      let detail = outcome.detail;
+      if (outcome.failure === 'unreachable' && outcome.lanBlocked?.length && this.deps.localNetworkAccess) {
+        const access = await this.deps.localNetworkAccess();
+        // markUnsupported doesn't bump `generation`, so re-check `entry.state` too; the cast works
+        // around TS treating it as still excluding 'revoked'/'unsupported' from this function's
+        // entry guard, even though either can land here during the await above.
+        const stateNow = entry.state as LinkState;
+        if (this.stopped || entry.generation !== generation || stateNow === 'revoked' || stateNow === 'unsupported') return;
+        if (access === 'denied') {
+          this.deps.log(`${entry.link.label}: local network check denied; raw detail: ${outcome.detail}`);
+          detail = localNetworkBlockedDetail(this.deps.nodePath ?? 'node', outcome.lanBlocked);
+        }
+      }
       entry.backoffKind = outcome.failure === 'identity-refused' ? 'identity' : 'network';
       if (!entry.channel) {
         entry.state = 'offline';
-        entry.stateDetail = outcome.detail;
+        entry.stateDetail = detail;
         this.settleWaiters(entry, false);
         this.scheduleRetry(entry);
       }

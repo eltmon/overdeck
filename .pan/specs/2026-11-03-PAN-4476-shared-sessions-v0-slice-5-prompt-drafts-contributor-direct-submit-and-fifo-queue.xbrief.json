@@ -1,0 +1,1314 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-03T14:57:18Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4476: Shared Sessions v0 (slice 5): prompt drafts, contributor direct-submit and FIFO queue",
+    "updated": "2026-11-03T15:05:07.135Z"
+  },
+  "plan": {
+    "id": "pan-4476",
+    "title": "Shared Sessions v0 (slice 5): prompt drafts, contributor direct-submit and FIFO queue",
+    "status": "running",
+    "uid": "56597500-f5aa-4733-9bab-afcc9c3d1a25",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-03T14:57:18Z",
+    "updated": "2026-11-03T15:05:07.135Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4476",
+        "label": "PAN-4476",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/658",
+        "label": "PAN-658 (parent PRD .pan/drafts/pan-658.md)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4475",
+        "label": "PAN-4475 (slice 4, dependency)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "shared-sessions",
+      "webrtc",
+      "dashboard",
+      "frontend",
+      "contracts",
+      "security"
+    ],
+    "narratives": {
+      "Problem": "After slice 4 a shared-conversation viewer can only watch. The drafts channel carries nothing, the host hub reads only the hello on control, the viewer drops SharedMessage.author, and the contributor grant set by the slice-2 lobby has no effect. The parent PRD requires live prompt suggestions (FR-7), contributor direct-submit (FR-8) and a strict-FIFO host queue that flushes at turn end with an 'agent is working / N queued' indicator (FR-14).",
+      "Proposal": "Per .pan/drafts/PAN-4476.md: additive wire types (submit, submit-ack, draft-sent, DraftUpdate, stream agentWorking/queued, ShareView drafts/queue); a host DraftBoard (per-author LWW, host-set identity, 200 ms relay, backfill, no echo) and a SubmitQueue (strict FIFO, one delivery per agent turn through the handleConversationMessage door with the scheduled-messages outcome rule, '/', '!' and '#' prefixes refused); PeerHub wiring with a contributor gate and grant-revoke drops; author attribution by text correlation in the conversation bridge; POST /api/shares/:code/prompts for controller sends; a SuggestionList used read-only on the viewer page and with pick/edit/send in the host share dialog; a viewer draft box with contributor Send and the queue line; dev and user docs.",
+      "NonGoals": "- No CRDT or collaborative co-editing of one draft (a future collab channel).\n- No controller handoff and no viewer acting as controller (slice 7, PAN-4478); only the host picks and sends drafts.\n- No terminal channel content (slice 6, PAN-4477); terminal keeps no inbound handler.\n- No persistence of drafts or the queue across host restarts and no host reconnect (slice 8, PAN-4479).\n- No reordering, editing or cancelling of queued prompts.\n- The host's own normal composer sends are not queued.\n- No contributor attribution in the host's own conversation timeline.\n- No attachments or images in shared prompts; no slash commands, '!' shell commands or '#' memory notes from shared prompts.\n- No resuming of an ended conversation before delivery.\n- No auto-contributor designation by GitHub handle and no hosted web join (PAN-4481).\n- No turn detection for non-Claude harnesses beyond the 30 s fallback.\n- No suggestion list on the host conversation page outside the share dialog.\n- No logging of draft or prompt text."
+    },
+    "metadata": {
+      "sizeJustification": "About 38 files across about 7 path-subsystems because the lint counts each top-level doc file (anywhere.mdx, configuration/shared-sessions.mdx, docs/SHARED-SESSIONS.md), scripts/frontend-test-subset.txt and tests/unit separately, and every module ships with its own test file. The code is one vertical feature that the issue scopes as slice 5: drafts are useless without the suggestion list, a contributor submit is unsafe without the host queue and its gate, and the controller send shares that queue. Slices 2-4 shipped with the same justification. 16 items keep each diff reviewable.",
+      "canonicalFilename": "2026-11-03-PAN-4476-shared-sessions-v0-slice-5-prompt-drafts-contributor-direct-submit-and-fifo-queue.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Controller sends go through the same host FIFO queue via POST /api/shares/:code/prompts (D-1).",
+        "rationale": "One ordering and one 'N queued' count for every shared prompt, plus attribution for picked drafts; the host's normal composer stays unqueued."
+      },
+      {
+        "summary": "SuggestionList for the controller mounts in the existing ShareDialog, fed by the 1 s GET /api/shares poll (D-2).",
+        "rationale": "Reuses slice-2 D-6 polling; no new push channel to the host browser; about one second of latency is acceptable for suggestions."
+      },
+      {
+        "summary": "Queue status (agentWorking, queued) rides optional fields on presence SharedStream (D-3).",
+        "rationale": "Per-stream status fits the parent PRD's multi-stream forward-compatibility rule, and presence is already re-sent only on change."
+      },
+      {
+        "summary": "Viewer -> host drafts use a new DraftUpdate {text}; the host sets author fields itself and never echoes a draft to its author (D-4, D-5).",
+        "rationale": "The viewer page does not reliably know its GitHub id, the host must not trust inbound identity, and echoes would overwrite live typing."
+      },
+      {
+        "summary": "Turn detection polls summarizeConversationActivity every 1 s; after each delivery the queue waits for the turn to start (working, a new last message, or 30 s) and then to end (D-6, D-7).",
+        "rationale": "The activity summary is mtime-cached and its 180 s staleness guard prevents a wedged queue; the start wait prevents two prompts in one turn."
+      },
+      {
+        "summary": "Delivery reuses the scheduled-messages door rule: 2xx sent, 409 retry, other 4xx refused, 5xx/throw unknown and never redelivered (D-8).",
+        "rationale": "Proven at-most-once semantics already in the codebase (scheduled-message-delivery.ts)."
+      },
+      {
+        "summary": "Shared prompts starting with '/', '!' or '#' are refused for contributors and controller sends alike (D-9).",
+        "rationale": "handleConversationMessage routes '/pan' commands and '/compact', and the Claude Code TUI runs '!' as a shell command; a remote person must never reach them."
+      },
+      {
+        "summary": "Author attribution is text correlation in the conversation bridge, not a prompt prefix (D-10).",
+        "rationale": "SharedMessage.author was reserved for this slice; a prefix would change what the agent reads; a mismatch just leaves the author unset."
+      },
+      {
+        "summary": "Limits: 8,000 characters per draft/prompt, 20 queued total, 3 per contributor, 200 ms host relay throttle, 150 ms viewer send throttle, 64 KiB inbound envelope cap (D-11).",
+        "rationale": "Bounds keystroke fan-out and per-viewer memory on the host without affecting normal prompt sizes."
+      },
+      {
+        "summary": "ShareView.drafts and ShareView.queue are optional in the type (D-13).",
+        "rationale": "Existing slice-2 fixtures and tests keep compiling; viewOf always sets both."
+      },
+      {
+        "summary": "Drafts and the queue are memory only and drop on host restart or share end (D-15).",
+        "rationale": "Host reconnect is slice 8; persisting prompts adds a state store the repo avoids."
+      },
+      {
+        "summary": "The plan keeps all four issue bullets plus attribution in one slice with a sizeJustification instead of splitting into new sibling issues.",
+        "rationale": "The issue body scopes slice 5 as one unit; slices 2-4 used the same justification and finalize accepted it."
+      },
+      {
+        "summary": "The Playwright spec is not added to test:playwright.",
+        "rationale": "Follows the slice-2 and slice-4 D-20 precedent: it needs two built dashboards and Chromium; unit and loopback tests are the CI coverage."
+      }
+    ],
+    "items": [
+      {
+        "id": "wire-types",
+        "title": "Add slice-5 wire and host API types to packages/contracts/src/sharing.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:57:18Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4476",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/sharing.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "! grep -q '^import' packages/contracts/src/sharing.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the negated grep exits 0 because sharing.ts has no import line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "FR-10",
+            "FR-13",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "draft-board",
+            "submit-queue",
+            "hub-drafts",
+            "hub-submit",
+            "host-route",
+            "viewer-peer",
+            "host-suggestions"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4476.md WI-1 and section 'Wire format changes'. In packages/contracts/src/sharing.ts add SharedSubmitReason; the ControlPayload variants submit {clientId,text}, submit-ack {clientId,status,position?,reason?} and draft-sent; optional agentWorking?/queued? on SharedStream; DraftUpdate {text}; ShareDraftView, ShareQueueItemView, ShareQueueView, SendSharePromptRequest; optional ShareView.drafts and ShareView.queue (D-13). Update the DraftPayload comment and the file header. The file stays type-only with no import (D-R3-8). Exact shapes are in the PRD; copy them."
+        },
+        "items": [
+          {
+            "id": "wire-types.ac1",
+            "title": "Given the edited sharing.ts, when `npm run typecheck` runs, then it exits 0 and the file still contains no import line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-types.ac2",
+            "title": "ControlPayload accepts the variants `submit`, `submit-ack` (status queued|sent|rejected) and `draft-sent`, and SharedStream declares optional `agentWorking` and `queued`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-types.ac3",
+            "title": "When an existing slice-2 ShareView fixture without drafts or queue is type-checked, then typecheck accepts it because ShareView declares optional `drafts` and `queue`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-helpers",
+        "title": "Add sharedPromptRefusal, readDraftPayload and an inbound reader cap to sharing-wire.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:57:18Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4476",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/sharing-wire.ts",
+            "packages/contracts/src/__tests__/sharing-wire.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run packages/contracts/src/__tests__/sharing-wire.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "sharing-wire.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4476.md WI-2. In packages/contracts/src/sharing-wire.ts add SHARED_PROMPT_MAX_CHARS = 8_000, SHARE_MAX_INBOUND_ENVELOPE_CHARS = 65_536, sharedPromptRefusal(text) (empty or first non-whitespace char '/', '!' or '#' -> 'invalid_prompt'; longer than 8,000 -> 'too_long'; else null), readDraftPayload(value) (field-by-field rebuild; authorGithubId positive safe integer, authorLogin string, text string <= 8,000, updatedAt finite), and an optional SharedChannelReader constructor argument maxEnvelopeChars (default SHARE_MAX_ENVELOPE_CHARS) that bounds both unfragmented messages and fragment totals. index.ts already re-exports sharing-wire with export * (line 46). Add the named tests to packages/contracts/src/__tests__/sharing-wire.test.ts."
+        },
+        "items": [
+          {
+            "id": "wire-helpers.ac1",
+            "title": "sharedPromptRefusal returns 'invalid_prompt' for '', '   ', '/pan status', '  !ls' and '# notes', returns 'too_long' for 8,001 characters, and returns null for 'Fix the bug' and 'see /tmp/x'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-helpers.ac2",
+            "title": "readDraftPayload rejects authorGithubId 0, a missing text and an 8,001-character text, and drops unknown keys from a valid payload",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-helpers.ac3",
+            "title": "A SharedChannelReader built with cap 100 returns invalid too_large for a 101-character message and for fragments past the cap, while the default reader still reassembles a 100,000-character envelope",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "draft-board",
+        "title": "Create the host DraftBoard with per-author LWW drafts and a 200 ms relay throttle",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:57:18Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4476",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/sharing/draft-board.ts",
+            "src/dashboard/server/sharing/__tests__/draft-board.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/sharing/__tests__/draft-board.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "draft-board.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4476.md WI-3 and section 'Draft board'. Create src/dashboard/server/sharing/draft-board.ts exporting DRAFT_RELAY_MS = 200 and class DraftBoard({ now, onRelay }) with update(author, text), remove(githubId), take(githubId), list(), payloads(), close(). Relay at once when the author's last relay is >= 200 ms old, else one trailing relay of the latest text at last+200 ms. '' deletes; '' for an author with no draft is a no-op with no relay. Ignore text longer than SHARED_PROMPT_MAX_CHARS. startedAt fixed while a draft lives; updatedAt is the host clock. remove/take relay '' at once. No logging of text. Tests in src/dashboard/server/sharing/__tests__/draft-board.test.ts with vi.useFakeTimers()."
+        },
+        "items": [
+          {
+            "id": "draft-board.ac1",
+            "title": "Given three updates from one author within 200 ms under fake timers, when timers advance 200 ms, then onRelay was called exactly twice: the first text at once and the last text at 200 ms",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "draft-board.ac2",
+            "title": "Given an update with '', then onRelay receives text '' and list() no longer contains the author; given '' for an author with no draft or an 8,001-character update, then nothing is relayed and list() is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "draft-board.ac3",
+            "title": "list() returns drafts oldest-startedAt first, startedAt stays fixed across updates while updatedAt moves, and remove/take relay '' immediately",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "draft-board.ac4",
+            "title": "Given a pending trailing relay, when close() runs and timers advance, then onRelay receives nothing more",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "submit-queue",
+        "title": "Create the strict-FIFO SubmitQueue that delivers one shared prompt per agent turn",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:57:18Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4476",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/dashboard/server/sharing/submit-queue.ts",
+            "src/dashboard/server/sharing/__tests__/submit-queue.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/sharing/__tests__/submit-queue.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "submit-queue.test.ts passes",
+            "typecheck completes without errors",
+            "lint (including lint:circular) exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-9",
+            "FR-11",
+            "NFR-4",
+            "NFR-6"
+          ],
+          "foundationFor": [
+            "hub-submit",
+            "host-route",
+            "loopback-flow"
+          ],
+          "parallelSafeReason": "New module plus its own test file; no other item edits them, and its inputs are only the contracts types and helpers from its blockers."
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4476.md WI-4, decisions D-6..D-9, D-11 and section 'Submit queue'. Create src/dashboard/server/sharing/submit-queue.ts exporting QUEUE_TICK_MS = 1_000, TURN_START_TIMEOUT_MS = 30_000, QUEUE_MAX_ITEMS = 20, QUEUE_MAX_PER_AUTHOR = 3, class SubmitQueue(deps { deliver, activity, now }, events { onDelivering, onOutcome, onStatus }) with enqueue, dropAuthor, setWatching, view, close, and productionSubmitQueueDeps(conversationName) using decodeDoorResponse + handleConversationMessage (as scheduled-message-delivery.ts lines 79-84) and resolveClaudeSessionFile + summarizeConversationActivity. State machine idle -> awaiting-start (ends on working true, a changed lastMessageId, or 30 s) -> awaiting-end (ends on working false). Door rule: 2xx sent; 409 keep head and retry next tick; other 4xx delivery_refused; >=500 or throw delivery_unknown, never redelivered. Ticker is a re-armed setTimeout, one tick at a time, stopped when empty, idle and not watching. enqueue checks sharedPromptRefusal, then queue_full limits. No logging of prompt text; no execSync. Tests in src/dashboard/server/sharing/__tests__/submit-queue.test.ts with vi.useFakeTimers() covering cases (a)-(l) of WI-4."
+        },
+        "items": [
+          {
+            "id": "submit-queue.ac1",
+            "title": "Given submits A, B and C enqueued in one tick while activity reports working, when fake timers advance through three turns, then deliver is called in the order A, B, C and never twice without an intervening working-true then working-false turn",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "submit-queue.ac2",
+            "title": "Given a 2xx delivery while working stays false and lastMessageId is unchanged, when timers advance, then the next item is delivered only after TURN_START_TIMEOUT_MS plus an idle tick, and a changed lastMessageId ends that wait earlier",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "submit-queue.ac3",
+            "title": "A 409 answer keeps the item at the head and redelivers it on the next idle tick; a 400 emits onOutcome delivery_refused; a 500 or a thrown deliver emits delivery_unknown and the item is never delivered again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "submit-queue.ac4",
+            "title": "enqueue rejects '/pan status' as invalid_prompt, the 21st item and a 4th queued contributor item from one author as queue_full, and still accepts a controller item while that author is at 3",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "submit-queue.ac5",
+            "title": "When the queue is empty, idle and not watching, vi.getTimerCount() returns 0, and after close() no event callback fires",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "bridge-author",
+        "title": "Stamp SharedMessage.author on the user message a shared prompt produced",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:57:18Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4476",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/sharing/conversation-bridge.ts",
+            "src/dashboard/server/sharing/__tests__/conversation-bridge.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/sharing/__tests__/conversation-bridge.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-bridge.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4476.md WI-5, decision D-10 and section 'Conversation bridge attribution'. In src/dashboard/server/sharing/conversation-bridge.ts add expectAuthor(text, author) returning a cancel function; keep pending expectations (max 20, oldest dropped) and an authors map (message id -> author) on the instance, kept across reset() and cleared by close(). In onResult, an appended (new id) user message whose text.trim() equals the oldest matching pending text gets author; replaceMessages and onResult attach author from the map so history keeps it. Never stamp assistant messages. Extend src/dashboard/server/sharing/__tests__/conversation-bridge.test.ts."
+        },
+        "items": [
+          {
+            "id": "bridge-author.ac1",
+            "title": "Given expectAuthor('Fix it', alice), when a user message 'Fix it\\n' is appended, then the append payload carries author alice and a later history payload still carries it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bridge-author.ac2",
+            "title": "Given expectAuthor('Fix it'), when an assistant message with that text or a user message with other text is appended, then no payload carries author, and a cancelled expectation stamps nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bridge-author.ac3",
+            "title": "Given two expectations with the same text, when two matching user messages are appended, then both payloads carry their authors in order; when a 21st expectation is added, then the oldest is dropped",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "hub-drafts",
+        "title": "Read and relay drafts in PeerHub with host-set author identity and backfill",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:57:18Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4476",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/sharing/peer-hub.ts",
+            "src/dashboard/server/sharing/__tests__/peer-hub.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/sharing/__tests__/peer-hub.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "peer-hub.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-3",
+            "NFR-5"
+          ],
+          "parallelSafeReason": "Only this item and hub-submit edit peer-hub.ts, and the blocks edge hub-drafts -> hub-submit serializes them."
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4476.md WI-6 and 'Peer hub' steps 2 (board), 3, 4, 5, 10, 11 (draft part), 14 (board), 15. In src/dashboard/server/sharing/peer-hub.ts build a DraftBoard; give PeerEntry a draftReader and draftsSynced; build the control and draft readers with SHARE_MAX_INBOUND_ENVELOPE_CHARS; subscribe inbound drafts in connect() (terminal stays without an inbound handler); onDraftMessage updates the board with the sender's githubId and its snapshot login/avatar, ignoring payload author fields and anything before the hello negotiates; syncDrafts sends current drafts (not the receiver's own) once both drafts is open and the hello negotiated; relayDraft sends to every synced peer except the author; onSnapshot removes drafts of authors no longer admitted; add draftsView() to HostHub; extend the sendEnvelope payload union with DraftPayload. Extend src/dashboard/server/sharing/__tests__/peer-hub.test.ts."
+        },
+        "items": [
+          {
+            "id": "hub-drafts.ac1",
+            "title": "Given viewer 7 sends a drafts envelope {text:'hi', authorGithubId:999}, when the hub relays it, then viewer 8 receives authorGithubId 7 with 7's snapshot login and viewer 7 receives nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hub-drafts.ac2",
+            "title": "A viewer that negotiates after a draft exists receives that draft once, and never receives its own draft",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hub-drafts.ac3",
+            "title": "Given a snapshot that no longer lists viewer 7 as admitted, then the other peers receive a draft with text '' for 7 and draftsView() no longer returns 7",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hub-drafts.ac4",
+            "title": "Given a negotiated peer, then its terminal channel has zero onMessage subscriptions, and when a 70,000-character inbound control message arrives, then the hub sends nothing in reply",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "hub-submit",
+        "title": "Gate contributor submits in PeerHub, feed the SubmitQueue and publish queue status",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:57:18Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4476",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/dashboard/server/sharing/peer-hub.ts",
+            "src/dashboard/server/sharing/__tests__/peer-hub.test.ts",
+            "src/dashboard/server/sharing/hub-sync.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/sharing/__tests__/peer-hub.test.ts",
+            "npm run typecheck",
+            "wc -l src/dashboard/server/sharing/peer-hub.ts"
+          ],
+          "expected_outputs": [
+            "peer-hub.test.ts passes",
+            "typecheck completes without errors",
+            "peer-hub.ts has at most 750 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-10",
+            "FR-12",
+            "NFR-7"
+          ],
+          "foundationFor": [
+            "host-route",
+            "loopback-flow",
+            "e2e"
+          ],
+          "parallelSafeReason": "Runs after hub-drafts via a blocks edge; no other item edits peer-hub.ts or peer-hub.test.ts."
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4476.md WI-7 and 'Peer hub' steps 1, 2 (queue), 6, 7, 8, 9, 11 (queue part), 12, 13, 14 (queue). Add queue deps and bridge.expectAuthor to PeerHubDeps and productionPeerHubDeps; handle control submit only after the hello negotiates; validate clientId ([A-Za-z0-9_-], 1-64) and text; reject non-eligible or non-contributor senders with submit-ack rejected not_contributor; enqueue and ack queued with position, later sent or rejected; onDelivering calls bridge.expectAuthor and returns its cancel; onStatus re-sends presence with agentWorking and queued on the stream (presenceOf gains the status argument); onSnapshot drops queued items of authors no longer admitted or no longer contributor and acks rejected grant_revoked; setWatching follows negotiated peers; add sendFromController, queueView to HostHub; close() closes the queue. Implementation checkpoint: wc -l peer-hub.ts must be <= 750, else move presenceOf and draft sync helpers into src/dashboard/server/sharing/hub-sync.ts before committing. presenceOf now always adds agentWorking and queued to the stream, so update the existing exact stream assertions in peer-hub.test.ts (around lines 597 and 633) to include agentWorking false and queued 0. Extend peer-hub.test.ts."
+        },
+        "items": [
+          {
+            "id": "hub-submit.ac1",
+            "title": "Given contributor viewer 7 sends control submit {clientId:'c1', text:'Do it'}, when the fake deliver answers 200, then 7 receives submit-ack queued position 1 followed by submit-ack sent, and bridge.expectAuthor was called with 7's login before deliver",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hub-submit.ac2",
+            "title": "A submit from an admitted viewer whose snapshot contributor flag is false returns submit-ack rejected not_contributor and deliver is never called; a submit before the hello or with clientId 'a b' is ignored",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hub-submit.ac3",
+            "title": "When a snapshot flips viewer 7's contributor flag to false while 7 has a queued item, 7 receives submit-ack rejected grant_revoked for that item",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hub-submit.ac4",
+            "title": "After the queue status changes, every negotiated peer receives a presence envelope whose stream has agentWorking true and queued 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hub-submit.ac5",
+            "title": "sendFromController({text, draftGithubId: 7}) takes 7's draft, sends 7 control draft-sent, relays '' to the other peers and enqueues with author 7, while sendFromController({text:'!rm'}) returns invalid_prompt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "host-route",
+        "title": "Expose drafts and queue in ShareView and add POST /api/shares/:code/prompts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:57:18Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4476",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/share-host.ts",
+            "src/dashboard/server/services/__tests__/share-host.test.ts",
+            "src/dashboard/server/routes/shares.ts",
+            "tests/unit/dashboard/server/routes/shares.test.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/share-host.test.ts tests/unit/dashboard/server/routes/shares.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "share-host.test.ts and shares.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4476.md WI-8 and section 'ShareManager and route'. In src/dashboard/server/services/share-host.ts make viewOf add drafts (hub.draftsView() or []) and queue (hub.queueView() or an empty queue) and add ShareManager.sendPrompt(shortCode, body) -> 202 {ok,position} | 400 invalid_prompt/too_long | 404 share_not_found | 409 share_not_live | 429 queue_full; update the fake HostHub in services/__tests__/share-host.test.ts with sendFromController, draftsView, queueView. In src/dashboard/server/routes/shares.ts add parseSendPrompt (400 invalid_request), sendPromptFromBody and the POST /api/shares/:code/prompts route behind rejectUnsafeDashboardMutationRequest, merged into sharesRouteLayer, and list it in the header comment. Add the no-loss-matrix row for the new route after line 795. Extend tests/unit/dashboard/server/routes/shares.test.ts."
+        },
+        "items": [
+          {
+            "id": "host-route.ac1",
+            "title": "GET /api/shares views include the hub's drafts and queue, and a share without a hub returns drafts [] and an empty queue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-route.ac2",
+            "title": "POST /api/shares/:code/prompts returns 202 {ok:true, position} for a valid body, 400 invalid_request for {text:5} and for draftGithubId 0, 404 for an unknown code, 409 share_not_live without a host entry, and 429 queue_full when the hub refuses",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-route.ac3",
+            "title": "When a non-loopback request without a dashboard credential arrives, then the route returns 401; no response body contains a match for /odh_[0-9a-f]{64}/; and tests/unit/lib/overdeck/no-loss-matrix.ts contains POST /api/shares/:code/prompts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "loopback-flow",
+        "title": "Prove drafts and a contributor submit over real werift channels",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:57:18Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4476",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/sharing/__tests__/loopback-viewer.ts",
+            "src/dashboard/server/sharing/__tests__/peer-hub-loopback.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/sharing/__tests__/peer-hub-loopback.test.ts"
+          ],
+          "expected_outputs": [
+            "peer-hub-loopback.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4476.md WI-9. Add send(ch, payload) with per-channel seq to src/dashboard/server/sharing/__tests__/loopback-viewer.ts and extend src/dashboard/server/sharing/__tests__/peer-hub-loopback.test.ts: contributor viewer A sends a draft that viewer B receives with A's githubId, then A submits and receives submit-ack queued then sent while a fake deliver records the text. Waits use waitFor predicates, never fixed sleeps."
+        },
+        "items": [
+          {
+            "id": "loopback-flow.ac1",
+            "title": "Given two werift loopback viewers, when viewer A sends a drafts envelope {text:'hello'}, then viewer B receives a DraftPayload with A's githubId and text 'hello'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "loopback-flow.ac2",
+            "title": "When contributor A sends control submit, then A receives submit-ack queued and then submit-ack sent, and the fake deliver received the submitted text exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "viewer-peer",
+        "title": "Teach the browser WebRtcViewer drafts, submits, acks, author and queue fields",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:57:18Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4476",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/sharing/webrtc-viewer.ts",
+            "src/dashboard/frontend/src/components/chat/sharing/__tests__/webrtc-viewer.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/sharing/__tests__/webrtc-viewer.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "webrtc-viewer.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-5",
+            "FR-10",
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4476.md WI-10 and section 'Browser peer'. In src/dashboard/frontend/src/components/chat/sharing/webrtc-viewer.ts add per-channel outbound seq (hello is control seq 1), read drafts with readDraftPayload -> onDraft, handle control submit-ack -> onSubmitAck and draft-sent -> onDraftSent, add sendDraft(text) and submit(clientId, text) returning false before the hello or when the channel is not open, add an onReady() callback fired once per negotiation right after the hello reply is sent, let readSharedMessage keep author only when login is a string and avatarUrl a string starting with https://, and let readStream keep agentWorking (boolean) and queued (non-negative safe integer). terminal still gets no listener. Extend src/dashboard/frontend/src/components/chat/sharing/__tests__/webrtc-viewer.test.ts."
+        },
+        "items": [
+          {
+            "id": "viewer-peer.ac1",
+            "title": "After the hello, sendDraft('x') sends a drafts envelope with seq 1 and a second call seq 2, and submit('c1','Do it') sends a control envelope with seq 2; both return false before the hello, and onReady fires once right after the hello reply",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-peer.ac2",
+            "title": "When a host drafts envelope arrives, then onDraft receives the rebuilt payload without extra keys; when control submit-ack or draft-sent arrives, then onSubmitAck or onDraftSent fires",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-peer.ac3",
+            "title": "When a message arrives with author {login:'alice', avatarUrl:'https://avatars.githubusercontent.com/u/1'}, then onMessages receives it with author; with avatarUrl 'javascript:x', then author is dropped; and a presence stream with agentWorking true and queued 2 preserves both fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "suggestion-list",
+        "title": "Create SuggestionList with read-only and controller pick/edit/send modes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:57:18Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4476",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/sharing/SuggestionList.tsx",
+            "src/dashboard/frontend/src/components/chat/sharing/__tests__/SuggestionList.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/sharing/__tests__/SuggestionList.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "SuggestionList.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4476.md WI-11 and section 'Suggestion list'. Create src/dashboard/frontend/src/components/chat/sharing/SuggestionList.tsx (SuggestionItem, props items/mode/onSend) rendering nothing when empty, a 'Suggestions (N)' heading, rows with avatar, @login (font-mono), text clamped to three lines and aria-label 'Suggestion from @login'; controller mode adds Use -> inline textarea + Send (disabled while sharedPromptRefusal is non-null or pending) + Cancel, and keeps the editor open with the error after a rejected onSend. Follow pan-style-guide (no pills, neutral buttons). Create src/dashboard/frontend/src/components/chat/sharing/__tests__/SuggestionList.test.tsx and add its path to scripts/frontend-test-subset.txt in sorted position after SharingLobbyPanel.test.tsx."
+        },
+        "items": [
+          {
+            "id": "suggestion-list.ac1",
+            "title": "An empty item list renders nothing, and view mode renders 'Suggestion from @alice' rows with no buttons",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "suggestion-list.ac2",
+            "title": "In controller mode, clicking 'Use suggestion from @alice', editing the textarea and clicking 'Send suggestion from @alice' calls onSend once with the edited text, and Cancel closes the editor",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "suggestion-list.ac3",
+            "title": "Send is disabled for '/clear', and a rejected onSend shows its error message while the editor stays open",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "suggestion-list.ac4",
+            "title": "scripts/frontend-test-subset.txt contains src/components/chat/sharing/__tests__/SuggestionList.test.tsx in sorted order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "message-author",
+        "title": "Render the sender's @login and avatar on attributed user messages",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:57:18Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4476",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/chat-types.ts",
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/messageRows.tsx",
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/messageRows.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/messagesTimeline/messageRows.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "messageRows.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4476.md WI-12. Add author?: { login: string; avatarUrl: string } to ChatMessage in src/dashboard/frontend/src/components/chat/chat-types.ts. In the default branch of UserMessageRow in src/dashboard/frontend/src/components/chat/messagesTimeline/messageRows.tsx render, when message.author is set, a 16 px avatar and '@login' before the timestamp inside the messageTimestamp span with data-testid 'user-message-author'. No other branch changes. Extend messagesTimeline/messageRows.test.tsx."
+        },
+        "items": [
+          {
+            "id": "message-author.ac1",
+            "title": "A user message with author {login:'alice'} renders an element with data-testid 'user-message-author' containing '@alice' and an img",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "message-author.ac2",
+            "title": "A user message without author renders no user-message-author element, and an optimistic message still renders its pending state unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "viewer-composer",
+        "title": "Add the viewer draft box, contributor Send, queue line and suggestions to the shared page",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:57:18Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-4476",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/sharing/useSharedJoin.ts",
+            "src/dashboard/frontend/src/components/chat/sharing/SharedConversationView.tsx",
+            "src/dashboard/frontend/src/components/chat/sharing/__tests__/useSharedJoin.test.tsx",
+            "src/dashboard/frontend/src/components/chat/sharing/__tests__/SharedConversationView.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/sharing/__tests__/useSharedJoin.test.tsx src/components/chat/sharing/__tests__/SharedConversationView.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "useSharedJoin.test.tsx and SharedConversationView.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-7",
+            "FR-10",
+            "FR-12"
+          ],
+          "parallelSafeReason": "Only this item edits useSharedJoin.ts and SharedConversationView.tsx and their tests; its inputs come from blockers viewer-peer, suggestion-list and message-author."
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4476.md WI-13 and section 'Join hook and page'. In src/dashboard/frontend/src/components/chat/sharing/useSharedJoin.ts expose drafts, myDraft, setMyDraft (trailing 150 ms sendDraft), submitPrompt (crypto.randomUUID client id, viewer.submit, clear myDraft, sendDraft('') at once), submitStatus and draftSentNotice, all cleared by resetContent except myDraft (it survives a reconnect; leave clears it); on onReady send sendDraft(myDraft) at once, also when empty; ViewerPeer adds sendDraft and submit. In src/dashboard/frontend/src/components/chat/sharing/SharedConversationView.tsx add the SharedComposer block under the timeline (status line from presence.streams[0], SuggestionList mode view with avatars from presence, textarea 'Suggest a prompt' / 'Write a prompt' with maxLength 8000, contributor-only 'Send prompt' plus Ctrl/Cmd+Enter, refusal text, ack lines via submitReasonText, the draft-sent notice) and copy author in toChatMessage. Extend src/dashboard/frontend/src/components/chat/sharing/__tests__/useSharedJoin.test.tsx (fake timers) and src/dashboard/frontend/src/components/chat/sharing/__tests__/SharedConversationView.test.tsx."
+        },
+        "items": [
+          {
+            "id": "viewer-composer.ac1",
+            "title": "Under fake timers, three setMyDraft calls within 150 ms send exactly one sendDraft with the last text at 150 ms, and submitPrompt calls viewer.submit with a UUID-shaped id, clears myDraft and sends sendDraft('')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-composer.ac2",
+            "title": "Given view.contributor true, the admitted screen renders a 'Send prompt' button; given the same props with contributor false, it renders no 'Send prompt' and shows 'The host can pick your suggestion and send it.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-composer.ac3",
+            "title": "A presence stream with agentWorking true and queued 2 renders 'Agent is working · 2 queued', and a rejected grant_revoked status renders 'You can no longer send prompts directly.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-composer.ac4",
+            "title": "A lobby view renders no textarea, toChatMessage copies author onto the ChatMessage, and when onReady fires after a reconnect, then the hook sends sendDraft with the kept myDraft",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "host-suggestions",
+        "title": "Show suggestions and the queue in the host share dialog and send picks through the route",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:57:18Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4476",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/sharing/ShareDialog.tsx",
+            "src/dashboard/frontend/src/components/chat/sharing/shareApi.ts",
+            "src/dashboard/frontend/src/components/chat/sharing/__tests__/ShareDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/sharing/__tests__/ShareDialog.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ShareDialog.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-10",
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4476.md WI-14 and section 'Share dialog'. Add sendSharePrompt(shortCode, body) to src/dashboard/frontend/src/components/chat/sharing/shareApi.ts (POST /api/shares/:code/prompts with dashboardMutationJsonHeaders, ShareApiError on failure). In src/dashboard/frontend/src/components/chat/sharing/ShareDialog.tsx under SharingLobbyPanel render the queue line (same wording as the viewer), the queued items read-only, and SuggestionList mode controller fed by share.drafts; onSend posts {text, draftGithubId}, then toast.success('Queued') and refreshes the list. Extend src/dashboard/frontend/src/components/chat/sharing/__tests__/ShareDialog.test.tsx."
+        },
+        "items": [
+          {
+            "id": "host-suggestions.ac1",
+            "title": "Given a share fixture with two drafts, the dialog renders 'Suggestions (2)', and Use then Send posts POST /api/shares/<code>/prompts with body {\"text\":\"<edited>\",\"draftGithubId\":<id>}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-suggestions.ac2",
+            "title": "Given queue {agentWorking:true, items:[two]}, the dialog renders 'Agent is working · 2 queued' and both queued items",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-suggestions.ac3",
+            "title": "A share fixture without drafts or queue renders no suggestions section and no queue line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "e2e",
+        "title": "Add the two-dashboard Playwright spec for live drafts and contributor revoke",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:57:18Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-4476",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-4476-shared-input.spec.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npm run build && npx playwright test tests/pan-4476-shared-input.spec.ts"
+          ],
+          "expected_outputs": [
+            "pan-4476-shared-input.spec.ts passes and test-results/pan-4476/ contains viewer-composer-light.png, viewer-composer-dark.png, host-suggestions-light.png, host-suggestions-dark.png"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-7"
+          ],
+          "parallelSafeReason": "A new spec file no other item edits; it runs after the UI and route items it exercises."
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4476.md WI-15. Create src/dashboard/frontend/tests/pan-4476-shared-input.spec.ts from tests/pan-4475-shared-viewer.spec.ts (Miniflare share Worker, two startIsolatedDashboard children with their own temp OVERDECK_HOME, dead-loopback account.json baseUrl and anywhere.directory_url, local avatar PNG, never port 3011, isolated browser contexts). Flow: share, join, 'Admit @alice as contributor' (exact: true); viewer types in 'Write a prompt'; host dialog shows 'Suggestion from @alice' within 5 s; viewer sees 'Send prompt'; host clicks 'Remove contributor'; viewer's 'Send prompt' disappears and the textarea label becomes 'Suggest a prompt'. Write the four PNGs to test-results/pan-4476/ and inspect them. Do not add the spec to test:playwright."
+        },
+        "items": [
+          {
+            "id": "e2e.ac1",
+            "title": "Given the host admitted @alice as contributor, when alice types in 'Write a prompt', then the host's share dialog shows 'Suggestion from @alice' with that text within 5 seconds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2e.ac2",
+            "title": "When the host clicks 'Remove contributor', then alice's page no longer shows 'Send prompt' and its textarea is labelled 'Suggest a prompt'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2e.ac3",
+            "title": "When the spec runs, then it saves viewer-composer-light.png, viewer-composer-dark.png, host-suggestions-light.png and host-suggestions-dark.png under test-results/pan-4476/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document drafts, contributor prompts and the queue in the dev and user docs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:57:18Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4476",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/SHARED-SESSIONS.md",
+            "configuration/shared-sessions.mdx",
+            "anywhere.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -c 'Prompt drafts, contributor submits and the queue (slice 5, PAN-4476)' docs/SHARED-SESSIONS.md",
+            "! grep -q 'extra powers in a later release' configuration/shared-sessions.mdx"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "the grep -c prints 1",
+            "the negated grep exits 0 because the old sentence is gone"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-5",
+            "FR-8",
+            "FR-10",
+            "FR-11",
+            "FR-12",
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4476.md WI-16 exactly. docs/SHARED-SESSIONS.md: update the drafts and control rows of the slice-3 channel table (lines 199-203) and add the section '## Prompt drafts, contributor submits and the queue (slice 5, PAN-4476)' before '## Local development' with every listed topic. configuration/shared-sessions.mdx: replace the 'extra powers in a later release' and 'sees the same thing as any other viewer' text, add the Grant/Remove contributor item, the '## Suggestions and contributor prompts' section with the trust warning, the Roles and What viewers see and Limits additions, and change line 77 to 'Handing control to another person comes in a later release.'. anywhere.mdx line 270: replace 'prompt suggestions and contributor prompts are still planned' with 'viewers can suggest prompts, and contributors can send them'. Run npm run lint:docs."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "docs/SHARED-SESSIONS.md contains the slice-5 section that names QUEUE_TICK_MS, TURN_START_TIMEOUT_MS, the refused '/', '!' and '#' prefixes and POST /api/shares/:code/prompts with its status codes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "configuration/shared-sessions.mdx no longer contains 'extra powers in a later release' or 'sees the same thing as any other viewer', and contains a 'Suggestions and contributor prompts' section that warns to make only trusted people contributors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "anywhere.mdx no longer contains 'contributor prompts are still planned', and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wire-types",
+        "to": "draft-board",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-helpers",
+        "to": "draft-board",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-types",
+        "to": "submit-queue",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-helpers",
+        "to": "submit-queue",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-types",
+        "to": "hub-drafts",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-helpers",
+        "to": "hub-drafts",
+        "type": "blocks"
+      },
+      {
+        "from": "draft-board",
+        "to": "hub-drafts",
+        "type": "blocks"
+      },
+      {
+        "from": "hub-drafts",
+        "to": "hub-submit",
+        "type": "blocks"
+      },
+      {
+        "from": "submit-queue",
+        "to": "hub-submit",
+        "type": "blocks"
+      },
+      {
+        "from": "bridge-author",
+        "to": "hub-submit",
+        "type": "blocks"
+      },
+      {
+        "from": "hub-submit",
+        "to": "host-route",
+        "type": "blocks"
+      },
+      {
+        "from": "hub-submit",
+        "to": "loopback-flow",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-types",
+        "to": "viewer-peer",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-helpers",
+        "to": "viewer-peer",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-helpers",
+        "to": "suggestion-list",
+        "type": "blocks"
+      },
+      {
+        "from": "viewer-peer",
+        "to": "viewer-composer",
+        "type": "blocks"
+      },
+      {
+        "from": "suggestion-list",
+        "to": "viewer-composer",
+        "type": "blocks"
+      },
+      {
+        "from": "message-author",
+        "to": "viewer-composer",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-types",
+        "to": "host-suggestions",
+        "type": "blocks"
+      },
+      {
+        "from": "suggestion-list",
+        "to": "host-suggestions",
+        "type": "blocks"
+      },
+      {
+        "from": "viewer-composer",
+        "to": "e2e",
+        "type": "blocks"
+      },
+      {
+        "from": "host-suggestions",
+        "to": "e2e",
+        "type": "blocks"
+      },
+      {
+        "from": "host-route",
+        "to": "e2e",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

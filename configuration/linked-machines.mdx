@@ -319,6 +319,13 @@ never saved with the link. See
 | **Unsupported** | The other machine runs an Overdeck without machine links, or another link protocol. The state names the exact version, where to install it, and the `npm install -g @overdeck/core@<version>` command. It is not retried until **Reconnect** or a restart. |
 | **Revoked** | The other machine removed this machine's access. Link again with a new pairing link. |
 
+**On a Mac**, a route stuck in **Offline** can say "macOS is blocking local network access for Overdeck."
+instead of the raw connection error. The dashboard only shows this when two signals agree:
+every LAN route to the peer failed with the same `EHOSTUNREACH` errno, and a probe of this
+process's own network access confirms macOS denied it. A powered-off peer, which also fails
+fast with `EHOSTUNREACH`, keeps the raw error instead — turning on Local Network access
+would not help there.
+
 When a link drops, the row says why. **froze** means the other dashboard's event loop
 stalled (it reports its own stalls in the next heartbeat, so a frozen machine is told
 apart from a dead network); **network** means nothing arrived.
@@ -383,7 +390,8 @@ conversation runs on one machine at a time. The pull has four steps:
    code changes, and stops its harness. If a turn is running you choose **Wait for this
    turn** (up to 30 minutes) or **Stop it now**.
 2. **Transfer.** The settled conversation crosses the encrypted channel.
-3. **Adopt.** This machine continues it in its own checkout and resumes the harness.
+3. **Adopt.** This machine continues it in its own checkout and resumes the harness. It
+   keeps the title it had on the owner.
 4. **Finish.** The old copy shows "Continued on <this machine>" and is read-only.
 
 If adoption fails, the owner takes the conversation back and resumes it; nothing is

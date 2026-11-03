@@ -541,6 +541,17 @@ describe('pan connect on macOS (WI-10)', () => {
     );
   });
 
+  it('says how to allow local network access', async () => {
+    const { deps, stdout } = mac();
+
+    await runConnect({}, deps);
+    expect(plain(stdout).split('\n')[1]).toBe(
+      `macOS blocks the server's connections to other machines on this network until you allow them: `
+      + 'on this Mac, open System Settings → Privacy & Security → Local Network and turn on node (/opt/homebrew/bin/node). '
+      + 'node appears in that list after the server first tries to reach another machine, so check it once this Mac is linked.',
+    );
+  });
+
   it('reports the launchd manager in --json', async () => {
     const { deps, stdout } = mac();
 

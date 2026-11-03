@@ -1,0 +1,461 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-03T14:23:30Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4897: Mac set up with connect cannot reach LAN machines: macOS Local Network permission blocks the launchd server",
+    "updated": "2026-11-03T14:27:34.967Z"
+  },
+  "plan": {
+    "id": "pan-4897",
+    "title": "Mac set up with connect cannot reach LAN machines: macOS Local Network permission blocks the launchd server",
+    "status": "running",
+    "uid": "5b0be759-6f88-497f-b527-dac7b1465f75",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-03T14:23:30Z",
+    "updated": "2026-11-03T14:27:34.967Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4897",
+        "label": "PAN-4897",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4897.md",
+        "label": "PRD",
+        "type": "prd"
+      },
+      {
+        "uri": "https://developer.apple.com/documentation/technotes/tn3179-understanding-local-network-privacy",
+        "label": "Apple TN3179",
+        "type": "reference"
+      },
+      {
+        "uri": "https://github.com/openclaw/openclaw/issues/191429",
+        "label": "openclaw#191429 (same failure, node launch agent)",
+        "type": "reference"
+      }
+    ],
+    "tags": [
+      "anywhere",
+      "machine-links",
+      "macos",
+      "connect",
+      "diagnostics"
+    ],
+    "narratives": {
+      "Problem": "On a Mac set up with pan connect, the dashboard runs under the ai.overdeck.supervisor launch agent, and macOS Local Network privacy denies it every LAN connection. The Mac's link to a LAN peer stays offline with a raw 'connect EHOSTUNREACH' detail, and nothing in pan connect, the link state, the dashboard or the docs tells the operator to turn on node in System Settings → Privacy & Security → Local Network.",
+      "Proposal": "Keep the socket errno on tcp open failures (open.ts → ChannelOpenError.detail.cause). Add a pure LAN classifier and the operator message (src/lib/anywhere/local-network.ts) and a darwin-only gateway probe (src/lib/anywhere/local-network-probe.ts) that tests whether the dashboard process itself is denied. The link supervisor replaces the raw detail with the Local Network message only when every LAN tcp route failed with EHOSTUNREACH and the gateway probe returns denied, so a powered-off peer keeps its raw error. pan connect on macOS prints a forward-looking Local Network note. cli/machines.mdx, configuration/linked-machines.mdx and docs/ANYWHERE-ARCHITECTURE.md describe the denial and the fix.",
+      "NonGoals": "- Triggering the macOS Local Network prompt from pan connect, including a launchctl submit probe job\n- Running the supervisor as a root LaunchDaemon or wrapping node in a signed app bundle\n- A new LinkState value, a new contracts field, a frontend component change, or a pan doctor check\n- Detecting the denial for hostname routes (desk.local) or for wss://, rtc:// and rtc+turn:// routes\n- Proactive gateway probing at dashboard boot\n- Any change to pan connect --json output\n- Any change to packages/anywhere-channel"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Guide the operator to the Local Network setting instead of trying to trigger the macOS permission prompt.",
+        "rationale": "pan connect usually runs over SSH, which is exempt and has no GUI; Apple DTS has seen launch agents get EHOSTUNREACH with no alert; an unbundled node has no API to request or query the permission. The issue lists guidance as an acceptable outcome."
+      },
+      {
+        "summary": "Require a second signal (darwin gateway probe returns EHOSTUNREACH) before showing the Local Network message.",
+        "rationale": "macOS caches a reject route after ARP fails for a powered-off peer, so a fast EHOSTUNREACH alone would wrongly blame Local Network permission. The gateway probe runs in the dashboard process and so tests that process's own permission."
+      },
+      {
+        "summary": "Report the denial through the existing stateDetail string, not a new LinkState.",
+        "rationale": "machines.ts:74 and MachinesPanel.tsx:200 already render stateDetail; a new state touches contracts, frontend switches and the CLI for no operator benefit."
+      },
+      {
+        "summary": "Copy the socket errno into ChannelOpenError.detail.cause in src/lib/anywhere/channel/open.ts, not in toOpenError.",
+        "rationale": "Keeps @overdeck/anywhere-channel (shared with the phone build and its own typecheck lane) unchanged; only the Node tcp path has an errno."
+      },
+      {
+        "summary": "pan connect prints a forward-looking note rather than detecting the denial.",
+        "rationale": "At connect time the dashboard is usually started from the SSH shell, which is exempt; the denial appears only after the launch agent restarts the dashboard."
+      },
+      {
+        "summary": "Keep the blocked route URLs at the end of the message and log the raw detail.",
+        "rationale": "The issue wants the named cause instead of a raw EHOSTUNREACH, but a false positive must stay diagnosable."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-03-PAN-4897-mac-set-up-with-connect-cannot-reach-lan-machines-macos-local-network-permission-blocks-the-launchd-server.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "open-errno",
+        "title": "Keep the socket errno on tcp open failures",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T14:23:30Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4897",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/anywhere/channel/open.ts",
+            "src/lib/anywhere/channel/__tests__/channel.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/anywhere/channel/__tests__/channel.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "channel.test.ts passes including the extended 'reports an unreachable transport' case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In src/lib/anywhere/channel/open.ts, function connectTransport, tcp branch only: in socket.once('error'), build opened = toOpenError(error, url); when error.code is a string and opened.code === 'unreachable', reject with new ChannelOpenError('unreachable', opened.message, { ...opened.detail, cause: error.code }); otherwise reject with opened. Do not change the abort path, the wss path, or packages/anywhere-channel. Extend it('reports an unreachable transport') in channel.test.ts to also assert the rejection matches { code: 'unreachable', detail: { cause: 'ECONNREFUSED' } }."
+        },
+        "items": [
+          {
+            "id": "open-errno.ac1",
+            "title": "Given a closed local port, when openChannel('tcp://127.0.0.1:<port>') is called, then it rejects with code 'unreachable' and detail.cause 'ECONNREFUSED' (asserted in channel.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "open-errno.ac2",
+            "title": "Given a closed local port, when openChannel rejects, then the error message still starts with the route URL followed by the Node error message (asserted with toMatch in channel.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "open-errno.ac3",
+            "title": "When git diff --name-only origin/main is run after this item, then it lists no file under packages/anywhere-channel/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lan-classifier",
+        "title": "Add the LAN classifier and the Local Network message module",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T14:23:30Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4897",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "gateway-probe",
+            "supervisor-local-network",
+            "connect-local-network-note"
+          ],
+          "files_scope": [
+            "src/lib/anywhere/local-network.ts",
+            "src/lib/anywhere/__tests__/local-network.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/anywhere/__tests__/local-network.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "local-network.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Create src/lib/anywhere/local-network.ts (pure, no I/O, module header citing PAN-4897) exporting: LOCAL_NETWORK_SETTINGS = 'System Settings → Privacy & Security → Local Network'; isLanAddress(host) true only for IP literals in 10/8, 172.16/12, 192.168/16, 169.254/16, fe80::/10, fc00::/7 (strip [ ] from IPv6; false for 100.64/10, loopback, public, hostnames); interface RouteFailure { url: string; cause: string | undefined }; lanHostUnreachableRoutes(failures) returning the tcp:// URLs whose host is a LAN address, only when at least one exists and every one has cause 'EHOSTUNREACH', else []; localNetworkBlockedDetail(nodePath, routes) returning exactly the PRD D-6 text with routes joined by ', '. Write the table tests listed in PRD WI-2."
+        },
+        "items": [
+          {
+            "id": "lan-classifier.ac1",
+            "title": "isLanAddress returns true for 172.16.0.1, 172.31.255.255, 192.168.1.64, 10.0.0.1, 169.254.1.1, fe80::1, fd00::1 and false for 172.15.0.1, 172.32.0.1, 100.100.1.1, 127.0.0.1, 8.8.8.8, desk.local (table test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lan-classifier.ac2",
+            "title": "lanHostUnreachableRoutes returns both URLs for two LAN tcp routes failing with EHOSTUNREACH, and returns [] when one LAN route failed with ECONNREFUSED or when the only route is tcp://100.101.1.2:3011",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lan-classifier.ac3",
+            "title": "localNetworkBlockedDetail('/opt/homebrew/bin/node', ['tcp://192.168.1.64:3011']) returns a string that starts with 'macOS is blocking local network access for Overdeck.' and contains 'turn on node (/opt/homebrew/bin/node)' and 'Blocked routes: tcp://192.168.1.64:3011' (exact-string test of the D-6 text)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gateway-probe",
+        "title": "Add the darwin-only gateway probe for Local Network access",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T14:23:30Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4897",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/anywhere/local-network-probe.ts",
+            "src/lib/anywhere/__tests__/local-network-probe.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/anywhere/__tests__/local-network-probe.test.ts",
+            "npm run typecheck",
+            "grep -n 'execSync\\|spawnSync' src/lib/anywhere/local-network-probe.ts || true"
+          ],
+          "expected_outputs": [
+            "local-network-probe.test.ts passes",
+            "typecheck completes without errors",
+            "the grep prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Create src/lib/anywhere/local-network-probe.ts exporting type LocalNetworkAccess = 'denied' | 'allowed' | 'unknown', interface LocalNetworkProbeDeps { platform; execFile(file, args, { timeout }) => Promise<{ stdout }>; tcpConnect(host, port, timeoutMs) => Promise<string> (resolves 'connected', 'timeout' or the errno; never rejects) }, parseDefaultGateway(output) (reads the 'gateway: <ip>' line, else null), and async checkLocalNetworkAccess(deps?). Rules: platform !== 'darwin' ⇒ 'unknown' before any call; execFile('/sbin/route', ['-n','get','default'], { timeout: 2000 }) throws ⇒ 'unknown'; gateway missing or not an IPv4 address for which isLanAddress (from local-network.ts) is true ⇒ 'unknown'; tcpConnect(gateway, 9, 1000): 'EHOSTUNREACH' ⇒ 'denied'; 'connected' | 'timeout' | 'ECONNREFUSED' ⇒ 'allowed'; anything else ⇒ 'unknown'. Default execFile is promisify(child_process.execFile) with encoding utf-8; default tcpConnect uses net.connect with a timer and destroys the socket in every outcome. Never use execSync/spawnSync. Tests inject deps only — no real sockets or child processes."
+        },
+        "items": [
+          {
+            "id": "gateway-probe.ac1",
+            "title": "Given platform 'linux', checkLocalNetworkAccess returns 'unknown' and the injected execFile and tcpConnect are never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gateway-probe.ac2",
+            "title": "Given darwin and route output containing '   gateway: 192.168.1.1', tcpConnect resolving 'EHOSTUNREACH' returns 'denied', and 'ECONNREFUSED', 'connected' and 'timeout' each return 'allowed' (tcpConnect called with ('192.168.1.1', 9, 1000))",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gateway-probe.ac3",
+            "title": "Given darwin, a rejecting execFile, route output without a gateway line, a gateway of 100.64.0.1, or tcpConnect resolving 'ENETUNREACH', checkLocalNetworkAccess returns 'unknown'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gateway-probe.ac4",
+            "title": "grep -n 'execSync\\|spawnSync' src/lib/anywhere/local-network-probe.ts produces no output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "supervisor-local-network",
+        "title": "Link supervisor shows the Local Network message on a confirmed denial",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T14:23:30Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4897",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/link-supervisor.ts",
+            "src/dashboard/server/services/__tests__/link-supervisor-local-network.test.ts",
+            "configuration/linked-machines.mdx",
+            "docs/ANYWHERE-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/link-supervisor-local-network.test.ts src/dashboard/server/services/__tests__/link-supervisor.test.ts src/dashboard/server/services/__tests__/link-supervisor-phases.test.ts src/dashboard/server/services/__tests__/link-supervisor-routes.test.ts",
+            "npm run typecheck",
+            "npm run lint",
+            "wc -l src/dashboard/server/services/link-supervisor.ts"
+          ],
+          "expected_outputs": [
+            "all four link-supervisor test files pass",
+            "typecheck and lint complete without errors",
+            "link-supervisor.ts is under 1000 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-8",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 plus the WI-6 docs for linked-machines.mdx and ANYWHERE-ARCHITECTURE.md. In link-supervisor.ts: add lanBlocked?: string[] to the unreachable ProbeOutcome variant; in probe() set it from lanHostUnreachableRoutes over failures (cause = ChannelOpenError detail.cause, else undefined; omit when empty); joinFailures keeps earlier.lanBlocked when later has none; the NO_DIRECT_PATH_MESSAGE return in probePhased carries outcome.lanBlocked. Add deps localNetworkAccess?: () => Promise<LocalNetworkAccess> and nodePath?: string; defaultLinkSupervisorDeps sets localNetworkAccess only when process.platform === 'darwin' (to () => checkLocalNetworkAccess()) and nodePath: process.execPath. In connect(), in the !outcome.ok branch after the revoked/unsupported returns, when failure is 'unreachable', lanBlocked is non-empty and localNetworkAccess exists: await it, then return if this.stopped, entry.generation !== generation, or entry.state is 'revoked'/'unsupported'; on 'denied' log the raw detail via this.deps.log and set the detail to localNetworkBlockedDetail(nodePath ?? 'node', lanBlocked); otherwise keep outcome.detail. Tests in a new link-supervisor-local-network.test.ts modeled on link-supervisor-phases.test.ts using vi.useFakeTimers() and vi.advanceTimersByTimeAsync() (repo rule: never real delays), covering the seven cases in PRD WI-4. Docs: configuration/linked-machines.mdx after the ## States table add an 'On a Mac' paragraph quoting the D-6 opening sentence, the two signals, and that a powered-off peer keeps the raw error; docs/ANYWHERE-ARCHITECTURE.md D-10 bullet add the classification rule, the two module names, and that the check is injected only on darwin."
+        },
+        "items": [
+          {
+            "id": "supervisor-local-network.ac1",
+            "title": "Given two LAN tcp routes rejecting with cause EHOSTUNREACH and an injected localNetworkAccess resolving 'denied', the link's stateDetail starts with 'macOS is blocking local network access for Overdeck.' and ends with both route URLs; resolving 'allowed' leaves the raw joined detail",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-local-network.ac2",
+            "title": "localNetworkAccess is never called when it is not injected, when one LAN route failed with ECONNREFUSED, or when the only route is tcp://100.101.1.2:3011 (asserted with a vi.fn spy)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-local-network.ac3",
+            "title": "Given a direct route, relayEntitled returning false and a denied check, stateDetail is the Local Network message rather than NO_DIRECT_PATH_MESSAGE",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-local-network.ac4",
+            "title": "Given the link is removed while localNetworkAccess is pending, resolving it writes no stateDetail and schedules no retry for that link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-local-network.ac5",
+            "title": "configuration/linked-machines.mdx contains 'macOS is blocking local network access for Overdeck' under ## States, and docs/ANYWHERE-ARCHITECTURE.md D-10 names local-network-probe.ts and the gateway probe",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "connect-local-network-note",
+        "title": "pan connect on macOS prints the Local Network note",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:23:30Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4897",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/connect-launchd.ts",
+            "src/cli/commands/__tests__/connect.test.ts",
+            "cli/machines.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/connect.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "connect.test.ts passes including the new macOS note case and the unchanged --json case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5 plus the WI-6 docs for cli/machines.mdx. In connect-launchd.ts installMacService, replace note: null with the PRD WI-5 text, importing LOCAL_NETWORK_SETTINGS from src/lib/anywhere/local-network.ts and naming node (d.execPath). In connect.test.ts describe('pan connect on macOS (WI-10)') add it('says how to allow local network access') asserting the second plain stdout line equals the note with /opt/homebrew/bin/node. In cli/machines.mdx ### macOS add a paragraph: Local Network privacy blocks the launch agent's LAN connections; the exact note pan connect prints; turn on node at the printed path in System Settings → Privacy & Security → Local Network; the entry appears after the server's first attempt; Homebrew node is ad-hoc signed so check the grant again after brew upgrade node; Tailscale (pan tailscale setup) as the alternative when node is not listed."
+        },
+        "items": [
+          {
+            "id": "connect-local-network-note.ac1",
+            "title": "Given darwin with execPath /opt/homebrew/bin/node, runConnect prints, on the line after the launchd service line, a note containing 'System Settings → Privacy & Security → Local Network' and 'turn on node (/opt/homebrew/bin/node)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connect-local-network-note.ac2",
+            "title": "runConnect({ json: true }) on darwin still emits service { manager: 'launchd', name: 'ai.overdeck.supervisor', enabled: true } and no note text on stdout",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connect-local-network-note.ac3",
+            "title": "cli/machines.mdx ### macOS section contains 'Local Network', 'node', 'brew upgrade node' and 'pan tailscale setup'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "lan-classifier",
+        "to": "gateway-probe",
+        "type": "blocks"
+      },
+      {
+        "from": "lan-classifier",
+        "to": "supervisor-local-network",
+        "type": "blocks"
+      },
+      {
+        "from": "gateway-probe",
+        "to": "supervisor-local-network",
+        "type": "blocks"
+      },
+      {
+        "from": "open-errno",
+        "to": "supervisor-local-network",
+        "type": "blocks"
+      },
+      {
+        "from": "lan-classifier",
+        "to": "connect-local-network-note",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

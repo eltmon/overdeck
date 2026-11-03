@@ -1,0 +1,343 @@
+{
+  "version": "1",
+  "issueId": "PAN-4476",
+  "created": "2026-11-03T15:05:40.423Z",
+  "updated": "2026-11-03T16:34:08.223Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-03T16:29Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-03T16:29:00.425Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-03T16:32Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-11-03T16:32:00.487Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-03T16:34:08.223Z"
+    }
+  ],
+  "items": {
+    "wire-types": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4476",
+      "claimedAt": "2026-11-03T15:05:40.423Z",
+      "doneAt": "2026-11-03T15:13:07.770Z"
+    },
+    "wire-helpers": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4476",
+      "claimedAt": "2026-11-03T15:13:12.725Z",
+      "doneAt": "2026-11-03T15:14:49.209Z"
+    },
+    "draft-board": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4476",
+      "claimedAt": "2026-11-03T15:14:59.444Z",
+      "doneAt": "2026-11-03T15:19:15.118Z"
+    },
+    "submit-queue": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4476",
+      "claimedAt": "2026-11-03T15:19:16.370Z",
+      "doneAt": "2026-11-03T15:23:15.146Z"
+    },
+    "bridge-author": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4476",
+      "claimedAt": "2026-11-03T15:23:17.798Z",
+      "doneAt": "2026-11-03T15:24:28.426Z"
+    },
+    "hub-drafts": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4476",
+      "claimedAt": "2026-11-03T15:24:29.722Z",
+      "doneAt": "2026-11-03T15:28:46.653Z"
+    },
+    "hub-submit": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4476",
+      "claimedAt": "2026-11-03T15:30:38.336Z",
+      "doneAt": "2026-11-03T15:36:02.462Z"
+    },
+    "host-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4476",
+      "claimedAt": "2026-11-03T15:36:08.231Z",
+      "doneAt": "2026-11-03T15:40:32.406Z"
+    },
+    "loopback-flow": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4476",
+      "claimedAt": "2026-11-03T15:40:34.702Z",
+      "doneAt": "2026-11-03T15:46:09.658Z"
+    },
+    "viewer-peer": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4476",
+      "claimedAt": "2026-11-03T15:46:16.951Z",
+      "doneAt": "2026-11-03T15:48:38.864Z"
+    },
+    "suggestion-list": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4476",
+      "claimedAt": "2026-11-03T15:48:40.230Z",
+      "doneAt": "2026-11-03T15:49:39.422Z"
+    },
+    "message-author": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4476",
+      "claimedAt": "2026-11-03T15:49:41.123Z",
+      "doneAt": "2026-11-03T15:50:58.767Z"
+    },
+    "viewer-composer": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4476",
+      "claimedAt": "2026-11-03T15:51:01.307Z",
+      "doneAt": "2026-11-03T15:55:50.557Z"
+    },
+    "host-suggestions": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4476",
+      "claimedAt": "2026-11-03T15:55:52.154Z",
+      "doneAt": "2026-11-03T15:58:07.267Z"
+    },
+    "e2e": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4476",
+      "claimedAt": "2026-11-03T15:58:12.991Z",
+      "doneAt": "2026-11-03T16:00:56.159Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4476",
+      "claimedAt": "2026-11-03T16:00:57.906Z",
+      "doneAt": "2026-11-03T16:01:27.356Z"
+    },
+    "wire-types.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:03:00.623Z"
+    },
+    "wire-types.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:03:19.824Z"
+    },
+    "wire-types.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:03:39.807Z"
+    },
+    "wire-helpers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:03:58.828Z"
+    },
+    "wire-helpers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:04:19.746Z"
+    },
+    "wire-helpers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:04:46.428Z"
+    },
+    "draft-board.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:05:09.831Z"
+    },
+    "draft-board.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:05:34.636Z"
+    },
+    "draft-board.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:05:54.398Z"
+    },
+    "draft-board.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:06:11.330Z"
+    },
+    "submit-queue.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:06:28.896Z"
+    },
+    "submit-queue.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:06:45.995Z"
+    },
+    "submit-queue.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:07:00.993Z"
+    },
+    "submit-queue.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:07:17.830Z"
+    },
+    "submit-queue.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:07:34.804Z"
+    },
+    "bridge-author.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:07:51.152Z"
+    },
+    "bridge-author.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:08:06.625Z"
+    },
+    "bridge-author.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:08:22.839Z"
+    },
+    "hub-drafts.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:08:38.389Z"
+    },
+    "hub-drafts.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:08:54.027Z"
+    },
+    "hub-drafts.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:09:09.728Z"
+    },
+    "hub-drafts.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:09:26.438Z"
+    },
+    "hub-submit.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:09:41.942Z"
+    },
+    "hub-submit.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:09:56.823Z"
+    },
+    "hub-submit.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:10:13.359Z"
+    },
+    "hub-submit.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:10:29.150Z"
+    },
+    "hub-submit.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:10:45.400Z"
+    },
+    "host-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:11:01.147Z"
+    },
+    "host-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:11:17.603Z"
+    },
+    "host-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:11:32.628Z"
+    },
+    "loopback-flow.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:11:46.681Z"
+    },
+    "loopback-flow.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:12:00.579Z"
+    },
+    "viewer-peer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:12:15.552Z"
+    },
+    "viewer-peer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:12:30.983Z"
+    },
+    "viewer-peer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:12:47.159Z"
+    },
+    "suggestion-list.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:13:04.611Z"
+    },
+    "suggestion-list.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:13:20.537Z"
+    },
+    "suggestion-list.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:13:38.067Z"
+    },
+    "suggestion-list.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:13:54.533Z"
+    },
+    "message-author.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:14:11.951Z"
+    },
+    "message-author.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:14:28.592Z"
+    },
+    "viewer-composer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:14:44.583Z"
+    },
+    "viewer-composer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:14:59.680Z"
+    },
+    "viewer-composer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:15:16.782Z"
+    },
+    "viewer-composer.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:15:32.064Z"
+    },
+    "host-suggestions.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:15:50.533Z"
+    },
+    "host-suggestions.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:16:10.085Z"
+    },
+    "host-suggestions.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:16:29.080Z"
+    },
+    "e2e.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:16:44.941Z"
+    },
+    "e2e.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:17:00.317Z"
+    },
+    "e2e.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:17:17.365Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:17:34.802Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:17:51.649Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:18:07.315Z"
+    }
+  },
+  "feedback": [],
+  "agentModel": "claude-opus-5-5"
+}

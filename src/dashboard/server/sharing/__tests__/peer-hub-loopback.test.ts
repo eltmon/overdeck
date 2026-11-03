@@ -1,7 +1,8 @@
 /**
  * A real PeerHub on werift talking to a werift LoopbackViewer over loopback UDP (PRD PAN-4474 WI-7),
  * with a real ConversationBridge that parses a JSONL fixture through the production parser. Real
- * timers (the subject is real UDP I/O); every wait resolves on an event.
+ * timers (the subject is real UDP I/O); every wait resolves on an event. PAN-4476 adds two viewers
+ * exchanging a draft and a contributor submit acknowledged queued, then sent.
  */
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -61,6 +62,7 @@ const payloadOf = (envelope: SharedEnvelope) => envelope.payload as Conversation
 let dir: string;
 let hub: PeerHub | null = null;
 let viewer: LoopbackViewer | null = null;
+let others: LoopbackViewer[] = [];
 
 beforeEach(async () => {
   dir = await mkdtemp(join(tmpdir(), 'peer-hub-loopback-'));
@@ -71,6 +73,7 @@ afterEach(async () => {
   hub = null;
   await viewer?.close();
   viewer = null;
+  for (const other of others.splice(0)) await other.close();
   await rm(dir, { recursive: true, force: true });
 });
 
@@ -105,6 +108,11 @@ async function start(): Promise<{ emit: (result: ParseResult) => void; viewer: L
     {
       createPeerConnection: (config) => new RTCPeerConnection(config) as unknown as HubPeerConnection,
       bridge,
+      queue: {
+        deliver: async () => ({ status: 200, body: {} }),
+        activity: async () => ({ working: false, lastMessageId: null }),
+        now: () => Date.now(),
+      },
       streamLabel: async () => 'Fixture',
       now: () => Date.now(),
     },
@@ -120,6 +128,58 @@ async function start(): Promise<{ emit: (result: ParseResult) => void; viewer: L
     },
     viewer: loopback,
   };
+}
+
+/** Starts a hub with contributor 7 and viewer 8 on two loopback viewers; `deliver` records each prompt. */
+async function startTwo(): Promise<{ a: LoopbackViewer; b: LoopbackViewer; delivered: string[] }> {
+  const delivered: string[] = [];
+  const bridge = new ConversationBridge('conv-a', {
+    resolveSessionFile: async () => null,
+    parseInitial: async () => delta([]),
+    watch: () => ({ stop: () => undefined }),
+  });
+  const a = new LoopbackViewer();
+  const b = new LoopbackViewer();
+  others = [a, b];
+  const byId = new Map([[7, a], [8, b]]);
+  const peerHub = new PeerHub(
+    {
+      shortCode: 'ABC123',
+      scope,
+      sendFrame: (frame) => {
+        if (frame.type === 'signal') setImmediate(() => void byId.get(frame.githubId)?.onSignal(frame.data));
+        if (frame.type === 'ice-servers') setImmediate(() => peerHub.onIceServers([]));
+        return true;
+      },
+    },
+    {
+      createPeerConnection: (config) => new RTCPeerConnection(config) as unknown as HubPeerConnection,
+      bridge,
+      queue: {
+        deliver: async (text) => {
+          delivered.push(text);
+          return { status: 200, body: {} };
+        },
+        activity: async () => ({ working: false, lastMessageId: null }),
+        now: () => Date.now(),
+      },
+      streamLabel: async () => 'Fixture',
+      now: () => Date.now(),
+    },
+  );
+  hub = peerHub;
+  for (const [githubId, v] of byId) v.onOutgoingSignal((data) => setImmediate(() => peerHub.onSignal(githubId, data)));
+  peerHub.admit(7);
+  peerHub.admit(8);
+  const base = snapshot();
+  peerHub.onSnapshot({
+    ...base,
+    participants: [
+      { githubId: 7, login: 'alice', avatarUrl: 'https://a/7', state: 'admitted', contributor: true, connected: true },
+      { githubId: 8, login: 'bob', avatarUrl: 'https://a/8', state: 'admitted', contributor: false, connected: true },
+    ],
+  });
+  return { a, b, delivered };
 }
 
 describe('PeerHub over werift loopback', () => {
@@ -160,5 +220,24 @@ describe('PeerHub over werift loopback', () => {
       await v.waitFor((channel, envelope) => channel === 'conversation' && payloadOf(envelope).kind === 'append'),
     );
     expect(append.kind === 'append' ? append.message.text : null).toBe(text);
+  }, TIMEOUT_MS);
+});
+
+describe('PeerHub drafts and submits over werift loopback (PAN-4476)', () => {
+  it('relays a contributor draft to the other viewer and acknowledges a submit queued, then sent', async () => {
+    const { a, b, delivered } = await startTwo();
+    // Presence arrives only after the hello negotiated, so the hub now reads A's drafts and submits.
+    await a.waitFor((channel) => channel === 'presence');
+    a.send('drafts', { text: 'Try the fix', authorGithubId: 999 });
+    const draft = await b.waitFor((channel) => channel === 'drafts');
+    expect(draft.payload).toEqual({ authorGithubId: 7, authorLogin: 'alice', text: 'Try the fix', updatedAt: expect.any(Number) });
+
+    a.send('control', { kind: 'submit', clientId: 'c-1', text: 'Run the tests' });
+    const queued = await a.waitFor((channel, envelope) => channel === 'control' && (envelope.payload as { status?: string }).status === 'queued');
+    expect(queued.payload).toEqual({ kind: 'submit-ack', clientId: 'c-1', status: 'queued', position: 1 });
+    const sent = await a.waitFor((channel, envelope) => channel === 'control' && (envelope.payload as { status?: string }).status === 'sent');
+    expect(sent.payload).toEqual({ kind: 'submit-ack', clientId: 'c-1', status: 'sent' });
+    expect(delivered).toEqual(['Run the tests']);
+    expect(a.envelopes.get('drafts') ?? []).toEqual([]);
   }, TIMEOUT_MS);
 });

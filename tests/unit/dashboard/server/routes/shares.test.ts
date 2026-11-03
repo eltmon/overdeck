@@ -21,6 +21,7 @@ import { remoteRequestGateLayer } from '../../../../../src/dashboard/server/remo
 import { sharesRouteLayer } from '../../../../../src/dashboard/server/routes/shares.js';
 import { _resetDashboardSessionTokenForTests } from '../../../../../src/dashboard/server/routes/dashboard-auth.js';
 import { ShareManager, setShareManagerForTests, type ShareManagerDeps, type ShareSocket } from '../../../../../src/dashboard/server/services/share-host.js';
+import type { HostHub, PeerHubContext } from '../../../../../src/dashboard/server/sharing/peer-hub.js';
 
 const mocks = vi.hoisted(() => ({ byName: vi.fn() }));
 
@@ -53,7 +54,7 @@ let sockets: FakeSocket[];
 let store: Record<string, ShareRecord>;
 let signedIn: boolean;
 
-function fakeManager(): ShareManager {
+function fakeManager(createHub?: (ctx: PeerHubContext) => HostHub): ShareManager {
   const deps: ShareManagerDeps = {
     readAccount: async () => (signedIn
       ? { v: 1, baseUrl: 'https://overdeck.ai', accessToken: `odd_${'a'.repeat(64)}`, deviceId: 'd', label: 'desk', githubLogin: 'owner', githubId: 1, signedInAt: '2026-11-01T00:00:00.000Z' }
@@ -80,6 +81,7 @@ function fakeManager(): ShareManager {
       return socket;
     },
     now: () => new Date('2026-11-02T00:00:00.000Z'),
+    ...(createHub ? { createHub } : {}),
   };
   return new ShareManager(deps);
 }
@@ -239,5 +241,56 @@ describe('/api/shares (PAN-4473)', () => {
     await call('DELETE', '/api/shares/BCDFGHJK');
     expect(bodies).toHaveLength(8);
     for (const text of bodies) expect(text).not.toMatch(HOST_TOKEN_RE);
+  });
+});
+
+/** A hub that queues every controller send at position 1. */
+function stubHub(sent: unknown[]): HostHub {
+  return {
+    admit: () => undefined,
+    remove: () => undefined,
+    onSnapshot: () => undefined,
+    onSignal: () => undefined,
+    onIceServers: () => undefined,
+    onIceServersUnavailable: () => undefined,
+    draftsView: () => [],
+    queueView: () => ({ agentWorking: false, delivering: false, items: [] }),
+    sendFromController: (input) => {
+      sent.push(input);
+      return { ok: true, position: 1 };
+    },
+    close: () => undefined,
+  };
+}
+
+describe('POST /api/shares/:code/prompts (PAN-4476)', () => {
+  it('400s invalid bodies with invalid_request', async () => {
+    for (const bad of [{ text: 5 }, { text: 'x', draftGithubId: 0 }, { text: 'x', draftGithubId: 1.5 }, {}]) {
+      expect(await call('POST', '/api/shares/BCDFGHJK/prompts', bad)).toMatchObject({ status: 400, body: { error: 'invalid_request' } });
+    }
+  });
+
+  it('404s a malformed code and 409s a share with no live hub', async () => {
+    expect(await call('POST', '/api/shares/nope/prompts', { text: 'Go' })).toMatchObject({ status: 404, body: { error: 'share_not_found' } });
+    await call('POST', '/api/shares', { conversationName: 'conv-a' });
+    expect(await call('POST', '/api/shares/BCDFGHJK/prompts', { text: 'Go' })).toMatchObject({ status: 409, body: { error: 'share_not_live' } });
+  });
+
+  it('answers 202 with the queue position for a valid body', async () => {
+    const sent: unknown[] = [];
+    setShareManagerForTests(fakeManager(() => stubHub(sent)));
+    await call('POST', '/api/shares', { conversationName: 'conv-a' });
+    await connect();
+    const answer = await call('POST', '/api/shares/bcdf-ghjk/prompts', { text: 'Go', draftGithubId: 7 });
+    expect(answer).toMatchObject({ status: 202, body: { ok: true, position: 1 } });
+    expect(answer.headers['cache-control']).toBe('no-store');
+    expect(sent).toEqual([{ text: 'Go', draftGithubId: 7 }]);
+    for (const text of bodies) expect(text).not.toMatch(HOST_TOKEN_RE);
+  });
+
+  it('401s an uncredentialed request from a non-loopback peer', async () => {
+    const gated = Layer.mergeAll(remoteRequestGateLayer, sharesRouteLayer);
+    const lan = { credential: false, peer: '192.0.2.44', layer: gated };
+    expect((await call('POST', '/api/shares/BCDFGHJK/prompts', { text: 'Go' }, lan)).status).toBe(401);
   });
 });
