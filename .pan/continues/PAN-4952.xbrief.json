@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4952",
   "created": "2026-11-03T21:44:01.651Z",
-  "updated": "2026-11-03T22:13:25.110Z",
+  "updated": "2026-11-03T22:13:42.906Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,10 @@
     "skill-text.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T22:13:25.110Z"
+    },
+    "sync-script.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:13:42.906Z"
     }
   }
 }
