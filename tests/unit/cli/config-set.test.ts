@@ -55,6 +55,12 @@ describe('pan admin config set (D-4651-21)', () => {
     expect(err[0]).toContain('dotted snake_case');
   });
 
+  it('PAN-4905 ac9: remote.enabled refuses, names config.toml, and writes nothing', async () => {
+    expect(await configSetCommand('remote.enabled', 'true', deps())).toBe(1);
+    expect(err[0]).toContain('config.toml');
+    expect(() => readFileSync(join(home, 'config.yaml'), 'utf8')).toThrow();
+  });
+
   it('ac26: a value that makes the config fail to load restores the previous text', async () => {
     const before = '# keep me\nresources:\n  quality_gate_slots: 2\n';
     writeFileSync(join(home, 'config.yaml'), before);

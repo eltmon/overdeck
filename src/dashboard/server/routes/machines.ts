@@ -41,6 +41,9 @@ import { classifyHost, parseRouteUrl } from '../../../lib/anywhere/routes.js';
 import { FLY_MACHINE_ERROR_STATUS, FlyMachineError } from '../../../lib/anywhere/fly/provision.js';
 import { SshMachineError } from '../../../lib/anywhere/ssh/target.js';
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
+import { loadConfig } from '../../../lib/config.js';
+import { displayPath } from '../../../lib/remote-enabled.js';
+import { CONFIG_FILE } from '../../../lib/paths.js';
 import { closeChannelsForPeer } from '../channel-listener.js';
 import { channelOfRequest } from '../channel-peer.js';
 import { closeDeviceConnections } from '../device-connections.js';
@@ -97,7 +100,7 @@ function inboundView(record: PublicAccessTokenRecord): InboundMachineView {
 }
 
 export async function buildMachinesResponse(): Promise<MachinesResponse> {
-  const [identity, key, links, settings] = await Promise.all([ensureEnvironmentIdentity(), ensureMachineKey(), listLinks(), readAnywhereSettings()]);
+  const [identity, key, links, settings, config] = await Promise.all([ensureEnvironmentIdentity(), ensureMachineKey(), listLinks(), readAnywhereSettings(), loadConfig()]);
   const sshInfos = await Promise.all(links.map((link) => sshInfoForLink(link.id)));
   return {
     self: {
@@ -110,6 +113,9 @@ export async function buildMachinesResponse(): Promise<MachinesResponse> {
       load: currentMachineLoad(),
       tags: currentMachineProfile()?.tags ?? [],
       placement: currentMachineProfile()?.placement ?? 'auto',
+      // PAN-4905: the Add a Fly machine dialog reads this before the click.
+      remoteEnabled: config.remote?.enabled === true,
+      remoteConfigFile: displayPath(CONFIG_FILE),
     },
     links: links.map((link, index) => {
       const view = statusSource ? machineLinkView(link, null, statusSource) : machineLinkView(link, null);

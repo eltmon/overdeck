@@ -17,6 +17,7 @@ import { HttpRouter, HttpServerRequest, type HttpServerResponse } from 'effect/u
 
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
 import { FLY_MACHINE_ERROR_STATUS, FlyMachineError } from '../../../lib/anywhere/fly/provision.js';
+import { displayPath, enableRemoteInConfigToml, RemoteEnableError } from '../../../lib/remote-enabled.js';
 import { channelOfRequest } from '../channel-peer.js';
 import { jsonResponse } from '../http-helpers.js';
 import { addFlyMachine, type AddFlyMachineInput } from '../services/fly-machine-service.js';
@@ -86,5 +87,40 @@ export const machinesFlyRouteLayer = HttpRouter.add(
       details: JSON.stringify({ linkId: link.id, environmentId: link.environmentId, machineId: record.machineId, projectKey: record.projectKey, docker: record.docker }),
     });
     return jsonResponse({ link, record, ...(conversation ? { conversation } : {}) }, { status: 201 });
+  }),
+);
+
+/**
+ * `POST /api/machines/fly/enable-remote` (PAN-4905): sets `[remote] enabled =
+ * true` in config.toml via a targeted line edit, then the Add a Fly machine
+ * dialog refetches `GET /api/machines` to re-enable Add. Like
+ * `POST /api/machines/fly` it refuses a secure-channel request and is not in
+ * `route-scopes.ts` (needs `admin`).
+ */
+export const machinesFlyEnableRemoteRouteLayer = HttpRouter.add(
+  'POST',
+  '/api/machines/fly/enable-remote',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    if (channelOfRequest(request) !== null) {
+      return jsonResponse({ error: 'a linked machine cannot change remote settings here' }, { status: 403 });
+    }
+    const refused = rejectUnsafeDashboardMutationRequest(request);
+    if (refused) return refused;
+    const outcome = yield* Effect.promise(() => enableRemoteInConfigToml().then(
+      (value) => ({ ok: true as const, value }),
+      (error: unknown) => ({ ok: false as const, error }),
+    ));
+    if (!outcome.ok) {
+      const error = outcome.error;
+      const message = error instanceof RemoteEnableError ? error.message : (error as Error).message;
+      return jsonResponse({ error: 'remote-enable-failed', message }, { status: error instanceof RemoteEnableError ? 409 : 500 });
+    }
+    const { changed, path } = outcome.value;
+    const configFile = displayPath(path);
+    if (changed) {
+      emitActivityEntry({ source: 'dashboard', level: 'info', message: `Turned on remote ([remote] enabled = true in ${configFile})` });
+    }
+    return jsonResponse({ ok: true, changed, configFile }, { status: 200 });
   }),
 );

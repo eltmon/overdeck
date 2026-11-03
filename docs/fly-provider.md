@@ -160,6 +160,11 @@ auto_stop_timeout = 300
 | `remote.fly.auto_stop_timeout` | `300` | Idle timeout in seconds |
 | `remote.fly.api_token_env` | `"FLY_API_TOKEN"` | Environment variable name for the API token |
 
+Every `remote.*` key above lives in `~/.overdeck/config.toml`. The global
+`~/.overdeck/config.yaml` has its own `remote:` section, but it holds only
+`resiliency_tier` and `max_concurrent_agents` — not `enabled` or any other key
+in this table (PAN-4905).
+
 ---
 
 ## Building the pan-workspace Image
