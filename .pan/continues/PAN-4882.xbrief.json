@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4882",
   "created": "2026-11-03T06:27:51.535Z",
-  "updated": "2026-11-03T06:31:19.891Z",
+  "updated": "2026-11-03T06:31:29.521Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-4882",
       "claimedAt": "2026-11-03T06:27:51.535Z",
       "doneAt": "2026-11-03T06:31:19.891Z"
+    },
+    "relay-vm-signin": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4882",
+      "claimedAt": "2026-11-03T06:31:29.520Z"
     }
   }
 }
