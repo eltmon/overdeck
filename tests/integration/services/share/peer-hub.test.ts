@@ -262,6 +262,7 @@ describe('PeerHub through the share service on real workerd (PAN-4474)', () => {
               return { stop: () => undefined };
             },
           }),
+          terminal: { attach: async () => () => undefined, close: () => undefined },
           streamLabel: async () => 'Fixture',
           now: () => Date.now(),
         });

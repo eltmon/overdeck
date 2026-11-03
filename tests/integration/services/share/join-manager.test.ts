@@ -186,6 +186,7 @@ async function startHost(conversationId: string): Promise<Host> {
           return { stop: () => undefined };
         },
       }),
+      terminal: { attach: async () => () => undefined, close: () => undefined },
       streamLabel: async () => 'Fixture',
       now: () => Date.now(),
     }),
