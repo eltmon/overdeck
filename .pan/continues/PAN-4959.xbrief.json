@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4959",
   "created": "2026-11-03T21:54:38.804Z",
-  "updated": "2026-11-03T23:11:14.193Z",
+  "updated": "2026-11-03T23:17:28.875Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -68,6 +68,10 @@
       "claimedBy": "agent-pan-4959",
       "claimedAt": "2026-11-03T23:09:56.798Z",
       "doneAt": "2026-11-03T23:11:14.192Z"
+    },
+    "connect-account-view.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:17:28.874Z"
     }
   }
 }
