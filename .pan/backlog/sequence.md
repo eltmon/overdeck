@@ -1,11 +1,12 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T03:09:44.218529Z · model: claude-opus-5-5 · open: 870_
+_Last sequenced: 2026-11-03T03:11:10.908937Z · model: claude-opus-5-5 · open: 871_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4702 | S | critical | ok |  |  | Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs. |
+| 2 | PAN-4869 | S | medium | ok |  |  | In pipeline (planning): add a Machines sidebar entry, palette actions and a Home setup row so Anywhere is discoverable. |
 | 3 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 4 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install aborts workspace creation (since #4163); reproduced 2026-11-02 on botland too, so every polyrepo start fails. |
 | 7 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
@@ -882,6 +883,10 @@ _Last sequenced: 2026-11-03T03:09:44.218529Z · model: claude-opus-5-5 · open: 
 
 New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.
 
+### PAN-4869 (rank 2)
+
+New issue already in the pipeline, so it is pinned into the free rank 2 without moving any other node; it is a small frontend-only discoverability change with clear acceptance items.
+
 ### PAN-4636 (rank 3)
 
 New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.
@@ -1194,10 +1199,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 
 New this pass. shouldHoldForUat is consulted on exactly one merge path, so every other path merges a ready issue without asking whether its project holds for UAT — verified at code level on a real MIN-901 merge. This defeats the batch-train model directly: issues merge one at a time before a generation can assemble them.
 
-### PAN-3100 (rank 81)
-
-New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1205,10 +1206,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T03:09:44.218529Z",
+  "generatedAt": "2026-11-03T03:11:10.908937Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 870,
+  "openCount": 871,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -1220,6 +1221,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "dependsOn": [],
       "why": "Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs.",
       "rationale": "New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4869",
+      "rank": 2,
+      "size": "S",
+      "importance": "medium",
+      "score": 55,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline (planning): add a Machines sidebar entry, palette actions and a Home setup row so Anywhere is discoverable.",
+      "rationale": "New issue already in the pipeline, so it is pinned into the free rank 2 without moving any other node; it is a small frontend-only discoverability change with clear acceptance items.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -5032,6 +5046,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "why": "Finish src/lib Effect migration: remove or justify legacy Promise/sync surfaces",
       "gate": "auto",
       "planning": "interactive"
+    },
+    {
+      "issue": "PAN-4863",
+      "rank": 307,
+      "size": "S",
+      "importance": "medium",
+      "score": 45,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Manual AC-10 check of Anywhere connect on a real systemd VPS; needs a release shipping `pan connect` and a human-provisioned VPS.",
+      "rationale": "New issue split out of in-pipeline PAN-4774: Fly VMs lack systemd as PID 1, so AC-10 (connect survives logout and reboot) must run on a real VPS against the first release that ships `pan connect`. It is an operator-run verification step, so it takes free rank 307 beside the Anywhere epic and moves no other node.",
+      "gate": "auto",
+      "planning": "auto"
     },
     {
       "issue": "PAN-1246",
@@ -12068,19 +12095,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "dependsOn": [],
       "why": "Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them",
       "rationale": "Rank kept at the bottom: PAN-4820 closed so the dependency is dropped, but the operator still parks this undecided low-priority question.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4863",
-      "rank": 307,
-      "size": "S",
-      "importance": "medium",
-      "score": 45,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Manual AC-10 check of Anywhere connect on a real systemd VPS; needs a release shipping `pan connect` and a human-provisioned VPS.",
-      "rationale": "New issue split out of in-pipeline PAN-4774: Fly VMs lack systemd as PID 1, so AC-10 (connect survives logout and reboot) must run on a real VPS against the first release that ships `pan connect`. It is an operator-run verification step, so it takes free rank 307 beside the Anywhere epic and moves no other node.",
       "gate": "auto",
       "planning": "auto"
     }
