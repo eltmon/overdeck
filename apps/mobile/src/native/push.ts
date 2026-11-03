@@ -9,7 +9,7 @@
 import { Capacitor, type PermissionState, type PluginListenerHandle } from '@capacitor/core';
 import { PushNotifications, type PushNotificationsPlugin } from '@capacitor/push-notifications';
 import type { DirectoryWebState } from '@overdeck/anywhere-channel/web';
-import type { ApsEnvironment, ClientPlatform, ClientToDirectoryFrame } from '@overdeck/contracts';
+import type { ApsEnvironment, ClientToDirectoryFrame, PhonePlatform } from '@overdeck/contracts';
 import { useCallback, useSyncExternalStore } from 'react';
 
 import { OverdeckKeys, type OverdeckKeysPlugin } from './keys';
@@ -66,7 +66,7 @@ export interface PushController {
 export interface PushDeps {
   directory: PushDirectory;
   /** `shellPlatform()`. */
-  platform: ClientPlatform;
+  platform: PhonePlatform;
   plugin?: Pick<PushNotificationsPlugin, 'checkPermissions' | 'requestPermissions' | 'register' | 'addListener'>;
   keys?: Pick<OverdeckKeysPlugin, 'pushEnvironment'>;
   log?: (message: string, error?: unknown) => void;

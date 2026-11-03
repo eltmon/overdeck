@@ -26,6 +26,8 @@ export const INBOX_HOLD_MS = 86_400_000
 export const APPROVAL_TTL_MS = 600_000
 /** Phones (directory clients) one account may register (PAN-4823 D-2, NFR-3). Clients never count as machines. */
 export const CLIENT_LIMIT = 5
+/** PAN-4927 D-18: connectors are counted apart from phones. */
+export const CONNECTOR_LIMIT = 10
 /** Pushes the directory forwards per account per minute (PAN-4823 D-9). */
 export const PUSH_RATE_PER_MINUTE = 30
 /**
@@ -43,6 +45,7 @@ export const FREE_MACHINE_LIMIT_MESSAGE = "The free account includes 3 machines"
 export const NO_DIRECT_PATH_MESSAGE = "No direct path; install Tailscale or use the relay plan"
 export const RELAY_CAP_MESSAGE = "Relay allowance used; install Tailscale or add 50 GB"
 export const CLIENT_LIMIT_MESSAGE = "This account already has 5 phones. Remove one in the app or on a machine."
+export const CONNECTOR_LIMIT_MESSAGE = "This account already has 10 Overdeck connectors. Remove one in Settings → Anywhere → Bots."
 
 /** WebSocket close codes the directory uses. */
 export const CONNECT_CLOSE_CODES = {
@@ -53,7 +56,7 @@ export const CONNECT_CLOSE_CODES = {
   /** Replaced by a newer socket for the same machine. */
   replaced: 4011,
   forgotten: 4012,
-  /** A sixth phone on one account (PAN-4823 D-2). */
+  /** A sixth phone or an eleventh connector on one account (PAN-4823 D-2, PAN-4927 D-18). */
   clientLimit: 4013,
 } as const
 export type ConnectCloseCode = (typeof CONNECT_CLOSE_CODES)[keyof typeof CONNECT_CLOSE_CODES]
@@ -94,8 +97,10 @@ export interface RelayStatus {
 
 export type SignalPurpose = "link" | "approval"
 
-/** The phone app's platform. */
-export type ClientPlatform = "ios" | "android"
+/** A phone's platform: the only platforms that can hold a push registration. */
+export type PhonePlatform = "ios" | "android"
+/** A directory client's platform: a phone, or `node` for an Overdeck connector (PAN-4927 D-18). */
+export type ClientPlatform = PhonePlatform | "node"
 /** Which APNs host a token belongs to: Debug builds register `sandbox`, Release builds `production`. */
 export type ApsEnvironment = "production" | "sandbox"
 /** `high` for question, approval and failed; else `normal` (the Web Push rule). */
@@ -238,7 +243,8 @@ export type ClientToDirectoryFrame =
     readonly label: string
     /**
      * The phone's install-level X25519 public key: its push public key (PAN-4837 C-2), 64 lowercase
-     * hex. Link keys are per machine.
+     * hex. Link keys are per machine. A `node` client (connector) sends its install key here, not a
+     * push key.
      */
     readonly publicKeyHex: string
     /** At most 32 characters. */
@@ -258,7 +264,7 @@ export type ClientToDirectoryFrame =
   }
   | Extract<MachineToDirectoryFrame, { type: "ice-servers" | "relay-usage" }>
   /** `token` is at most 4096 characters; `apsEnvironment` is sent by iOS only. */
-  | { readonly type: "push-register"; readonly platform: ClientPlatform; readonly token: string; readonly apsEnvironment?: ApsEnvironment }
+  | { readonly type: "push-register"; readonly platform: PhonePlatform; readonly token: string; readonly apsEnvironment?: ApsEnvironment }
   | { readonly type: "push-unregister" }
   | { readonly type: "forget-client" }
 

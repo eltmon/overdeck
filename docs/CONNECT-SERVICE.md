@@ -28,12 +28,13 @@ The overdeck.ai directory, the WebRTC introduction, the relay add-on's credentia
 
 The wire protocol is `packages/contracts/src/connect.ts` (runtime-import-free so the Worker imports it by relative path); the dashboard's `GET /api/directory` view is `packages/contracts/src/connect-view.ts`.
 
-`connect.ts` also carries the phone app's frames (PAN-4823): `ClientToDirectoryFrame`, `DirectoryToClientFrame`, the machine's `push` and the directory's `push-result`, with `CLIENT_LIMIT`, `PUSH_RATE_PER_MINUTE` and `PUSH_SEALED_MAX_CHARS`. The directory serves the client role (PAN-4829, "Phone clients" below). The directory forwards sealed push to APNs and FCM (PAN-4830, "Phone push" below).
+`connect.ts` also carries the phone app's frames (PAN-4823): `ClientToDirectoryFrame`, `DirectoryToClientFrame`, the machine's `push` and the directory's `push-result`, with `CLIENT_LIMIT`, `CONNECTOR_LIMIT`, `PUSH_RATE_PER_MINUTE` and `PUSH_SEALED_MAX_CHARS`. The directory serves the client role (PAN-4829, "Clients: phones and connectors" below). The directory forwards sealed push to APNs and FCM (PAN-4830, "Phone push" below).
 
-## Phone clients (PAN-4829)
+## Clients: phones and connectors (PAN-4829, PAN-4927)
 
-- **Role.** A socket's first valid hello fixes its role: `hello` makes it a machine, `hello-client` a phone. The decoder then accepts only that role's frames; a cross-role frame is `bad_frame`.
+- **Role.** A socket's first valid hello fixes its role: `hello` makes it a machine, `hello-client` a client. The decoder then accepts only that role's frames; a cross-role frame is `bad_frame`. A client's `platform` is `ios` or `android` (a phone) or `node` (an Overdeck connector, `pan mcp connector`, PAN-4927 D-18).
 - **Phone key.** A phone's `hello-client.publicKeyHex` is its install-level push public key (PAN-4837 C-2). Link keys are per machine and never reach the directory.
+- **Connector.** A connector sends the same frames as a phone; its `hello-client.publicKeyHex` is its install key, not a push key. `push-register` from a `node` client is always `bad_frame`. A re-hello that changes a client's family (phone ↔ connector) counts against the new family's cap and clears its push registration.
 - **Welcome.** `welcome-client` carries the protocol, the plan, `relayAllowed` and the account's machines with their online state.
 - **Broadcasts.** Phones receive every `directory` frame machines receive and every `relay-status`, but never approvals or inbox frames. No machine frame ever lists a phone.
 - **Signals.** A phone signals an online machine with `purpose: 'link'` only, and the machine sees `from` = the phone's `clientId`. A machine's `link` signal to an online phone arrives with `from` = its environment id. Phone to phone is `bad_frame`; an offline target is `peer_offline`.
@@ -65,6 +66,7 @@ The wire protocol is `packages/contracts/src/connect.ts` (runtime-import-free so
 
 - **Machines:** a `free` account holds at most 3 (`hello` for a fourth environment id → `error machine_limit` "The free account includes 3 machines", close 4009). `tester` (every allowlisted account until billing) has no limit.
 - **Phones (clients):** at most 5 per account on every plan (`hello-client` for a sixth `clientId` → `error client_limit` "This account already has 5 phones. Remove one in the app or on a machine.", close 4013). Phones never count against the machine limit. One socket per phone (a newer one closes the older with 4011); `forget-client` deletes the phone and closes with 4012.
+- **Connectors (clients):** at most 10 per account on every plan (`hello-client` with `platform: node` for an eleventh `clientId` → `error client_limit` "This account already has 10 Overdeck connectors. Remove one in Settings → Anywhere → Bots.", close 4013). Connectors never count against the machine or phone limit.
 - **Sockets:** one per machine; a newer socket for the same machine closes the older with 4011. `forget` closes with 4012. `ping`/`pong` is a runtime auto-response, so an idle socket never wakes the object.
 - **Approvals:** 1 pending request per requesting machine, 5 per account, 10-minute expiry.
 - **Relay:** 50 GB (`RELAY_MONTHLY_CAP_BYTES`) per account per UTC calendar month; each `relay-usage` report (from a machine or a phone) broadcasts the month's `relay-status` to every machine and phone, the report that reaches the cap broadcasts `relay-status { stopped: true }`, and later credential requests answer `relay_cap_reached`.
@@ -102,6 +104,8 @@ npm run build:dry                     # bundle with no credentials and no upload
 ## Deploy
 
 Operator-only. **No agent deploys** and no agent runs any of the commands below. The custom-domain route in `wrangler.jsonc` creates the `connect.overdeck.ai` DNS record on first deploy.
+
+An older deployed directory refuses `hello-client` with `platform: node` as `bad_frame` (it predates PAN-4927 D-18), so this deploy must land before any `@overdeck/core` release ships the connector (PAN-4927 CP-5).
 
 1. `npm run build:dry` in `services/connect` exits 0.
 2. Deploy `services/account` first (`docs/ACCOUNT-SERVICE.md`, "Deploy"); the `ACCOUNT` binding needs `overdeck-account` with its `AccountRpc` entrypoint returning `entitlement`, or every directory socket answers `account_service_outdated`.
