@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T18:08:10.386219Z · model: claude-opus-5-5 · open: 867_
+_Last sequenced: 2026-11-03T18:25:53.135573Z · model: claude-opus-5-5 · open: 865_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -397,7 +397,6 @@ _Last sequenced: 2026-11-03T18:08:10.386219Z · model: claude-opus-5-5 · open: 
 | 397 | PAN-3829 | L | medium | ok |  |  | Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main) |
 | 398 | PAN-2280 | M | medium | ok |  |  | Resumed conversations wedge without writing transcripts when dashboard is black-holed |
 | 399 | PAN-2197 | S | medium | ok |  |  | work agents skip `pan done` (manual push instead) |
-| 400 | PAN-4477 | S | medium | ok |  |  | Shared Sessions slice 6: read-only terminal channel over the pty-hub byte stream |
 | 401 | PAN-2069 | XS | medium | ok |  |  | caveman: follow-up gaps |
 | 402 | PAN-1918 | XS | medium | ok |  |  | full frontend vitest suite runs in no CI path |
 | 403 | PAN-1912 | XS | medium | ok |  |  | Pi agent transcripts hide tool-call detail; agent panes lack the Tools show/hide toggle |
@@ -448,7 +447,7 @@ _Last sequenced: 2026-11-03T18:08:10.386219Z · model: claude-opus-5-5 · open: 
 | 448 | PAN-4151 | L | medium | needs-refinement |  | PAN-3822 | Deferred remainder of PAN-3822/#4067: GitLab MR sync, PR page + search, handoff link copy, diffstat, link-dialog a11y, sync throttle |
 | 449 | PAN-1330 | S | medium | ok |  |  | CLI cannot address planning-*/specialist-* sessions |
 | 450 | PAN-4481 | M | medium | ok |  |  | Shared Sessions slice 10: hosted web join page; awaits operator decision OD-1 on sign-in without a local install |
-| 451 | PAN-4482 | S | medium | ok |  | PAN-4477, PAN-4478, PAN-4479, PAN-4480, PAN-4481 | Shared Sessions slice 11: signaling-privacy e2e, forced-TURN check (operator checkpoint) and full AC sweep |
+| 451 | PAN-4482 | S | medium | ok |  | PAN-4478, PAN-4479, PAN-4480, PAN-4481 | Shared Sessions slice 11: signaling-privacy e2e, forced-TURN check (operator checkpoint) and full AC sweep |
 | 452 | PAN-1226 | L | medium | ok |  |  | PAN-1148 unified-dashboard redesign |
 | 453 | PAN-1173 | S | medium | ok |  |  | pan show <bare-number> derives wrong agent ID for PAN-prefixed issues |
 | 454 | PAN-1154 | M | medium | ok |  |  | pan up does not kill existing port holders |
@@ -598,8 +597,7 @@ _Last sequenced: 2026-11-03T18:08:10.386219Z · model: claude-opus-5-5 · open: 
 | 600 | PAN-958 | M | medium | ok |  |  | Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
 | 601 | PAN-949 | M | medium | ok |  |  | feat: add conversation for project from sidebar |
 | 602 | PAN-3157 | XS | medium | ok |  |  | Rescoped: Awareness rail should show conv-flywheel as the Flywheel with its last tick (derive-status.ts) and link to /flywheel. |
-| 603 | PAN-4905 | XS | low | ok |  |  | Add a Fly machine error says 'the Overdeck config' but remote.enabled is read only from config.toml; name the file and key exactly. |
-| 604 | PAN-4908 | S | low | ok |  | PAN-4905 | Other remote-not-enabled messages name no file and the dead verb 'pan remote setup'; reuse PAN-4905's remoteEnabledHint(). |
+| 604 | PAN-4908 | S | low | ok |  |  | Other remote-not-enabled messages name no file and the dead verb 'pan remote setup'; reuse PAN-4905's remoteEnabledHint(). |
 | 605 | PAN-947 | M | medium | ok |  |  | feat: project management actions in unified sidebar |
 | 606 | PAN-938 | M | medium | ok |  |  | Fizzy visual pipeline |
 | 607 | PAN-903 | M | medium | ok |  |  | Detect ~/.claude.json corruption on startup and surface it in the dashboard |
@@ -1202,10 +1200,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T18:08:10.386219Z",
+  "generatedAt": "2026-11-03T18:25:53.135573Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 867,
+  "openCount": 865,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -6110,18 +6108,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
-      "issue": "PAN-4477",
-      "rank": 400,
-      "size": "S",
-      "importance": "medium",
-      "score": 54,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Shared Sessions slice 6: read-only terminal channel over the pty-hub byte stream",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2069",
       "rank": 401,
       "size": "XS",
@@ -6743,14 +6729,13 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "score": 50,
       "condition": "ok",
       "dependsOn": [
-        "PAN-4477",
         "PAN-4478",
         "PAN-4479",
         "PAN-4480",
         "PAN-4481"
       ],
       "why": "Shared Sessions slice 11: signaling-privacy e2e, forced-TURN check (operator checkpoint) and full AC sweep",
-      "rationale": "Rank held: dependency PAN-4475 (Shared Sessions slice 4, viewer surface) closed completed on 2026-11-03; remaining slices still gate this sweep.",
+      "rationale": "Dependency PAN-4477 (slice 6 read-only terminal channel) closed on 2026-11-03, so its edge is dropped; rank holds.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11943,18 +11928,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
-      "issue": "PAN-4905",
-      "rank": 603,
-      "size": "XS",
-      "importance": "low",
-      "score": 36,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Add a Fly machine error says 'the Overdeck config' but remote.enabled is read only from config.toml; name the file and key exactly.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4906",
       "rank": 458,
       "size": "S",
@@ -11974,11 +11947,9 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "importance": "low",
       "score": 34,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4905"
-      ],
+      "dependsOn": [],
       "why": "Other remote-not-enabled messages name no file and the dead verb 'pan remote setup'; reuse PAN-4905's remoteEnabledHint().",
-      "rationale": "New follow-up split from PAN-4905; placed directly after it because it is blocked on the helper PAN-4905 adds.",
+      "rationale": "Its blocker PAN-4905 closed on 2026-11-03, so the remoteEnabledHint() helper exists; rank holds at 604 and the issue is now unblocked.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12830,13 +12801,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "confidence": 1
     },
     {
-      "from": "PAN-4477",
-      "to": "PAN-4482",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4478",
       "to": "PAN-4482",
       "type": "unblocks",
@@ -13241,13 +13205,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
-    },
-    {
-      "from": "PAN-4905",
-      "to": "PAN-4908",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
     },
     {
       "from": "PAN-4917",
