@@ -13,7 +13,7 @@ import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from
 import { MACHINE_TOKEN_SCOPES } from '../../../../lib/access-tokens.js';
 import { LinkUnavailableError } from '../../../../lib/anywhere/link-client.js';
 import { markConversationReleased } from '../../../../lib/overdeck/conversation-release.js';
-import { createConversation, getConversationByName, setConversationClaudeSessionId } from '../../../../lib/overdeck/conversations.js';
+import { createConversation, getConversationByName, setConversationClaudeSessionId, updateConversationTitle } from '../../../../lib/overdeck/conversations.js';
 import type { SettleOptions, SettleResult } from '../../../../lib/vault/settle.js';
 import type { DashboardCredential } from '../../routes/dashboard-auth.js';
 import { handleRelease, handleReleaseComplete, handleReleaseUndo } from '../../routes/conversation-pull.js';
@@ -88,6 +88,17 @@ describe('owner release (PAN-4650 WI-9)', () => {
     expect(deps.stop).toHaveBeenCalledWith(NAME);
     const pack = await readTransferPack(NAME, body.transferId as string, deps);
     expect(pack?.length).toBe(body.bytes);
+  });
+
+  it('ac1 (PAN-4904): passes the owner conversation title as recordTitle', async () => {
+    updateConversationTitle(NAME, 'Add a --json flag that prints the counts as JSON, and a test for it.');
+    await handleRelease(machine(), NAME, { to: VIEWER }, deps);
+    expect(settleCalls[0]!.recordTitle).toBe('Add a --json flag that prints the counts as JSON, and a test for it.');
+  });
+
+  it('ac2 (PAN-4904): an untitled owner conversation settles without a recordTitle', async () => {
+    await handleRelease(machine(), NAME, { to: VIEWER }, deps);
+    expect('recordTitle' in settleCalls[0]!).toBe(false);
   });
 
   it("'stop' aborts a running turn first", async () => {

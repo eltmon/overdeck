@@ -12,4 +12,5 @@
   ],
   "vars": { "PUBLIC_BASE_URL": "https://connect.overdeck.ai", "STUN_URLS": "stun:stun.cloudflare.com:3478" }
   // TURN_KEY_ID, TURN_KEY_API_TOKEN: Worker secrets set by the operator (docs/CONNECT-SERVICE.md "Deploy").
+  // APNS_KEY_P8, APNS_KEY_ID, APNS_TEAM_ID, FCM_SERVICE_ACCOUNT_JSON, FCM_PROJECT_ID: Worker secrets for phone push (PAN-4830).
 }

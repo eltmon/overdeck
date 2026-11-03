@@ -27,7 +27,23 @@ machine's root token.
 ## Set up a phone
 
 On the machine, open Settings → Anywhere → **Set up a phone**. The dialog has
-four steps:
+two tabs: **Overdeck app** (first) and **Browser on the phone**.
+
+### Overdeck app
+
+This machine must be signed in to overdeck.ai first (`pan account login`);
+otherwise the tab says so and shows no code.
+
+Install Overdeck from Google Play or the App Store, select
+**Create pairing code**, and scan the QR code with the app. The code works
+once and expires after 10 minutes; select **Create another code** for a new
+one. The tab lists the phones paired with this machine; **Remove** signs a
+phone out of this machine and closes its open connections. No Tailscale is
+needed for the app.
+
+### Browser on the phone
+
+The dialog has four steps:
 
 1. **Install Tailscale.** Scan the QR code with the phone, install Tailscale,
    and sign in with the same account as the machine.

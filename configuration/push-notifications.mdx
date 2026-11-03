@@ -6,8 +6,9 @@ description: "Get a phone notification when an agent or conversation needs you, 
 # Push notifications
 
 When an agent or conversation stops to wait for you, Overdeck can tell your
-phone. Your own machine sends the notification. No relay and no overdeck.ai
-service is involved.
+phone. Your own machine sends the notification. For Web Push and ntfy, no
+relay and no overdeck.ai service is involved; notifications for the Overdeck app
+pass through connect.overdeck.ai as ciphertext that only the phone can open.
 
 ## What you get
 
@@ -115,6 +116,18 @@ The dashboard reads the block on every send, so changes apply without a
 restart. A bad value never stops the dashboard from starting: invalid entries
 are ignored, and a bad ntfy setting shows its reason in the Phone notifications
 panel.
+
+## The Overdeck app
+
+Each phone paired with the Overdeck app receives every needs-you notification,
+sealed with `crypto_box_seal` to that phone's own push key. Your machine sends
+the sealed notification to connect.overdeck.ai, which forwards the ciphertext to
+Apple or Google; neither overdeck.ai nor Apple or Google can read it. A
+notification holds at most 2,256 bytes, so a long body is shortened and ends
+with `…`. The machine must be signed in to overdeck.ai and connected to it.
+Settings → Anywhere → Phone notifications shows the count, such as
+`Overdeck app: 2 phones`, and removing a phone from the device list stops its
+notifications within 5 seconds. To pair a phone, see [Phone](/configuration/phone).
 
 ## Optional: ntfy
 

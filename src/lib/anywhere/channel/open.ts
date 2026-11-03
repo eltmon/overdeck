@@ -119,7 +119,13 @@ function connectTransport(url: TransportUrl, signal: AbortSignal): Promise<Duple
       signal.addEventListener('abort', onAbort, { once: true });
       socket.once('error', (error) => {
         signal.removeEventListener('abort', onAbort);
-        fail(error);
+        const opened = toOpenError(error, url);
+        const code = (error as NodeJS.ErrnoException).code;
+        if (typeof code === 'string' && opened.code === 'unreachable') {
+          reject(new ChannelOpenError('unreachable', opened.message, { ...opened.detail, cause: code }));
+          return;
+        }
+        reject(opened);
       });
       socket.once('connect', () => {
         signal.removeEventListener('abort', onAbort);
