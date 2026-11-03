@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T21:23:54.869203Z · model: claude-opus-5-5 · open: 864_
+_Last sequenced: 2026-11-03T21:25:18.150330Z · model: claude-opus-5-5 · open: 865_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -328,6 +328,7 @@ _Last sequenced: 2026-11-03T21:23:54.869203Z · model: claude-opus-5-5 · open: 
 | 322 | PAN-1451 | M | high | needs-refinement |  |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
 | 323 | PAN-1452 | M | high | ok |  |  | PAN-1381 follow-up: per-reviewer restart with model override (architectural mismatch with PAN-1048) |
 | 324 | PAN-4927 | XL | medium | needs-refinement | ✓ |  | Epic: inject Overdeck MCP into every managed agent + OAuth /mcp + Hermes/OpenClaw/Grok plugins; PRD in progress, no children filed. |
+| 325 | PAN-4929 | S | medium | needs-refinement |  | PAN-4553 | Likely duplicate of PAN-4553 (polyrepo root npm install aborts pan start; MIN-1135 repro). Close when PAN-4553 lands. |
 | 326 | PAN-1553 | M | high | ok |  |  | Investigate Claude Code Fast mode support (and fast-tier pricing) |
 | 327 | PAN-1504 | M | high | ok |  |  | pan hygiene |
 | 328 | PAN-1480 | L | high | ok |  |  | TLDR: 93% bypass rate |
@@ -1199,10 +1200,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T21:23:54.869203Z",
+  "generatedAt": "2026-11-03T21:25:18.150330Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 864,
+  "openCount": 865,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -11958,6 +11959,21 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "gate": "auto",
       "planning": "auto",
       "isEpic": true
+    },
+    {
+      "issue": "PAN-4929",
+      "rank": 325,
+      "size": "S",
+      "importance": "medium",
+      "score": 40,
+      "condition": "needs-refinement",
+      "dependsOn": [
+        "PAN-4553"
+      ],
+      "why": "Likely duplicate of PAN-4553 (polyrepo root npm install aborts pan start; MIN-1135 repro). Close when PAN-4553 lands.",
+      "rationale": "New since the prior run: it reports the same root-level npm install failure as PAN-4553 on a fresh MIN-1135 start, so it waits behind PAN-4553 at a free mid rank instead of competing for pickup.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13171,6 +13187,13 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
+    },
+    {
+      "from": "PAN-4553",
+      "to": "PAN-4929",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.95
     }
   ]
 }
