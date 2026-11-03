@@ -186,7 +186,15 @@ const landingPage: Handler = async (_req, rc) => {
   const { status } = (await res.json()) as RoomStatusBody;
   if (status !== 'active') return endedPage();
   const nonce = btoa(String.fromCharCode(...rc.deps.randomBytes(16)));
-  return invitePage(shortCode, nonce);
+  return invitePage(shortCode, nonce, rc.config.web ? { publicBaseUrl: rc.config.publicBaseUrl } : null);
+};
+
+/** GET /viewer/viewer.js: the hosted viewer bundle from the static assets (PAN-4481 FR-15). */
+const viewerAsset: Handler = async (req, rc) => {
+  if (!rc.env.ASSETS) return json({ error: 'not_found' }, 404);
+  const res = await rc.env.ASSETS.fetch(new Request(new URL('/viewer/viewer.js', req.url)));
+  if (res.status !== 200) return json({ error: 'not_found' }, 404);
+  return new Response(res.body, { status: 200, headers: { 'Content-Type': 'text/javascript; charset=utf-8' } });
 };
 
 const ROUTES: Route[] = [
@@ -197,6 +205,7 @@ const ROUTES: Route[] = [
   { method: 'GET', pattern: '/v1/rooms/:code/join', handler: joinSocket },
   { method: 'GET', pattern: '/v1/rooms/:code/web-join', handler: webJoinSocket },
   { method: 'GET', pattern: '/s/:code', handler: landingPage },
+  { method: 'GET', pattern: '/viewer/viewer.js', handler: viewerAsset },
   { method: 'GET', pattern: '/auth/signin', handler: webSignIn },
   { method: 'GET', pattern: '/auth/callback', handler: webCallback },
   { method: 'POST', pattern: '/auth/signout', handler: webSignOut },
