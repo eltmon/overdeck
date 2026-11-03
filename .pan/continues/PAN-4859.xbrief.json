@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4859",
   "created": "2026-11-02T23:46:32.176Z",
-  "updated": "2026-11-03T00:13:50.422Z",
+  "updated": "2026-11-03T00:14:05.025Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -82,6 +82,10 @@
     "route-ssh-lookup.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T00:13:50.421Z"
+    },
+    "route-ssh-lookup.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:14:05.024Z"
     }
   }
 }
