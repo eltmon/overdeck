@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4829",
   "created": "2026-11-03T07:49:13.339Z",
-  "updated": "2026-11-03T08:05:25.348Z",
+  "updated": "2026-11-03T08:08:33.319Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,9 +46,10 @@
       "doneAt": "2026-11-03T08:04:55.304Z"
     },
     "miniflare-ac2": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4829",
-      "claimedAt": "2026-11-03T08:05:25.348Z"
+      "claimedAt": "2026-11-03T08:05:25.348Z",
+      "doneAt": "2026-11-03T08:08:33.318Z"
     }
   }
 }
