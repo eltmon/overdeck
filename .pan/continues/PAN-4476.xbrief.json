@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4476",
   "created": "2026-11-03T15:05:40.423Z",
-  "updated": "2026-11-03T16:03:00.624Z",
+  "updated": "2026-11-03T16:03:19.825Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -108,6 +108,10 @@
     "wire-types.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T16:03:00.623Z"
+    },
+    "wire-types.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:03:19.824Z"
     }
   }
 }
