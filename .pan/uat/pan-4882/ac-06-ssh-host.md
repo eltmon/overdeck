@@ -93,3 +93,56 @@ $ cat /root/.overdeck/ssh-launch/server.json
 The VM runs the published 0.73.0 build, `7de98491242` (tag `v0.73.0`). All four fix SHAs are ancestors of it
 (`git merge-base --is-ancestor <sha> 7de98491242` → yes for `04f8bccc9df`, `6ca4ae19e6e`, `af764fb9907`,
 `054aea3e486`), so the VM-side half of PAN-4861 (the helper's stop) is the fixed code.
+
+## Remove — from the browser
+
+Before removal the VM ran `dashboard/server.js` (pid 1966, 458 s) and `supervisor/server.js` (pid 2187, 450 s).
+In the same isolated browser: the machine row's **Remove** →
+
+```
+dialog: Remove 811d674f124718? · This machine loses access to 811d674f124718, and 811d674f124718 is told to drop
+its access here. · Overdeck started the server on ssh://root@127.0.0.1:10022. Removing this machine stops that
+server. · Leave the server running · Cancel · Remove
+leave-running checked: false
+removed-at 2026-11-03T06:48:46.641Z
+DELETE /api/machines/4155fbb0-246b-42f7-9a51-85512ed0675a 200 {"ok":true,"peerNotified":false,"ssh":{"stopped":true,"reason":"stopped"},"fly":null}
+```
+
+Screenshot: [ac-06-remove-dialog.png](ac-06-remove-dialog.png). Home's link list afterwards held only the two
+AC-4 Fly VMs.
+
+D-12 checks on the VM, each through `ssh -p 10022 root@127.0.0.1` running
+`ps -eo pid,etimes,args | grep -E 'supervisor/server.js|dashboard/server.js' | grep -v grep` (exit 1 = no
+match) and `curl -s -o /dev/null -w '%{http_code}' 127.0.0.1:3011/api/health`:
+
+| After Remove | Matching processes | `/api/health` | `/root/.overdeck/ssh-launch/` |
+| --- | --- | --- | --- |
+| 30 s (06:49:16) | none (`procs-exit=1`) | `000` | empty |
+| 90 s (06:50:16) | none (`procs-exit=1`) | `000` | empty |
+| 180 s (06:51:46) | none (`procs-exit=1`) | `000` | empty |
+
+In PAN-4774 the supervisor stayed up and restarted the dashboard 26–30 s after removal. Here both stayed stopped
+for three minutes, so the PAN-4861 fix holds live. `peerNotified: false` is expected: the helper stops the VM's
+server, so it cannot answer the unlink notice.
+
+## Cleanup
+
+```
+$ fly machine destroy 811d674f124718 -a pan-workspaces --force
+811d674f124718 has been destroyed
+$ kill 3175189            # the `fly proxy 10022:2222 …` pid listening on 127.0.0.1:10022
+$ ss -ltnp | grep -c ':10022 '
+0
+$ ssh-keygen -R '[127.0.0.1]:10022'
+/home/eltmon/.ssh/known_hosts updated.
+Original contents retained as /home/eltmon/.ssh/known_hosts.old
+$ rm -f /home/eltmon/.ssh/id_ed25519 /home/eltmon/.ssh/id_ed25519.pub
+$ rm -rf /home/eltmon/Projects/overdeck/workspaces/feature-pan-4882/.tmp/pan-4882/ssh
+$ test -e ~/.ssh/id_ed25519 || echo "id_ed25519 absent"
+id_ed25519 absent
+```
+
+`ssh-keygen -R` rewrote `~/.ssh/known_hosts.old` as its backup. The run leaves that file in place rather than
+deleting an operator file it cannot tell apart from an earlier one; `~/.ssh/config` was not touched.
+
+Status: passed — managed server and supervisor stayed stopped at 30/90/180 s after browser Remove
