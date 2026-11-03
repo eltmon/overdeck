@@ -218,4 +218,18 @@ describe('MachinesPanel (PAN-4645 WI-20)', () => {
     await user.click(button);
     expect(document.querySelector('[data-component="add-fly-machine-dialog"]')).toBeTruthy();
   });
+
+  it('PAN-4905: button text shows "(remote off)" when self.remoteEnabled is false', async () => {
+    fetchMock.mockImplementation((input: string | URL | Request, init?: RequestInit) => {
+      const url = input.toString();
+      if (url === '/api/machines' && !init?.method) {
+        return Promise.resolve(jsonResponse(200, { ...MACHINES, self: { ...MACHINES.self, remoteEnabled: false } }));
+      }
+      if (url === '/api/anywhere/status') return Promise.resolve(jsonResponse(200, { machine: null, addresses: [], devices: { active: 0 }, vault: { state: 'off', backend: null }, problems: [], viewer: { kind: 'root-session' } }));
+      if (url === '/api/devices') return Promise.resolve(jsonResponse(200, { devices: [] }));
+      return Promise.resolve(jsonResponse(404, { error: 'not found' }));
+    });
+    renderWithProviders(<MachinesPanel />);
+    expect(await screen.findByRole('button', { name: 'Add a Fly machine (remote off)' })).toBeTruthy();
+  });
 });

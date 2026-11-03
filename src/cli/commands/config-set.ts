@@ -7,6 +7,9 @@
  * `[a, b]` a list. After the write the config is loaded again; if loading
  * fails, the previous file text is restored and the error is printed. This is
  * the command Compare settings prints for each difference.
+ *
+ * `remote.enabled` refuses (PAN-4905): it lives only in config.toml `[remote]`,
+ * so writing it into config.yaml would be a silent no-op.
  */
 import { readFile, unlink, writeFile } from 'node:fs/promises';
 
@@ -15,6 +18,7 @@ import { parse, parseDocument } from 'yaml';
 
 import { clearConfigCache, getGlobalConfigPath, loadConfigNoMigration } from '../../lib/config-yaml/load.js';
 import { yamlFlowValue } from '../../lib/settings-resolved.js';
+import { remoteEnabledHint } from '../../lib/remote-enabled.js';
 
 export const CONFIG_KEY_PATTERN = /^[a-z0-9_]+(\.[a-z0-9_]+)*$/;
 
@@ -46,6 +50,10 @@ export const defaultConfigSetDeps = (): ConfigSetDeps => ({
 export async function configSetCommand(key: string, rawValue: string, deps: ConfigSetDeps = defaultConfigSetDeps()): Promise<number> {
   if (!CONFIG_KEY_PATTERN.test(key)) {
     deps.stderr(`Invalid key ${JSON.stringify(key)}: use dotted snake_case, for example resources.quality_gate_slots.`);
+    return 1;
+  }
+  if (key === 'remote.enabled') {
+    deps.stderr(`remote.enabled is not a config.yaml setting, so nothing was changed: ${remoteEnabledHint()}.`);
     return 1;
   }
   let value: unknown;
