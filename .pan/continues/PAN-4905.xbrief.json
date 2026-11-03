@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4905",
   "created": "2026-11-03T15:51:11.476Z",
-  "updated": "2026-11-03T16:48:45.738Z",
+  "updated": "2026-11-03T16:49:00.236Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -162,6 +162,10 @@
     "config-set-remote-enabled-guard.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T16:48:45.738Z"
+    },
+    "config-set-remote-enabled-guard.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:49:00.235Z"
     }
   }
 }
