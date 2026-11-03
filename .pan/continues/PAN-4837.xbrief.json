@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4837",
   "created": "2026-11-03T16:16:59.604Z",
-  "updated": "2026-11-03T19:05:29.601Z",
+  "updated": "2026-11-03T19:06:00.575Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -340,6 +340,10 @@
     "pairing-flow.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T19:05:29.601Z"
+    },
+    "pairing-flow.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T19:06:00.575Z"
     }
   }
 }
