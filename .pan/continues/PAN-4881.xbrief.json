@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4881",
   "created": "2026-11-03T06:05:06.618Z",
-  "updated": "2026-11-03T06:13:01.911Z",
+  "updated": "2026-11-03T06:13:59.558Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-11-03T06:12:56.097Z"
     },
     "serve-test-token-cleanup": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4881",
-      "claimedAt": "2026-11-03T06:13:01.911Z"
+      "claimedAt": "2026-11-03T06:13:01.911Z",
+      "doneAt": "2026-11-03T06:13:59.557Z"
     }
   }
 }
