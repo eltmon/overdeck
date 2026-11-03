@@ -253,4 +253,19 @@ describe('vault settle', () => {
     expect(logThroughVersion(record, 1)).toEqual(['c1']);
     expect(logThroughVersion(record, 9)).toEqual(['c1', 'c2', 'c3', 'c4']);
   });
+
+  it('transcriptFacts skips a Codex <recommended_plugins> injection and titles from the typed prompt', () => {
+    const codex = [
+      JSON.stringify({ type: 'session_meta', payload: { id: 'thread-1', cwd: '/w/x' } }),
+      JSON.stringify({
+        type: 'response_item',
+        payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: '<recommended_plugins>\nHere is a list of plugins that are available but not installed.' }] },
+      }),
+      JSON.stringify({
+        type: 'response_item',
+        payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Add a --json flag' }] },
+      }),
+    ];
+    expect(transcriptFacts(codex, 'codex').title).toBe('Add a --json flag');
+  });
 });
