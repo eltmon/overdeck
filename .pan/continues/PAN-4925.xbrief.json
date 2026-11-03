@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4925",
+  "created": "2026-11-03T20:26:03.235Z",
+  "updated": "2026-11-03T20:26:03.235Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "fix-smee-stop-test": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4925",
+      "claimedAt": "2026-11-03T20:26:03.235Z"
+    }
+  }
+}
