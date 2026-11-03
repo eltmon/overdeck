@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4481",
   "created": "2026-11-03T15:57:16.582Z",
-  "updated": "2026-11-03T17:00:17.009Z",
+  "updated": "2026-11-03T17:00:32.617Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -212,6 +212,10 @@
     "docs-hosted-join.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T17:00:17.009Z"
+    },
+    "docs-hosted-join.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T17:00:32.617Z"
     }
   }
 }
