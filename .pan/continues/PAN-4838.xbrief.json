@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4838",
   "created": "2026-11-03T21:01:46.602Z",
-  "updated": "2026-11-03T21:57:23.901Z",
+  "updated": "2026-11-03T21:57:41.743Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -170,6 +170,10 @@
     "push-registration.ac5": {
       "status": "completed",
       "doneAt": "2026-11-03T21:57:23.901Z"
+    },
+    "notification-tap.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T21:57:41.742Z"
     }
   }
 }
