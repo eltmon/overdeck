@@ -4,6 +4,7 @@ import { PHONE_PAIR_LINK_PREFIX, parsePhonePairLink } from '@overdeck/contracts'
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 
 import { type DeviceIdentity, loadIdentity } from '../native/keys';
+import { type PushController, pushSupported, startPush } from '../native/push';
 import { type Connection, createConnection } from './connection';
 import { createDirectory, type ShellDirectory } from './directory';
 import { resetTransport } from '../../../../src/dashboard/frontend/src/lib/wsTransport';
@@ -30,6 +31,8 @@ type View = { kind: 'machines' } | { kind: 'pair'; link: string | null } | { kin
 interface Services {
   directory: ShellDirectory;
   connection: Connection;
+  /** Push registration, iOS only (PAN-4838 D-9). */
+  push: PushController | null;
 }
 
 const errorText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
@@ -129,11 +132,13 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
     });
     const meter = createRelayMeter((bytes) => directory.client.send({ type: 'relay-usage', bytes }));
     const connection = createConnection({ directory, meter });
-    setServices({ directory, connection });
+    const push = pushSupported() ? startPush({ directory: directory.client, platform: shellPlatform() }) : null;
+    setServices({ directory, connection, push });
     void directory.client.start();
     const uninstallResume = installResumeHandler(() => ({ directory: directory.client, connection, resetTransport: () => resetTransport() }));
     return () => {
       uninstallResume();
+      push?.stop();
       meter.stop();
       directory.client.stop();
       directory.dialer.close();
