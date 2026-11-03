@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4849",
   "created": "2026-11-03T03:09:47.454Z",
-  "updated": "2026-11-03T03:17:06.271Z",
+  "updated": "2026-11-03T03:20:37.219Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-11-03T03:16:51.944Z"
     },
     "deft-routes": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4849",
-      "claimedAt": "2026-11-03T03:17:06.270Z"
+      "claimedAt": "2026-11-03T03:17:06.270Z",
+      "doneAt": "2026-11-03T03:20:37.219Z"
     }
   }
 }
