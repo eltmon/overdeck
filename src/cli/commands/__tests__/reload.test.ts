@@ -33,6 +33,8 @@ const mocks = vi.hoisted(() => ({
   waitForRestartApproval: vi.fn(),
   readRunningDashboardBootGates: vi.fn(),
   repointGlobalCliToDeployment: vi.fn(),
+  acquireReloadLock: vi.fn(),
+  reloadSupersedeDetail: vi.fn(),
 }));
 
 vi.mock('../../../lib/composer-commands/reload.js', () => ({ reportComposerReloadProgress: mocks.reportComposerReloadProgress }));
@@ -53,6 +55,12 @@ vi.mock('../../../lib/deploy/global-cli-link.js', () => ({
 // PAN-3899: reload reads the running dashboard's boot gates over HTTP first.
 vi.mock('../../../lib/deploy/running-boot-gates.js', () => ({
   readRunningDashboardBootGates: mocks.readRunningDashboardBootGates,
+}));
+
+// PAN-4888: the supersede protocol owns the reload lock; its own tests cover it.
+vi.mock('../../../lib/deploy/reload-supersede.js', () => ({
+  acquireReloadLock: mocks.acquireReloadLock,
+  reloadSupersedeDetail: mocks.reloadSupersedeDetail,
 }));
 
 vi.mock('../../../lib/restart-lock.js', () => ({
@@ -216,6 +224,14 @@ describe('reloadCommand', () => {
       release: vi.fn(() => Promise.resolve()),
     });
     mocks.readRestartLockHolder.mockResolvedValue(null);
+    mocks.acquireReloadLock.mockResolvedValue({
+      kind: 'acquired',
+      lock: {
+        refresh: vi.fn(() => Promise.resolve()),
+        release: vi.fn(() => Promise.resolve()),
+      },
+    });
+    mocks.reloadSupersedeDetail.mockResolvedValue(null);
     mocks.readPlatformConfig.mockReturnValue({
       dashboardPort: 3010,
       dashboardApiPort: 3011,
@@ -254,7 +270,7 @@ describe('reloadCommand', () => {
       "git 'rev-parse' 'HEAD'": [{ stdout: `${DEFAULT_ORIGIN_MAIN_SHA}\n` }],
       "git 'rev-parse' 'origin/main'": [{ stdout: `${DEFAULT_ORIGIN_MAIN_SHA}\n` }],
       "git 'worktree' 'prune'": [{ stdout: '' }],
-      [`git 'worktree' 'add' '--detach' '${DEFAULT_BUILD_WORKTREE}' 'origin/main'`]: [{ stdout: '' }],
+      [`git 'worktree' 'add' '--detach' '${DEFAULT_BUILD_WORKTREE}' '${DEFAULT_ORIGIN_MAIN_SHA}'`]: [{ stdout: '' }],
       [`git 'worktree' 'remove' '--force' '${DEFAULT_BUILD_WORKTREE}'`]: [{ stdout: '' }],
     });
   });
@@ -311,17 +327,81 @@ describe('reloadCommand', () => {
   });
 
   it('refuses the detached path when the restart lock is already held', async () => {
-    mocks.acquireRestartLock.mockResolvedValue(null);
-    mocks.readRestartLockHolder.mockResolvedValue({ pid: 777777, caller: 'pan reload', ts: Date.now() });
+    mocks.acquireReloadLock.mockResolvedValue({
+      kind: 'refused',
+      message: 'restart in progress (held by PID 777777 (pan restart))',
+    });
 
     await reloadCommand({});
 
+    expect(mocks.acquireReloadLock).toHaveBeenCalledWith(DEFAULT_ORIGIN_MAIN_SHA, expect.objectContaining({
+      isAncestor: expect.any(Function),
+    }));
     expect(mocks.restartDashboard).not.toHaveBeenCalled();
     expect(mocks.spawn).not.toHaveBeenCalled();
     expect(mocks.writeRestartStatus).toHaveBeenCalledWith(
-      expect.objectContaining({ success: false, error: expect.stringContaining('restart in progress') }),
+      expect.objectContaining({ success: false, error: 'restart in progress (held by PID 777777 (pan restart))' }),
     );
     expect(process.exitCode).toBe(2);
+  });
+
+  it('signals pan dev without fetching origin, even when fetch would fail', async () => {
+    mocks.readDevSupervisorMarker.mockReturnValue({
+      pid: 424242,
+      dashboardPort: 3010,
+      apiPort: 3011,
+      startedAt: '2026-06-07T00:00:00.000Z',
+    });
+    mockExecByCommand({
+      "git 'rev-parse' '--show-toplevel'": [{ stdout: '/repo\n' }],
+      "git 'fetch' 'origin' 'main'": [{ code: 128, stderr: 'fetch failed' }],
+    });
+    const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true);
+
+    await reloadCommand({});
+
+    expect(killSpy).toHaveBeenCalledWith(424242, 'SIGUSR2');
+    expect(mocks.acquireReloadLock).not.toHaveBeenCalled();
+    expect(mocks.exec).not.toHaveBeenCalledWith("git 'fetch' 'origin' 'main'", expect.anything());
+    expect(process.exitCode).toBeUndefined();
+
+    killSpy.mockRestore();
+  });
+
+  it('exits 0 without building when a covering reload is already waiting', async () => {
+    mocks.acquireReloadLock.mockResolvedValue({
+      kind: 'covered',
+      holder: { pid: 555, ts: Date.now(), caller: 'pan reload', targetSha: DEFAULT_ORIGIN_MAIN_SHA, supersedable: true },
+    });
+
+    await reloadCommand({});
+
+    expect(mocks.spawn).not.toHaveBeenCalled();
+    expect(mocks.restartDashboard).not.toHaveBeenCalled();
+    expect(mocks.writeRestartStatus).not.toHaveBeenCalled();
+    expect(mocks.waitForRestartApproval).not.toHaveBeenCalled();
+    expect(process.exitCode).toBeUndefined();
+    const messages = vi.mocked(console.log).mock.calls.map(([message]) => String(message));
+    expect(messages.some((message) => message.includes('PID 555') && message.includes('nothing to add'))).toBe(true);
+  });
+
+  it('builds the target SHA it resolved before taking the lock', async () => {
+    mocks.statSync.mockReturnValue({ mtimeMs: 2000 });
+    mockSpawnExits();
+
+    await reloadCommand({});
+
+    const resolveIndex = mocks.exec.mock.calls.findIndex(([command]) => command === "git 'rev-parse' 'origin/main'");
+    expect(resolveIndex).toBeGreaterThanOrEqual(0);
+    expect(mocks.exec.mock.invocationCallOrder[resolveIndex])
+      .toBeLessThan(mocks.acquireReloadLock.mock.invocationCallOrder[0]!);
+    expect(mocks.acquireReloadLock).toHaveBeenCalledWith(DEFAULT_ORIGIN_MAIN_SHA, expect.anything());
+    expect(mocks.exec).toHaveBeenCalledWith(
+      `git 'worktree' 'add' '--detach' '${DEFAULT_BUILD_WORKTREE}' '${DEFAULT_ORIGIN_MAIN_SHA}'`,
+      expect.objectContaining({ cwd: DEFAULT_REPO_ROOT }),
+    );
+    // The pinned build fetches once (to resolve the target), not again inside the build.
+    expect(mocks.exec.mock.calls.filter(([command]) => command === "git 'fetch' 'origin' 'main'")).toHaveLength(1);
   });
 
   it('reloads for an agent initiator without consulting a deploy gate', async () => {
@@ -329,7 +409,7 @@ describe('reloadCommand', () => {
 
     await reloadCommand({ skipBuild: true });
 
-    expect(mocks.acquireRestartLock).toHaveBeenCalledWith('pan reload');
+    expect(mocks.acquireReloadLock).toHaveBeenCalledWith(undefined, expect.anything());
     expect(mocks.restartDashboard).toHaveBeenCalledTimes(1);
   });
 
@@ -373,7 +453,7 @@ describe('reloadCommand', () => {
     expect(mocks.exec).toHaveBeenCalledWith("git 'fetch' 'origin' 'main'", expect.objectContaining({ cwd: DEFAULT_REPO_ROOT }));
     expect(mocks.exec).toHaveBeenCalledWith("git 'worktree' 'prune'", expect.objectContaining({ cwd: DEFAULT_REPO_ROOT }));
     expect(mocks.exec).toHaveBeenCalledWith(
-      `git 'worktree' 'add' '--detach' '${DEFAULT_BUILD_WORKTREE}' 'origin/main'`,
+      `git 'worktree' 'add' '--detach' '${DEFAULT_BUILD_WORKTREE}' '${DEFAULT_ORIGIN_MAIN_SHA}'`,
       expect.objectContaining({ cwd: DEFAULT_REPO_ROOT }),
     );
     expect(mocks.spawn).toHaveBeenCalledWith('/usr/bin/bun', ['install'], expect.objectContaining({ cwd: DEFAULT_BUILD_WORKTREE, stdio: 'inherit' }));
@@ -462,7 +542,7 @@ describe('reloadCommand', () => {
       "git 'rev-parse' 'HEAD'": [{ stdout: `${DEFAULT_ORIGIN_MAIN_SHA}\n` }],
       "git 'rev-parse' 'origin/main'": [{ stdout: `${DEFAULT_ORIGIN_MAIN_SHA}\n` }],
       "git 'worktree' 'prune'": [{ stdout: '' }, { stdout: '' }],
-      [`git 'worktree' 'add' '--detach' '${DEFAULT_BUILD_WORKTREE}' 'origin/main'`]: [{ stdout: '' }],
+      [`git 'worktree' 'add' '--detach' '${DEFAULT_BUILD_WORKTREE}' '${DEFAULT_ORIGIN_MAIN_SHA}'`]: [{ stdout: '' }],
       [`git 'worktree' 'remove' '--force' '${previousRoot}'`]: [{ code: 128 }],
     });
     mockSpawnExits();
@@ -505,8 +585,8 @@ describe('reloadCommand', () => {
       .map(([command]) => command as string)
       .filter((command) => command.includes("git 'worktree' 'add'"));
     expect(addedRoots).toEqual([
-      `git 'worktree' 'add' '--detach' '${ALTERNATE_BUILD_WORKTREE}' 'origin/main'`,
-      `git 'worktree' 'add' '--detach' '${ALTERNATE_BUILD_WORKTREE}' 'origin/main'`,
+      `git 'worktree' 'add' '--detach' '${ALTERNATE_BUILD_WORKTREE}' '${DEFAULT_ORIGIN_MAIN_SHA}'`,
+      `git 'worktree' 'add' '--detach' '${ALTERNATE_BUILD_WORKTREE}' '${DEFAULT_ORIGIN_MAIN_SHA}'`,
     ]);
     expect(marker).toEqual(activeBundle);
     expect(mocks.fsRm).toHaveBeenCalledWith(ALTERNATE_BUILD_WORKTREE, { recursive: true, force: true });
@@ -675,7 +755,7 @@ describe('reloadCommand', () => {
       "git 'rev-parse' 'HEAD'": [{ stdout: '2222222222222222222222222222222222222222\n' }],
       "git 'rev-parse' 'origin/main'": [{ stdout: '0973c8c0973c8c0973c8c0973c8c0973c8c097\n' }],
       "git 'worktree' 'prune'": [{ stdout: '' }],
-      [`git 'worktree' 'add' '--detach' '${buildWorktree}' 'origin/main'`]: [{ stdout: '' }],
+      [`git 'worktree' 'add' '--detach' '${buildWorktree}' '0973c8c0973c8c0973c8c0973c8c0973c8c097'`]: [{ stdout: '' }],
     });
     mockSpawnExits();
 
@@ -741,6 +821,7 @@ describe('reloadCommand', () => {
       expect(process.exitCode).toBe(2);
       expect(console.error).toHaveBeenCalledWith(expect.stringContaining('Refusing `pan reload --no-deacon`'));
       expect(mocks.acquireRestartLock).not.toHaveBeenCalled();
+      expect(mocks.acquireReloadLock).not.toHaveBeenCalled();
       expect(mocks.exec).not.toHaveBeenCalled();
       expect(mocks.spawn).not.toHaveBeenCalled();
       expect(mocks.readRunningDashboardBootGates).not.toHaveBeenCalled();
@@ -821,7 +902,7 @@ describe('reloadCommand', () => {
       "git 'rev-parse' 'HEAD'": [{ stdout: '2222222222222222222222222222222222222222\n' }],
       "git 'rev-parse' 'origin/main'": [{ stdout: '0973c8c0973c8c0973c8c0973c8c0973c8c097\n' }],
       "git 'worktree' 'prune'": [{ stdout: '' }],
-      [`git 'worktree' 'add' '--detach' '${buildWorktree}' 'origin/main'`]: [{ stdout: '' }],
+      [`git 'worktree' 'add' '--detach' '${buildWorktree}' '0973c8c0973c8c0973c8c0973c8c0973c8c097'`]: [{ stdout: '' }],
       [`git 'worktree' 'remove' '--force' '${buildWorktree}'`]: [{ stdout: '' }],
     });
     mockSpawnExits({ build: 1 });
@@ -854,6 +935,7 @@ describe('reloadCommand', () => {
     expect(mocks.writeRestartStatus).toHaveBeenCalledWith(
       expect.objectContaining({ success: false, error: expect.stringContaining('fetch failed') }),
     );
+    expect(mocks.acquireReloadLock).not.toHaveBeenCalled();
     expect(process.exitCode).toBe(1);
   });
 
@@ -869,7 +951,7 @@ describe('reloadCommand', () => {
       "git 'rev-parse' 'HEAD'": [{ stdout: `${DEFAULT_ORIGIN_MAIN_SHA}\n` }],
       "git 'rev-parse' 'origin/main'": [{ stdout: `${DEFAULT_ORIGIN_MAIN_SHA}\n` }],
       "git 'worktree' 'prune'": [{ stdout: '' }],
-      [`git 'worktree' 'add' '--detach' '${DEFAULT_BUILD_WORKTREE}' 'origin/main'`]: [{ stdout: '' }],
+      [`git 'worktree' 'add' '--detach' '${DEFAULT_BUILD_WORKTREE}' '${DEFAULT_ORIGIN_MAIN_SHA}'`]: [{ stdout: '' }],
       [`git 'worktree' 'remove' '--force' '${DEFAULT_BUILD_WORKTREE}'`]: [{ stdout: '' }],
     });
     mockSpawnExits();

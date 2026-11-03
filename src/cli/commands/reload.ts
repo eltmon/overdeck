@@ -6,8 +6,10 @@ import {
   activateDashboardDeployment,
   buildDashboardFromOriginMain,
   dashboardDeploymentRoots,
+  isAncestorCommit,
   liveDashboardDeploymentRoots,
   removeDashboardDeployment,
+  resolveOriginMainSha,
   runGitAsync,
   selectDashboardDeploymentRoot,
   sweepDashboardDeployments,
@@ -19,6 +21,7 @@ import {
   writeActiveDashboardBundle,
 } from '../../lib/deploy/active-dashboard-bundle.js';
 import { repointGlobalCliToDeployment } from '../../lib/deploy/global-cli-link.js';
+import { acquireReloadLock } from '../../lib/deploy/reload-supersede.js';
 import { readRunningDashboardBootGates } from '../../lib/deploy/running-boot-gates.js';
 import { formatBootGateState, type BootGateState } from '../../lib/boot-gates.js';
 import { supervisorDeploymentFailure } from '../../lib/channels/pty-supervisor-locate.js';
@@ -179,28 +182,29 @@ async function runReload(
     ));
   }
 
-  const lock = await acquireRestartLock('pan reload');
-  if (!lock) {
-    const holder = await readRestartLockHolder();
-    const heldBy = holder ? `held by PID ${holder.pid} (${holder.caller})` : 'held by another process';
-    const error = `restart in progress (${heldBy})`;
-    console.error(chalk.yellow(error));
-    await recordReloadStatus(startedAt, false, error);
-    process.exitCode = 2;
-    return;
-  }
-
-  try {
-    // PAN-1662: when a `pan dev` session owns the dashboard, don't refuse — signal
-    // it (SIGUSR2) to rebuild the server bundle and hot-restart the API child in
-    // place. This applies merged/edited server code without tearing down the
-    // interactive dev session or hijacking it into detached production mode. The
-    // frontend recovers via its graceful reconnect (PAN-1580). This is also the
-    // path the flywheel uses to apply its own merged server changes.
-    {
-      const { readDevSupervisorMarker } = await import('../../lib/dev-supervisor.js');
-      const dev = readDevSupervisorMarker();
-      if (dev) {
+  // PAN-1662: when a `pan dev` session owns the dashboard, don't refuse — signal
+  // it (SIGUSR2) to rebuild the server bundle and hot-restart the API child in
+  // place. This applies merged/edited server code without tearing down the
+  // interactive dev session or hijacking it into detached production mode. The
+  // frontend recovers via its graceful reconnect (PAN-1580). This is also the
+  // path the flywheel uses to apply its own merged server changes. It runs
+  // before any target resolution, so an unreachable origin never blocks a dev
+  // hot-restart (PAN-4888 D12).
+  {
+    const { readDevSupervisorMarker } = await import('../../lib/dev-supervisor.js');
+    const dev = readDevSupervisorMarker();
+    if (dev) {
+      const devLock = await acquireRestartLock('pan reload');
+      if (!devLock) {
+        const holder = await readRestartLockHolder();
+        const heldBy = holder ? `held by PID ${holder.pid} (${holder.caller})` : 'held by another process';
+        const error = `restart in progress (${heldBy})`;
+        console.error(chalk.yellow(error));
+        await recordReloadStatus(startedAt, false, error);
+        process.exitCode = 2;
+        return;
+      }
+      try {
         try {
           process.kill(dev.pid, 'SIGUSR2');
         } catch (err: any) {
@@ -221,17 +225,55 @@ async function runReload(
           return;
         }
         return;
+      } finally {
+        await devLock.release();
       }
     }
+  }
 
+  // PAN-4888: resolve the origin/main commit this reload builds before taking
+  // the lock, record it there, and build exactly it. A newer reload can then
+  // replace a waiting one, and an equal or older one has nothing to add.
+  let repoRoot = process.cwd();
+  let targetSha: string | undefined;
+  if (!options.skipBuild) {
+    try {
+      repoRoot = await resolvePrimaryRepoRoot(process.cwd());
+      targetSha = await resolveOriginMainSha(repoRoot);
+    } catch (error) {
+      const message = `${(error as Error)?.message || String(error)} — old dashboard left running`;
+      console.error(chalk.red(message));
+      await recordReloadStatus(startedAt, false, message);
+      process.exitCode = 1;
+      return;
+    }
+  }
+
+  const acquired = await acquireReloadLock(targetSha, {
+    isAncestor: (ancestor, descendant) => isAncestorCommit(repoRoot, ancestor, descendant),
+  });
+  if (acquired.kind === 'covered') {
+    console.log(chalk.green(
+      `✓ A reload of origin/main ${acquired.holder.targetSha?.slice(0, 12)} is already building or waiting for approval (PID ${acquired.holder.pid}). `
+      + 'It already contains origin/main ' + (targetSha ?? '').slice(0, 12) + ', so this reload has nothing to add.',
+    ));
+    return;
+  }
+  if (acquired.kind === 'refused') {
+    console.error(chalk.yellow(acquired.message));
+    await recordReloadStatus(startedAt, false, acquired.message);
+    process.exitCode = 2;
+    return;
+  }
+  const lock = acquired.lock;
+
+  try {
     const config = readPlatformConfig();
-    let repoRoot = process.cwd();
     let deployment: DashboardDeployment | null = null;
     let activation: DashboardDeploymentActivation | null = null;
     const previousBundle = readActiveDashboardBundle();
     if (!options.skipBuild) {
       try {
-        repoRoot = await resolvePrimaryRepoRoot(process.cwd());
         const generationRoots = dashboardDeploymentRoots();
         await sweepDashboardDeployments(repoRoot, [
           ...generationRoots,
@@ -255,6 +297,7 @@ async function runReload(
         }
         deployment = await buildDashboardFromOriginMain(repoRoot, {
           deploymentRoot: () => nextDeployRoot,
+          targetSha,
         });
         const deployedMtime = dashboardBundleMtimeMs(deployment.serverPath);
         if (deployedMtime <= 0) {
