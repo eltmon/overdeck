@@ -66,3 +66,67 @@ $ command -v claude
 ```
 
 (same output on both VMs). The workers and lanes are real Claude Code sessions, as in PAN-4774.
+
+## Remote worker
+
+Root conversation on home (`POST /api/conversations` with the internal token and an `Origin` header,
+body `{"projectKey":"pan4882-anywhere-smoke","message":"Root for PAN-4882 lanes. Wait."}`):
+
+```
+{"id":3531,"name":"20261103-6766","status":"active","cwd":"/home/eltmon/Projects/pan4882-anywhere-smoke","harness":"claude-code","projectKey":"pan4882-anywhere-smoke"}
+```
+
+From `/home/eltmon/Projects/pan4882-anywhere-smoke`:
+
+```
+$ pan worker run --machine fly-87477d7a911d28 --issue PANANYWHER-1 --read-only --parent conv-20261103-6766 \
+    --harness claude-code --model claude-sonnet-5-5 --ignore-unpushed --detach \
+    --prompt "Read README.md in your working directory and write one sentence that says what this project does. Send that sentence as your report with pan worker report, then stop."
+06:51:09  Could not start the worker on fly-87477d7a911d28: fly-87477d7a911d28: Secure channel to wss://pan-workspaces.fly.dev/ws/link?fly-instance=87477d7a911d28 did not open within 2500 ms
+06:51:31  (same command) same error, rc=1
+06:51:49  (same command) Started agent-pananywher-1-worker-1 on fly-87477d7a911d28        rc=0, returned 06:52:07
+```
+
+Between the attempts home's `pan machines list --json` showed fly1 `online` with a fresh heartbeat
+(`lastHeartbeatAt: 06:51:13.455Z`, no incident). The CLI opens its own secure channel over the public Fly route
+with a 2.5 s budget (`LINK_WAIT_MS`, `src/lib/anywhere/link-client.ts`), and two of three attempts missed it.
+This is not the AC-4 pass condition, but it is a defect and is filed under WI-13.
+
+Home's stand-in and the change log:
+
+```
+$ ls -la --time-style=full-iso ~/.overdeck/agents/agent-pananywher-1-worker-1/remote.json
+-rw------- 1 eltmon eltmon 421 2026-11-03 01:52:20.793 (06:52:20.793Z)
+{ "remoteId": "agent-pananywher-1-worker-1", "parentId": "conv-20261103-6766", "issueId": "PANANYWHER-1",
+  "createdAt": "2026-11-03T06:52:06.587Z", "state": "running", "lastSeq": 1, "lastSeenAt": "2026-11-03T06:52:20.766Z",
+  "unreachableSince": null, … }
+
+# .tmp/pan-4882/remote-json-changes.log — jq -c '{state,lastSeq,lastSeenAt}' every 2 s, printed on change
+06:52:23 {"state":"running","lastSeq":1,"lastSeenAt":"2026-11-03T06:52:20.766Z"}
+
+$ pan worker wait agent-pananywher-1-worker-1 --timeout 600          # started 06:52:2x
+This project is a webpack plugin that runs Prepack over matched JavaScript output files (configurable via `test` and `prepack` options) to optimize them during the build.
+worker agent-pananywher-1-worker-1 report 1: done; next: pan worker wait agent-pananywher-1-worker-1 --after 1
+wait-exit=0 06:52:26
+
+# 60 s later, past the 60 s startup grace:
+$ jq -c '{state,lastSeq,lastSeenAt,createdAt,unreachableSince}' ~/.overdeck/agents/agent-pananywher-1-worker-1/remote.json
+{"state":"running","lastSeq":1,"lastSeenAt":"2026-11-03T06:53:32.870Z","createdAt":"2026-11-03T06:52:06.587Z","unreachableSince":null}
+```
+
+On fly1, `/.overdeck/agents/agent-pananywher-1-worker-1/reports/0001.json`:
+
+```json
+{ "seq": 1, "at": "2026-11-03T06:52:16.552Z", "status": "done",
+  "body": "This project is a webpack plugin that runs Prepack over matched JavaScript output files (configurable via `test` and `prepack` options) to optimize them during the build.\n" }
+```
+
+**Gap in the change log.** The worker reported 10 s after the stand-in was created (06:52:16.552Z), and the
+follower picked the report up at 06:52:20.766Z. The watcher started at 06:52:23, after the start command
+returned, so its first line already shows `lastSeq: 1`; it has no line from the 14 s before the report. The
+result still settles the check. In PAN-4774 the stand-in read `state: exited`, `lastSeq: 0` 0.3 s after it was
+written, and a stand-in in `exited` is never followed again, so `lastSeq` could not have advanced. Here the
+follower kept following until the report (`lastSeq: 1`, `state: running`), `pan worker wait` exited 0 with the
+report, and the follower was still following 86 s after creation.
+
+Result: passed.
