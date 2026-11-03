@@ -129,12 +129,16 @@ type Frame = Record<string, unknown>;
 /** One client socket: records every frame and the close, and resolves waits on events only. */
 class Peer {
   readonly frames: Frame[] = [];
+  /** Every message as received, including non-JSON text such as the `pong` auto-response. */
+  readonly texts: string[] = [];
   closed: { code: number; reason: string } | null = null;
   private wake: Array<() => void> = [];
 
   constructor(private readonly ws: WebSocket) {
     ws.addEventListener('message', (event) => {
-      this.frames.push(JSON.parse(String(event.data)) as Frame);
+      const text = String(event.data);
+      this.texts.push(text);
+      if (text.startsWith('{')) this.frames.push(JSON.parse(text) as Frame);
       this.notify();
     });
     ws.addEventListener('close', (event) => {
@@ -156,6 +160,17 @@ class Peer {
 
   send(frame: Frame): void {
     this.ws.send(JSON.stringify(frame));
+  }
+
+  sendText(text: string): void {
+    this.ws.send(text);
+  }
+
+  /** Waits until at least `count` messages have arrived (JSON or not). */
+  async waitForTexts(count: number): Promise<string[]> {
+    await this.until(() => this.texts.length >= count || this.closed !== null);
+    if (this.texts.length < count) throw new Error(`socket closed (${JSON.stringify(this.closed)}) after ${JSON.stringify(this.texts)}`);
+    return this.texts;
   }
 
   /** Waits for the first frame from index `from` matching `match`, and returns it. */
@@ -261,9 +276,17 @@ describe('share service on real workerd (PAN-658 share-room-do)', () => {
     a.send({ type: 'signal', data: answer, extra: 'dropped' });
     expect(await host.waitFor(isType('signal'), mark)).toEqual({ type: 'signal', githubId: VIEWER_A.id, data: answer });
 
-    // Once admitted, A gets ICE servers too.
+    // A `ping` text frame is answered `pong` by the runtime and never reaches the frame decoder (PAN-4481 FR-10).
+    const before = a.texts.length;
+    a.sendText('ping');
+    expect((await a.waitForTexts(before + 1)).slice(before)).toEqual(['pong']);
+
+    // Once admitted, A gets ICE servers too; the frame after the ping decodes normally and no invalid_frame arrives.
     a.send({ type: 'ice-servers' });
     expect(await a.waitFor(isType('ice-servers'))).toEqual({ type: 'ice-servers', iceServers: STUB_ICE_SERVERS });
+    expect(a.texts.slice(before)).toHaveLength(2);
+    expect(a.texts[before]).toBe('pong');
+    expect(a.frames.filter(isType('error'))).toEqual([{ type: 'error', code: 'not_admitted' }]);
     expect(turnRequests).toHaveLength(2);
 
     // Kick: A's socket closes 4010 and a rejoin lands in the lobby.
