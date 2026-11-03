@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4925",
   "created": "2026-11-03T20:26:03.235Z",
-  "updated": "2026-11-03T20:44:27.812Z",
+  "updated": "2026-11-03T20:45:41.780Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-11-03T20:44:21.332Z"
     },
     "docs-signals-fixture-pids": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4925",
-      "claimedAt": "2026-11-03T20:44:27.812Z"
+      "claimedAt": "2026-11-03T20:44:27.812Z",
+      "doneAt": "2026-11-03T20:45:41.779Z"
     }
   }
 }
