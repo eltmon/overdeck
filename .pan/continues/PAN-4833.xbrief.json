@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4833",
   "created": "2026-11-03T04:52:36.921Z",
-  "updated": "2026-11-03T06:10:55.577Z",
+  "updated": "2026-11-03T06:11:19.345Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -102,6 +102,10 @@
     "package-scaffold.ac4": {
       "status": "completed",
       "doneAt": "2026-11-03T06:10:55.576Z"
+    },
+    "move-protocol.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:11:19.345Z"
     }
   }
 }
