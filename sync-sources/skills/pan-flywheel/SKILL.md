@@ -222,6 +222,11 @@ Once a PR onto Overdeck's own `main` merges, apply the deploy rule, then run:
 pan reload
 ```
 
+`pan reload` exits 0 when a reload of the same commit is already waiting, and
+replaces a waiting reload of an older commit (PAN-4888), so the Flywheel never
+needs to wait for, or retry around, a held reload. Exit 2 still means a
+non-reload restart holds the lock.
+
 Only for an Overdeck merge — not for merges in other projects the loop is
 also driving. Other projects deploy their own way; do not `pan reload` on
 their behalf.

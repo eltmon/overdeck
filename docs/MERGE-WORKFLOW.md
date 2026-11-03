@@ -589,6 +589,36 @@ bundle's source repo. It publishes `project.deploy_changed` with `emitOnly`
 when the projection changes, and the frontend reads `deployByProjectKey` from
 the snapshot and those events. The frontend never polls.
 
+### A newer reload replaces a waiting one (PAN-4888)
+
+`pan reload` resolves `origin/main` before it takes the restart lock, writes
+that commit (`targetSha`) and `supersedable: true` into the lock record, and
+builds exactly that commit. A reload that finds the lock held runs the
+protocol in [`reload-supersede.ts`](../src/lib/deploy/reload-supersede.ts).
+It compares the two commits by git ancestry. When its own commit equals, or is
+an ancestor of, the holder's, it is covered: it exits 0 without building and
+records no restart status, so an older invocation that resumes late never
+replaces a newer build. When the holder's commit is a strict ancestor of its
+own, it writes its own marker, `~/.overdeck/reload-supersede/<pid>.json`,
+naming the holder's pid, rewrites it every 2 seconds, and waits up to 20
+minutes for the lock. Diverged history is refused with exit 2 and nothing is
+replaced. A holder that is not a supersedable `pan reload` (`pan restart`, the
+supervisor, `pan connect`, a reload from an older CLI) is refused with exit 2
+exactly as before.
+
+The holder checks for a fresh marker from a live writer that names its pid
+before each restart-gate poll. It steps aside only after
+`POST /api/restart-gate/withdraw` removes its request; the server refuses
+that withdraw once an approval epoch covers the request, in the same
+synchronous transition `approve` uses, so an approval is never discarded and
+the holder restarts as approved instead. A holder that steps aside restores
+the previous active-bundle record and primary `dist/` and removes its
+generation, unless `/api/health` `buildCommit` shows the dashboard already
+runs its build, in which case it keeps it. It records no restart-status
+entry, so no `Deploy ✗` chip appears, and it exits 0. The first deploy of this
+change still runs the installed CLI as the holder, so that one reload is
+refused the old way.
+
 ### Boot preflight before switchover
 
 `pan reload` builds `origin/main` into the idle generation, then refuses to

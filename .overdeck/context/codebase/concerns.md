@@ -523,6 +523,14 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   pairs from/import with a quoted word (PAN-4508's `from "custom"`) blocks every
   deploy. Even after the lexer fix, the first reload of a change runs the
   *installed* CLI, so never write that syntax in source comments.
+- **`pan reload` holds the restart lock through its unbounded approval wait** (PAN-4888) —
+  `src/cli/commands/reload.ts` takes `~/.overdeck/restart.lock` (`caller: 'pan reload'`),
+  builds `origin/main`, activates the build (active-bundle record + primary `dist/` swap), then
+  waits on the restart gate with no timeout. `pan restart` waits on the gate *before* taking the
+  lock, so a waiting reload is the only lock holder that can sit for hours. A newer `pan reload`
+  replaces a waiting one through per-newcomer markers (`src/lib/deploy/reload-supersede.ts`); the
+  holder steps aside only after `POST /api/restart-gate/withdraw` succeeds. Holders written by an
+  older CLI lack `supersedable: true` and still refuse newcomers with exit 2.
 - **Most `main` commits are bookkeeping** (PAN-4618) — ~95% of commits on
   `main` are `chore(workspace)` commits touching only `.pan/**` or
   `.overdeck/memory/**`. Once PAN-4618 lands they run no `CI` workflow (only
