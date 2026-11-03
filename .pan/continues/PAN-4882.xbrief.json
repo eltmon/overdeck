@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4882",
   "created": "2026-11-03T06:27:51.535Z",
-  "updated": "2026-11-03T07:35:02.138Z",
+  "updated": "2026-11-03T07:35:10.924Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -62,6 +62,11 @@
       "claimedBy": "agent-pan-4882",
       "claimedAt": "2026-11-03T06:55:32.435Z",
       "doneAt": "2026-11-03T06:58:26.027Z"
+    },
+    "relay-udp-blocked": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4882",
+      "claimedAt": "2026-11-03T07:35:10.924Z"
     }
   }
 }
