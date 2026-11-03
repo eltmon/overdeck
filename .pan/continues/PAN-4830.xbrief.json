@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4830",
   "created": "2026-11-03T14:25:43.002Z",
-  "updated": "2026-11-03T14:25:43.003Z",
+  "updated": "2026-11-03T14:26:54.137Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "store-extract": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4830",
-      "claimedAt": "2026-11-03T14:25:43.002Z"
+      "claimedAt": "2026-11-03T14:25:43.002Z",
+      "doneAt": "2026-11-03T14:26:54.137Z"
     }
   }
 }
