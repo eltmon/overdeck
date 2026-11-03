@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4852",
   "created": "2026-11-03T02:45:30.764Z",
-  "updated": "2026-11-03T03:48:33.620Z",
+  "updated": "2026-11-03T03:48:58.700Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -85,6 +85,11 @@
       "claimedBy": "agent-pan-4852",
       "claimedAt": "2026-11-03T03:21:39.865Z",
       "doneAt": "2026-11-03T03:48:33.619Z"
+    },
+    "launch-placement-wiring": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4852",
+      "claimedAt": "2026-11-03T03:48:58.700Z"
     }
   }
 }
