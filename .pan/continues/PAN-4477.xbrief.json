@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4477",
   "created": "2026-11-03T15:02:33.095Z",
-  "updated": "2026-11-03T16:37:35.419Z",
+  "updated": "2026-11-03T16:37:51.798Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -234,6 +234,10 @@
     "viewer-terminal-toggle.ac4": {
       "status": "completed",
       "doneAt": "2026-11-03T16:37:35.419Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:37:51.797Z"
     }
   }
 }
