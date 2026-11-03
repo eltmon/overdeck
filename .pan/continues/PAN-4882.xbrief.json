@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4882",
   "created": "2026-11-03T06:27:51.535Z",
-  "updated": "2026-11-03T07:35:41.895Z",
+  "updated": "2026-11-03T07:36:03.809Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -70,9 +70,10 @@
       "doneAt": "2026-11-03T07:35:32.505Z"
     },
     "relay-encryption-capture": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4882",
-      "claimedAt": "2026-11-03T07:35:41.894Z"
+      "claimedAt": "2026-11-03T07:35:41.894Z",
+      "doneAt": "2026-11-03T07:36:03.809Z"
     }
   }
 }
