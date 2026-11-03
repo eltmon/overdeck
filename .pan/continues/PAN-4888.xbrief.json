@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4888",
   "created": "2026-11-03T08:25:32.067Z",
-  "updated": "2026-11-03T08:43:05.857Z",
+  "updated": "2026-11-03T08:43:11.454Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,11 @@
       "claimedBy": "agent-pan-4888",
       "claimedAt": "2026-11-03T08:42:18.750Z",
       "doneAt": "2026-11-03T08:43:05.857Z"
+    },
+    "banner-build-sha": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4888",
+      "claimedAt": "2026-11-03T08:43:11.453Z"
     }
   }
 }
