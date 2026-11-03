@@ -4,6 +4,7 @@
  * key never crosses the bridge. Link keys are per machine and live in the `machines` secret.
  */
 import { registerPlugin } from '@capacitor/core';
+import type { ApsEnvironment } from '@overdeck/contracts';
 
 export type SecretName = 'account' | 'machines';
 
@@ -19,6 +20,8 @@ export interface OverdeckKeysPlugin {
   removeSecret(options: { name: SecretName }): Promise<void>;
   /** Deletes the identity, the push key pair and every secret (sign-out). */
   reset(): Promise<void>;
+  /** iOS only: the APNs host this build's tokens belong to (PAN-4838 D-7). */
+  pushEnvironment(): Promise<{ apsEnvironment: ApsEnvironment }>;
 }
 
 export const OverdeckKeys = registerPlugin<OverdeckKeysPlugin>('OverdeckKeys', {

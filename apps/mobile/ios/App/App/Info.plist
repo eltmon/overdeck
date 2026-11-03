@@ -58,6 +58,8 @@
 	<true/>
 	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
 	<true/>
+	<key>OverdeckSharedKeychainGroup</key>
+	<string>$(AppIdentifierPrefix)ai.overdeck.shared</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Overdeck uses the camera to scan the pairing code shown on your computer.</string>
 	<key>UILaunchStoryboardName</key>

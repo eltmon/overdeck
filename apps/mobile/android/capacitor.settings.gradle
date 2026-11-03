@@ -7,3 +7,6 @@ project(':capacitor-app').projectDir = new File('../../../node_modules/.bun/@cap
 
 include ':capacitor-browser'
 project(':capacitor-browser').projectDir = new File('../../../node_modules/.bun/@capacitor+browser@8.0.5/node_modules/@capacitor/browser/android')
+
+include ':capacitor-push-notifications'
+project(':capacitor-push-notifications').projectDir = new File('../../../node_modules/.bun/@capacitor+push-notifications@8.1.3/node_modules/@capacitor/push-notifications/android')

@@ -1,6 +1,7 @@
-/** Settings (PAN-4837 C-8): the account, paired machines, the Live Activity switch, the app version and sign out. */
+/** Settings (PAN-4837 C-8): the account, notifications (PAN-4838 FR-4), paired machines, the Live Activity switch (PAN-4839), the app version and sign out. */
 import { useState } from 'react';
 
+import type { PushPermission } from '../native/push';
 import { APP_VERSION } from './config';
 import type { AccountRecord, PairedMachine } from './types';
 
@@ -18,13 +19,16 @@ export interface LiveActivitySetting {
 interface SettingsScreenProps {
   account: AccountRecord;
   machines: readonly PairedMachine[];
-  liveActivity: LiveActivitySetting | null;
+  /** The Live Activity row (PAN-4839); absent or null where it is not supported. */
+  liveActivity?: LiveActivitySetting | null;
   onForget(environmentId: string): void;
   onSignOut(): Promise<void>;
   onBack(): void;
+  /** The Notifications switch; absent where push is not supported. */
+  notifications?: { enabled: boolean; permission: PushPermission; onChange(on: boolean): void };
 }
 
-export function SettingsScreen({ account, machines, liveActivity, onForget, onSignOut, onBack }: SettingsScreenProps) {
+export function SettingsScreen({ account, machines, liveActivity, onForget, onSignOut, onBack, notifications }: SettingsScreenProps) {
   const [signingOut, setSigningOut] = useState(false);
 
   return (
@@ -41,6 +45,26 @@ export function SettingsScreen({ account, machines, liveActivity, onForget, onSi
         <span className="text-foreground">{account.label || 'This phone'}</span>
         <span className="font-mono text-xs text-muted-foreground">{account.deviceId}</span>
       </div>
+      {notifications ? (
+        <div className="flex flex-col gap-2">
+          <h3 className="text-sm font-medium text-foreground">Notifications</h3>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={notifications.enabled}
+            onClick={() => notifications.onChange(!notifications.enabled)}
+            className="flex min-h-11 items-center justify-between gap-3 border-b border-border text-sm text-foreground"
+          >
+            <span>Notifications</span>
+            <span className="text-muted-foreground">{notifications.enabled ? 'On' : 'Off'}</span>
+          </button>
+          <p className="text-xs text-muted-foreground">
+            {notifications.permission === 'denied'
+              ? 'Notifications are off for Overdeck in iOS Settings. Open Settings → Notifications → Overdeck to turn them on.'
+              : 'Needs-you alerts from your paired machines. Their text is end-to-end encrypted; only this phone can read it.'}
+          </p>
+        </div>
+      ) : null}
       <div className="flex flex-col gap-2">
         <h3 className="text-sm font-medium text-foreground">Paired machines</h3>
         {machines.length === 0 ? <p className="text-sm text-muted-foreground">No paired machines.</p> : null}
