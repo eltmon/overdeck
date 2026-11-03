@@ -98,6 +98,21 @@ interface PhoneRequestLog {
   rpc: string[];
 }
 
+/** Throws, naming the first entry, unless every logged request is one the phone token may make. */
+function assertPhoneRequests(log: PhoneRequestLog): void {
+  const allowed = allowedRpcTags([...PHONE_TOKEN_SCOPES]);
+  for (const { method, path } of log.http) {
+    if (REMOTE_GATE_ALLOWLIST.has(`${method} ${path}`)) continue;
+    const required = requiredScopeFor(method, path);
+    if (!scopeSatisfies(PHONE_TOKEN_SCOPES, required)) {
+      throw new Error(`${method} ${path} needs ${required}, which the phone token does not have`);
+    }
+  }
+  for (const tag of log.rpc) {
+    if (!allowed.includes(tag)) throw new Error(`RPC ${tag} is not allowed for the phone token`);
+  }
+}
+
 const PHONE_APP_REQUEST_LOG = JSON.parse(
   readFileSync(fileURLToPath(new URL('../../../../apps/mobile/request-log.json', import.meta.url)), 'utf8'),
 ) as PhoneRequestLog;
@@ -108,15 +123,14 @@ describe('phone app logged requests (PAN-4837 WI-23)', () => {
     expect(PHONE_APP_REQUEST_LOG.rpc.length).toBeGreaterThan(0);
   });
 
-  it('every logged HTTP request is credential-free or resolves to a scope PHONE_TOKEN_SCOPES satisfies', () => {
-    for (const { method, path } of PHONE_APP_REQUEST_LOG.http) {
-      if (REMOTE_GATE_ALLOWLIST.has(`${method} ${path}`)) continue;
-      expect(scopeSatisfies(PHONE_TOKEN_SCOPES, requiredScopeFor(method, path)), `${method} ${path}`).toBe(true);
-    }
+  it('every logged request is credential-free or within PHONE_TOKEN_SCOPES', () => {
+    expect(() => assertPhoneRequests(PHONE_APP_REQUEST_LOG)).not.toThrow();
   });
 
-  it('every logged RPC tag is allowed for PHONE_TOKEN_SCOPES', () => {
-    const allowed = allowedRpcTags([...PHONE_TOKEN_SCOPES]);
-    for (const tag of PHONE_APP_REQUEST_LOG.rpc) expect(allowed, tag).toContain(tag);
+  it('names the entry when a logged request needs a scope the phone lacks', () => {
+    expect(() => assertPhoneRequests({ http: [{ method: 'GET', path: '/api/settings', status: 403 }], rpc: [] })).toThrow(
+      'GET /api/settings needs admin',
+    );
+    expect(() => assertPhoneRequests({ http: [], rpc: ['pan.getAvailableEditors'] })).toThrow('RPC pan.getAvailableEditors');
   });
 });
