@@ -1,0 +1,203 @@
+/**
+ * PAN-4849 WI-2: the Deft read routes and the pipeline switch route. The Deft
+ * pipeline check, the workspace lookup, the project list and the `pan`
+ * spawner are mocked; the state reader runs against the fixture tree.
+ */
+import { EventEmitter } from 'node:events';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
+import type { ChildProcess } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { Effect } from 'effect';
+import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const FIXTURE_DIR = fileURLToPath(new URL('../../../../lib/deft/__tests__/fixtures/directive', import.meta.url));
+const GOLDEN_PATH = fileURLToPath(new URL('../../../../lib/deft/__tests__/fixtures/deft-issue-state.golden.json', import.meta.url));
+
+const mocks = vi.hoisted(() => ({
+  isDeftPipelineIssue: vi.fn(),
+  getIssueWorkspacePath: vi.fn(),
+  listProjectsAsync: vi.fn(),
+  emitActivityEntry: vi.fn(),
+}));
+
+vi.mock('../../../../lib/deft/issue-pipeline.js', () => ({ isDeftPipelineIssue: mocks.isDeftPipelineIssue }));
+vi.mock('../../../../lib/overdeck/issue-projects.js', () => ({ getIssueWorkspacePath: mocks.getIssueWorkspacePath }));
+vi.mock('../../../../lib/deft/archive.js', () => ({ isNativeDirectiveProject: async () => false }));
+vi.mock('../../../../lib/activity-logger.js', () => ({ emitActivityEntry: mocks.emitActivityEntry }));
+vi.mock('../../../../lib/projects.js', async importOriginal => ({
+  ...(await importOriginal<typeof import('../../../../lib/projects.js')>()),
+  listProjectsAsync: mocks.listProjectsAsync,
+}));
+
+const { deftRouteLayer, setDeftPipelineSpawnerForTests } = await import('../deft.js');
+
+const GOLDEN = JSON.parse(readFileSync(GOLDEN_PATH, 'utf8'));
+const scratch = mkdtempSync(join(tmpdir(), 'deft-routes-'));
+afterAll(() => rmSync(scratch, { recursive: true, force: true }));
+
+async function call(method: string, path: string, init: { body?: unknown; origin?: string | null } = {}) {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (init.origin !== null) headers.Origin = init.origin ?? 'http://localhost:3011';
+  const request = HttpServerRequest.fromWeb(new Request(`http://localhost${path}`, {
+    method,
+    headers,
+    body: init.body === undefined ? undefined : JSON.stringify(init.body),
+  }));
+  const response = await Effect.runPromise(Effect.scoped(Effect.flatMap(
+    HttpRouter.toHttpEffect(deftRouteLayer),
+    (app) => Effect.provideService(app, HttpServerRequest.HttpServerRequest, request),
+  )));
+  const payload = (response as { body: { body?: Uint8Array } }).body;
+  const text = payload?.body ? new TextDecoder().decode(payload.body) : '';
+  return { status: (response as { status?: number }).status ?? 200, json: text ? JSON.parse(text) : null };
+}
+
+class FakeChild extends EventEmitter {
+  stdout = new EventEmitter() as EventEmitter & { resume: () => void };
+  stderr = new EventEmitter();
+  unref = vi.fn();
+  constructor() {
+    super();
+    this.stdout.resume = () => undefined;
+  }
+}
+
+let children: FakeChild[];
+const spawner = vi.fn((_args: string[], _env: Record<string, string>) => {
+  const child = new FakeChild();
+  children.push(child);
+  return child as unknown as ChildProcess;
+});
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  children = [];
+  setDeftPipelineSpawnerForTests(spawner);
+  mocks.isDeftPipelineIssue.mockResolvedValue(true);
+  mocks.getIssueWorkspacePath.mockReturnValue(FIXTURE_DIR);
+  mocks.listProjectsAsync.mockResolvedValue([]);
+});
+
+afterEach(() => {
+  // Let every switch finish so the in-memory running set is empty for the next test.
+  for (const child of children) child.emit('exit', 0);
+  setDeftPipelineSpawnerForTests(null);
+});
+
+describe('GET /api/issues/:id/deft', () => {
+  it('returns 400 for an invalid issue id', async () => {
+    expect((await call('GET', '/api/issues/not-an-id/deft')).status).toBe(400);
+  });
+
+  it('returns 404 for an issue that does not run on Deft', async () => {
+    mocks.isDeftPipelineIssue.mockResolvedValue(false);
+    const res = await call('GET', '/api/issues/PAN-1/deft');
+    expect(res.status).toBe(404);
+    expect(res.json).toEqual({ error: 'PAN-1 does not run on Deft' });
+  });
+
+  it('returns 404 when the Deft issue has no workspace', async () => {
+    mocks.getIssueWorkspacePath.mockReturnValue(null);
+    const res = await call('GET', '/api/issues/PAN-1/deft');
+    expect(res.status).toBe(404);
+    expect(res.json).toEqual({ error: 'no workspace' });
+  });
+
+  it('returns the state read from the workspace', async () => {
+    // The golden's overdue flags are computed at 2026-11-02T18:00Z.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-02T18:00:00Z'));
+    try {
+      const res = await call('GET', '/api/issues/pan-1/deft');
+      expect(res.status).toBe(200);
+      expect(res.json).toEqual(GOLDEN);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('GET /api/deft/issues', () => {
+  it('summarizes every issue whose override file holds pipeline: deft', async () => {
+    const project = mkdtempSync(join(scratch, 'project-'));
+    const overrides = join(project, '.pan', 'skill-overrides');
+    mkdirSync(overrides, { recursive: true });
+    writeFileSync(join(overrides, 'PAN-1.yaml'), 'pipeline: deft\n');
+    writeFileSync(join(overrides, 'PAN-2.yaml'), 'pipeline: deft\n');
+    writeFileSync(join(overrides, 'PAN-3.yaml'), 'skills: {}\n');
+    mocks.listProjectsAsync.mockResolvedValue([{ key: 'p', config: { name: 'p', path: project } }]);
+    mocks.getIssueWorkspacePath.mockImplementation((id: string) => (id === 'PAN-1' ? FIXTURE_DIR : null));
+
+    const res = await call('GET', '/api/deft/issues');
+
+    expect(res.status).toBe(200);
+    expect(res.json).toEqual({
+      issues: [
+        {
+          issueId: 'PAN-1',
+          scopeCounts: { proposed: 1, pending: 1, active: 1, completed: 1, cancelled: 1 },
+          specDriftUnresolved: 1,
+          installDrift: 0,
+          handoffState: 'pr_open',
+          openEscalations: 3,
+        },
+        { issueId: 'PAN-2', scopeCounts: {}, specDriftUnresolved: 0, installDrift: 0, handoffState: null, openEscalations: 0 },
+      ],
+    });
+  });
+});
+
+describe('POST /api/issues/:id/pipeline', () => {
+  it('refuses a missing Origin with 403', async () => {
+    const res = await call('POST', '/api/issues/PAN-1/pipeline', { body: { pipeline: 'deft' }, origin: null });
+    expect(res.status).toBe(403);
+    expect(spawner).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for a bad body', async () => {
+    expect((await call('POST', '/api/issues/PAN-1/pipeline', { body: { pipeline: 'other' } })).status).toBe(400);
+    expect((await call('POST', '/api/issues/PAN-1/pipeline', { body: { pipeline: 'deft', start: 'yes' } })).status).toBe(400);
+    expect(spawner).not.toHaveBeenCalled();
+  });
+
+  it('answers 202 and spawns pan skills deft use once', async () => {
+    const res = await call('POST', '/api/issues/pan-1/pipeline', { body: { pipeline: 'deft', start: true } });
+    expect(res.status).toBe(202);
+    expect(res.json).toEqual({ accepted: true, issueId: 'PAN-1', pipeline: 'deft' });
+    expect(spawner).toHaveBeenCalledTimes(1);
+    expect(spawner.mock.calls[0]![0]).toEqual(['skills', 'deft', 'use', 'PAN-1', '--start']);
+  });
+
+  it('spawns back without --start for the Overdeck pipeline', async () => {
+    await call('POST', '/api/issues/PAN-1/pipeline', { body: { pipeline: 'overdeck', start: true } });
+    expect(spawner.mock.calls[0]![0]).toEqual(['skills', 'deft', 'back', 'PAN-1']);
+  });
+
+  it('returns 409 for a second switch before the first exits, then accepts after exit', async () => {
+    expect((await call('POST', '/api/issues/PAN-1/pipeline', { body: { pipeline: 'deft' } })).status).toBe(202);
+    const second = await call('POST', '/api/issues/PAN-1/pipeline', { body: { pipeline: 'overdeck' } });
+    expect(second.status).toBe(409);
+    expect(second.json).toEqual({ error: 'a pipeline switch for PAN-1 is already running' });
+    expect(spawner).toHaveBeenCalledTimes(1);
+
+    children[0]!.emit('exit', 0);
+    expect(mocks.emitActivityEntry).toHaveBeenCalledWith({ source: 'dashboard', level: 'info', message: 'Switched PAN-1 to deft', issueId: 'PAN-1' });
+    expect((await call('POST', '/api/issues/PAN-1/pipeline', { body: { pipeline: 'overdeck' } })).status).toBe(202);
+  });
+
+  it('records the last stderr lines when the switch fails', async () => {
+    await call('POST', '/api/issues/PAN-1/pipeline', { body: { pipeline: 'deft' } });
+    children[0]!.stderr.emit('data', 'line 1\nline 2\nline 3\nline 4\nline 5\nline 6\n');
+    children[0]!.emit('exit', 1);
+    expect(mocks.emitActivityEntry).toHaveBeenCalledWith({
+      source: 'dashboard',
+      level: 'error',
+      message: 'Pipeline switch for PAN-1 failed: line 2\nline 3\nline 4\nline 5\nline 6',
+      issueId: 'PAN-1',
+    });
+  });
+});
