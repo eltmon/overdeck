@@ -16,6 +16,7 @@ import type { HostHub, PeerHubContext } from '../../sharing/peer-hub.js';
 import {
   PING_INTERVAL_MS,
   PONG_TIMEOUT_MS,
+  SHARE_RECONNECT_DELAYS_MS,
   ShareManager,
   type ShareManagerDeps,
   type ShareSocket,
@@ -280,17 +281,25 @@ describe('ShareManager', () => {
     expect(view?.lastError).toEqual({ code: 'unknown_participant', githubId: 7, at: '2026-11-02T00:00:00.000Z' });
   });
 
-  it('close 4004 removes the record; close 1006 keeps it disconnected (ac3)', async () => {
+  it('close 4004 removes the record; close 1006 reconnects after 1 s (ac3)', async () => {
     const ended = harness();
     (await createConnected(ended)).drop(4004);
     expect(await ended.manager.list()).toEqual([]);
     expect(ended.store).toEqual({});
 
     const dropped = harness();
-    (await createConnected(dropped)).drop(1006);
+    const first = await createConnected(dropped);
+    first.drop(1006);
     const [view] = await dropped.manager.list();
-    expect(view).toMatchObject({ shortCode: 'BCDFGHJK', connection: 'disconnected' });
+    expect(view).toMatchObject({ shortCode: 'BCDFGHJK', connection: 'reconnecting' });
     expect(Object.keys(dropped.store)).toEqual(['BCDFGHJK']);
+    await vi.advanceTimersByTimeAsync(999);
+    expect(dropped.sockets).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(dropped.sockets).toHaveLength(2);
+    const second = dropped.sockets[1] as FakeSocket;
+    expect(second.url).toBe(first.url);
+    expect(second.headers).toEqual({ Authorization: `Bearer ${hostToken(1)}` });
   });
 
   it('close 4008 records lastError replaced and keeps the record', async () => {
@@ -301,7 +310,15 @@ describe('ShareManager', () => {
     expect(Object.keys(h.store)).toEqual(['BCDFGHJK']);
   });
 
-  it('an unexpected 404 at the upgrade removes the record; a 500 keeps it', async () => {
+  it('close 4008 does not reconnect', async () => {
+    const h = harness();
+    (await createConnected(h)).drop(4008);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(h.sockets).toHaveLength(1);
+    expect((await h.manager.list())[0]?.connection).toBe('disconnected');
+  });
+
+  it('an unexpected 404 at the upgrade removes the record; a 500 reconnects', async () => {
     const gone = harness();
     await gone.manager.create(SCOPE);
     (gone.sockets[0] as FakeSocket).emit('unexpected-response', {}, { statusCode: 404 });
@@ -311,7 +328,78 @@ describe('ShareManager', () => {
     const flaky = harness();
     await flaky.manager.create(SCOPE);
     (flaky.sockets[0] as FakeSocket).emit('unexpected-response', {}, { statusCode: 500 });
-    expect(await flaky.manager.list()).toMatchObject([{ connection: 'disconnected' }]);
+    expect(await flaky.manager.list()).toMatchObject([{ connection: 'reconnecting' }]);
+    expect((flaky.sockets[0] as FakeSocket).terminated).toBe(true);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(flaky.sockets).toHaveLength(2);
+  });
+
+  it('backs off 1, 2, 4, 8, 15, 30, 30 s and resets after a room frame', async () => {
+    const h = harness();
+    await createConnected(h);
+    const schedule = [1_000, 2_000, 4_000, 8_000, 15_000, 30_000, 30_000];
+    expect(SHARE_RECONNECT_DELAYS_MS).toEqual(schedule.slice(0, 6));
+    for (const [i, delay] of schedule.entries()) {
+      (h.sockets.at(-1) as FakeSocket).drop(1006);
+      await vi.advanceTimersByTimeAsync(delay - 1);
+      expect(h.sockets).toHaveLength(i + 1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(h.sockets).toHaveLength(i + 2);
+    }
+    const newest = h.sockets.at(-1) as FakeSocket;
+    newest.open();
+    newest.deliver({ type: 'room', snapshot: snapshot('BCDFGHJK') });
+    expect((await h.manager.list())[0]?.connection).toBe('connected');
+    newest.drop(1006);
+    await vi.advanceTimersByTimeAsync(999);
+    expect(h.sockets).toHaveLength(8);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(h.sockets).toHaveLength(9);
+  });
+
+  it('a 404 on a reconnect attempt removes the record and stops', async () => {
+    const h = harness();
+    (await createConnected(h)).drop(1006);
+    await vi.advanceTimersByTimeAsync(1000);
+    (h.sockets[1] as FakeSocket).emit('unexpected-response', {}, { statusCode: 404 });
+    expect(await h.manager.list()).toEqual([]);
+    expect(h.store).toEqual({});
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(h.sockets).toHaveLength(2);
+  });
+
+  it('end and stop cancel a pending reconnect', async () => {
+    const ended = harness();
+    (await createConnected(ended)).drop(1006);
+    expect(await ended.manager.end('BCDFGHJK')).toEqual({ status: 204 });
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(ended.sockets).toHaveLength(1);
+
+    const stopped = harness();
+    (await createConnected(stopped)).drop(1006);
+    stopped.manager.stop();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(stopped.sockets).toHaveLength(1);
+    expect(Object.keys(stopped.store)).toEqual(['BCDFGHJK']);
+  });
+
+  it('late events from a replaced socket change nothing', async () => {
+    const h = harness();
+    const old = await createConnected(h);
+    old.drop(1006);
+    await vi.advanceTimersByTimeAsync(1000);
+    const fresh = h.sockets[1] as FakeSocket;
+    fresh.open();
+    fresh.deliver({ type: 'room', snapshot: snapshot('BCDFGHJK') });
+
+    old.drop(4004);
+    old.emit('error', new Error('late'));
+    old.deliver({ type: 'room', snapshot: snapshot('BCDFGHJK', { hostConnected: false }) });
+
+    expect(await h.manager.list()).toMatchObject([{ connection: 'connected', snapshot: snapshot('BCDFGHJK') }]);
+    expect(Object.keys(h.store)).toEqual(['BCDFGHJK']);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(h.sockets).toHaveLength(2);
   });
 
   it('pings every 30 s and terminates after 75 s without a pong (ac4)', async () => {
@@ -326,7 +414,7 @@ describe('ShareManager', () => {
     await vi.advanceTimersByTimeAsync(1);
     expect(socket.terminated).toBe(true);
     const [view] = await h.manager.list();
-    expect(view?.connection).toBe('disconnected');
+    expect(view?.connection).toBe('reconnecting');
     expect(Object.keys(h.store)).toEqual(['BCDFGHJK']);
   });
 
@@ -490,6 +578,32 @@ describe('ShareManager WebRTC hub wiring (PAN-4474)', () => {
     const other = await createConnected(second.h);
     other.drop(4004);
     expect(second.hub().count('close')).toBe(1);
+  });
+
+  it('keeps one hub across a reconnect and routes the new socket\'s room frame to it', async () => {
+    const { h, hubs, hub } = hubHarness();
+    (await createConnected(h)).drop(1006);
+    await vi.advanceTimersByTimeAsync(1000);
+    const fresh = h.sockets[1] as FakeSocket;
+    fresh.open();
+    fresh.deliver({ type: 'room', snapshot: snapshot('BCDFGHJK', { participants: [] }) });
+    expect(hubs).toHaveLength(1);
+    expect(hub().count('close')).toBe(0);
+    expect(hub().count('onSnapshot')).toBe(2);
+  });
+
+  it('sends hub frames on the new socket after a reconnect', async () => {
+    const { h, hub } = hubHarness();
+    const old = await createConnected(h);
+    old.drop(1006);
+    expect(hub().ctx.sendFrame({ type: 'ice-servers' })).toBe(false);
+    await vi.advanceTimersByTimeAsync(1000);
+    const fresh = h.sockets[1] as FakeSocket;
+    fresh.open();
+    fresh.deliver({ type: 'room', snapshot: snapshot('BCDFGHJK') });
+    expect(hub().ctx.sendFrame({ type: 'ice-servers' })).toBe(true);
+    expect(fresh.sent).toEqual([JSON.stringify({ type: 'ice-servers' })]);
+    expect(old.sent).toEqual([]);
   });
 
   it('closes the hub once on end and on stop', async () => {
