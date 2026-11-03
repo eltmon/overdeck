@@ -567,6 +567,20 @@ The launch agent `~/Library/LaunchAgents/ai.overdeck.supervisor.plist` starts wh
 in. macOS has no lingering for user agents, so a Mac that must come back after a reboot
 with nobody logged in needs automatic login (**System Settings → Users & Groups**).
 
+macOS 15+'s Local Network privacy blocks that launch agent's connections to other machines
+on this network until you allow them. `pan connect` prints the exact note:
+
+```
+macOS blocks the server's connections to other machines on this network until you allow them: on this Mac, open System Settings → Privacy & Security → Local Network and turn on node (/opt/homebrew/bin/node). node appears in that list after the server first tries to reach another machine, so check it once this Mac is linked.
+```
+
+Turn on `node` at the printed path in **System Settings → Privacy & Security → Local
+Network**; the entry only appears there after the server's first attempt to reach another
+machine, so it will not be listed immediately after `pan connect`. Homebrew's `node` is
+ad-hoc signed, so macOS can treat an upgraded binary as a new app — check the grant again
+after `brew upgrade node`. When `node` is not in the list at all, link over Tailscale
+instead (`pan tailscale setup`).
+
 ### No systemd
 
 In a container, without `XDG_RUNTIME_DIR` (for example after `su` instead of logging in over
