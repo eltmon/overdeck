@@ -24,6 +24,7 @@ see [cli/skills-commands.mdx](../cli/skills-commands.mdx).
 | `browser.ts` | `buildBrowserRuntime`, `isBrowserReady`, `browserDownloads` |
 | `gstack.ts` | `GSTACK_SKILL_MAP`, `classifyGstackSkill`, `GSTACK_DISCLOSURE` |
 | `deft.ts` | `DEFT_SKILL_MAP`, `DEFT_READONLY_SKILLS`, `applyDeftHostNotice` |
+| `ox-build.ts` | `buildOx`, `isOxBuildReady`, `assertGoAvailable`, `oxBuildCommands`, `oxBuildDownloads`, `oxBuildEnv`, `OX_BINARIES`, `OX_BUILD_MARKER`: the `sageox` pack's `go build` of `ox` and its two adapters (PAN-4852) |
 
 ### `src/lib/skill-overrides/`
 
@@ -42,8 +43,8 @@ see [cli/skills-commands.mdx](../cli/skills-commands.mdx).
 | File | Responsibility |
 |---|---|
 | `issue-pipeline.ts` | `readIssuePipeline`, `isDeftPipelineIssue`: the issue file's `pipeline: deft` key; errors read as Overdeck |
-| `install-snapshot.ts` | `DeftInstallSnapshot`, `readDeftSnapshot`, `writeDeftSnapshot`, `touchedDeftDir` |
-| `install.ts` | `installDeftIntoWorktree`, `runDirectiveInstall` (npm/pnpm launcher, or `bun add` plus runtime setup for Bun), `deftExcludeFilePath` |
+| `install-snapshot.ts` | `DeftInstallSnapshot`, `readDeftSnapshot`, `writeDeftSnapshot`, `touchedDeftDir`, `legacyDeftExcludeFilePath` (the pre-PAN-4852 exclude file that `uninstall.ts` still clears) |
+| `install.ts` | `installDeftIntoWorktree`, `runDirectiveInstall` (npm/pnpm launcher, or `bun add` plus runtime setup for Bun); hides the deposit through `src/lib/git/worktree-exclude.ts` |
 | `uninstall.ts` | `removeDeftInstall`: exact undo from the snapshot |
 | `lift.ts` | `withDeftInstallLifted`, `DeftLiftError` |
 | `archive.ts` | `planDeftArchive`, `saveDeftState`, `isDeftArchiveCurrent`, `isNativeDirectiveProject` |
@@ -58,25 +59,83 @@ see [cli/skills-commands.mdx](../cli/skills-commands.mdx).
 
 `pan skills deft use|back|save|show` (`src/cli/commands/skills-deft-pipeline.ts`)
 switch one issue onto Deft Directive's pipeline. The install snapshot is
-`<worktree>/.overdeck/deft-install.json`; the exclude file is
-`<git-dir>/info/overdeck-deft-exclude`; the run summary is
+`<worktree>/.overdeck/deft-install.json`; the hide is the `deft` block in
+`<git-dir>/info/overdeck-exclude` (shared with SageOx, see below); the run summary is
 `<worktree>/.overdeck/deft-run-summary.jsonl`. The lift wraps
 `rebaseFeatureBranch` (`src/lib/cloister/merge-rebase.ts`), each repo sync in
 `syncMainAcrossWorkspaceRepos` (`src/lib/cloister/sync-main-workspace.ts`), and
 the merge train's sibling rebase and force-push (`rebaseSibling` in
 `src/lib/cloister/merge-train-deps.ts`).
 The merge gate (`evaluateIssueMergeGate`, `src/lib/cloister/merge-gate.ts`)
-waives approval at head for a Deft issue and runs `deftMergeGuardForIssue`;
-`forgeMergeGate` raises the drift decision, and the forge-merge route runs the
-guard itself. `startRequestReviewPipeline`, `spawnReviewRoleForIssueBody` and
+waives approval at head for a Deft issue and runs `deftMergeGuardForIssue`
+through `evaluateRepoMergeGuards` (`src/lib/cloister/repo-merge-guards.ts`);
+`forgeMergeGate` raises the drift decision, and the forge-merge route calls
+`evaluateRepoMergeGuards` itself. `startRequestReviewPipeline`, `spawnReviewRoleForIssueBody` and
 `spawnRun` keep Overdeck review and test agents off Deft issues; the derived
 state treats `deftPipeline` as approved; the auto-merge schedule route,
 scheduler and executor apply `deftAutoMergeHold`. User guide:
 `features/skill-packs.mdx`, "Running an issue on Deft".
 
+### `src/lib/sageox/` and the shared hide — SageOx (PAN-2444, PAN-4852)
+
+| File | Responsibility |
+|---|---|
+| `disclosure.ts` | `SAGEOX_DISCLOSURE` (leaf module) |
+| `config.ts` | `sageox_upload` and `sageox_binding: committed` in `projects.yaml`: `readSageoxUpload`, `setSageoxUpload`, `readSageoxBindingCommitted`, `setSageoxBindingCommitted` |
+| `probe.ts` | `probeOxHostContract`: `ox host-contract --json` with a 2 s timeout |
+| `binary.ts` | `resolveOxBinary`: the built `<packdir>/<commit>/bin/ox` for the trusted commit; no `PATH` fallback |
+| `binding.ts` | The binding store: `bindingDir`, `readBinding`, `writeBinding`, `defaultBranchTracksSageox`, `readSageoxLinkState` |
+| `placement.ts` | `sageoxDirState` (tracked, placed, hand-made, absent), `ensureSageoxPlaced`, `removeSageoxPlacement`, `PLACEMENT_MARKER` |
+| `launch.ts` | `resolveSageoxLaunch`, `oxHookCommand`, `sageoxClaudeHooks`, `SAGEOX_CLAUDE_EVENTS` |
+| `codex-hooks.ts` | `writeSageoxCodexHooks`, `removeSageoxCodexHooks`, `codexHookTrustHash`, `SAGEOX_CODEX_EVENTS` |
+| `link.ts` | `linkSageoxProject` (`pan skills pack sageox link`), `sageoxAuthFilePath` |
+| `commit.ts` | `commitSageoxBinding` (`pan skills pack sageox commit`), `SAGEOX_LINK_BRANCH` |
+| `merge-guard.ts` | `evaluateSageoxMergeGuard`, `readSageoxChangedPaths`, `sageoxMergeGuardForIssue` |
+| `../git/worktree-exclude.ts` | `excludeTarget`, `setExcludeBlock`, `readExcludeBlock`, `removeExcludeBlock`: owner blocks (`deft`, `sageox`) in `<git-dir>/info/overdeck-exclude` for a linked worktree, or in `info/exclude` for the primary checkout |
+| `../cloister/repo-merge-guards.ts` | `evaluateRepoMergeGuards`: the Deft guard, then the SageOx guard; the first refusal wins |
+
+### SageOx
+
+The `sageox` pack builds `ox`, `ox-adapter-claude-code` and
+`ox-adapter-codex` into `~/.overdeck/packs/sageox/<commit>/bin/` with Go's
+caches under `~/.overdeck/packs/sageox/go/` (`oxBuildEnv`). The build marker
+`bin/.overdeck-ox-build.json` (`OX_BUILD_MARKER`) is written last; a build is
+ready only when it names the trusted commit and `bin/ox` is executable. Only
+`add`, `update` and `sync` build; launches, probes, hooks and doctor use the
+built binary (`resolveOxBinary`). `scripts/check-sageox-build-home.sh` runs
+`pan skills pack add sageox --yes` with an empty `HOME` and fails if anything
+lands outside `~/.overdeck/` or under `packs/` outside `sageox/`.
+
+The **binding store** `~/.overdeck/packs/sageox/bindings/<project>/` holds the
+untracked `.sageox/` files `ox init` wrote in `link`'s throwaway worktree
+(`config.json` required, at most 50 files). `removePack('sageox')` keeps it. At
+launch, `ensureSageoxPlaced` copies it into the git root's `.sageox/` and
+writes the **marker** `.sageox/.overdeck-placed` (`{ version, projectKey,
+files, placedAt }`); `removeSageoxPlacement` deletes only marker-listed
+untracked files, then the marker. Both resolve every marker path inside
+`.sageox/` before deleting, since the marker lives in the worktree.
+
+The hide is one `sageox` owner block in the same exclude file Deft uses
+(`worktree-exclude.ts`). A worktree has only one `core.excludesFile`, so the
+two owners share it.
+
+For Codex, `writeSageoxCodexHooks` writes `<codexHome>/hooks.json` and the
+**Codex trust block** (`# overdeck:sageox-hooks:begin` …
+`# overdeck:sageox-hooks:end`) at the end of `config.toml`, one
+`[hooks.state."<realpath(codexHome)>/hooks.json:<event_snake>:0:0"]` table
+with `trusted_hash` per event. The launch-settings step writes it after
+`initCodexHome` and the pack block, so it survives both rewrites.
+
+The merge guard runs in `evaluateIssueMergeGate` (for otherwise-ready PRs) and
+in the forge-merge route, both through `evaluateRepoMergeGuards`. It is
+server-reachable, so its git calls are async `execFile` with a 30 s timeout.
+Fork contract and ledger: [docs/SAGEOX-FORK.md](SAGEOX-FORK.md). User guide:
+`features/skill-packs.mdx`, "SageOx".
+
 ### Other files
 
 `src/cli/commands/skills.ts`, `src/cli/commands/skills-deft.ts`, `src/cli/commands/skills-deft-pipeline.ts`,
+`src/cli/commands/skills-sageox.ts`, `src/cli/commands/doctor-sageox.ts`,
 `src/dashboard/server/routes/misc/skill-overrides.ts`,
 `src/dashboard/frontend/src/components/skills/SkillPacksSection.tsx`,
 `src/lib/sageox/`, `src/lib/deft/`.
@@ -128,7 +187,7 @@ fields each adapter fills in — see their type definitions in `adapters.ts`.
 | `adapter` | Default adapter | all known packs |
 | `skillsRoot` | Directory the `plain` adapter scans instead of `skills/`, relative to the plugin root | `sageox` |
 | `pluginRoot` | Repo-relative directory holding the plugin (manifest, skills, agents, hooks, license); default the repo root | `pstack` |
-| `ref` | Ref `pan skills pack add <id>` pins when `--ref` is omitted (a tag, branch, or 40-hex commit) | `pstack` |
+| `ref` | Ref `pan skills pack add <id>` pins when `--ref` is omitted (a tag, branch, or 40-hex commit) | `pstack`, `sageox` |
 | `mountExtras` | Plugin-root-relative files or directories the mount copies next to `skills/` | `pstack` |
 | `optIn` | Skill names that are opt-in: the pack toggle never turns them on | `mattpocock`, `sageox`, `gstack`, `pstack` |
 | `disclosure` | One-line statement of what leaves the machine, shown on the pack row | `sageox`, `gstack` |
@@ -196,10 +255,13 @@ fields each adapter fills in — see their type definitions in `adapters.ts`.
 
 | Part | Test file |
 |---|---|
-| Pack adapters, sources, browser sources, mount, render, browser, gstack, Deft | `src/lib/skill-packs/__tests__/{adapters,sources,sources-browser,mount,render,browser,gstack,deft}.test.ts` |
+| Pack adapters, sources, browser sources, mount, render, browser, gstack, Deft, the `ox` build | `src/lib/skill-packs/__tests__/{adapters,sources,sources-browser,sources-sageox,mount,render,browser,gstack,deft,ox-build}.test.ts` |
 | Skill override resolution, store, launch, conversation flags | `src/lib/skill-overrides/__tests__/{resolve,store,launch,conversation-flags}.test.ts` |
 | CLI: skills, pack browser, SageOx doctor check | `src/cli/commands/__tests__/{skills,skills-pack-browser,doctor-sageox}.test.ts` |
 | Dashboard skill-overrides route | `src/dashboard/server/routes/__tests__/skill-overrides-route.test.ts` |
 | Dashboard skill packs UI | `src/dashboard/frontend/src/components/skills/SkillPacksSection.test.tsx` |
-| SageOx | `src/lib/sageox/__tests__/*.test.ts` |
+| SageOx (binary, binding, placement, launch, Codex hooks, link, commit, merge guard, config, probe) | `src/lib/sageox/__tests__/*.test.ts` |
+| Shared hide | `src/lib/git/__tests__/worktree-exclude.test.ts` |
+| Repo merge guards | `src/lib/cloister/__tests__/repo-merge-guards.test.ts` |
+| SageOx build with an empty `HOME` (operator script, needs Go and the network) | `scripts/check-sageox-build-home.sh` |
 | Deft | `src/lib/deft/__tests__/*.test.ts` |

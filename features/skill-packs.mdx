@@ -35,7 +35,7 @@ Changes apply at the next launch; a running agent keeps the skills it launched w
 | `gstack` | `garrytan/gstack` | fork `eltmon/gstack`, `--ref main` (pack mode) | `gstack-runtime` | 22 / 14 | Yes: `bash setup --pack-root …` at add, update and sync; skill scripts when you invoke a skill | needs bun; upstream commits fail the pack-mode check |
 | gstack browser runtime | `garrytan/gstack` | the same render | part of `gstack-runtime` | 9 / 9 (browser / browser-opt-in) | Yes: `bun install`, five compiled binaries, Chromium download (about 1 GB on disk) | second consent: `pan skills pack browser gstack` |
 | `deft` | `deftai/directive` | fork `eltmon/directive`, `--ref <ref>` (default branch `master`) | `deft-readonly` | 7 / 0 | No | host notice in every mounted skill |
-| `sageox` | `sageox/ox` | fork `eltmon/ox`, `--ref overdeck/host-managed` | `plain`, skills root `extensions/skills` | 15 / 9 | No pack code; Overdeck-added hooks run the `ox` you build from the fork | Claude Code only; uploads are a second opt-in |
+| `sageox` | `sageox/ox` | fork `eltmon/ox` at `0e6c7e2` (default ref, branch `overdeck/host-managed-v0.25.0`) | `plain`, skills root `extensions/skills` | 17 / 9 | Overdeck builds `ox` (and the Claude Code and Codex adapters) from the pinned commit; Overdeck-added hooks run it | needs Go; Claude Code and Codex; uploads are a second opt-in |
 | any git repo (example `impeccable`) | `pbakaus/impeccable` | the url you pass, `--ref skill-v4.7.0` | detected: `claude-plugin` (has `.claude-plugin/plugin.json`), else `plain` | 1 / 0 | No | `pan skills pack add impeccable https://github.com/pbakaus/impeccable --ref skill-v4.7.0` |
 
 Counts are at the commit in the Source column. The add and update preview shows the counts for your commit. Each pack has its own section under [Packs](#packs).
@@ -91,7 +91,7 @@ Adding a pack trusts this commit and enables nothing. Turn it on with: pan skill
 
 Adding a pack trusts the resolved commit and turns nothing on. In a terminal, Overdeck asks `Trust this commit? [y/N]`. Without a terminal, pass `--yes`; otherwise nothing is written. The pack id must match `[a-z0-9][a-z0-9-]*` and cannot be a core skill name. Overdeck picks the adapter itself (the known-pack default, else `claude-plugin` when the repo has `.claude-plugin/plugin.json`, otherwise `plain`); pass `--adapter plain|claude-plugin|deft-readonly|gstack-runtime` to choose. A repository cannot register a pack by committing a file; only `pan skills pack add` can.
 
-For a known pack (`mattpocock`, `pstack`, `gstack`, `deft`, `sageox`) the url is optional. Only `pstack` also has a default ref, so `pan skills pack add pstack` is enough; the others need `--ref`.
+For a known pack (`mattpocock`, `pstack`, `gstack`, `deft`, `sageox`) the url is optional. `pstack` and `sageox` also have a default ref, so `pan skills pack add pstack` and `pan skills pack add sageox` are enough; the others need `--ref`.
 
 ### What is not applied
 
@@ -106,12 +106,13 @@ Runtime packs (gstack) are the exception: their scripts are mounted and run when
 - A repository cannot register itself; only `pan skills pack add` can.
 - Overdeck mounts skill directories only. Hooks, MCP servers, commands, agents, context injection, git hooks and scripts are **Not applied**; scripts inside a skill directory are copied but never run by Overdeck. See [What is not applied](#what-is-not-applied).
 - Runtime packs are the exception: gstack runs its pack-mode setup once per trusted commit (at add, update or sync) and its scripts when you invoke a skill; the preview lists every script before you trust it. See [gstack](#gstack).
+- SageOx is the other exception: Overdeck runs `go build` on the trusted commit (at add, update or sync) and runs the built `ox` from hooks it adds itself; the preview lists the build commands, the paths they write, and the downloads. See [SageOx](#sageox).
 - The gstack browser runtime is a second, separate consent that lists every download and path it writes.
 - Opt-in skills change files Overdeck owns or reach paid, cloud or push actions; the pack toggle never turns them on. See [How packs turn on and off](#how-packs-turn-on-and-off).
 - A launch never touches the network: it mounts from the cache or skips the pack with a warning.
 - Pack skills never land in `~/.claude/skills` or `~/.agents/skills`, so they cannot reach sessions you start outside Overdeck.
 - Disclosures: the `sageox` and `gstack` pack rows show what leaves the machine.
-  - SageOx: "SageOx records agent sessions on this machine. With uploads off (the default) Overdeck runs `ox` with the network off: nothing is sent. With uploads on for a project, redacted session transcripts and session metadata are uploaded to the SageOx cloud ledger for that repo, and `ox` may fetch team context. Requires the eltmon/ox build; see `pan doctor`."
+  - SageOx: "SageOx records agent sessions on this machine. With uploads off (the default) Overdeck runs `ox` with the network off: nothing is sent. With uploads on for a project, redacted session transcripts and session metadata are uploaded to the SageOx cloud ledger for that repo, and `ox` may fetch team context. Overdeck builds ox from the eltmon/ox fork; see `pan doctor`."
   - gstack: "Runs gstack's bash and bun scripts from ~/.overdeck/packs/gstack; telemetry and update checks are off. Opt-in skills can send code to OpenAI (codex) or call paid or cloud APIs. The optional browser runtime downloads npm packages and Chromium into ~/.overdeck/packs/gstack/browser."
 - Deft skills carry a host notice, and outside a Directive project Claude Code launches deny Deft's CLIs. See [Deft Directive](#deft-directive).
 - `pan skills pack remove <id>` deletes the cache, every mount that holds the pack, dangling launch links, and Codex plugin caches.
@@ -141,7 +142,7 @@ Known packs come from operator-controlled forks under `github.com/eltmon/`. A fo
 | `eltmon/plugins` | `cursor/plugins` | No | `gh repo sync eltmon/plugins` | `pan skills pack update pstack --ref <commit>` |
 | `eltmon/directive` | `deftai/directive` | No | `gh repo sync eltmon/directive` (default branch `master`) | `pan skills pack update deft --ref <ref>`, then `pan skills deft status` |
 | `eltmon/gstack` | `garrytan/gstack` | Yes: pack mode | merge in a fork clone, see below | `pan skills pack update gstack` |
-| `eltmon/ox` | `sageox/ox` | Yes: host-managed mode | rebase `overdeck/host-managed` in a fork clone; branch ledger in [docs/SAGEOX-FORK.md](https://github.com/eltmon/overdeck/blob/main/docs/SAGEOX-FORK.md) | rebuild `ox` at the new commit, `ox host-contract --json`, `pan skills pack update sageox --ref overdeck/host-managed`, `pan doctor` |
+| `eltmon/ox` | `sageox/ox` | Yes: host-managed mode | rebase `overdeck/host-managed` onto the newest upstream tag as new `-v<tag>` branches (never force-push the old ones); ledger in [docs/SAGEOX-FORK.md](https://github.com/eltmon/overdeck/blob/main/docs/SAGEOX-FORK.md) | `pan skills pack update sageox --ref <new head>` (rebuilds `ox`), `pan doctor` |
 
 Never run `gh repo sync --force` on `eltmon/gstack` or `eltmon/ox`; it hard-resets the branch and deletes the fork's own commits.
 
@@ -156,7 +157,7 @@ Never run `gh repo sync --force` on `eltmon/gstack` or `eltmon/ox`; it hard-rese
 
 ### When upstream is fine
 
-Any url works, and pinning already protects you: the trusted commit does not move until you confirm an update. Registering `mattpocock` from `https://github.com/mattpocock/skills` or `pstack` from `https://github.com/cursor/plugins` works the same way. gstack and SageOx need their forks: upstream gstack commits fail the pack-mode check, and the `sageox` pack needs an `ox` built from `eltmon/ox`.
+Any url works, and pinning already protects you: the trusted commit does not move until you confirm an update. Registering `mattpocock` from `https://github.com/mattpocock/skills` or `pstack` from `https://github.com/cursor/plugins` works the same way. gstack and SageOx need their forks: upstream gstack commits fail the pack-mode check, and the `sageox` pack needs the fork's host-managed mode, which Overdeck builds into its own `ox`.
 
 ## Packs
 
@@ -478,7 +479,7 @@ pan skills deft back <ISSUE> [--json]            # save, remove the install exac
 
 **What the install writes, and how it is hidden.** npm and pnpm projects run Deft's installer, `npx --yes @deftai/directive install --yes`. Deft's installer refuses Bun projects, so for a project with `bun.lock` or `bun.lockb` Overdeck adds `@deftai/directive-runtime` with `bun add -d --exact` and then runs the runtime's own `setup` step. The deposit (pointer skills, slash wrappers, hook registrations, `.githooks/`, `AGENTS.md`, `Taskfile.yml`, `xbrief/`, `.deft/`, the `package.json` pin, and the lockfile change) stays out of git:
 
-- New paths go into a per-worktree exclude file, `<git-dir>/info/overdeck-deft-exclude`, which starts with a copy of your global excludes.
+- New paths go into a `# overdeck:deft begin` … `# overdeck:deft end` block in a per-worktree exclude file, `<git-dir>/info/overdeck-exclude`, which starts with a copy of your global excludes. SageOx keeps its own block in the same file.
 - Tracked files that the install changed, such as `package.json`, `.gitignore`, and the lockfile, get `--skip-worktree`.
 - `core.hooksPath=.githooks` is set for that worktree only, through `extensions.worktreeConfig`. The shared value and the sibling worktrees are not changed.
 
@@ -509,50 +510,65 @@ Without a readable snapshot, `back` cannot undo the install exactly. It then cle
 
 ### SageOx
 
-[SageOx](https://github.com/sageox/ox) records coding-agent sessions and syncs them to a team ledger. Overdeck offers it as the `sageox` pack, built from the operator's fork [eltmon/ox](https://github.com/eltmon/ox). The fork adds a **host-managed mode**: with `OX_HOST_MANAGED=1`, `ox` writes nothing into the repository (no `AGENTS.md`/`CLAUDE.md` markers, no `.claude/settings.json` hooks), adds no attribution to commits or PRs, never asks the agent to run `ox init`, and stays offline unless Overdeck allows the network.
+[SageOx](https://github.com/sageox/ox) records coding-agent sessions and syncs them to a team ledger. Overdeck offers it as the `sageox` pack, built from the operator's fork [eltmon/ox](https://github.com/eltmon/ox). The fork adds a **host-managed mode**: with `OX_HOST_MANAGED=1`, `ox` writes nothing into the repository (no `AGENTS.md`/`CLAUDE.md` markers, no `.claude/settings.json` hooks), adds no attribution to commits or PRs, never asks the agent to run `ox init`, and stays offline unless uploads are on for the project.
 
-SageOx is **off by default**, for every project and issue. It works with **Claude Code** launches only; Codex launches never get SageOx skills or hooks, and print a warning when the pack would have been on.
+SageOx is **off by default**, for every project and issue. It works with **Claude Code** and **Codex** launches. A project does not have to commit `.sageox/` to try it: Overdeck keeps the project's SageOx link files outside the repository and places them, hidden from git, in each checkout that has SageOx on.
 
 **What leaves the machine:**
 
-> SageOx records agent sessions on this machine. With uploads off (the default) Overdeck runs `ox` with the network off: nothing is sent. With uploads on for a project, redacted session transcripts and session metadata are uploaded to the SageOx cloud ledger for that repo, and `ox` may fetch team context. Requires the eltmon/ox build; see `pan doctor`.
+> SageOx records agent sessions on this machine. With uploads off (the default) Overdeck runs `ox` with the network off: nothing is sent. With uploads on for a project, redacted session transcripts and session metadata are uploaded to the SageOx cloud ledger for that repo, and `ox` may fetch team context. Overdeck builds ox from the eltmon/ox fork; see `pan doctor`.
 
 The Skills page shows the same text on the `sageox` pack row.
 
 #### One-time setup
 
-1. **Build `ox` from the fork**, at the commit the pack trusts. Overdeck never installs `ox`. The fork needs Go 1.26 (the default `GOTOOLCHAIN=auto` downloads it).
+1. **Add the pack.** Overdeck pins the fork's head and builds `ox` itself. You need Go on `PATH`; without it, `add` stops with `pack sageox needs go on PATH (https://go.dev/dl/)`.
 
    ```bash
-   git clone git@github.com:eltmon/ox.git && cd ox
-   git switch --detach <trusted commit>      # shown by: pan skills pack list
-   go build -o ~/.local/bin/ox ./cmd/ox
-   ox host-contract --json                   # must print "contract":"overdeck-host/1"
+   pan skills pack add sageox
    ```
 
-2. **Register the pack** (the ref is a branch or tag in the fork):
+   The consent preview adds three rows before `Trust this commit? [y/N]`:
+
+   - **Builds:** the three commands, each run in the extracted commit: `go build -o <packdir>/<commit>/bin/ox ./cmd/ox`, then the same for `ox-adapter-claude-code` and `ox-adapter-codex`. Recording runs the adapter next to `ox`, so both are built.
+   - **Writes:** `<packdir>/<commit>/bin/` and `<packdir>/go/` (Go's build cache, module cache and config), where `<packdir>` is `~/.overdeck/packs/sageox`. Nothing is written to `~/.local/bin`, `~/go` or `~/.cache`.
+   - **Downloads:** the Go modules listed in `go.sum` (from `proxy.golang.org`) and, when your Go is older than the fork asks for, the Go toolchain `GOTOOLCHAIN=auto` fetches. At the pinned commit that is `Go toolchain go1.27.3 (GOTOOLCHAIN=auto)`, about 70 MB, into `<packdir>/go/mod`.
+
+   The build runs after you confirm and before the pack is registered. `pan skills pack update sageox` shows the preview and builds again when the commit moves. `pan skills pack sync sageox` builds the trusted commit without asking when its build is missing. Launches never build. The repo-writing skills (`ox-cli-init`, `ox-cli-attest`, `ox-cli-skill-manager`, `ox-cli-pr-header`, `ox-cli-plan`, and the `ox-cli-cart*` skills) are opt-in: the pack toggle never turns them on.
+
+2. **Log in to SageOx once**, with the built `ox` (`pan doctor` prints its path):
 
    ```bash
-   pan skills pack add sageox https://github.com/eltmon/ox --ref overdeck/host-managed
+   ~/.overdeck/packs/sageox/<commit>/bin/ox login
    ```
 
-   The repo-writing skills (`ox-cli-init`, `ox-cli-attest`, `ox-cli-skill-manager`, `ox-cli-pr-header`, `ox-cli-plan`, and the `ox-cli-cart*` skills) are opt-in: the pack toggle never turns them on.
+   Overdeck never runs `ox login` and never reads the login file.
 
-3. **In each repository you choose**, log in and initialize SageOx yourself, once. Overdeck never runs these commands. Host-managed `ox init` writes only `.sageox/` (no `AGENTS.md`/`CLAUDE.md` markers, no hook files, no git hooks). It registers the repository with SageOx, so it needs the network:
+3. **Link each project** you want to try SageOx in:
 
    ```bash
-   ox login
-   OX_HOST_MANAGED=1 OX_HOST_NETWORK=on ox init
-   ox status        # wait until it shows the project's ledger
+   pan skills pack sageox link --project myapp [--team <team>]
    ```
 
-   Session recording writes into a local clone of the project's SageOx ledger. The ox daemon that `ox init` starts clones it; wait until `ox status` shows the ledger. With uploads off, Overdeck keeps `ox` offline and no daemon runs, so without this clone SageOx records nothing.
+   `link` checks that the SageOx login file exists, without reading it. It then fetches the project's default branch, creates a throwaway detached worktree of `origin/<default>` under `<packdir>/tmp/`, and runs `ox init` there in host-managed mode with the network on. `ox init` registers the repository with SageOx and writes `.sageox/`. `link` stores those files as the project's **SageOx link** in `<packdir>/bindings/<project>/`. It then waits up to 120 seconds for `ox` to clone the project's ledger, and removes the throwaway worktree. No checkout of the project changes, and nothing is committed. If the ledger is not cloned within 120 seconds, `link` still succeeds and prints `the SageOx ledger is not cloned yet; ox clones it in the background. Check with: <bin> status`. Recording needs that clone. Pass `--team` when your SageOx account has several teams. See [`pan skills pack sageox link`](/cli/skills-commands#pan-skills-pack-sageox-link).
 
-4. **Turn the pack on** for that project (or one issue):
+4. **Turn the pack on** for a project, an issue, or a conversation:
 
    ```bash
-   pan skills set --pack sageox on --project myapp
+   pan skills set --pack sageox on --issue MYAPP-12
    ```
+
+   The next launch places the link files and records the session. See [Placement](#placement-and-the-hide).
+
+5. **Optional: commit the link.** When the team wants SageOx for every checkout, open one PR that adds `.sageox/`:
+
+   ```bash
+   pan skills pack sageox commit --project myapp
+   ```
+
+   It creates a throwaway worktree on a new branch `overdeck/sageox-link` from `origin/<default>`, copies the link files into `.sageox/`, commits them as `chore(sageox): add the SageOx link files`, pushes, and opens (or reuses) the PR `Add the SageOx link files (.sageox/)`. After the PR exists, it records `sageox_binding: committed` for the project in `~/.overdeck/projects.yaml`, which lets the merge guard pass PRs that change `.sageox/`. If the default branch already tracks `.sageox/config.json`, it records the flag and prints `already committed on <default>`. Known limits: the commit runs the project's git hooks in the throwaway worktree, so a project whose hooks need `node_modules` (husky, for example) fails there (Overdeck does not pass `--no-verify`); and the local `overdeck/sageox-link` branch stays in the repository on purpose, as the only copy if the push failed. See [`pan skills pack sageox commit`](/cli/skills-commands#pan-skills-pack-sageox-commit).
+
+`pan skills pack sageox status` shows each project's link state in the `LINK` column: `committed`, `held` (a link is stored), or `none`.
 
 #### Uploads
 
@@ -564,21 +580,57 @@ pan skills pack sageox upload off --project myapp
 pan skills pack sageox status [--project <key>] [--json]
 ```
 
-`status` shows, for each project, whether the pack is on (and from which level) and whether uploads are enabled. With uploads off, Overdeck sets `OX_HOST_NETWORK=off` and `OX_SESSION_PUBLISHING=manual`, so sessions stay on this machine. With uploads on, it sets `OX_HOST_NETWORK=on` and `OX_SESSION_PUBLISHING=auto`.
+`status` shows, for each project, whether the pack is on (and from which level), whether uploads are enabled, and the link state. With uploads off, Overdeck sets `OX_HOST_NETWORK=off` and `OX_SESSION_PUBLISHING=manual`, so sessions stay on this machine. With uploads on, it sets `OX_HOST_NETWORK=on` and `OX_SESSION_PUBLISHING=auto`.
+
+#### Placement and the hide
+
+When SageOx is on for a launch, Overdeck looks at `.sageox/` in the launch's git root. It has one of four states:
+
+| State | What it is | What Overdeck does |
+|---|---|---|
+| Tracked | Git tracks `.sageox/config.json` (the project committed its link) | Uses it; never writes or deletes anything there |
+| Placed | `.sageox/.overdeck-placed` exists | Owns the files the marker lists; refreshes them from the stored link |
+| Hand-made | An untracked `.sageox/` with no marker that holds a `config.json`, or a `.sageox/` symlink | Uses it; never places over it or deletes it |
+| Absent | No `.sageox/`, or an untracked `.sageox/` with neither a marker nor a `config.json` (what is left after switch-off: `ox`'s logs, cache and sessions) | Places the stored link |
+
+Placement hides `.sageox/` first, then copies each link file (a file whose bytes already match is not rewritten), then writes the marker, so a half-placed `.sageox/` never shows in `git status`. Only the checkout being launched gets a `.sageox/`; other worktrees of the project do not. If the project has no stored link, the launch continues without SageOx and prints `[launcher] WARNING: SageOx not applied: project <key> has no SageOx link; run pan skills pack sageox link --project <key>`.
+
+The hide is a `/.sageox/` pattern in an owner block (`# overdeck:sageox begin` … `# overdeck:sageox end`):
+
+- In an issue worktree (a linked worktree), the block goes into `<git-dir>/info/overdeck-exclude`, which Overdeck sets as that worktree's `core.excludesFile`. The file starts with a copy of your global excludes file and is shared with the [Deft](#running-an-issue-on-deft) hide, each in its own block. Other worktrees are not affected.
+- In the primary checkout (a conversation launched in the project root), the block goes into the repository's `info/exclude`. That file is shared by every worktree of the repository, so `.sageox/` is hidden in all of them. Every other line in it is kept.
+
+#### Switching SageOx off
+
+When SageOx resolves off for a launch, that launch looks for `.sageox/.overdeck-placed` in its working directory (the worktree or the project root). If the marker is there, it deletes each file the marker lists that git does not track, then the marker. It keeps the hide and everything `ox` wrote while running (`logs/`, `cache/`, `sessions/` and so on). Turning SageOx on again places the link again. A failure here prints one `[launcher] WARNING: SageOx placed files not removed: …` line and the launch continues.
+
+#### Merge guard
+
+Placed link files are hidden, but an agent can still add them with `git add -f`. So every merge door (the merge-ready set, the Merge button, auto-merge, the merge queue, the approval refresh, and `POST /api/issues/:id/forge-merge`) refuses a PR whose diff touches `.sageox/`, unless the project has committed its link: `sageox_binding: committed` in `projects.yaml`, or a default branch that tracks `.sageox/config.json`. The refusal reads:
+
+```text
+PR changes SageOx link files (.sageox/) but <key> has not opted in to committing them; remove them from the PR or run pan skills pack sageox commit --project <key>
+```
+
+The guard reads the PR's changed files with a local `git diff` against `origin/<default>`, fetching the PR head once when it is not local. It fails closed: when the diff cannot be read, the PR is refused with `SageOx merge guard could not read the PR's changed files: …; fetch the PR head in <dir>`. Polyrepo projects (`workspace.type: polyrepo`) are skipped. For a Deft issue, the Deft guard runs first and its refusal wins.
 
 #### What a launch gets
 
-When the pack is on for a Claude Code launch, Overdeck checks two more things at launch time: the launch's git root has a `.sageox/` directory, and the `ox` on `PATH` answers `ox host-contract --json` within 2 seconds. When all hold, the launch's `--settings` JSON carries:
+When the pack is on, Overdeck resolves the `ox` it built for the trusted commit and checks that it answers `ox host-contract --json` within 2 seconds. Only then does it place the link. There is no fallback to an `ox` on `PATH`. When all of that holds:
 
-- the env `OX_HOST_MANAGED=1`, `OX_PROJECT_ROOT=<git root>`, `OX_HOST_NETWORK`, `OX_SESSION_PUBLISHING`, `SAGEOX_TELEMETRY=false`, `SAGEOX_FRICTION=false`, `SAGEOX_DAEMON=false`, and `OX_NO_DAEMON=1`;
-- one `ox agent hook <event>` hook for each of `SessionStart`, `PreCompact`, `PostToolUse`, `Stop`, `SessionEnd`, and `UserPromptSubmit`, with the same env written inline in each hook command;
-- the `sageox` pack skills you turned on.
+- **Claude Code** gets, in the launch's `--settings` JSON, the env `OX_HOST_MANAGED=1`, `OX_PROJECT_ROOT=<git root>`, `OX_HOST_NETWORK`, `OX_SESSION_PUBLISHING`, `SAGEOX_TELEMETRY=false`, `SAGEOX_FRICTION=false`, `SAGEOX_DAEMON=false`, and `OX_NO_DAEMON=1`, plus one `ox agent hook <event>` hook for each of `SessionStart`, `PreCompact`, `PostToolUse`, `Stop`, `SessionEnd`, and `UserPromptSubmit`.
+- **Codex** gets `ox agent hook <event>` for its six events (`SessionStart`, `PreToolUse`, `PostToolUse`, `UserPromptSubmit`, `Stop`, `SessionEnd`) in `hooks.json` in the agent's own `CODEX_HOME`. Codex runs such hooks only when they are trusted, so Overdeck also writes a `# overdeck:sageox-hooks:begin` … `# overdeck:sageox-hooks:end` block at the end of that `config.toml`. The block trusts exactly those six hooks, keyed by the resolved `hooks.json` path. Overdeck never uses `--dangerously-bypass-hook-trust`, which would also run a repository's own `.codex/hooks.json` unreviewed.
+- Both get the `sageox` pack skills you turned on.
 
-These hooks come from Overdeck, not from the pack; the pack's own capabilities are still **Not applied**. If any check fails, or anything goes wrong, the launch continues without SageOx: no env, no hooks, no `sageox` skills, and one `[launcher] WARNING:` line naming the reason. Turning the pack off removes all of it at the next launch.
+Every hook runs the built `ox` by absolute path with the env written inline, and does nothing if that binary is gone. These hooks come from Overdeck, not from the pack; the pack's own capabilities are still **Not applied**. If any check fails, or anything goes wrong, the launch continues without SageOx: no env, no hooks, no `sageox` skills, and one `[launcher] WARNING:` line naming the reason. When SageOx is off, a Codex launch deletes that `hooks.json` and the trust block, and every launch removes placed link files as described in [Switching SageOx off](#switching-sageox-off).
 
 #### What `pan doctor` checks
 
-When the `sageox` pack is registered, `pan doctor` adds a **SageOx (ox)** row. It is `ok` when `ox` answers the `overdeck-host/1` contract and was built from the pack's trusted commit. It warns, with the build command as the fix, when `ox` is missing, is upstream `ox` without the host contract, or was built from a different commit. Without the pack, there is no row.
+When the `sageox` pack is registered, `pan doctor` adds a **SageOx (ox)** row. It is `ok` when Overdeck built `ox` for the trusted commit and that binary answers the `overdeck-host/1` contract: `built ox at <packdir>/<commit>/bin/ox; host contract overdeck-host/1, ox <version>; pack <short commit>`. It warns, with the fix `pan skills pack sync sageox`, when the build is missing (`ox not built for pack <short commit>`), when the built binary is not executable, has no host contract, prints unreadable output, or times out. Without the pack, there is no row.
+
+#### Removing SageOx
+
+`pan skills pack remove sageox` deletes the build and the cache but keeps the stored links, because recreating one needs `ox login`, the network, and a second `ox init` registration. It prints `kept SageOx link files in <packdir>/bindings/ (delete them by hand to forget every project's SageOx link)`.
 
 ## Where state lives and when changes apply
 
@@ -594,8 +646,11 @@ When the `sageox` pack is registered, `pan doctor` adds a **SageOx (ox)** row. I
 | gstack runtime and state | `~/.overdeck/packs/gstack/render/<commit>/` and `~/.overdeck/packs/gstack/state/` |
 | gstack browser runtime | `~/.overdeck/packs/gstack/browser/` (bun cache, Chromium, Chromium's fontconfig and GPU caches), and `node_modules` plus binaries inside the render |
 | gstack browser consent | `~/.overdeck/config.yaml`, under `skills.packs.gstack.browser: true` |
+| SageOx build | `~/.overdeck/packs/sageox/<commit>/bin/` (`ox`, both adapters, and the build marker `.overdeck-ox-build.json`) and Go's caches in `~/.overdeck/packs/sageox/go/` |
+| SageOx links | `~/.overdeck/packs/sageox/bindings/<project>/`; `pan skills pack remove sageox` keeps them |
+| SageOx upload and committed-link flags | `~/.overdeck/projects.yaml`, under `projects.<key>.sageox_upload` and `projects.<key>.sageox_binding: committed` |
 
-The cache lives in `~/.overdeck/packs/` and can be rebuilt at any time, except the gstack `state/` dir, which holds gstack's own config, sessions and learnings: `pan skills pack sync [id]` re-fetches the cache, and `pan skills pack gc [--max-age-days <n>]` removes mounts no launch uses. `pan skills pack remove <id>` unregisters a pack, clears its global toggle and global skill values, and deletes its cache; project and issue values stay but do nothing until the pack is added again.
+The cache lives in `~/.overdeck/packs/` and can be rebuilt at any time, except the gstack `state/` dir, which holds gstack's own config, sessions and learnings: `pan skills pack sync [id]` re-fetches the cache, and `pan skills pack gc [--max-age-days <n>]` removes mounts no launch uses. `pan skills pack remove <id>` unregisters a pack, clears its global toggle and global skill values, and deletes its cache (for `sageox`, everything except the stored links in `bindings/`); project and issue values stay but do nothing until the pack is added again.
 
 ### When pack changes apply
 
@@ -614,7 +669,10 @@ In the dashboard, packs appear above the skill list on the Skills page, in proje
 | Launch prints `[launcher] WARNING: gstack browser runtime not built; run pan skills pack sync gstack` | Browser consent is recorded but the runtime for the trusted commit is missing | `pan skills pack sync gstack` |
 | `pack gstack needs bun on PATH (https://bun.sh)` | `bun` is not installed or not on `PATH` | Install bun, then repeat the command |
 | An old gstack render stays after `pan skills pack gc` | A linked mount still uses it, or it is younger than `--max-age-days` (using a mount resets its age and its render's age) | Wait until no launch uses it, or run `pan skills pack gc --max-age-days <n>` with a smaller value |
-| Codex launches show no SageOx skills and print `SageOx is on but supports Claude Code launches only; sageox skills and hooks not applied` | SageOx supports Claude Code launches only | Use a Claude Code launch |
+| Launch prints `[launcher] WARNING: SageOx not applied: project <key> has no SageOx link; run pan skills pack sageox link --project <key>` | SageOx is on, but the project has neither a stored link nor a `.sageox/` in the checkout | `pan skills pack sageox link --project <key>`, then relaunch |
+| Launch prints `[launcher] WARNING: SageOx not applied: ox is not built for the sageox pack (<commit>); run pan skills pack sync sageox` | The build for the trusted commit is missing or incomplete; launches never build | `pan skills pack sync sageox` (needs Go), then relaunch |
+| A PR is not mergeable with `PR changes SageOx link files (.sageox/) but <key> has not opted in to committing them; …` | The PR adds or changes `.sageox/`, and the project has not committed its link | Remove `.sageox/` from the PR, or run `pan skills pack sageox commit --project <key>` and merge that PR first |
+| A PR is not mergeable with `SageOx merge guard could not read the PR's changed files: …` | The guard could not read the PR's diff, so it fails closed | Fetch the PR head in the named directory (`git fetch origin <branch>`), then let the gate re-check |
 
 ## Terminology: skill packs and skill bundles
 

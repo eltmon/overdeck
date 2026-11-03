@@ -101,15 +101,18 @@ lists their rebased hashes.
 
 ### CP-1 outcome (offline recording)
 
-Primary branch taken, no fallback. Under `OX_HOST_MANAGED=1` with the network off, recording is fully local: prime starts the recording and writes `<ledger>/.sageox/cache/sessions/<name>/raw.jsonl`, and no request is sent. **Precondition:** recording needs a local clone of the project's ledger (`ledger.Exists`). Only the ox daemon's sync scheduler clones it, which needs the network, and the daemon never runs in offline host-managed mode. Without a clone, prime reports `ledger_needed` and records nothing (it still sends nothing). So the operator's one-time setup must let the daemon clone the ledger once with the network on: `OX_HOST_MANAGED=1 OX_HOST_NETWORK=on ox init` starts the daemon, which clones it; `ox status` shows when it is there. `OX_SESSION_RECORDING` is not forced to `disabled`.
+Primary branch taken, no fallback. Under `OX_HOST_MANAGED=1` with the network off, recording is fully local: prime starts the recording and writes `<ledger>/.sageox/cache/sessions/<name>/raw.jsonl`, and no request is sent. **Precondition:** recording needs a local clone of the project's ledger (`ledger.Exists`). Only the ox daemon's sync scheduler clones it, which needs the network, and the daemon never runs in offline host-managed mode. Without a clone, prime reports `ledger_needed` and records nothing (it still sends nothing). So the operator's one-time setup must let the daemon clone the ledger once with the network on: `OX_HOST_MANAGED=1 OX_HOST_NETWORK=on ox init` starts the daemon, which clones it; `ox status` shows when it is there. Since PAN-4852, `pan skills pack sageox link` runs that `ox init` in a throwaway worktree and waits up to 120 s for the clone. `OX_SESSION_RECORDING` is not forced to `disabled`.
 
 ## Building
 
 Overdeck builds `ox` itself. `pan skills pack add sageox` pins the trusted
 commit, shows a consent preview, and builds `ox`, `ox-adapter-claude-code` and
-`ox-adapter-codex` into the pack directory; `pan skills pack update sageox` and
-`pan skills pack sync sageox` rebuild when the build is missing. Launches use
-that binary by absolute path. Nothing is written to `~/.local/bin`.
+`ox-adapter-codex` into `~/.overdeck/packs/sageox/<commit>/bin/`, with Go's
+caches under `~/.overdeck/packs/sageox/go/`. `pan skills pack update sageox`
+builds the new commit when the ref moves, and `pan skills pack sync sageox`
+builds the trusted commit when its build is missing. Launches, hooks and
+`pan doctor` use that binary by absolute path, never an `ox` on `PATH`.
+Nothing is written to `~/.local/bin`.
 
 The manual build below is for fork development only. `go.mod` requires
 `go 1.26.0` with `toolchain go1.27.3`; with the default `GOTOOLCHAIN=auto`, an

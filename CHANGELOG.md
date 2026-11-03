@@ -10,6 +10,14 @@
 - Auto-merge holds a Deft issue whose Deft policy requires a human merge (PAN-4820).
 - `pan skills deft save|show|back <ISSUE>`: commit the state archive, inspect the install and merge-guard verdict, and switch back with an exact undo (PAN-4820).
 
+### Added: SageOx without committing (PAN-4852)
+
+- Overdeck builds `ox` itself: `pan skills pack add sageox` (no `--ref` needed; the pack pins `eltmon/ox` `0e6c7e2`) shows the three `go build` commands, the output paths and the downloads (Go modules and, when your Go is older, the go1.27.3 toolchain), then builds `ox`, `ox-adapter-claude-code` and `ox-adapter-codex` into `~/.overdeck/packs/sageox/<commit>/bin/`. `update` and `sync` rebuild when needed, launches and `pan doctor` use only that binary, and nothing is written to `~/.local/bin` or outside `~/.overdeck/`. `pan skills pack remove sageox` keeps the stored SageOx links (PAN-4852).
+- `pan skills pack sageox link --project <key>` runs `ox init` in a throwaway worktree, stores the project's `.sageox/` files outside the repository, and waits for the ledger clone; no checkout changes. With SageOx on, each launch places those files in its checkout, hides them from git (the worktree's `info/overdeck-exclude`, or an `info/exclude` block in the primary checkout), and removes them at the next launch after SageOx is switched off. `pan skills pack sageox status` gains a `LINK` column (PAN-4852).
+- Every merge door refuses a PR that touches `.sageox/` unless the project committed its link; `pan skills pack sageox commit --project <key>` opens that one PR and records `sageox_binding: committed` (PAN-4852).
+- SageOx works with Codex launches: six `ox agent hook` hooks in the agent's own `CODEX_HOME`, pre-trusted in `config.toml`, removed when SageOx is off (PAN-4852).
+- The `eltmon/ox` fork is rebased onto upstream `v0.25.0` as new `overdeck-base-v0.25.0` and `overdeck/host-managed-v0.25.0` branches; `docs/SAGEOX-FORK.md` records the rebase (PAN-4852).
+
 ### Added: Overdeck Anywhere
 
 The public, per-release changelog is [`changelog.mdx`](changelog.mdx). Session Vault (`pan vault`) and device pairing (`pan pair`, `pan devices`) were released in v0.64.0. Merged since then:

@@ -65,7 +65,10 @@ pan skills pack add <id> [url] [--ref <ref>] [--adapter <adapter>] [--browser] [
 
 Registers a git skill pack at the commit a ref resolves to and trusts it;
 enables nothing. Known packs (`mattpocock`, `pstack`, `gstack`, `deft`,
-`sageox`) default the url and, for `pstack`, the ref.
+`sageox`) default the url and, for `pstack` and `sageox`, the ref. For
+`sageox`, the preview also lists the `go build` commands, the paths they
+write and the downloads, and trusting the commit builds `ox` and its two
+adapters before the pack is registered.
 
 | Flag | Effect |
 | --- | --- |
@@ -80,7 +83,9 @@ pan skills pack add mattpocock --ref v1.2.3
 
 Exits 1 on an unknown `--adapter` value, a pack with no default url or ref
 when none is given, a pack source error, or when the commit was not
-trusted (declined, or not written without a terminal and `--yes`). With
+trusted (declined, or not written without a terminal and `--yes`). For
+`sageox`, a missing Go (`pack sageox needs go on PATH (https://go.dev/dl/)`)
+or a failed build is a pack source error. With
 `--browser`, the pack is registered as soon as the commit is trusted; a
 declined or failed browser-runtime step then exits 1 with the pack already
 registered. Finish it with `pan skills pack browser <id>` rather than
@@ -93,7 +98,8 @@ pan skills pack update <id> [--ref <ref>] [--yes]
 ```
 
 Moves a pack to the commit its ref (or `--ref`) now resolves to, after
-showing the preview again.
+showing the preview again. For `sageox`, a moved commit is built after you
+confirm.
 
 | Flag | Effect |
 | --- | --- |
@@ -132,7 +138,9 @@ pan skills pack remove <id>
 
 Unregisters a pack, clears its global toggles, and deletes its cache,
 every mount that contains it, and dangling launch links, and Codex
-plugin caches.
+plugin caches. For `sageox`, it keeps the stored SageOx links and prints
+`kept SageOx link files in <packdir>/bindings/ (delete them by hand to
+forget every project's SageOx link)`.
 
 ```bash
 pan skills pack remove gstack
@@ -151,7 +159,9 @@ pan skills pack sync [id]
 ```
 
 Re-fetches a pack and extracts its trusted commit, or every registered
-pack when `id` is omitted.
+pack when `id` is omitted. For `sageox`, it also builds `ox` for the
+trusted commit when that build is missing, without asking (the commit is
+already trusted).
 
 ```bash
 pan skills pack sync gstack
@@ -205,8 +215,11 @@ the browser runtime was not trusted.
 pan skills pack sageox status [--project <key>] [--json]
 ```
 
-Shows, per project, whether the `sageox` pack is on and whether uploads
-are enabled.
+Shows, per project, whether the `sageox` pack is on, whether uploads are
+enabled, and the SageOx link state in the `LINK` column: `committed` (the
+project committed `.sageox/`, or has `sageox_binding: committed`), `held`
+(a link is stored for it), or `none`. `--json` adds a `"link"` field with
+the same values.
 
 | Flag | Effect |
 | --- | --- |
@@ -236,6 +249,79 @@ pan skills pack sageox upload on --project myapp
 ```
 
 Exits 1 if `state` is not `on` or `off`, or on a SageOx config error.
+
+## pan skills pack sageox link
+
+```bash
+pan skills pack sageox link --project <key> [--team <team>]
+```
+
+Creates the project's SageOx link without changing any of its checkouts.
+It checks that the SageOx login file exists (it never reads it), fetches
+the default branch, and runs the Overdeck-built `ox init` in a throwaway
+detached worktree of `origin/<default>` under
+`~/.overdeck/packs/sageox/tmp/`, in host-managed mode with the network on.
+The untracked files `ox init` writes under `.sageox/` are stored in
+`~/.overdeck/packs/sageox/bindings/<key>/`. It then waits up to 120 seconds
+for `ox` to clone the project's ledger, and removes the throwaway worktree.
+
+| Flag | Effect |
+| --- | --- |
+| `--project <key>` | Project key (required) |
+| `--team <team>` | SageOx team (name, slug or id), passed to `ox init`; needed when your account has several teams |
+
+```bash
+pan skills pack sageox link --project myapp
+```
+
+Run `<built ox> login` once before the first `link`. When the default
+branch already tracks `.sageox/`, `link` changes nothing and says that the
+committed link is used. When a link is already stored, it prints
+`already linked: <dir>`. When the ledger is not cloned within 120 seconds,
+it prints `the SageOx ledger is not cloned yet; ox clones it in the
+background. Check with: <bin> status` and still exits 0.
+
+Exits 1 on an unknown project, when `ox` is not built
+(`pan skills pack sync sageox`), when the login file is missing
+(`SageOx login not found. Run: <bin> login`), when the fetch fails, when
+`ox init` fails (the last 20 lines of its output are printed), or when
+`ox init` writes outside `.sageox/` even in the fresh-clone fallback.
+
+## pan skills pack sageox commit
+
+```bash
+pan skills pack sageox commit --project <key>
+```
+
+Opens one PR that adds the project's stored SageOx link files as
+`.sageox/`, then records `sageox_binding: committed` for the project in
+`~/.overdeck/projects.yaml`. The commit is made in a throwaway worktree on
+the branch `overdeck/sageox-link` from `origin/<default>`; no project
+checkout changes. Re-running it reuses the branch and an open PR. The
+flag is written only after the PR exists, so a failed run records
+nothing.
+
+| Flag | Effect |
+| --- | --- |
+| `--project <key>` | Project key (required) |
+
+```bash
+pan skills pack sageox commit --project myapp
+```
+
+Prints `opened <url>` or `reused <url>`, then
+`recorded sageox_binding: committed for <key>`. When the default branch
+already tracks `.sageox/config.json`, it records the flag and prints
+`already committed on <default>`.
+
+The commit runs the project's git hooks in the throwaway worktree, so a
+project whose hooks need `node_modules` (husky, for example) fails there;
+`--no-verify` is not used. The local `overdeck/sageox-link` branch stays
+in the repository.
+
+Exits 1 on an unknown project, when the project has no stored link
+(`run pan skills pack sageox link --project <key>`), when the fetch,
+worktree, commit or push fails, or when the forge returns no PR URL.
 
 ## pan skills deft status
 
