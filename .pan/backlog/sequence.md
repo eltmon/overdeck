@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T05:25:13.126838Z · model: claude-opus-5-5 · open: 870_
+_Last sequenced: 2026-11-03T05:27:25.296228Z · model: claude-opus-5-5 · open: 871_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -561,6 +561,7 @@ _Last sequenced: 2026-11-03T05:25:13.126838Z · model: claude-opus-5-5 · open: 
 | 564 | PAN-4409 | M | medium | ok |  |  | Overdeck integration on OKF v0.2.0 (injector trust tiers, new verbs); blocked on external eltmon/okf#9 |
 | 565 | PAN-4410 | M | medium | ok |  | PAN-4409 | Migrate eltmon/overdeck-knowledge to OKF v0.2 and refresh stale concepts; last link in the OKF chain |
 | 566 | PAN-2978 | S | medium | ok |  | PAN-2976, PAN-2977 | Opt-in per-agent install recipes for ACP CLIs from the setup UI; deliberately separated for its supply-chain trust decision. |
+| 567 | PAN-4878 | XS | low | ok |  | PAN-4852 | Delete dead ox curl installer in prereqs registry; PAN-4852 builds ox from the pinned fork commit, so ~/.local/bin/ox is never used. |
 | 568 | PAN-1754 | M | medium | ok |  |  | surface + edit the host claude CLI default model (~/.claude/settings.json) from the Settings page |
 | 569 | PAN-1751 | M | medium | ok |  |  | harness picker on every Settings → Roles row (plan/work/review/test/ship/strike), not just Flywheel |
 | 570 | PAN-1750 | M | medium | ok |  |  | UAT assembly/conflict agent |
@@ -1205,10 +1206,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T05:25:13.126838Z",
+  "generatedAt": "2026-11-03T05:27:25.296228Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 870,
+  "openCount": 871,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -12083,6 +12084,21 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "rationale": "Rank kept at the bottom: PAN-4820 closed so the dependency is dropped, but the operator still parks this undecided low-priority question.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4878",
+      "rank": 567,
+      "size": "XS",
+      "importance": "low",
+      "score": 30,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4852"
+      ],
+      "why": "Delete dead ox curl installer in prereqs registry; PAN-4852 builds ox from the pinned fork commit, so ~/.local/bin/ox is never used.",
+      "rationale": "New issue placed in a free low-tier slot: a self-contained XS deletion with exact targets, best done after PAN-4852 lands its Overdeck-built ox.",
+      "gate": "auto",
+      "planning": "skip"
     }
   ],
   "edges": [
@@ -13548,6 +13564,13 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-4852",
+      "to": "PAN-4878",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.7
     }
   ]
 }
