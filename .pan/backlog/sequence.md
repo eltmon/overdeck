@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T16:23:11.225100Z · model: claude-opus-5-5 · open: 869_
+_Last sequenced: 2026-11-03T16:26:02.065226Z · model: claude-opus-5-5 · open: 868_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -178,7 +178,6 @@ _Last sequenced: 2026-11-03T16:23:11.225100Z · model: claude-opus-5-5 · open: 
 | 172 | PAN-3307 | XS | high | ok |  |  | commitlint scope-enum lists 11 scopes, 14 real ones are missing, and it still names the removed beads scope — trains everyone to ignore it. |
 | 173 | PAN-4634 | M | medium | needs-refinement |  |  | Terra unserved on claude-code route: no CLIProxy release (to v8.0.44) lists it; bump pin, add to GPT_56_MODELS. Aliases also broken. |
 | 174 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
-| 175 | PAN-4897 | S | high | ok |  |  | macOS Local Network privacy blocks the launchd server, so a connect-set-up Mac stays half linked; detect and explain the denial |
 | 176 | PAN-1868 | XS | high | ok |  |  | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
 | 177 | PAN-4847 | S | high | ok |  |  | Remote reap silently skips review request when a background writer dirties a tracked file; pipeline stalls at PR-open. |
 | 178 | PAN-1042 | S | high | ok |  |  | cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions |
@@ -1204,10 +1203,10 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T16:23:11.225100Z",
+  "generatedAt": "2026-11-03T16:26:02.065226Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 869,
+  "openCount": 868,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -3443,19 +3442,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "gate": "blocked",
       "planning": "skip",
       "isEpic": true
-    },
-    {
-      "issue": "PAN-4897",
-      "rank": 175,
-      "size": "S",
-      "importance": "high",
-      "score": 70,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "macOS Local Network privacy blocks the launchd server, so a connect-set-up Mac stays half linked; detect and explain the denial",
-      "rationale": "New in-pipeline issue with a verified cause: launchd-started Node gets EHOSTUNREACH for LAN addresses on macOS 15+, leaving Anywhere links half online. Slotted beside the fresh-npx-machine setup bug (PAN-4629) because it breaks first-run Anywhere setup on Macs.",
-      "gate": "auto",
-      "planning": "auto"
     },
     {
       "issue": "PAN-1868",
@@ -13280,13 +13266,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "confidence": 0.6
     },
     {
-      "from": "PAN-4897",
-      "to": "PAN-4896",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
       "from": "PAN-3944",
       "to": "PAN-4903",
       "type": "informs",
@@ -13299,13 +13278,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-4897",
-      "to": "PAN-4909",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
     }
   ]
 }
