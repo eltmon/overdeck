@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4835",
   "created": "2026-11-03T07:59:34.235Z",
-  "updated": "2026-11-03T08:48:13.259Z",
+  "updated": "2026-11-03T08:56:46.640Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-11-03T08:47:47.015Z"
     },
     "phone-key-pinned": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4835",
-      "claimedAt": "2026-11-03T08:48:13.259Z"
+      "claimedAt": "2026-11-03T08:48:13.259Z",
+      "doneAt": "2026-11-03T08:56:46.640Z"
     }
   }
 }
