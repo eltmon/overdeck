@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4838",
   "created": "2026-11-03T21:01:46.602Z",
-  "updated": "2026-11-03T21:17:00.321Z",
+  "updated": "2026-11-03T21:17:11.430Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,11 @@
       "claimedBy": "agent-pan-4838",
       "claimedAt": "2026-11-03T21:16:38.962Z",
       "doneAt": "2026-11-03T21:17:00.321Z"
+    },
+    "push-plugin-dependency": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4838",
+      "claimedAt": "2026-11-03T21:17:11.430Z"
     }
   }
 }
