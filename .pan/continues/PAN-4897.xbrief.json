@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4897",
   "created": "2026-11-03T14:27:55.739Z",
-  "updated": "2026-11-03T15:00:03.570Z",
+  "updated": "2026-11-03T15:00:25.025Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,6 +50,10 @@
     "open-errno.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T15:00:03.570Z"
+    },
+    "lan-classifier.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:00:25.025Z"
     }
   }
 }
