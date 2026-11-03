@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4861",
   "created": "2026-11-02T23:50:27.148Z",
-  "updated": "2026-11-03T00:07:43.766Z",
+  "updated": "2026-11-03T00:07:58.985Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -42,6 +42,10 @@
     "helper-stops-supervisor.ac4": {
       "status": "completed",
       "doneAt": "2026-11-03T00:07:43.766Z"
+    },
+    "helper-stops-supervisor.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:07:58.985Z"
     }
   }
 }
