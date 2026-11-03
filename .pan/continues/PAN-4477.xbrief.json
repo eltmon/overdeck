@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4477",
   "created": "2026-11-03T15:02:33.095Z",
-  "updated": "2026-11-03T16:53:39.126Z",
+  "updated": "2026-11-03T17:22:05.576Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -17,6 +17,16 @@
       "reason": "resume",
       "agentModel": "claude-opus-5-5",
       "timestamp": "2026-11-03T16:53:39.126Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-03T17:11:54.664Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-03T17:22Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-03T17:22:05.576Z"
     }
   ],
   "items": {
@@ -271,6 +281,14 @@
       "doneAt": "2026-11-03T16:40:10.048Z"
     }
   },
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-03T17:22:05Z",
+      "markdownBody": "# CodeRabbit findings for PAN-4477 (PR #4913)\n\nCodeRabbit posted 2 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4458145389 · configuration/shared-sessions.mdx:107 [Minor]: Update the \"In this release\" bullets to cover the Terminal view.\n  https://github.com/eltmon/overdeck/pull/4913#discussion_r4458145389\n- Thread 4458145403 · src/dashboard/frontend/src/components/chat/sharing/SharedTerminalView.tsx:48 [Minor]: Normalize tmux snapshot line endings before sending the snapshot frame.\n  https://github.com/eltmon/overdeck/pull/4913#discussion_r4458145403\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/4913/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-4477`.\n   If you only replied, you are done.\n5. If PR #4913 has already merged when you read this, nothing more lands on it: open a follow-up issue\n   for the findings you agree with instead of pushing."
+    }
+  ],
   "agentModel": "claude-opus-5-5"
 }
