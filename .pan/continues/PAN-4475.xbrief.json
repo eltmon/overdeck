@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4475",
   "created": "2026-11-03T09:11:44.436Z",
-  "updated": "2026-11-03T13:33:28.204Z",
+  "updated": "2026-11-03T13:44:34.015Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -92,6 +92,10 @@
       "claimedBy": "agent-pan-4475",
       "claimedAt": "2026-11-03T10:22:55.395Z",
       "doneAt": "2026-11-03T10:24:38.208Z"
+    },
+    "viewer-api-types.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:44:34.015Z"
     }
   },
   "agentModel": "claude-opus-5-5"
