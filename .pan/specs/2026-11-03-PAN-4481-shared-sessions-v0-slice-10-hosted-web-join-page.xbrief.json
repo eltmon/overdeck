@@ -4,17 +4,17 @@
     "created": "2026-11-03T15:48:54Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4481: Shared Sessions v0 (slice 10): hosted web join page",
-    "updated": "2026-11-03T15:55:45.207Z"
+    "updated": "2026-11-03T15:56:58.797Z"
   },
   "plan": {
     "id": "pan-4481",
     "title": "Shared Sessions v0 (slice 10): hosted web join page",
-    "status": "proposed",
+    "status": "running",
     "uid": "9c321233-6fa0-4839-85f0-c2b2f1635dae",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-03T15:48:54Z",
-    "updated": "2026-11-03T15:55:45.207Z",
+    "updated": "2026-11-03T15:56:58.797Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4481",
@@ -897,5 +897,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
