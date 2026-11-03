@@ -1,6 +1,15 @@
-import type { HostFrame, RoomParticipant, RoomSnapshot, ShareScope, SignalData } from '@overdeck/contracts';
+import type {
+  ConversationPayload,
+  HostFrame,
+  RoomParticipant,
+  RoomSnapshot,
+  ShareScope,
+  SharedEnvelope,
+  SignalData,
+} from '@overdeck/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { ConversationSink } from '../conversation-bridge.js';
 import {
   ICE_SERVERS_CACHE_MS,
   ICE_SERVERS_TIMEOUT_MS,
@@ -132,11 +141,12 @@ function setup(
     sendFrame?: (frame: HostFrame) => boolean;
     streamLabel?: () => Promise<string>;
     onPeer?: (peer: FakePeer) => void;
+    attach?: PeerHubDeps['bridge']['attach'];
   } = {},
 ) {
   const frames: HostFrame[] = [];
   const peers: FakePeer[] = [];
-  const bridge = { attach: vi.fn(async () => () => undefined), close: vi.fn() };
+  const bridge = { attach: vi.fn(options.attach ?? (async () => () => undefined)), close: vi.fn() };
   const deps: PeerHubDeps = {
     createPeerConnection: (config) => {
       const peer = new FakePeer(config);
@@ -400,5 +410,160 @@ describe('PeerHub admission gate, signaling and ICE', () => {
     await settle();
     expect(s.peers).toHaveLength(1);
     expect(s.hub.peerCount()).toBe(0);
+  });
+});
+
+function viewerHello(hello: Record<string, unknown> = {}, seq = 1): string {
+  return JSON.stringify({
+    v: 1,
+    ch: 'control',
+    streamId: 'conv-a',
+    seq,
+    t: 1,
+    payload: { kind: 'hello', hello: { v: 1, scopeKinds: ['conversation'], scope, ...hello } },
+  });
+}
+
+const envelopes = (channel: FakeChannel) => channel.sent.map((part) => JSON.parse(part) as SharedEnvelope);
+
+describe('PeerHub hello and conversation content', () => {
+  it('sends the host hello as the first control envelope', async () => {
+    const s = setup();
+    const peer = await connected(s);
+    peer.channel('control').open();
+    expect(envelopes(peer.channel('control'))).toEqual([
+      {
+        v: 1,
+        ch: 'control',
+        streamId: 'conv-a',
+        seq: 1,
+        t: expect.any(Number),
+        payload: { kind: 'hello', hello: { v: 1, scopeKinds: ['conversation'], scope } },
+      },
+    ]);
+  });
+
+  it('sends no conversation content before the viewer hello, then the history as seq 1', async () => {
+    const history: ConversationPayload = {
+      kind: 'history',
+      messages: [{ id: 'm1', role: 'user', text: 'hi', createdAt: '2026-11-03T00:00:00Z' }],
+    };
+    const s = setup({
+      attach: async (sink: ConversationSink) => {
+        sink.send(history);
+        return () => undefined;
+      },
+    });
+    const peer = await connected(s);
+    peer.channel('control').open();
+    peer.channel('conversation').open();
+    await settle();
+    expect(s.bridge.attach).not.toHaveBeenCalled();
+    expect(peer.channel('conversation').sent).toEqual([]);
+
+    peer.channel('control').onMessage.emit(viewerHello());
+    await settle();
+    expect(s.bridge.attach).toHaveBeenCalledTimes(1);
+    expect(envelopes(peer.channel('conversation'))).toEqual([
+      { v: 1, ch: 'conversation', streamId: 'conv-a', seq: 1, t: expect.any(Number), payload: history },
+    ]);
+
+    peer.channel('control').onMessage.emit(viewerHello({}, 2));
+    await settle();
+    expect(s.bridge.attach).toHaveBeenCalledTimes(1);
+    expect(peer.channel('control').sent).toHaveLength(1);
+  });
+
+  it('attaches when the conversation channel opens after the hello negotiated', async () => {
+    const s = setup();
+    const peer = await connected(s);
+    peer.channel('control').open();
+    peer.channel('control').onMessage.emit(viewerHello());
+    expect(s.bridge.attach).not.toHaveBeenCalled();
+    peer.channel('conversation').open();
+    expect(s.bridge.attach).toHaveBeenCalledTimes(1);
+  });
+
+  it('answers a failed negotiation with a control error and never attaches', async () => {
+    const s = setup();
+    const peer = await connected(s);
+    peer.channel('control').open();
+    peer.channel('conversation').open();
+    peer.channel('control').onMessage.emit(viewerHello({ scopeKinds: [] }));
+    peer.channel('control').onMessage.emit(viewerHello({}, 2));
+    await settle();
+    expect(envelopes(peer.channel('control')).map((e) => e.payload)).toEqual([
+      { kind: 'hello', hello: { v: 1, scopeKinds: ['conversation'], scope } },
+      { kind: 'error', code: 'scope_kind_unsupported' },
+    ]);
+    expect(s.bridge.attach).not.toHaveBeenCalled();
+  });
+
+  it('ignores a binary control message and a control message that is not a hello', async () => {
+    const s = setup();
+    const peer = await connected(s);
+    peer.channel('control').open();
+    peer.channel('conversation').open();
+    peer.channel('control').onMessage.emit(Buffer.from(viewerHello()));
+    peer.channel('control').onMessage.emit('not json');
+    await settle();
+    expect(s.bridge.attach).not.toHaveBeenCalled();
+    expect(peer.channel('control').sent).toHaveLength(1);
+  });
+
+  it('sends unavailable history_too_large when the history is over the envelope limit', async () => {
+    const s = setup({
+      attach: async (sink: ConversationSink) => {
+        sink.send({
+          kind: 'history',
+          messages: [{ id: 'm1', role: 'user', text: 'a'.repeat(33 * 1024 * 1024), createdAt: '2026-11-03T00:00:00Z' }],
+        });
+        return () => undefined;
+      },
+    });
+    const peer = await connected(s);
+    peer.channel('control').open();
+    peer.channel('conversation').open();
+    peer.channel('control').onMessage.emit(viewerHello());
+    await settle();
+    expect(envelopes(peer.channel('conversation'))).toEqual([
+      {
+        v: 1,
+        ch: 'conversation',
+        streamId: 'conv-a',
+        seq: 1,
+        t: expect.any(Number),
+        payload: { kind: 'unavailable', reason: 'history_too_large' },
+      },
+    ]);
+  });
+
+  it('detaches the conversation when the peer closes', async () => {
+    const detach = vi.fn();
+    const s = setup({ attach: async () => detach });
+    const peer = await connected(s);
+    peer.channel('control').open();
+    peer.channel('conversation').open();
+    peer.channel('control').onMessage.emit(viewerHello());
+    await settle();
+    s.hub.remove(7);
+    expect(detach).toHaveBeenCalledTimes(1);
+  });
+
+  it('never writes to or reads from drafts and terminal', async () => {
+    const s = setup();
+    const peer = await connected(s);
+    for (const channel of peer.channels) channel.open();
+    peer.channel('control').onMessage.emit(viewerHello());
+    await settle();
+    expect(peer.channel('drafts').sent).toEqual([]);
+    expect(peer.channel('terminal').sent).toEqual([]);
+    expect(peer.channels.map((c) => [c.label, c.onMessage.subscriptions])).toEqual([
+      ['control', 1],
+      ['conversation', 0],
+      ['drafts', 0],
+      ['terminal', 0],
+      ['presence', 0],
+    ]);
   });
 });

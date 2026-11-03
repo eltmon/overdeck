@@ -13,16 +13,29 @@
  * candidates only. A peer whose viewer is no longer eligible, or whose connection fails, is closed;
  * the next snapshot that shows the viewer eligible offers a new one.
  *
+ * Content (FR-7, FR-8, D-4..D-6): each side's first `control` envelope is a hello. The host sends
+ * its hello when `control` opens and sends no content until the viewer's hello negotiates; a failed
+ * negotiation answers with a `control` error and nothing else. A negotiated peer's `conversation`
+ * channel carries the bridge's `history`, then `append` and `update`. The hub reads inbound messages
+ * on `control` only; `drafts` and `terminal` carry nothing in this slice (NFR-4).
+ *
  * Plain async class with injected seams (slice 2's D-8). Nothing here logs signaling data, ICE
  * credentials or content.
  */
 import {
   SHARED_CHANNELS,
+  SHARED_SCOPE_KINDS,
+  SHARED_WIRE_VERSION,
+  SharedChannelReader,
+  negotiateHello,
+  type ControlPayload,
+  type ConversationPayload,
   type HostFrame,
   type IceServer,
   type RoomSnapshot,
   type ShareScope,
   type SharedChannel,
+  type SharedHello,
   type SignalData,
 } from '@overdeck/contracts';
 import { RTCPeerConnection } from 'werift';
@@ -100,10 +113,16 @@ interface PeerEntry {
   readonly channels: Map<SharedChannel, HubDataChannel>;
   readonly writers: Map<SharedChannel, ChannelWriter>;
   readonly open: Set<SharedChannel>;
+  readonly seq: Map<SharedChannel, number>;
   readonly pendingLocal: Candidate[];
   readonly pendingRemote: Candidate[];
+  /** Reassembles inbound `control` messages. */
+  readonly reader: SharedChannelReader;
   localSent: boolean;
   remoteSet: boolean;
+  helloState: 'waiting' | 'negotiated' | 'failed';
+  detachConversation: (() => void) | null;
+  conversationAttached: boolean;
   closed: boolean;
 }
 
@@ -121,12 +140,14 @@ export class PeerHub implements HostHub {
   private iceCache: { servers: readonly IceServer[]; fetchedAt: number } | null = null;
   private pendingIce: PendingIce | null = null;
   private readonly label: Promise<string>;
+  private readonly hostHello: SharedHello;
 
   constructor(
     private readonly ctx: PeerHubContext,
     private readonly deps: PeerHubDeps,
   ) {
     this.label = deps.streamLabel().catch(() => ctx.scope.conversationId);
+    this.hostHello = { v: SHARED_WIRE_VERSION, scopeKinds: SHARED_SCOPE_KINDS, scope: ctx.scope };
   }
 
   /** Live (not closed) peer connections, for tests and diagnostics. */
@@ -206,10 +227,15 @@ export class PeerHub implements HostHub {
       channels: new Map(),
       writers: new Map(),
       open: new Set(),
+      seq: new Map(),
       pendingLocal: [],
       pendingRemote: [],
+      reader: new SharedChannelReader(),
       localSent: false,
       remoteSet: false,
+      helloState: 'waiting',
+      detachConversation: null,
+      conversationAttached: false,
       closed: false,
     };
     this.peers.set(githubId, entry);
@@ -240,6 +266,8 @@ export class PeerHub implements HostHub {
           if (state === 'open') this.onChannelOpen(entry, label);
           else if (state === 'closed') this.closePeer(entry);
         });
+        // Inbound messages are read on `control` only (NFR-4).
+        if (label === 'control') channel.onMessage.subscribe((data) => this.onControlMessage(entry, data));
       }
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
@@ -336,12 +364,63 @@ export class PeerHub implements HostHub {
     if (!channel || entry.open.has(label)) return;
     entry.open.add(label);
     entry.writers.set(label, new ChannelWriter(channel, () => this.closePeer(entry)));
+    if (label === 'control') this.sendEnvelope(entry, 'control', { kind: 'hello', hello: this.hostHello });
+    else if (label === 'conversation') this.maybeAttachConversation(entry);
+  }
+
+  private onControlMessage(entry: PeerEntry, data: string | Buffer): void {
+    if (entry.closed || typeof data !== 'string') return;
+    const result = entry.reader.read(data);
+    if (result.kind !== 'envelope' || result.envelope.ch !== 'control') return;
+    const payload = result.envelope.payload as { kind?: unknown; hello?: unknown } | null;
+    if (typeof payload !== 'object' || payload === null || payload.kind !== 'hello') return;
+    if (entry.helloState !== 'waiting') return;
+    const negotiated = negotiateHello(this.hostHello, payload.hello);
+    if (negotiated.ok) {
+      entry.helloState = 'negotiated';
+      this.maybeAttachConversation(entry);
+    } else {
+      entry.helloState = 'failed';
+      this.sendEnvelope(entry, 'control', { kind: 'error', code: negotiated.code });
+    }
+  }
+
+  private maybeAttachConversation(entry: PeerEntry): void {
+    if (entry.closed || entry.helloState !== 'negotiated' || !entry.open.has('conversation') || entry.conversationAttached) {
+      return;
+    }
+    entry.conversationAttached = true;
+    void this.deps.bridge.attach({ send: (payload) => this.sendConversation(entry, payload) }).then((detach) => {
+      if (entry.closed) detach();
+      else entry.detachConversation = detach;
+    });
+  }
+
+  private sendConversation(entry: PeerEntry, payload: ConversationPayload): void {
+    try {
+      this.sendEnvelope(entry, 'conversation', payload);
+    } catch (error) {
+      if (!(error instanceof RangeError)) throw error;
+      this.sendEnvelope(entry, 'conversation', { kind: 'unavailable', reason: 'history_too_large' });
+    }
+  }
+
+  private sendEnvelope(entry: PeerEntry, ch: SharedChannel, payload: ControlPayload | ConversationPayload): void {
+    if (entry.closed) return;
+    const writer = entry.writers.get(ch);
+    if (!writer) return;
+    const seq = (entry.seq.get(ch) ?? 0) + 1;
+    // A RangeError (envelope too large) sends nothing, so it must not consume the seq.
+    writer.send({ v: SHARED_WIRE_VERSION, ch, streamId: this.ctx.scope.conversationId, seq, t: this.deps.now(), payload });
+    entry.seq.set(ch, seq);
   }
 
   private closePeer(entry: PeerEntry): void {
     if (entry.closed) return;
     entry.closed = true;
     if (this.peers.get(entry.githubId) === entry) this.peers.delete(entry.githubId);
+    entry.detachConversation?.();
+    entry.detachConversation = null;
     for (const writer of entry.writers.values()) writer.close();
     for (const channel of entry.channels.values()) {
       try {
