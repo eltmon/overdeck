@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4479",
   "created": "2026-11-03T15:06:40.232Z",
-  "updated": "2026-11-03T15:50:03.928Z",
+  "updated": "2026-11-03T15:50:23.980Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -194,6 +194,11 @@
     "join-restore-integration.ac2": {
       "status": "completed",
       "doneAt": "2026-11-03T15:50:03.927Z"
+    },
+    "host-repark-integration": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4479",
+      "claimedAt": "2026-11-03T15:50:23.980Z"
     }
   }
 }
