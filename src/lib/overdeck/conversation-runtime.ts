@@ -60,7 +60,7 @@ import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { piFifoPaths } from '../runtimes/pi-fifo.js';
 import { generateLauncherScript } from '../launcher-generator.js';
 import { waitForClaudeReady } from './claude-readiness.js';
-import { claudeSystemPromptFiles, getAcpLauncherFields, waitForHostReady, waitForPromptReady } from '../agents/runtime-command.js';
+import { claudeSystemPromptFiles, getAcpLauncherFields, waitForCodexAppServerReady, waitForHostReady, waitForPromptReady } from '../agents/runtime-command.js';
 import { reapPrimeAgentDaemon } from '../prime-agent/daemon.js';
 import { getPrimeAgentLauncherFields } from '../prime-agent/launcher-fields.js';
 import { requirePrimeAgentSessionFile } from '../runtimes/storage/prime-agent.js';
@@ -337,6 +337,14 @@ export async function waitForConversationRuntimeReady(tmuxSession: string, harne
       return;
     case 'codex-tui-prompt':
     case 'codex-app-server-ready':
+      // PAN-4903: an app-server conversation takes its first message only through
+      // the host socket, so wait until the host answers `ready`. Without this the
+      // first delivery raced the socket bind and fell through to a terminal paste
+      // (on Herdr, a tmux "no current target"). A TUI conversation's supervisor
+      // socket is already awaited inside the spawn.
+      if ((loadConfigSync().config.codex?.transport ?? 'app-server') === 'app-server') {
+        await waitForCodexAppServerReady(tmuxSession, 60, { sessionExists: tmuxSessionExists });
+      }
       return;
     case 'claude-session-signal':
       if (mode === 'respawn') await waitForReadySignal(tmuxSession, 30);
