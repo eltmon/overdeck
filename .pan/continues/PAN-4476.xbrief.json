@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4476",
   "created": "2026-11-03T15:05:40.423Z",
-  "updated": "2026-11-03T16:11:32.628Z",
+  "updated": "2026-11-03T16:11:46.681Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -224,6 +224,10 @@
     "host-route.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T16:11:32.628Z"
+    },
+    "loopback-flow.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:11:46.681Z"
     }
   }
 }
