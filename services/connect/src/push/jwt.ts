@@ -12,6 +12,15 @@ export function base64UrlBytes(bytes: Uint8Array): string {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
+/** Decodes base64url with or without padding (a JWK's `d`, for instance). */
+export function base64UrlToBytes(text: string): Uint8Array {
+  const b64 = text.replace(/-/g, '+').replace(/_/g, '/');
+  const binary = atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4));
+  const out = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
+  return out;
+}
+
 export function base64UrlJson(value: unknown): string {
   return base64UrlBytes(new TextEncoder().encode(JSON.stringify(value)));
 }
