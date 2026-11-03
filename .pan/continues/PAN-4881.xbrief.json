@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4881",
   "created": "2026-11-03T06:05:06.618Z",
-  "updated": "2026-11-03T06:34:43.298Z",
+  "updated": "2026-11-03T06:35:03.319Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,6 +50,10 @@
     "rename-test-hermetic-token.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T06:34:43.297Z"
+    },
+    "setup-clears-worker-token.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:35:03.319Z"
     }
   }
 }
