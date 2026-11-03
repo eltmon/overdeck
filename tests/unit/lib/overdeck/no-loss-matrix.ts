@@ -528,6 +528,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/machines/ssh/test',                kind: 'http', disposition: 'READ',        door: 'ssh-machine-service.testSshHost (PAN-4404)' },
   { surface: 'GET /api/machines/ssh/config-hosts',         kind: 'http', disposition: 'READ',        door: 'ssh/target.listSshConfigAliases (PAN-4404)' },
   { surface: 'POST /api/machines/fly',                     kind: 'http', disposition: 'WRITE',       door: 'fly-machine-service.addFlyMachine -> link-store.upsertLink + fly machine-store (PAN-4652)' },
+  { surface: 'POST /api/machines/fly/enable-remote',       kind: 'http', disposition: 'WRITE',       door: 'remote-enabled.enableRemoteInConfigToml -> config.toml [remote] enabled (PAN-4905)' },
   { surface: 'POST /api/remote/work-agents',               kind: 'http', disposition: 'WRITE',       door: 'fly-work-agent-service.startFlyWorkAgent -> addFlyMachine + remote-state (PAN-4734)' },
   { surface: 'GET /api/versions/self',                     kind: 'http', disposition: 'READ',        door: 'fleet/harness-versions.listInstalledHarnessClis + fleet-update job store (PAN-4654)' },
   { surface: 'POST /api/versions/self/update',             kind: 'http', disposition: 'WRITE',       door: 'fleet-update-service.start|escalate -> ${OVERDECK_HOME}/fleet-update.json (PAN-4654)' },

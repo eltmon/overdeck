@@ -1,0 +1,294 @@
+{
+  "version": "1",
+  "issueId": "PAN-4477",
+  "created": "2026-11-03T15:02:33.095Z",
+  "updated": "2026-11-03T17:22:05.576Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-03T16:49Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-03T16:49:02.392Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-03T16:53:39.126Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-03T17:11:54.664Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-03T17:22Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-03T17:22:05.576Z"
+    }
+  ],
+  "items": {
+    "wire-terminal-types": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4477",
+      "claimedAt": "2026-11-03T15:02:33.095Z",
+      "doneAt": "2026-11-03T15:10:22.931Z"
+    },
+    "pty-hub-listeners": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4477",
+      "claimedAt": "2026-11-03T15:10:32.914Z",
+      "doneAt": "2026-11-03T15:13:41.815Z"
+    },
+    "hub-pty-attach-extract": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4477",
+      "claimedAt": "2026-11-03T15:13:47.319Z",
+      "doneAt": "2026-11-03T15:20:12.441Z"
+    },
+    "tmux-hub-subscribe": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4477",
+      "claimedAt": "2026-11-03T15:20:19.646Z",
+      "doneAt": "2026-11-03T15:23:42.270Z"
+    },
+    "terminal-bridge": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4477",
+      "claimedAt": "2026-11-03T15:23:48.518Z",
+      "doneAt": "2026-11-03T15:26:24.496Z"
+    },
+    "peer-hub-terminal": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4477",
+      "claimedAt": "2026-11-03T15:26:30.869Z",
+      "doneAt": "2026-11-03T15:29:15.838Z"
+    },
+    "viewer-peer-terminal": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4477",
+      "claimedAt": "2026-11-03T15:29:22.924Z",
+      "doneAt": "2026-11-03T15:32:06.111Z"
+    },
+    "shared-terminal-view": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4477",
+      "claimedAt": "2026-11-03T15:32:12.538Z",
+      "doneAt": "2026-11-03T15:34:21.810Z"
+    },
+    "viewer-terminal-toggle": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4477",
+      "claimedAt": "2026-11-03T15:34:28.794Z",
+      "doneAt": "2026-11-03T15:37:35.454Z"
+    },
+    "shared-terminal-e2e": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4477",
+      "claimedAt": "2026-11-03T15:37:41.341Z",
+      "doneAt": "2026-11-03T15:46:02.044Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4477",
+      "claimedAt": "2026-11-03T15:46:13.841Z",
+      "doneAt": "2026-11-03T15:47:20.866Z"
+    },
+    "wire-terminal-types.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:04:29.716Z"
+    },
+    "wire-terminal-types.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:27:21.436Z"
+    },
+    "wire-terminal-types.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:27:40.444Z"
+    },
+    "pty-hub-listeners.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:27:55.329Z"
+    },
+    "pty-hub-listeners.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:28:11.338Z"
+    },
+    "pty-hub-listeners.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:28:28.613Z"
+    },
+    "pty-hub-listeners.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:28:45.846Z"
+    },
+    "pty-hub-listeners.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:29:01.187Z"
+    },
+    "hub-pty-attach-extract.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:29:16.691Z"
+    },
+    "hub-pty-attach-extract.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:29:31.926Z"
+    },
+    "hub-pty-attach-extract.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:29:49.502Z"
+    },
+    "hub-pty-attach-extract.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:30:05.848Z"
+    },
+    "tmux-hub-subscribe.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:30:21.521Z"
+    },
+    "tmux-hub-subscribe.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:30:37.124Z"
+    },
+    "tmux-hub-subscribe.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:30:52.402Z"
+    },
+    "tmux-hub-subscribe.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:31:08.633Z"
+    },
+    "tmux-hub-subscribe.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:31:25.020Z"
+    },
+    "terminal-bridge.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:31:40.708Z"
+    },
+    "terminal-bridge.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:31:57.322Z"
+    },
+    "terminal-bridge.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:32:11.955Z"
+    },
+    "terminal-bridge.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:32:28.966Z"
+    },
+    "terminal-bridge.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:32:44.690Z"
+    },
+    "peer-hub-terminal.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:33:00.165Z"
+    },
+    "peer-hub-terminal.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:33:14.996Z"
+    },
+    "peer-hub-terminal.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:33:31.272Z"
+    },
+    "peer-hub-terminal.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:33:47.198Z"
+    },
+    "peer-hub-terminal.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:34:02.100Z"
+    },
+    "peer-hub-terminal.ac6": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:34:18.051Z"
+    },
+    "viewer-peer-terminal.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:34:33.509Z"
+    },
+    "viewer-peer-terminal.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:34:49.884Z"
+    },
+    "viewer-peer-terminal.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:35:07.262Z"
+    },
+    "viewer-peer-terminal.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:35:25.237Z"
+    },
+    "shared-terminal-view.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:35:43.042Z"
+    },
+    "shared-terminal-view.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:36:00.374Z"
+    },
+    "shared-terminal-view.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:36:16.610Z"
+    },
+    "shared-terminal-view.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:36:31.785Z"
+    },
+    "viewer-terminal-toggle.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:36:47.412Z"
+    },
+    "viewer-terminal-toggle.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:37:03.264Z"
+    },
+    "viewer-terminal-toggle.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:37:19.190Z"
+    },
+    "viewer-terminal-toggle.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:37:35.419Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:37:51.797Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:38:08.054Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:38:23.214Z"
+    },
+    "shared-terminal-e2e.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:39:37.192Z"
+    },
+    "shared-terminal-e2e.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:39:52.998Z"
+    },
+    "shared-terminal-e2e.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:40:10.048Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-03T17:22:05Z",
+      "markdownBody": "# CodeRabbit findings for PAN-4477 (PR #4913)\n\nCodeRabbit posted 2 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4458145389 · configuration/shared-sessions.mdx:107 [Minor]: Update the \"In this release\" bullets to cover the Terminal view.\n  https://github.com/eltmon/overdeck/pull/4913#discussion_r4458145389\n- Thread 4458145403 · src/dashboard/frontend/src/components/chat/sharing/SharedTerminalView.tsx:48 [Minor]: Normalize tmux snapshot line endings before sending the snapshot frame.\n  https://github.com/eltmon/overdeck/pull/4913#discussion_r4458145403\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/4913/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-4477`.\n   If you only replied, you are done.\n5. If PR #4913 has already merged when you read this, nothing more lands on it: open a follow-up issue\n   for the findings you agree with instead of pushing."
+    }
+  ],
+  "agentModel": "claude-opus-5-5"
+}

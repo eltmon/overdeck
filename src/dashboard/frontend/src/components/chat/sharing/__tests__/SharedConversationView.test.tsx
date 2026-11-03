@@ -1,6 +1,6 @@
 /** PAN-4475 WI-9: every viewer screen's exact text and controls, and no host content in the lobby. */
 import { fireEvent, render, screen } from '@testing-library/react';
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import type { JoinState, JoinView, PresencePayload, SharedMessage } from '@overdeck/contracts';
 
@@ -11,6 +11,14 @@ import type { SharedJoin } from '../useSharedJoin';
 vi.mock('../../ChatMarkdown', () => ({
   ChatMarkdownSettingsProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
   ChatMarkdown: ({ text }: { text: string }) => <div data-testid="chat-markdown">{text}</div>,
+}));
+
+// The real view needs xterm; this stand-in only starts and stops the watch like it does.
+vi.mock('../SharedTerminalView', () => ({
+  SharedTerminalView: ({ watch }: { watch: (listener: () => void) => () => void }) => {
+    useEffect(() => watch(() => undefined), [watch]);
+    return <div data-testid="shared-terminal" />;
+  },
 }));
 
 vi.mock('@tanstack/react-virtual', () => ({
@@ -74,6 +82,7 @@ function props(overrides: Partial<SharedJoin> = {}): SharedJoin & { code: string
     join: vi.fn(),
     leave: vi.fn(),
     reconnect: vi.fn(),
+    watchTerminal: vi.fn(() => vi.fn()),
     ...overrides,
   };
 }
@@ -244,6 +253,43 @@ describe('SharedConversationView (PAN-4475 WI-9)', () => {
     expect(sharedRouteCode('#/shared/nope')).toBeNull();
     expect(sharedRouteCode('#/conv/BCDFGHJK')).toBeNull();
     expect(sharedRouteCode('')).toBeNull();
+  });
+});
+
+describe('SharedConversationView terminal toggle (PAN-4477 WI-9)', () => {
+  const connected = (overrides: Partial<SharedJoin> = {}) =>
+    live('admitted', { peerPhase: 'connected', presence: PRESENCE, messages: MESSAGES, hasHistory: true, ...overrides });
+
+  it('shows Conversation pressed and Terminal unpressed once connected', () => {
+    render(<SharedConversationView {...connected()} />);
+    expect(screen.getByRole('group', { name: 'Shared view' })).toBeTruthy();
+    expect(button('Conversation').getAttribute('aria-pressed')).toBe('true');
+    expect(button('Terminal').getAttribute('aria-pressed')).toBe('false');
+    expect(document.querySelector('[data-testid="shared-conversation-timeline"]')).not.toBeNull();
+  });
+
+  it('Terminal mounts the terminal view and starts the watch; Conversation stops it', () => {
+    const stop = vi.fn();
+    const p = connected({ watchTerminal: vi.fn(() => stop) });
+    render(<SharedConversationView {...p} />);
+
+    fireEvent.click(button('Terminal'));
+    expect(screen.getByTestId('shared-terminal')).toBeTruthy();
+    expect(document.querySelector('[data-testid="shared-conversation-timeline"]')).toBeNull();
+    expect(p.watchTerminal).toHaveBeenCalledTimes(1);
+    expect(button('Terminal').getAttribute('aria-pressed')).toBe('true');
+
+    fireEvent.click(button('Conversation'));
+    expect(screen.queryByTestId('shared-terminal')).toBeNull();
+    expect(stop).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows no toggle in the lobby or before the peer connects', () => {
+    const { unmount } = render(<SharedConversationView {...live('lobby', { messages: MESSAGES })} />);
+    expect(screen.queryByTestId('shared-view-toggle')).toBeNull();
+    unmount();
+    render(<SharedConversationView {...live('admitted', { peerPhase: 'connecting' })} />);
+    expect(screen.queryByTestId('shared-view-toggle')).toBeNull();
   });
 });
 

@@ -158,7 +158,20 @@ The conversation then streams in this dashboard like any linked conversation: us
 Fly machines use the `[remote]` and `[remote.fly]` settings, which `pan start --remote`
 also uses to start [work agents on Fly](#work-agents-on-fly):
 
-- `remote.enabled = true` in `~/.overdeck/config.toml`.
+- `enabled = true` under `[remote]` in `~/.overdeck/config.toml`:
+
+  ```toml
+  [remote]
+  enabled = true
+  ```
+
+  `remote.enabled` lives only in config.toml. The global `~/.overdeck/config.yaml`
+  also has a `remote:` section, but it holds only `resiliency_tier` and
+  `max_concurrent_agents` — an `enabled` key there does nothing, and
+  `pan admin config set remote.enabled <value>` refuses rather than write it. In
+  the dashboard, Settings → Anywhere → Machines → **Add a Fly machine** shows a
+  "Remote is off" notice with a **Turn on remote** button that writes the
+  `[remote] enabled = true` line for you.
 - A Fly token: `fly auth login`, or `FLY_API_TOKEN` (or the variable that
   `[remote.fly] api_token_env` names). `fly auth login`'s stored login works, but Overdeck
   only refreshes it through `flyctl` after a rejected request (PAN-4748), so a host where

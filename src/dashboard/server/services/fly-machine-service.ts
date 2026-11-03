@@ -58,6 +58,8 @@ import {
   provisionFlyMachine,
 } from '../../../lib/anywhere/fly/provision.js';
 import { loadConfig, type RemoteConfig } from '../../../lib/config.js';
+import { displayPath, remoteEnabledHint, configYamlSetsRemoteEnabled } from '../../../lib/remote-enabled.js';
+import { getGlobalConfigPath } from '../../../lib/config-yaml/load.js';
 import { getProviderForModel, UnknownModelError } from '../../../lib/providers.js';
 import { createFlyApiClient, flyTokenRejectedMessage, isFlyAuthError } from '../../../lib/remote/fly-api.js';
 import { checkRemoteSpendCap } from '../../../lib/remote/remote-agents.js';
@@ -116,6 +118,8 @@ export interface FlyMachineServiceDeps {
   checkCodexPolicy: (model: string) => Promise<{ allowed: boolean; reason?: string }>;
   /** Home's Codex binary, version and valid sign-in, or null (D-2). */
   homeCodex: () => Promise<HomeCodexState | null>;
+  /** PAN-4905: whether the global config.yaml sets `remote.enabled` (which nothing reads). */
+  yamlSetsRemoteEnabled: () => Promise<boolean>;
 }
 
 /** D-10: these modules reach `app-server-manager.js` and its `ws`, so they load only when a Codex request asks. */
@@ -155,6 +159,7 @@ const defaultDeps: Omit<FlyMachineServiceDeps, 'notifyLinksChanged'> = {
   log: (message) => console.warn(`[fly-machines] ${message}`),
   checkCodexPolicy,
   homeCodex: () => readHomeCodexState(),
+  yamlSetsRemoteEnabled: () => configYamlSetsRemoteEnabled(),
 };
 
 /**
@@ -174,7 +179,10 @@ function publicIpHint(appName: string): string {
 async function refuseEarly(input: AddFlyMachineInput, deps: FlyMachineServiceDeps): Promise<FlyMachineHarness> {
   const config = await deps.loadConfig();
   if (config.remote?.enabled !== true) {
-    throw new FlyMachineError('remote-disabled', 'Fly machines need remote.enabled: true in the Overdeck config.');
+    const yamlNote = (await deps.yamlSetsRemoteEnabled())
+      ? ` ${displayPath(getGlobalConfigPath())} sets remote.enabled, but that file does not hold this setting.`
+      : '';
+    throw new FlyMachineError('remote-disabled', `Fly machines need remote turned on: ${remoteEnabledHint()}.${yamlNote}`);
   }
   if (!deps.hasFlyToken(config.remote)) {
     throw new FlyMachineError('no-fly-token', 'No Fly API token: run `fly auth login`, or set FLY_API_TOKEN (or the variable remote.fly.api_token_env names).');
