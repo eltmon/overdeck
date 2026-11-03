@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4849",
   "created": "2026-11-03T03:09:47.454Z",
-  "updated": "2026-11-03T04:56:29.535Z",
+  "updated": "2026-11-03T04:57:00.790Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -212,6 +212,10 @@
     "pending-escalations.ac5": {
       "status": "completed",
       "doneAt": "2026-11-03T04:56:29.535Z"
+    },
+    "deft-menu-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:57:00.789Z"
     }
   }
 }
