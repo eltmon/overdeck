@@ -23,6 +23,7 @@
  */
 import b4a from 'b4a';
 import Noise, { type NoiseState } from 'noise-handshake';
+import dh from 'noise-handshake/dh';
 
 import type { CryptoPort } from './crypto-port.js';
 import { MODE_BYTES, type ChannelMode } from './wire.js';
@@ -34,6 +35,12 @@ export const NOISE_LINK_PROTOCOL = 1;
 export interface StaticKeyPair {
   publicKey: Uint8Array;
   secretKey: Uint8Array;
+}
+
+/** A fresh X25519 static key pair from the same libsodium the handshake uses (the phone's per-machine link key, PAN-4837 C-1). */
+export function generateStaticKeyPair(): StaticKeyPair {
+  const { publicKey, secretKey } = dh.generateKeyPair();
+  return { publicKey, secretKey };
 }
 
 /** Keys both ends hold once a handshake completes. */

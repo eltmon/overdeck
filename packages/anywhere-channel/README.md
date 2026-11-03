@@ -10,7 +10,7 @@ server bundles inline it through the workspace symlink (tsdown `alwaysBundle: /^
 
 | Import | Runs on | Exports |
 | --- | --- | --- |
-| `@overdeck/anywhere-channel` | anywhere | The protocol core: `noise.ts` (`pairingSecrets`, `prologueFor`, `approvalNonce`, `approvalCommitment`, `approvalSas`, the IK/XX/XXpsk0 constructors, `StaticKeyPair`), `wire.ts` (preamble, frames, refusals, `FrameReader`, `RawDuplex`), `initiator.ts` (`runInitiatorHandshake`, `withDeadline`, `ChannelOpenError`, `ChannelMarker`), and `type CryptoPort`. |
+| `@overdeck/anywhere-channel` | anywhere | The protocol core: `noise.ts` (`pairingSecrets`, `prologueFor`, `approvalNonce`, `approvalCommitment`, `approvalSas`, the IK/XX/XXpsk0 constructors, `StaticKeyPair`, `generateStaticKeyPair`), `wire.ts` (preamble, frames, refusals, `FrameReader`, `RawDuplex`), `initiator.ts` (`runInitiatorHandshake`, `withDeadline`, `ChannelOpenError`, `ChannelMarker`), and `type CryptoPort`. |
 | `@overdeck/anywhere-channel/node` | Node | The core plus `nodeCrypto` (`node:crypto`). The server imports this. |
 | `@overdeck/anywhere-channel/web` | browser | The core plus `webCrypto`, `openSecureChannel`, `RtcDuplexWeb` (and `RTC_MAX_MESSAGE_BYTES`, `RTC_HIGH_WATER_BYTES`, `RTC_LOW_WATER_BYTES`), `DirectoryWebClient`, `createMachineDialer`; HTTP over a channel (`serializeRequest`, `ResponseParser`, `HttpParseError`, `CHANNEL_HOST`, `MAX_RESPONSE_BODY_BYTES`, `requestOnChannel`, `createChannelPool`, `ChannelHttpError`, `CHANNEL_POOL_MAX`, `CHANNEL_POOL_IDLE_MS`); `ChannelWebSocket` with `ChannelMessageEvent` and `ChannelCloseEvent`; and the page shims (`installChannelShims`, `channelPathFor`). No file under `src/` (the server) imports it. |
 

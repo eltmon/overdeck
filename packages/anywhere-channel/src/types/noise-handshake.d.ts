@@ -23,3 +23,8 @@ declare module 'noise-handshake' {
   const Noise: NoiseConstructor;
   export default Noise;
 }
+
+declare module 'noise-handshake/dh' {
+  const dh: { generateKeyPair(): { publicKey: Uint8Array; secretKey: Uint8Array } };
+  export default dh;
+}
