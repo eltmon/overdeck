@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4477",
   "created": "2026-11-03T15:02:33.095Z",
-  "updated": "2026-11-03T16:39:52.999Z",
+  "updated": "2026-11-03T16:40:10.048Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -254,6 +254,10 @@
     "shared-terminal-e2e.ac2": {
       "status": "completed",
       "doneAt": "2026-11-03T16:39:52.998Z"
+    },
+    "shared-terminal-e2e.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:40:10.048Z"
     }
   }
 }
