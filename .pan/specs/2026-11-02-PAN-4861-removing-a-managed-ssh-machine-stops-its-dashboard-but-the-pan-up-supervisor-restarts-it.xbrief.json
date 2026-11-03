@@ -1,0 +1,270 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T23:44:32Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4861: Removing a managed SSH machine stops its dashboard, but the pan up supervisor restarts it",
+    "updated": "2026-11-02T23:49:11.030Z"
+  },
+  "plan": {
+    "id": "pan-4861",
+    "title": "Removing a managed SSH machine stops its dashboard, but the pan up supervisor restarts it",
+    "status": "running",
+    "uid": "99b582cb-1b85-4d91-8a9b-b73391183b76",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-02T23:44:32Z",
+    "updated": "2026-11-02T23:49:11.030Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4861",
+        "label": "PAN-4861",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "anywhere",
+      "ssh-machines",
+      "supervisor",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "The SSH helper's managed stop (stop case 5 in src/lib/anywhere/ssh/helper.ts stopLocked) sends SIGTERM only to the dashboard pid. pan up also started the supervisor (dist/supervisor/server.js), whose watchdog runs pan restart --dashboard after 3 failed health polls (about 30 s). The helper then deletes the launch marker, so the restarted dashboard is external and no later remove stops it. The remove dialog promises the opposite.",
+      "Proposal": "In stop case 5 only, stop the host's supervisor before signalling the dashboard, the same way pan down does (stopSupervisorUnitIfActive(), else stopSupervisorProcess()). Then confirm for up to 3 s that nothing answers GET /health with ok:true on the supervisor port; if a supervisor still answers (e.g. the launchd agent pan connect loads), answer stop-failed, keep the marker and do not signal the dashboard. Raise the linking side's stop timeout from 45 s to 60 s for the longer worst-case path. Update docs/ANYWHERE-ARCHITECTURE.md, configuration/linked-machines.mdx and the supervisor header comment. Full detail: .pan/drafts/PAN-4861.md (D-4861-1..7).",
+      "NonGoals": "- No change to the supervisor (src/supervisor/*) beyond its header comment: no HTTP stop route, no 'stopped on purpose' watchdog state.\n- No change to the start path, the launch marker schema ({ v: 1, pid, apiPort, version, startedAt, startedBy }) or SSH_HELPER_PROTOCOL.\n- No new HelperStopReason value and no frontend change; surfacing stop-failed in the remove dialog is out of scope.\n- The helper never boots out the launchd agent and never runs systemctl disable on overdeck-supervisor.service.\n- No change to pan down, and no stop of CLIProxy, Traefik, smee or review sessions.\n- Stop cases 1-4 (not-running, external, restarted, in-use) must never stop the supervisor.\n- No handling of a detached pan restart --dashboard spawned by the supervisor before it was stopped.\n- No live end-to-end SSH smoke of the managed path; scripts/anywhere/ssh-machine-smoke.mjs is unchanged.\n- No edit to .pan/drafts/PAN-4404.md (historical record of D-4404-8)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Stop any live supervisor in stop case 5 (no provenance field in the launch marker).",
+        "rationale": "Case 5 is reachable only when this linker ran pan up itself and no other machine holds a link, so any live supervisor's only remaining job is to restart the dashboard being stopped. A provenance rule would leave the bug in place whenever the supervisor pre-existed and cannot cover markers written before the fix. Counter-case accepted and documented: a pan connect host with an enabled unit gets the unit stopped until next boot."
+      },
+      {
+        "summary": "Reuse pan down's supervisor stop primitives instead of a new supervisor stop route or calling pan down.",
+        "rationale": "The issue offers 'pan down scoped to what this linker started' or stopping the supervisor first. A new HTTP stop route adds an unauthenticated loopback surface; pan down also stops smee, Traefik and the dashboard by port, which D-4404-8 rejected."
+      },
+      {
+        "summary": "Verify via GET /health on the supervisor port that no supervisor answers before signalling the dashboard; otherwise stop-failed and keep the marker.",
+        "rationale": "One mechanism-agnostic check covers the launchd agent (KeepAlive, never booted out) and any failed stop, and fails closed: the server stays running and managed instead of being killed and restarted as external."
+      },
+      {
+        "summary": "Report an unstoppable supervisor through the existing stop-failed error code; no protocol or reason-union change.",
+        "rationale": "HelperStopReason is mirrored in target.ts STOP_REASONS and the service; the linking side already maps stop-failed to removal reason stop-failed, so no cross-cutting change is needed."
+      },
+      {
+        "summary": "Raise HELPER_STOP_TIMEOUT_MS from 45_000 to 60_000.",
+        "rationale": "Worst case becomes lock 30 s + supervisor stop up to 3 s + probe 3 s + dashboard grace 10 s + requests, about 50 s, which no longer fits 45 s."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Small: 3 items, 7 files across the SSH helper, the linking service constant and docs.",
+      "canonicalFilename": "2026-11-02-PAN-4861-removing-a-managed-ssh-machine-stops-its-dashboard-but-the-pan-up-supervisor-restarts-it.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "helper-stops-supervisor",
+        "title": "SSH helper stop case 5 stops the supervisor before the dashboard, with tests modelling a restarting supervisor",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T23:44:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4861",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/anywhere/ssh/helper.ts",
+            "src/lib/anywhere/ssh/__tests__/helper.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/anywhere/ssh/__tests__/helper.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "helper.test.ts passes, including the new supervisor tests and the unchanged case-5 kill-call assertions",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle",
+            "lint:file-size passes (helper.ts stays far below the 1000-line ceiling)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-1 and WI-2 together (the tests must land with the HelperDeps change, or the existing case-5 tests break). In src/lib/anywhere/ssh/helper.ts: add HelperDeps.supervisorPort (default getSupervisorPort()) and HelperDeps.stopSupervisor() (default: `if (await stopSupervisorUnitIfActive()) return; stopSupervisorProcess();`); add SUPERVISOR_STOP_WAIT_MS = 3_000 and a supervisorAnswers(deps) probe (GET http://127.0.0.1:<supervisorPort>/health, true only for response.ok and JSON ok === true); in stopLocked, after the in-use check and before `deps.kill(healthPid, 'SIGTERM')`, call stopSupervisor (a throw becomes failure('stop-failed', ...)), poll supervisorAnswers every STOP_POLL_MS until false or the 3 s deadline, and if it still answers return failure('stop-failed', message naming the port and the launchd agent) without signalling and without deleting the marker. Update the module header bullet as the PRD gives it. The sync stopSupervisorProcess is allowed because the helper runs only in the pan machines ssh-helper CLI (D-4861-7); do not add an async twin. If lint:circular flags the static imports of ../../supervisor.js or ../../systemd.js, switch to dynamic imports inside the default functions. In helper.test.ts: extend the harness with supervisorRunning/supervisorStoppable, supervisorPort 3012, a vi.fn stopSupervisor, a 3012/health answer placed before the healthPid===null throw, and a restartingSupervisor(h) kill model that schedules healthPid = 5151 after 30 s if the supervisor is still running when the dashboard is killed; add the four tests listed in PRD WI-2 and add `expect(h.stopSupervisor).not.toHaveBeenCalled()` to cases 1-4 and the machines-list failure test. Use fake timers only (repo rule: vi.useFakeTimers + vi.advanceTimersByTimeAsync, never real waits)."
+        },
+        "items": [
+          {
+            "id": "helper-stops-supervisor.ac1",
+            "title": "Given a managed marker and a running, stoppable supervisor that restarts the dashboard 30 s after it dies, when runHelperStop runs, then it returns { stopped: true, reason: 'stopped' }, stopSupervisor's invocationCallOrder precedes kill's, and after advancing fake time 60 s the health pid is still null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "helper-stops-supervisor.ac2",
+            "title": "Given a supervisor that still answers ok:true on port 3012 after stopSupervisor, when runHelperStop runs, then it returns { ok: false, error: 'stop-failed' } with a message containing 3012, kill is never called, and the marker file still exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "helper-stops-supervisor.ac3",
+            "title": "Given stop cases 1-4 (not-running, external, restarted, in-use) or a machines list answering HTTP 500, when runHelperStop runs, then stopSupervisor is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "helper-stops-supervisor.ac4",
+            "title": "Given no supervisor (or a non-supervisor JSON answer on port 3012), when case 5 runs, then kill calls are exactly [[4242,'SIGTERM']] when the dashboard exits and [[4242,'SIGTERM'],[4242,'SIGKILL']] when it is still alive after 10 s, and the result is { stopped: true, reason: 'stopped' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "helper-stops-supervisor.ac5",
+            "title": "defaultHelperDeps returns supervisorPort equal to getSupervisorPort() and a stopSupervisor that calls stopSupervisorUnitIfActive() and calls stopSupervisorProcess() only when that returns false; npm run typecheck and npm run lint:circular exit 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stop-timeout-60s",
+        "title": "Raise the linking side's ssh-helper stop timeout from 45 s to 60 s",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T23:44:32Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-4861",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/ssh-machine-service.ts",
+            "src/dashboard/server/services/__tests__/ssh-machine-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/ssh-machine-service.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ssh-machine-service.test.ts passes with the stop call's timeoutMs asserted as 60_000",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In src/dashboard/server/services/ssh-machine-service.ts change `export const HELPER_STOP_TIMEOUT_MS = 45_000;` to `60_000` with the comment `// D-4861-6: lock wait 30 s + supervisor stop and probe + dashboard grace 10 s.` In the service test change `expect(h.sshCalls[0]!.timeoutMs).toBe(45_000);` to `toBe(60_000)`. Nothing else in the service changes."
+        },
+        "items": [
+          {
+            "id": "stop-timeout-60s.ac1",
+            "title": "HELPER_STOP_TIMEOUT_MS exports 60_000 and runSsh receives timeoutMs 60_000 for the ssh-helper stop call, as the updated service test asserts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stop-timeout-60s.ac2",
+            "title": "runSsh still receives timeoutMs 20_000 for the version probe and 150_000 for the start call, unchanged by this item",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-supervisor-stop",
+        "title": "Document that a managed SSH remove stops the supervisor before the dashboard",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T23:44:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4861",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ANYWHERE-ARCHITECTURE.md",
+            "configuration/linked-machines.mdx",
+            "src/supervisor/server.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n 'D-4861-1' docs/ANYWHERE-ARCHITECTURE.md",
+            "grep -c 'Removal stops only the dashboard process' configuration/linked-machines.mdx"
+          ],
+          "expected_outputs": [
+            "lint:docs passes",
+            "grep finds D-4861-1 in the Adopt and stop rules heading and Stop paragraph",
+            "grep -c prints 0 for the retired sentence"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. (1) docs/ANYWHERE-ARCHITECTURE.md: rename the heading to `### Adopt and stop rules (D-4404-7, D-4404-8, D-4861-1)` and rewrite the end of the **Stop** paragraph: after in-use, the helper stops the host's supervisor first the way pan down does (overdeck-supervisor.service when active, else the supervisor.pid process) because the supervisor restarts a dashboard it watches; if a supervisor still answers /health on the supervisor port after 3 s (for example the launchd agent pan connect loads) the helper answers stop-failed, keeps the marker and leaves the server running; otherwise SIGTERM the dashboard pid, SIGKILL after 10 s, delete the marker, stopped. Other sidecars (CLIProxy, Traefik, smee) stay running and pan down is not used. A pan connect host with an enabled unit gets the unit stopped until next boot. The linking side waits up to 60 s. (2) configuration/linked-machines.mdx, section 'Started by Overdeck, or already running': replace the paragraph starting 'Removal stops only the dashboard process.' with text saying removal stops the dashboard and the supervisor that pan up runs next to it, other sidecars (CLIProxy) keep running, an unstoppable supervisor (the Mac launchd agent from pan connect) leaves the server running, and the in-use and restarted cases still leave it running. Keep identifiers in backticks; no bare <word> in MDX prose (PAN-4779). (3) src/supervisor/server.ts header line 16: 'Stopped by `pan down`, and by `pan machines ssh-helper stop` when a linked machine removes a server it started (PAN-4861). Independent of the dashboard's own lifecycle.' Do not edit .pan/drafts/PAN-4404.md."
+        },
+        "items": [
+          {
+            "id": "docs-supervisor-stop.ac1",
+            "title": "docs/ANYWHERE-ARCHITECTURE.md renders a Stop paragraph that names D-4861-1, says the supervisor is stopped before the dashboard is signalled, and says a supervisor still answering after 3 s produces stop-failed with the server left running",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-supervisor-stop.ac2",
+            "title": "configuration/linked-machines.mdx no longer contains 'Removal stops only the dashboard process' and its replacement paragraph states that removal stops the supervisor with the dashboard while CLIProxy keeps running",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-supervisor-stop.ac3",
+            "title": "The src/supervisor/server.ts header names `pan machines ssh-helper stop` as a second stopper, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  },
+  "status": "active"
+}

@@ -1,0 +1,72 @@
+{
+  "version": "1",
+  "issueId": "PAN-4861",
+  "created": "2026-11-02T23:50:27.148Z",
+  "updated": "2026-11-03T00:12:18.277Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "helper-stops-supervisor": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4861",
+      "claimedAt": "2026-11-02T23:50:27.148Z",
+      "doneAt": "2026-11-02T23:58:21.669Z"
+    },
+    "stop-timeout-60s": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4861",
+      "claimedAt": "2026-11-02T23:58:29.416Z",
+      "doneAt": "2026-11-03T00:00:23.423Z"
+    },
+    "docs-supervisor-stop": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4861",
+      "claimedAt": "2026-11-03T00:00:29.454Z",
+      "doneAt": "2026-11-03T00:02:27.639Z"
+    },
+    "helper-stops-supervisor.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:07:00.004Z"
+    },
+    "helper-stops-supervisor.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:07:14.587Z"
+    },
+    "helper-stops-supervisor.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:07:29.206Z"
+    },
+    "helper-stops-supervisor.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:07:43.766Z"
+    },
+    "helper-stops-supervisor.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:07:58.985Z"
+    },
+    "stop-timeout-60s.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:08:13.924Z"
+    },
+    "stop-timeout-60s.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:08:27.949Z"
+    },
+    "docs-supervisor-stop.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:08:42.419Z"
+    },
+    "docs-supervisor-stop.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:08:57.778Z"
+    },
+    "docs-supervisor-stop.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:09:12.458Z"
+    }
+  },
+  "feedback": []
+}

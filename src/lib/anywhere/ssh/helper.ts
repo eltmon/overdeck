@@ -15,9 +15,12 @@
  *   (0600). `managed` = the marker names this linker and the health pid;
  *   anything else is `external`. With pairing, mint a one-time pairing credential
  *   from the host's own dashboard with the internal token.
- * - **Stop** (D-4404-8): signal the dashboard only when the marker still proves
- *   this linker started it and no other machine holds an active link to it.
- *   Sidecars that `pan up` started are left running; `pan down` is not used.
+ * - **Stop** (D-4404-8, D-4861-1): when the marker still proves this linker
+ *   started the dashboard and no other machine holds an active link to it,
+ *   stop the supervisor first (the systemd unit or the supervisor.pid
+ *   process, as `pan down` does), confirm nothing answers on its port, then
+ *   signal the dashboard. Other sidecars that `pan up` started are left
+ *   running; `pan down` is not used.
  *
  * Every dependency is injectable so the tests run on fake timers and an
  * in-memory file system. A server that answers `/api/health` with any status
@@ -34,6 +37,8 @@ import { UUID_V4_LOWERCASE } from '../../environment-identity.js';
 import { ensureInternalToken, INTERNAL_TOKEN_HEADER } from '../../internal-token.js';
 import { getOverdeckHome } from '../../paths.js';
 import { readPlatformConfig } from '../../platform-lifecycle.js';
+import { getSupervisorPort, stopSupervisorProcess } from '../../supervisor.js';
+import { stopSupervisorUnitIfActive } from '../../systemd.js';
 import type { HelperFailure, HelperResult, HelperStartResult, HelperStopReason, HelperStopResult } from './target.js';
 
 export const LOCK_STALE_MS = 180_000;
@@ -44,6 +49,7 @@ export const HEALTH_WAIT_MS = 30_000;
 export const HEALTH_POLL_MS = 500;
 export const STOP_GRACE_MS = 10_000;
 export const STOP_POLL_MS = 250;
+export const SUPERVISOR_STOP_WAIT_MS = 3_000;
 const HEALTH_REQUEST_TIMEOUT_MS = 2_000;
 const OUTPUT_TAIL_LINES = 20;
 
@@ -86,6 +92,13 @@ export interface HelperDeps {
   apiPort: number;
   internalToken(): string;
   panVersion: string;
+  /** The host's supervisor port (dashboard API port + 1). */
+  supervisorPort: number;
+  /**
+   * Stop the host's supervisor the way `pan down` does: the systemd user unit
+   * when it is active, else the process in `${OVERDECK_HOME}/supervisor.pid`.
+   */
+  stopSupervisor(): Promise<void>;
 }
 
 const nodeFs: HelperFs = {
@@ -145,6 +158,25 @@ function isAliveDefault(pid: number): boolean {
   }
 }
 
+/** D-4861-1: the same supervisor stop as `pan down`. The helper runs only in the CLI, so the sync process stop is allowed (D-4861-7). */
+async function stopSupervisorDefault(): Promise<void> {
+  if (await stopSupervisorUnitIfActive()) return;
+  stopSupervisorProcess();
+}
+
+/** True when a supervisor answers `GET /health` with `ok: true` on the supervisor port. */
+async function supervisorAnswers(deps: HelperDeps): Promise<boolean> {
+  try {
+    const response = await deps.fetch(`http://127.0.0.1:${deps.supervisorPort}/health`, {
+      signal: AbortSignal.timeout(HEALTH_REQUEST_TIMEOUT_MS),
+    });
+    const body = (await response.json().catch(() => null)) as { ok?: unknown } | null;
+    return response.ok && body?.ok === true;
+  } catch {
+    return false;
+  }
+}
+
 /** Production dependencies: real fetch, fs and processes; ports and token from this host's OVERDECK_HOME. */
 export function defaultHelperDeps(panVersion: string): HelperDeps {
   return {
@@ -158,6 +190,8 @@ export function defaultHelperDeps(panVersion: string): HelperDeps {
     apiPort: readPlatformConfig().dashboardApiPort,
     internalToken: ensureInternalToken,
     panVersion,
+    supervisorPort: getSupervisorPort(),
+    stopSupervisor: stopSupervisorDefault,
   };
 }
 
@@ -416,6 +450,21 @@ async function stopLocked(linker: string, deps: HelperDeps): Promise<HelperResul
     (entry) => typeof entry === 'object' && entry !== null && (entry as { environmentId?: unknown }).environmentId !== linker,
   );
   if (others) return stopped(false, 'in-use');
+
+  // D-4861-1: the supervisor restarts a dashboard it watches, so it goes first.
+  try {
+    await deps.stopSupervisor();
+  } catch (error) {
+    return failure('stop-failed', `Could not stop the supervisor on this host: ${(error as Error).message}`);
+  }
+  const supervisorDeadline = deps.now() + SUPERVISOR_STOP_WAIT_MS;
+  while ((await supervisorAnswers(deps)) && deps.now() < supervisorDeadline) await sleep(STOP_POLL_MS);
+  if (await supervisorAnswers(deps)) {
+    return failure(
+      'stop-failed',
+      `A supervisor still answers on port ${deps.supervisorPort} (on a Mac, the launchd agent ai.overdeck.supervisor that pan connect loads). It would restart the dashboard, so the server was left running.`,
+    );
+  }
 
   try {
     deps.kill(healthPid, 'SIGTERM');
