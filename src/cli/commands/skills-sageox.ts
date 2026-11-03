@@ -1,7 +1,8 @@
 /**
- * `pan skills pack sageox link` (PAN-4852 WI-14).
+ * `pan skills pack sageox link` (PAN-4852 WI-14) and `commit` (WI-19).
  *
  *   pan skills pack sageox link --project <key> [--team <team>]
+ *   pan skills pack sageox commit --project <key>
  *
  * `skills.ts` registers these on its `sageox` command. Like `skills.ts`, this
  * module imports only Commander types and chalk statically; the SageOx logic
@@ -40,9 +41,29 @@ export async function skillsPackSageoxLinkCommand(options: SageoxLinkOptions): P
   }
 }
 
-/** Adds `link` to `pan skills pack sageox`. */
+export async function skillsPackSageoxCommitCommand(options: { project: string }): Promise<void> {
+  const { commitSageoxBinding, SageoxCommitError } = await import('../../lib/sageox/commit.js');
+  let result;
+  try {
+    result = await commitSageoxBinding(options.project);
+  } catch (error) {
+    if (error instanceof SageoxCommitError) {
+      console.error(chalk.red(error.message));
+      process.exit(1);
+    }
+    throw error;
+  }
+  if (result.status === 'already-committed') console.log(`already committed on ${result.branch}`);
+  else console.log(`${result.created ? 'opened' : 'reused'} ${result.url}`);
+  console.log(`recorded sageox_binding: committed for ${options.project}`);
+}
+
+/** Adds `link` and `commit` to `pan skills pack sageox`. */
 export function registerSkillsSageoxCommands(sageox: Command): void {
   sageox.command('link').description("Run ox init in a throwaway worktree and store the project's SageOx link files (changes no checkout)")
     .requiredOption('--project <key>', 'Project key').option('--team <team>', 'SageOx team (name, slug or id) passed to ox init')
     .action(skillsPackSageoxLinkCommand);
+  sageox.command('commit').description("Open one PR that adds the project's stored SageOx link files as .sageox/, then record sageox_binding: committed")
+    .requiredOption('--project <key>', 'Project key')
+    .action(skillsPackSageoxCommitCommand);
 }
