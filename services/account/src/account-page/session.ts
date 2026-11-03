@@ -138,13 +138,6 @@ export function identitySection(session: UserSession): string {
 <form method="post" action="/account/logout"><input type="hidden" name="csrf" value="${escapeHtml(session.csrfToken)}"><button type="submit">Sign out</button></form>`;
 }
 
-/** GET /account until the full page lands (WI-6): the sign-in page, or the identity alone. */
-export const identityPage: Handler = async (req, rc) => {
-  const user = await requireUserSession(req, rc);
-  if (!user.ok) return user.response;
-  return html(layout(ACCOUNT_TITLE, identitySection(user.session)));
-};
-
 /** POST /account/logout */
 export const logout: Handler = async (req, rc) => {
   const user = await requireUserSession(req, rc);

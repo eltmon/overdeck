@@ -21,6 +21,7 @@ import * as deletion from './deletion.ts';
 import * as adminScreen from './admin/screen.ts';
 import * as adminSession from './admin/session.ts';
 import * as adminPending from './admin/pending.ts';
+import * as accountPage from './account-page/page.ts';
 import * as accountSession from './account-page/session.ts';
 
 interface Route {
@@ -55,7 +56,7 @@ const ROUTES: Route[] = [
   { method: 'POST', pattern: '/admin/grants', handler: adminScreen.addGrant },
   { method: 'POST', pattern: '/admin/grants/:githubId/revoke', handler: adminScreen.revokeGrant },
   { method: 'POST', pattern: '/admin/pending/:githubId/allow', handler: adminPending.allow },
-  { method: 'GET', pattern: '/account', handler: accountSession.identityPage },
+  { method: 'GET', pattern: '/account', handler: accountPage.page },
   { method: 'POST', pattern: '/account/login', handler: accountSession.login, bucket: 'account-login' },
   { method: 'POST', pattern: '/account/logout', handler: accountSession.logout, bucket: 'account-action' },
 ];
