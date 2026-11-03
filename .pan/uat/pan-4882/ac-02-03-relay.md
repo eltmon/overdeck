@@ -71,3 +71,12 @@ expired unapproved over 57 minutes (06:36:51–07:32:01; the last code was issue
 time was about 01:30–02:30. So the four relay items are recorded as `not-run` and the relay VM is torn down.
 
 Sign-in: not-run — device code not approved after 57 min (three codes expired)
+
+## UDP blocked
+
+Not run. Outcomes A and B need the relay VM linked to home, and the link needs the VM signed in to overdeck.ai
+(the directory carries the TURN credentials and the relay route). No `iptables` or `ip6tables` rule was ever applied
+on the VM, so no D-9 revert timer exists. No reconnect was posted, no relay dial time exists, and no
+`ac-03-using-relay.png` was taken.
+
+UDP blocked: not-run — device code not approved after 57 min
