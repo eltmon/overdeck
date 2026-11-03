@@ -2,8 +2,9 @@
  * PAN-2444 O4: SageOx launch wiring with injected layers, git root, probe and
  * upload flag; the `.sageox/` check runs against a real temp dir.
  * PAN-4852 WI-7: the probe and hooks use the built `ox` by absolute path.
+ * PAN-4852 WI-13: placement and switch-off are injected and recorded.
  */
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -20,6 +21,9 @@ const packOff: SkillOverrideLayers = { global: {}, packs: { global: { sageox: fa
 const BIN = '/home/u/.overdeck/packs/sageox/abc/bin/ox';
 const built: OxBinary = { ok: true, bin: BIN, binDir: '/home/u/.overdeck/packs/sageox/abc/bin', commit: 'abc' };
 
+let placeCalls: Array<[string, string]>;
+let removeCalls: string[];
+
 function deps(overrides: Partial<SageoxLaunchDeps> & { layers?: SkillOverrideLayers; probeResult?: OxProbeResult; upload?: boolean } = {}): SageoxLaunchDeps {
   return {
     loadLayers: async () => ({ layers: overrides.layers ?? packOn, projectKey: 'oss' }),
@@ -27,13 +31,16 @@ function deps(overrides: Partial<SageoxLaunchDeps> & { layers?: SkillOverrideLay
     resolveBinary: async () => built,
     probe: async () => overrides.probeResult ?? { ok: true, version: '0.19.0', commit: 'abc' },
     readUpload: async () => overrides.upload ?? false,
+    place: async (placeRoot, projectKey) => { placeCalls.push([placeRoot, projectKey]); return { ok: true, state: 'placed' }; },
+    removePlacement: async cwd => { removeCalls.push(cwd); return { removed: [] }; },
     ...overrides,
   };
 }
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'sageox-launch-'));
-  mkdirSync(join(root, '.sageox'));
+  placeCalls = [];
+  removeCalls = [];
 });
 
 afterEach(() => {
@@ -51,12 +58,51 @@ describe('resolveSageoxLaunch', () => {
     expect(probed).toBe(false);
   });
 
-  it('is inactive with a warning when .sageox/ is missing at the git root', async () => {
-    rmSync(join(root, '.sageox'), { recursive: true });
-    const result = await resolveSageoxLaunch(ctx(), 'claude-code', deps());
-    expect(result.active).toBe(false);
+  it('removes a placed binding from the cwd when SageOx is off and returns no settings', async () => {
+    const result = await resolveSageoxLaunch(ctx(), 'claude-code', deps({
+      layers: packOff,
+      removePlacement: async cwd => { removeCalls.push(cwd); return { removed: ['config.json', 'README.md'] }; },
+    }));
+    expect(result).toEqual({ active: false, warnings: [] });
     expect(result.settings).toBeUndefined();
-    expect(result.warnings).toEqual([expect.stringContaining(`no .sageox/ at ${root}`)]);
+    expect(removeCalls).toEqual([ctx().cwd]);
+    expect(placeCalls).toEqual([]);
+  });
+
+  it('turns a switch-off failure into one warning', async () => {
+    const result = await resolveSageoxLaunch(ctx(), 'claude-code', deps({
+      layers: packOff,
+      removePlacement: async () => { throw new Error('EACCES: permission denied'); },
+    }));
+    expect(result).toEqual({
+      active: false,
+      warnings: ['[launcher] WARNING: SageOx placed files not removed: EACCES: permission denied'],
+    });
+  });
+
+  it('places the binding at the git root, then returns settings, when SageOx is on', async () => {
+    const result = await resolveSageoxLaunch(ctx(), 'claude-code', deps());
+    expect(result.active).toBe(true);
+    expect(result.settings?.env.OX_PROJECT_ROOT).toBe(root);
+    expect(placeCalls).toEqual([[root, 'oss']]);
+    expect(removeCalls).toEqual([]);
+  });
+
+  it('is inactive with the link warning when the project has no binding', async () => {
+    const warning = 'SageOx not applied: project oss has no SageOx link; run pan skills pack sageox link --project oss';
+    const result = await resolveSageoxLaunch(ctx(), 'claude-code', deps({ place: async () => ({ ok: false, warning }) }));
+    expect(result).toEqual({ active: false, warnings: [`[launcher] WARNING: ${warning}`] });
+  });
+
+  it('drops SageOx with one warning when placement throws', async () => {
+    const result = await resolveSageoxLaunch(ctx(), 'claude-code', deps({ place: async () => { throw new Error('ENOSPC: no space left on device'); } }));
+    expect(result).toEqual({ active: false, warnings: ['[launcher] WARNING: SageOx not applied: ENOSPC: no space left on device'] });
+  });
+
+  it('is inactive with a warning and places nothing when the launch has no project', async () => {
+    const result = await resolveSageoxLaunch(ctx(), 'claude-code', deps({ loadLayers: async () => ({ layers: packOn }) }));
+    expect(result).toEqual({ active: false, warnings: ['[launcher] WARNING: SageOx not applied: the launch has no project'] });
+    expect(placeCalls).toEqual([]);
   });
 
   it('is inactive with a warning when the cwd is not in a git repo', async () => {
@@ -70,6 +116,7 @@ describe('resolveSageoxLaunch', () => {
       active: false,
       warnings: ['[launcher] WARNING: SageOx not applied: ox host contract probe failed (no-contract); see pan doctor'],
     });
+    expect(placeCalls).toEqual([]);
   });
 
   it('wires env and six hooks with uploads off by default', async () => {
@@ -122,6 +169,7 @@ describe('resolveSageoxLaunch', () => {
       warnings: ['[launcher] WARNING: SageOx not applied: ox is not built for the sageox pack (abc1234); run pan skills pack sync sageox'],
     });
     expect(probed).toBe(false);
+    expect(placeCalls).toEqual([]);
   });
 
   it('quotes a built ox path that needs shell quoting in the hook command', () => {
@@ -154,7 +202,6 @@ describe('resolveSageoxLaunch', () => {
 
   it('single-quotes a git root that needs shell quoting', async () => {
     const quoted = join(root, "it's here");
-    mkdirSync(join(quoted, '.sageox'), { recursive: true });
     const result = await resolveSageoxLaunch(ctx(), 'claude-code', deps({ gitRoot: async () => quoted }));
     const command = (result.settings?.hooks['Stop'] as Array<{ hooks: Array<{ command: string }> }>)[0]?.hooks[0]?.command;
     expect(command).toContain(`OX_PROJECT_ROOT='${root}/it'\\''s here'`);
