@@ -90,6 +90,42 @@ describe('evaluateConflictRepairGate', () => {
     const result = await evaluateConflictRepairGate('PAN-1', deps);
     expect(result.conflicting).toBe(false);
     expect(result.reason).toContain('CI checks failing on PR HEAD');
+    expect(result.reason).toBe(`CI checks failing on PR HEAD ${HEAD}`);
+  });
+
+  it('is conflicting when every failing check was cancelled or timed out (PAN-4917)', async () => {
+    const { deps } = gateDeps(conflictingFacts({
+      checks: 'red',
+      checkFailures: [
+        { name: 'Prompt change trailer gate', conclusion: 'CANCELLED' },
+        { name: 'build (22)', conclusion: 'TIMED_OUT' },
+      ],
+    }));
+    const result = await evaluateConflictRepairGate('PAN-1', deps);
+    expect(result.conflicting).toBe(true);
+  });
+
+  it('is not conflicting when a cancelled check sits beside a failed one, and names both (PAN-4917)', async () => {
+    const { deps } = gateDeps(conflictingFacts({
+      checks: 'red',
+      checkFailures: [
+        { name: 'Prompt change trailer gate', conclusion: 'CANCELLED' },
+        { name: 'test', conclusion: 'FAILURE' },
+      ],
+    }));
+    const result = await evaluateConflictRepairGate('PAN-1', deps);
+    expect(result.conflicting).toBe(false);
+    expect(result.reason).toBe(`CI checks failing on PR HEAD ${HEAD}: Prompt change trailer gate (CANCELLED), test (FAILURE)`);
+  });
+
+  it('names a failing commit status in the decline reason (PAN-4917)', async () => {
+    const { deps } = gateDeps(conflictingFacts({
+      checks: 'red',
+      checkFailures: [{ name: 'dagger/test', conclusion: 'ERROR' }],
+    }));
+    const result = await evaluateConflictRepairGate('PAN-1', deps);
+    expect(result.conflicting).toBe(false);
+    expect(result.reason).toMatch(/: dagger\/test \(ERROR\)$/);
   });
 
   it('is not conflicting for a draft', async () => {

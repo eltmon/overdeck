@@ -546,6 +546,13 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   decisive test run, DoD row 6 skips candidates missing a required check, and the
   Command Deck chip uses `resolveCiHead` (`ci/project-ci-github.ts`, newest push
   run of `ci.yml`).
+- **`fetch-depth: 0` in CI fetches every branch, including `overdeck-state`** (PAN-4917) —
+  `actions/checkout` with `fetch-depth: 0` pulls all ~716 heads and ~588 tags. The archived
+  `overdeck-state` branch alone holds ~195k commits and ~391k trees not on `main` (main has
+  ~20k commits), so a full checkout can take over 5 minutes, and `filter: blob:none` does not
+  remove that cost. A job that needs history should fetch only the refs it reads. A job killed
+  by its own `timeout-minutes` reports conclusion `CANCELLED`, the same as a superseded run.
+  `lint-group (core)` still uses `fetch-depth: 0` (PAN-2227).
 - **The transcript heartbeat exists only where `runtimes/index.ts` loaded** —
   `liveness.ts` cannot import the registry (cycle), so `registerLivenessHeartbeatLookup`
   runs as a side effect of `src/lib/runtimes/index.ts`. A process that never loads it
@@ -648,3 +655,4 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   different target breaks it with "could not determine executable to run".
 <!-- last-verified: 2026-11-03 -->
 <!-- last-verified: 2026-11-03 (PAN-4905) -->
+<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917) -->
