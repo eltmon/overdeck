@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4477",
   "created": "2026-11-03T15:02:33.095Z",
-  "updated": "2026-11-03T16:36:47.412Z",
+  "updated": "2026-11-03T16:37:03.265Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -222,6 +222,10 @@
     "viewer-terminal-toggle.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T16:36:47.412Z"
+    },
+    "viewer-terminal-toggle.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:37:03.264Z"
     }
   }
 }
