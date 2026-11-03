@@ -26,16 +26,17 @@ import type { JoinEvent, SignalData } from '@overdeck/contracts';
 import { Effect, Layer, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
+import { normalizeShareCode, parseJoinTarget } from '../../../lib/sharing/share-code.js';
 import { readShareUrl, shareOrigin, type ShareUrlResult } from '../../../lib/sharing/share-service.js';
 import { jsonResponse } from '../http-helpers.js';
 import { getJoinManager } from '../services/share-join.js';
 import { rejectUnauthorizedDashboardRequest, rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
-import { normalizeShareCode } from './shares.js';
+
+export { parseJoinTarget };
 
 type Answer = { status: number; json?: unknown };
 
 export const JOIN_SSE_KEEPALIVE_MS = 15_000;
-const MAX_TARGET_LENGTH = 2_048;
 const MAX_SDP_LENGTH = 32_768;
 const MAX_CANDIDATE_LENGTH = 2_048;
 
@@ -61,19 +62,6 @@ function parseJsonObject(text: string): Record<string, unknown> | null {
 
 const readBody = (request: HttpServerRequest.HttpServerRequest) =>
   request.text.pipe(Effect.map(parseJsonObject), Effect.orElseSucceed(() => null));
-
-/** A short code, or a join URL whose path ends in `/s/<code>`; null unless it normalizes. */
-export function parseJoinTarget(raw: unknown): string | null {
-  if (typeof raw !== 'string' || raw.length === 0 || raw.length > MAX_TARGET_LENGTH) return null;
-  let candidate = raw.trim();
-  try {
-    const match = /\/s\/([^/]+)\/?$/.exec(new URL(candidate).pathname);
-    if (match?.[1]) candidate = decodeURIComponent(match[1]);
-  } catch {
-    // Not a URL: treat it as a code.
-  }
-  return normalizeShareCode(candidate);
-}
 
 /** Rebuilds a browser signal from its known keys only; the viewer never sends an offer. */
 export function parseSignalBody(body: Record<string, unknown> | null): SignalData | null {

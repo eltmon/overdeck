@@ -71,6 +71,11 @@ export const COMMAND_GROUPS = {
     load: () => import('./commands/account/index.js'),
     register: (mod, program) => mod.registerAccountCommands(program),
   }),
+  sharing: group({
+    names: ['share', 'join'],
+    load: () => import('./commands/sharing/index.js'),
+    register: (mod, program) => mod.registerSharingCommands(program),
+  }),
   test: group({
     names: ['test'],
     load: () => import('./commands/test.js'),

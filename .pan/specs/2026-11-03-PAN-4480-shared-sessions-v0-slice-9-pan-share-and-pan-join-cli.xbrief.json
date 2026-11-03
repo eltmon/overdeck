@@ -1,0 +1,778 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-03T15:48:25Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4480: Shared Sessions v0 (slice 9): pan share and pan join CLI",
+    "updated": "2026-11-03T15:56:04.189Z"
+  },
+  "plan": {
+    "id": "pan-4480",
+    "title": "Shared Sessions v0 (slice 9): pan share and pan join CLI",
+    "status": "running",
+    "uid": "42276a3c-9b84-4c93-b99c-30ce5088ed06",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-03T15:48:25Z",
+    "updated": "2026-11-03T15:56:04.189Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4480",
+        "label": "PAN-4480",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4480.md",
+        "label": "PRD PAN-4480",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/pan-658.md",
+        "label": "Parent PRD PAN-658 rev 3",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "shared-sessions",
+      "cli",
+      "pan-share",
+      "pan-join",
+      "zero-install",
+      "share-service"
+    ],
+    "metadata": {
+      "sizeJustification": "The issue requires the two verbs, their wrapper skills in the same change (scripts/lint-skills.sh fails otherwise), the share Worker invite-page line, the drift-gated composer manifest, a zero-install cold-start test and the docs. That spans src/lib, src/dashboard, src/cli, tests/unit, tests/integration, services/share, sync-sources, packages/contracts and the doc roots, 25 files in all. Splitting the invite page or the skills into sibling issues would ship a page naming a command that does not exist, or verbs that fail lint:skills. PRD D-13.",
+      "canonicalFilename": "2026-11-03-PAN-4480-shared-sessions-v0-slice-9-pan-share-and-pan-join-cli.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Shared Sessions slices 1-4 let a host share a conversation from the dashboard and a viewer join from the browser, but there is no terminal path. The invite page tells a joiner to run pan up, which needs tmux and a global install, so a person who never installed Overdeck cannot join at all. The operator requires npx @overdeck/core join <code> to work cold on a machine with only Node 22.",
+      "Proposal": "Add a lazy command group with two verbs. pan share <conversation> resolves the conversation, calls POST /api/shares on the running dashboard with the internal token, and prints the join link and the join code (BCDF-GHJK) plus both join commands. pan join <link-or-code> parses the target, runs the existing device flow (loginCommand) when account.json is missing, starts the bundled dashboard server detached when nothing answers on the local API URL (modelled on pan serve, not pan up), posts the join intent, polls until the join leaves connecting, and opens <apiUrl>/#/shared/<CODE> where the existing page subscribes to the live join and shows the lobby. Short-code parsers move to a leaf module so the CLI never imports dashboard routes. The share Worker invite page gains pan join <CODE> and npx @overdeck/core join <CODE>. Wrapper skills, the regenerated composer manifest, a slow cold-start integration test and the docs ship in the same change.",
+      "NonGoals": "- No pan share list, pan share end, or admit/kick/revoke from the CLI; the dashboard share dialog owns them.\n- pan share never auto-starts a dashboard.\n- No hosted web join (PAN-4481) and no pan:// protocol handler.\n- pan join does not hold the join event stream and does not render the conversation in the terminal.\n- No change to /api/shares*, /api/joins*, the room reducer, share-host.ts or share-join.ts behavior, and no new dashboard HTTP route.\n- Auto-start does not support dashboard.require_token_mint: true without an existing browser session.\n- No change to pan serve or pan up.\n- No change to the package.json bin map."
+    },
+    "autoDecisions": [
+      {
+        "summary": "pan join auto-starts the bundled dashboard the way pan serve does (detached spawn of dist/dashboard/server.js under process.execPath, log to dashboard.log, wait for /api/health from the spawned PID), not through pan up.",
+        "rationale": "pan up makes a missing tmux fatal, refuses non-primary cwds and starts Herdr/Traefik/Electron; a viewer needs none of that, and the zero-install requirement forbids needing tmux or Herdr. A later pan up replaces the auto-started server because stopDashboard frees the ports by PID."
+      },
+      {
+        "summary": "The documented no-install command is npx @overdeck/core join <CODE>.",
+        "rationale": "npm 10.9.4 libnpmexec get-bin-from-manifest.js runs a multi-bin package when every bin value is the same file; package.json maps overdeck and pan to ./dist/cli/index.js. The issue also reports npx -y @overdeck/core --version working."
+      },
+      {
+        "summary": "pan share requires a running dashboard and exits 1 with 'Start it with pan up' when none answers.",
+        "rationale": "The host WebRTC hub lives in the full dashboard stack next to the conversation's terminal session; a bare auto-started server is the wrong host."
+      },
+      {
+        "summary": "pan join reuses loginCommand unchanged for sign-in instead of a new device-flow wrapper.",
+        "rationale": "loginCommand already prints the device-flow lines, exits on failure and handles slow_down through pollForToken; reuse keeps one sign-in path."
+      },
+      {
+        "summary": "The CLI posts the join intent itself through callDashboard with the internal token, then opens /#/shared/<CODE> without any token in the URL.",
+        "rationale": "Internal-token credentials skip CSRF by design; the PAN-4475 PRD names pan join as a join-intent sender; useSharedJoin subscribes to a live join without posting; appending overdeck_token to the hash would corrupt the #/shared route and loopback browsers mint sessions without it."
+      },
+      {
+        "summary": "pan join polls GET /api/joins/<code> every 500 ms for at most 15 s while connecting, then maps the state to a message; terminal states exit 1 without opening a browser.",
+        "rationale": "A wrong or ended code resolves to ended within that window, so the user gets a terminal answer instead of an error page; live states open the lobby."
+      },
+      {
+        "summary": "--no-open prints the URL and does not hold the event stream.",
+        "rationale": "A join with no subscriber becomes away after 60 s and the page re-posts an away join on load, so holding the stream adds code without changing the outcome."
+      },
+      {
+        "summary": "pan share takes a required <conversation> argument (numeric id or name) and adds --json; pan join adds only --no-open.",
+        "rationale": "The issue names pan share <conversationId>; numeric-or-name resolution matches pan handoff; --json gives skills and scripts a stable output; --no-open covers headless machines and the cold-start test."
+      },
+      {
+        "summary": "The zero-install acceptance is proven by a slow integration test that runs the built CLI's join in temp HOME/OVERDECK_HOME with tmux, herdr and pan shadowed by exit-127 stubs, plus manual npm pack + npx evidence in the PR body.",
+        "rationale": "CI cannot run a real npx install from the registry; running dist/cli/index.js from an unrelated cwd with only config.yaml in the home exercises the same code path, and the packed-tarball run is recorded by the test role."
+      },
+      {
+        "summary": "normalizeShareCode and parseJoinTarget move to src/lib/sharing/share-code.ts; the route modules re-export them.",
+        "rationale": "The CLI must not import dashboard route modules (Effect HTTP router, share managers); re-exports keep the existing route tests unchanged."
+      },
+      {
+        "summary": "The auto-started dashboard boots with agent auto-resume off: env goes through applyBootGateEnv(env, { resume: false }) from src/lib/boot-gates.ts, so OVERDECK_NO_RESUME=1; the Deacon gate keeps its default.",
+        "rationale": "Joining a share must not resume an installed user's stopped agent fleet as a side effect; an explicit no-resume fast-paths boot reconciliation to hold_all, and a later pan up restores the user's normal gates. PRD D-14."
+      }
+    ],
+    "items": [
+      {
+        "id": "share-code-leaf",
+        "title": "Move short-code parsers to src/lib/sharing/share-code.ts and add formatShareCode",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T15:48:25Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-4480",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/sharing/share-code.ts",
+            "src/dashboard/server/routes/shares.ts",
+            "src/dashboard/server/routes/joins.ts",
+            "tests/unit/lib/sharing/share-code.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/sharing/share-code.test.ts tests/unit/dashboard/server/routes/shares.test.ts tests/unit/dashboard/server/routes/joins.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all three test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Create src/lib/sharing/share-code.ts importing nothing, exporting SHORT_CODE_ALPHABET, normalizeShareCode (body moved verbatim from routes/shares.ts, grep 'export function normalizeShareCode'), parseJoinTarget (body moved verbatim from routes/joins.ts, grep 'export function parseJoinTarget', with MAX_TARGET_LENGTH = 2_048) and formatShareCode(code) returning code.slice(0,4)+'-'+code.slice(4) for 8-char codes, else code unchanged. In routes/shares.ts delete SHORT_CODE_ALPHABET and normalizeShareCode, import it from '../../../lib/sharing/share-code.js' and re-export it (export { normalizeShareCode }). In routes/joins.ts delete MAX_TARGET_LENGTH and parseJoinTarget, replace the './shares.js' import with an import of normalizeShareCode and parseJoinTarget from the leaf module, and re-export parseJoinTarget. Add tests/unit/lib/sharing/share-code.test.ts with the cases listed in PRD WI-1."
+        },
+        "items": [
+          {
+            "id": "share-code-leaf.ac1",
+            "title": "Given the leaf module, when share-code.test.ts runs, then normalizeShareCode('bcdf-ghjk') returns 'BCDFGHJK', normalizeShareCode('BCDFGHJA') returns null, parseJoinTarget('https://share.overdeck.ai/s/bcdf-ghjk/') returns 'BCDFGHJK', parseJoinTarget of a 2,049-char string returns null and formatShareCode('BCDFGHJK') returns 'BCDF-GHJK'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-code-leaf.ac2",
+            "title": "Given the move, when grep -n 'export function normalizeShareCode\\|export function parseJoinTarget' src/dashboard/server/routes/*.ts runs, then it prints nothing, and src/lib/sharing/share-code.ts contains no import statement",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-code-leaf.ac3",
+            "title": "Given the re-exports, when tests/unit/dashboard/server/routes/shares.test.ts and joins.test.ts run unchanged, then vitest reports 0 failed tests for both files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "local-dashboard-helper",
+        "title": "Add ensureLocalDashboard: probe /api/health and auto-start the bundled server detached",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T15:48:25Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4480",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "join-command",
+            "cold-start-test"
+          ],
+          "files_scope": [
+            "src/cli/commands/sharing/local-dashboard.ts",
+            "tests/unit/cli/sharing/local-dashboard.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/sharing/local-dashboard.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "local-dashboard.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "FR-11",
+            "NFR-2",
+            "NFR-4"
+          ],
+          "parallelSafeReason": "Touches only two new files under src/cli/commands/sharing/ and tests/unit/cli/sharing/; no other item writes them."
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Create src/cli/commands/sharing/local-dashboard.ts exporting DASHBOARD_PROBE_TIMEOUT_MS = 2_000, DASHBOARD_START_TIMEOUT_MS = 120_000, LocalDashboardError, LocalDashboard { apiUrl, started, pid }, LocalDashboardDeps { fetch, spawn, apiUrl, waitForHealth, packageRoot }, ensureLocalDashboard(deps) and openDashboardUrl(url) (openBrowser from src/lib/browser.ts provided with @effect/platform-node/NodeServices layer, as serve.ts openServeUrlInBrowser does). Heavy modules load by dynamic import inside functions. Steps: resolve apiUrl (deps.apiUrl ?? getDashboardApiUrl from src/lib/config.ts), probe GET <apiUrl>/api/health with AbortController + setTimeout(2_000) (never AbortSignal.timeout); any HTTP response means running -> {started:false}. On fetch failure require http: + hostname localhost/127.0.0.1/[::1] + explicit port, else throw LocalDashboardError('No Overdeck dashboard answers at <apiUrl>. Start it with pan up.'). Require <packageRoot>/dist/dashboard/server.js and public/index.html else throw 'Dashboard bundle not found in ...'. ensureInternalToken(); mkdir -p getOverdeckHome(); spawn(process.execPath, [server], { detached: true, cwd: getOverdeckHome(), stdio: openDashboardLogStdio(), env: applyBootGateEnv({ ...process.env minus DASHBOARD_URL and OVERDECK_DASHBOARD_URL, PORT, API_PORT, OVERDECK_MODE: 'production' }, { resume: false }) (PRD D-14, so OVERDECK_NO_RESUME=1) }); child.unref(). Race waitForHealth(port, pid) (default waitForDashboardHealth from src/lib/platform-lifecycle.ts with timeoutMs 120_000 and expectedPid) against child 'exit' and 'error'; map each to the LocalDashboardError messages in PRD WI-2, naming DASHBOARD_LOG_FILE; never kill the child. No execSync. Tests per PRD WI-2 with fake fetch, fake spawn (EventEmitter with pid and unref), temp packageRoot and OVERDECK_HOME, vi.useFakeTimers(). Implementation checkpoint: if the cold-start test shows the bundled server hard-failing without tmux/Herdr, fix that boot step to log and continue; if larger than one function, pan tell flywheel-orchestrator with the log lines."
+        },
+        "items": [
+          {
+            "id": "local-dashboard-helper.ac1",
+            "title": "Given /api/health answers 200 or 503, when ensureLocalDashboard runs, then it returns started: false and the injected spawn is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "local-dashboard-helper.ac2",
+            "title": "Given the probe fetch rejects and apiUrl is http://localhost:4567, when ensureLocalDashboard runs, then spawn is called once with process.execPath, [<root>/dist/dashboard/server.js], detached: true, cwd equal to the temp OVERDECK_HOME, env.PORT and env.API_PORT '4567', env.OVERDECK_MODE 'production', env.OVERDECK_NO_RESUME '1', and no DASHBOARD_URL or OVERDECK_DASHBOARD_URL key even when both are set in process.env; waitForHealth receives (4567, pid) and the result is started: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "local-dashboard-helper.ac3",
+            "title": "Given a probe fetch that never settles, when fake timers advance 2,000 ms, then the probe aborts and the spawn path runs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "local-dashboard-helper.ac4",
+            "title": "Given apiUrl https://overdeck.localhost with a rejecting fetch, or a missing dashboard bundle, when ensureLocalDashboard runs, then it rejects with LocalDashboardError naming 'pan up' or 'Dashboard bundle not found' respectively and never spawns",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "local-dashboard-helper.ac5",
+            "title": "Given the spawned child emits exit with code 1 before health passes, when ensureLocalDashboard runs, then it rejects with a LocalDashboardError whose message contains 'exited with code 1' and 'dashboard.log'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "share-command",
+        "title": "Implement shareCommand: resolve the conversation, POST /api/shares, print link and join code",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T15:48:25Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4480",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/sharing/share.ts",
+            "tests/unit/cli/sharing/share.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/sharing/share.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "share.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Create src/cli/commands/sharing/share.ts exporting ShareOptions { json?: boolean }, ShareDeps { callDashboard, resolveConversation } and shareCommand(ref, options, io = defaultAccountIo, deps = {}) using AccountIo from ../account/shared.js. Default resolveConversation is resolveConversation from ../handoff-shared.js (numeric -> getConversationById, else getConversationByName); null -> io.err('No conversation matches <ref>. Use the number from /conv/<id> or the conversation name.') and io.exit(1) with no dashboard call. callDashboard('/api/shares', { method: 'POST', body: { conversationName } }) from ../dashboard-call.js; DashboardUnreachableError -> 'The Overdeck dashboard is not running. Start it with pan up, then run pan share again.' exit 1; non-200/201 -> 'Cannot share <name>: ' + errorText(response), exit 1. --json prints JSON.stringify(view) as one line. Otherwise print the six lines from PRD WI-3 using formatShareCode from src/lib/sharing/share-code.ts; on 200 the first line is 'Conversation <name> is already shared.'. Never start a dashboard. Tests per PRD WI-3 with captureIo from tests/unit/cli/vault/helpers.ts."
+        },
+        "items": [
+          {
+            "id": "share-command.ac1",
+            "title": "Given callDashboard answers 201 with a ShareView for BCDFGHJK, when shareCommand('42', {}) runs with a resolver returning { name: 'conv-name' }, then the POST body is { conversationName: 'conv-name' } and stdout contains the join link, 'Join code: BCDF-GHJK', 'pan join BCDF-GHJK' and 'npx @overdeck/core join BCDF-GHJK'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-command.ac2",
+            "title": "Given a 200 answer, when shareCommand runs, then stdout contains 'is already shared'; given { json: true }, then stdout is exactly one line that JSON.parse returns as the ShareView",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-command.ac3",
+            "title": "Given an unresolvable ref, when shareCommand runs, then it exits 1 and callDashboard is never called; given DashboardUnreachableError, then it exits 1 and stderr names 'pan up'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-command.ac4",
+            "title": "Given a 412 body { error: 'not_signed_in', message: 'Sign in with pan account login to share conversations.' }, when shareCommand runs, then stderr contains that message, it exits 1, and no output line contains 'odh_' or 'odd_'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "join-command",
+        "title": "Implement joinCommand: parse target, sign in if needed, ensure dashboard, post join intent, settle, open lobby",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T15:48:25Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4480",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "register-verbs",
+            "wrapper-skills",
+            "cold-start-test",
+            "docs"
+          ],
+          "files_scope": [
+            "src/cli/commands/sharing/join.ts",
+            "tests/unit/cli/sharing/join.test.ts",
+            "src/cli/commands/account/login.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/sharing/join.test.ts tests/unit/cli/account/login.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "join.test.ts and login.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-8",
+            "FR-9",
+            "FR-10",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "parallelSafeReason": "Touches two new files plus a comment line in login.ts that no other item edits."
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Create src/cli/commands/sharing/join.ts exporting JOIN_SETTLE_POLL_MS = 500, JOIN_SETTLE_TIMEOUT_MS = 15_000, JoinOptions { open?: boolean }, JoinDeps { fetch, ensureDashboard, callDashboard, openUrl } and joinCommand(target, options, io = defaultAccountIo, deps = {}). Steps: (1) parseJoinTarget from src/lib/sharing/share-code.ts; null -> io.err('Not a share link or join code: <target>. A join code looks like BCDF-GHJK.') exit 1 before any network call or file write. (2) readAccount() from src/lib/account/store.ts; throw -> message, exit 1; null -> io.out('Sign in to overdeck.ai to join this conversation.'), await loginCommand({}, io, { fetch: deps.fetch }) from ../account/login.js, readAccount() again, still null -> 'Sign-in did not complete. Run: pan account login' exit 1. (3) ensureDashboard (default ensureLocalDashboard from ./local-dashboard.js); LocalDashboardError -> message, exit 1; started -> print 'Started Overdeck at <apiUrl>.'. (4) callDashboard('/api/joins', { method: 'POST', body: { code } }); unreachable -> exit 1 naming pan up; non-200/201 -> 'Cannot join: ' + errorText, exit 1. (5) while state === 'connecting' and summed waits < 15_000: wait 500 ms (setTimeout promise), GET /api/joins/<code>. (6) map the final state per the PRD WI-4 table (lobby/admitted/host-disconnected/connecting open the browser and exit 0; ended/rejected/is-host/full/revoked/disconnected/other print their message and exit 1 without opening). (7) url = <apiUrl>/#/shared/<code> with no token; open unless options.open === false (on rejection print 'Open this URL in your browser: <url>'); always print 'Shared conversation: <url>'; with --no-open also print 'Opening the page later rejoins automatically.'. Edit the header comment of src/cli/commands/account/login.ts line 4 ('nothing else in the CLI reads the token file this writes') to say pan join (PAN-4480) runs this flow when the machine is not signed in; no code change in login.ts. Tests per PRD WI-4 with temp OVERDECK_HOME, captureIo and vi.useFakeTimers(); for the device-flow cases reuse the flushRealIo pattern from tests/unit/cli/account/login.test.ts because ensureEnvironmentIdentity does real file I/O between fake-timer advances."
+        },
+        "items": [
+          {
+            "id": "join-command.ac1",
+            "title": "Given target 'nope', when joinCommand runs, then it exits 1 and neither fetch nor ensureDashboard is called and no file is created in OVERDECK_HOME",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "join-command.ac2",
+            "title": "Given a signed-in home, a POST answering connecting and GETs answering connecting then lobby, when fake timers advance 1,000 ms, then openUrl is called once with http://localhost:4567/#/shared/BCDFGHJK, stdout contains 'Waiting for the host', and the target https://share.overdeck.ai/s/bcdf-ghjk posts body { code: 'BCDFGHJK' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "join-command.ac3",
+            "title": "Given no account.json and a device flow whose first token poll answers slow_down with interval 10 after interval 5, when fake timers advance, then exactly one token poll has happened at 5,000 ms and at 14,999 ms and a second poll happens at 15,000 ms; with slow_down and no interval the next poll comes 10 s later; afterwards account.json holds the issued odd_ token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "join-command.ac4",
+            "title": "Given the POST answers state ended, when joinCommand runs, then stderr contains 'has ended', it exits 1 and openUrl is never called; given connecting for the whole window, then after 15,000 ms openUrl is called, stdout contains 'Still connecting' and GET was called at most 30 times",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "join-command.ac5",
+            "title": "Given { open: false }, when joinCommand reaches lobby, then openUrl is never called and stdout contains the shared URL and 'rejoins automatically'; in every join.test.ts case no output line contains 'odd_' or 'odh_' and no opened URL contains 'overdeck_token'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "register-verbs",
+        "title": "Register pan share and pan join as a lazy command group and regenerate the composer manifest",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T15:48:25Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4480",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/sharing/index.ts",
+            "src/cli/command-groups.ts",
+            "tests/unit/cli/sharing/cli-wiring.test.ts",
+            "packages/contracts/src/composer-commands.generated.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/sharing/cli-wiring.test.ts tests/unit/cli/command-groups.test.ts",
+            "npm run build",
+            "node dist/cli/index.js share --help",
+            "node dist/cli/index.js join --help",
+            "npm run lint:slash-commands"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "share --help prints 'Usage: overdeck share [options] <conversation>' and lists --json",
+            "join --help prints 'Usage: overdeck join [options] <link-or-code>' and lists --no-open",
+            "lint:slash-commands prints '✓ composer-command manifest matches the CLI registry'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Create src/cli/commands/sharing/index.ts exactly as the PRD WI-5 snippet: imports only commander and ../../lazy-action.js; sharingAction drops Commander's trailing Command; registers share (<conversation>, --json, lazy './share.js' shareCommand) and join (<link-or-code>, --no-open, lazy './join.js' joinCommand) with the PRD descriptions. In src/cli/command-groups.ts add sharing: group({ names: ['share', 'join'], load: () => import('./commands/sharing/index.js'), register: (mod, program) => mod.registerSharingCommands(program) }) directly after the account entry. Add tests/unit/cli/sharing/cli-wiring.test.ts mirroring tests/unit/cli/account/cli-wiring.test.ts. Then npm run build and npm run generate:slash-commands, and commit the regenerated packages/contracts/src/composer-commands.generated.ts. src/cli/index.ts is not touched."
+        },
+        "items": [
+          {
+            "id": "register-verbs.ac1",
+            "title": "Given the wiring test with share.js and join.js mocked, when it parses 'share 42', 'share conv-a --json', 'join BCDF-GHJK' and 'join BCDF-GHJK --no-open', then shareCommand receives ['42', {}] and ['conv-a', { json: true }] and joinCommand receives ['BCDF-GHJK', { open: true }] and ['BCDF-GHJK', { open: false }], and no call receives a Command instance",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "register-verbs.ac2",
+            "title": "Given the new group, when tests/unit/cli/command-groups.test.ts runs unchanged, then vitest reports 0 failed tests, and src/cli/commands/sharing/index.ts contains no import other than commander and ../../lazy-action.js",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "register-verbs.ac3",
+            "title": "Given a fresh build, when npm run lint:slash-commands runs, then it prints '✓ composer-command manifest matches the CLI registry' and composer-commands.generated.ts contains entries with id 'pan-share' and 'pan-join'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "invite-page-join-commands",
+        "title": "Show pan join <CODE> and npx @overdeck/core join <CODE> on the share Worker invite page",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T15:48:25Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-4480",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/share/src/pages.ts",
+            "tests/unit/services/share/routes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/services/share/routes.test.ts",
+            "npm run typecheck:share",
+            "npm --prefix services/share run build:dry"
+          ],
+          "expected_outputs": [
+            "routes.test.ts passes",
+            "typecheck:share exits 0",
+            "build:dry exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. In services/share/src/pages.ts invitePage, after the paragraph starting 'Overdeck not opening?', append the paragraph '<p>Or join from a terminal: <code>pan join ${code}</code>. No Overdeck yet? With Node 22 or newer, run <code>npx @overdeck/core join ${code}</code>.</p>' using the escaped code already in scope. Update the file header's 'pan join returns in slice 9 (PAN-4480)' sentence to say the page shows pan join and the npx command. CSP, script and endedPage() unchanged. In tests/unit/services/share/routes.test.ts, in the active-room invite test replace expect(text).not.toContain('pan join') with toContain('pan join BCDFGHJK') and toContain('npx @overdeck/core join BCDFGHJK'); keep the single-<script> assertion; keep the 404 test's not.toContain('pan join')."
+        },
+        "items": [
+          {
+            "id": "invite-page-join-commands.ac1",
+            "title": "Given an active room, when GET /s/bcdf-ghjk is served, then the HTML contains 'pan join BCDFGHJK' and 'npx @overdeck/core join BCDFGHJK', still contains exactly one <script> element, and its Content-Security-Policy equals invitePageCsp(nonce)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "invite-page-join-commands.ac2",
+            "title": "Given an unknown code, when GET /s/BCDFGHJK answers 404, then the page contains neither 'pan join' nor '<script' and keeps HTML_CSP",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "invite-page-join-commands.ac3",
+            "title": "Given the change, when npm run typecheck:share and npm --prefix services/share run build:dry run, then both exit 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wrapper-skills",
+        "title": "Add pan-share and pan-join wrapper skills",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T15:48:25Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4480",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/pan-share/SKILL.md",
+            "sync-sources/skills/pan-join/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build",
+            "npm run lint:skills"
+          ],
+          "expected_outputs": [
+            "build completes",
+            "lint:skills prints 'skill CLI lint passed'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. Create the two SKILL.md files per docs/SKILLS-CONVENTION.md CLI-wrapper rules with the frontmatter in the PRD (description starts with 'pan share <conversation> — ' / 'pan join <link-or-code> — '). Bodies carry only what --help lacks: pan-share (finding the id via pan conversations current --json or /conv/<id>; needs pan up and pan account login; what to send; admitting from the share dialog; --json; error meanings not_signed_in, dashboard down, 409 released conversation); pan-join (sign-in prompt, auto-start, lobby; --no-open and the 60-second rejoin; the npx form; terminal-state messages and responses; invite-only accounts). Every pan share / pan join command line uses only --json, --no-open or --help. Commit in the same PR as the verbs."
+        },
+        "items": [
+          {
+            "id": "wrapper-skills.ac1",
+            "title": "Given a fresh build, when npm run lint:skills runs, then it prints 'skill CLI lint passed' with sync-sources/skills/pan-share/SKILL.md and sync-sources/skills/pan-join/SKILL.md present",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wrapper-skills.ac2",
+            "title": "Given the two files, when their frontmatter is read, then pan-share's description starts with 'pan share <conversation> — ' and pan-join's with 'pan join <link-or-code> — ', and pan-join's body contains 'npx @overdeck/core join'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cold-start-test",
+        "title": "Add the zero-install cold-start slow integration test for pan join",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T15:48:25Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-4480",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/integration/cli/join-cold-start.slow.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build",
+            "VITEST_INCLUDE_SLOW=1 npx vitest run tests/integration/cli/join-cold-start.slow.test.ts"
+          ],
+          "expected_outputs": [
+            "build completes",
+            "join-cold-start.slow.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ],
+          "parallelSafeReason": "Adds one new test file that no other item touches."
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Create tests/integration/cli/join-cold-start.slow.test.ts. Copy (do not import) the wrangler dry-run bundle, Miniflare construction and ACCOUNT_STUB from tests/integration/services/share/join-manager.test.ts (stub accepts tokenFor(1) owner and tokenFor(100) alice). Start a node:http fake account service on a free 127.0.0.1 port answering /oauth/device/code (interval 1, expires_in 900), /oauth/token (200 with access_token tokenFor(100), device_id d100, label alice) and /v1/me (githubId 100, githubLogin alice, access active). Create a room with createRoom(<miniflare url>, tokenFor(1), { kind: 'conversation', conversationId: 'cold-start' }). Temp home, overdeckHome = <home>/.overdeck containing only config.yaml with anywhere.share_url = <miniflare url> and anywhere.directory_url = http://127.0.0.1:9, temp cwd, and a shims dir with executable tmux, herdr and pan scripts that exit 127. Pick a free port P. Spawn process.execPath with [<repo>/dist/cli/index.js, 'join', <BCDF-GHJK form>, '--no-open'] from the temp cwd with env HOME, OVERDECK_HOME, OVERDECK_ACCOUNT_URL=<fake account url>, OVERDECK_DASHBOARD_URL=http://127.0.0.1:P, PATH=<shims>:<PATH>; wait for exit (180 s). Assert per PRD WI-6. Fail fast with 'run npm run build first' when dist/cli/index.js or dist/dashboard/server.js is missing. Teardown in afterAll even on failure: SIGTERM the pid from /api/health, wait for the port to stop answering with vi.waitFor, dispose Miniflare, close the fake account server, remove temp dirs. Never touch port 3011 or the operator's ~/.overdeck. The test role also records manual npm pack + npx -y ./overdeck-core-<version>.tgz join <code> --no-open output in the PR body (PRD WI-6). Before spawning, assert process.versions.bun is undefined (the dashboard and CLI run under Node 22 only)."
+        },
+        "items": [
+          {
+            "id": "cold-start-test.ac1",
+            "title": "Given a temp HOME and OVERDECK_HOME holding only config.yaml and tmux/herdr/pan stubs that exit 127, when the built CLI runs join <code> --no-open, then it exits 0 and stdout contains 'To sign in, open:', 'Started Overdeck at http://127.0.0.1:<P>' and 'Waiting for the host to let you in'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cold-start-test.ac2",
+            "title": "Given that run, when the test reads the temp home and calls GET http://127.0.0.1:<P>/api/joins/<code> with the internal token, then account.json exists with mode 0o600 and the join answers 200 with state 'lobby' and login 'alice'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cold-start-test.ac3",
+            "title": "Given the test finishes or fails, when afterAll runs, then it sends SIGTERM to the PID reported by /api/health and a later fetch to http://127.0.0.1:<P>/api/health rejects with ECONNREFUSED",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document pan share and pan join in cli/share.mdx, shared-sessions.mdx, account.mdx and SHARED-SESSIONS.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T15:48:25Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-4480",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/share.mdx",
+            "docs.json",
+            "configuration/shared-sessions.mdx",
+            "cli/account.mdx",
+            "docs/SHARED-SESSIONS.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "FR-10",
+            "FR-11",
+            "FR-12",
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. (1) Create cli/share.mdx (title 'pan share and pan join') with ## pan share (usage, printed lines, errors) and ## pan join (usage, the four steps, the state-message table from PRD WI-4, npx @overdeck/core join <CODE> needing Node 22+, --no-open and the 60-second rejoin, auto-start on the configured API port logging to ~/.overdeck/logs/dashboard.log, pan up later replaces it, dashboard.require_token_mint caveat). (2) docs.json: add \"cli/share\" after \"cli/account\". (3) configuration/shared-sessions.mdx: pan share paragraph in ## Share a conversation; ### From a terminal under ## Join a shared conversation with pan join and the npx form; ## Before you start says a viewer without Overdeck can use npx @overdeck/core join <CODE>; link /cli/share. (4) cli/account.mdx line 9: replace 'nothing else in the CLI reads the token file, and no command prompts for it.' with the PRD sentence naming pan share and pan join. (5) docs/SHARED-SESSIONS.md: rewrite the GET /s/:code row's 'Slice 9 ... adds pan join back.' sentence to say the page shows pan join <CODE> and npx @overdeck/core join <CODE>; add ## CLI: pan share and pan join (slice 9, PAN-4480) before ## Local development covering D-1, D-2/H-1, D-3, D-5, D-12, the pan join order and the cold-start test command."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "Given the docs change, when npm run lint:docs runs, then it exits 0 and docs.json lists 'cli/share' directly after 'cli/account'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "Given cli/share.mdx, when it is read, then it contains the headings '## pan share' and '## pan join', the command 'npx @overdeck/core join', the flag '--no-open' and the message 'This share has ended, or the code is wrong.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "Given configuration/shared-sessions.mdx and cli/account.mdx, when grep runs, then shared-sessions.mdx contains '### From a terminal' and 'npx @overdeck/core join', and cli/account.mdx no longer contains 'no command prompts for it'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac4",
+            "title": "Given docs/SHARED-SESSIONS.md, when grep runs, then it contains '## CLI: pan share and pan join (slice 9, PAN-4480)' before '## Local development' and no longer contains 'adds `pan join` back'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "share-code-leaf",
+        "to": "share-command",
+        "type": "blocks"
+      },
+      {
+        "from": "share-code-leaf",
+        "to": "join-command",
+        "type": "blocks"
+      },
+      {
+        "from": "local-dashboard-helper",
+        "to": "join-command",
+        "type": "blocks"
+      },
+      {
+        "from": "share-command",
+        "to": "register-verbs",
+        "type": "blocks"
+      },
+      {
+        "from": "join-command",
+        "to": "register-verbs",
+        "type": "blocks"
+      },
+      {
+        "from": "register-verbs",
+        "to": "wrapper-skills",
+        "type": "blocks"
+      },
+      {
+        "from": "register-verbs",
+        "to": "cold-start-test",
+        "type": "blocks"
+      },
+      {
+        "from": "register-verbs",
+        "to": "docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

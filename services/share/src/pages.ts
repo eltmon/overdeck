@@ -7,7 +7,8 @@
  * PAN-4475 (D-14): the invite page carries one nonce'd inline script that probes the local
  * dashboard (`GET /api/share-probe` on `LOCAL_DASHBOARD_ORIGINS`) and navigates to
  * `<origin>/#/shared/<CODE>` when it answers. The manual link and `pan up` instructions always
- * show. The 404 page keeps `HTML_CSP` and has no script. `pan join` returns in slice 9 (PAN-4480).
+ * show. The 404 page keeps `HTML_CSP` and has no script. The invite page also shows `pan join <CODE>`
+ * and the no-install `npx @overdeck/core join <CODE>` (PAN-4480).
  */
 
 export const HTML_CSP = "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'";
@@ -99,6 +100,8 @@ export function invitePage(shortCode: string, nonce: string): Response {
     '<p>Overdeck not opening? Start it with <code>pan up</code>, then reload this page. ' +
     'If your browser asks whether this page may reach apps on this device, choose Allow. ' +
     `If your dashboard uses another port, open <code>http://localhost:&lt;port&gt;/#/shared/${code}</code>.</p>` +
+    `<p>Or join from a terminal: <code>pan join ${code}</code>. ` +
+    `No Overdeck yet? With Node 22 or newer, run <code>npx @overdeck/core join ${code}</code>.</p>` +
     `<p>New to Overdeck? <a href="${escapeHtml(INSTALL_DOCS_URL)}">Install it first</a>.</p>` +
     `<script nonce="${escapeHtml(nonce)}">${detectScript(shortCode)}</script>`;
   return page('Shared conversation', body, 200, invitePageCsp(nonce));
