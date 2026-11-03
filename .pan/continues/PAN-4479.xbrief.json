@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4479",
   "created": "2026-11-03T15:06:40.232Z",
-  "updated": "2026-11-03T15:29:35.653Z",
+  "updated": "2026-11-03T15:29:53.914Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -78,6 +78,11 @@
     "host-repark-boot.ac5": {
       "status": "completed",
       "doneAt": "2026-11-03T15:29:35.652Z"
+    },
+    "host-end-offline": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4479",
+      "claimedAt": "2026-11-03T15:29:53.914Z"
     }
   }
 }
