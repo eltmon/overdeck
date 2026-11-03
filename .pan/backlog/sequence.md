@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T20:36:32.608418Z · model: claude-opus-5-5 · open: 865_
+_Last sequenced: 2026-11-03T20:41:33.304711Z · model: claude-opus-5-5 · open: 866_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -327,6 +327,7 @@ _Last sequenced: 2026-11-03T20:36:32.608418Z · model: claude-opus-5-5 · open: 
 | 321 | PAN-1219 | M | high | needs-refinement |  |  | Promote across-cycle review state to first-class data (cycle SHA, prior findings) instead of prompt-derived |
 | 322 | PAN-1451 | M | high | needs-refinement |  |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
 | 323 | PAN-1452 | M | high | ok |  |  | PAN-1381 follow-up: per-reviewer restart with model override (architectural mismatch with PAN-1048) |
+| 324 | PAN-4927 | XL | medium | needs-refinement | ✓ |  | Epic: inject Overdeck MCP into every managed agent + OAuth /mcp + Hermes/OpenClaw/Grok plugins; PRD in progress, no children filed. |
 | 326 | PAN-1553 | M | high | ok |  |  | Investigate Claude Code Fast mode support (and fast-tier pricing) |
 | 327 | PAN-1504 | M | high | ok |  |  | pan hygiene |
 | 328 | PAN-1480 | L | high | ok |  |  | TLDR: 93% bypass rate |
@@ -1200,10 +1201,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T20:36:32.608418Z",
+  "generatedAt": "2026-11-03T20:41:33.304711Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 865,
+  "openCount": 866,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -11977,6 +11978,20 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "rationale": "New since prior run: a small safety fix with an exact recipe (reuse the isSmeeCommand cmdline guard), placed in the free rank 269 slot.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4927",
+      "rank": 324,
+      "size": "XL",
+      "importance": "medium",
+      "score": 55,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "Epic: inject Overdeck MCP into every managed agent + OAuth /mcp + Hermes/OpenClaw/Grok plugins; PRD in progress, no children filed.",
+      "rationale": "New issue that describes itself as an epic: it injects the Overdeck MCP server into every managed harness with per-agent scoped tokens, turns agent workflow verbs into tools, adds OAuth and an opt-in Tailscale Funnel /mcp, and ships Hermes, OpenClaw and Grok plugins. The PRD is still being written and no child issues are filed, so it is needs-refinement and marked as an epic so nothing picks it up directly. It slots into free rank 324 beside the overlapping MCP and Anywhere work (PAN-3789, PAN-2350) without moving any other node.",
+      "gate": "auto",
+      "planning": "auto",
+      "isEpic": true
     }
   ],
   "edges": [
@@ -13204,6 +13219,27 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-3789",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-255",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-2353",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
     }
   ]
 }
