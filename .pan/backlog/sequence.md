@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T19:41:44.848695Z · model: claude-opus-5-5 · open: 864_
+_Last sequenced: 2026-11-03T19:52:03.275001Z · model: claude-opus-5-5 · open: 864_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -416,7 +416,6 @@ _Last sequenced: 2026-11-03T19:41:44.848695Z · model: claude-opus-5-5 · open: 
 | 417 | PAN-3890 | S | medium | ok |  |  | opencode provider stream errors (rate limit) are invisible in the feed and never retried; first message dies silently |
 | 418 | PAN-3822 | L | medium | ok |  |  | PRD landed (12 items, FR-1..14): link PRs to conversations via branch detection + explicit override; unblocks PAN-3920 |
 | 419 | PAN-4479 | M | medium | ok |  |  | Shared Sessions slice 8: host reconnect inside the 5-minute window and viewer auto-restore |
-| 420 | PAN-4478 | S | medium | ok |  |  | Shared Sessions slice 7: controller handoff and data-owner reclaim, enforced host-side |
 | 421 | PAN-1673 | S | medium | ok |  |  | Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
 | 422 | PAN-1669 | S | medium | ok |  |  | restart-with-model doesn't emit a live event |
 | 423 | PAN-1668 | S | medium | ok |  |  | right-click 'restart with <model>' carries model only, never harness |
@@ -446,7 +445,7 @@ _Last sequenced: 2026-11-03T19:41:44.848695Z · model: claude-opus-5-5 · open: 
 | 448 | PAN-4151 | L | medium | needs-refinement |  | PAN-3822 | Deferred remainder of PAN-3822/#4067: GitLab MR sync, PR page + search, handoff link copy, diffstat, link-dialog a11y, sync throttle |
 | 449 | PAN-1330 | S | medium | ok |  |  | CLI cannot address planning-*/specialist-* sessions |
 | 450 | PAN-4481 | M | medium | ok |  |  | Shared Sessions slice 10: hosted web join page; awaits operator decision OD-1 on sign-in without a local install |
-| 451 | PAN-4482 | S | medium | ok |  | PAN-4478, PAN-4479, PAN-4481 | Shared Sessions slice 11: signaling-privacy e2e, forced-TURN check (operator checkpoint) and full AC sweep |
+| 451 | PAN-4482 | S | medium | ok |  | PAN-4479, PAN-4481 | Shared Sessions slice 11: signaling-privacy e2e, forced-TURN check (operator checkpoint) and full AC sweep |
 | 452 | PAN-1226 | L | medium | ok |  |  | PAN-1148 unified-dashboard redesign |
 | 453 | PAN-1173 | S | medium | ok |  |  | pan show <bare-number> derives wrong agent ID for PAN-prefixed issues |
 | 454 | PAN-1154 | M | medium | ok |  |  | pan up does not kill existing port holders |
@@ -517,6 +516,7 @@ _Last sequenced: 2026-11-03T19:41:44.848695Z · model: claude-opus-5-5 · open: 
 | 520 | PAN-3772 | XS | medium | ok |  |  | Conv view renders Claude Code's synthetic 'no visible output' nudge as an operator message; should read as plumbing. |
 | 521 | PAN-3853 | S | medium | needs-refinement |  |  | Review synthesizer self-declared an operator override; that override door was deleted by the cut — verify on the PR-review path |
 | 522 | PAN-3830 | S | medium | ok |  |  | OpenCode provider: curate picker models via Settings favorites (OpenRouter pattern) instead of listing every discovered model |
+| 523 | PAN-4924 | S | medium | ok |  |  | linked-machines.mdx promises switch model for running conversations; dashboard disables it. Fix docs or add the control. |
 | 524 | PAN-4367 | M | medium | ok |  |  | Replace inherited capability scores for Sonnet 5.5, GPT-6 Sol/Luna with measured ones; eval harness has closed |
 | 525 | PAN-2443 | M | medium | ok |  |  | OpenTelemetry GenAI semconv |
 | 526 | PAN-2442 | M | medium | ok |  |  | Agent Client Protocol (ACP) as Overdeck's structured control plane |
@@ -1199,7 +1199,7 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T19:41:44.848695Z",
+  "generatedAt": "2026-11-03T19:52:03.275001Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 864,
@@ -6377,18 +6377,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
-      "issue": "PAN-4478",
-      "rank": 420,
-      "size": "S",
-      "importance": "medium",
-      "score": 52,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Shared Sessions slice 7: controller handoff and data-owner reclaim, enforced host-side",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1673",
       "rank": 421,
       "size": "S",
@@ -6754,12 +6742,11 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "score": 50,
       "condition": "ok",
       "dependsOn": [
-        "PAN-4478",
         "PAN-4479",
         "PAN-4481"
       ],
       "why": "Shared Sessions slice 11: signaling-privacy e2e, forced-TURN check (operator checkpoint) and full AC sweep",
-      "rationale": "Dependency PAN-4477 (slice 6 read-only terminal channel) closed on 2026-11-03, so its edge is dropped; rank holds.",
+      "rationale": "Dependency PAN-4478 (slice 7) closed as completed; rank unchanged because other Shared Sessions slices remain open.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11963,6 +11950,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "rationale": "PAN-4835 merged in #4894, which clears its only dependency; rank held because the Anywhere phone epic is low-impact relative to substrate work above it.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4924",
+      "rank": 523,
+      "size": "S",
+      "importance": "medium",
+      "score": 45,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "linked-machines.mdx promises switch model for running conversations; dashboard disables it. Fix docs or add the control.",
+      "rationale": "New issue since the prior run: a docs-versus-UI mismatch found while filming the Anywhere video; it takes free rank 523 beside the related composer model-switching work (PAN-2626) so no other node moves.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12786,13 +12786,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "confidence": 1
     },
     {
-      "from": "PAN-4478",
-      "to": "PAN-4482",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4479",
       "to": "PAN-4482",
       "type": "unblocks",
@@ -13190,6 +13183,13 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.8
+    },
+    {
+      "from": "PAN-2626",
+      "to": "PAN-4924",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
     }
   ]
 }
