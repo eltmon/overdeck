@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4888",
   "created": "2026-11-03T08:25:32.067Z",
-  "updated": "2026-11-03T08:34:32.021Z",
+  "updated": "2026-11-03T08:34:37.291Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,11 @@
       "claimedBy": "agent-pan-4888",
       "claimedAt": "2026-11-03T08:33:29.196Z",
       "doneAt": "2026-11-03T08:34:32.020Z"
+    },
+    "reload-newcomer": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4888",
+      "claimedAt": "2026-11-03T08:34:37.291Z"
     }
   }
 }
