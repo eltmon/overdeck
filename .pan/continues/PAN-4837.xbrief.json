@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4837",
   "created": "2026-11-03T16:16:59.604Z",
-  "updated": "2026-11-03T19:21:11.847Z",
+  "updated": "2026-11-03T19:21:46.364Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -496,6 +496,10 @@
     "cp1-ios-simulator.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T19:21:11.847Z"
+    },
+    "cp1-ios-simulator.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T19:21:46.363Z"
     }
   }
 }
