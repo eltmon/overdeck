@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4477",
   "created": "2026-11-03T15:02:33.095Z",
-  "updated": "2026-11-03T16:27:40.444Z",
+  "updated": "2026-11-03T16:27:55.329Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -86,6 +86,10 @@
     "wire-terminal-types.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T16:27:40.444Z"
+    },
+    "pty-hub-listeners.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:27:55.329Z"
     }
   }
 }
