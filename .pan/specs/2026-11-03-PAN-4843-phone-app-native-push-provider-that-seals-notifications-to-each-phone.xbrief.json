@@ -4,17 +4,17 @@
     "created": "2026-11-03T14:17:36Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4843: Phone app: native push provider that seals notifications to each phone",
-    "updated": "2026-11-03T14:21:35.088Z"
+    "updated": "2026-11-03T14:22:26.423Z"
   },
   "plan": {
     "id": "pan-4843",
     "title": "Phone app: native push provider that seals notifications to each phone",
-    "status": "proposed",
+    "status": "running",
     "uid": "5b140274-bc47-4a23-a414-447a3e6fd557",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-03T14:17:36Z",
-    "updated": "2026-11-03T14:21:35.088Z",
+    "updated": "2026-11-03T14:22:26.423Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4843",
@@ -553,5 +553,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
