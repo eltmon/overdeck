@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4862",
   "created": "2026-11-02T23:48:40.343Z",
-  "updated": "2026-11-02T23:55:50.530Z",
+  "updated": "2026-11-03T00:33:44.365Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,10 @@
       "claimedBy": "agent-pan-4862",
       "claimedAt": "2026-11-02T23:55:15.962Z",
       "doneAt": "2026-11-02T23:55:50.530Z"
+    },
+    "live-relay-check": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:33:44.365Z"
     }
   }
 }
