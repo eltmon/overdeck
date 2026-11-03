@@ -4,17 +4,17 @@
     "created": "2026-11-03T14:16:22Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4830: Phone app: APNs and FCM delivery of sealed push in services/connect",
-    "updated": "2026-11-03T14:24:30.905Z"
+    "updated": "2026-11-03T14:25:36.603Z"
   },
   "plan": {
     "id": "pan-4830",
     "title": "Phone app: APNs and FCM delivery of sealed push in services/connect",
-    "status": "proposed",
+    "status": "running",
     "uid": "7ce90ac3-8228-4cb3-bbe4-7754bf212907",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-03T14:16:22Z",
-    "updated": "2026-11-03T14:24:30.905Z",
+    "updated": "2026-11-03T14:25:36.603Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4830",
@@ -980,5 +980,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
