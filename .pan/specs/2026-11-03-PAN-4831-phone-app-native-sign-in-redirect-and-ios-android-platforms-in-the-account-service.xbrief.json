@@ -4,17 +4,17 @@
     "created": "2026-11-03T03:57:01Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4831: Phone app: native sign-in redirect and ios/android platforms in the account service",
-    "updated": "2026-11-03T03:58:22.771Z"
+    "updated": "2026-11-03T03:59:53.546Z"
   },
   "plan": {
     "id": "pan-4831",
     "title": "Phone app: native sign-in redirect and ios/android platforms in the account service",
-    "status": "proposed",
+    "status": "running",
     "uid": "80a67985-c3cf-462f-b137-bb8970cbef15",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-03T03:57:01Z",
-    "updated": "2026-11-03T03:58:22.771Z",
+    "updated": "2026-11-03T03:59:53.546Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4831",
@@ -344,5 +344,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
