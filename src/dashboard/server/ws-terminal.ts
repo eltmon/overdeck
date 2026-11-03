@@ -22,17 +22,16 @@
  */
 
 import http from 'node:http';
-import { homedir } from 'node:os';
 import { WebSocketServer, WebSocket } from 'ws';
 import { Effect } from 'effect';
-import * as pty from '@lydell/node-pty';
-import { activePtyHubs, addClientToHub, broadcastToHub, removeClientFromHub, setClientReady, type PtyHub } from './pty-hub.js';
-import { buildTmuxArgs, capturePane, getWindowDimensions, listSessionNames, resizeWindow, sessionExists } from '../../lib/tmux.js';
+import type * as pty from '@lydell/node-pty';
+import { activePtyHubs, addClientToHub, notifyHubSize, removeClientFromHub, setClientReady, type PtyHub } from './pty-hub.js';
+import { attachHubPty, spawnTmuxAttachPty } from './pty-hub-attach.js';
+import { capturePane, getWindowDimensions, listSessionNames, resizeWindow, sessionExists } from '../../lib/tmux.js';
 import { consumeReauthTerminalToken } from './routes/codex-auth.js';
 import { WS_TERMINAL_SCOPE } from './route-scopes.js';
 import { authorizeDashboardUpgrade, channelOfIncoming, rejectUpgrade, trackDeviceSocket } from './ws-auth.js';
 import { AGENT_FENCED_MESSAGE, linkActorFence } from './link-fence.js';
-import { buildChildEnvWithoutTmux } from '../../lib/child-env.js';
 import { isRespawnPending, waitForSessionRespawn } from './services/pending-respawn.js';
 import { HerdrTerminalProcess, resolveHerdrTerminalId, resolveTerminalAttachTarget } from './services/terminal-service.js';
 import { startTerminalHeartbeat, wantsTerminalHeartbeat } from './ws-terminal-heartbeat.js';
@@ -478,6 +477,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
               sendControl(client, { type: 'size', cols: requestedCols, rows: requestedRows });
             }
           }
+          notifyHubSize(existingHub);
           sendControl(ws, { type: 'snapshot', cols: requestedCols, rows: requestedRows, data: '' });
         }
 
@@ -506,6 +506,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
             for (const client of existingHub.clients) {
               sendControl(client, { type: 'size', cols: parsed.cols, rows: parsed.rows });
             }
+            notifyHubSize(existingHub);
             return;
           }
           if (parsed?.type === 'attach') {
@@ -591,22 +592,8 @@ export function setupTerminalWebSocket(server: http.Server): void {
 
         ptyStarted = true;
         console.log(`[ws-terminal] Starting local PTY for ${sessionName} at ${hub.cols}x${hub.rows}`);
-        // Strip TMUX/TMUX_PANE from inherited env so `tmux attach-session` doesn't refuse
-        // with "sessions should be nested with care, unset $TMUX to force" when the
-        // dashboard server itself was launched from inside a tmux pane.
-        ptyProcess = pty.spawn('tmux', buildTmuxArgs(['attach-session', '-t', sessionName]), {
-          name: 'xterm-256color',
-          cols: hub.cols,
-          rows: hub.rows,
-          cwd: homedir(),
-          env: buildChildEnvWithoutTmux(process.env, {
-            TERM: 'xterm-256color',
-            COLORTERM: 'truecolor',
-            LANG: 'en_US.UTF-8',
-          }) as { [key: string]: string },
-        });
-
-        hub.pty = ptyProcess;
+        ptyProcess = spawnTmuxAttachPty(sessionName, hub.cols, hub.rows);
+        attachHubPty(activePtyHubs, sessionName, hub, ptyProcess);
 
         let ptyChunks = 0;
         let ptyBytes = 0;
@@ -621,20 +608,11 @@ export function setupTerminalWebSocket(server: http.Server): void {
         ptyProcess.onData((data) => {
           ptyChunks++;
           ptyBytes += data.length;
-          broadcastToHub(hub, data);
         });
 
         ptyProcess.onExit(({ exitCode }) => {
           console.log(`[ws-terminal] PTY for ${sessionName} exited with code ${exitCode}`);
           clearInterval(ptyDiagInterval);
-          activePtyHubs.delete(sessionName);
-          for (const client of hub.clients) {
-            if (client.readyState === WebSocket.OPEN) {
-              client.close(1000, 'Session ended');
-            }
-          }
-          hub.clients.clear();
-          hub.clientStates.clear();
         });
 
         for (const input of hub.pendingInput) {
@@ -676,6 +654,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
             for (const client of hub.clients) {
               sendControl(client, { type: 'size', cols: parsed.cols, rows: parsed.rows });
             }
+            notifyHubSize(hub);
           }
           return;
         }

@@ -191,7 +191,10 @@ export type SharedSubmitReason =
   | 'not_contributor' | 'invalid_prompt' | 'too_long' | 'queue_full'
   | 'grant_revoked' | 'delivery_refused' | 'delivery_unknown';
 
-/** `control` payloads. Slice 5 adds submit (viewer → host), submit-ack and draft-sent (host → viewer). */
+/**
+ * `control` payloads. Slice 5 adds submit (viewer → host), submit-ack and draft-sent (host → viewer);
+ * slice 6 adds the viewer's terminal watch.
+ */
 export type ControlPayload =
   | { readonly kind: 'hello'; readonly hello: SharedHello }
   | { readonly kind: 'error'; readonly code: SharedHelloError }
@@ -203,7 +206,21 @@ export type ControlPayload =
       readonly position?: number;           // 1-based, with 'queued'
       readonly reason?: SharedSubmitReason; // with 'rejected'
     }
-  | { readonly kind: 'draft-sent' };
+  | { readonly kind: 'draft-sent' }
+  /** Viewer → host: start (`true`) or stop (`false`) the read-only terminal stream (slice 6). */
+  | { readonly kind: 'terminal-watch'; readonly watch: boolean };
+
+export type TerminalUnavailableReason = 'terminal_not_found' | 'terminal_ended';
+
+/**
+ * `terminal` payloads (slice 6), host → viewer only. A watch starts with `snapshot`; `data` is raw
+ * terminal output (escape sequences included). The host reads nothing on this channel.
+ */
+export type TerminalPayload =
+  | { readonly kind: 'snapshot'; readonly cols: number; readonly rows: number; readonly data: string }
+  | { readonly kind: 'output'; readonly data: string }
+  | { readonly kind: 'size'; readonly cols: number; readonly rows: number }
+  | { readonly kind: 'unavailable'; readonly reason: TerminalUnavailableReason };
 
 /** The allow-listed subset of the internal ChatMessage that may cross to a viewer. */
 export interface SharedMessage {
