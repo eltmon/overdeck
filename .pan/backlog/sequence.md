@@ -1,12 +1,11 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T09:52:06.564575Z · model: claude-opus-5-5 · open: 875_
+_Last sequenced: 2026-11-03T09:57:23.507098Z · model: claude-opus-5-5 · open: 871_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4702 | S | critical | ok |  |  | Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs. |
-| 2 | PAN-4881 | S | high | ok |  |  | Order-dependent 401 in projects-rename.test.ts failed the v0.73.1 release full-suite run; make the test hermetic. |
 | 3 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 4 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install aborts workspace creation (since #4163); reproduced 2026-11-02 on botland too, so every polyrepo start fails. |
 | 5 | PAN-4882 | M | high | ok |  |  | Re-run the five v0.73 Anywhere checks fixed after the release run (TURN relay on Fly, AC-4, AC-6, AC-15) on deployed main. |
@@ -326,13 +325,12 @@ _Last sequenced: 2026-11-03T09:52:06.564575Z · model: claude-opus-5-5 · open: 
 | 321 | PAN-1219 | M | high | needs-refinement |  |  | Promote across-cycle review state to first-class data (cycle SHA, prior findings) instead of prompt-derived |
 | 322 | PAN-1451 | M | high | needs-refinement |  |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
 | 323 | PAN-1452 | M | high | ok |  |  | PAN-1381 follow-up: per-reviewer restart with model override (architectural mismatch with PAN-1048) |
-| 325 | PAN-4473 | M | medium | ok |  |  | Shared Sessions slice 2: host share action, share record file and lobby panel; first slice on the slice-1 share service |
 | 326 | PAN-1553 | M | high | ok |  |  | Investigate Claude Code Fast mode support (and fast-tier pricing) |
 | 327 | PAN-1504 | M | high | ok |  |  | pan hygiene |
 | 328 | PAN-1480 | L | high | ok |  |  | TLDR: 93% bypass rate |
 | 329 | PAN-1479 | M | high | ok |  |  | RTK: Add telemetry to measure token savings from bash output compression |
 | 330 | PAN-2950 | L | high | ok |  |  | Refactor god files back under file-size ceilings after the UX overhaul |
-| 331 | PAN-4474 | L | medium | ok |  | PAN-4473 | Shared Sessions slice 3: host WebRTC hub, content wire format and conversation bridge (werift spike first) |
+| 331 | PAN-4474 | L | medium | ok |  |  | Shared Sessions slice 3: host WebRTC hub, content wire format and conversation bridge (werift spike first) |
 | 332 | PAN-2720 | M | high | ok |  |  | File-size ratchet counts lines, so it rewards line-packing on the god files it means to improve |
 | 333 | PAN-2650 | S | high | ok |  |  | Shed-stack half is moot (slot merges verify on host); remaining: pan swarm recover path for a stuck ready-to-merge slot. |
 | 334 | PAN-2358 | M | high | ok |  |  | PAN-2145 follow-up: restore PAN-1535 hardening in transformMessageForHarness (rewritten during conversations.ts decomposition) |
@@ -452,7 +450,7 @@ _Last sequenced: 2026-11-03T09:52:06.564575Z · model: claude-opus-5-5 · open: 
 | 448 | PAN-4151 | L | medium | needs-refinement |  | PAN-3822 | Deferred remainder of PAN-3822/#4067: GitLab MR sync, PR page + search, handoff link copy, diffstat, link-dialog a11y, sync throttle |
 | 449 | PAN-1330 | S | medium | ok |  |  | CLI cannot address planning-*/specialist-* sessions |
 | 450 | PAN-4481 | M | medium | needs-refinement |  | PAN-4475 | Shared Sessions slice 10: hosted web join page; awaits operator decision OD-1 on sign-in without a local install |
-| 451 | PAN-4482 | S | medium | ok |  | PAN-4473, PAN-4474, PAN-4475, PAN-4476, PAN-4477, PAN-4478, PAN-4479, PAN-4480, PAN-4481 | Shared Sessions slice 11: signaling-privacy e2e, forced-TURN check (operator checkpoint) and full AC sweep |
+| 451 | PAN-4482 | S | medium | ok |  | PAN-4474, PAN-4475, PAN-4476, PAN-4477, PAN-4478, PAN-4479, PAN-4480, PAN-4481 | Shared Sessions slice 11: signaling-privacy e2e, forced-TURN check (operator checkpoint) and full AC sweep |
 | 452 | PAN-1226 | L | medium | ok |  |  | PAN-1148 unified-dashboard redesign |
 | 453 | PAN-1173 | S | medium | ok |  |  | pan show <bare-number> derives wrong agent ID for PAN-prefixed issues |
 | 454 | PAN-1154 | M | medium | ok |  |  | pan up does not kill existing port holders |
@@ -661,7 +659,6 @@ _Last sequenced: 2026-11-03T09:52:06.564575Z · model: claude-opus-5-5 · open: 
 | 661 | PAN-2353 | M | low | needs-refinement |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
 | 662 | PAN-4294 | L | low | ok |  |  | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
 | 663 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
-| 664 | PAN-4831 | S | medium | ok |  |  | Phone app W-ACC1: allow ai.overdeck.app:/oauth/callback PKCE redirect and ios/android platforms in account service; PAN-4774 done. |
 | 665 | PAN-3011 | M | low | ok |  | PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
 | 666 | PAN-4638 | L | medium | ok |  |  | Anywhere: run gauntlet lanes on linked machines/Fly VMs; waits on unfiled machine-link plan items; Fly stack + creds open |
 | 667 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
@@ -824,10 +821,9 @@ _Last sequenced: 2026-11-03T09:52:06.564575Z · model: claude-opus-5-5 · open: 
 | 824 | PAN-3248 | XS | low | stale |  |  | Stale: targets the deploy patrol (pan reload is the new home) deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 825 | PAN-3244 | S | low | stale |  |  | Stale: targets the deploy-patrol deploy window deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 826 | PAN-2775 | S | low | needs-refinement |  |  | Stale: targets boot-correlated reaping (boot reconciliation) deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 827 | PAN-4833 | M | medium | ok |  |  | Phone app W-WEB1: move noise/wire behind a crypto port into packages/anywhere-channel; browser channel; CP-1. |
+| 827 | PAN-4834 | M | medium | ok |  |  | Phone app W-WEB2: HTTP/1.1 and WebSocket clients inside the channel plus fetch/WS shims; PAN-4833 done, now unblocked. |
 | 828 | PAN-4835 | M | medium | ok |  |  | Phone app W-MAC1: phone access-token kind, pairing exchange, self-revoke and push-key routes, phone scopes. |
 | 829 | PAN-3505 | XS | low | needs-refinement |  |  | Stale: targets the flywheel state write door deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 830 | PAN-4834 | M | medium | ok |  | PAN-4833 | Phone app W-WEB2: HTTP/1.1 and WebSocket clients inside the channel plus fetch/WS shims; needs PAN-4833. |
 | 831 | PAN-4836 | S | medium | ok |  | PAN-4835 | Phone app W-MAC2: "Overdeck app" pairing QR tab in Settings > Anywhere with paired-phone list; needs PAN-4835. |
 | 832 | PAN-3321 | XS | low | stale |  |  | Stale: targets pan unstick deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 833 | PAN-736 | M | low | stale |  |  | Retired: work-types.ts, WorkTypeRouter and models.overrides are all gone (#4174); per-subagent routing needs a fresh roles.* design |
@@ -872,7 +868,7 @@ _Last sequenced: 2026-11-03T09:52:06.564575Z · model: claude-opus-5-5 · open: 
 | 872 | PAN-4594 | M | low | ok |  | PAN-4590 | Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590. |
 | 873 | PAN-4593 | L | low | needs-refinement |  | PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
 | 874 | PAN-4843 | M | medium | ok |  | PAN-4835 | Phone app W-MAC3: native PushProvider seals needs-you alerts to each phone push key via directory; needs PAN-4835. |
-| 875 | PAN-4837 | L | medium | ok |  | PAN-4834, PAN-4829, PAN-4831, PAN-4835 | Phone app W-APP1: Capacitor 8 apps/mobile shell, sign-in, machines, QR pairing, keys plugin; CP-3/CP-4. |
+| 875 | PAN-4837 | L | medium | ok |  | PAN-4834, PAN-4829, PAN-4835 | Phone app W-APP1: Capacitor 8 apps/mobile shell, sign-in, machines, QR pairing, keys plugin; CP-3/CP-4. |
 | 876 | PAN-4838 | M | medium | ok |  | PAN-4837, PAN-4830, PAN-4843 | Phone app W-IOS1: APNs registration and Notification Service Extension that decrypts sealed alerts. |
 | 877 | PAN-4840 | M | medium | ok |  | PAN-4837, PAN-4830, PAN-4843 | Phone app W-AND1: FCM FirebaseMessagingService decrypts sealed data payloads and posts notifications. |
 | 878 | PAN-4841 | M | medium | ok |  |  | Phone app W-REL1: Apple/Firebase/Play/Cloudflare setup and first store builds; operator approves purchases. |
@@ -886,10 +882,6 @@ _Last sequenced: 2026-11-03T09:52:06.564575Z · model: claude-opus-5-5 · open: 
 ### PAN-4702 (rank 1)
 
 New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.
-
-### PAN-4881 (rank 2)
-
-New in-pipeline substrate bug: the release job runs the full suite in one job, and leaked internal-token state from another file makes projects-rename.test.ts return 401, which blocked publishing v0.73.1. It is already picked up, so it takes the free rank 2 without moving any other node; no cross-references, so no edges.
 
 ### PAN-4636 (rank 3)
 
@@ -1203,6 +1195,10 @@ New this pass. The deployment gate's queue message is unusually good — it name
 
 Triage: verify "running at $0.00 with no capacity fallback" against the current liveness definition. Rank held.
 
+### PAN-3106 (rank 80)
+
+New this pass. shouldHoldForUat is consulted on exactly one merge path, so every other path merges a ready issue without asking whether its project holds for UAT — verified at code level on a real MIN-901 merge. This defeats the batch-train model directly: issues merge one at a time before a generation can assemble them.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1210,10 +1206,10 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T09:52:06.564575Z",
+  "generatedAt": "2026-11-03T09:57:23.507098Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 875,
+  "openCount": 871,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -1225,19 +1221,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "dependsOn": [],
       "why": "Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs.",
       "rationale": "New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4881",
-      "rank": 2,
-      "size": "S",
-      "importance": "high",
-      "score": 82,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Order-dependent 401 in projects-rename.test.ts failed the v0.73.1 release full-suite run; make the test hermetic.",
-      "rationale": "New in-pipeline substrate bug: the release job runs the full suite in one job, and leaked internal-token state from another file makes projects-rename.test.ts return 401, which blocked publishing v0.73.1. It is already picked up, so it takes the free rank 2 without moving any other node; no cross-references, so no edges.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -5242,19 +5225,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "planning": "auto"
     },
     {
-      "issue": "PAN-4473",
-      "rank": 325,
-      "size": "M",
-      "importance": "medium",
-      "score": 60,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Shared Sessions slice 2: host share action, share record file and lobby panel; first slice on the slice-1 share service",
-      "rationale": "Rank held: dependency PAN-4330 closed as completed on 2026-11-01, so it no longer gates this issue; remaining order is unchanged.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1553",
       "rank": 326,
       "size": "M",
@@ -5321,9 +5291,7 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "importance": "medium",
       "score": 60,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4473"
-      ],
+      "dependsOn": [],
       "why": "Shared Sessions slice 3: host WebRTC hub, content wire format and conversation bridge (werift spike first)",
       "gate": "auto",
       "planning": "auto"
@@ -6802,7 +6770,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "score": 50,
       "condition": "ok",
       "dependsOn": [
-        "PAN-4473",
         "PAN-4474",
         "PAN-4475",
         "PAN-4476",
@@ -9360,19 +9327,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "planning": "interactive"
     },
     {
-      "issue": "PAN-4831",
-      "rank": 664,
-      "size": "S",
-      "importance": "medium",
-      "score": 36,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Phone app W-ACC1: allow ai.overdeck.app:/oauth/callback PKCE redirect and ios/android platforms in account service; PAN-4774 done.",
-      "rationale": "PAN-4774 (Anywhere release AC run) closed as completed, so that dependency is removed; rank held because the phone-app epic is feature work that still ranks below substrate items.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3011",
       "rank": 665,
       "size": "M",
@@ -11361,19 +11315,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "planning": "auto"
     },
     {
-      "issue": "PAN-4833",
-      "rank": 827,
-      "size": "M",
-      "importance": "medium",
-      "score": 36,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Phone app W-WEB1: move noise/wire behind a crypto port into packages/anywhere-channel; browser channel; CP-1.",
-      "rationale": "PAN-4774 (Anywhere release AC run) closed as completed, so that dependency is removed; rank held because the phone-app epic is feature work that still ranks below substrate items.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4835",
       "rank": 828,
       "size": "M",
@@ -11401,16 +11342,14 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
     },
     {
       "issue": "PAN-4834",
-      "rank": 830,
+      "rank": 827,
       "size": "M",
       "importance": "medium",
       "score": 34,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4833"
-      ],
-      "why": "Phone app W-WEB2: HTTP/1.1 and WebSocket clients inside the channel plus fetch/WS shims; needs PAN-4833.",
-      "rationale": "PAN-4774 (Anywhere release AC run) closed as completed, so that dependency is removed; rank held because the phone-app epic is feature work that still ranks below substrate items.",
+      "dependsOn": [],
+      "why": "Phone app W-WEB2: HTTP/1.1 and WebSocket clients inside the channel plus fetch/WS shims; PAN-4833 done, now unblocked.",
+      "rationale": "Its only remaining dependency PAN-4833 (browser channel, W-WEB1) closed as completed, so it moves up into the freed rank 827.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11986,7 +11925,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "dependsOn": [
         "PAN-4834",
         "PAN-4829",
-        "PAN-4831",
         "PAN-4835"
       ],
       "why": "Phone app W-APP1: Capacitor 8 apps/mobile shell, sign-in, machines, QR pairing, keys plugin; CP-3/CP-4.",
@@ -12966,13 +12904,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "confidence": 1
     },
     {
-      "from": "PAN-4473",
-      "to": "PAN-4474",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4474",
       "to": "PAN-4475",
       "type": "unblocks",
@@ -13024,13 +12955,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
     {
       "from": "PAN-4409",
       "to": "PAN-4410",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4473",
-      "to": "PAN-4482",
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
@@ -13359,20 +13283,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
     },
     {
       "from": "PAN-4823",
-      "to": "PAN-4831",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4823",
-      "to": "PAN-4833",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4823",
       "to": "PAN-4835",
       "type": "contains",
       "source": "github-ref",
@@ -13384,13 +13294,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-4833",
-      "to": "PAN-4834",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.9
     },
     {
       "from": "PAN-4823",
@@ -13436,13 +13339,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
     },
     {
       "from": "PAN-4829",
-      "to": "PAN-4837",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.9
-    },
-    {
-      "from": "PAN-4831",
       "to": "PAN-4837",
       "type": "unblocks",
       "source": "ai-inferred",
