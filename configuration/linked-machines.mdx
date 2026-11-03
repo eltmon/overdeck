@@ -487,6 +487,12 @@ machines. The other machine must have a project for the same repository (the sam
 `github_repo` or `gitlab_repo`); if it does not, the error names the command that adds it
 (see [Projects across machines](#projects-across-machines)).
 
+The other machine chooses the working directory: its own copy of the project, or its
+default working directory (`~/Projects`, else home) when no project is chosen. With any
+machine but **This machine** chosen, the dialog's **Working directory** field is empty
+and reads, for example, "Set by desk: its copy of Overdeck". A directory you typed
+applies only to this machine and is kept if you switch back.
+
 Work started this way is **link-started**: the other machine records which machine asked
 for it. An agent on your machine may then message and stop that work, and only that work.
 It can never open terminals or port forwards there, create conversations or workers outside
