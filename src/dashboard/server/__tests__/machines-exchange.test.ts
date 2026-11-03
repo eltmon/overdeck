@@ -15,7 +15,8 @@ vi.mock('../../../lib/activity-logger.js', () => ({ emitActivityEntry: vi.fn() }
 
 const { _resetAccessTokensForTests, _settleAccessTokenWritesForTests, listActiveRecordsOfKind, MACHINE_TOKEN_SCOPES, verifyAccessToken } = await import('../../../lib/access-tokens.js');
 const { _resetLinkStoreForTests, _settleLinkStoreWritesForTests, listLinks } = await import('../../../lib/anywhere/link-store.js');
-const { pairingSecrets } = await import('../../../lib/anywhere/channel/noise.js');
+const { pairingSecrets } = await import('@overdeck/anywhere-channel');
+const { nodeCrypto } = await import('@overdeck/anywhere-channel/node');
 const { _resetPairingCredentialsForTests, consumePairingCredential, issuePairingCredential, takePairingById } = await import('../pairing-credentials.js');
 const { handleMachinesExchange } = await import('../routes/machines-peer.js');
 type ChannelMarker = import('../channel-peer.js').ChannelMarker;
@@ -119,7 +120,7 @@ describe('POST /api/machines/exchange (PAN-4645 WI-12)', () => {
 describe('pairing credentials by pairing id (D-4645-17)', () => {
   it('yields the PSK for a live credential once, then unknown; the device exchange consumes it too', () => {
     const { credential } = issuePairingCredential();
-    const { psk, pairingId } = pairingSecrets(credential);
+    const { psk, pairingId } = pairingSecrets(nodeCrypto, credential);
     const taken = takePairingById(pairingId);
     expect(taken).not.toBe('unknown');
     expect((taken as { psk: Buffer }).psk.equals(psk)).toBe(true);
@@ -128,7 +129,7 @@ describe('pairing credentials by pairing id (D-4645-17)', () => {
 
     const second = issuePairingCredential();
     expect(consumePairingCredential(second.credential)).toBe('ok');
-    expect(takePairingById(pairingSecrets(second.credential).pairingId)).toBe('unknown');
+    expect(takePairingById(pairingSecrets(nodeCrypto, second.credential).pairingId)).toBe('unknown');
     expect(takePairingById('00'.repeat(16))).toBe('unknown');
   });
 
@@ -138,7 +139,7 @@ describe('pairing credentials by pairing id (D-4645-17)', () => {
       vi.setSystemTime(new Date('2026-11-01T12:00:00.000Z'));
       const { credential } = issuePairingCredential();
       vi.setSystemTime(new Date('2026-11-01T12:11:00.000Z'));
-      expect(takePairingById(pairingSecrets(credential).pairingId)).toBe('expired');
+      expect(takePairingById(pairingSecrets(nodeCrypto, credential).pairingId)).toBe('expired');
     } finally {
       vi.useRealTimers();
     }

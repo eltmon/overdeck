@@ -3,9 +3,10 @@
 - **Language:** TypeScript (strict), ESM throughout.
 - **Runtime:** Node.js 22 for everything that ships (CLI, dashboard server,
   PTY supervisor). Bun is the *package manager / dev scratchpad* only
-  (`bun install`; root plus 9 bun workspaces: `packages/{contracts,effect-acp,
-  moonshine-linux-x64,qwen-tts-linux-x64,pi-extension,ohmypi-extension}`,
-  `src/dashboard/server`, `src/dashboard/frontend`, `apps/desktop`).
+  (`bun install`; root plus 13 bun workspaces: `packages/{contracts,effect-acp,
+  anywhere-channel,moonshine-linux-x64,qwen-tts-linux-x64,pi-extension,ohmypi-extension}`,
+  `src/dashboard/server`, `src/dashboard/frontend`, `apps/desktop`,
+  `services/{account,share,connect}`).
 - **Build:** tsdown (rolldown) for CLI / server / contracts (`tsdown.config.ts`
   at root, `src/dashboard/server/`, `packages/contracts/`, `scripts/`); Vite for
   the frontend. `npm run build` builds all.
@@ -74,4 +75,4 @@
   `docs/CONNECT-SERVICE.md`. The machine side adds `werift` (WebRTC, bundled) and
   `sodium-native` (sealed-box open) as root dependencies.
 
-<!-- last-verified: 2026-11-01 -->
+<!-- last-verified: 2026-11-03 -->

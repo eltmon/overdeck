@@ -25,11 +25,11 @@ import type { IncomingMessage, Server as HttpServer } from 'node:http';
 import type { Socket } from 'node:net';
 import type { Duplex } from 'node:stream';
 
+import { PREAMBLE_MAGIC, REFUSAL_CODES } from '@overdeck/anywhere-channel';
 import { createWebSocketStream, WebSocketServer } from 'ws';
 
 import { acceptChannel, type PairingSecret, refuseChannel } from '../../lib/anywhere/channel/accept.js';
 import type { ChannelSocket } from '../../lib/anywhere/channel/channel-socket.js';
-import { PREAMBLE_MAGIC, REFUSAL_CODES } from '../../lib/anywhere/channel/wire.js';
 import type { MachineKeyPair } from '../../lib/anywhere/machine-key.js';
 
 export const DEFAULT_MAX_PENDING = 32;

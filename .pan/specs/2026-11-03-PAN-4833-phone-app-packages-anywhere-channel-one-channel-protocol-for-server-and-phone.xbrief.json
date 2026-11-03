@@ -1,0 +1,998 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-03T04:46:34Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4833: Phone app: packages/anywhere-channel, one channel protocol for server and phone",
+    "updated": "2026-11-03T04:52:20.187Z"
+  },
+  "plan": {
+    "id": "pan-4833",
+    "title": "Phone app: packages/anywhere-channel, one channel protocol for server and phone",
+    "status": "running",
+    "uid": "6702638b-ca3f-4972-95e6-f44d92315bee",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-03T04:46:34Z",
+    "updated": "2026-11-03T04:52:20.187Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4833",
+        "label": "PAN-4833",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4823",
+        "label": "PAN-4823 (epic)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4833.md",
+        "label": "PRD",
+        "type": "document"
+      },
+      {
+        "uri": ".pan/drafts/pan-4823.md",
+        "label": "Epic PRD (W-WEB1, D-7, CP-1, AC-5)",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "anywhere",
+      "secure-channel",
+      "phone-app",
+      "noise",
+      "webrtc",
+      "package"
+    ],
+    "metadata": {
+      "sizeJustification": "One new workspace package plus the import sites of two protocol files that must move in one commit to keep the server building. The projected-surface lint counts each root file (package.json, bun.lock) and each top-level directory pair as a subsystem; the real change is the package, its server importers in src/lib/anywhere/channel and src/dashboard/server, and two docs. The issue is already one work item (W-WEB1) split from epic PAN-4823; its browser pieces are each a separate item here and share the package's crypto port and initiator.",
+      "canonicalFilename": "2026-11-03-PAN-4833-phone-app-packages-anywhere-channel-one-channel-protocol-for-server-and-phone.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The phone app (epic PAN-4823) must speak the secure channel byte for byte, but noise.ts and wire.ts use node:crypto and Buffer and live in the server tree, and the browser has no RTCDataChannel duplex, no directory client and no machine dialer. Whether pure-JS libsodium is fast enough in a phone WebView is unproven (CP-1).",
+      "Proposal": "Create the private MIT workspace package @overdeck/anywhere-channel with entries '.', './node' and './web'. Pin golden vectors on current code, move noise.ts and wire.ts into the package behind an explicit CryptoPort (Node and web implementations), extract the initiator handshake into a shared runInitiatorHandshake with a same-tick finisher used by the server's openChannel and the phone's openSecureChannel, add RtcDuplexWeb, DirectoryWebClient and createMachineDialer, prove web-to-Node handshakes with a cross-port test, and measure CP-1 in throttled Chromium, WebKit and the Android emulator. Details: .pan/drafts/PAN-4833.md.",
+      "NonGoals": "- HTTP/1.1 and WebSocket clients over the channel, the pool and the fetch/WebSocket page shims (PAN-4834)\n- The Capacitor app, key storage, sign-in and pairing UI (PAN-4837), and the iOS Simulator CP-1 leg\n- The directory's client role and subprotocol auth on /v1/directory (PAN-4829) and the client-role contract types (PAN-4828)\n- Moving accept.ts, channel-socket.ts, channel-agent.ts, rtc-transport.ts, rtc-duplex.ts or relay-ice-servers.ts out of src/lib/anywhere/channel/\n- Approval mode on the web\n- Any change to wire bytes, NOISE_LINK_PROTOCOL (stays 1), CONNECT_PROTOCOL_VERSION or the server responder's behavior\n- Publishing @overdeck/anywhere-channel to npm\n- Correcting pan-2350 D-2 (pan-4823 W-DOC)\n- Raising any row in scripts/file-size-allowlist.txt"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Extract the transport-agnostic initiator handshake from open.ts into packages/anywhere-channel/src/initiator.ts (PRD D-6), keeping open.ts on the server for transports and re-exporting the moved names.",
+        "rationale": "pan-4823 NFR-1 requires the phone and server to run the same protocol code; the phone needs exactly this sequence, and a second copy would drift. The issue says 'one channel protocol for server and phone'."
+      },
+      {
+        "summary": "Keep two crypto ports (node:crypto and @noble/hashes + getRandomValues) as pan-4823 D-7 states, rather than a single sodium-universal implementation.",
+        "rationale": "D-7 names both ports and AC-5 tests them against each other; the port must work before libsodium loads."
+      },
+      {
+        "summary": "Pass the CryptoPort as an explicit first argument (no module-global port).",
+        "rationale": "The cross-port test runs both ports in one process; a global would make that test meaningless."
+      },
+      {
+        "summary": "dialMachine is a method of createMachineDialer(directory) and reuses one RTCPeerConnection per (machine, relay).",
+        "rationale": "The machine's RtcTransport.accept closes an older peer connection for the same key on every new offer, so a new connection per dial would kill the phone's pooled channels."
+      },
+      {
+        "summary": "If PAN-4828's client-role contracts are not on main when directory-web starts, copy them verbatim into a temporary directory-frames.ts marked for deletion.",
+        "rationale": "Avoids stalling on a sibling issue without merging an unreviewed feature branch; the copy is mechanical and review can diff it."
+      },
+      {
+        "summary": "CP-1 carries the secure channel over a WebSocket to a local Node responder; legs are throttled Chromium, WebKit and the galaxyA16 Android emulator; the iOS Simulator leg is deferred to PAN-4837.",
+        "rationale": "CP-1 measures libsodium-in-JS cost, not WebRTC; the iOS Simulator needs the Mac rig and the operator, and WebKit is the same engine."
+      },
+      {
+        "summary": "@overdeck/anywhere-channel is private, source-exported (effect-acp pattern) and listed in root devDependencies.",
+        "rationale": "Both tsdown configs already bundle @overdeck/*; lint-dist-externals rejects workspace:* in published dependencies (PAN-3209)."
+      }
+    ],
+    "items": [
+      {
+        "id": "golden-vectors",
+        "title": "Pin golden vectors for the channel's deterministic encodings on current code",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T04:46:34Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4833",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/anywhere/channel/__tests__/golden-vectors.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/anywhere/channel/__tests__/golden-vectors.test.ts"
+          ],
+          "expected_outputs": [
+            "golden-vectors.test.ts passes against the unmodified noise.ts and wire.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Create src/lib/anywhere/channel/__tests__/golden-vectors.test.ts importing pairingSecrets, prologueFor, approvalCommitment, approvalSas from ../noise.js and encodePreamble, encodeFrame, encodeRefusal, REFUSAL_CODES from ../wire.js. Use the fixed inputs and the literal expected outputs in PRD Fact 17 (CODE='odp_'+'0123456789abcdef'.repeat(4), ID='00112233445566778899aabbccddeeff', H=32x0x11, N1=32x0x22, N2=32x0x33). Assert hex output equals the literal for every row; never compute an expected value with the function under test. If any literal differs on this branch, main changed since planning: refresh the literals from current code and say so in the commit body. Do not modify noise.ts or wire.ts in this item."
+        },
+        "items": [
+          {
+            "id": "golden-vectors.ac1",
+            "title": "Given the unmodified noise.ts and wire.ts, when golden-vectors.test.ts runs, then it passes and asserts all 15 Fact 17 outputs as hard-coded literals",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "golden-vectors.ac2",
+            "title": "The test asserts pairingSecrets(CODE).psk equals fa159b7cec33c9ba81b087f2b4df399f1f8010f621c729668ce0888feeab9eab and approvalSas(H, N1, N2) returns '553 891'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "golden-vectors.ac3",
+            "title": "The test file contains no call that derives an expected value from the function under test (every expected value is a string literal)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "package-scaffold",
+        "title": "Create the @overdeck/anywhere-channel workspace package with the CryptoPort and its Node and web implementations",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T04:46:34Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-4833",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "packages/anywhere-channel/package.json",
+            "packages/anywhere-channel/tsconfig.json",
+            "packages/anywhere-channel/src/index.ts",
+            "packages/anywhere-channel/src/node.ts",
+            "packages/anywhere-channel/src/web.ts",
+            "packages/anywhere-channel/src/crypto-port.ts",
+            "packages/anywhere-channel/src/crypto-node.ts",
+            "packages/anywhere-channel/src/crypto-web.ts",
+            "packages/anywhere-channel/src/__tests__/crypto-port.test.ts",
+            "package.json",
+            "src/dashboard/server/package.json",
+            "bun.lock"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bun install",
+            "npm run typecheck:anywhere-channel",
+            "npx vitest run packages/anywhere-channel/src/__tests__/crypto-port.test.ts",
+            "test -L node_modules/@overdeck/anywhere-channel"
+          ],
+          "expected_outputs": [
+            "typecheck:anywhere-channel exits 0",
+            "crypto-port.test.ts passes for both ports",
+            "node_modules/@overdeck/anywhere-channel is a symlink"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ],
+          "foundationFor": [
+            "move-protocol",
+            "shared-initiator",
+            "web-port-parity",
+            "web-secure-channel",
+            "directory-web",
+            "rtc-duplex-web",
+            "dial-machine",
+            "cp1-harness"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2, decisions D-1 and D-2. packages/anywhere-channel/package.json: name @overdeck/anywhere-channel, private true, type module, license MIT, exports '.'->./src/index.ts, './node'->./src/node.ts, './web'->./src/web.ts (types+import, effect-acp pattern, no build). dependencies exactly: noise-handshake 4.2.0, @hyperswarm/secret-stream 6.9.2, b4a 1.9.0, streamx 2.28.1, @noble/hashes 2.4.0, sodium-javascript 0.8.0, bare-events 2.9.2, @overdeck/contracts workspace:*; devDependencies vite ^8.3.1. tsconfig.json copies packages/contracts/tsconfig.json with lib [ES2022, DOM], types [node], noEmit true, include [src], and paths { '@overdeck/contracts': ['../contracts/src/index.ts'] } (frontend tsconfig pattern) so the package typecheck reads contracts source, not a stale dist. crypto-port.ts: interface CryptoPort { sha256(data: Uint8Array): Uint8Array; randomBytes(n: number): Uint8Array; timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean }. crypto-node.ts: nodeCrypto wraps node:crypto createHash/randomBytes/timingSafeEqual (false on length mismatch). crypto-web.ts: webCrypto uses sha256 from '@noble/hashes/sha2.js', globalThis.crypto.getRandomValues in chunks of <=65536 bytes, constant-time compare with no early exit. index.ts exports type CryptoPort; node.ts exports nodeCrypto and re-exports index; web.ts exports webCrypto and re-exports index. Root package.json: add packages/anywhere-channel to workspaces.packages, add '@overdeck/anywhere-channel': 'workspace:*' to devDependencies (NOT dependencies: lint-dist-externals rejects workspace:* there), add script typecheck:anywhere-channel = 'tsc --noEmit -p packages/anywhere-channel/tsconfig.json' and append '&& npm run typecheck:anywhere-channel' to typecheck. src/dashboard/server/package.json: add the dependency next to @overdeck/contracts. Run bun install; commit bun.lock. No tsdown or vitest alias is needed."
+        },
+        "items": [
+          {
+            "id": "package-scaffold.ac1",
+            "title": "Given bun install has run, when node resolves @overdeck/anywhere-channel from the repo root, then node_modules/@overdeck/anywhere-channel is a symlink to packages/anywhere-channel",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "package-scaffold.ac2",
+            "title": "Running npm run typecheck:anywhere-channel exits 0 and the root typecheck script invokes it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "package-scaffold.ac3",
+            "title": "For both nodeCrypto and webCrypto, sha256 of the UTF-8 bytes 'abc' returns ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad, randomBytes(70000) returns 70000 bytes, and timingSafeEqual returns false for arrays of different length",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "package-scaffold.ac4",
+            "title": "Root package.json contains @overdeck/anywhere-channel only under devDependencies, never under dependencies",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "move-protocol",
+        "title": "Move noise.ts and wire.ts into the package behind the crypto port and repoint server importers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T04:46:34Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "refactor",
+          "issueLabel": "pan-4833",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/anywhere-channel/src/noise.ts",
+            "packages/anywhere-channel/src/wire.ts",
+            "packages/anywhere-channel/src/types/noise-handshake.d.ts",
+            "packages/anywhere-channel/src/index.ts",
+            "packages/anywhere-channel/src/__tests__/golden-vectors.test.ts",
+            "src/lib/anywhere/channel/noise.ts",
+            "src/lib/anywhere/channel/wire.ts",
+            "src/lib/anywhere/channel/__tests__/golden-vectors.test.ts",
+            "src/lib/anywhere/channel/open.ts",
+            "src/lib/anywhere/channel/accept.ts",
+            "src/lib/anywhere/channel/channel-socket.ts",
+            "src/dashboard/server/pairing-credentials.ts",
+            "src/dashboard/server/channel-listener.ts",
+            "src/lib/anywhere/channel/__tests__/channel.test.ts",
+            "src/lib/anywhere/channel/__tests__/channel-capture.test.ts",
+            "src/dashboard/server/__tests__/channel-listener.test.ts",
+            "src/dashboard/server/__tests__/machines-exchange.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint:circular",
+            "npx vitest run packages/anywhere-channel/src/__tests__/golden-vectors.test.ts src/lib/anywhere/channel/__tests__ src/dashboard/server/__tests__/channel-listener.test.ts src/dashboard/server/__tests__/machines-exchange.test.ts src/dashboard/server/__tests__/channel-rtc.test.ts",
+            "git grep -nE \"channel/(noise|wire)(\\.js)?'\" -- src tests"
+          ],
+          "expected_outputs": [
+            "typecheck and lint:circular exit 0",
+            "golden vectors and all listed channel tests pass",
+            "the git grep prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1",
+            "NFR-2",
+            "NFR-4"
+          ],
+          "parallelSafeReason": "Runs alone in its slot after golden-vectors and package-scaffold; no other item touches its files until shared-initiator, which it blocks."
+        },
+        "narrative": {
+          "Action": "PRD WI-3, decisions D-3, D-4, D-5. git mv src/lib/anywhere/channel/noise.ts and wire.ts into packages/anywhere-channel/src/, and git mv the golden test to packages/anywhere-channel/src/__tests__/. noise.ts: import Noise from 'noise-handshake' (declare the module in src/types/noise-handshake.d.ts with the existing NoiseState/NoiseConstructor shapes, and make the first line of noise.ts '/// <reference path=\"./types/noise-handshake.d.ts\" />' because root tsc and the dashboard type lane reach noise.ts only through imports and would otherwise fail with TS7016), import b4a from 'b4a'; drop node:crypto and node:module; define StaticKeyPair { publicKey: Uint8Array; secretKey: Uint8Array } and use it instead of MachineKeyPair; pairingSecrets(crypto, code), approvalNonce(crypto), approvalCommitment(crypto, hash, nonce), approvalSas(crypto, hash, n1, n2) take CryptoPort first and hash b4a.concat([...]) with crypto.sha256; approvalSas reads the first 4 digest bytes with DataView getUint32(0, false); all Buffer types become Uint8Array. wire.ts: export interface RawDuplex { write(chunk: Uint8Array): boolean; on(...); off(...); destroy(error?: Error): void; readonly destroyed: boolean } and FrameReader takes RawDuplex; every Buffer.* call becomes b4a.* (PREAMBLE_MAGIC = b4a.from([0x00,0x4f,0x56,0x44,0x4c]); equals->b4a.equals; copy->set; toString->b4a.toString). index.ts re-exports noise.ts and wire.ts. Server: open.ts, accept.ts, channel-socket.ts, pairing-credentials.ts, channel-listener.ts and the four listed tests import from '@overdeck/anywhere-channel' and pass nodeCrypto (from '@overdeck/anywhere-channel/node') to the four D-3 functions; accept.ts uses nodeCrypto.timingSafeEqual; psk types become Uint8Array (accept.ts PairingSecret, pairing-credentials.ts lines ~34 and ~90); wrap Buffer-only calls on package results as Buffer.from(x).toString('hex') in server files (server files never import b4a). Golden test literals stay unchanged. No assertion in existing tests changes (NFR-4)."
+        },
+        "items": [
+          {
+            "id": "move-protocol.ac1",
+            "title": "Given the move is applied, when git grep -nE \"channel/(noise|wire)(\\.js)?'\" -- src tests runs, then it prints nothing and src/lib/anywhere/channel/noise.ts and wire.ts no longer exist",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-protocol.ac2",
+            "title": "When golden-vectors.test.ts runs from packages/anywhere-channel/src/__tests__/, vitest reports every case passing with the same literals WI-1 committed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-protocol.ac3",
+            "title": "When channel.test.ts, channel-capture.test.ts, channel-listener.test.ts, machines-exchange.test.ts and channel-rtc.test.ts run, vitest reports 0 failures and the diff of those files contains only import-specifier and nodeCrypto-argument changes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-protocol.ac4",
+            "title": "npm run typecheck exits 0 from the repo root (root tsc resolves the noise-handshake declaration through the triple-slash reference) and npm run lint:circular exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-protocol.ac5",
+            "title": "git grep -nE \"from 'node:|require\\(|\\bBuffer\\b\" -- packages/anywhere-channel/src/noise.ts packages/anywhere-channel/src/wire.ts prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "shared-initiator",
+        "title": "Extract the transport-agnostic initiator handshake into the package behind a same-tick finisher",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T04:46:34Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "refactor",
+          "issueLabel": "pan-4833",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/anywhere-channel/src/initiator.ts",
+            "packages/anywhere-channel/src/__tests__/initiator.test.ts",
+            "packages/anywhere-channel/src/index.ts",
+            "src/lib/anywhere/channel/open.ts",
+            "src/lib/anywhere/channel/channel-socket.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run packages/anywhere-channel/src/__tests__/initiator.test.ts src/lib/anywhere/channel/__tests__ src/dashboard/server/__tests__/channel-rtc.test.ts src/dashboard/server/services/__tests__/link-supervisor.test.ts src/dashboard/server/services/__tests__/directory-approval.test.ts",
+            "wc -l src/lib/anywhere/channel/open.ts"
+          ],
+          "expected_outputs": [
+            "typecheck exits 0",
+            "initiator.test.ts and the listed server tests pass",
+            "open.ts has fewer than 358 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-4",
+            "NFR-7"
+          ],
+          "foundationFor": [
+            "web-secure-channel",
+            "cp1-harness"
+          ],
+          "parallelSafeReason": "Depends only on move-protocol; it is the sole editor of open.ts and channel-socket.ts after that, and web-secure-channel waits on it."
+        },
+        "narrative": {
+          "Action": "PRD WI-4, decision D-6. Move from open.ts into packages/anywhere-channel/src/initiator.ts, logic unchanged: ChannelOpenError, ChannelOpenErrorCode, ChannelOpenDetail, DEFAULT_OPEN_TIMEOUT_MS, the options union (as InitiatorOptions with localKey: StaticKeyPair), withDeadline, handshakeAsInitiator (as runInitiatorHandshake(raw, label, opts, crypto, track, finish)), readMessage, refusalToError, toOpenError; move ChannelMarker from channel-socket.ts. runInitiatorHandshake ends with: const leftover = reader.detach(); if (finalMessage) raw.write(encodeFrame(finalMessage)); return finish({ raw, handshake: handshake.result(), leftover, channel }); with no await between those statements (bytes behind the last frame are lost otherwise). Timers typed ReturnType<typeof setTimeout>; AbortController+setTimeout only. open.ts keeps TransportUrl, RtcDialer, setRtcDialer, FLY_INSTANCE_PARAM, parseTransportUrl, connectTransport, openChannel, openChannelOverTransport, now calling withDeadline + runInitiatorHandshake(raw, label, opts, nodeCrypto, track, done => createChannelSocket({ raw: done.raw, initiator: true, handshake: done.handshake, channel: done.channel, leftover: done.leftover })), and re-exports ChannelOpenError, type ChannelOpenErrorCode, type ChannelOpenDetail, DEFAULT_OPEN_TIMEOUT_MS, type OpenChannelOptions (alias of InitiatorOptions); channel-socket.ts re-exports type ChannelMarker. No importer of open.ts or channel-socket.ts changes its import specifier. initiator.test.ts imports only package code and builds the responder from xxPskResponder/ikResponder/encodeFrame/encodeRefusal over node:stream duplexPair(); timeout/abort cases use vi.useFakeTimers()."
+        },
+        "items": [
+          {
+            "id": "shared-initiator.ac1",
+            "title": "Given a pairing responder that writes message 2 plus 5 extra bytes in one chunk, when runInitiatorHandshake completes, then finish receives leftover equal to exactly those 5 bytes and message 3 was already written to the raw duplex",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shared-initiator.ac2",
+            "title": "Given refusal frames 0x01, 0x02 and 0x04, runInitiatorHandshake rejects with ChannelOpenError codes unknown-peer, unsupported (with detail.linkProtocol) and busy",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shared-initiator.ac3",
+            "title": "With fake timers, a silent responder rejects with code timeout after advancing 10000 ms, an aborted signal rejects with code aborted, and both destroy the raw duplex",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shared-initiator.ac4",
+            "title": "open.ts contains fewer than 358 lines and no readMessage or refusalToError, and every file that imports ChannelOpenError from open.ts preserves its import specifier",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shared-initiator.ac5",
+            "title": "When channel.test.ts, channel-rtc.test.ts, link-supervisor.test.ts and directory-approval.test.ts run, vitest reports 0 failures with no assertion changed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "web-port-parity",
+        "title": "Run the golden vectors against both the Node and web crypto ports",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T04:46:34Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4833",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/anywhere-channel/src/__tests__/golden-vectors.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run packages/anywhere-channel/src/__tests__/golden-vectors.test.ts"
+          ],
+          "expected_outputs": [
+            "golden-vectors.test.ts reports passing cases for both the node and web ports"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. In packages/anywhere-channel/src/__tests__/golden-vectors.test.ts wrap the pairingSecrets, approvalCommitment and approvalSas assertions in describe.each([['node', nodeCrypto], ['web', webCrypto]]) (webCrypto from '../crypto-web.js'). Encoder assertions (no port) stay as they are. Literals unchanged."
+        },
+        "items": [
+          {
+            "id": "web-port-parity.ac1",
+            "title": "When golden-vectors.test.ts runs, then the pairingSecrets, approvalCommitment and approvalSas cases execute once for the node port and once for the web port",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "web-port-parity.ac2",
+            "title": "Given the web port, the golden suite returns the same Fact 17 literals as the node port: vitest reports every node and web case passing with no literal changed from WI-1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "web-secure-channel",
+        "title": "Add openSecureChannel for the web port and prove web-to-Node pairing and link handshakes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T04:46:34Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4833",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/anywhere-channel/src/secure-channel-web.ts",
+            "packages/anywhere-channel/src/types/secret-stream.d.ts",
+            "packages/anywhere-channel/src/web.ts",
+            "tests/integration/anywhere/web-channel-handshake.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:anywhere-channel",
+            "npx vitest run tests/integration/anywhere/web-channel-handshake.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:anywhere-channel exits 0",
+            "web-channel-handshake.test.ts passes all five cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6, decision D-7 (pan-4823 AC-5 first half). types/secret-stream.d.ts declares module '@hyperswarm/secret-stream' default class SecretStream extends streamx Duplex with constructor (isInitiator, rawStream, { handshake: { tx, rx, hash, publicKey, remotePublicKey: Uint8Array }, data?: Uint8Array }). secure-channel-web.ts (first line '/// <reference path=\"./types/secret-stream.d.ts\" />'): openSecureChannel(raw: RawDuplex, opts: WebChannelOptions, label='machine'): Promise<SecureChannel> = withDeadline(label, opts, (_s, track) => { track(raw); return runInitiatorHandshake(raw, label, opts, webCrypto, track, d => ({ stream: new SecretStream(true, d.raw, { handshake: { tx: d.handshake.tx, rx: d.handshake.rx, hash: d.handshake.hash, publicKey: d.handshake.localPublicKey, remotePublicKey: d.handshake.remotePublicKey }, ...(d.leftover.length > 0 ? { data: d.leftover } : {}) }), channel: d.channel })); }). WebChannelOptions offers mode link (remoteKeyHex) and pairing (pairingCode) only, default timeout 10 s. web.ts exports openSecureChannel, type WebChannelOptions, type SecureChannel. Test: keys from createRequire(import.meta.url)('noise-handshake/dh').generateKeyPair(); server side is acceptChannel from src/lib/anywhere/channel/accept.ts on end A of node:stream duplexPair(); web side passes end B directly to openSecureChannel (a Node Duplex satisfies RawDuplex). Never import streamx, b4a or other package-only dependencies from tests/: they are not hoisted to the root node_modules."
+        },
+        "items": [
+          {
+            "id": "web-secure-channel.ac1",
+            "title": "Given a pairing code known to acceptChannel, when openSecureChannel runs in pairing mode, then both sides resolve, each side's channel.remoteKeyHex equals the other side's public key hex, and 64 KiB written in each direction arrives byte-identical",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "web-secure-channel.ac2",
+            "title": "Given acceptChannel pins the web key, when openSecureChannel runs in link mode with the server's key, then the channel opens and 64 KiB round-trips intact",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "web-secure-channel.ac3",
+            "title": "A link dial naming a key the responder does not hold rejects with ChannelOpenError code identity-refused, and a link dial whose key isPinnedPeer refuses rejects with code unknown-peer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "web-secure-channel.ac4",
+            "title": "A pairing dial with a different code rejects with ChannelOpenError code pairing-refused",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "directory-web",
+        "title": "Add DirectoryWebClient: the phone's directory socket with subprotocol auth, back-off and keepalive",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T04:46:34Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4833",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/anywhere-channel/src/directory-web.ts",
+            "packages/anywhere-channel/src/__tests__/directory-web.test.ts",
+            "packages/anywhere-channel/src/directory-frames.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck:anywhere-channel",
+            "npx vitest run packages/anywhere-channel/src/__tests__/directory-web.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:anywhere-channel exits 0",
+            "directory-web.test.ts passes on fake timers"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7, decisions D-9 and D-10. Precondition (D-9 checkpoint): git fetch origin main && git grep -q ClientToDirectoryFrame origin/main -- packages/contracts/src/connect.ts. If found, merge origin/main (pan sync-main pan-4833) and import ClientToDirectoryFrame, DirectoryToClientFrame, CONNECT_CLOSE_CODES, CONNECT_PROTOCOL_VERSION, CLIENT_LIMIT_MESSAGE, DirectoryMachine, ConnectPlan, RelayStatus, IceServer, SignalData from @overdeck/contracts. Fallback: create packages/anywhere-channel/src/directory-frames.ts with a verbatim copy of those client-role types/constants from git show origin/feature/pan-4828:packages/contracts/src/connect.ts, headed '// TEMPORARY copy of PAN-4828 contracts; delete and import from @overdeck/contracts once PAN-4828 merges.' Never merge origin/feature/pan-4828. Implement DirectoryWebClient per the PRD WI-7 API: socket URL wss://<host>/v1/directory from baseUrl (http->ws); new WebSocket(url, ['overdeck.bearer.'+token]); on open require socket.protocol to equal the offered protocol else close and reconnect; send hello-client {type, protocol, clientId, label (control chars dropped, trimmed, <=64, never empty -> first 8 chars of clientId), publicKeyHex, appVersion (<=32), platform}; pong text updates last pong; welcome-client -> online, reset back-off, store plan/relayAllowed/machines; directory -> machines; error client_limit -> refusal; deliver frames to on() handlers (a throwing handler does not stop others); ping every 30 s, drop+reconnect after 75 s without pong; closes 4001/4003/4010/4011/4012/4013 -> refused (no retry; 4013 -> CLIENT_LIMIT_MESSAGE); other closes -> back-off 1000 ms doubling to 300000 ms times (1 + (random()*2-1)*0.2); send() false unless online; iceServers(relay) sends ice-servers with a 32-hex requestId and resolves on the matching reply, rejects on a matching error or after 10000 ms; a null token opens no socket. Tests inject a fake WebSocket class and random: () => 0.5, use vi.useFakeTimers(). Do not edit web.ts (dial-machine adds the export)."
+        },
+        "items": [
+          {
+            "id": "directory-web.ac1",
+            "title": "Given a token odd_<64 hex>, when start() runs, then the fake WebSocket is constructed with protocol overdeck.bearer.<token> and, after open, receives a hello-client frame carrying clientId, label, publicKeyHex, appVersion, platform and protocol 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "directory-web.ac2",
+            "title": "Given repeated close code 1006, the client reconnects after 1000, 2000 and 4000 ms and never waits longer than 300000 ms",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "directory-web.ac3",
+            "title": "Given close code 4013, the client sets state refused with CLIENT_LIMIT_MESSAGE and opens no new socket after advancing 600000 ms",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "directory-web.ac4",
+            "title": "Given 75 s without a pong, the client drops the socket and opens a new one; given a welcome-client frame, state becomes online and machines equals the frame's list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "directory-web.ac5",
+            "title": "iceServers(true) resolves with the reply whose requestId matches and rejects after 10000 ms without one",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rtc-duplex-web",
+        "title": "Add RtcDuplexWeb: a streamx Duplex over a browser RTCDataChannel with the server's limits",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T04:46:34Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4833",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/anywhere-channel/src/rtc-duplex-web.ts",
+            "packages/anywhere-channel/src/__tests__/rtc-duplex-web.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run packages/anywhere-channel/src/__tests__/rtc-duplex-web.test.ts",
+            "npm run typecheck:anywhere-channel"
+          ],
+          "expected_outputs": [
+            "rtc-duplex-web.test.ts passes",
+            "typecheck:anywhere-channel exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. export class RtcDuplexWeb extends streamx Duplex with RTC_MAX_MESSAGE_BYTES=16*1024, RTC_HIGH_WATER_BYTES=1024*1024, RTC_LOW_WATER_BYTES=256*1024 (same names/values as src/lib/anywhere/channel/rtc-duplex.ts). Constructor (channel: RTCDataChannel, peerId): binaryType='arraybuffer', bufferedAmountLowThreshold=RTC_LOW_WATER_BYTES, remoteAddress='rtc:'+peerId.replace(/-/g,'').slice(0,16); message events push new Uint8Array(data) (strings via b4a.from(data,'utf8')) and count bytesIn; close event pushes null and destroys. _write(data, cb): error when channel not open; send slices <=16 KiB; count bytesOut; cb() at once when bufferedAmount <= 1 MiB else on next bufferedamountlow event. _final/_destroy close the channel unless closing/closed. _read(cb) calls cb(). Tests use a FakeDataChannel extends EventTarget with settable readyState/bufferedAmount recording send calls. Do not edit web.ts (dial-machine adds the export)."
+        },
+        "items": [
+          {
+            "id": "rtc-duplex-web.ac1",
+            "title": "When 40 KiB is written, then the fake channel receives sends of 16384, 16384 and 8192 bytes in order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rtc-duplex-web.ac2",
+            "title": "Given bufferedAmount of 2 MiB, the write callback stays pending until a bufferedamountlow event is dispatched, then completes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rtc-duplex-web.ac3",
+            "title": "When a message event carrying an ArrayBuffer is dispatched, the duplex emits identical bytes on its readable side",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rtc-duplex-web.ac4",
+            "title": "A close event emits end and close on the duplex, destroy() calls channel.close() exactly once, and a write after close fails with an error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dial-machine",
+        "title": "Add createMachineDialer/dialMachine: WebRTC dial to a machine through directory signal frames, one peer connection per machine",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T04:46:34Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-4833",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/anywhere-channel/src/dial-machine.ts",
+            "packages/anywhere-channel/src/__tests__/dial-machine.test.ts",
+            "packages/anywhere-channel/src/web.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:anywhere-channel",
+            "npx vitest run packages/anywhere-channel/src/__tests__/dial-machine.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:anywhere-channel exits 0",
+            "dial-machine.test.ts passes on fake timers"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-5"
+          ],
+          "parallelSafeReason": "Owns its new files; its only shared file, web.ts, is serialized behind web-secure-channel by an edge."
+        },
+        "narrative": {
+          "Action": "PRD WI-9, decision D-8 (the machine's RtcTransport.accept closes an older peer connection for the same (from, relay, purpose) key, so the phone must reuse one RTCPeerConnection per machine). createMachineDialer(directory: Pick<DirectoryWebClient,'send'|'on'|'iceServers'>, deps?: { RTCPeerConnection? }) returns { dialMachine(environmentId, { relay, signal?, timeoutMs? = 15000 }): Promise<RtcDuplexWeb>; close(environmentId?) }. Cache key '<environmentId>|relay' or '|direct'; reuse unless connectionState failed/closed/disconnected; concurrent first dials share one creation promise. Create: iceServers = await directory.iceServers(relay); new RTCPeerConnection({ iceServers, iceTransportPolicy: relay ? 'relay' : 'all' }); session = 32 lowercase hex; first createDataChannel('ovdl', { ordered: true }) BEFORE createOffer; setLocalDescription; send { type:'signal', to: environmentId, session, purpose:'link', relay, data:{ sdp:{ type:'offer', sdp } } }; local candidates gathered before the offer are queued then flushed as { candidate:{ candidate, sdpMid: sdpMid ?? null, sdpMLineIndex: sdpMLineIndex ?? null } }. Ignore signal frames unless session and from match; first answer sets remote description and flushes queued remote candidates; addIceCandidate errors swallowed. An error frame with this session closes the entry and rejects pending dials with Error(frame.message). Later dials open another ovdl channel on the live pc. Resolve new RtcDuplexWeb(channel, environmentId) on open; reject on close-before-open, connectionState failed/closed, abort (Error name AbortError) or timeout; close the entry only if no channel ever opened on it. pc.ondatachannel channels are closed at once. web.ts: export RtcDuplexWeb and its three constants, DirectoryWebClient and its types, createMachineDialer, type MachineDialer, type ClientSignaling. Tests inject FakePeerConnection/FakeDataChannel and a fake directory; vi.useFakeTimers()."
+        },
+        "items": [
+          {
+            "id": "dial-machine.ac1",
+            "title": "Given a first dial with relay true, then exactly one signal frame with purpose link, a 32-hex session and an offer sdp is sent, and the peer connection was constructed with iceTransportPolicy relay",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dial-machine.ac2",
+            "title": "The dialer sends candidates gathered before the offer only after the offer frame, and it ignores an answer whose from differs from the machine id (no setRemoteDescription call is recorded)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dial-machine.ac3",
+            "title": "Two dials to the same machine create one peer connection and two ovdl data channels; a dial after the connection reports failed creates a new peer connection",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dial-machine.ac4",
+            "title": "An error frame carrying the dial's session rejects the pending dial with its message, and a dial with no answer rejects after advancing 15000 ms",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dial-machine.ac5",
+            "title": "web.ts exports openSecureChannel, RtcDuplexWeb, DirectoryWebClient and createMachineDialer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cp1-harness",
+        "title": "CP-1: run the web build (sodium-javascript) in Chromium, WebKit and the Android emulator and record handshake and 1 MiB times",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T04:46:34Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "spike",
+          "issueLabel": "pan-4833",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/anywhere-channel/cp1/index.html",
+            "packages/anywhere-channel/cp1/harness.ts",
+            "packages/anywhere-channel/cp1/ws-duplex.ts",
+            "packages/anywhere-channel/cp1/vite.config.ts",
+            "packages/anywhere-channel/cp1/serve.ts",
+            "tests/integration/anywhere/cp1-browsers.slow.test.ts",
+            "packages/anywhere-channel/CP-1.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "VITEST_INCLUDE_SLOW=1 npx vitest run tests/integration/anywhere/cp1-browsers.slow.test.ts",
+            "test -s packages/anywhere-channel/CP-1.md"
+          ],
+          "expected_outputs": [
+            "cp1-browsers.slow.test.ts passes for chromium (4x CPU throttle) and webkit",
+            "CP-1.md exists and records per-engine handshakeMs and transferMs with a pass/fail verdict"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-5"
+          ],
+          "parallelSafeReason": "Creates only new files under packages/anywhere-channel/cp1 and tests/integration/anywhere; nothing else edits them."
+        },
+        "narrative": {
+          "Action": "PRD WI-10, decisions D-11 and D-12 (pan-4823 CP-1, AC-5 second half). cp1/vite.config.ts: root cp1/, outDir cp1/dist (ignored by the existing .gitignore 'dist/' rule), target es2020, resolve.alias { events: 'bare-events', 'sodium-native': 'sodium-javascript' }. cp1/ws-duplex.ts: streamx Duplex over a browser WebSocket (binaryType arraybuffer). cp1/harness.ts: read ws and code from location.search; key pair from noise-handshake/dh generateKeyPair(); time openSecureChannel(pairing) as handshakeMs; write 64 x 16 KiB; wait for the responder's 4-byte 'done'; transferMs; report {engine: navigator.userAgent, ok, handshakeMs, transferMs, error?} by POST /result and in <pre id=result>. cp1/serve.ts exports startCp1Server({host, port}) -> { url, pairingCode, results, close() }: serves cp1/dist, accepts /channel WebSockets (ws WebSocketServer + createWebSocketStream) into acceptChannel (src/lib/anywhere/channel/accept.ts) with a fresh key and takePairing matching pairingSecrets(nodeCrypto, pairingCode); writes 'done' at 1048576 bytes; when run directly (npx tsx packages/anywhere-channel/cp1/serve.ts --host 0.0.0.0 --port 8791) it builds with Vite's build() API, prints the URL and each result, exits after the first result or 10 minutes. cp1-browsers.slow.test.ts builds, starts the server on 127.0.0.1:0, runs Playwright chromium (CDP Emulation.setCPUThrottlingRate {rate: 4} before navigating) and webkit, waits for #result (60 s ceiling), asserts ok. Android leg: ~/Android/Sdk/emulator/emulator -avd galaxyA16 -no-window -no-audio -no-snapshot-save in background; adb wait-for-device; wait for sys.boot_completed=1; start serve.ts on 0.0.0.0:8791; adb shell am start -a android.intent.action.VIEW -d 'http://10.0.2.2:8791/?ws=ws://10.0.2.2:8791/channel&code=<code>'; record result; adb emu kill. Fallbacks (D-12): no browser on the AVD or no boot within 5 min -> record 'Android leg not run: <reason>' and apply the 2 s bar to throttled Chromium; iOS Simulator leg is not run here -> record 'iOS Simulator leg deferred to PAN-4837 (W-APP1); Playwright WebKit stands in'; WebKit launch failure -> record the error, leg not run. Pass bar: handshake ok in every leg run and 1 MiB < 2 s on the Android emulator (or throttled Chromium under fallback). Only if the bar fails: implement the libsodium-wrappers adapter per PRD WI-10 step 7 in packages/anywhere-channel/src/sodium-wasm.ts, re-run, record both; if that also fails, pan tell flywheel-orchestrator and stop. CP-1.md records date, commit, engine/user agent, handshakeMs, transferMs, pass/fail per leg."
+        },
+        "items": [
+          {
+            "id": "cp1-harness.ac1",
+            "title": "Given the harness built with sodium-native aliased to sodium-javascript, when cp1-browsers.slow.test.ts runs, then Playwright Chromium under 4x CPU throttle and Playwright WebKit each report ok true with numeric handshakeMs and transferMs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cp1-harness.ac2",
+            "title": "CP-1.md records, per leg run, the engine user agent, commit, handshakeMs, transferMs and pass or fail against the 2 s bar",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cp1-harness.ac3",
+            "title": "CP-1.md records the Android emulator leg result, or the D-12 fallback line naming why it did not run",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cp1-harness.ac4",
+            "title": "CP-1.md records that the iOS Simulator leg is deferred to PAN-4837 with WebKit standing in",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document the package: README, ANYWHERE-ARCHITECTURE library/wire sections, codebase map entries",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T04:46:34Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4833",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/anywhere-channel/README.md",
+            "docs/ANYWHERE-ARCHITECTURE.md",
+            ".overdeck/context/codebase/architecture.md",
+            ".overdeck/context/codebase/stack.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -c createRequire docs/ANYWHERE-ARCHITECTURE.md",
+            "grep -n anywhere-channel docs/ANYWHERE-ARCHITECTURE.md .overdeck/context/codebase/architecture.md .overdeck/context/codebase/stack.md"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "grep -c createRequire prints 0",
+            "each of the three files contains anywhere-channel"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11. New packages/anywhere-channel/README.md: purpose (one protocol source for machine and phone, pan-4823 D-7, MIT), the three entry points and their exports, the crypto port as explicit argument (D-3), the initiator seam and same-tick rule (D-6), browser bundling requirements (events->bare-events, sodium-native->sodium-javascript, @noble/hashes/sha2.js), the dialer's one-peer-connection-per-machine rule (D-8), a link to CP-1.md with the headline numbers. docs/ANYWHERE-ARCHITECTURE.md 'Library and handshakes': replace the createRequire sentence with: both pinned exactly and kept external to the server bundles (tsdown neverBundle) because they reach sodium-native prebuilds; the protocol code imports them statically from packages/anywhere-channel/src/noise.ts; the IK bullet names runInitiatorHandshake (packages/anywhere-channel/src/initiator.ts) behind openChannel (src/lib/anywhere/channel/open.ts). 'Wire format': name packages/anywhere-channel/src/wire.ts and say the phone app runs the same file. Add a 'Phone side (PAN-4833)' paragraph: ./web entry, openSecureChannel, RtcDuplexWeb, DirectoryWebClient, createMachineDialer, one-peer-connection rule. .overdeck/context/codebase/architecture.md: add a packages/anywhere-channel/ row after packages/contracts/ and say in the anywhere/ bullet that Noise/wire code lives in @overdeck/anywhere-channel with a Node crypto port; one last-verified line at the end. stack.md line 6: add anywhere-channel to the packages list and correct the workspace count to match root workspaces.packages; update last-verified."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "docs/ANYWHERE-ARCHITECTURE.md names packages/anywhere-channel/src/noise.ts, wire.ts and initiator.ts as the protocol sources, contains a Phone side (PAN-4833) paragraph, and grep -c createRequire on it prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "packages/anywhere-channel/README.md contains the ., ./node and ./web entry points, the events->bare-events and sodium-native->sodium-javascript aliases, and a link to CP-1.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": ".overdeck/context/codebase/architecture.md contains a packages/anywhere-channel/ table row and stack.md contains anywhere-channel in its workspace package list, each file with exactly one last-verified line at the end",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac4",
+            "title": "npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "golden-vectors",
+        "to": "move-protocol",
+        "type": "blocks"
+      },
+      {
+        "from": "package-scaffold",
+        "to": "move-protocol",
+        "type": "blocks"
+      },
+      {
+        "from": "move-protocol",
+        "to": "shared-initiator",
+        "type": "blocks"
+      },
+      {
+        "from": "move-protocol",
+        "to": "web-port-parity",
+        "type": "blocks"
+      },
+      {
+        "from": "package-scaffold",
+        "to": "rtc-duplex-web",
+        "type": "blocks"
+      },
+      {
+        "from": "package-scaffold",
+        "to": "directory-web",
+        "type": "blocks"
+      },
+      {
+        "from": "shared-initiator",
+        "to": "web-secure-channel",
+        "type": "blocks"
+      },
+      {
+        "from": "rtc-duplex-web",
+        "to": "dial-machine",
+        "type": "blocks"
+      },
+      {
+        "from": "directory-web",
+        "to": "dial-machine",
+        "type": "blocks"
+      },
+      {
+        "from": "web-secure-channel",
+        "to": "dial-machine",
+        "type": "blocks"
+      },
+      {
+        "from": "web-secure-channel",
+        "to": "cp1-harness",
+        "type": "blocks"
+      },
+      {
+        "from": "shared-initiator",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "web-secure-channel",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "dial-machine",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "cp1-harness",
+        "to": "docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

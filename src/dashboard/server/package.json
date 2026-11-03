@@ -9,6 +9,7 @@
     "build": "tsdown"
   },
   "dependencies": {
+    "@overdeck/anywhere-channel": "workspace:*",
     "@overdeck/contracts": "workspace:*",
     "effect": "catalog:",
     "@effect/platform-bun": "catalog:",

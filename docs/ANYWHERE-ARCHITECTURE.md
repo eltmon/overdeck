@@ -128,11 +128,15 @@ the UI and the CLI is five dash-separated groups of four hex characters.
 ## Library and handshakes (D-4645-1, D-4645-2)
 
 `noise-handshake@4.2.0` (Holepunch) runs the handshake, `@hyperswarm/secret-stream@6.9.2`
-carries the stream, both pinned exactly and loaded with `createRequire` because they
-reach `sodium-native` prebuilt binaries. Two patterns:
+carries the stream. Both are pinned exactly and stay external to the server bundles (tsdown
+`neverBundle`) because they reach `sodium-native` prebuilt binaries; the protocol code imports
+them with static ESM imports from `packages/anywhere-channel/src/noise.ts` (PAN-4833). Hashing
+and randomness go through a crypto port passed as an argument (`nodeCrypto` on the server,
+`webCrypto` on the phone), so the same source runs on both. Two patterns:
 
-- **IK** for a link whose peer key is pinned: the initiator (`openChannel`,
-  `src/lib/anywhere/channel/open.ts`) proves its own key and names the responder's in
+- **IK** for a link whose peer key is pinned: the initiator (`openChannel` in
+  `src/lib/anywhere/channel/open.ts`, which runs `runInitiatorHandshake` from
+  `packages/anywhere-channel/src/initiator.ts`) proves its own key and names the responder's in
   message 1; the responder (`acceptChannel`, `accept.ts`) accepts only a key that an
   active `machine` token is bound to (refusal `01` otherwise).
 - **XXpsk0** for pairing: both sides mix in a pre-shared key derived from the pairing
@@ -149,7 +153,8 @@ The Noise prologue binds the mode and the pairing id (or approval request id): `
 
 ## Wire format (D-4645-5)
 
-The same bytes travel over raw TCP (`tcp://host:port`, routes `lan`, `tailnet`,
+`packages/anywhere-channel/src/wire.ts` encodes and parses everything below, and the phone app
+runs the same file. The same bytes travel over raw TCP (`tcp://host:port`, routes `lan`, `tailnet`,
 `public`), as the binary payload of a `/ws/link` WebSocket (`wss://host/ws/link`), and over a
 WebRTC data channel (`rtc://<environment id>`, `rtc+turn://<environment id>`; PAN-2356).
 
@@ -170,6 +175,18 @@ WebRTC data channel (`rtc://<environment id>`, `rtc+turn://<environment id>`; PA
 stack treats as a socket. Its `channel` marker carries `{ mode, remoteKeyHex, pairingId }`
 and its `remoteAddress` is `link:<first 16 hex of the remote key>`, so every channel
 request counts as remote (D-4645-10): never a loopback peer, never a trusted local caller.
+
+### Phone side (PAN-4833)
+
+The phone app imports the same protocol from `@overdeck/anywhere-channel/web`:
+`openSecureChannel` runs the shared initiator sequence (link and pairing only) on the web crypto
+port and pure-JS libsodium; `RtcDuplexWeb` wraps a browser `RTCDataChannel` with the server's
+limits (16 KiB messages, back-pressure above 1 MiB); `DirectoryWebClient` is the client-role
+directory socket (`hello-client`, token in the `overdeck.bearer.<token>` subprotocol); and
+`createMachineDialer` opens `ovdl` channels to a machine. Because a machine closes an older
+peer connection when a new offer arrives for the same peer, the dialer keeps one peer connection
+per (machine, relay) and opens one more data channel on it per dial. No server file imports
+`./web`. CP-1 timings are in `packages/anywhere-channel/CP-1.md`.
 
 ## One session per connection; the same port (D-4645-3, D-4645-4)
 

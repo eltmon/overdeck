@@ -19,22 +19,9 @@
 import { createRequire } from 'node:module';
 import { Duplex } from 'node:stream';
 
-import type { HandshakeResult } from './noise.js';
-import type { ChannelMode } from './wire.js';
+import type { ChannelMarker, HandshakeResult } from '@overdeck/anywhere-channel';
 
-export type { ChannelMode } from './wire.js';
-
-export interface ChannelMarker {
-  mode: ChannelMode;
-  /** Peer static key, 64 lowercase hex characters. */
-  remoteKeyHex: string;
-  /** Pairing mode only. */
-  pairingId: string | null;
-  /** Approval mode only (PAN-2356): the approval request id, 32 hex. */
-  requestId?: string;
-  /** Approval mode only: the six-digit SAS both operators compare, as `123 456`. */
-  approvalSas?: string;
-}
+export type { ChannelMarker, ChannelMode } from '@overdeck/anywhere-channel';
 
 interface SecretStreamLike {
   write(chunk: Uint8Array): boolean;
@@ -56,8 +43,8 @@ interface SecretStreamConstructor {
     isInitiator: boolean,
     rawStream: Duplex,
     opts: {
-      handshake: { tx: Buffer; rx: Buffer; hash: Buffer; publicKey: Buffer; remotePublicKey: Buffer };
-      data?: Buffer;
+      handshake: { tx: Uint8Array; rx: Uint8Array; hash: Uint8Array; publicKey: Uint8Array; remotePublicKey: Uint8Array };
+      data?: Uint8Array;
     },
   ): SecretStreamLike;
 }
@@ -74,7 +61,7 @@ export interface CreateChannelSocketOptions {
   handshake: HandshakeResult;
   channel: ChannelMarker;
   /** Bytes already read from `raw` behind the last handshake frame. */
-  leftover?: Buffer;
+  leftover?: Uint8Array;
 }
 
 interface RawTransport extends Duplex {
