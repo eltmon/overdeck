@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4477",
   "created": "2026-11-03T15:02:33.095Z",
-  "updated": "2026-11-03T15:23:48.518Z",
+  "updated": "2026-11-03T15:26:24.497Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-11-03T15:23:42.270Z"
     },
     "terminal-bridge": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4477",
-      "claimedAt": "2026-11-03T15:23:48.518Z"
+      "claimedAt": "2026-11-03T15:23:48.518Z",
+      "doneAt": "2026-11-03T15:26:24.496Z"
     }
   }
 }
