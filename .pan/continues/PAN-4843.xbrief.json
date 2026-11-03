@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4843",
   "created": "2026-11-03T14:22:31.106Z",
-  "updated": "2026-11-03T14:29:35.604Z",
+  "updated": "2026-11-03T14:31:03.381Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-11-03T14:29:28.126Z"
     },
     "payload-builder": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4843",
-      "claimedAt": "2026-11-03T14:29:35.604Z"
+      "claimedAt": "2026-11-03T14:29:35.604Z",
+      "doneAt": "2026-11-03T14:31:03.380Z"
     }
   }
 }
