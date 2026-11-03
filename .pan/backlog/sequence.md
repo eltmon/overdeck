@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T02:54:09.766176Z · model: claude-opus-5-5 · open: 870_
+_Last sequenced: 2026-11-03T03:07:14.311807Z · model: claude-opus-5-5 · open: 870_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -19,7 +19,7 @@ _Last sequenced: 2026-11-03T02:54:09.766176Z · model: claude-opus-5-5 · open: 
 | 15 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
 | 16 | PAN-4551 | L | high | ok |  |  | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
 | 17 | PAN-4671 | M | high | ok |  |  | CodeRabbit comments posted after the reviewer snapshot merge unseen; deliver late ones to the work agent at merge. Needs handoff. |
-| 17 | PAN-4773 | M | high | ok |  |  | Route CodeRabbit findings to the work agent automatically; hold auto-merge while threads are unanswered. Overlaps PAN-4671. Handoff. |
+| 17 | PAN-4773 | S | high | ok |  |  | Route CodeRabbit findings to the work agent; agent fixes or replies with reason. Operator dropped the merge hold. Handoff. |
 | 18 | PAN-4674 | S | high | ok |  |  | Operator can't remove a configured crew (Fable expert) in Settings tiered execution; removal or model change doesn't persist |
 | 19 | PAN-4673 | S | high | ok |  |  | Model Routing selects truncate model names (Opus 5.5 shows as Opus 5): narrow column plus repeated provider prefix in option text |
 | 20 | PAN-4675 | S | critical | ok |  |  | One transient gh label timeout aborts post-merge lifecycle; merge door replies Already merged, so the issue can never close. |
@@ -936,7 +936,7 @@ New substrate fix to the merge door that closes the gap which let PAN-4672's fin
 
 ### PAN-4773 (rank 17)
 
-New substrate issue that replaces five manual Flywheel relays of CodeRabbit findings and stops PRs like #4667/#4716 merging past unanswered threads; it overlaps PAN-4671 (late CodeRabbit comments) so it shares rank 17 to be planned together, and reuses PAN-4772's skip-reason surface. Needs a supervised handoff (TENET-10).
+Operator comment on 2026-11-03 narrowed scope: no auto-merge hold, only route each CodeRabbit finding to the work agent through the feedback-routing door, where the agent fixes it or replies with a reason. Size drops M to S; rank 17 is kept because it still removes repeated manual Flywheel relays and is already being built through a supervised merge-systems handoff (TENET-10). It still overlaps PAN-4671 (late CodeRabbit comments).
 
 ### PAN-4674 (rank 18)
 
@@ -1205,7 +1205,7 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T02:54:09.766176Z",
+  "generatedAt": "2026-11-03T03:07:14.311807Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 870,
@@ -1395,13 +1395,13 @@ New this pass. The test role evaluates the workspace working tree rather than th
     {
       "issue": "PAN-4773",
       "rank": 17,
-      "size": "M",
+      "size": "S",
       "importance": "high",
       "score": 74,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Route CodeRabbit findings to the work agent automatically; hold auto-merge while threads are unanswered. Overlaps PAN-4671. Handoff.",
-      "rationale": "New substrate issue that replaces five manual Flywheel relays of CodeRabbit findings and stops PRs like #4667/#4716 merging past unanswered threads; it overlaps PAN-4671 (late CodeRabbit comments) so it shares rank 17 to be planned together, and reuses PAN-4772's skip-reason surface. Needs a supervised handoff (TENET-10).",
+      "why": "Route CodeRabbit findings to the work agent; agent fixes or replies with reason. Operator dropped the merge hold. Handoff.",
+      "rationale": "Operator comment on 2026-11-03 narrowed scope: no auto-merge hold, only route each CodeRabbit finding to the work agent through the feedback-routing door, where the agent fixes it or replies with a reason. Size drops M to S; rank 17 is kept because it still removes repeated manual Flywheel relays and is already being built through a supervised merge-systems handoff (TENET-10). It still overlaps PAN-4671 (late CodeRabbit comments).",
       "gate": "auto",
       "planning": "auto"
     },
