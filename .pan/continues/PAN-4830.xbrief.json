@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4830",
   "created": "2026-11-03T14:25:43.002Z",
-  "updated": "2026-11-03T14:56:32.577Z",
+  "updated": "2026-11-03T14:56:49.813Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -212,6 +212,10 @@
     "push-e2e.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T14:56:32.577Z"
+    },
+    "push-e2e.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:56:49.813Z"
     }
   }
 }
