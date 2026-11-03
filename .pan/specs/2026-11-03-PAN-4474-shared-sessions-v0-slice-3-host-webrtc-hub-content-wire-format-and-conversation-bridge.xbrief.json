@@ -4,17 +4,17 @@
     "created": "2026-11-03T06:43:10Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4474: Shared Sessions v0 (slice 3): host WebRTC hub, content wire format and conversation bridge",
-    "updated": "2026-11-03T06:46:06.239Z"
+    "updated": "2026-11-03T06:47:54.721Z"
   },
   "plan": {
     "id": "pan-4474",
     "title": "Shared Sessions v0 (slice 3): host WebRTC hub, content wire format and conversation bridge",
-    "status": "proposed",
+    "status": "running",
     "uid": "a43ee4d0-2b4e-4db7-a026-e511422d4523",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-03T06:43:10Z",
-    "updated": "2026-11-03T06:46:06.239Z",
+    "updated": "2026-11-03T06:47:54.721Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4474",
@@ -955,5 +955,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
