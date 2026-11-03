@@ -21,6 +21,7 @@ import * as deletion from './deletion.ts';
 import * as adminScreen from './admin/screen.ts';
 import * as adminSession from './admin/session.ts';
 import * as adminPending from './admin/pending.ts';
+import * as accountActions from './account-page/actions.ts';
 import * as accountPage from './account-page/page.ts';
 import * as accountSession from './account-page/session.ts';
 
@@ -59,6 +60,7 @@ const ROUTES: Route[] = [
   { method: 'GET', pattern: '/account', handler: accountPage.page },
   { method: 'POST', pattern: '/account/login', handler: accountSession.login, bucket: 'account-login' },
   { method: 'POST', pattern: '/account/logout', handler: accountSession.logout, bucket: 'account-action' },
+  { method: 'POST', pattern: '/account/machines/:environmentId/remove', handler: accountActions.removeMachine, bucket: 'account-action' },
 ];
 
 function matchPattern(pattern: string, pathname: string): Record<string, string> | null {

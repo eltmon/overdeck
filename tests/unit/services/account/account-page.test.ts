@@ -162,3 +162,79 @@ describe('account page (PAN-4959 WI-6)', () => {
     expect(body).toContain('Access: No expiry');
   });
 });
+
+describe('removing a machine from the account page (PAN-4959 WI-7)', () => {
+  /** A tester with machines 1 and 2 in the directory and an active devices row for each. */
+  async function withMachines(remove: (req: Request) => Response = () => Response.json({ removed: true }), viewAnswer?: () => Response) {
+    const directory = fakeDirectory((path, req) => {
+      if (path === '/remove-machine') return remove(req);
+      return viewAnswer ? viewAnswer() : Response.json(viewOf([machine(1, true), machine(2, false)]));
+    });
+    const env = makeEnv({ DIRECTORY: directory.namespace });
+    const deps = makeDeps({ now: NOW });
+    await seedGrant(env, TESS, 'tester');
+    const client = await makeAccountClient(env, deps, 'u-tess', TESS);
+    for (const n of [1, 2]) {
+      await dbOf(env)
+        .prepare('INSERT INTO devices (device_id, user_id, token_hash, platform, label, environment_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        .bind(`d-${n}`, 'u-tess', `hash-${n}`, 'linux-x64', `machine-${n}`, `env-${n}`, 0)
+        .run();
+    }
+    const revoked = async () =>
+      (await dbOf(env).prepare('SELECT device_id, revoked_by FROM devices WHERE revoked_at IS NOT NULL ORDER BY device_id').all<{ device_id: string; revoked_by: string }>()).results;
+    return { env, deps, client, calls: directory.calls, revoked };
+  }
+
+  it('revokes the machine device, removes it from the directory and answers 303 to /account', async () => {
+    const { client, calls, revoked } = await withMachines();
+    const res = await client.post('/account/machines/env-1/remove');
+    expect(res.status).toBe(303);
+    expect(res.headers.get('Location')).toBe('/account');
+    expect(await revoked()).toEqual([{ device_id: 'd-1', revoked_by: 'user' }]);
+    expect(calls.filter((c) => c.path === '/remove-machine')).toEqual([{ name: 'u-tess', path: '/remove-machine', method: 'POST', body: '{"environmentId":"env-1"}' }]);
+  });
+
+  it('treats a machine the DO already forgot as removed', async () => {
+    const { client, revoked } = await withMachines(() => Response.json({ error: 'unknown_machine' }, { status: 404 }));
+    expect((await client.post('/account/machines/env-2/remove')).status).toBe(303);
+    expect(await revoked()).toEqual([{ device_id: 'd-2', revoked_by: 'user' }]);
+  });
+
+  it('refuses a post without csrf or from another origin with 403 and revokes nothing', async () => {
+    const { client, calls, revoked } = await withMachines();
+    expect((await client.post('/account/machines/env-1/remove', {}, { csrf: null })).status).toBe(403);
+    expect((await client.post('/account/machines/env-1/remove', {}, { csrf: 'ff'.repeat(16) })).status).toBe(403);
+    const foreign = await client.post('/account/machines/env-1/remove', {}, { origin: 'https://evil.example' });
+    expect(foreign.status).toBe(403);
+    expect(await foreign.text()).toContain('Request rejected.');
+    expect(await revoked()).toEqual([]);
+    expect(calls).toEqual([]);
+  });
+
+  it('answers 404 with the page when the machine is not in the directory', async () => {
+    const { client, revoked } = await withMachines();
+    const res = await client.post('/account/machines/env-9/remove');
+    expect(res.status).toBe(404);
+    const body = await res.text();
+    expect(body).toContain('That machine is no longer in the directory.');
+    expect(body).toContain('<h2>Machines</h2>');
+    expect(await revoked()).toEqual([]);
+  });
+
+  it('answers 503 with the unavailable sentence when the directory throws, revoking nothing', async () => {
+    const { client, revoked } = await withMachines(undefined, () => {
+      throw new Error('directory down');
+    });
+    const res = await client.post('/account/machines/env-1/remove');
+    expect(res.status).toBe(503);
+    expect(await res.text()).toContain('Machines and relay use are unavailable right now.');
+    expect(await revoked()).toEqual([]);
+  });
+
+  it('answers 503 when the directory lists the machine but cannot remove it', async () => {
+    const { client } = await withMachines(() => new Response(null, { status: 500 }));
+    const res = await client.post('/account/machines/env-1/remove');
+    expect(res.status).toBe(503);
+    expect(await res.text()).toContain('Machines and relay use are unavailable right now.');
+  });
+});
