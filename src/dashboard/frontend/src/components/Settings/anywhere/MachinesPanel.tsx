@@ -335,7 +335,7 @@ export function MachinesPanel() {
         <h3 className="text-sm font-medium text-foreground">Machines</h3>
         <div className="flex items-center gap-2">
           <button type="button" onClick={() => setFlyOpen(true)} className={buttonClass}>
-            Add a Fly machine
+            {data?.self.remoteEnabled === false ? 'Add a Fly machine (remote off)' : 'Add a Fly machine'}
           </button>
           <button type="button" onClick={() => setSshOpen(true)} className={buttonClass}>
             Add an SSH machine

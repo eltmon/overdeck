@@ -774,9 +774,13 @@ never learns the id of a failed provision.
 
 ### Adding (`addFlyMachine`)
 
-The early refusals create nothing: `remote.enabled` not true (`remote-disabled`), no Fly token
-(`no-fly-token`), a harness that cannot run on a Fly machine (`harness-unsupported`; Claude Code and Codex can, see `### Codex (PAN-4296)`), a message
-without a project (`bad-request`), and the spend cap (`cap-reached`). Then it provisions,
+The early refusals create nothing: `remote.enabled` not true (`remote-disabled`; PAN-4905 —
+the message names config.toml's display path and the exact `enabled = true` line under
+`[remote]` via `remoteEnabledHint()` in `lib/remote-enabled.ts`, and adds a sentence when the
+global config.yaml's `remote:` section has its own `enabled` key, which nothing reads), no Fly
+token (`no-fly-token`), a harness that cannot run on a Fly machine (`harness-unsupported`;
+Claude Code and Codex can, see `### Codex (PAN-4296)`), a message without a project
+(`bad-request`), and the spend cap (`cap-reached`). Then it provisions,
 writes a provisional record, links (`createMachineLink` with the public route; an
 `unreachable` link names the one-time `fly ips allocate-v4 --shared` / `allocate-v6` fix),
 patches the record, wakes the link supervisor, clones the project (`pan project clone
@@ -787,6 +791,19 @@ destroys the machine, removes the link if one was made and deletes the record.
 `notifyLinksChanged` is a required argument because its module (`routes/machines.ts`)
 imports this service for the unlink hook. The route runs the whole flow in one request; the
 CLI sends it with `node:http` because Node's fetch gives up on response headers after 300 s.
+
+`GET /api/machines` reports `self.remoteEnabled` (effective `loadConfig().remote?.enabled
+=== true`) and `self.remoteConfigFile` (config.toml's display path), both optional so older
+linked peers and fixtures still decode. The dashboard's Add a Fly machine dialog reads these
+before any click on Add to show a "Remote is off" notice and disable Add, with no extra
+route (PAN-4905). Its **Turn on remote** button calls `POST /api/machines/fly/enable-remote`,
+which refuses a secure-channel request and an unsafe dashboard mutation like
+`POST /api/machines/fly` does, then calls `enableRemoteInConfigToml()` — a minimal line edit
+that sets `[remote] enabled = true`, preserves every other byte of config.toml, is a no-op
+when already true, and throws `RemoteEnableError` (409, writing nothing) when the file does
+not parse or the edit would not read back `remote.enabled === true` (an inline `remote = {
+… }` table or a dotted key would make the appended `[remote]` header a duplicate
+definition). On success the dialog refetches `GET /api/machines` to re-enable Add.
 
 ### The loops
 

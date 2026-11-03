@@ -7,6 +7,11 @@
  * new VM is started from the new-conversation dialog's Fly (new VM) choice
  * instead. The request is synchronous and can take minutes, longer with a
  * project to clone.
+ *
+ * PAN-4905: the dialog stays openable when remote is off. It reads
+ * `self.remoteEnabled` from the shared `GET /api/machines` query and shows a
+ * "Remote is off" notice with the hint before any click on Add, disabling Add
+ * until remote is on.
  */
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -15,7 +20,7 @@ import { toast } from 'sonner';
 
 import { fetchRegisteredProjects } from '../../CommandDeck/UnknownProjectState';
 import { ANYWHERE_STATUS_QUERY_KEY, apiError, isOk } from './anywhereApi';
-import { addFlyMachine, MACHINES_QUERY_KEY } from './machinesApi';
+import { addFlyMachine, enableRemote, loadMachines, MACHINES_QUERY_KEY } from './machinesApi';
 
 interface AddFlyMachineDialogProps {
   open: boolean;
@@ -33,8 +38,12 @@ function AddFlyMachineDialogBody({ onClose }: { onClose: () => void }) {
   const [region, setRegion] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [remoteDisabledRace, setRemoteDisabledRace] = useState(false);
+  const [enabling, setEnabling] = useState(false);
 
   const { data: projects } = useQuery({ queryKey: ['registered-projects'], queryFn: fetchRegisteredProjects });
+  const { data: machines } = useQuery({ queryKey: MACHINES_QUERY_KEY, queryFn: loadMachines });
+  const remoteOff = machines?.self.remoteEnabled === false || remoteDisabledRace;
 
   const trimmedRegion = region.trim();
 
@@ -45,6 +54,7 @@ function AddFlyMachineDialogBody({ onClose }: { onClose: () => void }) {
       const result = await addFlyMachine({ ...(projectKey ? { projectKey } : {}), ...(trimmedRegion ? { region: trimmedRegion } : {}) });
       if (!isOk(result)) {
         const body = result.body as { message?: unknown; error?: unknown } | null;
+        if (body?.error === 'remote-disabled') setRemoteDisabledRace(true);
         setError(typeof body?.message === 'string' ? body.message : typeof body?.error === 'string' ? body.error : apiError(result));
         return;
       }
@@ -59,6 +69,26 @@ function AddFlyMachineDialogBody({ onClose }: { onClose: () => void }) {
       setError((err as Error).message);
     } finally {
       setBusy(false);
+    }
+  };
+
+  const handleEnableRemote = async () => {
+    setEnabling(true);
+    try {
+      const result = await enableRemote();
+      if (!isOk(result)) {
+        const body = result.body as { message?: unknown } | null;
+        setError(typeof body?.message === 'string' ? body.message : apiError(result));
+        return;
+      }
+      setError(null);
+      setRemoteDisabledRace(false);
+      toast.success(`Turned on remote in ${result.body.configFile}`);
+      await queryClient.invalidateQueries({ queryKey: MACHINES_QUERY_KEY });
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setEnabling(false);
     }
   };
 
@@ -88,6 +118,22 @@ function AddFlyMachineDialogBody({ onClose }: { onClose: () => void }) {
             void handleAdd();
           }}
         >
+          {remoteOff && (
+            <div role="status" data-testid="fly-remote-off" className="rounded-md border border-border px-3 py-2 text-xs text-foreground space-y-2">
+              <p>
+                Remote is off. Fly machines need <code>enabled = true</code> under <code>[remote]</code> in {machines?.self.remoteConfigFile ?? '~/.overdeck/config.toml'}.
+              </p>
+              <button
+                type="button"
+                onClick={() => void handleEnableRemote()}
+                disabled={enabling}
+                className="rounded-md border border-border px-2.5 py-1 text-xs text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50"
+              >
+                {enabling ? 'Turning on…' : 'Turn on remote'}
+              </button>
+            </div>
+          )}
+
           <div className="space-y-2">
             <label htmlFor="add-fly-project" className="text-xs text-muted-foreground">Project</label>
             <select
@@ -102,7 +148,7 @@ function AddFlyMachineDialogBody({ onClose }: { onClose: () => void }) {
             </select>
             <p className="text-xs text-muted-foreground">
               Starts a Fly.io VM that runs Overdeck and links it to this machine. With a project, the VM clones it.
-              Needs remote.enabled and a Fly token; see Fly machines in the docs.
+              Needs remote turned on (<code>[remote] enabled = true</code> in config.toml) and a Fly token; see Fly machines in the docs.
             </p>
           </div>
 
@@ -136,7 +182,7 @@ function AddFlyMachineDialogBody({ onClose }: { onClose: () => void }) {
             </button>
             <button
               type="submit"
-              disabled={busy}
+              disabled={busy || remoteOff}
               className="rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
             >
               {busy ? 'Adding…' : 'Add'}
