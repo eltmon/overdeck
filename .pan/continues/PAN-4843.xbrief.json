@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4843",
   "created": "2026-11-03T14:22:31.106Z",
-  "updated": "2026-11-03T14:52:56.200Z",
+  "updated": "2026-11-03T14:53:10.539Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -118,6 +118,10 @@
     "service-wiring.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T14:52:56.200Z"
+    },
+    "settings-line.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:53:10.539Z"
     }
   }
 }
