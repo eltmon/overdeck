@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4479",
   "created": "2026-11-03T15:06:40.232Z",
-  "updated": "2026-11-03T15:28:09.882Z",
+  "updated": "2026-11-03T15:28:28.610Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -62,6 +62,10 @@
     "host-repark-boot.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T15:28:09.882Z"
+    },
+    "host-repark-boot.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:28:28.610Z"
     }
   }
 }
