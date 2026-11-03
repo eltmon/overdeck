@@ -1,12 +1,13 @@
 /**
- * Decoding of machine → directory frames (PRD PAN-2356 WI-5, "Wire protocol").
+ * Decoding of machine and client (PAN-4829) → directory frames (PRD PAN-2356 WI-5, "Wire protocol").
+ * A socket's role decides which frames it may send; `decodeFrame` takes that role.
  *
  * Input is untrusted. Binary frames, strings over 64 KiB, non-JSON, non-objects, unknown types
  * and wrong field types are all `bad_frame`. Each frame is rebuilt from its known keys only, so an
  * unlisted field is never stored or forwarded.
  */
 import { CONNECT_PROTOCOL_VERSION } from '../../../packages/contracts/src/connect.ts';
-import type { DirectoryEndpoint, MachineToDirectoryFrame } from '../../../packages/contracts/src/connect.ts';
+import type { ClientToDirectoryFrame, DirectoryEndpoint, MachineToDirectoryFrame } from '../../../packages/contracts/src/connect.ts';
 import type { SignalData } from '../../../packages/contracts/src/sharing.ts';
 
 /** 64 KiB, counted in UTF-16 code units (`string.length`). */
@@ -35,6 +36,14 @@ const CONTROL_CHARS = /[\u0000-\u001f\u007f-\u009f]/;
 
 /** `unsupported` is a well-formed `hello` for another protocol version (close 4010). */
 export type DecodeResult = { ok: true; frame: MachineToDirectoryFrame } | { ok: false; reason: 'bad_frame' | 'unsupported' };
+
+/** A socket's role, fixed by its first valid hello (PAN-4829 D-1). */
+export type SocketRole = 'machine' | 'client';
+
+export type FrameDecodeResult =
+  | { ok: true; role: 'machine'; frame: MachineToDirectoryFrame }
+  | { ok: true; role: 'client'; frame: ClientToDirectoryFrame }
+  | { ok: false; reason: 'bad_frame' | 'unsupported' };
 
 type Obj = Record<string, unknown>;
 
@@ -118,14 +127,32 @@ function signalDataOf(value: unknown): SignalData {
   };
 }
 
+/** A hello's `protocol`: a safe integer, and the version this service speaks. */
+function protocolOf(obj: Obj): typeof CONNECT_PROTOCOL_VERSION {
+  const protocol = obj['protocol'];
+  if (typeof protocol !== 'number' || !Number.isSafeInteger(protocol)) fail();
+  if (protocol !== CONNECT_PROTOCOL_VERSION) throw new Unsupported('unsupported');
+  return protocol;
+}
+
+/** `ice-servers`, shared by machines and clients. */
+function iceServersOf(obj: Obj): Extract<MachineToDirectoryFrame, { type: 'ice-servers' }> {
+  return { type: 'ice-servers', requestId: str(obj, 'requestId', 64, REQUEST_ID_RE), relay: bool(obj, 'relay') };
+}
+
+/** `relay-usage`, shared by machines and clients. */
+function relayUsageOf(obj: Obj): Extract<MachineToDirectoryFrame, { type: 'relay-usage' }> {
+  const bytes = obj['bytes'];
+  if (typeof bytes !== 'number' || !Number.isSafeInteger(bytes) || bytes < 0 || bytes > MAX_RELAY_USAGE_BYTES) fail();
+  return { type: 'relay-usage', bytes };
+}
+
 function build(obj: Obj): MachineToDirectoryFrame {
   const type = obj['type'];
   switch (type) {
     case 'hello': {
-      const protocol = obj['protocol'];
+      const protocol = protocolOf(obj);
       const linkProtocol = obj['linkProtocol'];
-      if (typeof protocol !== 'number' || !Number.isSafeInteger(protocol)) fail();
-      if (protocol !== CONNECT_PROTOCOL_VERSION) throw new Unsupported('unsupported');
       if (typeof linkProtocol !== 'number' || !Number.isSafeInteger(linkProtocol)) fail();
       return {
         type,
@@ -155,7 +182,7 @@ function build(obj: Obj): MachineToDirectoryFrame {
       };
     }
     case 'ice-servers':
-      return { type, requestId: str(obj, 'requestId', 64, REQUEST_ID_RE), relay: bool(obj, 'relay') };
+      return iceServersOf(obj);
     case 'approval-request': {
       const to = obj['to'];
       return { type, requestId: str(obj, 'requestId', 32, ID_HEX_RE), to: to === null ? null : environmentIdOf(obj, 'to') };
@@ -174,31 +201,98 @@ function build(obj: Obj): MachineToDirectoryFrame {
       if (retryAfterSeconds < 60 || retryAfterSeconds > 3600) fail();
       return { type, eventId: str(obj, 'eventId', 36, EVENT_ID_RE), retryAfterSeconds };
     }
-    case 'relay-usage': {
-      const bytes = obj['bytes'];
-      if (typeof bytes !== 'number' || !Number.isSafeInteger(bytes) || bytes < 0 || bytes > MAX_RELAY_USAGE_BYTES) fail();
-      return { type, bytes };
-    }
+    case 'relay-usage':
+      return relayUsageOf(obj);
     default:
       return fail();
   }
 }
 
-export function decodeMachineFrame(raw: string | ArrayBuffer): DecodeResult {
-  const bad = { ok: false, reason: 'bad_frame' } as const;
-  if (typeof raw !== 'string' || raw.length > MAX_FRAME_CHARS) return bad;
+/**
+ * Client frames (PAN-4829 D-4). `push-register` and `push-unregister` stay `bad_frame` until push
+ * delivery (PAN-4830); every machine-only type is `bad_frame`.
+ */
+function buildClient(obj: Obj): ClientToDirectoryFrame {
+  const type = obj['type'];
+  switch (type) {
+    case 'hello-client': {
+      const protocol = protocolOf(obj);
+      const platform = obj['platform'];
+      const frame = {
+        type,
+        protocol,
+        clientId: str(obj, 'clientId', 36, UUID_RE),
+        label: str(obj, 'label', MAX_LABEL_CHARS),
+        publicKeyHex: str(obj, 'publicKeyHex', 64, KEY_HEX_RE),
+        appVersion: str(obj, 'appVersion', 32),
+      } as const;
+      if (platform !== 'ios' && platform !== 'android') fail();
+      return { ...frame, platform };
+    }
+    case 'signal': {
+      if (obj['purpose'] !== 'link') fail();
+      return {
+        type,
+        to: environmentIdOf(obj, 'to'),
+        session: str(obj, 'session', 32, ID_HEX_RE),
+        purpose: 'link',
+        relay: bool(obj, 'relay'),
+        data: signalDataOf(obj['data']),
+      };
+    }
+    case 'ice-servers':
+      return iceServersOf(obj);
+    case 'relay-usage':
+      return relayUsageOf(obj);
+    case 'forget-client':
+      return { type };
+    default:
+      return fail();
+  }
+}
+
+/** Size, JSON and object checks shared by every role; `null` means `bad_frame`. */
+function parse(raw: string | ArrayBuffer): Obj | null {
+  if (typeof raw !== 'string' || raw.length > MAX_FRAME_CHARS) return null;
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
-    return bad;
+    return null;
   }
-  if (!isObject(parsed)) return bad;
+  return isObject(parsed) ? parsed : null;
+}
+
+/** Runs a builder, mapping its throws to a decode failure. */
+function attempt<T>(builder: () => T): { ok: true; frame: T } | { ok: false; reason: 'bad_frame' | 'unsupported' } {
   try {
-    return { ok: true, frame: build(parsed) };
+    return { ok: true, frame: builder() };
   } catch (error) {
-    if (error instanceof Invalid) return bad;
+    if (error instanceof Invalid) return { ok: false, reason: 'bad_frame' };
     if (error instanceof Unsupported) return { ok: false, reason: 'unsupported' };
     throw error;
   }
+}
+
+/**
+ * Decodes a frame by the socket's role (PAN-4829 D-4). With no role yet, `hello-client` is read
+ * with the client rules and every other frame with the machine rules, so `hello` registers a
+ * machine and any other first frame keeps today's `hello required` close.
+ */
+export function decodeFrame(raw: string | ArrayBuffer, role: SocketRole | null): FrameDecodeResult {
+  const obj = parse(raw);
+  if (obj === null) return { ok: false, reason: 'bad_frame' };
+  const asClient = role === 'client' || (role === null && obj['type'] === 'hello-client');
+  if (asClient) {
+    const result = attempt(() => buildClient(obj));
+    return result.ok ? { ok: true, role: 'client', frame: result.frame } : result;
+  }
+  const result = attempt(() => build(obj));
+  return result.ok ? { ok: true, role: 'machine', frame: result.frame } : result;
+}
+
+export function decodeMachineFrame(raw: string | ArrayBuffer): DecodeResult {
+  const obj = parse(raw);
+  if (obj === null) return { ok: false, reason: 'bad_frame' };
+  return attempt(() => build(obj));
 }
