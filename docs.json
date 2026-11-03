@@ -60,6 +60,7 @@
               "configuration/session-vault",
               "configuration/remote-access",
               "configuration/linked-machines",
+              "configuration/shared-sessions",
               "configuration/triggers",
               "configuration/tailscale",
               "configuration/mcp",

@@ -7,6 +7,8 @@
 // `sharing-wire.ts`, which the Worker never imports.
 // PAN-4473 (slice 2) adds the host dashboard API types at the end of this file: the shapes the
 // browser exchanges with its local dashboard server to create, list and manage shares.
+// PAN-4475 (slice 4) adds the viewer dashboard API types at the end: the shapes the viewer browser
+// exchanges with its own dashboard server.
 
 export type ShareProtocolVersion = 1;
 export type ShareScope = { readonly kind: 'conversation'; readonly conversationId: string };
@@ -197,3 +199,32 @@ export interface DraftPayload {
   readonly text: string;
   readonly updatedAt: number;
 }
+
+// ── Viewer dashboard API (PAN-4475, slice 4): the viewer browser ⇄ its own dashboard server. ──
+// The device token never appears in these types.
+
+/** A join's state on the viewer server. Live: connecting, lobby, admitted, host-disconnected. */
+export type JoinState =
+  | 'connecting' | 'lobby' | 'admitted' | 'host-disconnected'
+  | 'away'          // closed by the viewer server's grace timer; POST /api/joins reopens it
+  | 'disconnected'  // unexpected close or network error; POST /api/joins reopens it
+  | 'left' | 'kicked' | 'revoked' | 'ended' | 'is-host' | 'full' | 'replaced' | 'rejected';
+
+export interface JoinView {
+  readonly shortCode: string;
+  readonly joinUrl: string;              // <share_url>/s/<shortCode>
+  readonly state: JoinState;
+  readonly contributor: boolean;
+  readonly login: string | null;         // the signed-in GitHub login from account.json
+  readonly closeCode: number | null;     // the last join-socket close code, if any
+  readonly error: string | null;         // e.g. 'unreachable', 'http_503'; never a token
+}
+
+export interface CreateJoinRequest { readonly code: string }
+export interface JoinIceServersResponse { readonly iceServers: readonly IceServer[] }
+
+/** Server-sent events on GET /api/joins/:code/events. The SSE `event:` name is `type`. */
+export type JoinEvent =
+  | { readonly type: 'state'; readonly view: JoinView }
+  | { readonly type: 'signal'; readonly data: SignalData }
+  | { readonly type: 'replaced' };

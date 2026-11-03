@@ -6,6 +6,8 @@ import { fetchWithTimeout } from './lib/apiFetch';
 import { dashboardMutationJsonHeaders } from './lib/wsTransport';
 import { EmergencyStopOverlay } from './components/EmergencyStopOverlay';
 import { EventRouter } from './components/EventRouter';
+import { sharedRouteCode } from './components/chat/sharing/joinApi';
+import { SharedConversationRoute } from './components/chat/sharing/SharedConversationView';
 import { SearchModal } from './components/search/SearchModal';
 import { CommandPalette, type ConversationPaletteOpenRequest } from './components/CommandPalette';
 import { NO_PROJECT_KEY } from './components/CommandDeck/projectsData';
@@ -112,7 +114,13 @@ function PrdViewerHost() {
 export default function App() {
   useEffect(() => {
     normalizeCurrentRoute();
+    // PAN-4475: the shared-conversation route is chosen on load; a same-tab hash change into it reloads.
+    const onHash = () => { if (sharedRouteCode(window.location.hash)) window.location.reload(); };
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
   }, []);
+  const sharedCode = sharedRouteCode(window.location.hash);
+  if (sharedCode) return <SharedConversationRoute code={sharedCode} />;
   const terminalPath = window.location.pathname;
   const terminalSession = new URLSearchParams(window.location.search).get('terminal');
   if (terminalPath.startsWith('/terminal/') || terminalSession) {

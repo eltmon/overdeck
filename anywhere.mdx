@@ -27,8 +27,8 @@ Overdeck runs on your own machine. Your agents, workspaces and conversations liv
   <Card title="Know when you're needed" icon="bell">
     Get a notification when an agent needs you.
   </Card>
-  <Card title="Share a live session" icon="users">
-    Later: share a live session with someone else.
+  <Card title="Share a live session" icon="users" href="/configuration/shared-sessions">
+    Share a live conversation with someone else.
   </Card>
 </CardGroup>
 
@@ -178,6 +178,7 @@ to add one.
 | The MCP server (`pan mcp serve`, **Copy MCP URL**) | next release | [MCP server](/configuration/mcp) |
 | Sign in to overdeck.ai (`pan account login`, `status`, `logout`) | next release | [pan account](/cli/account) |
 | Pipeline agents' transcripts saved to the Session Vault automatically | next release | [Session Vault](/configuration/session-vault) |
+| Shared sessions: share a conversation by link, viewers watch it live in their own Overdeck | next release | [Shared sessions](/configuration/shared-sessions) |
 
 ## Roadmap
 
@@ -256,16 +257,18 @@ consists of hosted services.
     ([PAN-2353](https://github.com/eltmon/overdeck/issues/2353)).
   </Step>
   <Step title="Hosted services on overdeck.ai">
-    **Account service, directory, relay add-on and webhook inbox built (next release,
-    invite-only); billing, the hosted vault and shared sessions planned. This is the paid plan
+    **Account service, directory, relay add-on, webhook inbox and shared sessions built (next
+    release, invite-only); billing and the hosted vault planned. This is the paid plan
     above.**
 
     The account service, the directory with direct connections, the relay add-on and the
     webhook inbox are built and ship in the next release. overdeck.ai accounts are invite-only:
     testers are added by the operator. A machine signs in with
     [`pan account login`](/cli/account), which runs once per machine and is optional. Still
-    planned: billing, the hosted Session Vault and shared sessions. The share service for
-    shared sessions is built, but the dashboard cannot share a session yet.
+    planned: billing and the hosted Session Vault. Shared sessions are built:
+    a host shares a conversation by link and viewers watch it live in their own Overdeck
+    ([Shared sessions](/configuration/shared-sessions)); prompt suggestions and contributor
+    prompts are still planned.
 
     The server code for these services is published in
     [`services/`](https://github.com/eltmon/overdeck/tree/main/services) under the

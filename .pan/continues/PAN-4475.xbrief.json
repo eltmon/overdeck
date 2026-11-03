@@ -1,0 +1,340 @@
+{
+  "version": "1",
+  "issueId": "PAN-4475",
+  "created": "2026-11-03T09:11:44.436Z",
+  "updated": "2026-11-03T14:07:02.465Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-03T13:33:28.204Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-03T14:07Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-03T14:07:02.464Z"
+    }
+  ],
+  "items": {
+    "viewer-api-types": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4475",
+      "claimedAt": "2026-11-03T09:11:44.436Z",
+      "doneAt": "2026-11-03T09:21:53.717Z"
+    },
+    "share-service-join-url": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4475",
+      "claimedAt": "2026-11-03T09:22:17.870Z",
+      "doneAt": "2026-11-03T09:23:16.582Z"
+    },
+    "join-manager-lifecycle": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4475",
+      "claimedAt": "2026-11-03T09:23:24.388Z",
+      "doneAt": "2026-11-03T09:28:09.945Z"
+    },
+    "join-manager-relay": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4475",
+      "claimedAt": "2026-11-03T09:28:11.680Z",
+      "doneAt": "2026-11-03T09:35:06.251Z"
+    },
+    "viewer-routes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4475",
+      "claimedAt": "2026-11-03T09:35:09.117Z",
+      "doneAt": "2026-11-03T09:42:40.971Z"
+    },
+    "share-probe-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4475",
+      "claimedAt": "2026-11-03T09:42:43.112Z",
+      "doneAt": "2026-11-03T09:49:06.743Z"
+    },
+    "landing-detect": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4475",
+      "claimedAt": "2026-11-03T09:49:16.405Z",
+      "doneAt": "2026-11-03T09:50:59.522Z"
+    },
+    "browser-peer": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4475",
+      "claimedAt": "2026-11-03T09:51:02.242Z",
+      "doneAt": "2026-11-03T09:59:23.023Z"
+    },
+    "viewer-route-screens": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4475",
+      "claimedAt": "2026-11-03T09:59:25.175Z",
+      "doneAt": "2026-11-03T10:12:39.300Z"
+    },
+    "relay-integration-test": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4475",
+      "claimedAt": "2026-11-03T10:12:41.086Z",
+      "doneAt": "2026-11-03T10:15:09.563Z"
+    },
+    "viewer-e2e": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4475",
+      "claimedAt": "2026-11-03T10:14:41.451Z",
+      "doneAt": "2026-11-03T10:21:33.752Z"
+    },
+    "user-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4475",
+      "claimedAt": "2026-11-03T10:21:36.231Z",
+      "doneAt": "2026-11-03T10:22:53.482Z"
+    },
+    "dev-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4475",
+      "claimedAt": "2026-11-03T10:22:55.395Z",
+      "doneAt": "2026-11-03T10:24:38.208Z"
+    },
+    "viewer-api-types.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:44:34.015Z"
+    },
+    "viewer-api-types.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:44:47.061Z"
+    },
+    "viewer-api-types.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:45:00.238Z"
+    },
+    "share-service-join-url.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:45:14.879Z"
+    },
+    "share-service-join-url.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:45:29.390Z"
+    },
+    "share-service-join-url.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:45:43.753Z"
+    },
+    "join-manager-lifecycle.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:45:58.067Z"
+    },
+    "join-manager-lifecycle.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:46:10.727Z"
+    },
+    "join-manager-lifecycle.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:46:22.871Z"
+    },
+    "join-manager-lifecycle.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:46:35.444Z"
+    },
+    "join-manager-lifecycle.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:46:48.217Z"
+    },
+    "join-manager-relay.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:47:00.948Z"
+    },
+    "join-manager-relay.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:47:14.073Z"
+    },
+    "join-manager-relay.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:47:26.614Z"
+    },
+    "join-manager-relay.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:47:39.562Z"
+    },
+    "join-manager-relay.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:47:52.084Z"
+    },
+    "viewer-routes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:48:05.272Z"
+    },
+    "viewer-routes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:48:18.016Z"
+    },
+    "viewer-routes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:48:30.037Z"
+    },
+    "viewer-routes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:48:42.086Z"
+    },
+    "viewer-routes.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:48:55.250Z"
+    },
+    "share-probe-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:49:08.330Z"
+    },
+    "share-probe-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:49:21.167Z"
+    },
+    "share-probe-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:49:33.750Z"
+    },
+    "share-probe-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:49:46.027Z"
+    },
+    "landing-detect.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:49:58.835Z"
+    },
+    "landing-detect.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:50:13.276Z"
+    },
+    "landing-detect.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:50:27.820Z"
+    },
+    "landing-detect.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:50:42.644Z"
+    },
+    "landing-detect.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:50:58.027Z"
+    },
+    "browser-peer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:51:11.696Z"
+    },
+    "browser-peer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:51:24.602Z"
+    },
+    "browser-peer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:51:37.273Z"
+    },
+    "browser-peer.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:51:50.060Z"
+    },
+    "browser-peer.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:52:02.649Z"
+    },
+    "viewer-route-screens.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:52:14.520Z"
+    },
+    "viewer-route-screens.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:52:27.195Z"
+    },
+    "viewer-route-screens.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:52:39.308Z"
+    },
+    "viewer-route-screens.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:52:51.507Z"
+    },
+    "viewer-route-screens.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:53:04.009Z"
+    },
+    "relay-integration-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:53:16.492Z"
+    },
+    "relay-integration-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:53:28.884Z"
+    },
+    "relay-integration-test.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:53:41.332Z"
+    },
+    "relay-integration-test.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:53:53.645Z"
+    },
+    "viewer-e2e.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:54:06.081Z"
+    },
+    "viewer-e2e.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:54:19.354Z"
+    },
+    "viewer-e2e.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:54:31.385Z"
+    },
+    "viewer-e2e.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:54:43.538Z"
+    },
+    "viewer-e2e.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:54:56.013Z"
+    },
+    "viewer-e2e.ac6": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:55:09.530Z"
+    },
+    "user-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:55:23.967Z"
+    },
+    "user-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:55:39.355Z"
+    },
+    "user-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:55:53.794Z"
+    },
+    "user-docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:56:07.477Z"
+    },
+    "dev-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:56:20.217Z"
+    },
+    "dev-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:56:34.205Z"
+    },
+    "dev-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:56:47.634Z"
+    }
+  },
+  "agentModel": "claude-opus-5-5",
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-03T14:07:02Z",
+      "markdownBody": "# CodeRabbit findings for PAN-4475 (PR #4895)\n\nCodeRabbit posted 1 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4455753964 · src/dashboard/frontend/src/components/chat/sharing/webrtc-viewer.ts:98 [Minor]: Validate presence participant entries before they reach `Header`.\n  https://github.com/eltmon/overdeck/pull/4895#discussion_r4455753964\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/4895/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-4475`.\n   If you only replied, you are done.\n5. If PR #4895 has already merged when you read this, nothing more lands on it: open a follow-up issue\n   for the findings you agree with instead of pushing."
+    }
+  ]
+}

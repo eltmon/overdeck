@@ -795,6 +795,16 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/shares/:code/commands',           kind: 'http', disposition: 'WRITE',       door: 'src/dashboard/server/services/share-host.ts' },
   { surface: 'DELETE /api/shares/:code',                  kind: 'http', disposition: 'WRITE',       door: 'src/lib/sharing/share-record.ts' },
 
+  // ── joins.ts ──────────────────────────────────────────────────────────────
+  { surface: 'POST /api/joins',                           kind: 'http', disposition: 'WRITE',       door: 'src/dashboard/server/services/share-join.ts' },
+  { surface: 'GET /api/joins/:code',                      kind: 'http', disposition: 'READ',        door: 'src/dashboard/server/services/share-join.ts' },
+  { surface: 'GET /api/joins/:code/events',               kind: 'http', disposition: 'READ',        door: 'src/dashboard/server/services/share-join.ts' },
+  { surface: 'POST /api/joins/:code/signal',              kind: 'http', disposition: 'WRITE',       door: 'src/dashboard/server/services/share-join.ts' },
+  { surface: 'POST /api/joins/:code/ice-servers',         kind: 'http', disposition: 'WRITE',       door: 'src/dashboard/server/services/share-join.ts' },
+  { surface: 'DELETE /api/joins/:code',                   kind: 'http', disposition: 'WRITE',       door: 'src/dashboard/server/services/share-join.ts' },
+  { surface: 'GET /api/share-probe',                      kind: 'http', disposition: 'READ',        door: 'src/lib/sharing/share-service.ts' },
+  { surface: 'OPTIONS /api/share-probe',                  kind: 'http', disposition: 'READ',        door: 'src/lib/sharing/share-service.ts' },
+
   // ── workspaces.ts ─────────────────────────────────────────────────────────
   { surface: 'GET /api/workspace-stack-health',                      kind: 'http', disposition: 'AGGREGATE',   door: 'Issues + Agents + stack health' },
   { surface: 'GET /api/workspaces/:issueId',                         kind: 'http', disposition: 'AGGREGATE',   door: 'IssuesResolver.get + AgentsResolver + workspace details' },

@@ -191,7 +191,9 @@ const landingPage: Handler = async (_req, rc) => {
   const res = await roomFetch(rc.env, shortCode, INTERNAL.status);
   if (res.status !== 200) return endedPage();
   const { status } = (await res.json()) as RoomStatusBody;
-  return status === 'active' ? invitePage(shortCode) : endedPage();
+  if (status !== 'active') return endedPage();
+  const nonce = btoa(String.fromCharCode(...rc.deps.randomBytes(16)));
+  return invitePage(shortCode, nonce);
 };
 
 const ROUTES: Route[] = [

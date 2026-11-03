@@ -4,7 +4,7 @@ import type { AccountBinding, AccountVerifyResult } from '../../../../services/s
 import { sha256Hex } from '../../../../services/share/src/codes.ts';
 import type { Deps, Env, RoomInitBody } from '../../../../services/share/src/env.ts';
 import { HDR_HOST_TOKEN_HASH, parseConfig } from '../../../../services/share/src/env.ts';
-import { HTML_CSP } from '../../../../services/share/src/pages.ts';
+import { HTML_CSP, invitePageCsp } from '../../../../services/share/src/pages.ts';
 import { guardBody, handle, MAX_BODY_BYTES } from '../../../../services/share/src/routes.ts';
 
 const TEST_BASE_URL = 'https://share.test';
@@ -362,18 +362,39 @@ describe('DELETE /v1/rooms/:code', () => {
 });
 
 describe('GET /s/:code', () => {
-  it('an active room returns the invite page with pan join and no room data', async () => {
+  it('an active room returns the localhost-detect invite page with a nonce\'d script and no room data', async () => {
     const rooms = fakeRooms(defaultRoom);
     const res = await call('GET', '/s/bcdf-ghjk', makeEnv({ ROOMS: rooms.ns }));
     expect(res.status).toBe(200);
     expect(res.headers.get('Content-Type')).toBe('text/html; charset=utf-8');
-    expect(res.headers.get('Content-Security-Policy')).toBe(HTML_CSP);
-    expect(HTML_CSP).toBe("default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'");
     const text = await res.text();
+    const nonce = /<script nonce="([^"]+)">/.exec(text)?.[1];
+    expect(nonce).toBeTruthy();
+    const csp = res.headers.get('Content-Security-Policy');
+    expect(csp).toBe(invitePageCsp(nonce as string));
+    expect(csp).toContain(`script-src 'nonce-${nonce}'`);
+    expect(csp).toContain('connect-src http://localhost:3011 http://127.0.0.1:3011');
     expect(text).toContain('You were invited to a shared Overdeck conversation');
-    expect(text).toContain('pan join BCDFGHJK');
-    expect(text).not.toContain('<script');
+    expect(text).toContain('"BCDFGHJK"');
+    expect(text).toContain('href="http://localhost:3011/#/shared/BCDFGHJK"');
+    expect(text).toContain('pan up');
+    expect(text).not.toContain('pan join');
+    expect(text.match(/<script/g)).toHaveLength(1);
+    // Still no room data: no host login and no scope.
+    expect(text).not.toContain('octo');
+    expect(text).not.toContain('conversationId');
     expect(rooms.calls).toEqual([expect.objectContaining({ name: 'BCDFGHJK', path: '/status', method: 'GET' })]);
+  });
+
+  it('two invite pages get different nonces', async () => {
+    const rooms = fakeRooms(defaultRoom);
+    const nonces: string[] = [];
+    for (let i = 0; i < 2; i += 1) {
+      const text = await (await call('GET', '/s/BCDFGHJK', makeEnv({ ROOMS: rooms.ns }))).text();
+      nonces.push(/<script nonce="([^"]+)">/.exec(text)?.[1] ?? '');
+    }
+    expect(nonces[0]).not.toBe('');
+    expect(nonces[0]).not.toBe(nonces[1]);
   });
 
   it('an unknown code returns a 404 page that reveals nothing about the code', async () => {
@@ -385,6 +406,9 @@ describe('GET /s/:code', () => {
     expect(text).toContain('This share link has ended or does not exist.');
     expect(text).not.toContain('BCDFGHJK');
     expect(text).not.toContain('pan join');
+    expect(res.headers.get('Content-Security-Policy')).toBe(HTML_CSP);
+    expect(HTML_CSP).toBe("default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'");
+    expect(text).not.toContain('<script');
   });
 
   it('an ended room and a malformed code both return the 404 page; a malformed code never reaches the DO', async () => {

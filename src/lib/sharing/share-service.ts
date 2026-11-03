@@ -73,6 +73,16 @@ export function hostSocketUrl(base: string, shortCode: string): string {
   return `${base.replace(/^http/, 'ws')}/v1/rooms/${shortCode}/host?v=1`;
 }
 
+/** `https://host` → `wss://host/v1/rooms/<code>/join?v=1`; loopback `http:` → `ws:`. */
+export function joinSocketUrl(base: string, shortCode: string): string {
+  return `${base.replace(/^http/, 'ws')}/v1/rooms/${shortCode}/join?v=1`;
+}
+
+/** The origin of a parsed share URL (`https://share.overdeck.ai`), for the probe's CORS check. */
+export function shareOrigin(base: string): string {
+  return new URL(base).origin;
+}
+
 function isJoinUrl(value: unknown, shortCode: string): boolean {
   if (typeof value !== 'string') return false;
   let parsed: URL;

@@ -89,7 +89,10 @@ Origin, then session cookie or internal token — see [DASHBOARD-AUTH.md](DASHBO
   [SHARED-SESSIONS.md](SHARED-SESSIONS.md). PAN-4474 adds `src/dashboard/server/sharing/` —
   `peer-hub.ts` (one werift `RTCPeerConnection` per admitted viewer), `conversation-bridge.ts`
   (history backfill, then live append/update from `watchConversation`) and `channel-writer.ts` —
-  wired into `ShareManager`.
+  wired into `ShareManager`. PAN-4475 adds the viewer side: `routes/joins.ts` (`/api/joins*`,
+  `/api/share-probe`) over `services/share-join.ts` (`JoinManager`, one join socket per short
+  code), and the frontend route `/#/shared/<code>` (`components/chat/sharing/SharedConversationView.tsx`,
+  `webrtc-viewer.ts`).
 - Companion terminals (PAN-3974, PAN-3835): an OpenCode or Codex conversation's TERMINAL
   streams a separate `companion-<ownerSession>` tmux session running `opencode attach` or
   `codex resume --remote` against the conversation's own runtime, opened through
