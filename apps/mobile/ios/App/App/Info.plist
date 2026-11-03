@@ -54,6 +54,10 @@
       </array>
     </dict>
 	</dict>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
+	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
+	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Overdeck uses the camera to scan the pairing code shown on your computer.</string>
 	<key>UILaunchStoryboardName</key>

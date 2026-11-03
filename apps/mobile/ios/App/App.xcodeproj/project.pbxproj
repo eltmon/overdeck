@@ -7,28 +7,59 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		08FF6241437D94E79F1D5C7D /* OverdeckWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 4039A5743761BD63CC90BD7F /* OverdeckWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		1C1CF39CFBA15F954550B505 /* OverdeckWidgetsBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 193F5E35C98D5F358C823557 /* OverdeckWidgetsBundle.swift */; };
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
 		4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */ = {isa = PBXBuildFile; productRef = 4D22ABE82AF431CB00220026 /* CapApp-SPM */; };
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
-		7FFB70C7594369EAAF962B27 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C343077DF52CE62B37053F1 /* KeychainStore.swift */; };
-		72ECDAB82DCC55FFB58EBE7D /* OverdeckKeysPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB8ED7E546FE7A5CAC444B61 /* OverdeckKeysPlugin.swift */; };
-		F24760087A074D2C0F975CAF /* MainViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E29945D56D2C3D38A2BAB379 /* MainViewController.swift */; };
 		504EC30D1FED79650016851F /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30B1FED79650016851F /* Main.storyboard */; };
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
+		69B62D6932675EEBE8D0A2B7 /* OverdeckActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DD61EC345A7415D22092065 /* OverdeckActivityAttributes.swift */; };
+		72ECDAB82DCC55FFB58EBE7D /* OverdeckKeysPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB8ED7E546FE7A5CAC444B61 /* OverdeckKeysPlugin.swift */; };
+		75A314C2AF36BB52E768599E /* OverdeckActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DD61EC345A7415D22092065 /* OverdeckActivityAttributes.swift */; };
+		7ACE0857F4DE468EDA66A563 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D0EE6F74C0F768296286ADB7 /* Foundation.framework */; };
+		7FFB70C7594369EAAF962B27 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C343077DF52CE62B37053F1 /* KeychainStore.swift */; };
 		9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9582B6822FE993A50072D4E8 /* SceneDelegate.swift */; };
+		A2AEACF21D7CE23E9595A8DD /* OverdeckLiveActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBE90D33B6567550429B9FB6 /* OverdeckLiveActivityWidget.swift */; };
+		F24760087A074D2C0F975CAF /* MainViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E29945D56D2C3D38A2BAB379 /* MainViewController.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		7C8DF43B51EA9348120A30BF /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D0C2EC9C5EE361A44032DE94;
+			remoteInfo = OverdeckWidgets;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		87A534352140C08E6665A052 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				08FF6241437D94E79F1D5C7D /* OverdeckWidgets.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		193F5E35C98D5F358C823557 /* OverdeckWidgetsBundle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OverdeckWidgetsBundle.swift; sourceTree = "<group>"; };
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
+		3F3F2C70DD3158FE53447648 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		4039A5743761BD63CC90BD7F /* OverdeckWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = OverdeckWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		4C343077DF52CE62B37053F1 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
 		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
-		4C343077DF52CE62B37053F1 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
-		EB8ED7E546FE7A5CAC444B61 /* OverdeckKeysPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverdeckKeysPlugin.swift; sourceTree = "<group>"; };
-		E29945D56D2C3D38A2BAB379 /* MainViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewController.swift; sourceTree = "<group>"; };
 		504EC30C1FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		504EC30E1FED79650016851F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		504EC3111FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
@@ -36,6 +67,12 @@
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
 		9582B6822FE993A50072D4E8 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
+		9DD61EC345A7415D22092065 /* OverdeckActivityAttributes.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OverdeckActivityAttributes.swift; sourceTree = "<group>"; };
+		CABB314042086FDCAC77D52D /* App.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
+		CBE90D33B6567550429B9FB6 /* OverdeckLiveActivityWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OverdeckLiveActivityWidget.swift; sourceTree = "<group>"; };
+		D0EE6F74C0F768296286ADB7 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		E29945D56D2C3D38A2BAB379 /* MainViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewController.swift; sourceTree = "<group>"; };
+		EB8ED7E546FE7A5CAC444B61 /* OverdeckKeysPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverdeckKeysPlugin.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -47,15 +84,35 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		8C7ADDB3A93FF156F430FACA /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7ACE0857F4DE468EDA66A563 /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		4E5642AA4540CDC60FC195E8 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				9DD61EC345A7415D22092065 /* OverdeckActivityAttributes.swift */,
+			);
+			name = Shared;
+			path = Shared;
+			sourceTree = "<group>";
+		};
 		504EC2FB1FED79650016851F = {
 			isa = PBXGroup;
 			children = (
 				958DCC722DB07C7200EA8C5F /* debug.xcconfig */,
 				504EC3061FED79650016851F /* App */,
 				504EC3051FED79650016851F /* Products */,
+				4E5642AA4540CDC60FC195E8 /* Shared */,
+				E4FE6DB52756F208BC431033 /* OverdeckWidgets */,
+				81FC4E6F0E25F484B28E6CA5 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -63,6 +120,7 @@
 			isa = PBXGroup;
 			children = (
 				504EC3041FED79650016851F /* App.app */,
+				4039A5743761BD63CC90BD7F /* OverdeckWidgets.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -82,8 +140,36 @@
 				504EC3131FED79650016851F /* Info.plist */,
 				2FAD9762203C412B000D30F8 /* config.xml */,
 				50B271D01FEDC1A000F3C39B /* public */,
+				CABB314042086FDCAC77D52D /* App.entitlements */,
 			);
 			path = App;
+			sourceTree = "<group>";
+		};
+		81FC4E6F0E25F484B28E6CA5 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				907A25E185B063D3D86BF6AB /* iOS */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		907A25E185B063D3D86BF6AB /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				D0EE6F74C0F768296286ADB7 /* Foundation.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
+		E4FE6DB52756F208BC431033 /* OverdeckWidgets */ = {
+			isa = PBXGroup;
+			children = (
+				193F5E35C98D5F358C823557 /* OverdeckWidgetsBundle.swift */,
+				CBE90D33B6567550429B9FB6 /* OverdeckLiveActivityWidget.swift */,
+				3F3F2C70DD3158FE53447648 /* Info.plist */,
+			);
+			name = OverdeckWidgets;
+			path = OverdeckWidgets;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -96,10 +182,12 @@
 				504EC3001FED79650016851F /* Sources */,
 				504EC3011FED79650016851F /* Frameworks */,
 				504EC3021FED79650016851F /* Resources */,
+				87A534352140C08E6665A052 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				A00DDFF870F4EC29E8B73375 /* PBXTargetDependency */,
 			);
 			name = App;
 			packageProductDependencies = (
@@ -108,6 +196,23 @@
 			productName = App;
 			productReference = 504EC3041FED79650016851F /* App.app */;
 			productType = "com.apple.product-type.application";
+		};
+		D0C2EC9C5EE361A44032DE94 /* OverdeckWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A1E3EC929287D67950971F76 /* Build configuration list for PBXNativeTarget "OverdeckWidgets" */;
+			buildPhases = (
+				C3460515DAB56707F64BF8ED /* Sources */,
+				8C7ADDB3A93FF156F430FACA /* Frameworks */,
+				CC45EBBDE2695D19C11E538C /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = OverdeckWidgets;
+			productName = OverdeckWidgets;
+			productReference = 4039A5743761BD63CC90BD7F /* OverdeckWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -142,6 +247,7 @@
 			projectRoot = "";
 			targets = (
 				504EC3031FED79650016851F /* App */,
+				D0C2EC9C5EE361A44032DE94 /* OverdeckWidgets */,
 			);
 		};
 /* End PBXProject section */
@@ -160,6 +266,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		CC45EBBDE2695D19C11E538C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -172,10 +285,30 @@
 				72ECDAB82DCC55FFB58EBE7D /* OverdeckKeysPlugin.swift in Sources */,
 				F24760087A074D2C0F975CAF /* MainViewController.swift in Sources */,
 				9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */,
+				75A314C2AF36BB52E768599E /* OverdeckActivityAttributes.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C3460515DAB56707F64BF8ED /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1C1CF39CFBA15F954550B505 /* OverdeckWidgetsBundle.swift in Sources */,
+				A2AEACF21D7CE23E9595A8DD /* OverdeckLiveActivityWidget.swift in Sources */,
+				69B62D6932675EEBE8D0A2B7 /* OverdeckActivityAttributes.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A00DDFF870F4EC29E8B73375 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = OverdeckWidgets;
+			target = D0C2EC9C5EE361A44032DE94 /* OverdeckWidgets */;
+			targetProxy = 7C8DF43B51EA9348120A30BF /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
 		504EC30B1FED79650016851F /* Main.storyboard */ = {
@@ -197,6 +330,32 @@
 /* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
+		30E127B7C5DDB2892FC2D90F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = OverdeckWidgets/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = ai.overdeck.app.widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 		504EC3141FED79650016851F /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 958DCC722DB07C7200EA8C5F /* debug.xcconfig */;
@@ -311,6 +470,7 @@
 			baseConfigurationReference = 958DCC722DB07C7200EA8C5F /* debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = App/Info.plist;
@@ -333,6 +493,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = App/Info.plist;
@@ -349,6 +510,31 @@
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
+		};
+		F974DD69EC741F8E4A2A222D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = OverdeckWidgets/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = ai.overdeck.app.widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
 		};
 /* End XCBuildConfiguration section */
 
@@ -367,6 +553,15 @@
 			buildConfigurations = (
 				504EC3171FED79650016851F /* Debug */,
 				504EC3181FED79650016851F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A1E3EC929287D67950971F76 /* Build configuration list for PBXNativeTarget "OverdeckWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				30E127B7C5DDB2892FC2D90F /* Release */,
+				F974DD69EC741F8E4A2A222D /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
