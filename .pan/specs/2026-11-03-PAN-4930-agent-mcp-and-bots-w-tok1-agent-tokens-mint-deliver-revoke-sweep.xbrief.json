@@ -1,0 +1,774 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-03T21:38:23Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4930: Agent MCP and bots (W-TOK1): Agent tokens: mint, deliver, revoke, sweep",
+    "updated": "2026-11-03T21:45:58.465Z"
+  },
+  "plan": {
+    "id": "pan-4930",
+    "title": "Agent MCP and bots (W-TOK1): Agent tokens: mint, deliver, revoke, sweep",
+    "status": "proposed",
+    "uid": "a400bab3-2797-408c-bcf5-f9ae795e7057",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-03T21:38:23Z",
+    "updated": "2026-11-03T21:45:58.465Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4930",
+        "label": "PAN-4930",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4927",
+        "label": "PAN-4927 (epic)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "access-tokens",
+      "mcp",
+      "security",
+      "agents",
+      "pan-4927"
+    ],
+    "metadata": {
+      "sizeJustification": "Seven subsystems only because each of the four doc files counts as its own subsystem (docs/DASHBOARD-AUTH.md, docs/ROLES.md, cli/token.mdx, .pan/drafts); the code spans src/lib, src/dashboard and tests/unit. The issue's AC-1 requires every stop path (stopAgent, exited event, close-out, conversation stop) and the sweep to revoke, so splitting them into sibling issues would ship a token lifecycle with live-token leaks. 23 files, under the 25-file limit.",
+      "canonicalFilename": "2026-11-03-PAN-4930-agent-mcp-and-bots-w-tok1-agent-tokens-mint-deliver-revoke-sweep.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Managed agents reach Overdeck through pan with the machine's admin internal token, so their actions carry no identity and no least privilege. The epic PAN-4927 gives each managed agent its own scoped MCP token; this item builds the token lifecycle: record fields, minting with 0600 file delivery, revocation on every stop path, and a sweep for crashes.",
+      "Proposal": "Extract the access-token record validator into a leaf module, add agentId/agentKind/role to kind 'token' records (epic D-6), add fresh-read registry helpers that work in CLI processes, carry the identity on the dashboard credential, and add src/lib/mcp/agent-token.ts with AGENT_TOKEN_SCOPES (D-8), ensureAgentMcpToken (reuse-or-mint, <dir>/mcp-token 0600 via temp+rename, verify-after-write) and never-throwing revoke helpers. Call the revoke helpers from stopAgent, stopAgentSync, the supervisor exited event (agents and conversations), close-out teardown and stopConversationRuntime. Add a primary-dashboard sweep (60 s after boot, then every 10 minutes, 10-minute grace) that revokes tokens of confirmed-dead owners and prunes agent records revoked over 7 days ago. Launch-time minting stays in W-INJ1.",
+      "NonGoals": "- No spawn-site, relaunch or launcher call of ensureAgentMcpToken and no MCP config injection (W-INJ1/W-INJ2/W-INJ3 own them)\n- No mcp.agents config switch (W-INJ1)\n- No change to pan mcp serve, OVERDECK_MCP_TOKEN_FILE reading or tool visibility (W-MCP1)\n- No change to linked-conversation-proxy.ts or fleetCaller forwarding of agent tokens (epic D-9)\n- No /api/self/* routes and no new HTTP route of any kind\n- No expiresAt/oauthClientId fields and no expiry check in verifyAccessToken (W-OAUTH1)\n- No filtering of agent tokens out of pan token list or Settings -> Access Tokens\n- No cross-process lock on access-tokens.json\n- No removal of agents' admin reach through the pan CLI (epic H-1)\n- Never put a plaintext token in a log line, launcher script, argv or env export"
+    },
+    "autoDecisions": [
+      {
+        "summary": "W-TOK1 builds and tests ensureAgentMcpToken but adds no spawn-site call; AC-1 is verified at module level for a work agent, a review run and a conversation owner.",
+        "rationale": "The issue says to follow the epic's W-TOK1 section, which lists no spawn files; the epic assigns launch minting and the tight spawn.ts budget (3 lines of headroom) to W-INJ1."
+      },
+      {
+        "summary": "A conversation token's agentId is the conversation name; its directory is conversationStateDir(conv.tmuxSession) = conversations/conv-<name>/, always passed by the caller.",
+        "rationale": "Epic D-6 names the conversation name and W-SELF1 resolves it with getConversationByName; the epic's conversations/<name>/ path does not match the code (conversation-runtime.ts:581)."
+      },
+      {
+        "summary": "agent-token.ts reads the registry fresh through new readActiveAccessTokenRecord and revokeAccessTokensMatching helpers instead of verifyAccessToken.",
+        "rationale": "verifyAccessToken uses the per-process snapshot, which is empty in CLI processes such as pan kill, and it writes lastUsedAt."
+      },
+      {
+        "summary": "revokeAgentMcpTokens takes { agentKind, dir } and matches agentKind as well as agentId.",
+        "rationale": "An agent id and a conversation name could collide; matching the kind removes the ambiguity at no cost."
+      },
+      {
+        "summary": "The sweep keeps tokens younger than a 10-minute grace and treats only isConfirmedDead verdicts as death.",
+        "rationale": "A token is minted before its pane exists, and runtime-indeterminate must never count as death (liveness.ts contract)."
+      },
+      {
+        "summary": "Agent tokens are named agent:<role>:<agentId> (cut to 200 chars) and stay visible in pan token list and Settings.",
+        "rationale": "createAccessToken requires a name of at most 200 chars; the epic's W-DOC already plans to document agent tokens in pan token list."
+      },
+      {
+        "summary": "The role field is validated as a lowercase slug, not against the Role union.",
+        "rationale": "A record failing validation corrupts the whole registry, so a future role must not make this version refuse every token."
+      }
+    ],
+    "items": [
+      {
+        "id": "extract-record-leaf",
+        "title": "Extract access-token record types and validator into src/lib/access-token-records.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T21:38:23Z",
+        "metadata": {
+          "issueLabel": "pan-4930",
+          "traces": [
+            "NFR-5"
+          ],
+          "difficulty": "simple",
+          "kind": "refactor",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/access-token-records.ts",
+            "src/lib/access-tokens.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/access-tokens.test.ts tests/unit/lib/access-tokens-machine.test.ts tests/unit/lib/access-tokens-phone.test.ts",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the three existing access-token test files pass unchanged",
+            "lint:circular reports no cycle"
+          ],
+          "readiness": "ready"
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4930.md work item W-1. Move ACCESS_TOKEN_SCOPES, AccessTokenScope, AccessTokenKind, MachineAccess, MACHINE_ACCESS_LEVELS, MACHINE_KEY_HEX, UUID_V4, AccessTokenRecord, isMachineAccess and isRecord (src/lib/access-tokens.ts lines 62-105 and 211-249) unchanged into the new leaf src/lib/access-token-records.ts. Export MACHINE_KEY_HEX, UUID_V4, isMachineAccess and isRecord from the leaf because createAccessToken and parseRegistry still use them. access-tokens.ts imports them and re-exports the public names (ACCESS_TOKEN_SCOPES, MACHINE_ACCESS_LEVELS and the four types) so no importer changes. The leaf imports nothing from access-tokens.ts. No behaviour change."
+        },
+        "items": [
+          {
+            "id": "extract-record-leaf.ac1",
+            "title": "Given the extraction, when src/lib/access-token-records.ts is read, then it contains isRecord and AccessTokenRecord and has no import from './access-tokens.js'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-record-leaf.ac2",
+            "title": "Given the extraction, when npx vitest runs tests/unit/lib/access-tokens.test.ts, access-tokens-machine.test.ts and access-tokens-phone.test.ts, then all three pass with no test file edited",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-record-leaf.ac3",
+            "title": "Given the extraction, when npm run lint:circular runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agent-record-fields",
+        "title": "Add agentId/agentKind/role to token records with validator, input guards and fresh-read helpers",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T21:38:23Z",
+        "metadata": {
+          "issueLabel": "pan-4930",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1"
+          ],
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "credential-agent-fields",
+            "agent-token-module",
+            "token-sweep"
+          ],
+          "files_scope": [
+            "src/lib/access-token-records.ts",
+            "src/lib/access-tokens.ts",
+            "tests/unit/lib/access-tokens-agent.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/access-tokens-agent.test.ts tests/unit/lib/access-tokens.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "access-tokens-agent.test.ts and access-tokens.test.ts pass",
+            "file-size guard passes; wc -l src/lib/access-tokens.ts is below 600"
+          ],
+          "readiness": "ready"
+        },
+        "narrative": {
+          "Action": "PRD W-2. Add optional agentId, agentKind ('agent'|'conversation') and role to AccessTokenRecord in the leaf. isRecord accepts them only on kind 'token', all three together, agentId matching ^[A-Za-z0-9._:/-]{1,200}$, role matching ^[a-z][a-z0-9-]{0,63}$ (not checked against the Role union, PRD D-7); any other kind carrying them makes the file corrupt. CreateAccessTokenInput gains the same three fields; createAccessToken throws when they are set on a non-token kind, when one is missing or malformed, or when scopes include admin or forward. Add to access-tokens.ts: readActiveAccessTokenRecord(token) (fresh file read, constant-time hash compare, never touches the snapshot or lastUsedAt), revokeAccessTokensMatching(match) (one mutate, fires onAccessTokensRevoked, no write when nothing matches) and pruneEndedAccessTokens(olderThanMs, now) (removes only records with agentId whose revokedAt is older than the cutoff). Update the access-tokens.ts module header with an agent-token paragraph. access-tokens.ts must stay under 600 lines. New test file tests/unit/lib/access-tokens-agent.test.ts using the same temp OVERDECK_HOME + vi.resetModules + fake Date setup as access-tokens.test.ts."
+        },
+        "items": [
+          {
+            "id": "agent-record-fields.ac1",
+            "title": "Given a registry file whose records lack the new fields, when refreshAccessTokens runs, then it resolves and verifyAccessToken accepts its token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-record-fields.ac2",
+            "title": "Given a registry file with a device record carrying agentId, when refreshAccessTokens runs, then it rejects and verifyAccessToken refuses every token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-record-fields.ac3",
+            "title": "Given createAccessToken is called with kind 'token', an agentId and scopes containing admin or forward, then it rejects with the PAN-4927 D-8 message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-record-fields.ac4",
+            "title": "Given an active agent token, when readActiveAccessTokenRecord is called with it, then it returns the record and the file's lastUsedAt stays null; after revokeAccessToken it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-record-fields.ac5",
+            "title": "Given agent records revoked 8 days and 6 days ago and a plain token revoked 30 days ago, when pruneEndedAccessTokens(7 days) runs, then only the 8-day agent record is removed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "credential-agent-fields",
+        "title": "Carry agentId/agentKind/role on the dashboard token credential",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T21:38:23Z",
+        "metadata": {
+          "issueLabel": "pan-4930",
+          "traces": [
+            "FR-6"
+          ],
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/dashboard-auth.ts",
+            "src/dashboard/server/routes/__tests__/dashboard-auth.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/routes/__tests__/dashboard-auth.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "dashboard-auth.test.ts passes including the two new cases"
+          ],
+          "readiness": "ready"
+        },
+        "narrative": {
+          "Action": "PRD W-3. In src/dashboard/server/routes/dashboard-auth.ts the DashboardCredential token member (line 158) gains optional agentId, agentKind and role. resolveDashboardCredential (line 222) spreads them in only when record.agentId is set, so a plain token credential keeps exactly kind, tokenId and scopes. Extend src/dashboard/server/routes/__tests__/dashboard-auth.test.ts next to the existing token test at line 316."
+        },
+        "items": [
+          {
+            "id": "credential-agent-fields.ac1",
+            "title": "Given a Bearer agent token, when resolveDashboardCredential runs, then it returns kind 'token' with the record's agentId, agentKind and role",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "credential-agent-fields.ac2",
+            "title": "Given a Bearer plain token, when resolveDashboardCredential runs, then the credential has no agentId key and equals { kind, tokenId, scopes }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agent-token-module",
+        "title": "Create src/lib/mcp/agent-token.ts with AGENT_TOKEN_SCOPES, ensureAgentMcpToken and revoke helpers",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T21:38:23Z",
+        "metadata": {
+          "issueLabel": "pan-4930",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-2",
+            "NFR-6"
+          ],
+          "difficulty": "complex",
+          "kind": "backend",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "revoke-stop-agent",
+            "revoke-exited-event",
+            "revoke-closeout",
+            "revoke-conversation-stop",
+            "token-sweep"
+          ],
+          "files_scope": [
+            "src/lib/mcp/agent-token.ts",
+            "tests/unit/lib/mcp/agent-token.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/mcp/agent-token.test.ts",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "agent-token.test.ts passes",
+            "lint:circular reports no cycle"
+          ],
+          "readiness": "ready"
+        },
+        "narrative": {
+          "Action": "PRD W-4 and decisions D-1 to D-8, D-12. New module exporting AGENT_TOKEN_FILE='mcp-token', AgentTokenRole, AGENT_TOKEN_SCOPES (the D-8 table verbatim), AgentTokenOwner {agentId, agentKind, role, dir}, agentMcpTokenPath(dir), ensureAgentMcpToken(owner), revokeAgentMcpTokens(agentId, {agentKind='agent', dir?}), revokeAgentMcpTokensForIssue(issueId). It reads the registry only through readActiveAccessTokenRecord, revokeAccessTokensMatching, listAccessTokens and createAccessToken (never verifyAccessToken or the snapshot). ensureAgentMcpToken reuses the file's token only when it is active and has the same agentId, agentKind, role and scope set; otherwise it revokes the owner's active tokens, mints with name `agent:<role>:<agentId>` cut to 200 chars, mkdirs dir 0700, writes <dir>/mcp-token via temp file (mode 0600) + rename, then re-reads once and mints a second time if the record did not persist, throwing 'agent token for <agentId> did not persist in the access-token registry' if the second check fails. revokeAgentMcpTokens matches agentId AND agentKind, unlinks the file (unlink, never rm; for conversations only when dir is given), and never throws. revokeAgentMcpTokensForIssue reads getAgentState from agents/agent-state-read.js and compares issueId case-insensitively. Imports limited to node built-ins, ../access-tokens.js, ../agents/agent-state-read.js and the Role type. Mint at launch is NOT part of this item (W-INJ1). New test tests/unit/lib/mcp/agent-token.test.ts. For agentKind 'agent', ensureAgentMcpToken and revokeAgentMcpTokens pass agentId through normalizeAgentId (../agents/identity.js) first, so a mint under 'PAN-1' and a stopAgent revoke under 'agent-pan-1' name the same owner."
+        },
+        "items": [
+          {
+            "id": "agent-token-module.ac1",
+            "title": "Given AGENT_TOKEN_SCOPES, when the test reads every row, then each Role and 'conversation' has a row equal to the D-8 table and no row contains admin, forward, read:settings or read:costs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-token-module.ac2",
+            "title": "Given owners for a work agent (role work), a review run (role review) and a conversation (agentKind conversation), when ensureAgentMcpToken runs for each, then each dir holds an mcp-token file with mode 0600 and exactly one active record exists per agentId with that role's scopes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-token-module.ac3",
+            "title": "Given an intact token file, when ensureAgentMcpToken runs again, then it returns the same tokenId; given the file deleted, the record revoked, or a different role, then it returns a new tokenId and the old record is revoked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-token-module.ac4",
+            "title": "Given an owner with a token (including one minted as agentId 'PAN-1'), when revokeAgentMcpTokens runs with the normalized id 'agent-pan-1', then zero active records remain for that owner and the file is gone; given a corrupt registry, then it resolves 0 without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-token-module.ac5",
+            "title": "Given readActiveAccessTokenRecord returns null after the first mint, when ensureAgentMcpToken runs, then it mints a second time; given null twice, then it rejects with the 'did not persist' message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "revoke-stop-agent",
+        "title": "Revoke agent tokens in stopAgent and stopAgentSync",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T21:38:23Z",
+        "metadata": {
+          "issueLabel": "pan-4930",
+          "traces": [
+            "FR-4"
+          ],
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/termination.ts",
+            "src/lib/__tests__/agents-stop-terminal-backend.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/agents-stop-terminal-backend.test.ts",
+            "bash scripts/guard-agent-dir-removal.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "agents-stop-terminal-backend.test.ts passes",
+            "agent-dir removal guard passes"
+          ],
+          "readiness": "ready"
+        },
+        "narrative": {
+          "Action": "PRD W-5. In src/lib/agents/termination.ts import revokeAgentMcpTokens from ../mcp/agent-token.js. In stopAgent add `yield* Effect.promise(() => revokeAgentMcpTokens(normalizedId));` right after the `if (state) { ... yield* saveAgentState(state); }` block (outside the if, so a missing state still revokes). In stopAgentSync add `void revokeAgentMcpTokens(normalizedId).catch(() => undefined);` after the final saveAgentRuntimeState call, with a comment that the sweep is the backstop. Extend src/lib/__tests__/agents-stop-terminal-backend.test.ts with a vi.mock of ../mcp/agent-token.js."
+        },
+        "items": [
+          {
+            "id": "revoke-stop-agent.ac1",
+            "title": "Given a mocked token module, when stopAgent(AGENT, 'operator') runs, then revokeAgentMcpTokens is called once with the normalized agent id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "revoke-stop-agent.ac2",
+            "title": "Given a mocked token module, when stopAgentSync(AGENT) runs, then revokeAgentMcpTokens is called once and stopAgentSync still returns synchronously",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "revoke-exited-event",
+        "title": "Revoke tokens on the supervisor exited event for agents and conversations",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T21:38:23Z",
+        "metadata": {
+          "issueLabel": "pan-4930",
+          "traces": [
+            "FR-4"
+          ],
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/agent-projection.ts",
+            "tests/unit/dashboard/server/services/agent-projection.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/server/services/agent-projection.test.ts tests/unit/dashboard/server/services/agent-projection-herdr-pane.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "both agent-projection test files pass"
+          ],
+          "readiness": "ready"
+        },
+        "narrative": {
+          "Action": "PRD W-6, decision D-11. In src/dashboard/server/services/agent-projection.ts add an optional dep `revokeAgentMcpTokens` to AgentLifecycleDeps and import the real one from ../../../lib/mcp/agent-token.js plus conversationStateDir from ../../../lib/overdeck/conversation-pane-role.js. Agent case 'exited' (line 266): after saveAgentStateAndEmitEventWithDeps, `void (deps.revokeAgentMcpTokens ?? revokeAgentMcpTokens)(agentId).catch(() => undefined);`. Conversation case 'exited' (line 343): right after markConversationEnded and before appendActivity('stopped') and the `if (conversation.status === 'ended') return` early exit, await the revoke with (conversation.name, { agentKind: 'conversation', dir: conversationStateDir(conversation.tmuxSession) }), catching errors. The respawn-pending and superseded-launch returns stay before the revoke. Extend tests/unit/dashboard/server/services/agent-projection.test.ts by injecting the dep."
+        },
+        "items": [
+          {
+            "id": "revoke-exited-event.ac1",
+            "title": "Given an agent with state, when an exited lifecycle event is applied, then the injected revoke dep is called with that agent id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "revoke-exited-event.ac2",
+            "title": "Given a supervised conversation, when an exited event is applied, then the revoke dep is called with conversation.name, agentKind 'conversation' and the conv-<name> state dir, also when the row was already ended",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "revoke-exited-event.ac3",
+            "title": "Given a conversation whose respawn started after the exiting launch, when the exited event is applied, then it returns respawn-pending and the revoke dep is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "revoke-closeout",
+        "title": "Revoke an issue's agent tokens at close-out teardown",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T21:38:23Z",
+        "metadata": {
+          "issueLabel": "pan-4930",
+          "traces": [
+            "FR-4",
+            "NFR-6"
+          ],
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/teardown-workspace.ts",
+            "tests/unit/lib/lifecycle/teardown-workspace-agent-state.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/lifecycle/teardown-workspace-agent-state.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "teardown-workspace-agent-state.test.ts passes"
+          ],
+          "readiness": "ready"
+        },
+        "narrative": {
+          "Action": "PRD W-7, decision D-12. In src/lib/lifecycle/teardown-workspace.ts import revokeAgentMcpTokensForIssue from ../mcp/agent-token.js and call `await revokeAgentMcpTokensForIssue(issueLower);` right after `persistIssueAgentsStopped(issueLower);` (line 132, inside killTmuxSessionsImpl), before removeAgentStateImpl removes agent state. Extend tests/unit/lib/lifecycle/teardown-workspace-agent-state.test.ts with a mock of the token module."
+        },
+        "items": [
+          {
+            "id": "revoke-closeout.ac1",
+            "title": "Given a mocked token module, when the close-out kill-sessions step runs for PAN-1, then revokeAgentMcpTokensForIssue is called once with 'pan-1' after the issue's agents are persisted stopped",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "revoke-closeout.ac2",
+            "title": "Given revokeAgentMcpTokensForIssue resolves 0 because the registry is corrupt, when the step runs, then the step still returns its normal result",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "revoke-conversation-stop",
+        "title": "Revoke a conversation's token in stopConversationRuntime",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T21:38:23Z",
+        "metadata": {
+          "issueLabel": "pan-4930",
+          "traces": [
+            "FR-4"
+          ],
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-runtime.ts",
+            "tests/unit/lib/overdeck/conversation-runtime-prime.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/overdeck/conversation-runtime-prime.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "conversation-runtime-prime.test.ts passes",
+            "file-size guard passes"
+          ],
+          "readiness": "ready"
+        },
+        "narrative": {
+          "Action": "PRD W-8. In src/lib/overdeck/conversation-runtime.ts import revokeAgentMcpTokens from ../mcp/agent-token.js and add as the last statement of stopConversationRuntime (after the killConversationRuntimeProcesses try/catch): `await revokeAgentMcpTokens(name, { agentKind: 'conversation', dir: conversationStateDir(conv.tmuxSession) });` (conversationStateDir is already imported at line 39). Budget +3 lines (file 1178, cap 1252). Extend tests/unit/lib/overdeck/conversation-runtime-prime.test.ts, which already calls stopConversationRuntime at lines 191-199."
+        },
+        "items": [
+          {
+            "id": "revoke-conversation-stop.ac1",
+            "title": "Given a mocked token module, when stopConversationRuntime runs for conversation 'conv-claude' with tmuxSession 'conv-claude', then revokeAgentMcpTokens is called once with ('conv-claude', { agentKind: 'conversation', dir: <OVERDECK_HOME>/conversations/conv-claude })",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "revoke-conversation-stop.ac2",
+            "title": "Given the change, when bash scripts/lint-file-size.sh runs, then it exits 0 and git diff --stat origin/main shows conversation-runtime.ts grew by at most 3 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "token-sweep",
+        "title": "Add the agent-token sweep service and start it with the conversation sweeps",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T21:38:23Z",
+        "metadata": {
+          "issueLabel": "pan-4930",
+          "traces": [
+            "FR-5",
+            "NFR-4"
+          ],
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/agent-token-sweep.ts",
+            "src/dashboard/server/services/conversation-sweeps.ts",
+            "tests/unit/dashboard/server/services/agent-token-sweep.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/server/services/agent-token-sweep.test.ts",
+            "npm run lint:liveness"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "agent-token-sweep.test.ts passes",
+            "lint:liveness passes"
+          ],
+          "readiness": "ready"
+        },
+        "narrative": {
+          "Action": "PRD W-9, decisions D-9 and D-10. New src/dashboard/server/services/agent-token-sweep.ts exporting AGENT_TOKEN_SWEEP_FIRST_MS=60_000, AGENT_TOKEN_SWEEP_INTERVAL_MS=600_000, AGENT_TOKEN_SWEEP_GRACE_MS=600_000, AGENT_TOKEN_PRUNE_AFTER_MS=7 days, sweepAgentTokensOnce(deps?) and startAgentTokenSweep/stopAgentTokenSweep. One run: for each active record with agentId, agent kind → revoke when getAgentState is null, or when max(createdAt, state.startedAt, state.lastResumeAt) is older than the grace and isConfirmedDead(await isAlive(agentId)); conversation kind → revoke when getConversationByName is null, archivedAt is set, or status 'ended' with the token older than the grace. Revoke through revokeAgentMcpTokens with the owner dir (agents: default; conversations: conversationStateDir(conv?.tmuxSession ?? `conv-${agentId}`)). Then pruneEndedAccessTokens(AGENT_TOKEN_PRUNE_AFTER_MS). A failure on one token is logged and the run continues; the run never throws. Use isAlive/isConfirmedDead from src/lib/agents/liveness.ts only. Timers: setTimeout chain (60 s first, then 10 min after each run ends), unref'd, start idempotent. Wire start/stop into src/dashboard/server/services/conversation-sweeps.ts with log line '[agent-tokens] sweep started (boot +60s, 10m sweep)'. New test tests/unit/dashboard/server/services/agent-token-sweep.test.ts with vi.useFakeTimers and injected deps."
+        },
+        "items": [
+          {
+            "id": "token-sweep.ac1",
+            "title": "Given an agent token older than the grace whose isAlive verdict is no-session, when sweepAgentTokensOnce runs, then that token is revoked in that one run; given a runtime-indeterminate verdict or a token minted 1 minute ago, then it is kept",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "token-sweep.ac2",
+            "title": "Given conversation tokens whose rows are missing, archived, or ended (token older than the grace), when one run executes, then each is revoked; given an active row, then the token is kept",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "token-sweep.ac3",
+            "title": "Given isAlive throws for the first token, when one run executes, then the second dead owner's token is still revoked and pruneEndedAccessTokens is called once with AGENT_TOKEN_PRUNE_AFTER_MS",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "token-sweep.ac4",
+            "title": "Given fake timers, when startAgentTokenSweep is called twice, then no run happens before 60 s, exactly one run happens at 60 s, and the next happens 10 minutes after that run ends; after stopAgentTokenSweep no further run happens",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document agent tokens in DASHBOARD-AUTH, ROLES, cli/token.mdx and the epic PRD",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T21:38:23Z",
+        "metadata": {
+          "issueLabel": "pan-4930",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-5"
+          ],
+          "difficulty": "simple",
+          "kind": "docs",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-AUTH.md",
+            "docs/ROLES.md",
+            "cli/token.mdx",
+            ".pan/drafts/pan-4927.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs passes"
+          ],
+          "readiness": "ready"
+        },
+        "narrative": {
+          "Action": "PRD W-10. docs/DASHBOARD-AUTH.md: under '## Credentials' add subsection 'Agent tokens (PAN-4927)' stating the three fields (valid only on kind token), the token file <owner dir>/mcp-token mode 0600 with the two owner dirs (agents/<agentId>/ and conversations/conv-<name>/), the five revoking stop paths (stopAgent, stopAgentSync, supervisor exited, close-out, stopConversationRuntime), the sweep cadence (60 s after boot, then every 10 minutes) and the 7-day prune, and that an older Overdeck treats an agent token as a plain token; under '## Scopes' add the D-8 table. docs/ROLES.md: section 'Agent token scopes (PAN-4927)' with the D-8 table and the rule never admin/forward/read:settings/read:costs, approve only for conversations. cli/token.mdx under '## list': agent tokens appear named agent:<role>:<agentId>, are revoked when the agent stops, and are removed 7 days after revocation. .pan/drafts/pan-4927.md: add 'Revision 2 (PAN-4930 planning)' note under W-TOK1 listing corrections C-1..C-5 from .pan/drafts/PAN-4930.md, and in W-INJ1 steps 3-4 a note that the conversation dir is conversationStateDir(conv.tmuxSession) and agentId is conv.name. The W-INJ1 note also states that the mint must run after the agent state is saved, because the sweep revokes an agent token whose state is missing (PRD H-9)."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "Given the change, when docs/DASHBOARD-AUTH.md is read, then it contains a heading 'Agent tokens (PAN-4927)' naming mcp-token, mode 0600, the five revoking stop paths, the 10-minute sweep and the 7-day prune",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "Given the change, when docs/ROLES.md is read, then it shows the D-8 table with review, test and ship lacking operate and only conversation holding approve",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "Given the change, when cli/token.mdx is read, then its list section states agent tokens are named agent:<role>:<agentId> and are revoked when the agent stops",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac4",
+            "title": "Given the change, when npm run lint:docs runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "extract-record-leaf",
+        "to": "agent-record-fields",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-record-fields",
+        "to": "credential-agent-fields",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-record-fields",
+        "to": "agent-token-module",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-token-module",
+        "to": "revoke-stop-agent",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-token-module",
+        "to": "revoke-exited-event",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-token-module",
+        "to": "revoke-closeout",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-token-module",
+        "to": "revoke-conversation-stop",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-token-module",
+        "to": "token-sweep",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
