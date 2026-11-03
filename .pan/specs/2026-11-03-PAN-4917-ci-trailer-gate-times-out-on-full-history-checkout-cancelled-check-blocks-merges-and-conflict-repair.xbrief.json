@@ -4,17 +4,17 @@
     "created": "2026-11-03T18:20:05Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4917: CI trailer gate times out on full-history checkout; cancelled check blocks merges and conflict repair",
-    "updated": "2026-11-03T18:31:31.895Z"
+    "updated": "2026-11-03T18:32:25.240Z"
   },
   "plan": {
     "id": "pan-4917",
     "title": "CI trailer gate times out on full-history checkout; cancelled check blocks merges and conflict repair",
-    "status": "proposed",
+    "status": "running",
     "uid": "0aff8622-a4ab-43fe-8001-574c87b5861f",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-03T18:20:05Z",
-    "updated": "2026-11-03T18:31:31.895Z",
+    "updated": "2026-11-03T18:32:25.240Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4917",
@@ -430,5 +430,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
