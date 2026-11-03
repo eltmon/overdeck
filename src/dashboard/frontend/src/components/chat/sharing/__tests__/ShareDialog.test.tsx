@@ -218,3 +218,34 @@ describe('ShareDialog suggestions and queue (PAN-4476 WI-14)', () => {
     expect(document.querySelector('[data-component="share-queue"]')).toBeNull();
   });
 });
+
+describe('ShareDialog controller handoff (PAN-4478 WI-8)', () => {
+  it('shows suggestions read-only while a viewer controls', () => {
+    const avatar = (id: number) => `https://avatars.githubusercontent.com/u/${id}`;
+    const snapshot = SHARE.snapshot;
+    if (!snapshot) throw new Error('no snapshot');
+    api.shares = {
+      data: [{
+        ...SHARE,
+        controllerGithubId: 200,
+        snapshot: {
+          ...snapshot,
+          controllerGithubId: 200,
+          participants: [
+            { githubId: 100, login: 'alice', avatarUrl: avatar(100), state: 'lobby', contributor: false, connected: true },
+            { githubId: 200, login: 'bob', avatarUrl: avatar(200), state: 'admitted', contributor: false, connected: true },
+          ],
+        },
+        drafts: [{ githubId: 200, login: 'bob', avatarUrl: avatar(200), text: 'Lint it', startedAt: '2026-11-03T00:00:00.000Z', updatedAt: '2026-11-03T00:00:01.000Z' }],
+      }],
+      isLoading: false,
+      error: null,
+    };
+    wrap(<ShareDialog target={{ name: 'conv-a' }} onClose={vi.fn()} />);
+    expect(screen.getByText('@bob has control.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Reclaim control' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Admit @alice' })).toBeNull();
+    expect(screen.getByText('Lint it')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Use suggestion from @bob' })).toBeNull();
+  });
+});
