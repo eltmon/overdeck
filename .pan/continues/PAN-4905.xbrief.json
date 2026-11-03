@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4905",
   "created": "2026-11-03T15:51:11.476Z",
-  "updated": "2026-11-03T16:46:57.996Z",
+  "updated": "2026-11-03T16:47:12.969Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -134,6 +134,10 @@
     "dialog-remote-off-notice.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T16:46:57.995Z"
+    },
+    "dialog-remote-off-notice.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:47:12.968Z"
     }
   }
 }
