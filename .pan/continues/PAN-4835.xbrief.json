@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4835",
   "created": "2026-11-03T07:59:34.235Z",
-  "updated": "2026-11-03T10:03:48.571Z",
+  "updated": "2026-11-03T10:04:22.567Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -148,6 +148,10 @@
     "phone-scope-rows.ac2": {
       "status": "completed",
       "doneAt": "2026-11-03T10:03:48.570Z"
+    },
+    "phone-scope-rows.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T10:04:22.566Z"
     }
   }
 }
