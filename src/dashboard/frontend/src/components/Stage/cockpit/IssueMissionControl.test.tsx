@@ -415,6 +415,17 @@ describe('IssueMissionControl', () => {
     }
   })
 
+  it('opens the Decisions body from a ?tab=decisions route (PAN-4849)', () => {
+    deftSummary.isDeft = true
+    window.history.replaceState(null, '', '/?tab=decisions')
+    try {
+      renderMissionControl()
+      expect(screen.getByTestId('deft-decisions')).toBeInTheDocument()
+    } finally {
+      deftSummary.isDeft = false
+    }
+  })
+
   it('renders one cost chip, the tracker link, and the narrative phase sentence in the header', () => {
     const { container } = renderMissionControl()
     const header = container.querySelector('[data-section="Header bar"]') as HTMLElement
