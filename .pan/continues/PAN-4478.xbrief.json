@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4478",
   "created": "2026-11-03T17:36:37.149Z",
-  "updated": "2026-11-03T18:34:12.696Z",
+  "updated": "2026-11-03T18:34:29.081Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -130,6 +130,10 @@
     "host-gate.ac2": {
       "status": "completed",
       "doneAt": "2026-11-03T18:34:12.696Z"
+    },
+    "host-gate.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:34:29.081Z"
     }
   }
 }
