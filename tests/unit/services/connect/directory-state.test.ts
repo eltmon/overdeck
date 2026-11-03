@@ -294,11 +294,15 @@ describe('directory reducer: relay credentials and metering (PAN-2356 WI-7)', ()
     const first = report(state, 600);
     expect(sends(first.effects)).toEqual([
       { kind: 'send', to: 'all', frame: { type: 'relay-status', month: '2026-11', bytesUsed: 600, capBytes: CAP, stopped: false } },
+      // Phones see the same status (PAN-4829 FR-8).
+      { kind: 'send', to: 'clients', frame: { type: 'relay-status', month: '2026-11', bytesUsed: 600, capBytes: CAP, stopped: false } },
     ]);
     state = first.state;
     const second = report(state, 500);
     expect(sends(second.effects)).toEqual([
       { kind: 'send', to: 'all', frame: { type: 'relay-status', month: '2026-11', bytesUsed: 1_100, capBytes: CAP, stopped: true } },
+      // Phones see the same status (PAN-4829 FR-8).
+      { kind: 'send', to: 'clients', frame: { type: 'relay-status', month: '2026-11', bytesUsed: 1_100, capBytes: CAP, stopped: true } },
     ]);
     const third = report(second.state, 10);
     expect(sends(third.effects)).toEqual([]);
@@ -314,5 +318,47 @@ describe('directory reducer: relay credentials and metering (PAN-2356 WI-7)', ()
     expect(sends(welcome.effects)[0]).toMatchObject({ frame: { relay: { month: '2026-11', bytesUsed: 2_000, capBytes: CAP, stopped: true } } });
     const decemberWelcome = reduce(capped, { kind: 'hello', registeredAs: null, identity: TESTER, frame: helloFrame(1), fingerprint: 'fp-1' }, ctx(december));
     expect(sends(decemberWelcome.effects)[0]).toMatchObject({ frame: { relay: { month: '2026-12', bytesUsed: 0, stopped: false } } });
+  });
+});
+
+describe('directory reducer: push before PAN-4830 (PAN-4828)', () => {
+  it('answers a push frame from a registered machine with bad_frame and keeps state', () => {
+    const state = register(1);
+    const result = reduce(
+      state,
+      {
+        kind: 'frame',
+        registeredAs: env(1),
+        frame: {
+          type: 'push',
+          requestId: '0'.repeat(32),
+          to: '00000000-0000-4000-8000-0000000000aa',
+          sealed: 'AAAA',
+          urgency: 'high',
+          collapseId: '1'.repeat(32),
+        },
+      },
+      { now: NOW, online: new Set(), stunUrls: [], relayCapBytes: RELAY_MONTHLY_CAP_BYTES, turnConfigured: false },
+    );
+    expect(result.state).toBe(state);
+    expect(sends(result.effects)).toEqual([
+      { kind: 'send', to: 'self', frame: { type: 'error', code: 'bad_frame', message: 'malformed frame' } },
+    ]);
+    expect(closes(result.effects)).toEqual([]);
+    expect(result.effects).toContainEqual({ kind: 'log', type: 'push', environmentId: env(1), outcome: 'bad_frame' });
+  });
+
+  it('decoder still refuses push until PAN-4830', () => {
+    const decoded = decodeMachineFrame(
+      JSON.stringify({
+        type: 'push',
+        requestId: '0'.repeat(32),
+        to: env(2),
+        sealed: 'AAAA',
+        urgency: 'high',
+        collapseId: '1'.repeat(32),
+      }),
+    );
+    expect(decoded).toEqual({ ok: false, reason: 'bad_frame' });
   });
 });

@@ -49,6 +49,7 @@ import { findActiveMachineTokenByKey } from '../../lib/access-tokens.js';
 import { websocketRpcRouteLayer } from './ws-rpc.js'
 import { issuesRouteLayer } from './routes/issues.js'
 import { testRemovalWaiverRouteLayer } from './routes/test-removal-waiver.js'
+import { deftRouteLayer } from './routes/deft.js'
 import { pipelineMembershipRouteLayer } from './routes/pipeline-membership.js'
 import { parkedRouteLayer } from './routes/parked.js'
 import { velocityRouteLayer } from './routes/velocity.js'
@@ -133,6 +134,7 @@ import { ttsRouteLayer } from './routes/tts.js';
 import { webhooksRouteLayer } from './routes/webhooks.js';
 import { triggerHooksRouteLayer } from './routes/trigger-hooks.js';
 import { triggersRouteLayer } from './routes/triggers.js';
+import { sharesRouteLayer } from './routes/shares.js';
 import { hooksRouteLayer } from './routes/hooks.js';
 import { diffsRouteLayer } from './routes/diffs.js';
 import { diffCompareRouteLayer } from './routes/diff-compare.js';
@@ -359,6 +361,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   websocketRpcRouteLayer,
   issuesRouteLayer,
   testRemovalWaiverRouteLayer,
+  deftRouteLayer,
   pipelineMembershipRouteLayer,
   parkedRouteLayer,
   velocityRouteLayer,
@@ -415,6 +418,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   webhooksRouteLayer,
   triggerHooksRouteLayer,
   triggersRouteLayer,
+  sharesRouteLayer,
   hooksRouteLayer,
   diffsRouteLayer,
   diffCompareRouteLayer,

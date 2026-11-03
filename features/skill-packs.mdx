@@ -506,7 +506,15 @@ Without a readable snapshot, `back` cannot undo the install exactly. It then cle
 - No polyrepo or remote (Fly) workspaces. `use` refuses them.
 - Deft's swarm mode refuses Bun projects, so a Deft issue in a Bun project runs without Deft swarm.
 - After `back`, the runtime's own dependencies stay in a `node_modules/` that existed before the install; only `node_modules/@deftai/` is removed.
-- The dashboard views for Deft issues (escalations, scopes, gates, and menu actions) are planned in [PAN-4849](https://github.com/eltmon/overdeck/issues/4849).
+
+**In the dashboard.** The dashboard shows Deft's own state, in Deft's own words, on the surfaces you already use. It reads the Directive files in the issue's worktree; it runs no Deft command.
+
+- **Switching.** The issue menu offers **Run on Deft** for an Overdeck issue that is not merged or closed, and **Back to Overdeck** for a Deft issue. They run `pan skills deft use <ISSUE>` and `pan skills deft back <ISSUE>`, and the activity feed reports when the switch finishes.
+- **Decisions tab.** A Deft issue's cockpit gains a Decisions tab: Deft's escalations, open first, with SLA, due time, `overdue` and `dangerous` marks and a **Resolve** control; Deft's decision records; and Deft's policy, read-only, with `requireHumanMerge` first.
+- **Needs-you.** An open escalation that needs an answer appears in Needs-you and in the question dialog, with its SLA and a `dangerous` chip. Answering it rewrites the escalation file and tells the work agent. An open `external` escalation does not block: it shows as **Deft: waiting on external**. When a Claude Code Deft agent ends its message with one of Deft's numbered menus, the question dialog offers the menu's labels verbatim and sends the exact label. Codex agents keep the menu in the terminal.
+- **Plan tab.** Plan › Tasks lists Deft's scopes by folder (In progress, Planned, Proposed, Done, Cancelled) with each item's evidence and disposition. A disposition Deft will not accept yet (no provenance, or an agent's) gets **Sign off**, which records a human sign-off in Deft's own terms. Plan › Map draws the scopes' swarm dependencies.
+- **Overview tab.** **Deft gates** lists Deft's own gate runs from its run summary. **Deft review cycle** shows Deft's review cycle for the PR: the verdict in Deft's names (`CLEAN`, `NEW_P0_P1`, `PENDING`), the five exit-predicate fields as met, unmet, or unknown, rounds with P0/P1/P2 counts and the fix commit, the review lease, and the `pr:watch` heartbeats and CLEAN records. Deft records no rounds, so the panel rebuilds them from Greptile's comments and the `fix: address Greptile review findings` commits, and says so. Greptile is the only reviewer that can end Deft's cycle: without it the panel says `No supported bot reviewer — Deft review cycle not running`.
+- **Other surfaces.** The phase rail shows `Deft: <delivery state>`. The project-tree row shows `spec drift <n>` (Deft's ledger of scope work the spec does not cover) and `install drift <n>` (hidden install files edited since the install). Changes › Files checks the changed files against Deft's approved scopes. Activity shows Deft's finish-loop progress. The agents lane lists Deft's subagents from their heartbeats, and a quiet one gets a `quiet` mark. A board card shows a `Deft` chip and its scope counts.
 
 ### SageOx
 

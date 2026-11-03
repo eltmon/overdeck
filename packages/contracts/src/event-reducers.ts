@@ -409,6 +409,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
             resolution: event.payload.resolution,
             resolutionCount: event.payload.resolutionCount,
             turnEndAssessment: event.payload.turnEndAssessment,
+            deftExternalEscalations: event.payload.deftExternalEscalations,
           },
         },
       }
@@ -553,6 +554,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
           delete base['pendingAskUserQuestion']
           delete base['pendingProposedPlan']
           delete base['turnEndAssessment']
+          delete base['deftExternalEscalations']
         }
         return base as AgentSnapshot
       })()

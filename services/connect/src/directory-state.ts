@@ -11,17 +11,19 @@ import {
   CONNECT_CLOSE_CODES,
   CONNECT_PROTOCOL_VERSION,
   FREE_MACHINE_LIMIT_MESSAGE,
-  RELAY_CAP_MESSAGE,
 } from '../../../packages/contracts/src/connect.ts';
 import type {
+  ClientPlatform,
   ConnectErrorCode,
   ConnectPlan,
   DirectoryEndpoint,
   DirectoryMachine,
+  DirectoryToClientFrame,
   DirectoryToMachineFrame,
   MachineToDirectoryFrame,
 } from '../../../packages/contracts/src/connect.ts';
-import { addUsage, bytesThisMonth, relayStatusOf } from './relay-meter.ts';
+import { iceServersAnswer, relayUsageAnswer } from './ice-relay.ts';
+import { relayStatusOf } from './relay-meter.ts';
 import type { RelayUsage } from './relay-meter.ts';
 
 /** One registered machine: a row of the `machines` table. */
@@ -32,6 +34,20 @@ export interface MachineRow {
   readonly fingerprint: string;
   readonly endpoints: readonly DirectoryEndpoint[];
   readonly serverVersion: string;
+  readonly deviceId: string;
+  /** Unix milliseconds. */
+  readonly registeredAt: number;
+  /** Unix milliseconds. */
+  readonly lastSeenAt: number;
+}
+
+/** One registered phone: a row of the `clients` table (PAN-4829). Never a machine. */
+export interface ClientRow {
+  readonly clientId: string;
+  readonly label: string;
+  readonly publicKeyHex: string;
+  readonly platform: ClientPlatform;
+  readonly appVersion: string;
   readonly deviceId: string;
   /** Unix milliseconds. */
   readonly registeredAt: number;
@@ -55,6 +71,8 @@ export interface DirectoryState {
   readonly plan: ConnectPlan | null;
   /** In registration order. */
   readonly machines: readonly MachineRow[];
+  /** Registered phones in registration order (PAN-4829); they never count as machines. */
+  readonly clients: readonly ClientRow[];
   /** Pending approvals, oldest first. Expired rows are dropped lazily on every event. */
   readonly approvals: readonly ApprovalRow[];
   /** The latest `relay_usage` row; a row from an earlier month counts as zero. */
@@ -95,13 +113,27 @@ export interface ReduceContext {
   readonly relayCapBytes: number;
   /** Both TURN secrets are set. */
   readonly turnConfigured: boolean;
+  /** Client ids with an open registered socket, not counting the event's own socket; absent ⇒ none (PAN-4829). */
+  readonly onlineClients?: ReadonlySet<string>;
 }
 
+const EMPTY_SET: ReadonlySet<string> = new Set();
+
+export const onlineClientsOf = (ctx: ReduceContext): ReadonlySet<string> => ctx.onlineClients ?? EMPTY_SET;
+
 /**
- * Socket targets. `self` is the event's socket; `others` is every registered socket except it;
- * `{ environmentId }` is that machine's registered sockets except the event's own.
+ * Socket targets. `self` is the event's socket; `others` is every other registered **machine**
+ * socket; `all` is self plus the other machines; `{ environmentId }` is that machine's registered
+ * sockets except the event's own. `clients` is every registered client socket except self, and
+ * `{ clientId }` is that client's sockets except self (PAN-4829).
  */
-export type Target = 'self' | 'others' | 'all' | { readonly environmentId: string };
+export type Target =
+  | 'self'
+  | 'others'
+  | 'all'
+  | 'clients'
+  | { readonly environmentId: string }
+  | { readonly clientId: string };
 
 export type DirectoryEffect =
   | { readonly kind: 'put-plan'; readonly plan: ConnectPlan }
@@ -121,16 +153,27 @@ export type DirectoryEffect =
   | { readonly kind: 'inbox-deliver' }
   | { readonly kind: 'inbox-forget'; readonly environmentId: string }
   | { readonly kind: 'register'; readonly environmentId: string }
-  | { readonly kind: 'send'; readonly to: Target; readonly frame: DirectoryToMachineFrame }
+  /** Phone registry (PAN-4829): upsert or delete a `clients` row, and bind the event's socket to a client. */
+  | { readonly kind: 'put-client'; readonly row: ClientRow }
+  | { readonly kind: 'delete-client'; readonly clientId: string }
+  | { readonly kind: 'register-client'; readonly clientId: string }
+  | { readonly kind: 'send'; readonly to: Target; readonly frame: DirectoryToMachineFrame | DirectoryToClientFrame }
   | { readonly kind: 'close'; readonly to: Target; readonly code: number; readonly reason: string }
-  | { readonly kind: 'log'; readonly type: string; readonly environmentId: string | null; readonly outcome: string };
+  | {
+    readonly kind: 'log';
+    readonly type: string;
+    readonly environmentId: string | null;
+    readonly outcome: string;
+    /** Set for a phone's events; logged beside the frame type, never its label or key. */
+    readonly clientId?: string;
+  };
 
 export interface ReduceResult {
   readonly state: DirectoryState;
   readonly effects: DirectoryEffect[];
 }
 
-export const EMPTY_DIRECTORY: DirectoryState = { plan: null, machines: [], approvals: [], relay: null };
+export const EMPTY_DIRECTORY: DirectoryState = { plan: null, machines: [], clients: [], approvals: [], relay: null };
 
 export function toDirectoryMachines(machines: readonly MachineRow[], online: ReadonlySet<string>): DirectoryMachine[] {
   return machines.map((row) => ({
@@ -145,8 +188,20 @@ export function toDirectoryMachines(machines: readonly MachineRow[], online: Rea
   }));
 }
 
-function errorFrame(code: ConnectErrorCode, message: string, extra?: { requestId?: string; session?: string }): DirectoryToMachineFrame {
+export function errorFrame(code: ConnectErrorCode, message: string, extra?: { requestId?: string; session?: string }): DirectoryToMachineFrame {
   return { type: 'error', code, message, ...extra };
+}
+
+/**
+ * A `directory` frame for the other machines and every phone (PAN-4829 FR-5). Approvals and inbox
+ * frames never use this: `others` stays machine-only, so phones never receive them.
+ */
+function broadcastDirectory(machines: DirectoryMachine[]): DirectoryEffect[] {
+  const frame = { type: 'directory', machines } as const;
+  return [
+    { kind: 'send', to: 'others', frame },
+    { kind: 'send', to: 'clients', frame },
+  ];
 }
 
 /** True when a live approval lets `a` and `b` exchange approval signals, in either direction. */
@@ -254,7 +309,7 @@ function hello(state: DirectoryState, event: Extract<DirectoryEvent, { kind: 'he
         machines,
       },
     },
-    { kind: 'send', to: 'others', frame: { type: 'directory', machines } },
+    ...broadcastDirectory(machines),
   );
   for (const approval of next.approvals) {
     if (approval.fromEnv === env || (approval.toEnv !== null && approval.toEnv !== env)) continue;
@@ -289,7 +344,7 @@ function frame(state: DirectoryState, event: Extract<DirectoryEvent, { kind: 'fr
         state: next,
         effects: [
           { kind: 'put-machine', row: updated },
-          { kind: 'send', to: 'others', frame: { type: 'directory', machines: toDirectoryMachines(next.machines, withOnline(ctx.online, self)) } },
+          ...broadcastDirectory(toDirectoryMachines(next.machines, withOnline(ctx.online, self))),
           { kind: 'log', type: f.type, environmentId: self, outcome: 'ok' },
         ],
       };
@@ -312,7 +367,7 @@ function frame(state: DirectoryState, event: Extract<DirectoryEvent, { kind: 'fr
           { kind: 'delete-machine', environmentId: target },
           ...dropped.map((r) => ({ kind: 'delete-approval', requestId: r.requestId }) as const),
           { kind: 'inbox-forget', environmentId: target },
-          { kind: 'send', to: 'others', frame: { type: 'directory', machines: toDirectoryMachines(next.machines, online) } },
+          ...broadcastDirectory(toDirectoryMachines(next.machines, online)),
           ...(self === target
             ? []
             : [{ kind: 'send', to: 'self', frame: { type: 'directory', machines: toDirectoryMachines(next.machines, online) } } as const]),
@@ -335,51 +390,34 @@ function frame(state: DirectoryState, event: Extract<DirectoryEvent, { kind: 'fr
       if (f.purpose === 'approval' && !approvalBetween(state.approvals, self, f.to)) {
         return refuse('approval_unknown', 'no pending approval between these machines', 'approval_unknown');
       }
-      if (!ctx.online.has(f.to)) return refuse('peer_offline', 'the other machine is offline', 'peer_offline');
-      return {
-        state,
-        effects: [
-          {
-            kind: 'send',
-            to: { environmentId: f.to },
-            // `from` is the sender socket's machine, never a field of the frame (D-2356-6).
-            frame: { type: 'signal', from: self, session: f.session, purpose: f.purpose, relay: f.relay, data: f.data },
-          },
-          { kind: 'log', type: f.type, environmentId: self, outcome: 'forwarded' },
-        ],
-      };
-    }
-    case 'ice-servers': {
-      if (f.relay) {
-        const ids = { requestId: f.requestId };
-        const refuse = (code: ConnectErrorCode, message: string): ReduceResult => ({
-          state,
-          effects: [
-            { kind: 'send', to: 'self', frame: errorFrame(code, message, ids) },
-            { kind: 'log', type: f.type, environmentId: self, outcome: code },
-          ],
-        });
-        // D-2356-12: plan, then cap, then TURN configured.
-        if (state.plan !== 'tester') return refuse('relay_not_allowed', 'the relay needs the relay plan');
-        if (bytesThisMonth(state.relay, ctx.now) >= ctx.relayCapBytes) return refuse('relay_cap_reached', RELAY_CAP_MESSAGE);
-        if (!ctx.turnConfigured) return refuse('turn_unavailable', 'relay credentials are not available');
+      if (ctx.online.has(f.to)) {
         return {
           state,
           effects: [
-            { kind: 'fetch-turn', requestId: f.requestId },
-            { kind: 'log', type: f.type, environmentId: self, outcome: 'turn' },
+            {
+              kind: 'send',
+              to: { environmentId: f.to },
+              // `from` is the sender socket's machine, never a field of the frame (D-2356-6).
+              frame: { type: 'signal', from: self, session: f.session, purpose: f.purpose, relay: f.relay, data: f.data },
+            },
+            { kind: 'log', type: f.type, environmentId: self, outcome: 'forwarded' },
           ],
         };
       }
-      const iceServers = ctx.stunUrls.length > 0 ? [{ urls: [...ctx.stunUrls] }] : [];
-      return {
-        state,
-        effects: [
-          { kind: 'send', to: 'self', frame: { type: 'ice-servers', requestId: f.requestId, iceServers } },
-          { kind: 'log', type: f.type, environmentId: self, outcome: 'stun' },
-        ],
-      };
+      // A machine answers a phone's link offer (PAN-4829 D-7); approvals never reach a phone.
+      if (onlineClientsOf(ctx).has(f.to) && f.purpose === 'link') {
+        return {
+          state,
+          effects: [
+            { kind: 'send', to: { clientId: f.to }, frame: { type: 'signal', from: self, session: f.session, purpose: 'link', relay: f.relay, data: f.data } },
+            { kind: 'log', type: f.type, environmentId: self, outcome: 'forwarded_client' },
+          ],
+        };
+      }
+      return refuse('peer_offline', 'the other machine is offline', 'peer_offline');
     }
+    case 'ice-servers':
+      return iceServersAnswer(state, f, ctx, { environmentId: self });
     case 'inbox-create':
       if (state.plan !== 'tester') {
         return {
@@ -403,20 +441,8 @@ function frame(state: DirectoryState, event: Extract<DirectoryEvent, { kind: 'fr
           { kind: 'log', type: f.type, environmentId: self, outcome: 'ok' },
         ],
       };
-    case 'relay-usage': {
-      const { usage, reachedCap } = addUsage(state.relay, f.bytes, ctx.now, ctx.relayCapBytes);
-      const next: DirectoryState = { ...state, relay: usage };
-      const effects: DirectoryEffect[] = [{ kind: 'put-relay-usage', usage }];
-      const status = relayStatusOf(usage, ctx.now, ctx.relayCapBytes);
-      if (reachedCap || !status.stopped) {
-        // Every machine's status card shows the month's traffic, so each report refreshes it. At the
-        // cap every machine closes its relay channels (no new credentials until the next month);
-        // later reports in a stopped month send nothing, since the stop was already broadcast.
-        effects.push({ kind: 'send', to: 'all', frame: { type: 'relay-status', ...status } });
-      }
-      effects.push({ kind: 'log', type: f.type, environmentId: self, outcome: reachedCap ? 'cap_reached' : 'counted' });
-      return { state: next, effects };
-    }
+    case 'relay-usage':
+      return relayUsageAnswer(state, f.bytes, ctx, { environmentId: self });
     case 'approval-request': {
       const ids = { requestId: f.requestId };
       const refuse = (code: ConnectErrorCode, message: string, outcome: string): ReduceResult => ({
@@ -467,6 +493,16 @@ function frame(state: DirectoryState, event: Extract<DirectoryEvent, { kind: 'fr
         ],
       };
     }
+    case 'push':
+      // PAN-4830 (PAN-4823 W-CON3) delivers pushes. Until then the decoder refuses `push`, so this
+      // answers exactly as an undecodable frame from a registered machine does today.
+      return {
+        state,
+        effects: [
+          { kind: 'send', to: 'self', frame: errorFrame('bad_frame', 'malformed frame') },
+          { kind: 'log', type: f.type, environmentId: self, outcome: 'bad_frame' },
+        ],
+      };
   }
 }
 
@@ -504,7 +540,7 @@ function reduceLive(state: DirectoryState, event: DirectoryEvent, ctx: ReduceCon
         state: next,
         effects: [
           { kind: 'put-machine', row: updated },
-          { kind: 'send', to: 'others', frame: { type: 'directory', machines: toDirectoryMachines(next.machines, ctx.online) } },
+          ...broadcastDirectory(toDirectoryMachines(next.machines, ctx.online)),
           { kind: 'log', type: 'close', environmentId: event.registeredAs, outcome: 'offline' },
         ],
       };

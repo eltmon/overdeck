@@ -22,6 +22,8 @@ import {
   type SessionPaneChoiceResult,
 } from '../../../../lib/session-pane-choice.js';
 import { emitActivityEntry } from '../../../../lib/activity-logger.js';
+import { DEFT_ESCALATION_TOOL_ID_PREFIX, DEFT_MENU_TOOL_ID_PREFIX } from '../../../../lib/deft/pending.js';
+import { answerDeftEscalation, answerDeftMenu } from '../../../../lib/deft/pending-answer.js';
 import { ReadModelService } from '../../read-model.js';
 import { EventStoreService } from '../../services/domain-services.js';
 import { jsonResponse } from '../../http-helpers.js';
@@ -157,13 +159,22 @@ export async function handlePostAgentAnswerQuestion(
 
   const pendingQuestions = await getAgentPendingQuestions(id);
   const matched = toolUseId ? pendingQuestions.find((q) => q.toolId === toolUseId) : undefined;
-  if (!matched && isOperatorDecisionToolId(toolUseId)) {
+  const deftToolId = toolUseId?.startsWith(DEFT_ESCALATION_TOOL_ID_PREFIX) || toolUseId?.startsWith(DEFT_MENU_TOOL_ID_PREFIX);
+  if (!matched && (isOperatorDecisionToolId(toolUseId) || deftToolId)) {
     return { body: { error: 'This decision was already answered or withdrawn', code: 'decision-closed' }, status: 409 };
   }
   if (pendingQuestions.length === 0) {
     return { body: { error: 'No pending questions found for this agent' }, status: 404 };
   }
   const questionSet = matched ?? pendingQuestions[0];
+
+  // PAN-4849: a Deft escalation is answered by rewriting its file; a Deft menu by its exact label.
+  if (questionSet.toolId.startsWith(DEFT_ESCALATION_TOOL_ID_PREFIX)) {
+    return answerDeftEscalation(id, questionSet.toolId, answers[0]);
+  }
+  if (questionSet.toolId.startsWith(DEFT_MENU_TOOL_ID_PREFIX)) {
+    return answerDeftMenu(id, questionSet.toolId, answers[0], questionSet.questions[0]?.options.map((o) => o.label) ?? []);
+  }
 
   // PAN-4383: a `pan ask` decision closes in the journal only once the answer
   // actually reached the agent.

@@ -765,6 +765,36 @@ the operator once (PAN-3580). The key does not hash the UAT notes: they are
 free text that varies run to run, and a notes-keyed delivery would re-tell
 the agent on every re-run of an unchanged head.
 
+**CodeRabbit findings reach the work agent (PAN-4773).** CodeRabbit is
+advisory: it reviews only sometimes, nothing waits for it, and no merge gate
+reads it (`lint:no-coderabbit-merge-gate`). When it does post a review, the
+`pull_request_review` webhook (`handlePullRequestReview` in
+`lib/webhook-handlers.ts`) hands it to `relayCodeRabbitReview`
+(`cloister/coderabbit-feedback.ts`):
+
+- Only a submitted, not dismissed, review by `coderabbitai[bot]` on a
+  `feature/<issue>` head with a pipeline workspace is routed.
+- The review's top-level inline threads are read
+  (`fetchCodeRabbitReviewThreads` in `cloister/coderabbit-ingestion.ts`); replies
+  are left out. A review with no inline thread (a summary, or "no actionable
+  comments") routes nothing.
+- A feedback file (specialist `coderabbit`) lists each thread: id, path and
+  line, severity, title and link. It tells the agent to fix the findings it
+  agrees with, and to reply on the thread with its reason for each one it
+  rejects (`gh api repos/<repo>/pulls/<n>/comments/<id>/replies`). After a
+  code change the agent pushes and runs `pan review request`; after replies
+  only, it is done.
+- Delivery is keyed on the review id through the resurrection ladder's target,
+  like conflict repair. A delivery is journaled as `feedback.delivered` with
+  kind `coderabbit`, and the same review is never delivered twice, also when
+  GitHub sends its event twice at once.
+- With no reachable work agent (an adopted PR has none), or a delivery that is
+  not accepted, the relay raises Needs-you with the feedback file.
+
+The relay runs on the webhook only, so a review posted while the dashboard is
+down is not routed later. The reviewer context still lists CodeRabbit findings
+as advisory (`cloister/review-context.ts`).
+
 The UAT verdict comment ends with a machine marker carrying the outcome and
 the commit UAT exercised, `<!-- overdeck-uat: failed sha=<commit> -->` (the
 `--tested-sha`, else the PR head when the verdict was posted). Merge
@@ -1572,6 +1602,7 @@ One piece of stored pipeline state came back, and it is not a status.
 | `merge.failed` | merge-ops' own `setStatus`, the single funnel every failing exit of `triggerMerge` passes through |
 | `merge.completed` | `cloister/merge-agent.ts` `postMergeLifecycle`, right after the forge answers "merged" |
 | `review.stale-approval-rerequested` | `dashboard/server/services/stale-approval-rereview.ts`, when the auto-merge scheduler asked the guarded review door for a head whose approval is stale, once per head, written only when the door answered `started` or `already-running` (`data.head`, `data.outcome`, PAN-4772) |
+| `feedback.delivered` / `feedback.skipped` | `cloister/feedback-delivery-record.ts`, from the review and UAT relays (kind `review`, `uat`) and the CodeRabbit relay `cloister/coderabbit-feedback.ts` (kind `coderabbit`, keyed per CodeRabbit review; it writes `feedback.delivered` only) (`data.kind`, `dedupKey`, `agentId`) |
 | `conflict.repair-requested` | `cloister/conflict-repair.ts` `tickConflictRepair`, once the sync-main repair for a merge-ready but conflicting head (`data.head`) was delivered, with `data.staleApproval: true` when the approval stood at an older head (PAN-4467) |
 | `conflict.repair-escalated` | `cloister/conflict-repair.ts` `tickConflictRepair`, when that head still conflicts after the 45-minute grace or its work agent cannot be reached (`data.head`, `data.reason`) |
 | `blocked.declared` | `pan task block <issue> <item> --on <ref>...` (source `pan-task-block`), with `data.item` and canonical `data.blockers` |

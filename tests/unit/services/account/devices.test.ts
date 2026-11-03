@@ -92,6 +92,12 @@ describe('device records (PAN-4293 account-device-credentials)', () => {
     expect(isValidPlatform('linux-x64')).toBe(true);
     expect(isValidPlatform('freebsd-x64')).toBe(false);
     expect(isValidPlatform('linux-x86')).toBe(false);
+    expect(isValidPlatform('ios-arm64')).toBe(true);
+    expect(isValidPlatform('android-arm64')).toBe(true);
+    expect(isValidPlatform('ios-x64')).toBe(false);
+    expect(isValidPlatform('android-x64')).toBe(false);
+    expect(isValidPlatform('ios-arm')).toBe(false);
+    expect(isValidPlatform('iphone-arm64')).toBe(false);
     expect(isValidEnvironmentId(ENV_A)).toBe(true);
     expect(isValidEnvironmentId(ENV_B.toUpperCase())).toBe(false);
     expect(isValidEnvironmentId('11111111-2222-1333-8444-555555555555')).toBe(false);
@@ -103,6 +109,8 @@ describe('device records (PAN-4293 account-device-credentials)', () => {
     expect(defaultLabel('linux-x64')).toBe('Linux device');
     expect(defaultLabel('darwin-arm64')).toBe('macOS device');
     expect(defaultLabel('win32-x64')).toBe('Windows device');
+    expect(defaultLabel('ios-arm64')).toBe('iPhone');
+    expect(defaultLabel('android-arm64')).toBe('Android phone');
     expect(normalizeLabel('  my laptop ')).toBe('my laptop');
     expect(normalizeLabel('')).toBeNull();
     expect(normalizeLabel('   ')).toBeNull();

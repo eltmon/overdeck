@@ -556,6 +556,12 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   (`src/lib/internal-token.ts`, `routes/agents/shared.ts`, the caveman hook
   script, four shell hooks). Never inject the token into a
   pane's env, and never add a reader that checks env first.
+  Test consequence (PAN-4881): every test file in a Vitest pool slot shares
+  `OVERDECK_HOME=<run root>/worker-<VITEST_POOL_ID>`, and mocking the
+  `paths.js` `OVERDECK_HOME` constant does not move the token file
+  (`getOverdeckHome()` reads env). A test that authenticates with an env token
+  must `rmSync(join(getOverdeckHome(), 'internal-token'), { force: true })`
+  before resetting the token cache, or a sibling file's token 401s it.
 - **Docker's bridge pool caps live workspace stacks** (PAN-4663) — the host fits
   ~31 bridge networks (`DEFAULT_DOCKER_BRIDGE_POOL_LIMIT`, `docker-bridge-pool.ts`);
   past that, every stack create/rebuild fails "all predefined address pools have been
@@ -616,4 +622,10 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   `setLocalDescription` waits for gathering. Passing Cloudflare's list as-is (UDP first) makes the relay
   route miss its 10 s budget on UDP-blocked networks. The relay route's list goes through
   `relayIceServers` (`src/lib/anywhere/channel/relay-ice-servers.ts`: TLS 443 first, no STUN) on both ends.
-<!-- last-verified: 2026-11-02 -->
+- **Fly VMs and SSH hosts must run home's exact `pan` version from npm** (PAN-4882) —
+  `provisionFlyMachine` (`src/lib/anywhere/fly/provision.ts`) runs `npm install -g @overdeck/core@<home
+  version>` and throws `version-mismatch` when that fails; the SSH-machine add answers 409
+  `version-mismatch`. Both pin to home's version, not npm `latest`, so a newer `latest` is harmless (PAN-4882
+  ran on home 0.73.0 with `latest` 0.73.1). Only a deployed version not yet on npm breaks both until it is
+  published; live checks then need a branch image built from the deployed commit.
+<!-- last-verified: 2026-11-03 -->

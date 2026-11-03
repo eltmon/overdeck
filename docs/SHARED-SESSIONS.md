@@ -123,8 +123,94 @@ Facts verified against the Cloudflare docs on 2026-10-02:
 | `ROOMS` | Durable Object binding | class `ShareRoom`, migration `v1` (`new_sqlite_classes`) |
 | `ACCOUNT` | service binding | `overdeck-account`, entrypoint `AccountRpc` (PAN-4293) |
 | `ROOM_CREATE_LIMIT` | rate-limit binding | 10 room creations per 60 s per GitHub id; unbound in tests, which means no limit |
+| `anywhere.share_url` | the host's `${OVERDECK_HOME}/config.yaml` (dashboard side, not the Worker) | the share service the dashboard talks to. Default `https://share.overdeck.ai`; `https:`, or `http:` to a loopback host for local development; no query, fragment or credentials |
 
 Local development reads the same names from `services/share/.dev.vars` (gitignored); `.dev.vars.example` holds placeholders.
+
+## Host side in the dashboard (slice 2, PAN-4473)
+
+The host side lives in the local dashboard server. The browser never talks to the share service and never sees a host token.
+
+**Share record file.** `${OVERDECK_HOME}/shared-sessions.json`, mode 0600, written atomically (temp file, then rename) through `src/lib/sharing/share-record.ts`. It is the host's memory of its rooms:
+
+```json
+{
+  "version": 1,
+  "rooms": {
+    "BCDFGHJK": {
+      "scopeKind": "conversation",
+      "scopeId": "<conversation name>",
+      "hostToken": "odh_<64 hex>",
+      "joinUrl": "https://share.overdeck.ai/s/BCDFGHJK",
+      "createdAt": "2026-11-02T00:00:00.000Z"
+    }
+  }
+}
+```
+
+A conversation has at most one share. An entry is removed when the operator ends the share, when the host socket closes with 4004 (room ended), or when the host-socket upgrade answers 404 or 401. A corrupt file is never replaced silently: reads fail with a message naming the file, and deleting it forgets the local shares.
+
+**Share service URL.** `anywhere.share_url` in `${OVERDECK_HOME}/config.yaml` (see the Configuration table), read on every share creation and every end. `src/lib/sharing/share-service.ts` holds the HTTP client: `POST /v1/rooms` with the device token from `account.json`, `DELETE /v1/rooms/:code` with the host token, 10 s timeouts.
+
+**Host socket.** `src/dashboard/server/services/share-host.ts` (`ShareManager`) writes the record, then opens `GET /v1/rooms/:code/host?v=1` with `Authorization: Bearer <hostToken>` and keeps the latest `room` snapshot and the latest `error` frame in memory. It sends a WebSocket protocol ping every 30 s and drops the socket after 75 s without a pong. Any close other than 4004 leaves the share `disconnected` with its record kept.
+
+**Routes.** All four are behind the dashboard's auth at the default `admin` scope and answer `Cache-Control: no-store`. Short codes are normalized like the Worker (uppercase, spaces and dashes stripped).
+
+| Route | Answers |
+| --- | --- |
+| `GET /api/shares` | 200 `{ shares: ShareView[] }`, live and stale shares, oldest first; 500 `share_record_unreadable` |
+| `POST /api/shares` | body `{ conversationName }`. 201 `ShareView` for a new room; 200 with the existing view when the conversation's share is already live; 400 `invalid_request`; 404 `conversation_not_found` (not a local conversation); 409 for a vault browse copy or a released conversation; 412 `not_signed_in`; 409 `account_rejected` / `account_expired`; 429 `rate_limited`; 500 `account_unreadable` / `share_url_invalid` / `share_record_unreadable`; 502 `share_service_unreachable` / `share_service_error` |
+| `POST /api/shares/:code/commands` | body is one share command. 202 `{ ok: true }` once the frame is sent; 400 `invalid_command`; 404 `share_not_found`; 409 `share_not_connected` |
+| `DELETE /api/shares/:code` | 204 after `DELETE /v1/rooms/:code` succeeds (404 from the service counts as gone); 404 `share_not_found`; 500 `share_url_invalid`; 502 `share_service_error` with the record kept |
+
+A stale record (no host socket, for example after a dashboard restart) is still listed and can still be ended. Creating a share for a conversation whose record is stale ends the old room best-effort and creates a new one.
+
+**Signed out.** Without `${OVERDECK_HOME}/account.json`, `POST /api/shares` answers 412 `{ "error": "not_signed_in", "message": "Sign in with pan account login to share conversations." }`, and the dialog shows a signed-out panel naming `pan account login`.
+
+**Lobby actions.** The conversation's ⋮ menu has **Share this conversation** for conversations that run on this machine. The share dialog shows the join link with **Copy**, the connection state, the lobby panel and **End share**, and polls `GET /api/shares` once a second while open. Each lobby button sends one host frame:
+
+| Button | Who | Host frame |
+| --- | --- | --- |
+| **Admit** | waiting | `{ "type": "admit", "githubId": N }` |
+| **Admit as contributor** | waiting | `{ "type": "admit", "githubId": N, "contributor": true }` (one click, one frame) |
+| **Revoke** | waiting or in the room | `{ "type": "revoke", "githubId": N }` |
+| **Grant contributor** / **Remove contributor** | in the room | `{ "type": "set-contributor", "githubId": N, "contributor": true / false }` |
+| **Kick** | in the room | `{ "type": "kick", "githubId": N }` |
+| **Un-revoke** | blocked | `{ "type": "unrevoke", "githubId": N }` |
+
+**Not done yet.** The host socket is not reconnected after a network drop and not re-parked after a dashboard restart: that is slice 8 ([PAN-4479](https://github.com/eltmon/overdeck/issues/4479)), which reads the same record file. Content (WebRTC) is described in the next section.
+
+## Host WebRTC hub and content wire format (slice 3, PAN-4474)
+
+Content travels peer-to-peer over WebRTC data channels between the host's dashboard server and each viewer. The share service only relays signaling (SDP and ICE) and never sees content.
+
+**WebRTC stack.** The host uses werift 0.25.1, the pure-TypeScript stack Overdeck Anywhere already ships, so no native addon is added. The slice 3 spike (`src/dashboard/server/sharing/__tests__/werift-spike.slow.test.ts`, opt-in with `VITEST_INCLUDE_SLOW=1`) measured 5.4 to 6.9 MB/s on loopback, delivered 1000 messages in order, and interoperated with headless Chromium on all five channels; the full result is in `.pan/drafts/pan-658.md` under *WebRTC dependency*.
+
+**Peer hub.** `src/dashboard/server/sharing/peer-hub.ts` (`PeerHub`), one per live share, holds one `RTCPeerConnection` per eligible viewer. The host always offers: it creates the five channels below, ordered and reliable, before its offer, and sends the offer and its ICE candidates as `signal` host frames. An inbound offer is ignored. ICE servers come from the share service's `ice-servers` frame; `error turn_unavailable`, or no answer within 5 s, falls back to an empty list (host candidates only). A successful list is cached for 50 minutes and shared by every viewer that starts while the request is in flight.
+
+**Content gate.** The hub keeps its own **host-admitted set**: GitHub ids this host process admitted by sending an `admit` frame. Only the host's own `admit` adds an id; `kick` and `revoke` remove one, and so does a snapshot that no longer lists the id at all. A room snapshot never adds an id. An **eligible viewer** is in the host-admitted set and listed in the latest snapshot as `admitted` and `connected`. Only eligible viewers get a peer connection, a `signal` frame or any content, whatever a snapshot claims.
+
+**Peer lifetime.** Every snapshot reconciles: an eligible viewer without a peer gets a new offer, and a peer whose viewer is no longer eligible is closed. Kick and revoke close the viewer's peer connection at once. A peer whose connection fails is removed, and the next snapshot that still shows the viewer eligible offers a new one with a fresh history. To ask for a fresh offer (for example after a browser reload), a viewer closes its join socket, waits for that socket's `close` event, and only then opens a new one, so the snapshot flips `connected` false then true. Opening the new socket first does not work: the service replaces the old socket with close 4008 and never marks the viewer disconnected. A dropped host socket keeps established peers; the hub closes only when the share's host entry is dropped (end, close 4004, a 404/401 upgrade, a replaced stale record, or shutdown).
+
+**Channels.** Every peer connection carries the same five labels:
+
+| Channel | Carries in slice 3 |
+| --- | --- |
+| `control` | The hello exchange and hello errors. The only channel the host reads. |
+| `conversation` | `history` (the stream's full message list, which replaces what the viewer has), then `append` for a new message, `update` for a changed one, or `unavailable` (`transcript_not_found`, `history_too_large`) |
+| `presence` | The roster: the data owner first (`isHost: true`), then every lobby and admitted participant, the controller and the stream list. Sent when the channel opens and again when a snapshot changes it. The block list and `connected` are never sent. |
+| `drafts` | Nothing yet (slice 5) |
+| `terminal` | Nothing yet (slice 6) |
+
+**Envelopes.** Every data-channel message is one encoded `SharedEnvelope` `{ v, ch, streamId, seq, t, payload }` or one fragment of one. `v` is 1. `streamId` is the shared conversation's name. `seq` counts per peer connection, per channel and per stream from 1; fragments do not consume one. An encoded envelope longer than `SHARE_MAX_MESSAGE_CHARS` (32,768 characters) is sent as `SharedChunk` fragments `{ v, chunk: { id, index, count }, data }` in order on the same channel. An envelope longer than `SHARE_MAX_ENVELOPE_CHARS` (32 Mi characters) is never sent; a history that large becomes `unavailable history_too_large`. A channel writer waits while the channel's `bufferedAmount` is above 1 MiB, and a peer whose queued content passes 64 Mi characters is closed.
+
+**Hello exchange.** The host sends its hello `{ v: 1, scopeKinds: ['conversation'], scope }` as the first `control` envelope when the channel opens. The viewer answers with its own hello, copying `scope` from the host's. The host sends no conversation or presence content until the viewer's hello negotiates: both sides agree on the lower `v`, each must support the other's scope kind, and the scopes must match. A failed negotiation gets a `control` envelope `{ kind: 'error', code }` (`invalid_hello`, `version_unsupported`, `scope_kind_unsupported`) and nothing else.
+
+**What crosses the wire.** Messages are mapped through `toSharedMessage`, an allow-list of `id`, `role`, `text`, `turnId`, `createdAt`, `completedAt`, `streaming` and `sequence`. The work log, tool calls, thinking, plans, cost and context usage are not shared. `src/dashboard/server/sharing/conversation-bridge.ts` parses the conversation's Claude JSONL once (the full file) and watches it for appends. Only Claude Code conversations stream: a conversation with no Claude session id gets `unavailable transcript_not_found`, and one whose stored session id belongs to another harness gets an empty history that never grows.
+
+**Host socket loss.** A host whose host socket dropped keeps streaming to its established peers, even after the share service ends the room on its 5-minute alarm. A viewer must therefore tear down its peer connection when its own join socket closes with 4004.
+
+**For slice 4.** `@overdeck/contracts` exports the wire format types from `sharing.ts` and the runtime helpers from `sharing-wire.ts` (`toSharedMessage`, `decodeEnvelope`, `encodeSharedMessage`, `SharedChannelReader`, `SeqTracker`, `negotiateHello`). The share Worker imports only `sharing.ts`, which stays type-only. `src/dashboard/server/sharing/__tests__/loopback-viewer.ts` is a werift viewer that tests use as a stand-in for the browser.
 
 ## Local development
 

@@ -85,7 +85,8 @@ function enrichmentChanged(prev: AgentEnrichment | undefined, next: AgentEnrichm
     prev.resolution !== next.resolution ||
     prev.resolutionCount !== next.resolutionCount ||
     prev.turnEndAssessment?.kind !== next.turnEndAssessment?.kind ||
-    prev.turnEndAssessment?.confidence !== next.turnEndAssessment?.confidence
+    prev.turnEndAssessment?.confidence !== next.turnEndAssessment?.confidence ||
+    prev.deftExternalEscalations !== next.deftExternalEscalations
   )
 }
 
@@ -346,6 +347,7 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
           resolution: enrichment.resolution as AgentEnrichmentChangedEvent['payload']['resolution'],
           resolutionCount: enrichment.resolutionCount,
           ...(enrichment.turnEndAssessment ? { turnEndAssessment: enrichment.turnEndAssessment } : {}),
+          ...(enrichment.deftExternalEscalations ? { deftExternalEscalations: enrichment.deftExternalEscalations } : {}),
         },
       }
 

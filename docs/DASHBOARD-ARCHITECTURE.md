@@ -80,6 +80,16 @@ Origin, then session cookie or internal token — see [DASHBOARD-AUTH.md](DASHBO
   and deflated entries only) and mapped by `vsix-import.ts` (PAN-4659). See
   [appearance.mdx](../configuration/appearance.mdx) "Color themes" for the operator-facing
   picture.
+- Shared Sessions host side (PAN-4473): `src/dashboard/server/routes/shares.ts` serves
+  `GET /api/shares`, `POST /api/shares`, `POST /api/shares/:code/commands` and
+  `DELETE /api/shares/:code`. They delegate to `ShareManager` in `services/share-host.ts`,
+  which holds one host WebSocket per live room to the share service. The record file door and
+  the share service HTTP client live in `src/lib/sharing/`. The host token stays on the
+  server; the browser sees `ShareView`s only. See "Host side in the dashboard" in
+  [SHARED-SESSIONS.md](SHARED-SESSIONS.md). PAN-4474 adds `src/dashboard/server/sharing/` —
+  `peer-hub.ts` (one werift `RTCPeerConnection` per admitted viewer), `conversation-bridge.ts`
+  (history backfill, then live append/update from `watchConversation`) and `channel-writer.ts` —
+  wired into `ShareManager`.
 - Companion terminals (PAN-3974, PAN-3835): an OpenCode or Codex conversation's TERMINAL
   streams a separate `companion-<ownerSession>` tmux session running `opencode attach` or
   `codex resume --remote` against the conversation's own runtime, opened through
@@ -1447,16 +1457,26 @@ fills, and groups with `groupPipelineIssues` in `lib/pipeline-state.ts`,
 which the desktop `PipelineView` shares — one definition of "active issue",
 one phase order, one sort. It adds no API route and no HTTP request.
 
-## Deft pipeline routes (planned, PAN-4849)
+## Deft pipeline routes (PAN-4849)
 
 PAN-4820 shipped the per-issue Deft pipeline as library and CLI code
-(`src/lib/deft/`, `pan skills deft use|back|save|show`); the dashboard has no
-Deft routes yet. [PAN-4849](https://github.com/eltmon/overdeck/issues/4849)
-plans these, and none of them is served today:
+(`src/lib/deft/`, `pan skills deft use|back|save|show`).
+[PAN-4849](https://github.com/eltmon/overdeck/issues/4849) serves it to the
+dashboard from `src/dashboard/server/routes/deft.ts`. The state routes read
+the issue's worktree with `src/lib/deft/state-reader.ts`, which uses
+`fs/promises` only and never throws (a malformed file becomes an `errors`
+entry). The review-cycle route loads PR data through Overdeck's cached PR,
+check-run and discussion loaders plus one async `git log`
+(`src/lib/deft/review-cycle-load.ts`) and derives the view model with the pure
+`src/lib/deft/review-cycle.ts`. Escalation and menu answers from the question
+dialog go through `POST /api/agents/:id/answer-question`
+(`src/lib/deft/pending-answer.ts`). The frontend reads these through
+`components/deft/queries.ts`:
 
 | Route | Purpose |
 |---|---|
 | `GET /api/issues/:id/deft` | One issue's Deft state for the cockpit (scopes, escalations, gates, drift) |
+| `GET /api/issues/:id/deft/review-cycle` | Deft's review cycle for the issue's PR (verdict, exit fields, reconstructed rounds, lease) |
 | `GET /api/deft/issues` | Batched Deft state for the board, tree rows and pipeline strip |
 | `POST /api/issues/:id/pipeline` | Run on Deft / Back to Overdeck; shells `pan skills deft use|back` |
 | `POST /api/issues/:id/deft/escalations/:escId/resolve` | Answer a Deft escalation (rewrites the escalation file) |

@@ -1,3 +1,4 @@
+/// <reference path="./types/noise-handshake.d.ts" />
 /**
  * Noise handshakes for secure channels (PAN-4645 D-4645-1, D-4645-17).
  *
@@ -20,69 +21,52 @@
  * library and copies its outputs. The static key pair is never zeroed by the
  * library (only ephemerals are), so the long-term machine key can be passed in.
  */
-import { createHash, randomBytes } from 'node:crypto';
-import { createRequire } from 'node:module';
+import b4a from 'b4a';
+import Noise, { type NoiseState } from 'noise-handshake';
 
-import type { MachineKeyPair } from '../machine-key.js';
+import type { CryptoPort } from './crypto-port.js';
 import { MODE_BYTES, type ChannelMode } from './wire.js';
 
 /** Link protocol version this module speaks; mirrors `LINK_PROTOCOL_VERSION` in `@overdeck/contracts`. */
 export const NOISE_LINK_PROTOCOL = 1;
 
-interface NoiseState {
-  initialise(prologue: Uint8Array, remoteStatic?: Uint8Array): void;
-  send(payload?: Uint8Array): Uint8Array;
-  recv(message: Uint8Array): Uint8Array;
-  complete: boolean;
-  rs: Uint8Array | null;
-  tx: Uint8Array | null;
-  rx: Uint8Array | null;
-  hash: Uint8Array | null;
+/** A Noise static key pair. The server's `MachineKeyPair` is assignable to it. */
+export interface StaticKeyPair {
+  publicKey: Uint8Array;
+  secretKey: Uint8Array;
 }
-
-interface NoiseConstructor {
-  new (
-    pattern: 'IK' | 'XX' | 'XXpsk0',
-    initiator: boolean,
-    staticKeyPair: MachineKeyPair,
-    opts?: { psk?: Uint8Array },
-  ): NoiseState;
-}
-
-const _require = createRequire(import.meta.url);
-const Noise = _require('noise-handshake') as NoiseConstructor;
 
 /** Keys both ends hold once a handshake completes. */
 export interface HandshakeResult {
-  tx: Buffer;
-  rx: Buffer;
-  hash: Buffer;
-  localPublicKey: Buffer;
-  remotePublicKey: Buffer;
+  tx: Uint8Array;
+  rx: Uint8Array;
+  hash: Uint8Array;
+  localPublicKey: Uint8Array;
+  remotePublicKey: Uint8Array;
 }
 
 export class Handshake {
   constructor(
     private readonly state: NoiseState,
-    private readonly localPublicKey: Buffer,
+    private readonly localPublicKey: Uint8Array,
   ) {}
 
   get complete(): boolean {
     return this.state.complete;
   }
 
-  send(payload?: Uint8Array): Buffer {
-    return Buffer.from(this.state.send(payload));
+  send(payload?: Uint8Array): Uint8Array {
+    return b4a.from(this.state.send(payload));
   }
 
-  recv(message: Uint8Array): Buffer {
-    return Buffer.from(this.state.recv(message));
+  recv(message: Uint8Array): Uint8Array {
+    return b4a.from(this.state.recv(message));
   }
 
   /** The peer's static key once learned (a copy; the library's view is a message subarray). */
-  remoteKey(): Buffer {
+  remoteKey(): Uint8Array {
     if (!this.state.rs) throw new Error('Noise handshake has not learned the remote static key yet');
-    return Buffer.from(this.state.rs);
+    return b4a.from(this.state.rs);
   }
 
   /** Copies of the split keys; only valid once `complete`. */
@@ -91,10 +75,10 @@ export class Handshake {
       throw new Error('Noise handshake is not complete');
     }
     return {
-      tx: Buffer.from(this.state.tx),
-      rx: Buffer.from(this.state.rx),
-      hash: Buffer.from(this.state.hash),
-      localPublicKey: Buffer.from(this.localPublicKey),
+      tx: b4a.from(this.state.tx),
+      rx: b4a.from(this.state.rx),
+      hash: b4a.from(this.state.hash),
+      localPublicKey: b4a.from(this.localPublicKey),
       remotePublicKey: this.remoteKey(),
     };
   }
@@ -104,11 +88,11 @@ export class Handshake {
  * The Noise prologue both ends must agree on:
  * `overdeck-link/<protocol>\0<mode byte>\0<pairing id or approval request id hex, or empty>`.
  */
-export function prologueFor(mode: ChannelMode, pairingId: string | null): Buffer {
-  return Buffer.concat([
-    Buffer.from(`overdeck-link/${NOISE_LINK_PROTOCOL}`, 'utf8'),
-    Buffer.from([0, MODE_BYTES[mode], 0]),
-    Buffer.from(mode === 'link' ? '' : pairingId ?? '', 'utf8'),
+export function prologueFor(mode: ChannelMode, pairingId: string | null): Uint8Array {
+  return b4a.concat([
+    b4a.from(`overdeck-link/${NOISE_LINK_PROTOCOL}`, 'utf8'),
+    b4a.from([0, MODE_BYTES[mode], 0]),
+    b4a.from(mode === 'link' ? '' : pairingId ?? '', 'utf8'),
   ]);
 }
 
@@ -116,8 +100,8 @@ export function prologueFor(mode: ChannelMode, pairingId: string | null): Buffer
 export const APPROVAL_NONCE_BYTES = 32;
 
 /** A fresh approval nonce. */
-export function approvalNonce(): Buffer {
-  return randomBytes(APPROVAL_NONCE_BYTES);
+export function approvalNonce(crypto: CryptoPort): Uint8Array {
+  return crypto.randomBytes(APPROVAL_NONCE_BYTES);
 }
 
 /**
@@ -131,13 +115,8 @@ export function approvalNonce(): Buffer {
  * must commit before the honest responder's nonce arrives. Either way it fixes its input before it
  * can know the code that input yields, so it cannot steer one leg's code to match the other's.
  */
-export function approvalCommitment(handshakeHash: Buffer, initiatorNonce: Buffer): Buffer {
-  return createHash('sha256')
-    .update('overdeck-approve-commit/1')
-    .update(Buffer.from([0]))
-    .update(handshakeHash)
-    .update(initiatorNonce)
-    .digest();
+export function approvalCommitment(crypto: CryptoPort, handshakeHash: Uint8Array, initiatorNonce: Uint8Array): Uint8Array {
+  return crypto.sha256(b4a.concat([b4a.from('overdeck-approve-commit/1', 'utf8'), b4a.from([0]), handshakeHash, initiatorNonce]));
 }
 
 /**
@@ -146,62 +125,58 @@ export function approvalCommitment(handshakeHash: Buffer, initiatorNonce: Buffer
  * zero-padded and shown as `123 456`. Computed only after the initiator's reveal matched its
  * commitment ({@link approvalCommitment}).
  */
-export function approvalSas(handshakeHash: Buffer, initiatorNonce: Buffer, responderNonce: Buffer): string {
-  const digest = createHash('sha256')
-    .update('overdeck-approve-sas/2')
-    .update(Buffer.from([0]))
-    .update(handshakeHash)
-    .update(initiatorNonce)
-    .update(responderNonce)
-    .digest();
-  const code = (digest.readUInt32BE(0) % 1_000_000).toString().padStart(6, '0');
+export function approvalSas(
+  crypto: CryptoPort,
+  handshakeHash: Uint8Array,
+  initiatorNonce: Uint8Array,
+  responderNonce: Uint8Array,
+): string {
+  const digest = crypto.sha256(
+    b4a.concat([b4a.from('overdeck-approve-sas/2', 'utf8'), b4a.from([0]), handshakeHash, initiatorNonce, responderNonce]),
+  );
+  const first = new DataView(digest.buffer, digest.byteOffset, 4).getUint32(0, false);
+  const code = (first % 1_000_000).toString().padStart(6, '0');
   return `${code.slice(0, 3)} ${code.slice(3)}`;
 }
 
 /** PSK and pairing id derived from a pairing code (D-4645-17). */
-export function pairingSecrets(code: string): { psk: Buffer; pairingId: string } {
-  const psk = createHash('sha256').update('overdeck-pair-psk/1').update(Buffer.from([0])).update(code, 'utf8').digest();
-  const pairingId = createHash('sha256')
-    .update('overdeck-pair-id/1')
-    .update(Buffer.from([0]))
-    .update(code, 'utf8')
-    .digest()
-    .subarray(0, 16)
-    .toString('hex');
-  return { psk, pairingId };
+export function pairingSecrets(crypto: CryptoPort, code: string): { psk: Uint8Array; pairingId: string } {
+  const psk = crypto.sha256(b4a.concat([b4a.from('overdeck-pair-psk/1', 'utf8'), b4a.from([0]), b4a.from(code, 'utf8')]));
+  const id = crypto.sha256(b4a.concat([b4a.from('overdeck-pair-id/1', 'utf8'), b4a.from([0]), b4a.from(code, 'utf8')]));
+  return { psk, pairingId: b4a.toString(id.subarray(0, 16), 'hex') };
 }
 
-export function ikInitiator(localKey: MachineKeyPair, remoteKey: Buffer, prologue: Buffer): Handshake {
+export function ikInitiator(localKey: StaticKeyPair, remoteKey: Uint8Array, prologue: Uint8Array): Handshake {
   const state = new Noise('IK', true, localKey);
   state.initialise(prologue, remoteKey);
   return new Handshake(state, localKey.publicKey);
 }
 
-export function ikResponder(localKey: MachineKeyPair, prologue: Buffer): Handshake {
+export function ikResponder(localKey: StaticKeyPair, prologue: Uint8Array): Handshake {
   const state = new Noise('IK', false, localKey);
   state.initialise(prologue);
   return new Handshake(state, localKey.publicKey);
 }
 
-export function xxPskInitiator(localKey: MachineKeyPair, psk: Buffer, prologue: Buffer): Handshake {
+export function xxPskInitiator(localKey: StaticKeyPair, psk: Uint8Array, prologue: Uint8Array): Handshake {
   const state = new Noise('XXpsk0', true, localKey, { psk });
   state.initialise(prologue);
   return new Handshake(state, localKey.publicKey);
 }
 
-export function xxInitiator(localKey: MachineKeyPair, prologue: Buffer): Handshake {
+export function xxInitiator(localKey: StaticKeyPair, prologue: Uint8Array): Handshake {
   const state = new Noise('XX', true, localKey);
   state.initialise(prologue);
   return new Handshake(state, localKey.publicKey);
 }
 
-export function xxResponder(localKey: MachineKeyPair, prologue: Buffer): Handshake {
+export function xxResponder(localKey: StaticKeyPair, prologue: Uint8Array): Handshake {
   const state = new Noise('XX', false, localKey);
   state.initialise(prologue);
   return new Handshake(state, localKey.publicKey);
 }
 
-export function xxPskResponder(localKey: MachineKeyPair, psk: Buffer, prologue: Buffer): Handshake {
+export function xxPskResponder(localKey: StaticKeyPair, psk: Uint8Array, prologue: Uint8Array): Handshake {
   const state = new Noise('XXpsk0', false, localKey, { psk });
   state.initialise(prologue);
   return new Handshake(state, localKey.publicKey);

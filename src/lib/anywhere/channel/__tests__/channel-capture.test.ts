@@ -7,13 +7,13 @@ import { createRequire } from 'node:module';
 import { Agent, createServer as createHttpServer, request as httpRequest } from 'node:http';
 import { connect, createServer as createNetServer, type Server as NetServer, type Socket } from 'node:net';
 
+import { FRAME_HEADER_LENGTH, PREAMBLE_LENGTH, PREAMBLE_MAGIC } from '@overdeck/anywhere-channel';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import type { MachineKeyPair } from '../../machine-key.js';
 import { acceptChannel } from '../accept.js';
 import type { ChannelSocket } from '../channel-socket.js';
 import { openChannel } from '../open.js';
-import { FRAME_HEADER_LENGTH, PREAMBLE_LENGTH, PREAMBLE_MAGIC } from '../wire.js';
 
 const _require = createRequire(import.meta.url);
 const dh = _require('noise-handshake/dh') as { generateKeyPair(): MachineKeyPair };

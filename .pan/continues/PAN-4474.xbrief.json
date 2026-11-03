@@ -1,0 +1,255 @@
+{
+  "version": "1",
+  "issueId": "PAN-4474",
+  "created": "2026-11-03T06:56:27.161Z",
+  "updated": "2026-11-03T08:01:56.051Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "wire-types": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4474",
+      "claimedAt": "2026-11-03T06:56:27.161Z",
+      "doneAt": "2026-11-03T06:56:50.800Z"
+    },
+    "wire-runtime": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4474",
+      "claimedAt": "2026-11-03T06:57:14.239Z",
+      "doneAt": "2026-11-03T07:00:20.251Z"
+    },
+    "channel-writer": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4474",
+      "claimedAt": "2026-11-03T07:02:42.760Z",
+      "doneAt": "2026-11-03T07:04:29.350Z"
+    },
+    "conversation-bridge": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4474",
+      "claimedAt": "2026-11-03T07:04:34.167Z",
+      "doneAt": "2026-11-03T07:09:49.192Z"
+    },
+    "werift-spike": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4474",
+      "claimedAt": "2026-11-03T07:09:54.101Z",
+      "doneAt": "2026-11-03T07:13:07.178Z"
+    },
+    "peer-hub-gate": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4474",
+      "claimedAt": "2026-11-03T07:13:44.045Z",
+      "doneAt": "2026-11-03T07:18:17.359Z"
+    },
+    "peer-hub-content": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4474",
+      "claimedAt": "2026-11-03T07:18:41.132Z",
+      "doneAt": "2026-11-03T07:21:59.928Z"
+    },
+    "peer-hub-presence": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4474",
+      "claimedAt": "2026-11-03T07:22:22.534Z",
+      "doneAt": "2026-11-03T07:23:45.837Z"
+    },
+    "share-manager-wiring": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4474",
+      "claimedAt": "2026-11-03T07:23:51.394Z",
+      "doneAt": "2026-11-03T07:25:49.332Z"
+    },
+    "share-worker-e2e": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4474",
+      "claimedAt": "2026-11-03T07:25:53.908Z",
+      "doneAt": "2026-11-03T07:27:40.833Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4474",
+      "claimedAt": "2026-11-03T07:27:45.571Z",
+      "doneAt": "2026-11-03T07:28:38.811Z"
+    },
+    "wire-types.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:45:45.800Z"
+    },
+    "wire-types.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:46:05.556Z"
+    },
+    "wire-types.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:46:25.916Z"
+    },
+    "wire-runtime.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:46:44.398Z"
+    },
+    "wire-runtime.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:47:02.945Z"
+    },
+    "wire-runtime.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:47:21.669Z"
+    },
+    "wire-runtime.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:47:40.392Z"
+    },
+    "werift-spike.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:47:59.884Z"
+    },
+    "werift-spike.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:48:21.123Z"
+    },
+    "werift-spike.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:48:42.567Z"
+    },
+    "werift-spike.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:49:03.709Z"
+    },
+    "channel-writer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:49:24.806Z"
+    },
+    "channel-writer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:49:47.938Z"
+    },
+    "channel-writer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:50:15.651Z"
+    },
+    "channel-writer.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:50:49.619Z"
+    },
+    "conversation-bridge.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:51:17.222Z"
+    },
+    "conversation-bridge.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:51:46.387Z"
+    },
+    "conversation-bridge.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:52:11.772Z"
+    },
+    "conversation-bridge.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:52:30.973Z"
+    },
+    "conversation-bridge.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:52:49.740Z"
+    },
+    "peer-hub-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:53:09.047Z"
+    },
+    "peer-hub-gate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:53:29.705Z"
+    },
+    "peer-hub-gate.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:53:50.865Z"
+    },
+    "peer-hub-gate.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:54:17.491Z"
+    },
+    "peer-hub-gate.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:54:38.373Z"
+    },
+    "peer-hub-content.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:54:56.793Z"
+    },
+    "peer-hub-content.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:55:21.735Z"
+    },
+    "peer-hub-content.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:55:43.941Z"
+    },
+    "peer-hub-content.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:56:05.820Z"
+    },
+    "peer-hub-content.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:56:26.784Z"
+    },
+    "peer-hub-presence.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:56:47.421Z"
+    },
+    "peer-hub-presence.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:57:08.522Z"
+    },
+    "peer-hub-presence.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:57:29.957Z"
+    },
+    "peer-hub-presence.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:57:47.728Z"
+    },
+    "share-manager-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:58:06.501Z"
+    },
+    "share-manager-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:58:30.823Z"
+    },
+    "share-manager-wiring.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:58:53.441Z"
+    },
+    "share-manager-wiring.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:59:15.378Z"
+    },
+    "share-worker-e2e.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:59:40.825Z"
+    },
+    "share-worker-e2e.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:00:01.635Z"
+    },
+    "share-worker-e2e.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:00:36.947Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:01:07.229Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:01:32.661Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:01:56.051Z"
+    }
+  }
+}

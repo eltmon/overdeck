@@ -2,16 +2,19 @@
  * MobileConversations — the phone conversation list and view (PAN-2355 FR-5, D-14, D-15).
  *
  * The list reads `GET /api/conversations`, newest activity first, archived rows
- * hidden. With a `conversationId` (numeric id or name — the read route resolves
- * both), the view mounts `ConversationPanel` exactly as the standalone popout
- * does. `ConversationPanel.tsx` is never edited for the phone; layout fixes go
- * in this wrapper's classes only.
+ * hidden. A local id or name is read from `GET /api/conversations/:id`; a linked
+ * name `@<machine>/<name>` is taken from the merged list (PAN-4871), because the
+ * proxied single-row read returns the owner's own row. The view then mounts
+ * `ConversationPanel` exactly as the standalone popout does. `ConversationPanel.tsx`
+ * is never edited for the phone; layout fixes go in this wrapper's classes only.
  */
 import { useQuery } from '@tanstack/react-query';
+import { parseLinkedConversationName } from '@overdeck/contracts';
 import { ConversationPanel } from '../chat/ConversationPanel';
 import type { Conversation } from '../CommandDeck/ConversationList';
 import { fetchWithTimeout } from '../../lib/apiFetch';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
+import { conversationRouteKey, findLinkedConversationRow } from '../../lib/linkedConversation';
 
 type ConversationRow = Conversation & { archivedAt?: string | null };
 
@@ -44,7 +47,7 @@ function ConversationListView({ onOpen }: { onOpen: (id: string) => void }) {
         <li key={c.id}>
           <button
             type="button"
-            onClick={() => onOpen(String(c.id))}
+            onClick={() => onOpen(conversationRouteKey(c))}
             className="flex min-h-11 w-full items-start justify-between gap-3 px-4 py-3 text-left"
           >
             <span className="min-w-0">
@@ -63,6 +66,14 @@ function ConversationView({ conversationId, onBack }: { conversationId: string; 
   const { data: conversation, isLoading, isError } = useQuery({
     queryKey: ['mobile-conversation', conversationId],
     queryFn: async () => {
+      // PAN-4871: a linked key opens the merged list's viewer-shaped row, as the
+      // desktop does. The proxied single-row read returns the owner's local row,
+      // whose local name would subscribe on this machine and never load.
+      if (parseLinkedConversationName(conversationId)) {
+        const row = findLinkedConversationRow(await fetchConversationList(), conversationId);
+        if (!row) throw new Error(`No linked conversation ${conversationId}`);
+        return row as Conversation;
+      }
       const res = await fetchWithTimeout(`/api/conversations/${encodeURIComponent(conversationId)}`);
       if (!res.ok) throw new Error(`Failed to load conversation: ${res.status}`);
       return (await res.json()) as Conversation;

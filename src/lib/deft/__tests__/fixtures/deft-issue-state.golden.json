@@ -1,0 +1,197 @@
+{
+  "issueId": "PAN-1",
+  "pipeline": "deft",
+  "mode": "not-installed",
+  "scopes": [
+    {
+      "path": "xbrief/proposed/idea.xbrief.json",
+      "folder": "proposed",
+      "planId": "scope-idea",
+      "title": "Idea scope",
+      "status": "proposed",
+      "items": []
+    },
+    {
+      "path": "xbrief/pending/base.xbrief.json",
+      "folder": "pending",
+      "planId": "scope-base",
+      "title": "Base scope",
+      "status": "pending",
+      "items": [{ "id": "b1", "title": "Base item", "status": "pending" }]
+    },
+    {
+      "path": "xbrief/active/ui.xbrief.json",
+      "folder": "active",
+      "planId": "scope-ui",
+      "title": "UI scope",
+      "status": "running",
+      "items": [
+        {
+          "id": "u1",
+          "title": "Render the panel",
+          "status": "completed",
+          "evidence": { "kind": "commit", "pointer": "abc1234", "recordedAt": "2026-11-02T13:00:00Z", "recordedBy": "agent:impl-1" }
+        },
+        {
+          "id": "u2",
+          "title": "Write the e2e test",
+          "status": "completed",
+          "disposition": {
+            "disposition": "waived",
+            "reason": "Covered by unit tests",
+            "provenanceKind": "agent",
+            "actor": "agent:impl-1",
+            "recordedAt": "2026-11-02T13:30:00Z"
+          }
+        }
+      ],
+      "swarm": { "dependsOn": ["scope-base"], "conflictGroup": "ui", "fileScope": ["src/a.ts", "docs/"] },
+      "handoffState": "pr_open",
+      "prNumber": 12
+    },
+    {
+      "path": "xbrief/completed/done.xbrief.json",
+      "folder": "completed",
+      "planId": "scope-done",
+      "title": "Done scope",
+      "status": "completed",
+      "items": [{ "id": "c1", "title": "Ship it", "status": "completed" }],
+      "handoffState": "delivered",
+      "deliveryDisposition": "merged",
+      "prNumber": 9
+    },
+    {
+      "path": "xbrief/cancelled/drop.xbrief.json",
+      "folder": "cancelled",
+      "planId": "scope-drop",
+      "title": "Dropped scope",
+      "status": "cancelled",
+      "items": []
+    }
+  ],
+  "escalations": [
+    {
+      "id": "esc-20261102120000-aaaaaa",
+      "agentId": "impl-1",
+      "type": "cmd_approval",
+      "title": "Run the database migration",
+      "body": "npm run migrate drops the old table.",
+      "createdAt": "2026-11-02T12:00:00Z",
+      "slaHours": 1,
+      "dueAt": "2026-11-02T13:00:00.000Z",
+      "overdue": true,
+      "status": "open",
+      "dangerous": true
+    },
+    {
+      "id": "esc-20261102120100-bbbbbb",
+      "agentId": "impl-1",
+      "type": "question",
+      "title": "Which table layout?",
+      "body": "Dense or roomy rows?",
+      "createdAt": "2026-11-02T12:01:00Z",
+      "slaHours": 24,
+      "dueAt": "2026-11-03T12:01:00.000Z",
+      "overdue": false,
+      "status": "open",
+      "dangerous": false
+    },
+    {
+      "id": "esc-20261102120200-cccccc",
+      "agentId": "impl-1",
+      "type": "external",
+      "title": "Waiting on the vendor API key",
+      "body": "The staging key expires Friday.",
+      "createdAt": "2026-11-02T12:02:00Z",
+      "slaHours": 72,
+      "dueAt": "2026-11-05T12:02:00.000Z",
+      "overdue": false,
+      "status": "open",
+      "dangerous": false
+    },
+    {
+      "id": "esc-20261101120000-dddddd",
+      "agentId": "impl-1",
+      "type": "approval",
+      "title": "Approve the scope",
+      "body": "Scope scope-ui is ready.",
+      "createdAt": "2026-11-01T12:00:00Z",
+      "slaHours": 4,
+      "dueAt": "2026-11-01T16:00:00.000Z",
+      "overdue": false,
+      "status": "resolved",
+      "dangerous": false,
+      "resolution": { "decision": "approved", "resolvedAt": "2026-11-01T13:00:00Z", "resolvedBy": "operator:eltmon", "note": "Looks right" }
+    }
+  ],
+  "heartbeats": [
+    {
+      "agentId": "impl-1",
+      "parentId": "deft-root",
+      "lastHeartbeatAt": "2026-11-02T17:55:00Z",
+      "lastMessage": "Implementing the UI scope",
+      "phase": "implementing"
+    },
+    {
+      "agentId": "pr-watch-12-4242",
+      "parentId": "impl-1",
+      "lastHeartbeatAt": "2026-11-02T17:58:00Z",
+      "lastMessage": "Waiting for Greptile",
+      "phase": "polling",
+      "prNumber": 12,
+      "waitKind": "review"
+    }
+  ],
+  "decisions": [
+    {
+      "id": "dec-ui-layout",
+      "decision": "Render scopes above tasks",
+      "whyWinner": "The plan tab is where operators look",
+      "confidence": "high",
+      "timestamp": "2026-11-02T14:00:00Z",
+      "activeScopeRefs": ["scope-ui"]
+    }
+  ],
+  "approvedScopes": [
+    {
+      "planId": "scope-ui",
+      "xbriefRelPath": "xbrief/active/ui.xbrief.json",
+      "approvedAt": "2026-11-02T11:00:00Z",
+      "fileScope": ["src/a.ts", "docs/"],
+      "humanApproval": { "kind": "human-event", "actor": "overdeck:eltmon" }
+    }
+  ],
+  "policy": {
+    "raw": { "requireHumanMerge": true, "review": { "reviewers": ["greptile"], "minGreptileConfidence": 4 } },
+    "requireHumanMerge": true,
+    "reviewers": ["greptile"],
+    "minGreptileConfidence": 4
+  },
+  "specDrift": {
+    "unresolved": [{ "scopeId": "scope-done", "reason": "Item c1 has no spec coverage", "specImpact": "minor" }]
+  },
+  "installDrift": [],
+  "liftConflicts": [],
+  "finishLoop": [
+    { "ts": "2026-11-02T15:00:00Z", "phase": "pr-open", "iteration": 1, "haltReason": null, "message": "opened PR #12", "prNumber": 12 },
+    { "ts": "2026-11-02T15:30:00Z", "phase": "pr-watch", "iteration": 1, "haltReason": null, "message": "pr:watch verdict=NEW_P0_P1", "prNumber": 12 },
+    { "ts": "2026-11-02T16:10:00Z", "phase": "address", "iteration": 2, "haltReason": null, "message": "addressed 2 findings", "prNumber": 12 }
+  ],
+  "gateRuns": [
+    {
+      "ts": "2026-11-02T14:35:00Z",
+      "target": "pre-pr",
+      "exitCode": 1,
+      "gates": [
+        { "id": "lint", "status": "run", "exitCode": 0 },
+        { "id": "e2e", "status": "skipped", "cause": "no browser available" },
+        { "id": "typecheck", "status": "failed", "exitCode": 2, "cause": "TS2322 in src/a.ts" }
+      ]
+    }
+  ],
+  "reviewerConfigPresent": true,
+  "cleanRecords": [
+    { "prNumber": 12, "headSha": "0123456789abcdef0123456789abcdef01234567", "cleanedAt": "2026-11-02T17:00:00Z" }
+  ],
+  "errors": [".deft/escalations/esc-bad.json: invalid JSON"]
+}

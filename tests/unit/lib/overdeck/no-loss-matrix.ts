@@ -367,6 +367,12 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/issues/:id/verification',                    kind: 'http', disposition: 'AGGREGATE',   door: 'Verification artifact + ReviewStatus verification state' },
   { surface: 'GET /api/issues/:id/test-removal-waiver',             kind: 'http', disposition: 'READ',        door: 'readTestSkipWaiver + snapshotWorkspaceHeads' },
   { surface: 'POST /api/issues/:id/test-removal-waiver',            kind: 'http', disposition: 'WRITE',       door: 'grantTestSkipWaiver → <workspace>/.overdeck/test-removal-waiver.json' },
+  { surface: 'GET /api/issues/:id/deft',                            kind: 'http', disposition: 'READ',        door: 'readDeftIssueState' },
+  { surface: 'GET /api/issues/:id/deft/review-cycle',               kind: 'http', disposition: 'READ',        door: 'loadDeftReviewCycle' },
+  { surface: 'GET /api/deft/issues',                                kind: 'http', disposition: 'READ',        door: 'summarizeDeftIssueState' },
+  { surface: 'POST /api/issues/:id/pipeline',                       kind: 'http', disposition: 'WRITE',       door: 'pan skills deft use|back (useDeftPipeline / backToOverdeck)' },
+  { surface: 'POST /api/issues/:id/deft/scopes/signoff',          kind: 'http', disposition: 'WRITE',       door: 'signOffDisposition → <worktree>/xbrief/<folder>/<scope>.xbrief.json' },
+  { surface: 'POST /api/issues/:id/deft/escalations/:escId/resolve', kind: 'http', disposition: 'WRITE',       door: 'resolveDeftEscalation → <worktree>/.deft/escalations/<escId>.json' },
   { surface: 'GET /api/issues/:issueId/staffing',                   kind: 'http', disposition: 'READ',        door: 'Issue record staffing override + resolved configuration' },
   { surface: 'POST /api/issues/:issueId/staffing',                  kind: 'http', disposition: 'WRITE',       door: 'Issue record writer updates the work-model override' },
   { surface: 'GET /api/issues/:id/tasks',                           kind: 'http', disposition: 'READ',        door: 'readWorkspacePlanSync (merged xBRIEF items) + issue record claims' },
@@ -778,6 +784,12 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/triggers',                        kind: 'http', disposition: 'WRITE',       door: 'src/lib/triggers/store.ts' },
   { surface: 'DELETE /api/triggers/:id',                  kind: 'http', disposition: 'WRITE',       door: 'src/lib/triggers/store.ts' },
   { surface: 'PUT /api/triggers/:id/signing-secret',      kind: 'http', disposition: 'WRITE',       door: 'src/lib/triggers/store.ts' },
+
+  // ── shares.ts ─────────────────────────────────────────────────────────────
+  { surface: 'GET /api/shares',                           kind: 'http', disposition: 'READ',        door: 'src/lib/sharing/share-record.ts' },
+  { surface: 'POST /api/shares',                          kind: 'http', disposition: 'WRITE',       door: 'src/lib/sharing/share-record.ts' },
+  { surface: 'POST /api/shares/:code/commands',           kind: 'http', disposition: 'WRITE',       door: 'src/dashboard/server/services/share-host.ts' },
+  { surface: 'DELETE /api/shares/:code',                  kind: 'http', disposition: 'WRITE',       door: 'src/lib/sharing/share-record.ts' },
 
   // ── workspaces.ts ─────────────────────────────────────────────────────────
   { surface: 'GET /api/workspace-stack-health',                      kind: 'http', disposition: 'AGGREGATE',   door: 'Issues + Agents + stack health' },

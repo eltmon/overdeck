@@ -1,13 +1,16 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T02:37:07.189286Z · model: claude-opus-5-5 · open: 870_
+_Last sequenced: 2026-11-03T09:52:06.564575Z · model: claude-opus-5-5 · open: 875_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4702 | S | critical | ok |  |  | Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs. |
+| 2 | PAN-4881 | S | high | ok |  |  | Order-dependent 401 in projects-rename.test.ts failed the v0.73.1 release full-suite run; make the test hermetic. |
 | 3 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 4 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install aborts workspace creation (since #4163); reproduced 2026-11-02 on botland too, so every polyrepo start fails. |
+| 5 | PAN-4882 | M | high | ok |  |  | Re-run the five v0.73 Anywhere checks fixed after the release run (TURN relay on Fly, AC-4, AC-6, AC-15) on deployed main. |
+| 6 | PAN-4888 | M | high | ok |  |  | pan reload: a held reload blocks newer ones and ships a stale build, so the operator approves restarts twice. |
 | 7 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
 | 8 | PAN-4690 | S | critical | ok |  |  | Review dispatch rewrites the tracked continue file uncommitted, so the dirty-tree gate blocks the review it dispatched |
 | 10 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
@@ -19,7 +22,6 @@ _Last sequenced: 2026-11-03T02:37:07.189286Z · model: claude-opus-5-5 · open: 
 | 15 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
 | 16 | PAN-4551 | L | high | ok |  |  | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
 | 17 | PAN-4671 | M | high | ok |  |  | CodeRabbit comments posted after the reviewer snapshot merge unseen; deliver late ones to the work agent at merge. Needs handoff. |
-| 17 | PAN-4773 | M | high | ok |  |  | Route CodeRabbit findings to the work agent automatically; hold auto-merge while threads are unanswered. Overlaps PAN-4671. Handoff. |
 | 18 | PAN-4674 | S | high | ok |  |  | Operator can't remove a configured crew (Fable expert) in Settings tiered execution; removal or model change doesn't persist |
 | 19 | PAN-4673 | S | high | ok |  |  | Model Routing selects truncate model names (Opus 5.5 shows as Opus 5): narrow column plus repeated provider prefix in option text |
 | 20 | PAN-4675 | S | critical | ok |  |  | One transient gh label timeout aborts post-merge lifecycle; merge door replies Already merged, so the issue can never close. |
@@ -151,6 +153,7 @@ _Last sequenced: 2026-11-03T02:37:07.189286Z · model: claude-opus-5-5 · open: 
 | 144 | PAN-2593 | S | high | ok |  |  | server children inherit bare system PATH |
 | 145 | PAN-4302 | M | high | ok |  |  | ~19 files exec gh directly, bypassing runGh: spend is unattributed and keeps hitting GitHub during quota pause. Follow-up to PAN-4291 |
 | 146 | PAN-2080 | M | high | needs-refinement |  |  | External transports (email/Slack/push/TTS) still plausible; its stated dependency on the PAN-2079 Inbox spine is undercut by boot… |
+| 147 | PAN-4885 | S | high | ok |  |  | pan worker run to an online Fly link fails 2 of 3 times: the 2.5 s secure-channel open budget is too short for the public Fly route. |
 | 148 | PAN-1436 | S | high | ok |  |  | PAN-1419 follow-up: stale stopped-agent zombies still pollute dashboard list |
 | 149 | PAN-3556 | S | high | ok |  |  | No per-agent spawn mutex: two flows allocated session identities 3s apart and the second pin orphaned the first transcript. |
 | 150 | PAN-3553 | S | high | ok |  |  | tmux list-panes -a exits 1 on a zero-session server, so the census reads unavailable post-reboot and conversations hang on 'Starting…'. |
@@ -311,6 +314,7 @@ _Last sequenced: 2026-11-03T02:37:07.189286Z · model: claude-opus-5-5 · open: 
 | 309 | PAN-1253 | M | high | needs-refinement |  |  | Flywheel: respect issue dependencies before autopicking work |
 | 310 | PAN-1357 | M | high | ok |  |  | Template conversations: load curated skill bundles into a single conversation |
 | 311 | PAN-1915 | M | high | ok |  |  | enhancement(security): API key at-rest hardening |
+| 312 | PAN-4886 | S | medium | ok |  |  | Live TURN relay check for PAN-4862 on Fly; scripted except one device-code sign-in, so it needs the operator present to approve. |
 | 313 | PAN-1435 | XS | high | ok |  |  | API keys in ~/.panopticon/config.yaml stored as plaintext |
 | 314 | PAN-1672 | M | high | ok |  |  | GPT-5.5/CLIProxy context-window deadlock: conversations get no overflow recovery + 200k window illusion |
 | 315 | PAN-1640 | M | high | ok |  |  | Re-platform interactive permission allow/deny onto a PreToolUse hook (provider-agnostic) |
@@ -561,6 +565,7 @@ _Last sequenced: 2026-11-03T02:37:07.189286Z · model: claude-opus-5-5 · open: 
 | 564 | PAN-4409 | M | medium | ok |  |  | Overdeck integration on OKF v0.2.0 (injector trust tiers, new verbs); blocked on external eltmon/okf#9 |
 | 565 | PAN-4410 | M | medium | ok |  | PAN-4409 | Migrate eltmon/overdeck-knowledge to OKF v0.2 and refresh stale concepts; last link in the OKF chain |
 | 566 | PAN-2978 | S | medium | ok |  | PAN-2976, PAN-2977 | Opt-in per-agent install recipes for ACP CLIs from the setup UI; deliberately separated for its supply-chain trust decision. |
+| 567 | PAN-4878 | XS | low | ok |  | PAN-4852 | Delete dead ox curl installer in prereqs registry; PAN-4852 builds ox from the pinned fork commit, so ~/.local/bin/ox is never used. |
 | 568 | PAN-1754 | M | medium | ok |  |  | surface + edit the host claude CLI default model (~/.claude/settings.json) from the Settings page |
 | 569 | PAN-1751 | M | medium | ok |  |  | harness picker on every Settings → Roles row (plan/work/review/test/ship/strike), not just Flywheel |
 | 570 | PAN-1750 | M | medium | ok |  |  | UAT assembly/conflict agent |
@@ -596,7 +601,6 @@ _Last sequenced: 2026-11-03T02:37:07.189286Z · model: claude-opus-5-5 · open: 
 | 600 | PAN-958 | M | medium | ok |  |  | Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
 | 601 | PAN-949 | M | medium | ok |  |  | feat: add conversation for project from sidebar |
 | 602 | PAN-3157 | XS | medium | ok |  |  | Rescoped: Awareness rail should show conv-flywheel as the Flywheel with its last tick (derive-status.ts) and link to /flywheel. |
-| 603 | PAN-4828 | S | medium | ok |  |  | Phone app W-CON1: contracts for directory client role and sealed push frames; first in build order; PAN-4774 done. |
 | 604 | PAN-947 | M | medium | ok |  |  | feat: project management actions in unified sidebar |
 | 605 | PAN-938 | M | medium | ok |  |  | Fizzy visual pipeline |
 | 606 | PAN-903 | M | medium | ok |  |  | Detect ~/.claude.json corruption on startup and surface it in the dashboard |
@@ -664,7 +668,7 @@ _Last sequenced: 2026-11-03T02:37:07.189286Z · model: claude-opus-5-5 · open: 
 | 668 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
 | 669 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
 | 670 | PAN-4760 | S | low | ok |  | PAN-4638 | Live 3-machine gauntlet check moved out of PAN-4638; needs its release, pan reload, a linked laptop rig and Fly setup by the operator. |
-| 671 | PAN-4829 | M | medium | ok |  | PAN-4828 | Phone app W-CON2: phones join the directory as clients (cap 5, not counted as machines), bearer subprotocol; needs PAN-4828. |
+| 671 | PAN-4829 | M | medium | ok |  |  | Phone app W-CON2: phones join the directory as clients (cap 5, not counted as machines), bearer subprotocol; needs PAN-4828. |
 | 672 | PAN-2084 | M | low | ok |  |  | Auto-create lightweight conversation worktrees on project chats |
 | 673 | PAN-2083 | M | low | ok |  | PAN-1592 | Composer: a failed first send leaves the text in BOTH the composer box and the retry outbox |
 | 674 | PAN-2082 | M | low | ok |  |  | Composer: a single send failure clears ALL in-flight optimistic bubbles (and strips siblings' compaction net) |
@@ -679,7 +683,7 @@ _Last sequenced: 2026-11-03T02:37:07.189286Z · model: claude-opus-5-5 · open: 
 | 683 | PAN-1983 | L | low | ok |  |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
 | 684 | PAN-2672 | S | low | needs-refinement |  |  | Transcript half reported fixed; parent-stays-ended half moved to PAN-4485. Verify on current build, then close. |
 | 685 | PAN-1958 | M | low | ok |  |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
-| 686 | PAN-4830 | M | medium | ok |  | PAN-4828 | Phone app W-CON3: directory delivers sealed push to APNs/FCM, placeholder-only bodies, dead-token cleanup; needs PAN-4828. |
+| 686 | PAN-4830 | M | medium | ok |  |  | Phone app W-CON3: directory delivers sealed push to APNs/FCM, placeholder-only bodies, dead-token cleanup; PAN-4828 done. |
 | 687 | PAN-1907 | M | low | ok |  |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every… |
 | 688 | PAN-1895 | M | low | ok |  |  | Spawn work agents from issue workspace slide-out |
 | 689 | PAN-1878 | M | low | ok |  |  | process: bake 'docs updated' into acceptance criteria / definition-of-done in role + planning prompts |
@@ -821,7 +825,7 @@ _Last sequenced: 2026-11-03T02:37:07.189286Z · model: claude-opus-5-5 · open: 
 | 825 | PAN-3244 | S | low | stale |  |  | Stale: targets the deploy-patrol deploy window deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 826 | PAN-2775 | S | low | needs-refinement |  |  | Stale: targets boot-correlated reaping (boot reconciliation) deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 827 | PAN-4833 | M | medium | ok |  |  | Phone app W-WEB1: move noise/wire behind a crypto port into packages/anywhere-channel; browser channel; CP-1. |
-| 828 | PAN-4835 | M | medium | ok |  | PAN-4828 | Phone app W-MAC1: phone access-token kind, pairing exchange, self-revoke and push-key routes, phone scopes. |
+| 828 | PAN-4835 | M | medium | ok |  |  | Phone app W-MAC1: phone access-token kind, pairing exchange, self-revoke and push-key routes, phone scopes. |
 | 829 | PAN-3505 | XS | low | needs-refinement |  |  | Stale: targets the flywheel state write door deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 830 | PAN-4834 | M | medium | ok |  | PAN-4833 | Phone app W-WEB2: HTTP/1.1 and WebSocket clients inside the channel plus fetch/WS shims; needs PAN-4833. |
 | 831 | PAN-4836 | S | medium | ok |  | PAN-4835 | Phone app W-MAC2: "Overdeck app" pairing QR tab in Settings > Anywhere with paired-phone list; needs PAN-4835. |
@@ -867,7 +871,7 @@ _Last sequenced: 2026-11-03T02:37:07.189286Z · model: claude-opus-5-5 · open: 
 | 871 | PAN-4592 | M | low | ok |  | PAN-4590 | pan semgrep ci-setup opens a PR adding a Semgrep Actions workflow + failure relay; needs gate mode from PAN-4590. |
 | 872 | PAN-4594 | M | low | ok |  | PAN-4590 | Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590. |
 | 873 | PAN-4593 | L | low | needs-refinement |  | PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
-| 874 | PAN-4843 | M | medium | ok |  | PAN-4828, PAN-4835 | Phone app W-MAC3: native PushProvider seals needs-you alerts to each phone push key via directory. |
+| 874 | PAN-4843 | M | medium | ok |  | PAN-4835 | Phone app W-MAC3: native PushProvider seals needs-you alerts to each phone push key via directory; needs PAN-4835. |
 | 875 | PAN-4837 | L | medium | ok |  | PAN-4834, PAN-4829, PAN-4831, PAN-4835 | Phone app W-APP1: Capacitor 8 apps/mobile shell, sign-in, machines, QR pairing, keys plugin; CP-3/CP-4. |
 | 876 | PAN-4838 | M | medium | ok |  | PAN-4837, PAN-4830, PAN-4843 | Phone app W-IOS1: APNs registration and Notification Service Extension that decrypts sealed alerts. |
 | 877 | PAN-4840 | M | medium | ok |  | PAN-4837, PAN-4830, PAN-4843 | Phone app W-AND1: FCM FirebaseMessagingService decrypts sealed data payloads and posts notifications. |
@@ -875,12 +879,17 @@ _Last sequenced: 2026-11-03T02:37:07.189286Z · model: claude-opus-5-5 · open: 
 | 879 | PAN-4839 | S | low | ok |  | PAN-4838 | Phone app W-IOS2: counts-only Live Activity, on by default with a Settings off switch; OD-1 settled; after PAN-4838. |
 | 880 | PAN-4842 | S | medium | ok |  | PAN-4837 | Phone app W-DOC: phone-app.mdx and updates to Anywhere, push, tailscale and service docs; finished last. |
 | 881 | PAN-4851 | S | low | needs-refinement |  |  | Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them |
+| 882 | PAN-4887 | M | medium | ok |  | PAN-4835 | Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); machines stay refused. |
 
 ## Rationale detail
 
 ### PAN-4702 (rank 1)
 
 New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.
+
+### PAN-4881 (rank 2)
+
+New in-pipeline substrate bug: the release job runs the full suite in one job, and leaked internal-token state from another file makes projects-rename.test.ts return 401, which blocked publishing v0.73.1. It is already picked up, so it takes the free rank 2 without moving any other node; no cross-references, so no edges.
 
 ### PAN-4636 (rank 3)
 
@@ -889,6 +898,14 @@ New substrate bug with a verified root cause: adoption (PAN-4605) calls startRev
 ### PAN-4553 (rank 4)
 
 Moved from rank 9 to the free rank 4: a 2026-11-02 comment shows the same abort on a second polyrepo project (botland), so the bug now blocks workspace creation for every polyrepo project, not only mind-your-now.
+
+### PAN-4882 (rank 5)
+
+New in-pipeline verification issue: the v0.73.0 acceptance run failed AC-2/3/4/6/15, and the fixes (PAN-4862, PAN-4861, PAN-4859, #4864) are closed, so nothing blocks the re-run. It is already picked up, so it takes the free rank 5 without moving any other node; it shares the release checklist with PAN-4863, recorded as an advisory informs edge.
+
+### PAN-4888 (rank 6)
+
+New in-pipeline substrate bug in the deploy path: reload.ts drops a newer reload while an older one holds the restart lock, and the holder deploys the build frozen at request time, which happened twice on 2026-11-03. It takes the free rank 6 so no pinned or ranked node moves; the body names no blocking cross-references.
 
 ### PAN-4733 (rank 7)
 
@@ -933,10 +950,6 @@ Moves 705 importing files off a four-month-old beta onto the supported line, whi
 ### PAN-4671 (rank 17)
 
 New substrate fix to the merge door that closes the gap which let PAN-4672's findings merge unreviewed; advisory-only with a clear design and ACs, but TENET-10 requires a supervised handoff.
-
-### PAN-4773 (rank 17)
-
-New substrate issue that replaces five manual Flywheel relays of CodeRabbit findings and stops PRs like #4667/#4716 merging past unanswered threads; it overlaps PAN-4671 (late CodeRabbit comments) so it shares rank 17 to be planned together, and reuses PAN-4772's skip-reason surface. Needs a supervised handoff (TENET-10).
 
 ### PAN-4674 (rank 18)
 
@@ -1190,14 +1203,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
 
 Triage: verify "running at $0.00 with no capacity fallback" against the current liveness definition. Rank held.
 
-### PAN-3106 (rank 80)
-
-New this pass. shouldHoldForUat is consulted on exactly one merge path, so every other path merges a ready issue without asking whether its project holds for UAT — verified at code level on a real MIN-901 merge. This defeats the batch-train model directly: issues merge one at a time before a generation can assemble them.
-
-### PAN-3100 (rank 81)
-
-New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1205,10 +1210,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T02:37:07.189286Z",
+  "generatedAt": "2026-11-03T09:52:06.564575Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 870,
+  "openCount": 875,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -1220,6 +1225,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "dependsOn": [],
       "why": "Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs.",
       "rationale": "New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4881",
+      "rank": 2,
+      "size": "S",
+      "importance": "high",
+      "score": 82,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Order-dependent 401 in projects-rename.test.ts failed the v0.73.1 release full-suite run; make the test hermetic.",
+      "rationale": "New in-pipeline substrate bug: the release job runs the full suite in one job, and leaked internal-token state from another file makes projects-rename.test.ts return 401, which blocked publishing v0.73.1. It is already picked up, so it takes the free rank 2 without moving any other node; no cross-references, so no edges.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1389,19 +1407,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "dependsOn": [],
       "why": "CodeRabbit comments posted after the reviewer snapshot merge unseen; deliver late ones to the work agent at merge. Needs handoff.",
       "rationale": "New substrate fix to the merge door that closes the gap which let PAN-4672's findings merge unreviewed; advisory-only with a clear design and ACs, but TENET-10 requires a supervised handoff.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4773",
-      "rank": 17,
-      "size": "M",
-      "importance": "high",
-      "score": 74,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Route CodeRabbit findings to the work agent automatically; hold auto-merge while threads are unanswered. Overlaps PAN-4671. Handoff.",
-      "rationale": "New substrate issue that replaces five manual Flywheel relays of CodeRabbit findings and stops PRs like #4667/#4716 merging past unanswered threads; it overlaps PAN-4671 (late CodeRabbit comments) so it shares rank 17 to be planned together, and reuses PAN-4772's skip-reason surface. Needs a supervised handoff (TENET-10).",
       "gate": "auto",
       "planning": "auto"
     },
@@ -5034,6 +5039,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "interactive"
     },
     {
+      "issue": "PAN-4863",
+      "rank": 307,
+      "size": "S",
+      "importance": "medium",
+      "score": 45,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Manual AC-10 check of Anywhere connect on a real systemd VPS; needs a release shipping `pan connect` and a human-provisioned VPS.",
+      "rationale": "New issue split out of in-pipeline PAN-4774: Fly VMs lack systemd as PID 1, so AC-10 (connect survives logout and reboot) must run on a real VPS against the first release that ships `pan connect`. It is an operator-run verification step, so it takes free rank 307 beside the Anywhere epic and moves no other node.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1246",
       "rank": 308,
       "size": "M",
@@ -8169,6 +8187,21 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
+      "issue": "PAN-4878",
+      "rank": 567,
+      "size": "XS",
+      "importance": "low",
+      "score": 30,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4852"
+      ],
+      "why": "Delete dead ox curl installer in prereqs registry; PAN-4852 builds ox from the pinned fork commit, so ~/.local/bin/ox is never used.",
+      "rationale": "New issue placed in a free low-tier slot: a self-contained XS deletion with exact targets, best done after PAN-4852 lands its Overdeck-built ox.",
+      "gate": "auto",
+      "planning": "skip"
+    },
+    {
       "issue": "PAN-1754",
       "rank": 568,
       "size": "M",
@@ -8589,19 +8622,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "dependsOn": [],
       "why": "Rescoped: Awareness rail should show conv-flywheel as the Flywheel with its last tick (derive-status.ts) and link to /flywheel.",
       "rationale": "Rank held at 601: the rescope comment names the concrete data source (deriveFlywheelStatus/findLastTick) and target route, so condition moves from needs-refinement to ok.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4828",
-      "rank": 603,
-      "size": "S",
-      "importance": "medium",
-      "score": 40,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Phone app W-CON1: contracts for directory client role and sealed push frames; first in build order; PAN-4774 done.",
-      "rationale": "PAN-4774 (Anywhere release AC run) closed as completed, so that dependency is removed; rank held because the phone-app epic is feature work that still ranks below substrate items.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -9438,9 +9458,7 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "importance": "medium",
       "score": 36,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4828"
-      ],
+      "dependsOn": [],
       "why": "Phone app W-CON2: phones join the directory as clients (cap 5, not counted as machines), bearer subprotocol; needs PAN-4828.",
       "rationale": "PAN-4774 (Anywhere release AC run) closed as completed, so that dependency is removed; rank held because the phone-app epic is feature work that still ranks below substrate items.",
       "gate": "auto",
@@ -9627,11 +9645,9 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "importance": "medium",
       "score": 34,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4828"
-      ],
-      "why": "Phone app W-CON3: directory delivers sealed push to APNs/FCM, placeholder-only bodies, dead-token cleanup; needs PAN-4828.",
-      "rationale": "PAN-4774 (Anywhere release AC run) closed as completed, so that dependency is removed; rank held because the phone-app epic is feature work that still ranks below substrate items.",
+      "dependsOn": [],
+      "why": "Phone app W-CON3: directory delivers sealed push to APNs/FCM, placeholder-only bodies, dead-token cleanup; PAN-4828 done.",
+      "rationale": "PAN-4828 (phone-app contracts) closed as completed, so that dependency is removed; rank held because the phone-app epic is feature work that still ranks below substrate items.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11364,9 +11380,7 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "importance": "medium",
       "score": 36,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4828"
-      ],
+      "dependsOn": [],
       "why": "Phone app W-MAC1: phone access-token kind, pairing exchange, self-revoke and push-key routes, phone scopes.",
       "rationale": "PAN-4774 (Anywhere release AC run) closed as completed, so that dependency is removed; rank held because the phone-app epic is feature work that still ranks below substrate items.",
       "gate": "auto",
@@ -11955,11 +11969,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "score": 32,
       "condition": "ok",
       "dependsOn": [
-        "PAN-4828",
         "PAN-4835"
       ],
-      "why": "Phone app W-MAC3: native PushProvider seals needs-you alerts to each phone push key via directory.",
-      "rationale": "PAN-4774 (Anywhere release AC run) closed as completed, so that dependency is removed; rank held because the phone-app epic is feature work that still ranks below substrate items.",
+      "why": "Phone app W-MAC3: native PushProvider seals needs-you alerts to each phone push key via directory; needs PAN-4835.",
+      "rationale": "PAN-4828 (phone-app contracts) closed as completed, so that dependency is removed; rank held because the phone-app epic is feature work that still ranks below substrate items.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12072,15 +12085,69 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
-      "issue": "PAN-4863",
-      "rank": 307,
+      "issue": "PAN-4882",
+      "rank": 5,
+      "size": "M",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Re-run the five v0.73 Anywhere checks fixed after the release run (TURN relay on Fly, AC-4, AC-6, AC-15) on deployed main.",
+      "rationale": "New in-pipeline verification issue: the v0.73.0 acceptance run failed AC-2/3/4/6/15, and the fixes (PAN-4862, PAN-4861, PAN-4859, #4864) are closed, so nothing blocks the re-run. It is already picked up, so it takes the free rank 5 without moving any other node; it shares the release checklist with PAN-4863, recorded as an advisory informs edge.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4885",
+      "rank": 147,
+      "size": "S",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan worker run to an online Fly link fails 2 of 3 times: the 2.5 s secure-channel open budget is too short for the public Fly route.",
+      "rationale": "New defect found by the in-pipeline PAN-4882 re-run: remote worker starts against an online Fly link intermittently fail on LINK_WAIT_MS (2.5 s) in link-client.ts. The fix is small and well-specified (larger open budget for online links, or one retry), and it makes Anywhere remote workers reliable, so it takes the free rank 147 beside other high, small reliability fixes without moving any node.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4886",
+      "rank": 312,
       "size": "S",
       "importance": "medium",
       "score": 45,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Manual AC-10 check of Anywhere connect on a real systemd VPS; needs a release shipping `pan connect` and a human-provisioned VPS.",
-      "rationale": "New issue split out of in-pipeline PAN-4774: Fly VMs lack systemd as PID 1, so AC-10 (connect survives logout and reboot) must run on a real VPS against the first release that ships `pan connect`. It is an operator-run verification step, so it takes free rank 307 beside the Anywhere epic and moves no other node.",
+      "why": "Live TURN relay check for PAN-4862 on Fly; scripted except one device-code sign-in, so it needs the operator present to approve.",
+      "rationale": "New manual verification issue: the relay fix shipped in 0.73.0 with unit tests only, and two live attempts expired unapproved. It is operator-gated like PAN-4863, so it takes the free rank 312 next to it; the PRD it replays lives on feature/pan-4882, recorded as an advisory informs edge.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4887",
+      "rank": 882,
+      "size": "M",
+      "importance": "medium",
+      "score": 30,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4835"
+      ],
+      "why": "Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); machines stay refused.",
+      "rationale": "New child of the phone-app epic PAN-4823, split from PAN-4835 and explicitly sequenced after it; placed at the tail of the phone-app chain so no existing rank moves.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4888",
+      "rank": 6,
+      "size": "M",
+      "importance": "high",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan reload: a held reload blocks newer ones and ships a stale build, so the operator approves restarts twice.",
+      "rationale": "New in-pipeline substrate bug in the deploy path: reload.ts drops a newer reload while an older one holds the restart lock, and the holder deploys the build frozen at request time, which happened twice on 2026-11-03. It takes the free rank 6 so no pinned or ranked node moves; the body names no blocking cross-references.",
       "gate": "auto",
       "planning": "auto"
     }
@@ -13256,13 +13323,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "confidence": 1
     },
     {
-      "from": "PAN-4671",
-      "to": "PAN-4773",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
       "from": "PAN-4811",
       "to": "PAN-4638",
       "type": "informs",
@@ -13282,13 +13342,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
-    },
-    {
-      "from": "PAN-4823",
-      "to": "PAN-4828",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
     },
     {
       "from": "PAN-4823",
@@ -13312,20 +13365,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "confidence": 1
     },
     {
-      "from": "PAN-4828",
-      "to": "PAN-4829",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.9
-    },
-    {
-      "from": "PAN-4828",
-      "to": "PAN-4830",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.9
-    },
-    {
       "from": "PAN-4823",
       "to": "PAN-4833",
       "type": "contains",
@@ -13338,13 +13377,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-4828",
-      "to": "PAN-4835",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.9
     },
     {
       "from": "PAN-4823",
@@ -13380,13 +13412,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-4828",
-      "to": "PAN-4843",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.9
     },
     {
       "from": "PAN-4835",
@@ -13548,6 +13573,55 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-4852",
+      "to": "PAN-4878",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-4882",
+      "to": "PAN-4863",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
+    },
+    {
+      "from": "PAN-4882",
+      "to": "PAN-4886",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4882",
+      "to": "PAN-4885",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.3
+    },
+    {
+      "from": "PAN-4823",
+      "to": "PAN-4887",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4835",
+      "to": "PAN-4887",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4887",
+      "to": "PAN-4842",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
     }
   ]
 }

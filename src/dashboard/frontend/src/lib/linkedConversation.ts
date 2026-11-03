@@ -26,6 +26,21 @@ export function conversationRouteKey(conv: { id: number; name: string; origin?: 
   return isLinkedConversation(conv) ? conv.name : String(conv.id);
 }
 
+type LinkedLookupRow = { name: string; origin?: string; machineLabel?: string; remoteName?: string };
+
+/**
+ * The merged-list row a linked key opens (PAN-4871): the row named `key`, else
+ * the linked row on the machine labelled `<target>` with owner name `<name>`.
+ * Null for a local key or when no linked row matches.
+ */
+export function findLinkedConversationRow<T extends LinkedLookupRow>(rows: readonly T[], key: string): T | null {
+  const linked = parseLinkedConversationName(key);
+  if (!linked) return null;
+  return rows.find((row) => row.name === key)
+    ?? rows.find((row) => isLinkedConversation(row) && row.machineLabel === linked.target && row.remoteName === linked.name)
+    ?? null;
+}
+
 /** `/ws/linked/<env>/terminal` for a linked conversation name, else null. */
 export function terminalWsPathFor(name: string): string | null {
   const linked = parseLinkedConversationName(name);

@@ -4,12 +4,12 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { SetUpPhoneDialog } from '../SetUpPhoneDialog';
-import { requestSettingsSection } from '../../../../lib/settingsSection';
+import { openSettingsSection } from '../../../../lib/settingsSection';
 
 vi.mock('../../../../lib/wsTransport', () => ({
   dashboardMutationJsonHeaders: vi.fn(async () => ({ 'Content-Type': 'application/json', 'x-overdeck-csrf-token': 'test' })),
 }));
-vi.mock('../../../../lib/settingsSection', () => ({ requestSettingsSection: vi.fn() }));
+vi.mock('../../../../lib/settingsSection', () => ({ requestSettingsSection: vi.fn(), openSettingsSection: vi.fn() }));
 
 function jsonResponse(status: number, body: unknown): Response {
   return { status, ok: status >= 200 && status < 300, json: () => Promise.resolve(body) } as Response;
@@ -58,7 +58,7 @@ describe('SetUpPhoneDialog (PAN-2355)', () => {
     requireTokenMint = true;
     pairingStatus = 200;
     addresses = [DESK];
-    vi.mocked(requestSettingsSection).mockClear();
+    vi.mocked(openSettingsSection).mockClear();
     mockServer();
   });
 
@@ -74,7 +74,7 @@ describe('SetUpPhoneDialog (PAN-2355)', () => {
     expect(screen.queryByRole('heading', { name: /Scan the pairing code/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Create pairing link' })).not.toBeInTheDocument();
     await user.click(open);
-    expect(requestSettingsSection).toHaveBeenCalledWith('access-tokens');
+    expect(openSettingsSection).toHaveBeenCalledWith('access-tokens');
   });
 
   it('creates a phone link at the chosen https address', async () => {

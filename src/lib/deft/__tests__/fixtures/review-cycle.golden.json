@@ -1,0 +1,80 @@
+{
+  "issueId": "PAN-1",
+  "prNumber": 12,
+  "headSha": "abc12340123456789abcdef0123456789abcdef0",
+  "reviewer": {
+    "present": true,
+    "name": "greptile",
+    "source": "comment",
+    "unsupported": []
+  },
+  "verdict": "NEW_P0_P1",
+  "exit": {
+    "checkRun": "met",
+    "headSha": "met",
+    "lastReviewedCommit": "met",
+    "confidence": "met",
+    "noBlocking": "unmet",
+    "confidenceScore": 4,
+    "minConfidence": 4,
+    "lastReviewedSha": "abc1234",
+    "p0p1Remaining": 1
+  },
+  "rounds": [
+    {
+      "index": 1,
+      "findings": {
+        "p0": 1,
+        "p1": 0,
+        "p2": 1
+      },
+      "commentCount": 2,
+      "fixCommit": {
+        "sha": "1111111111111111111111111111111111111111",
+        "subject": "fix: address Greptile review findings (batch)",
+        "committedAt": "2026-11-02T14:30:00Z"
+      },
+      "startedAt": "2026-11-02T13:00:00Z"
+    },
+    {
+      "index": 2,
+      "findings": {
+        "p0": 0,
+        "p1": 1,
+        "p2": 0
+      },
+      "commentCount": 1,
+      "fixCommit": null,
+      "startedAt": "2026-11-02T15:01:00Z"
+    }
+  ],
+  "roundsReconstructed": true,
+  "lease": {
+    "owner": "agent:impl-1",
+    "monitorAgentId": "pr-watch-12-4242",
+    "headSha": "abc1234",
+    "startedAt": "2026-11-02T17:45:00Z",
+    "expiresAt": "2026-11-02T18:15:00Z",
+    "endedAt": null,
+    "active": true
+  },
+  "heartbeats": [
+    {
+      "agentId": "pr-watch-12-4242",
+      "parentId": "impl-1",
+      "lastHeartbeatAt": "2026-11-02T17:58:00Z",
+      "lastMessage": "Waiting for Greptile",
+      "phase": "polling",
+      "prNumber": 12,
+      "waitKind": "review"
+    }
+  ],
+  "cleanRecords": [
+    {
+      "prNumber": 12,
+      "headSha": "0123456789abcdef0123456789abcdef01234567",
+      "cleanedAt": "2026-11-02T17:00:00Z"
+    }
+  ],
+  "errors": []
+}

@@ -1,0 +1,212 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-03T03:32:18Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4872: New conversation on another machine shows this machine's working directory",
+    "updated": "2026-11-03T03:35:20.270Z"
+  },
+  "plan": {
+    "id": "pan-4872",
+    "title": "New conversation on another machine shows this machine's working directory",
+    "status": "running",
+    "uid": "a5bd812d-cee7-4d6c-a268-724087d2670e",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-03T03:32:18Z",
+    "updated": "2026-11-03T03:35:20.270Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4872",
+        "label": "PAN-4872",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4872.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "anywhere",
+      "new-conversation",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "In the new-conversation dialog, choosing a linked machine, Auto or Fly (new VM) in the Machine field leaves the disabled Working directory field showing this machine's project path (NewConversationDialog.tsx renders value={cwd} for every machine). That path does not exist on the chosen machine and is never sent: createFleetConversation copies only FLEET_FIELDS (no cwd), and the owner's work door resolves the directory from the project's gitOrigin. The start is correct; only the display is wrong.",
+      "Proposal": "Add a pure machineCwdHint(machine, label, projectName) and a useMachineCwdHint hook (reusing MACHINES_QUERY_KEY) to MachineField.tsx. When the Machine field is not this machine, the dialog renders the Working directory input with value '' and the hint 'Set by <who>: its copy of <Project>' or 'Set by <who>: its default working directory' as placeholder and title, while keeping the cwd state so switching back restores it. Cover it in MachineField.test.tsx, including a fleet POST with no cwd key. Document the behavior in configuration/linked-machines.mdx and docs/ANYWHERE-ARCHITECTURE.md, and correct the machines-work.ts header (no-project default is getDefaultCwd, not home).",
+      "NonGoals": "- Listing, browsing or validating directories on another machine (the work door never takes a path; MachineProject is documented 'never a path')\n- Sending a subdirectory or any cwd to another machine\n- A dialog warning when the chosen machine lacks the project (the server already answers 404 project-missing with the add-project command)\n- Any code change to the fleet route, the work door, the CLI --machine flags or the MCP start_conversation tool\n- Clearing or rewriting the dialog's cwd state when the Machine field changes"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Clear the field and explain instead of offering the chosen machine's paths.",
+        "rationale": "The issue lists both readings. machines-work.ts states a caller never chooses a path on the owner, and packages/contracts MachineProject is documented 'never a path', so path offering would break the Anywhere design."
+      },
+      {
+        "summary": "No server work item.",
+        "rationale": "Verified: FLEET_FIELDS excludes cwd, the fleet route reads only machine/projectKey/model/harness/effort/issueId, and the work door starts in the matched project's checkout or getDefaultCwd(); fleet-conversations.test.ts ac10 already asserts the path-free work-door body."
+      },
+      {
+        "summary": "Render-only fix that keeps the cwd state.",
+        "rationale": "Switching back to this machine should restore the operator's edited directory; clearing state would lose input for no gain."
+      },
+      {
+        "summary": "Show the hint as the disabled input's placeholder and title.",
+        "rationale": "Keeps the label bound to a control, reuses the existing .input::placeholder style, and adds no new layout."
+      },
+      {
+        "summary": "The hook lives in MachineField.tsx and reuses MACHINES_QUERY_KEY; the label lookup ignores the online/hidden filter and falls back to 'the chosen machine'.",
+        "rationale": "React Query dedupes the request (no new fetch for the test network guard), and a link that drops offline after selection still shows its label."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-03-PAN-4872-new-conversation-on-another-machine-shows-this-machine-s-working-directory.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "cwd-hint",
+        "title": "Working directory field shows who sets it when another machine is chosen",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T03:32:18Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4872",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/newConversation/MachineField.tsx",
+            "src/dashboard/frontend/src/components/newConversation/NewConversationDialog.tsx",
+            "src/dashboard/frontend/src/components/newConversation/__tests__/MachineField.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/newConversation/__tests__/MachineField.test.tsx src/dashboard/frontend/src/components/newConversation/__tests__/NewConversationDialog.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "MachineField.test.tsx passes including the new 'Working directory on another machine (PAN-4872)' tests",
+            "NewConversationDialog.test.tsx passes unchanged",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 exactly. In MachineField.tsx add exported machineCwdHint(machine, label, projectName): null for machine ''; otherwise `Set by ${who}: ${projectName ? `its copy of ${projectName}` : 'its default working directory'}` where who is 'the machine Auto picks' for 'auto', 'the new Fly machine' for 'fly', else the label or 'the chosen machine'. Add exported useMachineCwdHint(choice, projectName) using useQuery({ queryKey: MACHINES_QUERY_KEY, queryFn: loadMachines, staleTime: 15_000 }) and (data?.links ?? []).find(link => link.environmentId === choice.machine)?.label ?? null. Extend the module header with one PAN-4872 sentence. In NewConversationDialog.tsx compute cwdHint = useMachineCwdHint(machine, project ? (project.name ?? project.key) : null) after the project useMemo, and set the Working directory input to value={cwdHint === null ? cwd : ''}, disabled={!projectKey || cwdHint !== null}, placeholder={cwdHint ?? (projectKey ? '' : 'Default working directory')}, title={cwdHint ?? undefined}. Do not touch setCwd, chooseProject, setMachine or payload code. Add the five tests listed in PRD WI-1 step 3 to MachineField.test.tsx using its existing fetch mock (project overdeck/Overdeck at /p/overdeck, link desk/env-desk)."
+        },
+        "items": [
+          {
+            "id": "cwd-hint.ac1",
+            "title": "Given project overdeck and Machine env-desk, the Working directory input renders an empty value, shows the hint text 'Set by desk: its copy of Overdeck', and is disabled (MachineField.test.tsx)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cwd-hint.ac2",
+            "title": "Given an edited cwd /p/overdeck/packages/web, choosing env-desk and then This machine restores the input value /p/overdeck/packages/web and re-enables the input",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cwd-hint.ac3",
+            "title": "Auto with no project renders the hint text 'Set by the machine Auto picks: its default working directory'; Fly with project overdeck renders 'Set by the new Fly machine: its copy of Overdeck'; machineCwdHint('env-gone', null, 'Overdeck') returns 'Set by the chosen machine: its copy of Overdeck' and machineCwdHint('', 'x', 'y') returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cwd-hint.ac4",
+            "title": "When Create is clicked with Machine env-desk after editing the cwd, the single POST to /api/fleet/conversations has no cwd key and includes machine 'env-desk' and projectKey 'overdeck'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-remote-cwd",
+        "title": "Document that the other machine sets the working directory",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T03:32:18Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4872",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/linked-machines.mdx",
+            "docs/ANYWHERE-ARCHITECTURE.md",
+            "src/dashboard/server/routes/machines-work.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Set by desk: its copy of Overdeck' configuration/linked-machines.mdx",
+            "grep -n 'machineCwdHint' docs/ANYWHERE-ARCHITECTURE.md",
+            "grep -n 'getDefaultCwd' src/dashboard/server/routes/machines-work.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "each grep prints one matching line",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2 exactly. (1) configuration/linked-machines.mdx, section '## Start work on another machine': after the paragraph ending '(see [Projects across machines](#projects-across-machines)).' add the paragraph quoted in the PRD (the other machine chooses the working directory: its own copy of the project, or its default working directory (~/Projects, else home) with no project; the field is empty and reads, for example, \"Set by desk: its copy of Overdeck\"; a typed directory applies only to this machine and is kept on switching back). (2) docs/ANYWHERE-ARCHITECTURE.md, section '### Work doors and provenance (D-4651-1/2/3)': after 'The caller never names a path.' add the PRD sentence naming createFleetConversation (never sends cwd) and machineCwdHint in newConversation/MachineField.tsx (PAN-4872). (3) src/dashboard/server/routes/machines-work.ts header lines 14-16: replace '(or the home directory when `gitOrigin` is null)' with '(or the default working directory, `getDefaultCwd`, when `gitOrigin` is null)'. Comment only."
+        },
+        "items": [
+          {
+            "id": "docs-remote-cwd.ac1",
+            "title": "configuration/linked-machines.mdx 'Start work on another machine' renders a paragraph saying the other machine chooses the working directory, with the example \"Set by desk: its copy of Overdeck\" and that a typed directory applies only to this machine",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-remote-cwd.ac2",
+            "title": "docs/ANYWHERE-ARCHITECTURE.md work-doors section states that createFleetConversation never sends cwd and names machineCwdHint in newConversation/MachineField.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-remote-cwd.ac3",
+            "title": "The machines-work.ts header names getDefaultCwd for the no-gitOrigin case and git diff shows only comment lines changed in that file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  },
+  "status": "active"
+}

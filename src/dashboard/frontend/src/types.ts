@@ -161,6 +161,8 @@ export interface Agent {
     askedAt: string;
     plan: string;
   };
+  /** PAN-4849 — open Deft `external` escalations: a quiet indicator, never pending input. */
+  deftExternalEscalations?: number;
   resolution?: AgentResolution;  // Lifecycle completion signal (PAN-309)
   resolutionCount?: number;      // How many times this resolution was set
   runtimeState?: string;         // 'completed' when agent finished normally (not session lost)

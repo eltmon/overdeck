@@ -11,20 +11,27 @@ import { duplexPair, type Duplex } from 'node:stream';
 import { WebSocket as WsClient, WebSocketServer } from 'ws';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { MachineKeyPair } from '../../machine-key.js';
-import { acceptChannel, type AcceptChannelOptions } from '../accept.js';
-import { type ChannelSocket, createChannelSocket, isChannelSocket } from '../channel-socket.js';
-import { approvalCommitment, approvalNonce, approvalSas, pairingSecrets, prologueFor, type HandshakeResult, xxInitiator } from '../noise.js';
-import { FLY_INSTANCE_PARAM, openChannel } from '../open.js';
 import {
+  approvalCommitment,
+  approvalNonce,
+  approvalSas,
   encodeFrame,
   encodePreamble,
   encodeRefusal,
   FrameReader,
+  type HandshakeResult,
   MAX_HANDSHAKE_FRAME,
+  pairingSecrets,
   parsePreambleHead,
+  prologueFor,
   REFUSAL_CODES,
-} from '../wire.js';
+  xxInitiator,
+} from '@overdeck/anywhere-channel';
+import { nodeCrypto } from '@overdeck/anywhere-channel/node';
+import type { MachineKeyPair } from '../../machine-key.js';
+import { acceptChannel, type AcceptChannelOptions } from '../accept.js';
+import { type ChannelSocket, createChannelSocket, isChannelSocket } from '../channel-socket.js';
+import { FLY_INSTANCE_PARAM, openChannel } from '../open.js';
 
 // A wss:// dial needs TLS; this wrapper sends it to a plain local ws server so
 // the tests can read the real upgrade request (PAN-4652 WI-4). ws:// dials pass through.
@@ -208,7 +215,7 @@ describe('secure channel (PAN-4645 WI-2)', () => {
     const initiator = freshKey();
     const responderKey = freshKey();
     const code = 'odp_test-code-123';
-    const { pairingId, psk } = pairingSecrets(code);
+    const { pairingId, psk } = pairingSecrets(nodeCrypto, code);
     const taken: string[] = [];
     let consumed = 0;
     const responder = await startResponder({
@@ -236,7 +243,7 @@ describe('secure channel (PAN-4645 WI-2)', () => {
 
   it('rejects a wrong pairing code with pairing-refused and reports the failure', async () => {
     const responderKey = freshKey();
-    const { pairingId, psk } = pairingSecrets('right-code');
+    const { pairingId, psk } = pairingSecrets(nodeCrypto, 'right-code');
     const failures: number[] = [];
     const responder = await startResponder({
       localKey: responderKey,
@@ -246,7 +253,7 @@ describe('secure channel (PAN-4645 WI-2)', () => {
     });
 
     // Same pairing id as the stored credential, different PSK: fails inside the handshake.
-    const wrongPsk = pairingSecrets('wrong-code');
+    const wrongPsk = pairingSecrets(nodeCrypto, 'wrong-code');
     const responderWithSameId = await startResponder({
       localKey: responderKey,
       isPinnedPeer: () => false,
@@ -447,12 +454,12 @@ describe('approval channel (PAN-2356 WI-13)', () => {
     const hash = Buffer.alloc(64, 7);
     const ni = Buffer.alloc(32, 1);
     const nr = Buffer.alloc(32, 2);
-    const sas = approvalSas(hash, ni, nr);
+    const sas = approvalSas(nodeCrypto, hash, ni, nr);
     expect(sas).toMatch(/^\d{3} \d{3}$/);
-    expect(approvalSas(hash, ni, nr)).toBe(sas);
-    expect(approvalSas(Buffer.alloc(64, 8), ni, nr)).not.toBe(sas);
-    expect(approvalSas(hash, ni, Buffer.alloc(32, 3))).not.toBe(sas);
-    expect(approvalCommitment(hash, ni)).not.toEqual(approvalCommitment(hash, nr));
+    expect(approvalSas(nodeCrypto, hash, ni, nr)).toBe(sas);
+    expect(approvalSas(nodeCrypto, Buffer.alloc(64, 8), ni, nr)).not.toBe(sas);
+    expect(approvalSas(nodeCrypto, hash, ni, Buffer.alloc(32, 3))).not.toBe(sas);
+    expect(approvalCommitment(nodeCrypto, hash, ni)).not.toEqual(approvalCommitment(nodeCrypto, hash, nr));
   });
 
   it('refuses a man in the middle that grinds its revealed nonce to match the other leg\'s code', async () => {
@@ -498,8 +505,8 @@ describe('approval channel (PAN-2356 WI-13)', () => {
     handshake.recv(await next());
     raw.write(encodeFrame(handshake.send()));
     const hash = handshake.result().hash;
-    const committed = approvalNonce();
-    raw.write(encodeFrame(approvalCommitment(hash, committed)));
+    const committed = approvalNonce(nodeCrypto);
+    raw.write(encodeFrame(approvalCommitment(nodeCrypto, hash, committed)));
     const responderNonce = await next();
 
     // The grind: search for a nonce whose code matches leg 1. The committed nonce cannot be changed.
@@ -511,7 +518,7 @@ describe('approval channel (PAN-2356 WI-13)', () => {
       const code = (prefix.copy().update(candidate).update(responderNonce).digest().readUInt32BE(0) % 1_000_000).toString().padStart(6, '0');
       if (`${code.slice(0, 3)} ${code.slice(3)}` === target) ground = Buffer.from(candidate);
     }
-    if (ground) expect(approvalSas(hash, ground, responderNonce)).toBe(target);
+    if (ground) expect(approvalSas(nodeCrypto, hash, ground, responderNonce)).toBe(target);
     raw.write(encodeFrame(ground ?? candidate));
 
     await vi.waitFor(() => expect(real.acceptErrors[0]).toMatchObject({ code: 'handshake-failed', message: 'Approval nonce did not match its commitment' }));

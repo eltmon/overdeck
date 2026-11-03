@@ -8,13 +8,13 @@ import { createRequire } from 'node:module';
 import http from 'node:http';
 import { connect, type Socket } from 'node:net';
 
+import { FrameReader } from '@overdeck/anywhere-channel';
 import { createWebSocketStream, WebSocket as WsClient, WebSocketServer } from 'ws';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { MachineKeyPair } from '../../../lib/anywhere/machine-key.js';
 import type { ChannelSocket } from '../../../lib/anywhere/channel/channel-socket.js';
 import { openChannel, openChannelOverTransport } from '../../../lib/anywhere/channel/open.js';
-import { FrameReader } from '../../../lib/anywhere/channel/wire.js';
 import { channelRequest } from '../services/machine-link-service.js';
 import {
   _resetChannelListenerForTests,

@@ -10,23 +10,33 @@
  * the initiator learns why. A responder that cannot decrypt an IK message 1
  * (the initiator pinned a different key) says nothing and drops the connection.
  */
-import { timingSafeEqual } from 'node:crypto';
 import type { Duplex } from 'node:stream';
 
-import type { MachineKeyPair } from '../machine-key.js';
-import { type ChannelMarker, type ChannelSocket, createChannelSocket } from './channel-socket.js';
-import { APPROVAL_NONCE_BYTES, approvalCommitment, approvalNonce, approvalSas, type Handshake, ikResponder, NOISE_LINK_PROTOCOL, prologueFor, xxPskResponder, xxResponder } from './noise.js';
 import {
+  APPROVAL_NONCE_BYTES,
+  approvalCommitment,
+  approvalNonce,
+  approvalSas,
   encodeFrame,
   encodeRefusal,
   FrameReader,
+  type Handshake,
+  ikResponder,
+  NOISE_LINK_PROTOCOL,
   PAIRING_ID_LENGTH,
   parsePreambleHead,
   PREAMBLE_LENGTH,
+  prologueFor,
   REFUSAL_CODES,
   type Refusal,
   WireError,
-} from './wire.js';
+  xxPskResponder,
+  xxResponder,
+} from '@overdeck/anywhere-channel';
+import { nodeCrypto } from '@overdeck/anywhere-channel/node';
+
+import type { MachineKeyPair } from '../machine-key.js';
+import { type ChannelMarker, type ChannelSocket, createChannelSocket } from './channel-socket.js';
 
 export const DEFAULT_ACCEPT_TIMEOUT_MS = 10_000;
 
@@ -51,7 +61,7 @@ export class ChannelAcceptError extends Error {
 }
 
 export interface PairingSecret {
-  psk: Buffer;
+  psk: Uint8Array;
   /** Called once the XXpsk0 handshake completes (the credential is spent). */
   onSuccess?: () => void;
 }
@@ -123,7 +133,7 @@ export async function acceptChannel(raw: Duplex, opts: AcceptChannelOptions): Pr
         // The initiator pinned a key that is not ours: nothing useful can be said.
         throw new ChannelAcceptError('handshake-failed', 'Noise IK message 1 did not decrypt (initiator pinned another key)');
       }
-      const remoteKeyHex = handshake.remoteKey().toString('hex');
+      const remoteKeyHex = Buffer.from(handshake.remoteKey()).toString('hex');
       if (!opts.isPinnedPeer(remoteKeyHex)) {
         throw refuse('unknown-peer', { code: REFUSAL_CODES.unknownPeer }, `Initiator key ${remoteKeyHex.slice(0, 16)}… is not pinned here`);
       }
@@ -132,7 +142,7 @@ export async function acceptChannel(raw: Duplex, opts: AcceptChannelOptions): Pr
     }
 
     if (head.mode === 'approval') {
-      const requestId = (await reader.readBytes(PAIRING_ID_LENGTH)).toString('hex');
+      const requestId = Buffer.from(await reader.readBytes(PAIRING_ID_LENGTH)).toString('hex');
       if (!opts.takeApproval?.(requestId)) {
         throw refuse('approval-refused', { code: REFUSAL_CODES.pairingRefused }, `No live approval request ${requestId}`);
       }
@@ -145,26 +155,26 @@ export async function acceptChannel(raw: Duplex, opts: AcceptChannelOptions): Pr
       } catch {
         throw new ChannelAcceptError('handshake-failed', 'Approval handshake message 3 did not verify');
       }
-      const remoteKeyHex = handshake.remoteKey().toString('hex');
+      const remoteKeyHex = Buffer.from(handshake.remoteKey()).toString('hex');
       // Commit-then-reveal (D-2356-10 amended): take the initiator's commitment, send our nonce,
       // and show a code only if the revealed nonce matches the commitment.
       const hash = handshake.result().hash;
       const commitment = await readMessage(reader);
-      const nonce = approvalNonce();
+      const nonce = approvalNonce(nodeCrypto);
       raw.write(encodeFrame(nonce));
       const initiatorNonce = await readMessage(reader);
       if (
         commitment.length !== 32
         || initiatorNonce.length !== APPROVAL_NONCE_BYTES
-        || !timingSafeEqual(approvalCommitment(hash, initiatorNonce), commitment)
+        || !nodeCrypto.timingSafeEqual(approvalCommitment(nodeCrypto, hash, initiatorNonce), commitment)
       ) {
         throw new ChannelAcceptError('handshake-failed', 'Approval nonce did not match its commitment');
       }
-      const sas = approvalSas(hash, initiatorNonce, nonce);
+      const sas = approvalSas(nodeCrypto, hash, initiatorNonce, nonce);
       return finish(raw, reader, handshake, false, null, { mode: 'approval', remoteKeyHex, pairingId: null, requestId, approvalSas: sas });
     }
 
-    const pairingId = (await reader.readBytes(PAIRING_ID_LENGTH)).toString('hex');
+    const pairingId = Buffer.from(await reader.readBytes(PAIRING_ID_LENGTH)).toString('hex');
     const taken = opts.takePairing(pairingId);
     if (taken === 'unknown') {
       opts.onPairingFailure();
@@ -186,7 +196,7 @@ export async function acceptChannel(raw: Duplex, opts: AcceptChannelOptions): Pr
       opts.onPairingFailure();
       throw refuse('pairing-refused', { code: REFUSAL_CODES.pairingRefused }, 'Pairing handshake message 3 did not verify');
     }
-    const remoteKeyHex = handshake.remoteKey().toString('hex');
+    const remoteKeyHex = Buffer.from(handshake.remoteKey()).toString('hex');
     taken.onSuccess?.();
     return finish(raw, reader, handshake, false, null, { mode: 'pairing', remoteKeyHex, pairingId });
   } catch (error) {
@@ -198,7 +208,7 @@ export async function acceptChannel(raw: Duplex, opts: AcceptChannelOptions): Pr
   }
 }
 
-async function readMessage(reader: FrameReader): Promise<Buffer> {
+async function readMessage(reader: FrameReader): Promise<Uint8Array> {
   const frame = await reader.readFrame();
   if (frame.kind !== 'message') {
     throw new ChannelAcceptError('bad-preamble', `Initiator sent refusal code ${frame.refusal.code} instead of a handshake message`);
@@ -215,7 +225,7 @@ function finish(
   reader: FrameReader,
   handshake: Handshake,
   initiator: boolean,
-  finalMessage: Buffer | null,
+  finalMessage: Uint8Array | null,
   channel: ChannelMarker,
 ): ChannelSocket {
   const leftover = reader.detach();

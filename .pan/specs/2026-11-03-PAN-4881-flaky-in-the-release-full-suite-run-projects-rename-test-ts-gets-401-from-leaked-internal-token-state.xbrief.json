@@ -1,0 +1,376 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-03T05:55:45Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4881: Flaky in the release full-suite run: projects-rename.test.ts gets 401 from leaked internal-token state",
+    "updated": "2026-11-03T06:04:10.000Z"
+  },
+  "plan": {
+    "id": "pan-4881",
+    "title": "Flaky in the release full-suite run: projects-rename.test.ts gets 401 from leaked internal-token state",
+    "status": "running",
+    "uid": "16a66384-c1a5-4dc3-aa5e-b59669ecfad8",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-03T05:55:45Z",
+    "updated": "2026-11-03T06:04:10.000Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4881",
+        "label": "PAN-4881",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "tests",
+      "flaky",
+      "internal-token",
+      "test-infra"
+    ],
+    "narratives": {
+      "Problem": "projects-rename.test.ts authenticates with OVERDECK_INTERNAL_TOKEN but never deletes <OVERDECK_HOME>/internal-token. tests/setup/overdeck-home.ts gives every test file in a Vitest pool slot the same OVERDECK_HOME (<run root>/worker-<VITEST_POOL_ID>), and the token file wins over the env var (PAN-4628). When an earlier file in the same slot leaves a token file, the rename route (project-rename.ts -> rejectUnsafeDashboardMutationRequest -> getInternalToken) rejects the test header with 401. Reproduced during planning: seeding a stale worker-home token file produces exactly 8 failed / 1 passed, all 401, matching the v0.73.1 release run.",
+      "Proposal": "Two independent fixes plus docs. (1) projects-rename.test.ts deletes join(getOverdeckHome(), 'internal-token') before and after each test (the idiom 34 sibling files already use) and gains a PAN-4881 regression test that seeds a stale token file and still gets 200. (2) tests/setup/overdeck-home.ts deletes <worker home>/internal-token at top level every time it runs (once per test file), so no file inherits a token file from a predecessor in its pool slot; this closes the leak class for all leakers at once. (3) docs/TESTING.md gains a subsection on the shared worker home and the token-file cleanup idiom. Verification uses the seeded repro config recipe in the PRD, because the full npm test must not run on the host. (4) The two leakers the planning hunt proved, tests/unit/cli/serve.test.ts and tests/lib/work-agent-lifecycle.test.ts, delete the worker-home token file in afterEach.",
+      "NonGoals": "- Changing token resolution order or any production code under src/ outside __tests__/ (src/lib/internal-token.ts stays as is)\n- Repointing OVERDECK_HOME at a per-test temp directory in projects-rename.test.ts\n- Editing the 34 sibling test files' existing token-file guards, or any leaking test file other than tests/unit/cli/serve.test.ts and tests/lib/work-agent-lifecycle.test.ts\n- Adding a shared test-helper module for token cleanup\n- Clearing an inherited OVERDECK_INTERNAL_TOKEN env var in a setup file\n- Changing vitest.config.ts worker count, isolation, retry, or globalSetup\n- Re-running the failed v0.73.1 release job (operator instance recovery)\n- Running the full npm test suite on the host"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Delete the worker-home token file in projects-rename.test.ts instead of repointing OVERDECK_HOME at TEST_HOME per test.",
+        "rationale": "34 sibling route tests already use rmSync(join(getOverdeckHome(), 'internal-token'), { force: true }); repointing the env var mid-file would make modules that captured the OVERDECK_HOME constant disagree with getOverdeckHome() and departs from every neighbor."
+      },
+      {
+        "summary": "Close the leak class with a top-level deletion in tests/setup/overdeck-home.ts, and also add afterEach cleanup to the two leakers the planning hunt proved (serve.test.ts, work-agent-lifecycle.test.ts).",
+        "rationale": "Leakers include any test reaching ensureInternalToken() through CLI commands, agent-runtime.ts or deacon-event-client.ts, and tests spawning dist/cli/index.js that source grep cannot find, so a per-file reset of the shared worker home is the only complete fix. The issue asks to fix leaking files too; the hunt of 41 candidates proved exactly two, each a one-line afterEach fix."
+      },
+      {
+        "summary": "Run the setup deletion at setup-file top level, not in a vitest hook.",
+        "rationale": "Top level runs before the test file's imports and hooks, so files that seed their own token file in beforeAll/beforeEach keep it; a global beforeEach would delete tokens seeded in beforeAll."
+      },
+      {
+        "summary": "Prove the fix with the seeded repro config on the host; leave the full single-job confirmation to the next CI Release run.",
+        "rationale": "Repo rules forbid running the full npm test on the host. The seeded repro deterministically reproduces the exact release failure (8 x 401) and so proves the fix more strongly than an order-dependent full run."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-03-PAN-4881-flaky-in-the-release-full-suite-run-projects-rename-test-ts-gets-401-from-leaked-internal-token-state.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "rename-test-hermetic-token",
+        "title": "Make projects-rename.test.ts delete the worker-home token file around each test, with a PAN-4881 regression test",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T05:55:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4881",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/__tests__/projects-rename.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/projects-rename.test.ts",
+            "mkdir -p .tmp/repro-root-rename/worker-0 .tmp/repro-root-rename/worker-1 && echo stale-token > .tmp/repro-root-rename/worker-0/internal-token && echo stale-token > .tmp/repro-root-rename/worker-1/internal-token && OVERDECK_TEST_HOME_ROOT=\"$PWD/.tmp/repro-root-rename\" npx vitest run --config .tmp/vitest.repro.config.ts --maxWorkers=1 src/dashboard/server/routes/__tests__/projects-rename.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "projects-rename.test.ts: 10 passed, 0 failed",
+            "seeded repro run: 10 passed, 0 failed, no 401 assertion errors",
+            "typecheck and lint exit 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 exactly. In src/dashboard/server/routes/__tests__/projects-rename.test.ts: import join from node:path, getOverdeckHome from '../../../../lib/paths.js' (the vi.mock spreads ...real so it is exported), and writeFileSync from node:fs. Add function useTestInternalToken() below const INTERNAL_TOKEN that sets process.env['OVERDECK_INTERNAL_TOKEN'] = INTERNAL_TOKEN, then rmSync(join(getOverdeckHome(), 'internal-token'), { force: true }), then _resetInternalTokenCacheForTests(), with the PAN-4628/PAN-4881 comment from the PRD. beforeEach calls useTestInternalToken() in place of its first two lines. afterEach adds rmSync(join(getOverdeckHome(), 'internal-token'), { force: true }) before its cache reset. Add the regression it(...) named with 'PAN-4881' from the PRD: write 'stale-sibling-token\\n' to join(getOverdeckHome(), 'internal-token'), reset the cache, call useTestInternalToken(), POST a rename of 'alpha' to 'After Stale Token', expect { status: 200, body: { key: 'alpha', name: 'After Stale Token' } }. Before running the seeded verify command, create .tmp/vitest.repro.config.ts from the PRD 'Verification recipe' step 1 (gitignored, never commit). Clean up afterwards with rm -rf .tmp/repro-root-rename (literal path). Do not touch any other test file or src/lib/internal-token.ts."
+        },
+        "items": [
+          {
+            "id": "rename-test-hermetic-token.ac1",
+            "title": "Given stale-token files seeded in .tmp/repro-root-rename/worker-0 and worker-1, when projects-rename.test.ts runs with the repro config and --maxWorkers=1, then every test passes and no test returns 401",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rename-test-hermetic-token.ac2",
+            "title": "npx vitest run on projects-rename.test.ts reports 10 passing tests, and one test title contains 'PAN-4881' and writes a stale token file before asserting status 200",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rename-test-hermetic-token.ac3",
+            "title": "The test file deletes the worker-home token file in both beforeEach (via useTestInternalToken, before _resetInternalTokenCacheForTests()) and afterEach, so after the file runs no <worker home>/internal-token exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "setup-clears-worker-token",
+        "title": "Delete the worker-home internal-token file at the top of tests/setup/overdeck-home.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T05:55:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4881",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/setup/overdeck-home.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "mkdir -p .tmp/repro-root-setup/worker-1 && echo stale-token > .tmp/repro-root-setup/worker-1/internal-token && OVERDECK_TEST_HOME_ROOT=\"$PWD/.tmp/repro-root-setup\" npx vitest run --config .tmp/vitest.repro.config.ts --maxWorkers=1 src/lib/__tests__/issue-id-bare-numeric-matches.test.ts && test ! -e .tmp/repro-root-setup/worker-1/internal-token && echo SEEDED-TOKEN-REMOVED",
+            "npx vitest run src/lib/__tests__/internal-token.test.ts tests/scripts/pan-hook-lib-guards.test.ts src/dashboard/server/routes/__tests__/issues-reopen.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "seeded run prints SEEDED-TOKEN-REMOVED",
+            "internal-token.test.ts, pan-hook-lib-guards.test.ts and issues-reopen.test.ts all pass",
+            "typecheck and lint exit 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. In tests/setup/overdeck-home.ts change the fs import to `import { mkdirSync, rmSync } from 'node:fs';` and, directly after `mkdirSync(overdeckHome, { recursive: true });`, add `rmSync(join(overdeckHome, 'internal-token'), { force: true });` with the three-line comment from the PRD (shared pool-slot home, token file wins over OVERDECK_INTERNAL_TOKEN per PAN-4628, PAN-4881). Use the file's own overdeckHome variable; do not import from src/. Run it at top level, never inside beforeAll/beforeEach. Create .tmp/vitest.repro.config.ts from the PRD 'Verification recipe' step 1 if it does not exist. Before the change the seeded verify command fails its `test ! -e` checks; after it, it prints SEEDED-TOKEN-REMOVED. Clean up with rm -rf .tmp/repro-root-setup (literal path). Do not change vitest.config.ts or tests/global-setup.ts. The setup deletes only its own pool slot's file (worker-<VITEST_POOL_ID>); never sweep worker-* — that would delete concurrent workers' tokens mid-run. With --maxWorkers=1 the pool id is 1, so seed and check only worker-1."
+        },
+        "items": [
+          {
+            "id": "setup-clears-worker-token.ac1",
+            "title": "Given a stale-token file seeded in .tmp/repro-root-setup/worker-1 (with --maxWorkers=1 the only pool id is 1, observed as home-1/), when issue-id-bare-numeric-matches.test.ts runs with the repro config, then the seeded file no longer exists afterwards and the command prints SEEDED-TOKEN-REMOVED",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "setup-clears-worker-token.ac2",
+            "title": "tests/setup/overdeck-home.ts deletes join(overdeckHome, 'internal-token') at module top level after mkdirSync, outside any vitest hook, and imports nothing from src/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "setup-clears-worker-token.ac3",
+            "title": "internal-token.test.ts, pan-hook-lib-guards.test.ts and issues-reopen.test.ts, which seed their own token files, each passes after the change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "serve-test-token-cleanup",
+        "title": "Delete the minted internal-token file in tests/unit/cli/serve.test.ts afterEach",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T05:55:45Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "test",
+          "issueLabel": "pan-4881",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/cli/serve.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/serve.test.ts",
+            "mkdir -p .tmp/hunt-root-serve && OVERDECK_TEST_HOME_ROOT=\"$PWD/.tmp/hunt-root-serve\" npx vitest run --config .tmp/vitest.repro.config.ts --maxWorkers=1 tests/unit/cli/serve.test.ts && ! ls .tmp/hunt-root-serve/worker-*/internal-token 2>/dev/null && echo NO-TOKEN-LEFT",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "serve.test.ts passes with 0 failures",
+            "hunt check prints NO-TOKEN-LEFT",
+            "typecheck and lint exit 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4. In tests/unit/cli/serve.test.ts, at the end of the top-level afterEach (anchor: `afterEach(() => {` followed by `vi.useRealTimers();`), add `rmSync(tokenFilePath(), { force: true });` with the two-line PAN-4881 comment from the PRD. tokenFilePath() and rmSync already exist in the file; add no imports. Create .tmp/vitest.repro.config.ts from the PRD 'Verification recipe' step 1 if it does not exist (gitignored, never commit). Clean up with rm -rf .tmp/hunt-root-serve (literal path)."
+        },
+        "items": [
+          {
+            "id": "serve-test-token-cleanup.ac1",
+            "title": "Given an empty repro root .tmp/hunt-root-serve, when tests/unit/cli/serve.test.ts runs alone with the repro config, then no worker-*/internal-token file exists afterwards and the check prints NO-TOKEN-LEFT",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "serve-test-token-cleanup.ac2",
+            "title": "The top-level afterEach in tests/unit/cli/serve.test.ts calls rmSync(tokenFilePath(), { force: true }), and every existing test in the file still passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lifecycle-test-token-cleanup",
+        "title": "Delete the internal-token file that tests/lib/work-agent-lifecycle.test.ts fixtures mint, in its afterEach",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T05:55:45Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "test",
+          "issueLabel": "pan-4881",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/lib/work-agent-lifecycle.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/work-agent-lifecycle.test.ts",
+            "mkdir -p .tmp/hunt-root-lifecycle && OVERDECK_TEST_HOME_ROOT=\"$PWD/.tmp/hunt-root-lifecycle\" npx vitest run --config .tmp/vitest.repro.config.ts --maxWorkers=1 tests/lib/work-agent-lifecycle.test.ts && ! ls .tmp/hunt-root-lifecycle/worker-*/internal-token 2>/dev/null && echo NO-TOKEN-LEFT",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "work-agent-lifecycle.test.ts passes with 0 failures",
+            "hunt check prints NO-TOKEN-LEFT",
+            "typecheck and lint exit 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5. In tests/lib/work-agent-lifecycle.test.ts add `import { getOverdeckHome } from '../../src/lib/paths.js';` beside the other ../../src/lib imports. In the afterEach inside describe('work-agent-lifecycle'), after the loop that removes agent dirs, add `rmSync(join(getOverdeckHome(), 'internal-token'), { force: true });` with the two-line PAN-4881 comment from the PRD (fixtures reach ensureInternalToken() in src/lib/agent-runtime.ts). rmSync and join are already imported. Create .tmp/vitest.repro.config.ts from the PRD 'Verification recipe' step 1 if it does not exist. Clean up with rm -rf .tmp/hunt-root-lifecycle (literal path)."
+        },
+        "items": [
+          {
+            "id": "lifecycle-test-token-cleanup.ac1",
+            "title": "Given an empty repro root .tmp/hunt-root-lifecycle, when tests/lib/work-agent-lifecycle.test.ts runs alone with the repro config, then no worker-*/internal-token file exists afterwards and the check prints NO-TOKEN-LEFT",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lifecycle-test-token-cleanup.ac2",
+            "title": "The afterEach in tests/lib/work-agent-lifecycle.test.ts calls rmSync on join(getOverdeckHome(), 'internal-token') with { force: true }, and every existing test in the file still passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-worker-home-token",
+        "title": "Document the shared worker home and token-file cleanup idiom in docs/TESTING.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T05:55:45Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4881",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/TESTING.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '### Shared worker home and the internal token' docs/TESTING.md",
+            "grep -n \"rmSync(join(getOverdeckHome(), 'internal-token'), { force: true });\" docs/TESTING.md",
+            "grep -n 'tests/setup/overdeck-home.ts' docs/TESTING.md"
+          ],
+          "expected_outputs": [
+            "each grep prints at least one matching line inside the new subsection"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. In docs/TESTING.md, under '## Writing Tests', insert '### Shared worker home and the internal token' after the '### Mocking' subsection and before '### Real-process fixtures'. In plain prose (short sentences, active voice) state: tests/setup/overdeck-home.ts sets OVERDECK_HOME to <run root>/worker-<VITEST_POOL_ID>, shared by every test file in that pool slot; mocking the paths.js OVERDECK_HOME or CONFIG_DIR constants does not move the token file because src/lib/internal-token.ts calls getOverdeckHome(), which reads the env var; the token file <OVERDECK_HOME>/internal-token wins over OVERDECK_INTERNAL_TOKEN (PAN-4628), so a test that authenticates with an env token deletes the file before resetting the token cache and again after the test (show a ts snippet with rmSync(join(getOverdeckHome(), 'internal-token'), { force: true }); then _resetInternalTokenCacheForTests();); the setup file deletes the worker-home token file before each test file starts (PAN-4881), which stops cross-file leaks only, so per-test cleanup is still required for leaks inside one file."
+        },
+        "items": [
+          {
+            "id": "docs-worker-home-token.ac1",
+            "title": "docs/TESTING.md contains a '### Shared worker home and the internal token' subsection placed between '### Mocking' and '### Real-process fixtures'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-worker-home-token.ac2",
+            "title": "The subsection names tests/setup/overdeck-home.ts, getOverdeckHome(), PAN-4628 and PAN-4881, and shows the rmSync(join(getOverdeckHome(), 'internal-token'), { force: true }); snippet followed by _resetInternalTokenCacheForTests();",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-worker-home-token.ac3",
+            "title": "The subsection states that the setup-file deletion covers cross-file leaks only and that per-test cleanup remains required within one file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "setup-clears-worker-token",
+        "to": "docs-worker-home-token",
+        "type": "informs"
+      },
+      {
+        "from": "rename-test-hermetic-token",
+        "to": "docs-worker-home-token",
+        "type": "informs"
+      }
+    ]
+  },
+  "status": "active"
+}

@@ -121,6 +121,10 @@ Every issue-action surface renders from the single executable registry in `src/d
 appears. There are no disabled rows with a reason, and no "N available now · M
 gated" count — a row the operator cannot click and cannot interpret is noise, and
 hiding it is what makes the ten-action ceiling mean anything.
+PAN-4849's pipeline switch follows the same rule: `runOnDeft` (Run on Deft) is
+listed only for an issue on Overdeck's pipeline that is not merged, done or
+cancelled, and `backToOverdeck` (Back to Overdeck) only for an issue running on
+Deft; the frontend learns "on Deft" from `GET /api/deft/issues`.
 
 `placement` is the second half of that rule. An entry marked `'contextual'` stays
 in the registry because a card or button invokes it by key, but no menu lists it:

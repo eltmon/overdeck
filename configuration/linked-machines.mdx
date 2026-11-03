@@ -31,7 +31,8 @@ On the machine that should reach it, paste the link:
 pan machines link https://desk.tailnet.ts.net/#pair=odp_…
 ```
 
-or **Settings → Anywhere → Machines → Link a machine**. The dialog takes the pairing
+or **Settings → Anywhere → Machines → Link a machine** (also the command palette's
+**Link a machine**). The dialog takes the pairing
 link, the access level and the **Link both ways** checkbox. Linking takes a few seconds:
 the two machines prove their keys to each other through the pairing code, exchange
 tokens, and the new link shows up as **Online** on both sides.
@@ -43,7 +44,7 @@ pairing link only works on the machine that printed it.
 
 A machine that this one reaches only over SSH (a VPS, a lab box behind a bastion) can be
 linked without running anything there by hand. Use **Settings → Anywhere → Machines →
-Add an SSH machine**, or:
+Add an SSH machine** (also the command palette's **Add an SSH machine**), or:
 
 ```bash
 pan machines add-ssh me@vps.example.com
@@ -130,7 +131,8 @@ pan machines add-fly --project overdeck --harness codex --model gpt-6.1-sol --me
 ```
 
 Settings → Anywhere → Machines has the same door as a dialog: **Add a Fly machine**, next to
-**Add an SSH machine**. It takes an optional project and, under Advanced, an optional
+**Add an SSH machine** (also the command palette's **Add a Fly machine**). It takes an
+optional project and, under Advanced, an optional
 region; it has no message, harness or model field, because it only links the machine — start
 a conversation on it from the new-conversation dialog's **Fly (new VM)** choice (see
 [Start work on another machine](#start-work-on-another-machine)) or with `--message` above.
@@ -360,7 +362,8 @@ renamed.
 
 ## Remote control
 
-Open a linked conversation from the list, or at `/conv/@<environment-id>/<name>`. Its
+Open a linked conversation from the list, or at `/conv/@<environment-id>/<name>`, or on
+the phone at `/m?conversation=@<environment-id>/<name>`. Its
 transcript streams live through this machine's server, and you can send, answer
 questions and approvals, stop, abort, switch model, compact and open its terminal, as if
 it were local. Images load from the owner. The owner's own access rules decide what is
@@ -486,6 +489,12 @@ A conversation or agent started on another machine runs there and is listed on b
 machines. The other machine must have a project for the same repository (the same
 `github_repo` or `gitlab_repo`); if it does not, the error names the command that adds it
 (see [Projects across machines](#projects-across-machines)).
+
+The other machine chooses the working directory: its own copy of the project, or its
+default working directory (`~/Projects`, else home) when no project is chosen. With any
+machine but **This machine** chosen, the dialog's **Working directory** field is empty
+and reads, for example, "Set by desk: its copy of Overdeck". A directory you typed
+applies only to this machine and is kept if you switch back.
 
 Work started this way is **link-started**: the other machine records which machine asked
 for it. An agent on your machine may then message and stop that work, and only that work.

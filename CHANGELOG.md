@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Added: Deft state in the dashboard
+
+- The issue menu offers **Run on Deft** and **Back to Overdeck**, which run `pan skills deft use|back` (PAN-4849).
+- A Deft issue's cockpit shows Deft's escalations (resolvable in a new Decisions tab and from Needs-you), decision records, policy, scopes with **Sign off**, the scope dependency map, Deft's gate runs and Deft's review cycle (PAN-4849).
+- The question dialog answers Deft's numbered menus with the exact label for Claude Code Deft agents (PAN-4849).
+- Board cards, project-tree rows, the phase rail, Changes › Files, Activity and the agents lane show Deft's scope counts, spec and install drift, delivery state, approved-scope check, finish loop and subagent heartbeats (PAN-4849).
+- New routes: `GET /api/issues/:id/deft`, `GET /api/issues/:id/deft/review-cycle`, `GET /api/deft/issues`, `POST /api/issues/:id/pipeline`, and the escalation-resolve and scope sign-off routes (PAN-4849).
+
 ### Added: Deft pipeline per issue
 
 - `pan skills deft use <ISSUE>` runs one issue on Deft Directive's own pipeline: Overdeck installs Directive into that issue's worktree and hides every deposited file from git, so the PR never carries it. Bun projects get the runtime through `bun add` and Directive's own setup step (PAN-4820).
