@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4473",
   "created": "2026-11-03T04:12:49.385Z",
-  "updated": "2026-11-03T05:26:20.462Z",
+  "updated": "2026-11-03T05:26:43.342Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -100,6 +100,10 @@
     "share-record-door.ac5": {
       "status": "completed",
       "doneAt": "2026-11-03T05:26:20.461Z"
+    },
+    "share-service-client.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:26:43.342Z"
     }
   }
 }
