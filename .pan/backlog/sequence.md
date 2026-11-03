@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T14:00:08.595859Z · model: claude-opus-5-5 · open: 867_
+_Last sequenced: 2026-11-03T14:12:09Z · model: claude-opus-5-5 · open: 867_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -656,6 +656,7 @@ _Last sequenced: 2026-11-03T14:00:08.595859Z · model: claude-opus-5-5 · open: 
 | 661 | PAN-2353 | M | low | needs-refinement |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
 | 662 | PAN-4294 | L | low | ok |  |  | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
 | 663 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
+| 664 | PAN-4896 | XS | low | ok |  |  | pan connect on macOS prints the Linux-only PAN-2804 systemd-run warning; gate it on process.platform linux and add a darwin test. |
 | 665 | PAN-3011 | M | low | ok |  | PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
 | 666 | PAN-4638 | L | medium | ok |  |  | Anywhere: run gauntlet lanes on linked machines/Fly VMs; waits on unfiled machine-link plan items; Fly stack + creds open |
 | 667 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
@@ -818,9 +819,8 @@ _Last sequenced: 2026-11-03T14:00:08.595859Z · model: claude-opus-5-5 · open: 
 | 825 | PAN-3244 | S | low | stale |  |  | Stale: targets the deploy-patrol deploy window deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 826 | PAN-2775 | S | low | needs-refinement |  |  | Stale: targets boot-correlated reaping (boot reconciliation) deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 827 | PAN-4834 | M | medium | ok |  |  | Phone app W-WEB2: HTTP/1.1 and WebSocket clients inside the channel plus fetch/WS shims; PAN-4833 done, now unblocked. |
-| 828 | PAN-4835 | M | medium | ok |  |  | Phone app W-MAC1: phone access-token kind, pairing exchange, self-revoke and push-key routes, phone scopes. |
 | 829 | PAN-3505 | XS | low | needs-refinement |  |  | Stale: targets the flywheel state write door deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 831 | PAN-4836 | S | medium | ok |  | PAN-4835 | Phone app W-MAC2: "Overdeck app" pairing QR tab in Settings > Anywhere with paired-phone list; needs PAN-4835. |
+| 831 | PAN-4836 | S | medium | ok |  |  | Phone app W-MAC2: "Overdeck app" pairing QR tab in Settings > Anywhere with paired-phone list; needs PAN-4835. |
 | 832 | PAN-3321 | XS | low | stale |  |  | Stale: targets pan unstick deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 833 | PAN-736 | M | low | stale |  |  | Retired: work-types.ts, WorkTypeRouter and models.overrides are all gone (#4174); per-subagent routing needs a fresh roles.* design |
 | 834 | PAN-762 | M | low | stale |  |  | Premise gone: models.overrides is a retired, ignored key since #4174, so there are no overrides left to warn about |
@@ -863,15 +863,15 @@ _Last sequenced: 2026-11-03T14:00:08.595859Z · model: claude-opus-5-5 · open: 
 | 871 | PAN-4592 | M | low | ok |  | PAN-4590 | pan semgrep ci-setup opens a PR adding a Semgrep Actions workflow + failure relay; needs gate mode from PAN-4590. |
 | 872 | PAN-4594 | M | low | ok |  | PAN-4590 | Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590. |
 | 873 | PAN-4593 | L | low | needs-refinement |  | PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
-| 874 | PAN-4843 | M | medium | ok |  | PAN-4835 | Phone app W-MAC3: native PushProvider seals needs-you alerts to each phone push key via directory; needs PAN-4835. |
-| 875 | PAN-4837 | L | medium | ok |  | PAN-4834, PAN-4835 | Phone app W-APP1: Capacitor 8 apps/mobile shell, sign-in, machines, QR pairing, keys plugin; CP-3/CP-4. |
+| 874 | PAN-4843 | M | medium | ok |  |  | Phone app W-MAC3: native PushProvider seals needs-you alerts to each phone push key via directory; needs PAN-4835. |
+| 875 | PAN-4837 | L | medium | ok |  | PAN-4834 | Phone app W-APP1: Capacitor 8 apps/mobile shell, sign-in, machines, QR pairing, keys plugin; needs PAN-4834. |
 | 876 | PAN-4838 | M | medium | ok |  | PAN-4837, PAN-4830, PAN-4843 | Phone app W-IOS1: APNs registration and Notification Service Extension that decrypts sealed alerts. |
 | 877 | PAN-4840 | M | medium | ok |  | PAN-4837, PAN-4830, PAN-4843 | Phone app W-AND1: FCM FirebaseMessagingService decrypts sealed data payloads and posts notifications. |
 | 878 | PAN-4841 | M | medium | ok |  |  | Phone app W-REL1: Apple/Firebase/Play/Cloudflare setup and first store builds; operator approves purchases. |
 | 879 | PAN-4839 | S | low | ok |  | PAN-4838 | Phone app W-IOS2: counts-only Live Activity, on by default with a Settings off switch; OD-1 settled; after PAN-4838. |
 | 880 | PAN-4842 | S | medium | ok |  | PAN-4837 | Phone app W-DOC: phone-app.mdx and updates to Anywhere, push, tailscale and service docs; finished last. |
 | 881 | PAN-4851 | S | low | needs-refinement |  |  | Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them |
-| 882 | PAN-4887 | M | medium | ok |  | PAN-4835 | Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); machines stay refused. |
+| 882 | PAN-4887 | M | medium | ok |  |  | Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); PAN-4835 merged. |
 
 ## Rationale detail
 
@@ -1202,7 +1202,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T14:00:08.595859Z",
+  "generatedAt": "2026-11-03T14:12:09Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 867,
@@ -3089,6 +3089,19 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "dependsOn": [],
       "why": "External transports (email/Slack/push/TTS) still plausible; its stated dependency on the PAN-2079 Inbox spine is undercut by boot…",
       "rationale": "Triage: the idea survives but its dependency on the PAN-2079 spine (built atop boot reconciliation) is substantially undercut. Parent epic PAN-2075 is closed, so the contains edge is dropped. Rank held.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4885",
+      "rank": 147,
+      "size": "S",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan worker run to an online Fly link fails 2 of 3 times: the 2.5 s secure-channel open budget is too short for the public Fly route.",
+      "rationale": "New defect found by the in-pipeline PAN-4882 re-run: remote worker starts against an online Fly link intermittently fail on LINK_WAIT_MS (2.5 s) in link-client.ts. The fix is small and well-specified (larger open budget for online links, or one retry), and it makes Anywhere remote workers reliable, so it takes the free rank 147 beside other high, small reliability fixes without moving any node.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -5076,6 +5089,19 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "condition": "ok",
       "dependsOn": [],
       "why": "enhancement(security): API key at-rest hardening",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4886",
+      "rank": 312,
+      "size": "S",
+      "importance": "medium",
+      "score": 45,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Live TURN relay check for PAN-4862 on Fly; scripted except one device-code sign-in, so it needs the operator present to approve.",
+      "rationale": "New manual verification issue: the relay fix shipped in 0.73.0 with unit tests only, and two live attempts expired unapproved. It is operator-gated like PAN-4863, so it takes the free rank 312 next to it; the PRD it replays lives on feature/pan-4882, recorded as an advisory informs edge.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -9309,6 +9335,19 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "interactive"
     },
     {
+      "issue": "PAN-4896",
+      "rank": 664,
+      "size": "XS",
+      "importance": "low",
+      "score": 30,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan connect on macOS prints the Linux-only PAN-2804 systemd-run warning; gate it on process.platform linux and add a darwin test.",
+      "rationale": "New issue filed 2026-11-03 from the Mac rig: a misleading but harmless warning during Anywhere onboarding with a one-line fix and clear AC, so it takes free rank 664 beside the Anywhere work.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-3011",
       "rank": 665,
       "size": "M",
@@ -11284,15 +11323,15 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-4835",
-      "rank": 828,
+      "issue": "PAN-4834",
+      "rank": 827,
       "size": "M",
       "importance": "medium",
-      "score": 36,
+      "score": 34,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Phone app W-MAC1: phone access-token kind, pairing exchange, self-revoke and push-key routes, phone scopes.",
-      "rationale": "PAN-4774 (Anywhere release AC run) closed as completed, so that dependency is removed; rank held because the phone-app epic is feature work that still ranks below substrate items.",
+      "why": "Phone app W-WEB2: HTTP/1.1 and WebSocket clients inside the channel plus fetch/WS shims; PAN-4833 done, now unblocked.",
+      "rationale": "Its only remaining dependency PAN-4833 (browser channel, W-WEB1) closed as completed, so it moves up into the freed rank 827.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11310,28 +11349,13 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-4834",
-      "rank": 827,
-      "size": "M",
-      "importance": "medium",
-      "score": 34,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Phone app W-WEB2: HTTP/1.1 and WebSocket clients inside the channel plus fetch/WS shims; PAN-4833 done, now unblocked.",
-      "rationale": "Its only remaining dependency PAN-4833 (browser channel, W-WEB1) closed as completed, so it moves up into the freed rank 827.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4836",
       "rank": 831,
       "size": "S",
       "importance": "medium",
       "score": 30,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4835"
-      ],
+      "dependsOn": [],
       "why": "Phone app W-MAC2: \"Overdeck app\" pairing QR tab in Settings > Anywhere with paired-phone list; needs PAN-4835.",
       "rationale": "PAN-4774 (Anywhere release AC run) closed as completed, so that dependency is removed; rank held because the phone-app epic is feature work that still ranks below substrate items.",
       "gate": "auto",
@@ -11876,9 +11900,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "importance": "medium",
       "score": 32,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4835"
-      ],
+      "dependsOn": [],
       "why": "Phone app W-MAC3: native PushProvider seals needs-you alerts to each phone push key via directory; needs PAN-4835.",
       "rationale": "PAN-4828 (phone-app contracts) closed as completed, so that dependency is removed; rank held because the phone-app epic is feature work that still ranks below substrate items.",
       "gate": "auto",
@@ -11892,11 +11914,10 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "score": 34,
       "condition": "ok",
       "dependsOn": [
-        "PAN-4834",
-        "PAN-4835"
+        "PAN-4834"
       ],
-      "why": "Phone app W-APP1: Capacitor 8 apps/mobile shell, sign-in, machines, QR pairing, keys plugin; CP-3/CP-4.",
-      "rationale": "Dependency PAN-4829 (phone directory clients) closed; rank held because PAN-4834 and PAN-4835 still block it.",
+      "why": "Phone app W-APP1: Capacitor 8 apps/mobile shell, sign-in, machines, QR pairing, keys plugin; needs PAN-4834.",
+      "rationale": "PAN-4835 merged in #4894, so only the in-pipeline PAN-4834 still gates it; rank held because the shell work is still blocked on that channel client.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11991,43 +12012,15 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-4885",
-      "rank": 147,
-      "size": "S",
-      "importance": "high",
-      "score": 72,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan worker run to an online Fly link fails 2 of 3 times: the 2.5 s secure-channel open budget is too short for the public Fly route.",
-      "rationale": "New defect found by the in-pipeline PAN-4882 re-run: remote worker starts against an online Fly link intermittently fail on LINK_WAIT_MS (2.5 s) in link-client.ts. The fix is small and well-specified (larger open budget for online links, or one retry), and it makes Anywhere remote workers reliable, so it takes the free rank 147 beside other high, small reliability fixes without moving any node.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4886",
-      "rank": 312,
-      "size": "S",
-      "importance": "medium",
-      "score": 45,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Live TURN relay check for PAN-4862 on Fly; scripted except one device-code sign-in, so it needs the operator present to approve.",
-      "rationale": "New manual verification issue: the relay fix shipped in 0.73.0 with unit tests only, and two live attempts expired unapproved. It is operator-gated like PAN-4863, so it takes the free rank 312 next to it; the PRD it replays lives on feature/pan-4882, recorded as an advisory informs edge.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4887",
       "rank": 882,
       "size": "M",
       "importance": "medium",
       "score": 30,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4835"
-      ],
-      "why": "Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); machines stay refused.",
-      "rationale": "New child of the phone-app epic PAN-4823, split from PAN-4835 and explicitly sequenced after it; placed at the tail of the phone-app chain so no existing rank moves.",
+      "dependsOn": [],
+      "why": "Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); PAN-4835 merged.",
+      "rationale": "PAN-4835 merged in #4894, which clears its only dependency; rank held because the Anywhere phone epic is low-impact relative to substrate work above it.",
       "gate": "auto",
       "planning": "auto"
     }
@@ -13204,13 +13197,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "from": "PAN-4823",
-      "to": "PAN-4835",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4823",
       "to": "PAN-4834",
       "type": "contains",
       "source": "github-ref",
@@ -13224,25 +13210,11 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "confidence": 1
     },
     {
-      "from": "PAN-4835",
-      "to": "PAN-4836",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.9
-    },
-    {
       "from": "PAN-4823",
       "to": "PAN-4843",
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-4835",
-      "to": "PAN-4843",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.9
     },
     {
       "from": "PAN-4823",
@@ -13253,13 +13225,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "from": "PAN-4834",
-      "to": "PAN-4837",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.9
-    },
-    {
-      "from": "PAN-4835",
       "to": "PAN-4837",
       "type": "unblocks",
       "source": "ai-inferred",
@@ -13395,13 +13360,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "from": "PAN-4823",
       "to": "PAN-4887",
       "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4835",
-      "to": "PAN-4887",
-      "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
     },
