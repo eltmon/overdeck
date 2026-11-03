@@ -24,7 +24,7 @@ declare module 'noise-handshake' {
   export default Noise;
 }
 
-declare module 'noise-handshake/dh' {
+declare module 'noise-handshake/dh.js' {
   const dh: { generateKeyPair(): { publicKey: Uint8Array; secretKey: Uint8Array } };
   export default dh;
 }

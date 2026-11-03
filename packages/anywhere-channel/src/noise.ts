@@ -23,7 +23,7 @@
  */
 import b4a from 'b4a';
 import Noise, { type NoiseState } from 'noise-handshake';
-import dh from 'noise-handshake/dh';
+import dh from 'noise-handshake/dh.js';
 
 import type { CryptoPort } from './crypto-port.js';
 import { MODE_BYTES, type ChannelMode } from './wire.js';

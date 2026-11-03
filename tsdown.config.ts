@@ -47,7 +47,7 @@ export default defineConfig({
       || id === 'es-module-lexer',
     // PAN-4645 (D-4645-2): the Noise stack resolves `sodium-native` prebuilds via
     // `require-addon`; bundling any of the four breaks that lookup.
-    neverBundle: ['@lydell/node-pty', 'noise-handshake', '@hyperswarm/secret-stream', 'sodium-universal', 'sodium-native'],
+    neverBundle: ['@lydell/node-pty', /^noise-handshake(\/.*)?$/, '@hyperswarm/secret-stream', 'sodium-universal', 'sodium-native'],
   },
   outDir: 'dist',
 });
