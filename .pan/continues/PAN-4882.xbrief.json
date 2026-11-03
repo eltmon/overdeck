@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4882",
   "created": "2026-11-03T06:27:51.535Z",
-  "updated": "2026-11-03T08:04:01.996Z",
+  "updated": "2026-11-03T08:04:25.831Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -300,6 +300,9 @@
       "status": "cancelled"
     },
     "relay-encryption-capture.ac1": {
+      "status": "cancelled"
+    },
+    "relay-encryption-capture.ac2": {
       "status": "cancelled"
     }
   }
