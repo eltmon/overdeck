@@ -246,7 +246,7 @@ describe('connect service on real workerd (PAN-2356 WI-3)', () => {
   it('GET /healthz reports configured: true and turn: true', async () => {
     const res = await req('/healthz');
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true, configured: true, turn: true });
+    expect(await res.json()).toEqual({ ok: true, configured: true, turn: true, apns: false, fcm: false });
   }, SLOW);
 
   it('answers 401 to a directory socket the account service rejects', async () => {
