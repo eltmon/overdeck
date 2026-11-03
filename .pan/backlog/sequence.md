@@ -1,14 +1,14 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T21:37:10.377622Z · model: claude-opus-5-5 · open: 895_
+_Last sequenced: 2026-11-03T23:06:43.414954Z · model: claude-opus-5-5 · open: 894_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4702 | S | critical | ok |  |  | Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs. |
-| 3 | PAN-4925 | M | critical | ok |  |  | CI shard 3/4 worker exits with all tests passing; each flake turns main red and holds every merge and deploy |
+| 2 | PAN-4961 | M | critical | ok |  |  | Disk floor checked once per creation; 6 concurrent starts took 15 GB to 4.9 GB, near the point where SQLite/git writes fail for every agent. |
 | 4 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
-| 5 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install aborts workspace creation (since #4163); reproduced 2026-11-02 on botland too, so every polyrepo start fails. |
+| 5 | PAN-4553 | S | critical | ok |  | PAN-4929 | Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges. |
 | 6 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
 | 7 | PAN-4690 | S | critical | ok |  |  | Review dispatch rewrites the tracked continue file uncommitted, so the dirty-tree gate blocks the review it dispatched |
 | 8 | PAN-4710 | S | high | ok |  |  | Deferred plan hand-off retries omit the guardrail ack, so they're refused at 'agent count high' and give up silently; needs handoff |
@@ -227,7 +227,6 @@ _Last sequenced: 2026-11-03T21:37:10.377622Z · model: claude-opus-5-5 · open: 
 | 221 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
 | 222 | PAN-3778 | S | medium | ok |  |  | Server snapshot cap shipped in #4558 (closed). Resume-from-offset on resubscribe is the remaining open piece; now unblocked. |
 | 223 | PAN-4575 | S | high | ok |  |  | Kimi ACP cancel is sent with id:"" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed. Unblocked. |
-| 224 | PAN-4903 | S | high | ok |  |  | Codex conv on a Herdr host loses its first message: spawn pastes it via tmux, no target; silent. needs-handoff (TENET-10). |
 | 225 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 226 | PAN-4616 | S | medium | ok |  |  | After PAN-4614 lands, check whether GitHub mergeable honors merge=union; if not, plan a merge-gate fallback |
 | 227 | PAN-4909 | S | high | ok |  |  | Mac set up with connect: Safari on localhost:3011 gets HTTP 401 from the loopback session mint, so the Mac's own dashboard won't load. |
@@ -328,7 +327,7 @@ _Last sequenced: 2026-11-03T21:37:10.377622Z · model: claude-opus-5-5 · open: 
 | 322 | PAN-1451 | M | high | needs-refinement |  |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
 | 323 | PAN-1452 | M | high | ok |  |  | PAN-1381 follow-up: per-reviewer restart with model override (architectural mismatch with PAN-1048) |
 | 324 | PAN-4927 | XL | medium | ok | ✓ |  | Epic: Overdeck MCP in every managed agent, OAuth /mcp, Hermes/OpenClaw/Grok plugins; PRD written, 29 children filed. |
-| 325 | PAN-4929 | S | medium | needs-refinement |  | PAN-4553 | Likely duplicate of PAN-4553 (polyrepo root npm install aborts pan start; MIN-1135 repro). Close when PAN-4553 lands. |
+| 325 | PAN-4929 | S | medium | ok |  |  | Likely duplicate of PAN-4553 (polyrepo root npm install aborts pan start; MIN-1135 repro). Close when PAN-4553 lands. |
 | 326 | PAN-1553 | M | high | ok |  |  | Investigate Claude Code Fast mode support (and fast-tier pricing) |
 | 327 | PAN-1504 | M | high | ok |  |  | pan hygiene |
 | 328 | PAN-1480 | L | high | ok |  |  | TLDR: 93% bypass rate |
@@ -448,8 +447,7 @@ _Last sequenced: 2026-11-03T21:37:10.377622Z · model: claude-opus-5-5 · open: 
 | 447 | PAN-1392 | S | low | stale |  |  | docs/prds/active→completed archive step is superseded by .pan/drafts and .pan/specs on the feature branch |
 | 448 | PAN-4151 | L | medium | needs-refinement |  | PAN-3822 | Deferred remainder of PAN-3822/#4067: GitLab MR sync, PR page + search, handoff link copy, diffstat, link-dialog a11y, sync throttle |
 | 449 | PAN-1330 | S | medium | ok |  |  | CLI cannot address planning-*/specialist-* sessions |
-| 450 | PAN-4481 | M | medium | ok |  |  | Shared Sessions slice 10: hosted web join page; awaits operator decision OD-1 on sign-in without a local install |
-| 451 | PAN-4482 | S | medium | ok |  | PAN-4481 | Shared Sessions slice 11: signaling-privacy e2e, forced-TURN check (operator checkpoint) and full AC sweep |
+| 451 | PAN-4482 | S | medium | ok |  |  | Shared Sessions slice 11: signaling-privacy e2e, forced-TURN check (operator checkpoint) and full AC sweep |
 | 452 | PAN-1226 | L | medium | ok |  |  | PAN-1148 unified-dashboard redesign |
 | 453 | PAN-1173 | S | medium | ok |  |  | pan show <bare-number> derives wrong agent ID for PAN-prefixed issues |
 | 454 | PAN-1154 | M | medium | ok |  |  | pan up does not kill existing port holders |
@@ -600,6 +598,7 @@ _Last sequenced: 2026-11-03T21:37:10.377622Z · model: claude-opus-5-5 · open: 
 | 600 | PAN-958 | M | medium | ok |  |  | Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
 | 601 | PAN-949 | M | medium | ok |  |  | feat: add conversation for project from sidebar |
 | 602 | PAN-3157 | XS | medium | ok |  |  | Rescoped: Awareness rail should show conv-flywheel as the Flywheel with its last tick (derive-status.ts) and link to /flywheel. |
+| 603 | PAN-4960 | M | medium | ok |  |  | Dashboard Settings → Anywhere Account card with PKCE sign-in; no code deps, so it ranks ahead of the PAN-4959 page it links to. |
 | 604 | PAN-4908 | S | low | ok |  |  | Other remote-not-enabled messages name no file and the dead verb 'pan remote setup'; reuse PAN-4905's remoteEnabledHint(). |
 | 605 | PAN-947 | M | medium | ok |  |  | feat: project management actions in unified sidebar |
 | 606 | PAN-938 | M | medium | ok |  |  | Fizzy visual pipeline |
@@ -907,9 +906,9 @@ _Last sequenced: 2026-11-03T21:37:10.377622Z · model: claude-opus-5-5 · open: 
 
 New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.
 
-### PAN-4925 (rank 3)
+### PAN-4961 (rank 2)
 
-New since the prior run and already in the pipeline. An intermittent vitest worker exit on shard 3/4 turns main red on roughly 1 in 4 runs, and a red main silently empties the merge gate and holds post-merge deploys until someone re-runs the shard. Fixing the root cause (not quarantining) restores trust in main's CI signal, so it sits beside PAN-4917 at the top of the CI-substrate tier.
+New substrate-improvement bug reproduced 2026-11-03: checkDiskFloor in workspace-manager/create.ts runs before bun install, the Docker stack and its ~1.94 GB node_modules volume, so six Flywheel starts in a few minutes each passed the 10 GiB floor and together drove free space from 15 GB to 4.9 GB. Below about 2 GB every agent hits ENOSPC (the PAN-1674 failure the floor exists to prevent), so this threatens the whole pipeline and takes the free rank 2 without moving any other node. The fix and its acceptance test are concrete, so condition is ok.
 
 ### PAN-4636 (rank 4)
 
@@ -917,7 +916,7 @@ New substrate bug with a verified root cause: adoption (PAN-4605) calls startRev
 
 ### PAN-4553 (rank 5)
 
-Moved from rank 9 to the free rank 4: a 2026-11-02 comment shows the same abort on a second polyrepo project (botland), so the bug now blocks workspace creation for every polyrepo project, not only mind-your-now.
+Rank unchanged; its duplicate PAN-4929 entered the pipeline with an open PR, so this issue now waits on that PR instead of being picked up separately.
 
 ### PAN-4733 (rank 6)
 
@@ -1230,10 +1229,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T21:37:10.377622Z",
+  "generatedAt": "2026-11-03T23:06:43.414954Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 895,
+  "openCount": 894,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -1245,19 +1244,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "dependsOn": [],
       "why": "Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs.",
       "rationale": "New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4925",
-      "rank": 3,
-      "size": "M",
-      "importance": "critical",
-      "score": 88,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "CI shard 3/4 worker exits with all tests passing; each flake turns main red and holds every merge and deploy",
-      "rationale": "New since the prior run and already in the pipeline. An intermittent vitest worker exit on shard 3/4 turns main red on roughly 1 in 4 runs, and a red main silently empties the merge gate and holds post-merge deploys until someone re-runs the shard. Fixing the root cause (not quarantining) restores trust in main's CI signal, so it sits beside PAN-4917 at the top of the CI-substrate tier.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1281,9 +1267,11 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "importance": "critical",
       "score": 90,
       "condition": "ok",
-      "dependsOn": [],
-      "why": "Polyrepo root npm install aborts workspace creation (since #4163); reproduced 2026-11-02 on botland too, so every polyrepo start fails.",
-      "rationale": "Moved from rank 9 to the free rank 4: a 2026-11-02 comment shows the same abort on a second polyrepo project (botland), so the bug now blocks workspace creation for every polyrepo project, not only mind-your-now.",
+      "dependsOn": [
+        "PAN-4929"
+      ],
+      "why": "Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges.",
+      "rationale": "Rank unchanged; its duplicate PAN-4929 entered the pipeline with an open PR, so this issue now waits on that PR instead of being picked up separately.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4080,19 +4068,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
-      "issue": "PAN-4903",
-      "rank": 224,
-      "size": "S",
-      "importance": "high",
-      "score": 72,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Codex conv on a Herdr host loses its first message: spawn pastes it via tmux, no target; silent. needs-handoff (TENET-10).",
-      "rationale": "New since the prior run. The first-message path for a Codex app-server conversation on a Herdr host still pastes through tmux, so the prompt is dropped with no dashboard error while pan tell works; it takes the free rank 224 so no other node moves, and its needs-handoff label means a supervised strike, never an autonomous pickup.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3510",
       "rank": 225,
       "size": "S",
@@ -6741,30 +6716,15 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
-      "issue": "PAN-4481",
-      "rank": 450,
-      "size": "M",
-      "importance": "medium",
-      "score": 48,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Shared Sessions slice 10: hosted web join page; awaits operator decision OD-1 on sign-in without a local install",
-      "rationale": "Rank held: dependency PAN-4475 (Shared Sessions slice 4, viewer surface) closed completed on 2026-11-03; no open dependency remains, but sibling slices ahead of it are still in the pipeline.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4482",
       "rank": 451,
       "size": "S",
       "importance": "medium",
       "score": 50,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4481"
-      ],
+      "dependsOn": [],
       "why": "Shared Sessions slice 11: signaling-privacy e2e, forced-TURN check (operator checkpoint) and full AC sweep",
-      "rationale": "Dependency PAN-4478 (slice 7) closed as completed; rank unchanged because other Shared Sessions slices remain open.",
+      "rationale": "Rank held: its prerequisite slice 10 (PAN-4481, hosted web join page) closed as completed, so this slice is now unblocked.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11905,7 +11865,7 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "condition": "ok",
       "dependsOn": [],
       "why": "Phone app W-REL1: Apple/Firebase/Play/Cloudflare setup and first store builds; operator approves purchases.",
-      "rationale": "PAN-4774 (Anywhere release AC run) closed as completed, so that dependency is removed; rank held because the phone-app epic is feature work that still ranks below substrate items.",
+      "rationale": "Rank held: new comments from PAN-4838 and PAN-4839 add device checks (AC-11, AC-12) to this run; feature work, still below substrate.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11996,10 +11956,8 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "size": "S",
       "importance": "medium",
       "score": 40,
-      "condition": "needs-refinement",
-      "dependsOn": [
-        "PAN-4553"
-      ],
+      "condition": "ok",
+      "dependsOn": [],
       "why": "Likely duplicate of PAN-4553 (polyrepo root npm install aborts pan start; MIN-1135 repro). Close when PAN-4553 lands.",
       "rationale": "New since the prior run: it reports the same root-level npm install failure as PAN-4553 on a fresh MIN-1135 start, so it waits behind PAN-4553 at a free mid rank instead of competing for pickup.",
       "gate": "auto",
@@ -12461,6 +12419,32 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "dependsOn": [],
       "why": "Anywhere account page (plan, relay allowance, machines, Creem portal, delete) + dashboard card; waits on PAN-4294 billing and OD.",
       "rationale": "New child of PAN-2350 filed 2026-11-03; it depends on PAN-4294 billing (rank 663) so it takes the free slot after it, and stays needs-refinement until the operator decides whether it ships with billing or read-only first.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4960",
+      "rank": 603,
+      "size": "M",
+      "importance": "medium",
+      "score": 30,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Dashboard Settings → Anywhere Account card with PKCE sign-in; no code deps, so it ranks ahead of the PAN-4959 page it links to.",
+      "rationale": "New child of PAN-2350, split from PAN-4959 on 2026-11-03. It needs no billing work, so it takes the free slot at 603, ahead of PAN-4959 (686), which waits on PAN-4294.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4961",
+      "rank": 2,
+      "size": "M",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Disk floor checked once per creation; 6 concurrent starts took 15 GB to 4.9 GB, near the point where SQLite/git writes fail for every agent.",
+      "rationale": "New substrate-improvement bug reproduced 2026-11-03: checkDiskFloor in workspace-manager/create.ts runs before bun install, the Docker stack and its ~1.94 GB node_modules volume, so six Flywheel starts in a few minutes each passed the 10 GiB floor and together drove free space from 15 GB to 4.9 GB. Below about 2 GB every agent hits ENOSPC (the PAN-1674 failure the floor exists to prevent), so this threatens the whole pipeline and takes the free rank 2 without moving any other node. The fix and its acceptance test are concrete, so condition is ok.",
       "gate": "auto",
       "planning": "auto"
     }
@@ -13286,13 +13270,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "confidence": 1
     },
     {
-      "from": "PAN-4481",
-      "to": "PAN-4482",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4418",
       "to": "PAN-4419",
       "type": "unblocks",
@@ -13636,25 +13613,11 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "confidence": 0.6
     },
     {
-      "from": "PAN-3944",
-      "to": "PAN-4903",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
-    },
-    {
       "from": "PAN-2626",
       "to": "PAN-4924",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
-    },
-    {
-      "from": "PAN-4925",
-      "to": "PAN-4926",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
     },
     {
       "from": "PAN-4927",
@@ -13676,13 +13639,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
-    },
-    {
-      "from": "PAN-4553",
-      "to": "PAN-4929",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.95
     },
     {
       "from": "PAN-4927",
@@ -14215,6 +14171,34 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-4839",
+      "to": "PAN-4841",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-2350",
+      "to": "PAN-4960",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4959",
+      "to": "PAN-4960",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4929",
+      "to": "PAN-4553",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.95
     }
   ]
 }

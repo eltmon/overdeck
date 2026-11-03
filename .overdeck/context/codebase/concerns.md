@@ -654,3 +654,12 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   the zero-install `npx @overdeck/core join <CODE>` on the share invite page works. A bin with a
   different target breaks it with "could not determine executable to run".
 <!-- last-verified: 2026-11-03 -->
+- **Fixture PIDs reach the real `process.kill`** (PAN-4925) — code such as `src/lib/smee.ts`
+  `stopSmeeProcess()` probes and signals the PID it reads from a pidfile. A test that mocks
+  `node:fs` to return a fixture PID (`'12345'`) but does not spy `process.kill` sends a real
+  SIGTERM to whatever holds that PID on the host. On CI the vitest fork running the test held it,
+  so the worker killed itself: "Worker exited unexpectedly", every test green, and the file
+  missing from the `✓ root <file>` list. Spy `process.kill` in any test whose code under test
+  signals a fixture PID. 39 test files carry literal PIDs without a `process.kill` spy; most only
+  use the PID as data, but none were audited.
+<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4925) -->

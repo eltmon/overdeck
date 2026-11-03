@@ -148,6 +148,25 @@ fake timers are installed, both `setTimeout` and the deadline's own
 `Date.now()` calls can freeze, so the ordering — real fixture first, fake
 clock after — is what keeps the poll live.
 
+### Signals and fixture PIDs
+
+Code under test that calls `process.kill` with a PID it read from a fixture
+(a mocked pidfile, a state row) sends that signal to the real host process
+holding that PID. The test must spy `process.kill` (`vi.spyOn(process,
+'kill')`) and assert the calls through the spy.
+
+`tests/setup/no-worker-signals.ts` (refusal logic in
+`tests/setup/worker-signal-guard.ts`) refuses a non-zero signal to the
+worker, the Vitest main process, PID `0`, and PID `-1`, and fails the test
+with a `[test-guard] refused process.kill(…)` error even when the code
+under test catches it. It does not protect other workers.
+
+To diagnose "Worker exited unexpectedly" with every test green: download the
+failed and a passing shard log, strip ANSI codes, extract the sorted
+`✓  root  <file>` lines from each, and `comm -3` them. The file present only
+in the passing log is the one whose worker died. PAN-4925 found
+`tests/unit/lib/smee-process.test.ts` this way.
+
 ## Dashboard UI Testing
 
 ### Playwright MCP
