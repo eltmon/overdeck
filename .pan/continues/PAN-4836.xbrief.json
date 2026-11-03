@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4836",
   "created": "2026-11-03T14:20:05.683Z",
-  "updated": "2026-11-03T14:42:03.424Z",
+  "updated": "2026-11-03T14:42:20.802Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -54,6 +54,10 @@
     "phone-pair-link.ac4": {
       "status": "completed",
       "doneAt": "2026-11-03T14:42:03.424Z"
+    },
+    "paired-phones-list.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:42:20.802Z"
     }
   }
 }
