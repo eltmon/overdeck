@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4888",
   "created": "2026-11-03T08:25:32.067Z",
-  "updated": "2026-11-03T09:28:59.010Z",
+  "updated": "2026-11-03T09:29:24.234Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -220,6 +220,10 @@
     "supersede-protocol.ac4": {
       "status": "completed",
       "doneAt": "2026-11-03T09:28:59.010Z"
+    },
+    "supersede-protocol.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:29:24.234Z"
     }
   }
 }
