@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4904",
   "created": "2026-11-03T15:44:28.853Z",
-  "updated": "2026-11-03T16:09:48.162Z",
+  "updated": "2026-11-03T16:10:03.226Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,10 @@
     "codex-injected-prefixes.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T16:09:48.162Z"
+    },
+    "release-record-title.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:10:03.226Z"
     }
   }
 }
