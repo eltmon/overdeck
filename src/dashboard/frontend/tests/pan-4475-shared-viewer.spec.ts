@@ -33,7 +33,7 @@ import { promisify } from 'node:util';
 import { test, expect, type Browser, type BrowserContext, type Page } from '@playwright/test';
 import { createConversation } from '../../../lib/overdeck/conversations.js';
 import { closeOverdeckDatabase } from '../../../lib/overdeck/infra.js';
-import { claudeProjectDir } from '../../../lib/runtimes/storage/claude-code.js';
+import { claudeProjectDir, claudeProjectsRoot } from '../../../lib/runtimes/storage/claude-code.js';
 import { createRoom } from '../../../lib/sharing/share-service.js';
 import { startIsolatedDashboard, type IsolatedDashboard } from './fixtures/isolated-dashboard.js';
 
@@ -119,7 +119,7 @@ function seedConversation(home: string, fakeHome: string): void {
     if (saved === undefined) delete process.env.OVERDECK_HOME;
     else process.env.OVERDECK_HOME = saved;
   }
-  const dir = claudeProjectDir(home, join(fakeHome, '.claude', 'projects'));
+  const dir = claudeProjectDir(home, claudeProjectsRoot(fakeHome));
   mkdirSync(dir, { recursive: true });
   transcript = join(dir, `${SESSION}.jsonl`);
   writeFileSync(transcript, `${userLine(FIRST, 'u-1', '2026-11-03T00:00:00.000Z')}\n${userLine(SECOND, 'u-2', '2026-11-03T00:00:01.000Z')}\n`);

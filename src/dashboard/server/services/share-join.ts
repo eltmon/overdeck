@@ -54,7 +54,7 @@ interface JoinConnection {
 interface Join {
   readonly shortCode: string;
   readonly joinUrl: string;
-  readonly login: string;
+  readonly login: string | null;
   readonly socketUrl: string;
   readonly headers: Record<string, string>;
   conn: JoinConnection;
