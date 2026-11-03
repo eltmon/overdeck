@@ -17,6 +17,7 @@ public class OverdeckKeysPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "setSecret", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "removeSecret", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "reset", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "pushEnvironment", returnType: CAPPluginReturnPromise),
     ]
 
     private static let clientIdKey = "clientId"
@@ -93,6 +94,16 @@ public class OverdeckKeysPlugin: CAPPlugin, CAPBridgedPlugin {
             try KeychainStore.removeAll(sharedGroup: PushKeys.sharedGroup())
             call.resolve()
         }
+    }
+
+    /// The APNs host this build's tokens belong to: an Xcode Debug run is sandbox, TestFlight and
+    /// App Store builds are Release, so production (PAN-4838 FR-3, D-7).
+    @objc func pushEnvironment(_ call: CAPPluginCall) {
+        #if DEBUG
+        call.resolve(["apsEnvironment": "sandbox"])
+        #else
+        call.resolve(["apsEnvironment": "production"])
+        #endif
     }
 
     /// The secret name, or nil after rejecting the call for any name but `account` and `machines`.
