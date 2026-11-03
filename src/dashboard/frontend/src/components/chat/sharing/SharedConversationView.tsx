@@ -13,13 +13,26 @@
  *
  * Once the peer is connected, a **Conversation** / **Terminal** toggle switches the admitted screen
  * to `SharedTerminalView`, the host's read-only terminal (PAN-4477). Conversation is the default.
+ *
+ * Control (PAN-4478 WI-9): while presence names this viewer as controller, `SharedControllerPanel`
+ * shows **You have control** with **Hand control back** and the lobby roster's controller actions
+ * (no Blocked section, no un-revoke), each sent over `control` and answered by the host's ack. The
+ * controller's composer sends prompts as controller sends and can pick the others' suggestions.
+ * Every viewer's header says who has control while a viewer holds it.
  */
-import { sharedPromptRefusal, type PresencePayload, type SharedMessage, type SharedSubmitReason } from '@overdeck/contracts';
+import {
+  sharedPromptRefusal,
+  type PresencePayload,
+  type ShareCommand,
+  type SharedMessage,
+  type SharedSubmitReason,
+} from '@overdeck/contracts';
 import { useState, type ReactNode } from 'react';
 
 import type { ChatMessage } from '../chat-types';
 import { MessagesTimeline } from '../MessagesTimeline';
 import { SharedTerminalView } from './SharedTerminalView';
+import { LobbyRoster } from './SharingLobbyPanel';
 import { queueStatusText, SuggestionList, type SuggestionItem } from './SuggestionList';
 import { LIVE_JOIN_STATES, useSharedJoin, type SharedJoin } from './useSharedJoin';
 import type { SubmitAck, ViewerNotice } from './webrtc-viewer';
@@ -61,7 +74,65 @@ function submitStatusText(status: SubmitAck): string {
   return submitReasonText(status.reason);
 }
 
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : 'The host did not accept that action.';
+}
+
+/** The viewer-controller's lobby (FR-12): hand control back, and the roster's controller actions. */
+function SharedControllerPanel(props: SharedJoin) {
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const presence = props.presence;
+  const self = props.selfGithubId;
+  if (!props.isController || !presence || self === null) return null;
+  const host = presence.participants.find((p) => p.isHost) ?? null;
+
+  const run = (command: ShareCommand) => {
+    // A viewer-controller cannot un-revoke (D-7); the roster never offers it here.
+    if (command.type === 'unrevoke') return;
+    setPending(true);
+    setError(null);
+    props.sendCommand(command).then(
+      () => setPending(false),
+      (failure: unknown) => {
+        setPending(false);
+        setError(errorText(failure));
+      },
+    );
+  };
+
+  return (
+    <div data-component="shared-controller" className="space-y-3 border-t border-border px-4 py-3">
+      <div className="flex items-center gap-2">
+        <h2 className="text-xs font-medium text-muted-foreground">You have control</h2>
+        {host ? (
+          <button
+            type="button"
+            className={`${NEUTRAL_BUTTON} ml-auto`}
+            disabled={pending}
+            onClick={() => run({ type: 'set-controller', githubId: host.githubId })}
+          >
+            Hand control back to @{host.login}
+          </button>
+        ) : null}
+      </div>
+      {error ? <p role="alert" className="text-xs text-destructive">{error}</p> : null}
+      <LobbyRoster
+        people={presence.participants.filter((p) => !p.isHost)}
+        blocked={null}
+        controllerGithubId={presence.controllerGithubId}
+        selfGithubId={self}
+        canAct
+        disabled={pending}
+        onCommand={run}
+      />
+    </div>
+  );
+}
+
 function SharedComposer(props: SharedJoin) {
+  const [controllerStatus, setControllerStatus] = useState<string | null>(null);
+  const controller = props.isController;
   const contributor = props.view?.contributor === true;
   const queueLine = queueStatusText(props.presence?.streams[0]);
   const participants = props.presence?.participants ?? [];
@@ -73,36 +144,58 @@ function SharedComposer(props: SharedJoin) {
   }));
   // The prefix hint is only for a prefix; an empty or blank box just disables Send.
   const refusal = props.myDraft.trim() === '' ? null : sharedPromptRefusal(props.myDraft);
-  const canSend = contributor && sharedPromptRefusal(props.myDraft) === null;
+  const canSend = (controller || contributor) && sharedPromptRefusal(props.myDraft) === null;
+  const sendAsController = () => {
+    const text = props.myDraft;
+    if (sharedPromptRefusal(text) !== null) return;
+    setControllerStatus(null);
+    props.sendControllerPrompt(text).then(
+      (position) => {
+        props.setMyDraft('');
+        setControllerStatus(position ? `Queued (#${position})` : 'Queued');
+      },
+      (failure: unknown) => setControllerStatus(errorText(failure)),
+    );
+  };
+  const send = controller ? sendAsController : props.submitPrompt;
+  const status = controller ? controllerStatus : props.submitStatus ? submitStatusText(props.submitStatus) : null;
   return (
     <div data-component="shared-composer" className="space-y-2 border-t border-border px-4 py-3">
       {queueLine ? <p role="status" className="text-xs text-muted-foreground">{queueLine}</p> : null}
-      <SuggestionList items={suggestions} mode="view" />
+      {controller ? (
+        <SuggestionList
+          items={suggestions}
+          mode="controller"
+          onSend={(item, text) => props.sendControllerPrompt(text, item.githubId).then(() => undefined)}
+        />
+      ) : (
+        <SuggestionList items={suggestions} mode="view" />
+      )}
       <textarea
-        aria-label={contributor ? 'Write a prompt' : 'Suggest a prompt'}
+        aria-label={controller || contributor ? 'Write a prompt' : 'Suggest a prompt'}
         className="w-full resize-y rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground"
         rows={3}
         maxLength={8000}
         value={props.myDraft}
         onChange={(event) => props.setMyDraft(event.target.value)}
         onKeyDown={(event) => {
-          if (contributor && event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+          if ((controller || contributor) && event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
             event.preventDefault();
-            props.submitPrompt();
+            send();
           }
         }}
       />
       <div className="flex items-center gap-2">
-        {contributor ? (
-          <button type="button" className={NEUTRAL_BUTTON} aria-label="Send prompt" disabled={!canSend} onClick={props.submitPrompt}>
+        {controller || contributor ? (
+          <button type="button" className={NEUTRAL_BUTTON} aria-label="Send prompt" disabled={!canSend} onClick={send}>
             Send
           </button>
         ) : (
           <p className="text-xs text-muted-foreground">The host can pick your suggestion and send it.</p>
         )}
-        {props.submitStatus ? <p role="status" className="text-xs text-muted-foreground">{submitStatusText(props.submitStatus)}</p> : null}
+        {status ? <p role="status" className="text-xs text-muted-foreground">{status}</p> : null}
       </div>
-      {contributor && refusal === 'invalid_prompt' ? <p className="text-xs text-muted-foreground">Prompts cannot start with /, ! or #.</p> : null}
+      {(controller || contributor) && refusal === 'invalid_prompt' ? <p className="text-xs text-muted-foreground">Prompts cannot start with /, ! or #.</p> : null}
       {props.draftSentNotice ? <p role="status" className="text-xs text-muted-foreground">The host sent your suggestion.</p> : null}
     </div>
   );
@@ -148,6 +241,9 @@ function Header({ code, presence, live, onLeave }: { code: string; presence: Pre
   const host = presence?.participants.find((p) => p.isHost) ?? null;
   const streamLabel = presence?.streams[0]?.label ?? null;
   const watching = presence ? presence.participants.filter((p) => !p.isHost && p.state === 'admitted').length : 0;
+  const controller = presence && host && presence.controllerGithubId !== host.githubId
+    ? presence.participants.find((p) => p.githubId === presence.controllerGithubId) ?? null
+    : null;
   return (
     <header className="flex items-center gap-3 border-b border-border px-4 py-2">
       <span className="min-w-0 truncate text-sm font-medium text-foreground">{streamLabel ?? 'Shared conversation'}</span>
@@ -158,6 +254,7 @@ function Header({ code, presence, live, onLeave }: { code: string; presence: Pre
         </span>
       ) : null}
       {presence ? <span className="shrink-0 text-xs text-muted-foreground">{watching} watching</span> : null}
+      {controller ? <span className="shrink-0 text-xs text-muted-foreground">@{controller.login} has control</span> : null}
       <span className="ml-auto flex shrink-0 items-center gap-2">
         <span className="font-mono text-xs text-muted-foreground">{formatShareCode(code)}</span>
         {live ? <button type="button" className={NEUTRAL_BUTTON} onClick={onLeave}>Leave</button> : null}
@@ -287,6 +384,7 @@ function AdmittedScreen(props: SharedJoin) {
       ) : lost ? null : (
         <Panel><Note>Connecting to the host…</Note></Panel>
       )}
+      <SharedControllerPanel {...props} />
       {showTimeline ? <SharedComposer {...props} /> : null}
     </>
   );

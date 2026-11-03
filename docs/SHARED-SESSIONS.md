@@ -196,9 +196,9 @@ Content travels peer-to-peer over WebRTC data channels between the host's dashbo
 
 | Channel | Carries |
 | --- | --- |
-| `control` | The hello exchange and hello errors; slice 5 adds `submit` (viewer → host), `submit-ack` and `draft-sent` (host → viewer), and slice 6 the viewer's `terminal-watch`. The host reads it with the 64 Ki inbound cap. |
+| `control` | The hello exchange and hello errors; slice 5 adds `submit` (viewer → host), `submit-ack` and `draft-sent` (host → viewer), slice 6 the viewer's `terminal-watch`, and slice 7 `identity` and `command-ack` (host → viewer), `command` and `controller-send` (viewer → host). The host reads it with the 64 Ki inbound cap. |
 | `conversation` | `history` (the stream's full message list, which replaces what the viewer has), then `append` for a new message, `update` for a changed one, or `unavailable` (`transcript_not_found`, `history_too_large`) |
-| `presence` | The roster: the data owner first (`isHost: true`), then every lobby and admitted participant, the controller and the stream list. Sent when the channel opens and again when a snapshot changes it. The block list and `connected` are never sent. |
+| `presence` | The roster: the data owner first (`isHost: true`), then every lobby and admitted participant, the host's effective controller (slice 7) and the stream list. Sent when the channel opens and again when a snapshot changes it. The block list and `connected` are never sent. |
 | `drafts` | Draft snapshots both ways (slice 5): viewer → host `DraftUpdate { text }`, host → viewer `DraftPayload` |
 | `terminal` | A watched viewer's read-only terminal (slice 6), host → viewer only |
 
@@ -297,7 +297,7 @@ Limits: 20 items in total (including the one being delivered), 3 queued items pe
 
 **Attribution.** Right before a delivery the hub calls `bridge.expectAuthor(text, author)`. The conversation bridge stamps `SharedMessage.author` (`{ login, avatarUrl }`) on the first appended user message whose trimmed text equals the delivered text, and keeps the stamp in later `history` payloads; viewers show `@login` and the avatar on that message. A rejected delivery cancels the expectation, at most 20 wait at once, and a prompt delivered while no viewer is attached (the bridge is stopped) stays unattributed. If Claude Code stores the prompt with different text, the message has no author; the prompt is never prefixed.
 
-**Host API.** `POST /api/shares/:code/prompts` `{ text, draftGithubId? }` queues a controller send behind the dashboard mutation gate: 202 `{ ok: true, position }`; 400 `invalid_request`, `invalid_prompt` or `too_long`; 404 `share_not_found`; 409 `share_not_live`; 429 `queue_full`. With `draftGithubId` the draft's author is credited and the draft is taken only after the send is queued; otherwise the data owner is. `GET /api/shares` views carry `drafts` (`ShareDraftView[]`, oldest started first) and `queue` (`ShareQueueView`: `agentWorking`, `delivering`, `items`). The share dialog polls them every second and shows the drafts in a controller-mode `SuggestionList` (**Use**, edit, **Send**).
+**Host API.** `POST /api/shares/:code/prompts` `{ text, draftGithubId? }` queues a controller send behind the dashboard mutation gate: 202 `{ ok: true, position }`; 400 `invalid_request`, `invalid_prompt` or `too_long`; 404 `share_not_found`; 409 `share_not_live`; 409 `not_controller` while a viewer controls (slice 7); 429 `queue_full`. With `draftGithubId` the draft's author is credited and the draft is taken only after the send is queued; otherwise the data owner is. `GET /api/shares` views carry `drafts` (`ShareDraftView[]`, oldest started first) and `queue` (`ShareQueueView`: `agentWorking`, `delivering`, `items`). The share dialog polls them every second and shows the drafts in a controller-mode `SuggestionList` (**Use**, edit, **Send**).
 
 Drafts and the queue are memory only. A host restart or a share end drops them, and items still queued when the hub closes are dropped.
 
@@ -319,6 +319,31 @@ Once the peer is connected, the viewer page shows a **Conversation** / **Termina
 **Overflow.** The terminal channel uses the same writer rule as the others: a peer whose queued content passes 64 Mi characters is closed, and the viewer sees "Connection to the host was lost." with **Reconnect**.
 
 **Version skew.** The change is additive and the wire version stays 1. An older host ignores `terminal-watch` (it acts only on `hello` and, from slice 5, `submit` on `control`), so its viewer's terminal view stays empty. An older viewer never sends a watch and has no `terminal` listener, so it receives nothing.
+
+## Controller handoff and reclaim (slice 7, PAN-4478)
+
+Slice 7 lets the data owner hand control to an admitted viewer. The **controller** is the one participant whose share commands (admit, kick, revoke, un-revoke, contributor grants, handoff) and prompt sends the host accepts. The data owner starts as controller.
+
+**The appointment.** The host does not take the controller from the share service. The `PeerHub` keeps its own appointment (`ControllerState` in `src/dashboard/server/sharing/controller.ts`): the viewer this host process last made controller with a `set-controller` it sent itself. The **effective controller** is that viewer when the latest room snapshot's `controllerGithubId` names the same viewer, and the data owner otherwise. So a handoff takes effect when the next snapshot confirms it, a reclaim takes effect on the host at once, and a share service that names a controller the host never appointed only produces "the data owner controls". A snapshot that no longer lists the appointed viewer as `admitted` clears the appointment; an admitted controller who goes offline keeps control. The appointment is memory only, so a host restart starts with the data owner in control.
+
+**The gate.** `controlRefusal` decides every share command, from the data owner's browser and from a viewer-controller alike. A command from anyone who is not the effective controller is refused `not_controller`. The one exception is **reclaim**: the data owner's `set-controller` with its own id is always accepted. A `set-controller` target must be the data owner, or a participant listed as `admitted` in the snapshot and admitted by this host. For the data owner, other targets go to the share service unchecked as before; a viewer-controller's targets are checked on the host (`admit` needs a lobby participant, `kick` and `revoke` any listed participant, `set-contributor` an admitted one). **End share** (`DELETE /api/shares/:code`) is never gated. A viewer-controller cannot un-revoke (presence never carries the block list) or end the share; the data owner reclaims first.
+
+**New `control` payloads.**
+
+| Payload | Direction | Fields |
+| --- | --- | --- |
+| `identity` | host → viewer | `githubId`: the viewer's own id, sent right after its hello negotiates and before any presence |
+| `command` | viewer → host | `clientId`, `command`: one of `admit`, `kick`, `revoke`, `set-contributor`, `set-controller` (`SharedControllerCommand`) |
+| `controller-send` | viewer → host | `clientId`, `text`, optional `draftGithubId`: a prompt queued as a controller send, credited to the viewer-controller (or to the picked draft's author) |
+| `command-ack` | host → viewer | `clientId`, `status` (`accepted` or `rejected`), `position` (with an accepted `controller-send`), `reason` (with `rejected`) |
+
+The host rebuilds each command from its known keys only, relays it through the host socket, and updates its host-admitted set and appointment exactly as for the data owner's own commands. Ack reasons: `not_controller`, `unknown_participant`, `invalid_target` (the viewer named itself), `invalid_command` (malformed, or `unrevoke`), `not_connected` (the host socket cannot send), and the queue's `invalid_prompt`, `too_long` and `queue_full`. The viewer fails a command that gets no ack within 10 s (`COMMAND_ACK_TIMEOUT_MS`) with "The host did not answer.". All four payloads are additive: an older viewer ignores `identity` and `command-ack`, and an older host ignores `command` and `controller-send`, so the viewer's call times out.
+
+**Presence.** Presence `controllerGithubId` is the host's effective controller, never the raw snapshot value. A reclaim, or a viewer handing control back, refreshes presence on every peer at once; a handoff to a viewer shows once the snapshot confirms it.
+
+**Host API.** `POST /api/shares/:code/commands` accepts `{ type: 'set-controller', githubId }`. While a viewer controls, every command except reclaim answers 409 `{ error: 'not_controller', message }`, and a `set-controller` target nobody admitted answers 409 `unknown_participant`. `POST /api/shares/:code/prompts` answers 409 `not_controller` while a viewer controls. `ShareView.controllerGithubId` carries the effective controller.
+
+**UI.** The share dialog's lobby offers **Hand control** on each admitted row while the data owner controls. While a viewer controls it shows "@login has control.", one **Reclaim control** button, no other lobby actions, and read-only suggestions. The viewer-controller's page shows **You have control** with **Hand control back to @owner**, the lobby roster (no Blocked section), a **Send prompt** button and the suggestions in controller mode. Every viewer's header shows "@login has control" while a viewer controls.
 
 ## CLI: pan share and pan join (slice 9, PAN-4480)
 
