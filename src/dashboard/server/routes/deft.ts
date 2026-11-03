@@ -265,6 +265,8 @@ const postResolveEscalationRoute = HttpRouter.add(
       const worktree = getIssueWorkspacePath(issueId);
       if (!worktree) return jsonResponse({ error: 'no workspace' }, { status: 404 });
       const outcome = await resolveDeftEscalation(worktree, escId, { decision, answer, note, actor: 'operator:dashboard' });
+      // Needs-you reads escalations through a 10 s cache; drop it so the answered one leaves now.
+      clearDeftPendingCache(worktree);
       if (outcome === 'not-found') return jsonResponse({ error: `no escalation ${escId}` }, { status: 404 });
       if (outcome === 'already-resolved') return jsonResponse({ error: `escalation ${escId} is already resolved` }, { status: 409 });
       const delivery = await notifyEscalationResolved(issueId, escId, decision, answer);

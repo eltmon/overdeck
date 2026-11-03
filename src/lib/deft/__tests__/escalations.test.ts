@@ -2,7 +2,7 @@
  * PAN-4849 WI-3: resolving a Deft escalation rewrites its file in place,
  * atomically, and refuses a second answer or an unsafe id.
  */
-import { cpSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { cpSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -57,6 +57,47 @@ describe('resolveDeftEscalation', () => {
     expect(await resolveDeftEscalation(root, '../x', { decision: 'approved', actor: 'operator:dashboard' }, NOW)).toBe('not-found');
     expect(await resolveDeftEscalation(root, 'esc-20990101000000-ffffff', { decision: 'approved', actor: 'operator:dashboard' }, NOW)).toBe('not-found');
     expect(readdirSync(join(root, '.deft', 'escalations')).sort()).toEqual(names);
+  });
+});
+
+describe('resolveDeftEscalation, review fixes (PAN-4849)', () => {
+  const custom = (root: string, file: string, id: string) =>
+    writeFileSync(join(root, '.deft', 'escalations', file), JSON.stringify({ ...readEscalation(root, ESC), id }));
+
+  it('resolves a custom Deft id by the id parsed from the file', async () => {
+    const root = worktree();
+    custom(root, 'deploy-approval.json', 'deploy-approval');
+    custom(root, 'renamed-file.json', 'other-id');
+    expect(await resolveDeftEscalation(root, 'deploy-approval', { decision: 'approved', actor: 'operator:dashboard' }, NOW)).toBe('resolved');
+    expect(await resolveDeftEscalation(root, 'other-id', { decision: 'denied', actor: 'operator:dashboard' }, NOW)).toBe('resolved');
+    expect(JSON.parse(readFileSync(join(root, '.deft', 'escalations', 'renamed-file.json'), 'utf8')).resolution.decision).toBe('denied');
+  });
+
+  it('never follows a symlink out of the escalations directory', async () => {
+    const root = worktree();
+    const outside = mkdtempSync(join(scratch, 'outside-'));
+    writeFileSync(join(outside, 'x.json'), JSON.stringify({ id: 'escaped', status: 'open' }));
+    symlinkSync(join(outside, 'x.json'), join(root, '.deft', 'escalations', 'escaped.json'));
+    expect(await resolveDeftEscalation(root, 'escaped', { decision: 'approved', actor: 'operator:dashboard' }, NOW)).toBe('not-found');
+    expect(JSON.parse(readFileSync(join(outside, 'x.json'), 'utf8')).status).toBe('open');
+  });
+
+  it('serializes concurrent resolves: one wins, the other is already-resolved', async () => {
+    const root = worktree();
+    const results = await Promise.all([
+      resolveDeftEscalation(root, ESC, { decision: 'approved', actor: 'operator:dashboard' }, NOW),
+      resolveDeftEscalation(root, ESC, { decision: 'denied', actor: 'operator:dashboard' }, NOW),
+    ]);
+    expect(results.sort()).toEqual(['already-resolved', 'resolved']);
+    expect(readEscalation(root, ESC).resolution.decision).toBe('approved');
+    expect(readdirSync(join(root, '.deft', 'escalations')).filter(name => name.endsWith('.tmp'))).toEqual([]);
+  });
+
+  it('refuses ids with path characters', async () => {
+    const root = worktree();
+    for (const bad of ['a/b', 'a\\b', '..', 'x..y', '']) {
+      expect(await resolveDeftEscalation(root, bad, { decision: 'approved', actor: 'operator:dashboard' }, NOW)).toBe('not-found');
+    }
   });
 });
 

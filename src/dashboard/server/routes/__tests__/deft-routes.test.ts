@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   listProjectsAsync: vi.fn(),
   emitActivityEntry: vi.fn(),
   deliverAgentMessage: vi.fn(),
+  clearDeftPendingCache: vi.fn(),
 }));
 
 vi.mock('../../../../lib/deft/issue-pipeline.js', () => ({ isDeftPipelineIssue: mocks.isDeftPipelineIssue }));
@@ -33,6 +34,7 @@ vi.mock('../../../../lib/overdeck/issue-projects.js', () => ({
 vi.mock('../../../../lib/deft/archive.js', () => ({ isNativeDirectiveProject: async () => false }));
 vi.mock('../../../../lib/activity-logger.js', () => ({ emitActivityEntry: mocks.emitActivityEntry }));
 vi.mock('../../../../lib/agents/delivery.js', () => ({ deliverAgentMessage: mocks.deliverAgentMessage }));
+vi.mock('../../../../lib/deft/pending.js', () => ({ clearDeftPendingCache: mocks.clearDeftPendingCache }));
 vi.mock('../../../../lib/projects.js', async importOriginal => ({
   ...(await importOriginal<typeof import('../../../../lib/projects.js')>()),
   listProjectsAsync: mocks.listProjectsAsync,
@@ -246,6 +248,7 @@ describe('POST /api/issues/:id/deft/escalations/:escId/resolve', () => {
   it('resolves once, tells the agent, and returns 409 the second time', async () => {
     const first = await call('POST', resolvePath(), { body: { decision: 'answered', answer: 'Dense rows' } });
     expect(first.status).toBe(200);
+    expect(mocks.clearDeftPendingCache).toHaveBeenCalledWith(mocks.getIssueWorkspacePath());
     expect(first.json).toEqual({ resolved: true, delivered: true });
     expect(mocks.deliverAgentMessage).toHaveBeenCalledWith(
       'agent-pan-1',
@@ -255,6 +258,13 @@ describe('POST /api/issues/:id/deft/escalations/:escId/resolve', () => {
 
     const second = await call('POST', resolvePath(), { body: { decision: 'answered', answer: 'Roomy rows' } });
     expect(second.status).toBe(409);
+  });
+
+  it('accepts a custom Deft escalation id', async () => {
+    const copy = mocks.getIssueWorkspacePath() as string;
+    const file = join(copy, '.deft', 'escalations', 'deploy-approval.json');
+    writeFileSync(file, JSON.stringify({ id: 'deploy-approval', agentId: 'impl-1', type: 'approval', title: 't', body: '', createdAt: '2026-11-02T12:00:00Z', slaHours: 4, status: 'open', dangerous: false }));
+    expect((await call('POST', resolvePath('deploy-approval'), { body: { decision: 'approved' } })).status).toBe(200);
   });
 
   it('reports a failed delivery after resolving', async () => {
