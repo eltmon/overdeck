@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4478",
   "created": "2026-11-03T17:36:37.149Z",
-  "updated": "2026-11-03T18:31:01.868Z",
+  "updated": "2026-11-03T18:31:20.189Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -98,6 +98,10 @@
     "controller-gate.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T18:31:01.868Z"
+    },
+    "controller-gate.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:31:20.189Z"
     }
   }
 }
