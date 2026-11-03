@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4835",
   "created": "2026-11-03T07:59:34.235Z",
-  "updated": "2026-11-03T10:12:39.496Z",
+  "updated": "2026-11-03T10:12:59.575Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -216,6 +216,10 @@
     "devices-panel-phones.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T10:12:39.496Z"
+    },
+    "devices-panel-phones.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T10:12:59.575Z"
     }
   }
 }
