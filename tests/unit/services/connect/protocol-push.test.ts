@@ -49,3 +49,35 @@ describe('machine push frame decoding (PAN-4830 WI-7, D-6)', () => {
     expect(decodeFrame(JSON.stringify(PUSH), 'machine')).toEqual({ ok: true, role: 'machine', frame: PUSH });
   });
 });
+
+describe('machine push-activity frame decoding (PAN-4839 WI-2)', () => {
+  const ACTIVITY = { type: 'push-activity', to: '00000000-0000-4000-9000-000000000001', needsYou: 0, running: 9999 } as const;
+  const decodeActivity = (over: Record<string, unknown>) => decodeMachineFrame(JSON.stringify({ ...ACTIVITY, ...over }));
+
+  it('decodes push-activity at both ends of the count range and drops an extra title', () => {
+    expect(decodeActivity({})).toEqual({ ok: true, frame: ACTIVITY });
+    expect(decodeActivity({ needsYou: 9999, running: 0 })).toEqual({ ok: true, frame: { ...ACTIVITY, needsYou: 9999, running: 0 } });
+    expect(decodeActivity({ title: 'Approve deploy?' })).toEqual({ ok: true, frame: ACTIVITY });
+  });
+
+  it.each([
+    ['-1', -1],
+    ['1.5', 1.5],
+    ['"3"', '3'],
+    ['10000', 10_000],
+    ['null', null],
+  ])('refuses a count of %s', (_name, value) => {
+    expect(decodeActivity({ needsYou: value })).toEqual(BAD);
+    expect(decodeActivity({ running: value })).toEqual(BAD);
+  });
+
+  it('refuses a missing count and a non-uuid to', () => {
+    expect(decodeActivity({ running: undefined })).toEqual(BAD);
+    expect(decodeActivity({ to: 'phone-1' })).toEqual(BAD);
+  });
+
+  it('refuses push-activity from a phone socket', () => {
+    expect(decodeFrame(JSON.stringify(ACTIVITY), 'client')).toEqual(BAD);
+    expect(decodeFrame(JSON.stringify(ACTIVITY), 'machine')).toEqual({ ok: true, role: 'machine', frame: ACTIVITY });
+  });
+});

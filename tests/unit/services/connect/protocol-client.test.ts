@@ -145,3 +145,40 @@ describe('decodeFrame for client sockets (PAN-4829 WI-2)', () => {
     expect(decodeMachineFrame('nope')).toEqual(BAD);
   });
 });
+
+describe('Live Activity registration frames (PAN-4839 WI-2)', () => {
+  const token = 'a'.repeat(64);
+
+  it('decodes activity-register with and without apsEnvironment and drops an extra key', () => {
+    expect(asClient({ type: 'activity-register', token, extra: 1 })).toEqual({
+      ok: true,
+      role: 'client',
+      frame: { type: 'activity-register', token },
+    });
+    expect(asClient({ type: 'activity-register', token, apsEnvironment: 'sandbox' })).toEqual({
+      ok: true,
+      role: 'client',
+      frame: { type: 'activity-register', token, apsEnvironment: 'sandbox' },
+    });
+    expect(asClient({ type: 'activity-register', token, apsEnvironment: 'production' })).toMatchObject({ ok: true });
+  });
+
+  it('decodes activity-unregister', () => {
+    expect(asClient({ type: 'activity-unregister', token })).toEqual({ ok: true, role: 'client', frame: { type: 'activity-unregister' } });
+  });
+
+  it.each([
+    ['a token with /', { token: 'ab/cd' }],
+    ['an empty token', { token: '' }],
+    ['a 4,097-char token', { token: 'x'.repeat(4097) }],
+    ['a missing token', {}],
+    ['apsEnvironment "dev"', { token, apsEnvironment: 'dev' }],
+  ])('refuses activity-register with %s', (_name, over) => {
+    expect(asClient({ type: 'activity-register', ...over })).toEqual(BAD);
+  });
+
+  it('refuses activity-register and activity-unregister from a machine socket', () => {
+    expect(decodeFrame(JSON.stringify({ type: 'activity-register', token }), 'machine')).toEqual(BAD);
+    expect(decodeFrame(JSON.stringify({ type: 'activity-unregister' }), 'machine')).toEqual(BAD);
+  });
+});
