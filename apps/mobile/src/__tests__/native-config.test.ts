@@ -26,6 +26,17 @@ describe('native project config', () => {
     expect(manifest).toContain('<uses-permission android:name="android.permission.CAMERA" />');
   });
 
+  it('asks for notifications and binds FCM messages only to OverdeckMessagingService on Android', () => {
+    const manifest = read('android/app/src/main/AndroidManifest.xml');
+    expect(manifest).toContain('<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />');
+    expect(manifest).toContain(
+      '<service android:name="com.capacitorjs.plugins.pushnotifications.MessagingService" tools:node="remove" />',
+    );
+    expect(manifest).toMatch(
+      /<service android:name="\.OverdeckMessagingService" android:exported="false">\s*<intent-filter>\s*<action android:name="com\.google\.firebase\.MESSAGING_EVENT" \/>/,
+    );
+  });
+
   it('registers the URL scheme and the camera usage string on iOS', () => {
     const plist = read('ios/App/App/Info.plist');
     expect(plist).toMatch(/<key>CFBundleURLSchemes<\/key>\s*<array>\s*<string>ai\.overdeck\.app<\/string>/);

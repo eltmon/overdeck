@@ -17,6 +17,7 @@
     "@capacitor/browser": "^8.0.4",
     "@capacitor/core": "^8.5.0",
     "@capacitor/ios": "^8.5.0",
+    "@capacitor/push-notifications": "^8.1.2",
     "@noble/hashes": "2.4.0",
     "@overdeck/anywhere-channel": "workspace:*",
     "@overdeck/contracts": "workspace:*",

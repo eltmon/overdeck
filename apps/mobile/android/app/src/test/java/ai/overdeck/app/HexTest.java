@@ -1,6 +1,8 @@
 package ai.overdeck.app;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 
 import org.junit.Test;
 
@@ -18,5 +20,18 @@ public class HexTest {
     @Test
     public void encodesSignedBytesWithoutSignExtension() {
         assertEquals("00017f80ff", Hex.encode(new byte[] { 0, 1, 0x7f, (byte) 0x80, (byte) 0xff }));
+    }
+
+    @Test
+    public void decodesWhatItEncodes() {
+        byte[] bytes = new byte[] { 0, 1, 0x7f, (byte) 0x80, (byte) 0xff };
+        assertArrayEquals(bytes, Hex.decode(Hex.encode(bytes)));
+        assertArrayEquals(bytes, Hex.decode("00017F80FF"));
+    }
+
+    @Test
+    public void rejectsOddLengthAndNonHexInput() {
+        assertThrows(IllegalArgumentException.class, () -> Hex.decode("abc"));
+        assertThrows(IllegalArgumentException.class, () -> Hex.decode("zz"));
     }
 }

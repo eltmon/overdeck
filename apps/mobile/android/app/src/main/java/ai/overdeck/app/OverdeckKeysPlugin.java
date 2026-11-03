@@ -20,8 +20,9 @@ import java.util.UUID;
 @CapacitorPlugin(name = "OverdeckKeys")
 public class OverdeckKeysPlugin extends Plugin {
     private static final String CLIENT_ID = "clientId";
-    private static final String PUSH_SECRET_KEY = "pushSecretKey";
-    private static final String PUSH_PUBLIC_KEY = "pushPublicKey";
+    // Package-private: OverdeckMessagingService reads the same key pair (PAN-4840).
+    static final String PUSH_SECRET_KEY = "pushSecretKey";
+    static final String PUSH_PUBLIC_KEY = "pushPublicKey";
     private static final String SECRET_PREFIX = "secret.";
 
     private SecureStore store;
