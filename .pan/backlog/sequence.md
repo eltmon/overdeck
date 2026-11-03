@@ -1,12 +1,11 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T20:18:03.275094Z · model: claude-opus-5-5 · open: 866_
+_Last sequenced: 2026-11-03T20:20:17.232449Z · model: claude-opus-5-5 · open: 865_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4702 | S | critical | ok |  |  | Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs. |
-| 2 | PAN-4917 | S | critical | ok |  |  | CI trailer gate's full-history checkout times out at 5 min; cancelled check reads red, blocking merges, pan reload and conflict repair |
 | 3 | PAN-4925 | M | critical | ok |  |  | CI shard 3/4 worker exits with all tests passing; each flake turns main red and holds every merge and deploy |
 | 4 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 5 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install aborts workspace creation (since #4163); reproduced 2026-11-02 on botland too, so every polyrepo start fails. |
@@ -878,10 +877,6 @@ _Last sequenced: 2026-11-03T20:18:03.275094Z · model: claude-opus-5-5 · open: 
 
 New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.
 
-### PAN-4917 (rank 2)
-
-New in-pipeline substrate issue: a cancelled Prompt-change-trailer job counts as red, so main deploys are blocked and the conflict-repair gate declines approved PRs (#4911 for PAN-4479, #4915 for PAN-4480). Placed in the free rank-2 slot because it unblocks the merge pipeline itself; fix is small (blobless checkout, timeout headroom, cancelled-check handling in the repair gate).
-
 ### PAN-4925 (rank 3)
 
 New since the prior run and already in the pipeline. An intermittent vitest worker exit on shard 3/4 turns main red on roughly 1 in 4 runs, and a red main silently empties the merge gate and holds post-merge deploys until someone re-runs the shard. Fixing the root cause (not quarantining) restores trust in main's CI signal, so it sits beside PAN-4917 at the top of the CI-substrate tier.
@@ -1194,6 +1189,10 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 
 New this pass. shouldHoldForUat is consulted on exactly one merge path, so every other path merges a ready issue without asking whether its project holds for UAT — verified at code level on a real MIN-901 merge. This defeats the batch-train model directly: issues merge one at a time before a generation can assemble them.
 
+### PAN-3100 (rank 81)
+
+New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1201,10 +1200,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T20:18:03.275094Z",
+  "generatedAt": "2026-11-03T20:20:17.232449Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 866,
+  "openCount": 865,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -1216,19 +1215,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "dependsOn": [],
       "why": "Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs.",
       "rationale": "New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4917",
-      "rank": 2,
-      "size": "S",
-      "importance": "critical",
-      "score": 88,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "CI trailer gate's full-history checkout times out at 5 min; cancelled check reads red, blocking merges, pan reload and conflict repair",
-      "rationale": "New in-pipeline substrate issue: a cancelled Prompt-change-trailer job counts as red, so main deploys are blocked and the conflict-repair gate declines approved PRs (#4911 for PAN-4479, #4915 for PAN-4480). Placed in the free rank-2 slot because it unblocks the merge pipeline itself; fix is small (blobless checkout, timeout headroom, cancelled-check handling in the repair gate).",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13204,13 +13190,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
-    },
-    {
-      "from": "PAN-4917",
-      "to": "PAN-4479",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.8
     },
     {
       "from": "PAN-2626",
