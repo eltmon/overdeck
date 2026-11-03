@@ -80,6 +80,13 @@ Origin, then session cookie or internal token — see [DASHBOARD-AUTH.md](DASHBO
   and deflated entries only) and mapped by `vsix-import.ts` (PAN-4659). See
   [appearance.mdx](../configuration/appearance.mdx) "Color themes" for the operator-facing
   picture.
+- Shared Sessions host side (PAN-4473): `src/dashboard/server/routes/shares.ts` serves
+  `GET /api/shares`, `POST /api/shares`, `POST /api/shares/:code/commands` and
+  `DELETE /api/shares/:code`. They delegate to `ShareManager` in `services/share-host.ts`,
+  which holds one host WebSocket per live room to the share service. The record file door and
+  the share service HTTP client live in `src/lib/sharing/`. The host token stays on the
+  server; the browser sees `ShareView`s only. See "Host side in the dashboard" in
+  [SHARED-SESSIONS.md](SHARED-SESSIONS.md).
 - Companion terminals (PAN-3974, PAN-3835): an OpenCode or Codex conversation's TERMINAL
   streams a separate `companion-<ownerSession>` tmux session running `opencode attach` or
   `codex resume --remote` against the conversation's own runtime, opened through
