@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4839",
   "created": "2026-11-03T21:01:30.274Z",
-  "updated": "2026-11-03T22:18:13.071Z",
+  "updated": "2026-11-03T22:18:29.178Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -264,6 +264,9 @@
     "machine-service.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T22:18:13.071Z"
+    },
+    "acceptance.ac1": {
+      "status": "cancelled"
     }
   }
 }
