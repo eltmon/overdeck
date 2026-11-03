@@ -169,11 +169,11 @@ describe('MCP acceptance with the default MCP scopes (PAN-4649 W-10)', () => {
     }
   });
 
-  it('answer_permission is refused without approve and reaches the route with it', async () => {
+  it('answer_permission is hidden without approve and reaches the route with it', async () => {
     const args = { conversation: 'conv-a', signature: 'sig-1', choice: 'allow-once' };
     const refused = await callTool(await mintToken([...MCP_DEFAULT_SCOPES]), 'answer_permission', args);
     expect(refused.isError).toBe(true);
-    expect(refused.text).toContain('missingScope: approve');
+    expect(refused.text).toBe('Unknown tool answer_permission');
     expect(stubCalls).toEqual([]);
 
     const allowed = await callTool(await mintToken([...MCP_DEFAULT_SCOPES, 'approve']), 'answer_permission', args);
@@ -188,10 +188,10 @@ describe('MCP acceptance with the default MCP scopes (PAN-4649 W-10)', () => {
     expect(stubCalls).toEqual([{ route: 'POST /api/fleet/conversations', body: { message: 'begin' } }]);
   });
 
-  it('PAN-4651 ac29: a linked conversation\'s permission prompt is refused without approve, before any forward', async () => {
+  it('PAN-4651 ac29: a linked conversation\'s permission prompt is hidden without approve, before any forward', async () => {
     const refused = await callTool(await mintToken([...MCP_DEFAULT_SCOPES]), 'answer_permission', { conversation: '@desk/conv-a', signature: 'sig-1', choice: 'allow-once' });
     expect(refused.isError).toBe(true);
-    expect(refused.text).toContain('missingScope: approve');
+    expect(refused.text).toBe('Unknown tool answer_permission');
     expect(stubCalls).toEqual([]);
   });
 });

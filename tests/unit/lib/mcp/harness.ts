@@ -8,7 +8,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
 import type { DashboardApi, DashboardApiResponse } from '../../../../src/lib/mcp/dashboard-api.js';
-import { createOverdeckMcpServer } from '../../../../src/lib/mcp/server.js';
+import { createOverdeckMcpServer, type OverdeckTool } from '../../../../src/lib/mcp/server.js';
 
 export interface RecordedCall {
   method: 'GET' | 'POST';
@@ -32,8 +32,13 @@ export function fakeApi(routes: Record<string, DashboardApiResponse>): FakeApi {
   };
 }
 
-export async function connectClient(api: DashboardApi, scopes: readonly string[], isAgent = false): Promise<Client> {
-  const server = createOverdeckMcpServer({ api, scopes, isAgent });
+export async function connectClient(
+  api: DashboardApi,
+  scopes: readonly string[],
+  isAgent = false,
+  tools?: readonly OverdeckTool[],
+): Promise<Client> {
+  const server = createOverdeckMcpServer({ api, scopes, isAgent }, tools);
   const client = new Client({ name: 'test', version: '0.0.0' });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   await server.connect(serverTransport);

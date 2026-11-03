@@ -13,7 +13,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../../../src/lib/config.js', () => ({ getDashboardApiUrl: () => 'http://localhost:3011' }));
 
 const { _resetAccessTokensForTests, _settleAccessTokenWritesForTests, createAccessToken, revokeAccessToken } = await import('../../../src/lib/access-tokens.js');
-const { ALL_TOOLS } = await import('../../../src/lib/mcp/server.js');
 const { runMcpServe } = await import('../../../src/cli/commands/mcp.js');
 
 const originalHome = process.env.OVERDECK_HOME;
@@ -90,7 +89,7 @@ describe('pan mcp serve (PAN-4649 W-9)', () => {
     const messages = lines.map((line) => JSON.parse(line) as { jsonrpc: string; id: number; result: { tools?: Array<{ name: string }> } });
     for (const message of messages) expect(message.jsonrpc).toBe('2.0');
     expect(messages[1]?.id).toBe(2);
-    expect(messages[1]?.result.tools?.map((tool) => tool.name)).toEqual(ALL_TOOLS.map((tool) => tool.name));
+    expect(messages[1]?.result.tools?.map((tool) => tool.name)).toEqual(['list_conversations', 'search_conversations', 'read_conversation', 'list_pending_input']);
 
     deps.stdin.end();
     await expect(serving).resolves.toBe(0);
