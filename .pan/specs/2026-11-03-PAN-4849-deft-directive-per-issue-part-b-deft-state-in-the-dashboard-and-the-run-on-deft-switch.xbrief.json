@@ -4,17 +4,17 @@
     "created": "2026-11-03T03:03:41Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4849: Deft Directive per issue, part B: Deft state in the dashboard and the Run on Deft switch",
-    "updated": "2026-11-03T03:08:17.394Z"
+    "updated": "2026-11-03T03:09:29.770Z"
   },
   "plan": {
     "id": "pan-4849",
     "title": "Deft Directive per issue, part B: Deft state in the dashboard and the Run on Deft switch",
-    "status": "proposed",
+    "status": "running",
     "uid": "941ec8f2-8294-4b3c-864b-1ad91f36a449",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-11-03T03:03:41Z",
-    "updated": "2026-11-03T03:08:17.394Z",
+    "updated": "2026-11-03T03:09:29.770Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4849",
@@ -1924,5 +1924,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
