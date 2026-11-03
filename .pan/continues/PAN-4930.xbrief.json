@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4930",
   "created": "2026-11-03T21:47:50.354Z",
-  "updated": "2026-11-03T23:22:55.217Z",
+  "updated": "2026-11-03T23:23:11.427Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -128,6 +128,10 @@
     "agent-token-module.ac5": {
       "status": "completed",
       "doneAt": "2026-11-03T23:22:55.217Z"
+    },
+    "revoke-stop-agent.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:23:11.427Z"
     }
   }
 }
