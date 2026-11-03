@@ -51,6 +51,9 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   rmSync(TEMP_ROOT, { recursive: true, force: true });
+  // serveCommand mints <OVERDECK_HOME>/internal-token; never leave it for the
+  // next test file in this worker's shared home (PAN-4881).
+  rmSync(tokenFilePath(), { force: true });
 });
 
 describe('serveCommand', () => {
