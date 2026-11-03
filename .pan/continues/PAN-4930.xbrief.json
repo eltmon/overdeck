@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4930",
   "created": "2026-11-03T21:47:50.354Z",
-  "updated": "2026-11-03T23:26:51.518Z",
+  "updated": "2026-11-03T23:27:06.698Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -176,6 +176,10 @@
     "token-sweep.ac4": {
       "status": "completed",
       "doneAt": "2026-11-03T23:26:51.517Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:27:06.698Z"
     }
   }
 }
