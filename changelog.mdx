@@ -14,6 +14,7 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
   #### Improved
 
   - **Overdeck Anywhere is easier to find:** a **Machines** entry in the sidebar shows how many linked machines are online, the command palette has Anywhere actions (link a machine, add an SSH or Fly machine, set up a phone, set up Tailscale and more), and the Get set up card on Home has a **Reach this machine from anywhere** row. ([#4874](https://github.com/eltmon/overdeck/pull/4874))
+  - **CodeRabbit findings reach the work agent:** when CodeRabbit posts a review with inline comments on a pipeline PR, Overdeck sends the findings to the issue's work agent. The agent fixes the ones it agrees with and replies on the PR thread with its reason for each one it rejects. Nothing waits for CodeRabbit when it posts nothing. ([#4870](https://github.com/eltmon/overdeck/pull/4870))
   - **Working directory on another machine:** when you choose another machine in the New conversation dialog, the Working directory field now says that the other machine sets it, instead of showing this machine's directory. ([#4873](https://github.com/eltmon/overdeck/pull/4873))
 
   #### Fixed

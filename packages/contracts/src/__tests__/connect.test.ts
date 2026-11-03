@@ -2,15 +2,24 @@ import { describe, expect, it } from "vitest"
 import { Schema } from "effect"
 import {
   APPROVAL_TTL_MS,
+  CLIENT_LIMIT,
+  CLIENT_LIMIT_MESSAGE,
   CONNECT_CLOSE_CODES,
   CONNECT_PROTOCOL_VERSION,
   FREE_MACHINE_LIMIT_MESSAGE,
   INBOX_BODY_MAX_BYTES,
   INBOX_HOLD_MS,
   NO_DIRECT_PATH_MESSAGE,
+  PUSH_PLAINTEXT_MAX_BYTES,
+  PUSH_RATE_PER_MINUTE,
+  PUSH_SEALED_MAX_CHARS,
   RELAY_CAP_MESSAGE,
   RELAY_MONTHLY_CAP_BYTES,
+  type ClientToDirectoryFrame,
   type DirectoryEndpoint,
+  type DirectoryToClientFrame,
+  type DirectoryToMachineFrame,
+  type MachineToDirectoryFrame,
 } from "../connect"
 import { DirectoryResponse } from "../connect-view"
 import type { AdvertisedEndpoint } from "../machines"
@@ -55,6 +64,7 @@ describe("connect protocol constants", () => {
     expect(FREE_MACHINE_LIMIT_MESSAGE).toBe("The free account includes 3 machines")
     expect(NO_DIRECT_PATH_MESSAGE).toBe("No direct path; install Tailscale or use the relay plan")
     expect(RELAY_CAP_MESSAGE).toBe("Relay allowance used; install Tailscale or add 50 GB")
+    expect(CLIENT_LIMIT_MESSAGE).toBe("This account already has 5 phones. Remove one in the app or on a machine.")
   })
 
   it("exports the numeric limits", () => {
@@ -63,6 +73,11 @@ describe("connect protocol constants", () => {
     expect(INBOX_BODY_MAX_BYTES).toBe(262_144)
     expect(INBOX_HOLD_MS).toBe(86_400_000)
     expect(APPROVAL_TTL_MS).toBe(600_000)
+    expect(CLIENT_LIMIT).toBe(5)
+    expect(PUSH_RATE_PER_MINUTE).toBe(30)
+    expect(PUSH_SEALED_MAX_CHARS).toBe(3072)
+    expect(PUSH_PLAINTEXT_MAX_BYTES).toBe(2256)
+    expect(4 * Math.ceil((PUSH_PLAINTEXT_MAX_BYTES + 48) / 3)).toBe(PUSH_SEALED_MAX_CHARS)
   })
 
   it("exports the close codes", () => {
@@ -73,6 +88,7 @@ describe("connect protocol constants", () => {
       unsupportedProtocol: 4010,
       replaced: 4011,
       forgotten: 4012,
+      clientLimit: 4013,
     })
   })
 
@@ -91,5 +107,91 @@ describe("DirectoryResponse", () => {
 
   it("rejects an unknown state", () => {
     expect(() => Schema.decodeUnknownSync(DirectoryResponse)({ ...sample, state: "paused" })).toThrow()
+  })
+})
+
+describe("phone client and push frames (PAN-4828)", () => {
+  const clientFrames: ClientToDirectoryFrame[] = [
+    {
+      type: "hello-client",
+      protocol: 1,
+      clientId: "00000000-0000-4000-8000-0000000000aa",
+      label: "iPhone",
+      publicKeyHex: "ab".repeat(32),
+      appVersion: "1.0.0",
+      platform: "ios",
+    },
+    {
+      type: "signal",
+      to: "env_0123456789abcdef",
+      session: "0".repeat(32),
+      purpose: "link",
+      relay: false,
+      data: { sdp: { type: "offer", sdp: "v=0" } },
+    },
+    { type: "ice-servers", requestId: "r", relay: false },
+    { type: "relay-usage", bytes: 0 },
+    { type: "push-register", platform: "ios", token: "tok", apsEnvironment: "sandbox" },
+    { type: "push-unregister" },
+    { type: "forget-client" },
+  ]
+  const clientBound: DirectoryToClientFrame[] = [
+    { type: "welcome-client", protocol: 1, plan: "tester", relayAllowed: true, machines: [] },
+    { type: "directory", machines: [] },
+  ]
+  const pushFrame: MachineToDirectoryFrame = {
+    type: "push",
+    requestId: "0".repeat(32),
+    to: "00000000-0000-4000-8000-0000000000aa",
+    sealed: "AAAA",
+    urgency: "high",
+    collapseId: "1".repeat(32),
+  }
+  const pushResults: DirectoryToMachineFrame[] = [
+    { type: "push-result", requestId: "r", ok: true },
+    { type: "push-result", requestId: "r", ok: false, error: "rate_limited" },
+  ]
+
+  it("covers every client frame type", () => {
+    expect(clientFrames.map((f) => f.type).sort()).toEqual([
+      "forget-client",
+      "hello-client",
+      "ice-servers",
+      "push-register",
+      "push-unregister",
+      "relay-usage",
+      "signal",
+    ])
+  })
+
+  it("round-trips every new frame through JSON", () => {
+    for (const f of [...clientFrames, ...clientBound, pushFrame, ...pushResults]) {
+      expect(JSON.parse(JSON.stringify(f))).toEqual(f)
+    }
+  })
+
+  it("rejects malformed frames at compile time", () => {
+    // @ts-expect-error "web" is not a ClientPlatform
+    const badPlatform: ClientToDirectoryFrame = { type: "hello-client", protocol: 1, clientId: "c", label: "l", publicKeyHex: "ab".repeat(32), appVersion: "1.0.0", platform: "web" }
+    // @ts-expect-error hello-client requires clientId
+    const missingClientId: ClientToDirectoryFrame = { type: "hello-client", protocol: 1, label: "l", publicKeyHex: "ab".repeat(32), appVersion: "1.0.0", platform: "ios" }
+    // @ts-expect-error a client signal's purpose is always "link"
+    const approvalSignal: ClientToDirectoryFrame = { type: "signal", to: "e", session: "0".repeat(32), purpose: "approval", relay: false, data: {} }
+    // @ts-expect-error "low" is not a PushUrgency
+    const badUrgency: MachineToDirectoryFrame = { type: "push", requestId: "0".repeat(32), to: "c", sealed: "AAAA", urgency: "low", collapseId: "1".repeat(32) }
+    // @ts-expect-error a failed push-result requires an error
+    const missingError: DirectoryToMachineFrame = { type: "push-result", requestId: "r", ok: false }
+    // @ts-expect-error a successful push-result cannot carry an error
+    const extraError: DirectoryToMachineFrame = { type: "push-result", requestId: "r", ok: true, error: "rate_limited" }
+    // @ts-expect-error clients never get approval-cancel
+    const approvalCancel: DirectoryToClientFrame = { type: "approval-cancel", requestId: "0".repeat(32) }
+    const rejected = [badPlatform, missingClientId, approvalSignal, badUrgency, missingError, extraError, approvalCancel]
+    expect(rejected).toHaveLength(7)
+  })
+
+  it("lets the directory reuse machine frames for clients", () => {
+    const fromMachine: Extract<DirectoryToMachineFrame, { type: "directory" }> = { type: "directory", machines: [] }
+    const forClient: DirectoryToClientFrame = fromMachine
+    expect(forClient.type).toBe("directory")
   })
 })

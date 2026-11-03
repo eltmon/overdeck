@@ -1,16 +1,13 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T04:45:23.504765Z · model: claude-opus-5-5 · open: 873_
+_Last sequenced: 2026-11-03T05:18:18.471726Z · model: claude-opus-5-5 · open: 870_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4702 | S | critical | ok |  |  | Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs. |
-| 2 | PAN-4869 | S | medium | ok |  |  | In pipeline: merged, verifying on main; adds a Machines sidebar entry and palette actions so Anywhere is findable. |
 | 3 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 4 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install aborts workspace creation (since #4163); reproduced 2026-11-02 on botland too, so every polyrepo start fails. |
-| 5 | PAN-4871 | S | high | ok |  |  | In pipeline: phone app opens linked-machine rows by id -1 and @env/name never loads; route via the linked-conversation proxy |
-| 6 | PAN-4872 | S | medium | ok |  |  | In pipeline: new-conversation dialog keeps this machine's working directory after picking a linked machine |
 | 7 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
 | 8 | PAN-4690 | S | critical | ok |  |  | Review dispatch rewrites the tracked continue file uncommitted, so the dirty-tree gate blocks the review it dispatched |
 | 10 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
@@ -885,10 +882,6 @@ _Last sequenced: 2026-11-03T04:45:23.504765Z · model: claude-opus-5-5 · open: 
 
 New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.
 
-### PAN-4869 (rank 2)
-
-New since the prior run; it is in the pipeline (merged, awaiting verification on main), so it is pinned in the free top slot and not re-ranked.
-
 ### PAN-4636 (rank 3)
 
 New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.
@@ -896,14 +889,6 @@ New substrate bug with a verified root cause: adoption (PAN-4605) calls startRev
 ### PAN-4553 (rank 4)
 
 Moved from rank 9 to the free rank 4: a 2026-11-02 comment shows the same abort on a second polyrepo project (botland), so the bug now blocks workspace creation for every polyrepo project, not only mind-your-now.
-
-### PAN-4871 (rank 5)
-
-New issue already in the pipeline, so it is pinned into a free top rank without moving any other node; the phone web app currently has no working way into another machine's conversation, and the body names the files, the fix and the tests.
-
-### PAN-4872 (rank 6)
-
-New issue already in the pipeline, pinned into the next free top rank without moving other nodes; observed but not yet investigated, though the expected behaviour and the starting file are stated.
 
 ### PAN-4733 (rank 7)
 
@@ -1201,6 +1186,18 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
 
 New this pass. The deployment gate's queue message is unusually good — it names the holders, the queue age, and warns against forcing — and it promises a 'next verification boundary' trigger that does not exist. Every holder cleared and the deploy never fired; the live build stayed stale for 35 minutes until a manual reload. A correct-sounding instruction that cannot happen is worse than no message.
 
+### PAN-3118 (rank 79)
+
+Triage: verify "running at $0.00 with no capacity fallback" against the current liveness definition. Rank held.
+
+### PAN-3106 (rank 80)
+
+New this pass. shouldHoldForUat is consulted on exactly one merge path, so every other path merges a ready issue without asking whether its project holds for UAT — verified at code level on a real MIN-901 merge. This defeats the batch-train model directly: issues merge one at a time before a generation can assemble them.
+
+### PAN-3100 (rank 81)
+
+New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1208,10 +1205,10 @@ New this pass. The deployment gate's queue message is unusually good — it name
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T04:45:23.504765Z",
+  "generatedAt": "2026-11-03T05:18:18.471726Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 873,
+  "openCount": 870,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -12084,45 +12081,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "dependsOn": [],
       "why": "Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them",
       "rationale": "Rank kept at the bottom: PAN-4820 closed so the dependency is dropped, but the operator still parks this undecided low-priority question.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4871",
-      "rank": 5,
-      "size": "S",
-      "importance": "high",
-      "score": 66,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: phone app opens linked-machine rows by id -1 and @env/name never loads; route via the linked-conversation proxy",
-      "rationale": "New issue already in the pipeline, so it is pinned into a free top rank without moving any other node; the phone web app currently has no working way into another machine's conversation, and the body names the files, the fix and the tests.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4872",
-      "rank": 6,
-      "size": "S",
-      "importance": "medium",
-      "score": 55,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: new-conversation dialog keeps this machine's working directory after picking a linked machine",
-      "rationale": "New issue already in the pipeline, pinned into the next free top rank without moving other nodes; observed but not yet investigated, though the expected behaviour and the starting file are stated.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4869",
-      "rank": 2,
-      "size": "S",
-      "importance": "medium",
-      "score": 55,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: merged, verifying on main; adds a Machines sidebar entry and palette actions so Anywhere is findable.",
-      "rationale": "New since the prior run; it is in the pipeline (merged, awaiting verification on main), so it is pinned in the free top slot and not re-ranked.",
       "gate": "auto",
       "planning": "auto"
     }
