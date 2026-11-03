@@ -4,17 +4,17 @@
     "created": "2026-11-03T16:14:54Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4837: Phone app: apps/mobile Capacitor app with sign-in, machines, pairing and the phone screens",
-    "updated": "2026-11-03T16:15:15.300Z"
+    "updated": "2026-11-03T16:16:27.453Z"
   },
   "plan": {
     "id": "pan-4837",
     "title": "Phone app: apps/mobile Capacitor app with sign-in, machines, pairing and the phone screens",
-    "status": "proposed",
+    "status": "running",
     "uid": "014714b5-89d4-4081-8de8-b34db1149c6e",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-03T16:14:54Z",
-    "updated": "2026-11-03T16:15:15.300Z",
+    "updated": "2026-11-03T16:16:27.453Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4837",
@@ -2190,5 +2190,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
