@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4888",
+  "created": "2026-11-03T08:25:32.067Z",
+  "updated": "2026-11-03T08:25:32.067Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "lock-target-record": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4888",
+      "claimedAt": "2026-11-03T08:25:32.067Z"
+    }
+  }
+}
