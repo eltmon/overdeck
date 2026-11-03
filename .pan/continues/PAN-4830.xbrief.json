@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4830",
   "created": "2026-11-03T14:25:43.002Z",
-  "updated": "2026-11-03T14:40:37.560Z",
+  "updated": "2026-11-03T14:40:52.888Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -98,6 +98,10 @@
     "fcm-sender.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T14:40:37.559Z"
+    },
+    "fcm-sender.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:40:52.888Z"
     }
   }
 }
