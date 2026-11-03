@@ -38,7 +38,7 @@ export type JoinApi = Pick<typeof joinApi, 'getJoin' | 'createJoin' | 'postSigna
 export type ViewerPeer = Pick<WebRtcViewer, 'onSignal' | 'close'>;
 export type ViewerFactory = (deps: WebRtcViewerDeps, callbacks: WebRtcViewerCallbacks) => ViewerPeer;
 
-export const LIVE_JOIN_STATES: ReadonlySet<JoinState> = new Set(['connecting', 'lobby', 'admitted', 'host-disconnected']);
+export const LIVE_JOIN_STATES: ReadonlySet<JoinState> = new Set(['connecting', 'lobby', 'admitted', 'host-disconnected', 'reconnecting']);
 
 const defaultViewer: ViewerFactory = (deps, callbacks) => new WebRtcViewer(deps, callbacks);
 

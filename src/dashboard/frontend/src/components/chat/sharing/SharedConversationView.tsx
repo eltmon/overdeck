@@ -163,19 +163,26 @@ function terminalScreen(props: SharedJoin): ReactNode {
 }
 
 function admittedScreen(props: SharedJoin): ReactNode {
+  const reconnecting = props.view?.state === 'reconnecting';
   const hostDisconnected = props.view?.state === 'host-disconnected';
   const lost = props.peerPhase === 'lost';
-  const showTimeline = props.hasHistory && (props.peerPhase === 'connected' || hostDisconnected || lost);
+  // A kept timeline stays visible while the host renegotiates (PAN-4479 FR-11).
+  const showTimeline = props.hasHistory;
   const messages = props.messages.map(toChatMessage);
+  let banner: ReactNode = null;
+  if (reconnecting) banner = <div className={BANNER} role="status">Reconnecting to the share service…</div>;
+  else if (hostDisconnected) banner = <div className={BANNER} role="status">Host disconnected — reconnecting…</div>;
+  else if (lost) {
+    banner = (
+      <div className={BANNER} role="status">
+        <span>Connection to the host was lost.</span>
+        <button type="button" className={NEUTRAL_BUTTON} onClick={props.reconnect}>Reconnect</button>
+      </div>
+    );
+  }
   return (
     <>
-      {hostDisconnected ? <div className={BANNER} role="status">Host disconnected — reconnecting…</div> : null}
-      {lost && !hostDisconnected ? (
-        <div className={BANNER} role="status">
-          <span>Connection to the host was lost.</span>
-          <button type="button" className={NEUTRAL_BUTTON} onClick={props.reconnect}>Reconnect</button>
-        </div>
-      ) : null}
+      {banner}
       {props.notices.map((notice) => (
         <p key={notice.kind} className="border-b border-border px-4 py-1.5 text-xs text-muted-foreground">{noticeText(notice)}</p>
       ))}
@@ -216,6 +223,8 @@ function body(props: SharedJoin & { code: string }): ReactNode {
     case 'admitted':
     case 'host-disconnected':
       return admittedScreen(props);
+    case 'reconnecting':
+      return props.hasHistory ? admittedScreen(props) : <Panel><Note>Reconnecting to the share service…</Note></Panel>;
     default:
       return terminalScreen(props);
   }
