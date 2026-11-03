@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4881",
   "created": "2026-11-03T06:05:06.618Z",
-  "updated": "2026-11-03T06:15:13.924Z",
+  "updated": "2026-11-03T06:15:20.360Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,11 @@
       "claimedBy": "agent-pan-4881",
       "claimedAt": "2026-11-03T06:14:05.083Z",
       "doneAt": "2026-11-03T06:15:13.924Z"
+    },
+    "docs-worker-home-token": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4881",
+      "claimedAt": "2026-11-03T06:15:20.360Z"
     }
   }
 }
