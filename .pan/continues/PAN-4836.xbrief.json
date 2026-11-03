@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4836",
   "created": "2026-11-03T14:20:05.683Z",
-  "updated": "2026-11-03T14:26:19.829Z",
+  "updated": "2026-11-03T14:31:24.006Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-11-03T14:26:10.847Z"
     },
     "app-pairing-panel": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4836",
-      "claimedAt": "2026-11-03T14:26:19.829Z"
+      "claimedAt": "2026-11-03T14:26:19.829Z",
+      "doneAt": "2026-11-03T14:31:24.006Z"
     }
   }
 }
