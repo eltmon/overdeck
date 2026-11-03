@@ -206,7 +206,7 @@ describe('JoinManager lifecycle', () => {
     [4010, 'kicked', null],
     [4011, 'revoked', null],
     [4013, 'full', null],
-    [1006, 'disconnected', 'connection_lost'],
+    [1006, 'reconnecting', 'connection_lost'],
   ] as const)('close code %i gives %s', async (code, expected, error) => {
     const h = harness();
     const socket = await joined(h);
@@ -252,7 +252,7 @@ describe('JoinManager lifecycle', () => {
     expect(state(h)).toBe('lobby');
     await vi.advanceTimersByTimeAsync(1);
     expect(socket.terminated).toBe(true);
-    expect(h.manager.get(CODE)).toMatchObject({ state: 'disconnected', error: 'connection_lost' });
+    expect(h.manager.get(CODE)).toMatchObject({ state: 'reconnecting', error: 'connection_lost' });
   });
 
   it('leave sends exactly the leave frame and a close with any code gives left', async () => {
@@ -301,6 +301,22 @@ describe('JoinManager lifecycle', () => {
     }
     socket.drop(4010);
     expect(JSON.stringify(h.manager.get(CODE))).not.toContain('odd_');
+  });
+
+  it('an unseated join never reconnects', async () => {
+    const refused = harness();
+    await refused.manager.join(CODE);
+    (refused.sockets[0] as FakeSocket).emit('unexpected-response', {}, { statusCode: 503 });
+    const errored = harness();
+    await errored.manager.join(CODE);
+    (errored.sockets[0] as FakeSocket).emit('error', new Error('ECONNREFUSED'));
+    const dropped = harness();
+    (await joined(dropped)).drop(1006);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(refused.manager.get(CODE)).toMatchObject({ state: 'disconnected', error: 'http_503' });
+    expect(errored.manager.get(CODE)).toMatchObject({ state: 'disconnected', error: 'unreachable' });
+    expect(dropped.manager.get(CODE)).toMatchObject({ state: 'disconnected', error: 'connection_lost' });
+    expect([refused.sockets.length, errored.sockets.length, dropped.sockets.length]).toEqual([1, 1, 1]);
   });
 
   it('join after kicked opens a new socket', async () => {
@@ -555,5 +571,119 @@ describe('JoinManager relay', () => {
     socket.deliver({ type: 'signal', data: OFFER });
     socket.drop(4010);
     expect(JSON.stringify(events)).not.toContain('odd_');
+  });
+});
+
+describe('JoinManager reconnect (PAN-4479)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'] });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('a seated join reconnects after 1 s with the same URL and token and is admitted again on status admitted', async () => {
+    const h = harness();
+    const first = await admitted(h);
+    const { events } = record(h);
+    first.drop(1006);
+    expect(h.manager.get(CODE)).toMatchObject({ state: 'reconnecting', error: 'connection_lost' });
+    await vi.advanceTimersByTimeAsync(999);
+    expect(h.sockets).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(h.sockets).toHaveLength(2);
+    const second = h.sockets[1] as FakeSocket;
+    expect(second.url).toBe(first.url);
+    expect(second.headers).toEqual({ Authorization: `Bearer ${TOKEN}` });
+    expect(state(h)).toBe('reconnecting');
+    second.open();
+    second.deliver({ type: 'status', status: 'admitted' });
+    expect(h.manager.get(CODE)).toMatchObject({ state: 'admitted', error: null });
+    expect(states(events)).toEqual(['admitted', 'reconnecting', 'admitted']);
+    expect([...first.sent, ...second.sent]).not.toContain('{"type":"leave"}');
+  });
+
+  it('a seated join backs off 1, 2, 4 s across failed attempts and resets after a status frame', async () => {
+    const h = harness();
+    (await joined(h)).deliver({ type: 'status', status: 'lobby' });
+    for (const [i, delay] of [1_000, 2_000, 4_000].entries()) {
+      (h.sockets.at(-1) as FakeSocket).drop(1006);
+      await vi.advanceTimersByTimeAsync(delay - 1);
+      expect(h.sockets).toHaveLength(i + 1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(h.sockets).toHaveLength(i + 2);
+    }
+    const newest = h.sockets.at(-1) as FakeSocket;
+    newest.open();
+    newest.deliver({ type: 'status', status: 'lobby' });
+    expect(state(h)).toBe('lobby');
+    newest.drop(1006);
+    await vi.advanceTimersByTimeAsync(999);
+    expect(h.sockets).toHaveLength(4);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(h.sockets).toHaveLength(5);
+  });
+
+  it('a seated 503 upgrade refusal or socket error reconnects', async () => {
+    const h = harness();
+    (await joined(h)).deliver({ type: 'status', status: 'admitted' });
+    (h.sockets[0] as FakeSocket).drop(1006);
+    await vi.advanceTimersByTimeAsync(1_000);
+    (h.sockets[1] as FakeSocket).emit('unexpected-response', {}, { statusCode: 503 });
+    expect(h.manager.get(CODE)).toMatchObject({ state: 'reconnecting', error: 'http_503' });
+    expect(h.sockets[1]?.terminated).toBe(true);
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(h.sockets).toHaveLength(3);
+    (h.sockets[2] as FakeSocket).emit('error', new Error('ECONNREFUSED'));
+    expect(h.manager.get(CODE)).toMatchObject({ state: 'reconnecting', error: 'unreachable' });
+    await vi.advanceTimersByTimeAsync(4_000);
+    expect(h.sockets).toHaveLength(4);
+  });
+
+  it('404 on a reconnect attempt ends the join and stops retrying', async () => {
+    const h = harness();
+    (await admitted(h)).drop(1006);
+    await vi.advanceTimersByTimeAsync(1_000);
+    (h.sockets[1] as FakeSocket).emit('unexpected-response', {}, { statusCode: 404 });
+    expect(state(h)).toBe('ended');
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(h.sockets).toHaveLength(2);
+  });
+
+  it('leave while reconnecting gives left and opens no socket', async () => {
+    const h = harness();
+    (await admitted(h)).drop(1006);
+    expect(h.manager.leave(CODE)).toBe('left');
+    expect(state(h)).toBe('left');
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(h.sockets).toHaveLength(1);
+  });
+
+  it('stop while reconnecting opens no socket', async () => {
+    const h = harness();
+    (await admitted(h)).drop(1006);
+    h.manager.stop();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(h.sockets).toHaveLength(1);
+  });
+
+  it('no subscriber for 60 s while waiting to reconnect gives away and opens no socket', async () => {
+    const h = harness({ reconnectDelaysMs: [90_000] });
+    const socket = await admitted(h);
+    record(h).unsubscribe();
+    socket.drop(1006);
+    expect(state(h)).toBe('reconnecting');
+    await vi.advanceTimersByTimeAsync(JOIN_UNSUBSCRIBED_GRACE_MS);
+    expect(state(h)).toBe('away');
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(h.sockets).toHaveLength(1);
+  });
+
+  it('iceServers and signal answer not_admitted while reconnecting', async () => {
+    const h = harness();
+    (await admitted(h)).drop(1006);
+    expect(await h.manager.iceServers(CODE)).toEqual({ ok: false, reason: 'not_admitted' });
+    expect(h.manager.signal(CODE, ANSWER)).toBe('not_admitted');
   });
 });

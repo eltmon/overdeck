@@ -15,8 +15,8 @@
  * A live join with no subscriber for 60 s is closed and becomes `away` (D-7).
  *
  * Keepalive copies `share-host.ts`: a protocol ping every 30 s; 75 s without a pong terminates the
- * socket and the join becomes `disconnected`. An unexpected close is never reconnected here (D-8;
- * slice 8, PAN-4479, adds automatic restore).
+ * socket. A seated join reconnects after an unexpected close on `SHARE_RECONNECT_DELAYS_MS` and is
+ * `reconnecting` meanwhile; a join that never got a status frame becomes `disconnected` (PAN-4479).
  *
  * Plain async class with injected seams, like `share-host.ts` (slice-2 D-8). Nothing here logs.
  */
@@ -25,7 +25,13 @@ import { WebSocket } from 'ws';
 
 import { readAccount, type AccountRecord } from '../../../lib/account/store.js';
 import { joinSocketUrl, readShareUrl, type ShareUrlResult } from '../../../lib/sharing/share-service.js';
-import { defaultOpenSocket, PING_INTERVAL_MS, PONG_TIMEOUT_MS, type ShareSocket } from './share-host.js';
+import {
+  defaultOpenSocket,
+  PING_INTERVAL_MS,
+  PONG_TIMEOUT_MS,
+  SHARE_RECONNECT_DELAYS_MS,
+  type ShareSocket,
+} from './share-host.js';
 
 export const JOIN_UNSUBSCRIBED_GRACE_MS = 60_000;
 export const JOIN_CLOSE_FALLBACK_MS = 5_000;
@@ -38,6 +44,8 @@ export interface JoinManagerDeps {
   readShareUrl(): Promise<ShareUrlResult>;
   openSocket(url: string, headers: Record<string, string>): ShareSocket;
   now(): number;
+  /** Reconnect backoff (PAN-4479 D-10); tests pass [0]. Default SHARE_RECONNECT_DELAYS_MS. */
+  reconnectDelaysMs?: readonly number[];
 }
 
 export type JoinOutcome =
@@ -76,6 +84,11 @@ interface Join {
   pongTimer: NodeJS.Timeout | null;
   closeFallbackTimer: NodeJS.Timeout | null;
   graceTimer: NodeJS.Timeout | null;
+  /** Got at least one status frame; only a seated join reconnects on its own (PAN-4479 D-7). */
+  seated: boolean;
+  /** Failed connects since the last status frame; indexes the backoff table. */
+  attempt: number;
+  retryTimer: NodeJS.Timeout | null;
 }
 
 interface IcePending {
@@ -84,7 +97,7 @@ interface IcePending {
   readonly timer: NodeJS.Timeout;
 }
 
-const LIVE_STATES: ReadonlySet<JoinState> = new Set(['connecting', 'lobby', 'admitted', 'host-disconnected']);
+const LIVE_STATES: ReadonlySet<JoinState> = new Set(['connecting', 'lobby', 'admitted', 'host-disconnected', 'reconnecting']);
 
 /** Close codes the share service uses, mapped to the join state they end in (State table). */
 const CLOSE_STATES: ReadonlyMap<number, JoinState> = new Map([
@@ -202,6 +215,7 @@ export class JoinManager {
   /** Closes every join socket (tests). */
   stop(): void {
     for (const join of this.joins.values()) {
+      this.clearRetry(join);
       this.finishConnection(join, 'close');
       this.resolveIce(join, []);
       join.subscriber = null;
@@ -254,6 +268,9 @@ export class JoinManager {
       pongTimer: null,
       closeFallbackTimer: null,
       graceTimer: null,
+      seated: false,
+      attempt: 0,
+      retryTimer: null,
     };
     this.joins.set(shortCode, join);
     this.listen(join, join.conn);
@@ -280,7 +297,7 @@ export class JoinManager {
       this.finishConnection(join, 'terminate');
       if (status === 404) this.setState(join, 'ended');
       else if (status === 401 || status === 403) this.setState(join, 'rejected');
-      else this.setState(join, 'disconnected', `http_${status}`);
+      else this.lose(join, `http_${status}`);
     });
     socket.on('close', (code) => {
       if (!current()) return;
@@ -289,12 +306,12 @@ export class JoinManager {
       if (this.settleIntent(join)) return;
       const state = CLOSE_STATES.get(code);
       if (state) this.setState(join, state);
-      else this.setState(join, 'disconnected', 'connection_lost');
+      else this.lose(join, 'connection_lost');
     });
     socket.on('error', () => {
       if (!current()) return;
       this.finishConnection(join, 'terminate');
-      if (!this.settleIntent(join)) this.setState(join, 'disconnected', 'unreachable');
+      if (!this.settleIntent(join)) this.lose(join, 'unreachable');
     });
   }
 
@@ -308,6 +325,8 @@ export class JoinManager {
     if (typeof parsed !== 'object' || parsed === null) return;
     const frame = parsed as ServiceToViewerFrame;
     if (frame.type === 'status') {
+      join.seated = true;
+      join.attempt = 0;
       if (frame.status === 'lobby') this.setState(join, 'lobby');
       else if (frame.status === 'admitted') {
         join.contributor = frame.contributor === true;
@@ -368,13 +387,52 @@ export class JoinManager {
 
   private reopen(join: Join): void {
     join.restarting = false;
+    this.openNextSocket(join);
+    this.setState(join, 'connecting');
+  }
+
+  private openNextSocket(join: Join): void {
     join.generation += 1;
     join.pendingSignals = [];
     join.subscribedThisGeneration = join.subscriber !== null;
     this.resolveIce(join, []);
     join.conn = { socket: this.deps.openSocket(join.socketUrl, join.headers), done: false };
     this.listen(join, join.conn);
-    this.setState(join, 'connecting');
+  }
+
+  /** An unexpected loss: a seated join reconnects; one that never got a status frame is `disconnected`. */
+  private lose(join: Join, error: string): void {
+    if (join.seated) this.scheduleReconnect(join, error);
+    else this.setState(join, 'disconnected', error);
+  }
+
+  private scheduleReconnect(join: Join, error: string): void {
+    this.finishConnection(join, 'terminate');
+    this.resolveIce(join, []);
+    this.clearRetry(join);
+    this.setState(join, 'reconnecting', error);
+    const delays = this.deps.reconnectDelaysMs ?? SHARE_RECONNECT_DELAYS_MS;
+    const delay = delays[Math.min(join.attempt, delays.length - 1)] ?? 0;
+    join.attempt += 1;
+    join.retryTimer = setTimeout(() => this.reconnectNow(join, error), delay);
+    join.retryTimer.unref?.();
+  }
+
+  /** Opens the next socket and stays `reconnecting`; the next status frame sets the state. */
+  private reconnectNow(join: Join, error: string): void {
+    join.retryTimer = null;
+    if (this.joins.get(join.shortCode) !== join || join.state !== 'reconnecting') return;
+    try {
+      this.openNextSocket(join);
+    } catch {
+      // openSocket threw synchronously: wait for the next slot.
+      this.scheduleReconnect(join, error);
+    }
+  }
+
+  private clearRetry(join: Join): void {
+    if (join.retryTimer) clearTimeout(join.retryTimer);
+    join.retryTimer = null;
   }
 
   /** D-7: no subscriber for 60 s closes a live join; it becomes `away`. */
@@ -382,7 +440,14 @@ export class JoinManager {
     this.clearGrace(join);
     join.graceTimer = setTimeout(() => {
       join.graceTimer = null;
-      if (join.subscriber || !isLive(join) || this.joins.get(join.shortCode) !== join || join.conn.done) return;
+      if (join.subscriber || !isLive(join) || this.joins.get(join.shortCode) !== join) return;
+      if (join.state === 'reconnecting' && join.conn.done) {
+        // Waiting between reconnect attempts: stop retrying.
+        this.clearRetry(join);
+        this.setState(join, 'away');
+        return;
+      }
+      if (join.conn.done) return;
       join.graceClosing = true;
       const { socket } = join.conn;
       if (socket.readyState !== WebSocket.OPEN) {
@@ -448,6 +513,7 @@ export class JoinManager {
     if (!LIVE_STATES.has(state)) {
       this.stopTimers(join);
       this.clearGrace(join);
+      this.clearRetry(join);
       this.resolveIce(join, []);
     }
     this.emit(join, { type: 'state', view: viewOf(join) });
@@ -474,7 +540,7 @@ export class JoinManager {
     join.pongTimer = setTimeout(() => {
       if (conn.done || join.conn !== conn) return;
       this.finishConnection(join, 'terminate');
-      this.setState(join, 'disconnected', 'connection_lost');
+      this.lose(join, 'connection_lost');
     }, PONG_TIMEOUT_MS);
     join.pongTimer.unref?.();
   }
