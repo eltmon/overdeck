@@ -107,7 +107,7 @@ Ask the user for (or auto-detect from the filesystem):
 |-------|----------|---------|-------|
 | Path | Yes | `~/Projects/myapp` | Must exist, must have `.git/` |
 | Name | Yes | `myapp` | Short lowercase key for projects.yaml |
-| Issue prefix | Yes | `APP` | Maps `APP-123` → this project. Goes in `issue_prefix` field |
+| Issue prefix | Yes | `APP` | Maps `APP-123` → this project. 1–10 uppercase letters, no digits. Goes in `issue_prefix` field |
 | Tracker | Yes | `github` / `linear` / `gitlab` | Where issues live |
 | Repo slug | Yes | `owner/repo` | `github_repo` or `gitlab_repo` |
 | Workspace type | Yes | `standalone` / `monorepo` / `polyrepo` | How git worktrees work |
