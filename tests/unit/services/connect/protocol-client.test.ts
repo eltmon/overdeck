@@ -74,9 +74,45 @@ describe('decodeFrame for client sockets (PAN-4829 WI-2)', () => {
     expect(asClient({ type: 'forget-client', extra: 1 })).toEqual({ ok: true, role: 'client', frame: { type: 'forget-client' } });
   });
 
-  it('keeps push-register and push-unregister bad_frame until PAN-4830', () => {
-    expect(asClient({ type: 'push-register', platform: 'ios', token: 't' })).toEqual(BAD);
-    expect(asClient({ type: 'push-unregister' })).toEqual(BAD);
+  it('decodes push-register and push-unregister (PAN-4830 D-6)', () => {
+    const token = 'a1'.repeat(32);
+    expect(asClient({ type: 'push-register', platform: 'ios', token, extra: 1 })).toEqual({
+      ok: true,
+      role: 'client',
+      frame: { type: 'push-register', platform: 'ios', token },
+    });
+    expect(asClient({ type: 'push-register', platform: 'ios', token, apsEnvironment: 'sandbox' })).toEqual({
+      ok: true,
+      role: 'client',
+      frame: { type: 'push-register', platform: 'ios', token, apsEnvironment: 'sandbox' },
+    });
+    const fcm = 'fA1:APA91b_x-y.z';
+    expect(asClient({ type: 'push-register', platform: 'android', token: fcm })).toEqual({
+      ok: true,
+      role: 'client',
+      frame: { type: 'push-register', platform: 'android', token: fcm },
+    });
+    expect(asClient({ type: 'push-register', platform: 'ios', token: 'x'.repeat(4096) })).toMatchObject({ ok: true });
+    expect(asClient({ type: 'push-unregister', extra: 1 })).toEqual({ ok: true, role: 'client', frame: { type: 'push-unregister' } });
+  });
+
+  it.each([
+    ['a 4,097-char token', { platform: 'ios', token: 'x'.repeat(4097) }],
+    ['a token with a slash', { platform: 'ios', token: 'ab/cd' }],
+    ['a token with a percent sign', { platform: 'ios', token: 'ab%2F' }],
+    ['a token with a space', { platform: 'ios', token: 'ab cd' }],
+    ['an empty token', { platform: 'ios', token: '' }],
+    ['apsEnvironment on android', { platform: 'android', token: 't', apsEnvironment: 'production' }],
+    ['apsEnvironment dev', { platform: 'ios', token: 't', apsEnvironment: 'dev' }],
+    ['apsEnvironment null', { platform: 'ios', token: 't', apsEnvironment: null }],
+    ['platform web', { platform: 'web', token: 't' }],
+  ])('refuses push-register with %s', (_name, over) => {
+    expect(asClient({ type: 'push-register', ...over })).toEqual(BAD);
+  });
+
+  it('refuses push-register and push-unregister from a machine socket', () => {
+    expect(decodeFrame(JSON.stringify({ type: 'push-register', platform: 'ios', token: 't' }), 'machine')).toEqual(BAD);
+    expect(decodeFrame(JSON.stringify({ type: 'push-unregister' }), 'machine')).toEqual(BAD);
   });
 
   it('refuses cross-role frames', () => {

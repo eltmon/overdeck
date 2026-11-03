@@ -1,0 +1,984 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-03T14:16:22Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4830: Phone app: APNs and FCM delivery of sealed push in services/connect",
+    "updated": "2026-11-03T14:25:36.603Z"
+  },
+  "plan": {
+    "id": "pan-4830",
+    "title": "Phone app: APNs and FCM delivery of sealed push in services/connect",
+    "status": "running",
+    "uid": "7ce90ac3-8228-4cb3-bbe4-7754bf212907",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-03T14:16:22Z",
+    "updated": "2026-11-03T14:25:36.603Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4830",
+        "label": "PAN-4830",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4823",
+        "label": "PAN-4823 (epic, W-CON3, AC-3)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4830.md",
+        "label": "PRD",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "connect",
+      "push",
+      "apns",
+      "fcm",
+      "phone-app",
+      "cloudflare-worker"
+    ],
+    "metadata": {
+      "sizeJustification": "About 30 distinct files_scope paths, but one subsystem (services/connect) plus its unit/integration tests and one doc; 13 of the paths are test files. W-CON3 is already the epic PAN-4823 child-issue unit. A sibling split (push/ library vs directory integration) would ship a library nothing calls, and registration without delivery is a frame the directory accepts but cannot act on, so neither half has an independently verifiable acceptance criterion; epic AC-3 needs both.",
+      "canonicalFilename": "2026-11-03-PAN-4830-phone-app-apns-and-fcm-delivery-of-sealed-push-in-services-connect.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The overdeck.ai directory (services/connect) refuses push, push-register and push-unregister as bad_frame. Phones cannot register an APNs/FCM token and machines cannot get a sealed notification to a closed phone app (epic PAN-4823 D-5, W-CON3).",
+      "Proposal": "Phones register their token on their clients row; a machine push is validated (known client, registration, 30 per account per UTC minute) by a pure reducer, delivered by the glue to APNs (deterministic quantized ES256 token, placeholder alert + sealed blob) or FCM HTTP v1 (service-account OAuth, data-only sealed blob) with one 2 s retry, and answered with push-result after a second pure step that clears dead tokens. Storage moves to directory-store.ts first to keep files under 600 lines.",
+      "NonGoals": "- No machine-side native push provider, sealing or push-result handling (PAN-4843)\n- No phone-side registration, NSE or FCM handler (PAN-4838, PAN-4840)\n- No Live Activity pushes or push-activity frame (PAN-4839)\n- No production secrets, Apple/Firebase setup or deploy (PAN-4841; deploy is operator-only)\n- No user-facing Mintlify pages or ANYWHERE-ARCHITECTURE.md edits (PAN-4842)\n- No change to CONNECT_PROTOCOL_VERSION or any packages/contracts type\n- No persistent delivery queue and no retries beyond one 2 s retry\n- No push token, sealed payload, JWT, access token or key in any log line\n- No node: imports or new dependencies in services/connect\n- No committed private keys or PEM fixtures"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Rate limit is a fixed UTC-minute counter in DirectoryState persisted as meta row push_window",
+        "rationale": "An in-memory counter resets when the Durable Object hibernates (~10 s idle); the Cloudflare RateLimit binding is a Worker binding and the decision lives in the DO reducer. Persisting keeps it deterministic and testable with an injected clock."
+      },
+      {
+        "summary": "APNs JWT uses quantized iat (45-min windows) and deterministic @noble/curves p256 signing with a module-level cache",
+        "rationale": "Every account DO signs its own token; randomized WebCrypto ECDSA would change the token per DO and risk 429 TooManyProviderTokenUpdates. t3code's Worker relay uses this exact scheme; @noble/curves is already a dependency."
+      },
+      {
+        "summary": "The .p8 scalar is read via WebCrypto importKey(pkcs8, extractable) + exportKey(jwk).d, with a DER-walk fallback (CP-1)",
+        "rationale": "services/connect must use Web APIs only (no node:crypto); the Miniflare test proves which path workerd supports."
+      },
+      {
+        "summary": "Per-fetch timeout 2,000 ms, one retry after 2 s on the send only, FCM OAuth exchange not retried",
+        "rationale": "Worst case 8 s stays under the machine's 10 s push-result wait (epic W-MAC3)."
+      },
+      {
+        "summary": "A dead token answers push-result no_registration; other failures and unconfigured providers answer delivery_failed",
+        "rationale": "The contract has four errors; a dead token means the phone dropped notifications, which W-MAC3 treats as not operator-facing."
+      },
+      {
+        "summary": "/healthz gains apns and fcm booleans",
+        "rationale": "Mirrors the existing turn flag so the operator can see W-REL1 secrets took effect without revealing values."
+      },
+      {
+        "summary": "push-register whose platform differs from the phone's hello-client platform is refused with bad_frame; apsEnvironment is accepted only for ios and defaults to production",
+        "rationale": "Contract says apsEnvironment is iOS-only; a mismatched platform can only be an app bug and would route a token to the wrong provider."
+      },
+      {
+        "summary": "Push tokens must match /^[0-9A-Za-z:_.-]{1,4096}$/ and are percent-encoded in the APNs URL",
+        "rationale": "The APNs token is placed in the URL path; refusing /, ?, % and spaces closes path injection."
+      },
+      {
+        "summary": "Storage code moves to directory-store.ts before push code lands",
+        "rationale": "directory.ts is 588 lines and the epic forbids source files over 600 lines."
+      },
+      {
+        "summary": "Only docs/CONNECT-SERVICE.md (plus .dev.vars.example and the wrangler.jsonc comment) is updated here",
+        "rationale": "User-facing Mintlify pages and ANYWHERE-ARCHITECTURE.md belong to W-DOC (PAN-4842) per the epic."
+      }
+    ],
+    "items": [
+      {
+        "id": "store-extract",
+        "title": "Move the directory schema, SQL and load() into directory-store.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:16:22Z",
+        "metadata": {
+          "issueLabel": "pan-4830",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "refactor",
+          "requiresInspection": false,
+          "files_scope": [
+            "services/connect/src/directory-store.ts",
+            "services/connect/src/directory.ts",
+            "tests/unit/services/connect/directory-glue.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck:connect",
+            "npx vitest run tests/unit/services/connect/",
+            "[ \"$(wc -l < services/connect/src/directory.ts)\" -le 490 ]"
+          ],
+          "expected_outputs": [
+            "typecheck:connect completes without errors",
+            "every test file under tests/unit/services/connect passes",
+            "the line-count check exits 0 (directory.ts has 490 lines or fewer)"
+          ],
+          "traces": [
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1 (D-15). Move SCHEMA, PUT_CLIENT_SQL, ClientSqlRow/ApprovalSqlRow/MachineSqlRow and the body of load() from services/connect/src/directory.ts into new services/connect/src/directory-store.ts, exported as SCHEMA, PUT_CLIENT_SQL and loadDirectory(sql: SqlStorage): DirectoryState. directory.ts imports them, sets this.state = loadDirectory(ctx.storage.sql) and drops its private load(). directory-glue.test.ts imports SCHEMA and PUT_CLIENT_SQL from directory-store.ts; no re-export from directory.ts. No behavior change."
+        },
+        "items": [
+          {
+            "id": "store-extract.ac1",
+            "title": "Given the extraction, when `grep -n \"private load\" services/connect/src/directory.ts` runs, then it prints nothing and directory-store.ts exports SCHEMA, PUT_CLIENT_SQL and loadDirectory",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "store-extract.ac2",
+            "title": "When `wc -l services/connect/src/directory.ts` runs, then it reports 490 lines or fewer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "store-extract.ac3",
+            "title": "When `npx vitest run tests/unit/services/connect/` runs, then every existing connect unit test passes with directory-glue.test.ts importing SCHEMA and PUT_CLIENT_SQL from directory-store.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "push-config",
+        "title": "Add push secrets parsing, shared push types and apns/fcm flags on /healthz",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:16:22Z",
+        "metadata": {
+          "issueLabel": "pan-4830",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "apns-sender",
+            "fcm-sender",
+            "deliver",
+            "push-registration",
+            "push-frame"
+          ],
+          "files_scope": [
+            "services/connect/src/push/config.ts",
+            "services/connect/src/env.ts",
+            "services/connect/src/routes.ts",
+            "services/connect/wrangler.jsonc",
+            "services/connect/.dev.vars.example",
+            "tests/unit/services/connect/push/config.test.ts",
+            "tests/unit/services/connect/routes.test.ts",
+            "tests/integration/services/connect/miniflare.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck:connect",
+            "npx vitest run tests/unit/services/connect/push/config.test.ts tests/unit/services/connect/routes.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:connect completes without errors",
+            "config.test.ts and routes.test.ts pass"
+          ],
+          "traces": [
+            "FR-11",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2 (D-4, D-13, D-14). Env gains optional APNS_KEY_P8, APNS_KEY_ID, APNS_TEAM_ID, FCM_SERVICE_ACCOUNT_JSON, FCM_PROJECT_ID. New services/connect/src/push/config.ts exports PushRegistration {platform, token, apsEnvironment: ApsEnvironment|null}, ApnsConfig {keyP8, keyId, teamId}, FcmConfig {projectId, clientEmail, privateKey}, PushConfig {apns|null, fcm|null}, PushOutcome (delivered | gone | failed{detail} | not_configured), SendResult (delivered | gone | retryable{detail} | failed{detail}) and parsePushConfig(env): a provider is null when any value is missing/blank or FCM_SERVICE_ACCOUNT_JSON is not JSON with string client_email and private_key; values trimmed; literal \\n in APNS_KEY_P8 becomes a newline. routes.ts healthz answers { ok, configured, turn, apns, fcm }. Extend the wrangler.jsonc secrets comment and .dev.vars.example with the five names. Update routes.test.ts:62,65 and miniflare.test.ts:249 healthz assertions to include apns:false, fcm:false."
+        },
+        "items": [
+          {
+            "id": "push-config.ac1",
+            "title": "Given no push secrets, when GET /healthz is called, then it returns exactly { ok: true, configured: true, turn: false, apns: false, fcm: false }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-config.ac2",
+            "title": "Given all five push secrets, when GET /healthz is called, then it returns apns: true and fcm: true and the body contains none of the secret strings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-config.ac3",
+            "title": "Given FCM_SERVICE_ACCOUNT_JSON is \"not json\" or lacks private_key, when parsePushConfig runs, then it returns fcm: null; given a blank APNS_KEY_ID it returns apns: null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-config.ac4",
+            "title": "Given APNS_KEY_P8 containing literal \\n sequences, when parsePushConfig runs, then keyP8 contains real newlines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "push-helpers",
+        "title": "Add JWT/PEM helpers and fetchWithTimeout for push providers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:16:22Z",
+        "metadata": {
+          "issueLabel": "pan-4830",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "services/connect/src/push/jwt.ts",
+            "services/connect/src/push/http.ts",
+            "tests/unit/services/connect/push/helpers.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck:connect",
+            "npx vitest run tests/unit/services/connect/push/helpers.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:connect completes without errors",
+            "helpers.test.ts passes"
+          ],
+          "traces": [
+            "NFR-3",
+            "NFR-6",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. push/jwt.ts: base64UrlBytes (no padding), base64UrlJson, pemToDer (strip ----- lines and whitespace, atob), signingInput(header, claims). push/http.ts: PUSH_FETCH_TIMEOUT_MS = 2_000 and fetchWithTimeout(fetchFn, url, init, ms) copying the turn.ts AbortController + setTimeout + Promise.race pattern (never AbortSignal.timeout). Tests generate keys at runtime and use fake timers."
+        },
+        "items": [
+          {
+            "id": "push-helpers.ac1",
+            "title": "Given bytes [0xfb, 0xff], when base64UrlBytes runs, then it returns \"-_8\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-helpers.ac2",
+            "title": "Given a PKCS#8 key generated at runtime and exported as PEM, when pemToDer runs, then it returns the original DER bytes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-helpers.ac3",
+            "title": "Given fake timers and a fetch stub that never answers, when 2,000 ms are advanced, then fetchWithTimeout rejects; given a stub that answers first, then it resolves with that response",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "apns-sender",
+        "title": "Sign deterministic APNs provider tokens and send the placeholder alert",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:16:22Z",
+        "metadata": {
+          "issueLabel": "pan-4830",
+          "inspectionDepth": "deep",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "complex",
+          "kind": "backend",
+          "parallelSafeReason": "Touches only the new push/apns.ts and its own test file; no other item edits them.",
+          "requiresInspection": true,
+          "foundationFor": [
+            "deliver",
+            "push-e2e"
+          ],
+          "files_scope": [
+            "services/connect/src/push/apns.ts",
+            "tests/unit/services/connect/push/apns.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck:connect",
+            "npx vitest run tests/unit/services/connect/push/apns.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:connect completes without errors",
+            "apns.test.ts passes"
+          ],
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-8",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 (D-9, D-10). push/apns.ts: constants APNS_TOPIC=ai.overdeck.app, PLACEHOLDER_TITLE=Overdeck, PLACEHOLDER_BODY=\"Something needs you\", APNS_TOKEN_WINDOW_SECONDS=2700, APNS_DEAD_REASONS. class ApnsTokenCache.get(config, nowMs): iat = floor(nowSec/2700)*2700; reuse cached JWT for the same iat; else read the P-256 scalar via crypto.subtle importKey(pkcs8, extractable) + exportKey(jwk).d (fallback: DER bytes after 02 01 01 04 20), sign signingInput({alg:ES256,kid},{iss:teamId,iat}) with p256.sign from @noble/curves/nist.js (RFC 6979, compact). export sharedApnsTokens. apnsBody(sealed, collapseId) returns exactly the FR-4 object. sendApns(req, {config, fetch, now, tokens}) posts to api.sandbox.push.apple.com or api.push.apple.com /3/device/<encodeURIComponent(token)> with the FR-4 headers; maps 200 delivered, 410 gone, 400 with dead reason gone, >=500 retryable apns_<status>, throw retryable apns_network, key error failed bad_key, else failed apns_<status>. SendResult is imported from push/config.ts. Keys in tests are generated at runtime."
+        },
+        "items": [
+          {
+            "id": "apns-sender.ac1",
+            "title": "Given a runtime-generated P-256 key, when ApnsTokenCache.get runs, then the JWT header is {alg:\"ES256\",kid} with claims {iss,iat} and its signature verifies with crypto.subtle.verify",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "apns-sender.ac2",
+            "title": "Given a window start T0, when get runs at T0+44 min and T0+46 min, then it returns the same JWT at 44 min and a different JWT with iat T0+2700 at 46 min; two separate caches at one time return byte-identical JWTs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "apns-sender.ac3",
+            "title": "Given a stub fetch, when sendApns sends a high-urgency push to a sandbox registration, then the URL is https://api.sandbox.push.apple.com/3/device/<token>, apns-priority is 10, apns-topic is ai.overdeck.app, and the parsed body toEqual exactly apnsBody(sealed, collapseId)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "apns-sender.ac4",
+            "title": "Given APNs answers 410, or 400 {\"reason\":\"BadDeviceToken\"}, when sendApns runs, then it returns gone; given 400 {\"reason\":\"PayloadTooLarge\"} it returns failed apns_400; given 503 it returns retryable apns_503",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fcm-sender",
+        "title": "Exchange the FCM service-account token and send the data-only message",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:16:22Z",
+        "metadata": {
+          "issueLabel": "pan-4830",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "complex",
+          "kind": "backend",
+          "parallelSafeReason": "Touches only the new push/fcm.ts and its own test file; no other item edits them.",
+          "requiresInspection": false,
+          "files_scope": [
+            "services/connect/src/push/fcm.ts",
+            "tests/unit/services/connect/push/fcm.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck:connect",
+            "npx vitest run tests/unit/services/connect/push/fcm.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:connect completes without errors",
+            "fcm.test.ts passes"
+          ],
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5 (D-11). push/fcm.ts: FCM_TOKEN_URL=https://oauth2.googleapis.com/token, FCM_SCOPE, FCM_TOKEN_EARLY_REFRESH_MS=300_000. class FcmTokenCache.get(config, fetchFn, nowMs) signs the RS256 assertion {iss:clientEmail, scope, aud:FCM_TOKEN_URL, iat, exp:iat+3600} with WebCrypto RSASSA-PKCS1-v1_5/SHA-256, posts form-encoded grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer via fetchWithTimeout, caches access_token until expiresAt-5min; failures fcm_oauth_<status>, fcm_oauth_network, fcm_oauth_bad_response, bad_key; drop(clientEmail). export sharedFcmTokens. fcmBody(token, sealed, urgency, collapseId) returns exactly the FR-6 object (HIGH/NORMAL, ttl 3600s, collapse_key, no notification key). sendFcm posts to https://fcm.googleapis.com/v1/projects/<projectId>/messages:send; 200 delivered, 404 or details[].errorCode UNREGISTERED gone, 401 drop token + failed fcm_401, >=500 retryable fcm_<status>, throw retryable fcm_network, else failed fcm_<status>."
+        },
+        "items": [
+          {
+            "id": "fcm-sender.ac1",
+            "title": "Given a runtime-generated RSA key, when the token exchange runs, then the request is form-encoded with grant_type jwt-bearer and the assertion claims equal exactly {iss, scope, aud, iat, exp: iat+3600} and verify with the public key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fcm-sender.ac2",
+            "title": "Given a cached access token, when sendFcm runs again before expires_in minus 5 minutes, then no token request is made; at expires_in minus 4 minutes a new token request is made",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fcm-sender.ac3",
+            "title": "Given a stub fetch, when sendFcm sends a normal-urgency push, then the parsed body toEqual exactly fcmBody(token, sealed, \"normal\", collapseId) with android.priority NORMAL and no notification key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fcm-sender.ac4",
+            "title": "Given FCM answers 404 or a 400 body with errorCode UNREGISTERED, when sendFcm runs, then it returns gone; given 401 it returns failed fcm_401 and the next send fetches a new access token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deliver",
+        "title": "Choose the provider, retry once after 2 s and return a PushOutcome",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:16:22Z",
+        "metadata": {
+          "issueLabel": "pan-4830",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "services/connect/src/push/deliver.ts",
+            "tests/unit/services/connect/push/deliver.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck:connect",
+            "npx vitest run tests/unit/services/connect/push/deliver.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:connect completes without errors",
+            "deliver.test.ts passes"
+          ],
+          "traces": [
+            "FR-9",
+            "FR-10",
+            "NFR-3",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6 (D-12, D-13). push/deliver.ts: PUSH_RETRY_DELAY_MS=2_000; deliverPush(req {registration, sealed, urgency, collapseId}, opts {config, fetch, now, sleep?, apnsTokens?, fcmTokens?}): Promise<PushOutcome>. iOS uses config.apns and sendApns, Android config.fcm and sendFcm; a null provider returns not_configured with no fetch. retryable => await sleep(2000) and retry once; a second retryable => failed with its detail. sleep defaults to setTimeout. Tests use vi.useFakeTimers."
+        },
+        "items": [
+          {
+            "id": "deliver.ac1",
+            "title": "Given apns: null in the config, when deliverPush runs for an iOS registration, then it returns not_configured and the fetch stub records zero calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deliver.ac2",
+            "title": "Given APNs answers 503 then 200 under fake timers, when deliverPush runs, then no second request exists after 1,999 ms, the second request is sent after 2,000 ms, and the result is delivered",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deliver.ac3",
+            "title": "Given APNs answers 503 twice, when deliverPush runs, then exactly 2 requests are sent and the result is failed with detail apns_503",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deliver.ac4",
+            "title": "Given APNs answers 410 or a non-dead 400, when deliverPush runs, then exactly 1 request is sent and the result is gone or failed respectively",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "decode-push",
+        "title": "Decode the machine push frame with the D-6 rules",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:16:22Z",
+        "metadata": {
+          "issueLabel": "pan-4830",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "services/connect/src/protocol.ts",
+            "tests/unit/services/connect/protocol-push.test.ts",
+            "tests/unit/services/connect/directory-state.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck:connect",
+            "npx vitest run tests/unit/services/connect/protocol-push.test.ts tests/unit/services/connect/directory-state.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:connect completes without errors",
+            "protocol-push.test.ts and directory-state.test.ts pass"
+          ],
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7 (D-6). protocol.ts build() gains case push: requestId 32 lowercase hex, to uuid v4, sealed matching /^[A-Za-z0-9+/]+={0,2}$/ with 4 <= length <= PUSH_SEALED_MAX_CHARS and length % 4 === 0, urgency high|normal, collapseId 32 lowercase hex; rebuilt from known keys only. The reducer case push (directory-state.ts:496) is untouched, so a decoded push is still answered bad_frame until push-frame lands. Replace the directory-state.test.ts \"decoder still refuses push until PAN-4830\" case with a decode-success case."
+        },
+        "items": [
+          {
+            "id": "decode-push.ac1",
+            "title": "Given a valid push frame with an extra key, when decodeFrame runs with role machine, then it returns ok with exactly the six known keys",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "decode-push.ac2",
+            "title": "Given sealed of 3,073 chars, sealed containing \"-\", sealed of length 6, urgency \"low\", an uppercase requestId, or a non-uuid to, when decodeFrame runs, then each returns bad_frame",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "decode-push.ac3",
+            "title": "Given a push frame, when decodeFrame runs with role client, then it returns bad_frame",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "push-registration",
+        "title": "Store and clear phone push registrations from push-register and push-unregister",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:16:22Z",
+        "metadata": {
+          "issueLabel": "pan-4830",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "complex",
+          "kind": "backend",
+          "parallelSafeReason": "Its shared files (protocol.ts, directory-state.ts, directory-store.ts, directory.ts) are ordered by blocks edges from decode-push, store-extract and to push-frame, so no concurrent item edits them.",
+          "requiresInspection": false,
+          "files_scope": [
+            "services/connect/src/protocol.ts",
+            "services/connect/src/directory-state.ts",
+            "services/connect/src/push-state.ts",
+            "services/connect/src/client-state.ts",
+            "services/connect/src/directory-store.ts",
+            "services/connect/src/directory.ts",
+            "tests/unit/services/connect/protocol-client.test.ts",
+            "tests/unit/services/connect/client-state.test.ts",
+            "tests/unit/services/connect/directory-glue.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck:connect",
+            "npx vitest run tests/unit/services/connect/",
+            "for f in services/connect/src/*.ts services/connect/src/push/*.ts; do [ \"$(wc -l < \"$f\")\" -le 600 ] || { echo \"$f over 600\"; exit 1; }; done"
+          ],
+          "expected_outputs": [
+            "typecheck:connect completes without errors",
+            "every test under tests/unit/services/connect passes",
+            "the size loop exits 0 with no \"over 600\" line"
+          ],
+          "traces": [
+            "FR-1",
+            "NFR-2",
+            "NFR-5",
+            "NFR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8 (D-2, D-4, D-5, D-6, D-7). buildClient decodes push-register {platform, token 1-4096 chars /^[0-9A-Za-z:_.-]+$/, apsEnvironment production|sandbox only with ios} and push-unregister. ClientRow gains push: PushRegistration|null (type imported from push/config.ts); DirectoryEffect gains put-client-push {clientId, registration|null}. New push-state.ts (imports only types from directory-state.ts) exports pushRegistrationAnswer: unknown row logs unknown_client; platform mismatch sends error bad_frame \"push platform does not match the phone\"; register stores {platform, token, apsEnvironment: ios ? (f.apsEnvironment ?? production) : null}; unregister sets null; logs never carry the token. client-state.ts replaces the placeholder at lines 152-158 and helloClient keeps existing?.push. directory-store.ts adds PUT_CLIENT_PUSH_SQL (UPDATE clients SET push_platform, push_token, aps_environment WHERE client_id) and loadDirectory reads the columns. directory.ts executes put-client-push at order 0. Flip protocol-client.test.ts:77-80."
+        },
+        "items": [
+          {
+            "id": "push-registration.ac1",
+            "title": "Given a registered iOS phone, when it sends push-register without apsEnvironment, then state stores {platform:\"ios\", token, apsEnvironment:\"production\"} and a put-client-push effect carries it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-registration.ac2",
+            "title": "Given a registered iOS phone, when it sends push-register with platform android, then it receives error bad_frame and no put-client-push effect is emitted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-registration.ac3",
+            "title": "Given a phone with a stored registration, when it sends hello-client again, then its push field is preserved in state and no put-client-push effect is emitted; when it sends push-unregister, then push becomes null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-registration.ac4",
+            "title": "Given a token containing \"/\", a 4,097-char token, or apsEnvironment on an android register, when decodeFrame runs with role client, then it returns bad_frame",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-registration.ac5",
+            "title": "When directory-glue.test.ts runs, then PUT_CLIENT_PUSH_SQL names exactly push_platform, push_token and aps_environment and PUT_CLIENT_SQL still names none of them",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "push-frame",
+        "title": "Validate, rate-limit and deliver machine push frames and answer push-result",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:16:22Z",
+        "metadata": {
+          "issueLabel": "pan-4830",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "complex",
+          "kind": "backend",
+          "parallelSafeReason": "Runs after push-registration, store-extract, decode-push and deliver by blocks edges, which order every shared file; nothing else edits them afterwards.",
+          "requiresInspection": false,
+          "files_scope": [
+            "services/connect/src/push-state.ts",
+            "services/connect/src/directory-state.ts",
+            "services/connect/src/directory-store.ts",
+            "services/connect/src/directory.ts",
+            "tests/unit/services/connect/push-state.test.ts",
+            "tests/unit/services/connect/directory-state.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck:connect",
+            "npx vitest run tests/unit/services/connect/",
+            "for f in services/connect/src/*.ts services/connect/src/push/*.ts; do [ \"$(wc -l < \"$f\")\" -le 600 ] || { echo \"$f over 600\"; exit 1; }; done"
+          ],
+          "expected_outputs": [
+            "typecheck:connect completes without errors",
+            "every test under tests/unit/services/connect passes",
+            "the size loop exits 0 with no \"over 600\" line"
+          ],
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-8",
+            "FR-10",
+            "NFR-2",
+            "NFR-5",
+            "NFR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9 (D-1, D-2, D-3, D-8, D-13). DirectoryState gains pushWindow {minute, count}|null (EMPTY_DIRECTORY null); DirectoryEffect gains put-push-window and deliver-push {requestId, clientId, registration, sealed, urgency, collapseId}; directory-state case push returns pushAnswer(state, f, ctx, self). push-state.ts pushAnswer: unknown to => push-result unknown_client; no registration => no_registration; minute=floor(now/60000), count>=PUSH_RATE_PER_MINUTE => rate_limited; else window+1, put-push-window and deliver-push; never reads ctx.online/onlineClients. reducePushOutcome: delivered => ok:true; gone => clear push only if row.push.token === used token (put-client-push null) and no_registration; failed => delivery_failed log failed_<detail>; not_configured => delivery_failed. directory-store.ts persists meta push_window and loads it. directory.ts executes put-push-window (order 0) and deliver-push (order 2: await deliverPush with parsePushConfig(this.env), this.deps.fetch, this.deps.now, then applyPushOutcome which reduces against the current this.state). Replace directory-state.test.ts:324-349 bad_frame case with unknown_client."
+        },
+        "items": [
+          {
+            "id": "push-frame.ac1",
+            "title": "Given a push whose to is not a phone of the account, when the reducer runs, then it sends push-result {ok:false, error:\"unknown_client\"} to self and emits no deliver-push",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-frame.ac2",
+            "title": "Given a registered phone with a registration and no open socket, when a machine sends push, then a deliver-push effect carries the stored registration and the frame sealed, urgency and collapseId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-frame.ac3",
+            "title": "Given 30 accepted pushes in one UTC minute, when the 31st arrives, then push-result rate_limited is sent with no deliver-push; when the first push of the next minute arrives, then deliver-push is emitted and put-push-window has count 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-frame.ac4",
+            "title": "Given outcome gone with the token the phone still holds, when reducePushOutcome runs, then push becomes null, put-client-push null is emitted and push-result no_registration is sent; given the phone re-registered a different token, then the new registration is preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-frame.ac5",
+            "title": "Given outcome failed {detail:\"apns_503\"} or not_configured, when reducePushOutcome runs, then push-result delivery_failed is sent and no log effect contains the token or sealed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "push-e2e",
+        "title": "Prove epic AC-3 on real workerd with stubbed APNs and FCM",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:16:22Z",
+        "metadata": {
+          "issueLabel": "pan-4830",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "complex",
+          "kind": "test",
+          "parallelSafeReason": "Its only file, miniflare.test.ts, is also edited by push-config, which a blocks edge orders first.",
+          "requiresInspection": false,
+          "files_scope": [
+            "tests/integration/services/connect/miniflare.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/integration/services/connect/miniflare.test.ts"
+          ],
+          "expected_outputs": [
+            "miniflare.test.ts passes, including the \"sealed push on real workerd (PAN-4830)\" block"
+          ],
+          "traces": [
+            "FR-4",
+            "FR-6",
+            "FR-8",
+            "NFR-1",
+            "NFR-2",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10 (CP-1). In the top-level beforeAll, before new Miniflare, generate a P-256 key and a 2048-bit RSA key with crypto.subtle and pass APNS_KEY_P8, APNS_KEY_ID=KEYID12345, APNS_TEAM_ID=TEAMID1234, FCM_SERVICE_ACCOUNT_JSON {client_email, private_key}, FCM_PROJECT_ID=overdeck-test as text bindings; healthz assertion becomes apns:true, fcm:true. Extend outboundService to record APNs (both hosts), oauth2.googleapis.com/token and fcm.googleapis.com/v1/projects/overdeck-test/messages:send requests; APNs answers 410 {\"reason\":\"Unregistered\"} for tokens starting dead, else 200; token endpoint {access_token:\"ya29.test\", expires_in:3600}; FCM 200. Add account u-push (tokens /^odd_6+[0-9a-f]$/, free) to ACCOUNT_STUB. New describe \"sealed push on real workerd (PAN-4830)\" with one machine, an iOS sandbox phone, an Android phone and a dead-token iOS phone; wait on push-result by requestId with the existing waitFor, no sleeps."
+        },
+        "items": [
+          {
+            "id": "push-e2e.ac1",
+            "title": "Given an iOS sandbox registration, when the machine sends push, then push-result ok:true arrives, exactly one request reaches https://api.sandbox.push.apple.com/3/device/<token>, its parsed body toEqual the FR-4 object (alert title \"Overdeck\", body \"Something needs you\") with s equal to the sealed blob, and its bearer JWT verifies with the generated public key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-e2e.ac2",
+            "title": "Given an Android registration, when the machine sends push, then push-result ok:true arrives and the FCM request body toEqual {message:{token, data:{s:sealed}, android:{priority, ttl:\"3600s\", collapse_key}}} with no notification key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-e2e.ac3",
+            "title": "Given a registration whose APNs answer is 410, when the machine sends push twice, then both answers are push-result no_registration and only the first produces an APNs request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-e2e.ac4",
+            "title": "When the block finishes, then no captured log line contains a push token, a sealed string, \"ya29.test\" or \"-----BEGIN\", and unexpectedOutbound is empty",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document phone push, its secrets, limits and healthz in docs/CONNECT-SERVICE.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:16:22Z",
+        "metadata": {
+          "issueLabel": "pan-4830",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "docs",
+          "requiresInspection": false,
+          "files_scope": [
+            "docs/CONNECT-SERVICE.md"
+          ],
+          "verify_commands": [
+            "npm run lint:docs",
+            "! grep -q \"until push delivery (PAN-4830)\" docs/CONNECT-SERVICE.md"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "the negated grep exits 0 (the stale sentence is gone)"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "FR-10",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11. docs/CONNECT-SERVICE.md: line 28 now says the directory forwards sealed push to APNs and FCM (PAN-4830); the Storage bullet (line 37) says the push columns hold the registration written only by push-register/push-unregister; the file table lists directory-store.ts, push-state.ts and src/push/{config,jwt,http,apns,fcm,deliver}.ts; new section \"Phone push (PAN-4830)\" (<= 20 lines) with register rules, push checks in order, exact APNs and FCM bodies, quantized deterministic ES256 token and why, FCM token caching, dead-token and clear-only-matching-token rules, one 2 s retry, 2 s timeouts and the 8 s worst case, push-result mapping, and that logs never carry tokens, payloads or credentials; Endpoints /healthz shape { ok, configured, turn, apns, fcm }; Limits \"Push: 30 pushes per account per UTC minute\"; Configuration rows for the five secrets with their unset behavior; a Deploy step for wrangler secret put of the five push secrets."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "Given the edit, when docs/CONNECT-SERVICE.md is read, then it contains a \"Phone push (PAN-4830)\" section stating the exact APNs body (title \"Overdeck\", body \"Something needs you\", s) and the FCM data-only body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "Given the edit, when the Configuration table is read, then it lists APNS_KEY_P8, APNS_KEY_ID, APNS_TEAM_ID, FCM_SERVICE_ACCOUNT_JSON and FCM_PROJECT_ID with their unset behavior, and the Endpoints table shows /healthz returning { ok, configured, turn, apns, fcm }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "When `grep -c \"until push delivery (PAN-4830)\" docs/CONNECT-SERVICE.md` runs, then it prints 0 and the Limits section states 30 pushes per account per UTC minute",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "store-extract",
+        "to": "push-registration",
+        "type": "blocks"
+      },
+      {
+        "from": "store-extract",
+        "to": "push-frame",
+        "type": "blocks"
+      },
+      {
+        "from": "push-config",
+        "to": "apns-sender",
+        "type": "blocks"
+      },
+      {
+        "from": "push-config",
+        "to": "fcm-sender",
+        "type": "blocks"
+      },
+      {
+        "from": "push-config",
+        "to": "push-registration",
+        "type": "blocks"
+      },
+      {
+        "from": "push-config",
+        "to": "push-e2e",
+        "type": "blocks"
+      },
+      {
+        "from": "push-helpers",
+        "to": "apns-sender",
+        "type": "blocks"
+      },
+      {
+        "from": "push-helpers",
+        "to": "fcm-sender",
+        "type": "blocks"
+      },
+      {
+        "from": "apns-sender",
+        "to": "deliver",
+        "type": "blocks"
+      },
+      {
+        "from": "fcm-sender",
+        "to": "deliver",
+        "type": "blocks"
+      },
+      {
+        "from": "decode-push",
+        "to": "push-registration",
+        "type": "blocks"
+      },
+      {
+        "from": "decode-push",
+        "to": "push-frame",
+        "type": "blocks"
+      },
+      {
+        "from": "push-registration",
+        "to": "push-frame",
+        "type": "blocks"
+      },
+      {
+        "from": "deliver",
+        "to": "push-frame",
+        "type": "blocks"
+      },
+      {
+        "from": "push-frame",
+        "to": "push-e2e",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

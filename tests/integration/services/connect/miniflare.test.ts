@@ -39,6 +39,8 @@ const TESTER_TOKEN = 'odd_' + 'e'.repeat(64);
 const TESTER_TOKEN_2 = 'odd_' + 'e'.repeat(63) + 'd';
 /** Phone tests (PAN-4829) use their own free account, 'u-phones', so earlier tests' machines do not matter. */
 const phoneToken = (n: number) => 'odd_' + n.toString(16).padStart(64, '7');
+/** Push tests (PAN-4830) use their own free account, 'u-push', so the 'u-phones' 5-phone cap is untouched. */
+const pushToken = (n: number) => 'odd_' + n.toString(16).padStart(64, '6');
 /** A second tester account whose relay allowance the cap test spends. */
 const RELAY_TOKEN = 'odd_' + 'c'.repeat(64);
 
@@ -51,6 +53,9 @@ export class AccountRpc extends WorkerEntrypoint {
     }
     if (token === ${JSON.stringify(RELAY_TOKEN)}) {
       return { ok: true, userId: 'u-relay', githubId: 3, deviceId: 'd-relay', entitlement: { plan: 'tester', maxDevices: null } };
+    }
+    if (/^odd_6+[0-9a-f]$/.test(token)) {
+      return { ok: true, userId: 'u-push', githubId: 5, deviceId: 'd-u' + token.slice(-1), entitlement: { plan: 'free', maxDevices: 3 } };
     }
     if (/^odd_7+[0-9a-f]$/.test(token)) {
       return { ok: true, userId: 'u-phones', githubId: 4, deviceId: 'd-p' + token.slice(-1), entitlement: { plan: 'free', maxDevices: 3 } };
@@ -72,6 +77,35 @@ const STUB_ICE_SERVERS = [{ urls: ['turns:turn.cloudflare.com:443?transport=tcp'
 /** Bodies of requests that reached the stubbed Cloudflare TURN credential API. */
 const turnBodies: string[] = [];
 const unexpectedOutbound: string[] = [];
+/** Requests that reached the stubbed APNs, Google OAuth and FCM endpoints (PAN-4830). */
+const pushRequests: Array<{ url: string; headers: Record<string, string>; body: string }> = [];
+const FCM_SEND_URL = 'https://fcm.googleapis.com/v1/projects/overdeck-test/messages:send';
+const FCM_ACCESS_TOKEN = 'ya29.test';
+/** APNs answers 410 Unregistered for a device token starting with this. */
+const DEAD_TOKEN_PREFIX = 'dead';
+/** The APNs key's public half, generated per run, to verify the provider token. */
+let apnsPublicKey: CryptoKey;
+
+function pkcs8Pem(der: ArrayBuffer): string {
+  const lines = Buffer.from(der).toString('base64').match(/.{1,64}/g) ?? [];
+  return ['-----BEGIN PRIVATE KEY-----', ...lines, '-----END PRIVATE KEY-----'].join('\n');
+}
+
+/** Stubs APNs, the Google token endpoint and FCM; null for any other URL. */
+async function pushProvider(request: Request): Promise<Response | null> {
+  const url = new URL(request.url);
+  const apns = (url.host === 'api.push.apple.com' || url.host === 'api.sandbox.push.apple.com') && url.pathname.startsWith('/3/device/');
+  if (request.method !== 'POST' || !(apns || url.href === 'https://oauth2.googleapis.com/token' || url.href === FCM_SEND_URL)) return null;
+  pushRequests.push({ url: url.href, headers: Object.fromEntries(request.headers), body: await request.text() });
+  if (apns) {
+    return url.pathname.startsWith(`/3/device/${DEAD_TOKEN_PREFIX}`)
+      ? Response.json({ reason: 'Unregistered' }, { status: 410 })
+      : new Response(null, { status: 200 });
+  }
+  if (url.href === FCM_SEND_URL) return Response.json({ name: 'projects/overdeck-test/messages/1' });
+  return Response.json({ access_token: FCM_ACCESS_TOKEN, expires_in: 3600 });
+}
+
 /** The relay allowance in this test (RELAY_CAP_BYTES), so the cap is reachable in a few reports. */
 const RELAY_CAP = 1_000;
 
@@ -87,6 +121,19 @@ beforeAll(async () => {
     maxBuffer: 16 * 1024 * 1024,
   });
   const bundle = await readFile(join(tmp, 'index.js'), 'utf8');
+  // Generated per run, never committed (PAN-4830 NFR-7).
+  const ec = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+  const rsa = await crypto.subtle.generateKey(
+    { name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' },
+    true,
+    ['sign'],
+  );
+  apnsPublicKey = ec.publicKey;
+  const apnsKeyP8 = pkcs8Pem(await crypto.subtle.exportKey('pkcs8', ec.privateKey));
+  const fcmAccount = JSON.stringify({
+    client_email: 'push@test.iam.gserviceaccount.com',
+    private_key: pkcs8Pem(await crypto.subtle.exportKey('pkcs8', rsa.privateKey)),
+  });
   mf = new Miniflare({
     // On disk, so the inbox test can scan every byte the Durable Object stored.
     resourcePersistencePath: join(tmp, 'state'),
@@ -105,6 +152,12 @@ beforeAll(async () => {
             TURN_KEY_ID: { type: 'text', value: TURN_KEY_ID },
             TURN_KEY_API_TOKEN: { type: 'text', value: 'turn-api-token-test' }, // a Worker secret in production
             RELAY_CAP_BYTES: { type: 'text', value: String(RELAY_CAP) },
+            // Worker secrets in production (PAN-4830).
+            APNS_KEY_P8: { type: 'text', value: apnsKeyP8 },
+            APNS_KEY_ID: { type: 'text', value: 'KEYID12345' },
+            APNS_TEAM_ID: { type: 'text', value: 'TEAMID1234' },
+            FCM_SERVICE_ACCOUNT_JSON: { type: 'text', value: fcmAccount },
+            FCM_PROJECT_ID: { type: 'text', value: 'overdeck-test' },
           },
           exports: { AccountDirectory: { type: 'durable-object', storage: 'sqlite' } },
         },
@@ -120,6 +173,8 @@ beforeAll(async () => {
                 turnBodies.push(await request.text());
                 return new Response(JSON.stringify({ iceServers: STUB_ICE_SERVERS }), { status: 201, headers: { 'Content-Type': 'application/json' } });
               }
+              const pushAnswer = await pushProvider(request);
+              if (pushAnswer) return pushAnswer;
               unexpectedOutbound.push(`${request.method} ${request.url}`);
               return new Response('unexpected outbound request', { status: 599 });
             },
@@ -243,10 +298,10 @@ async function register(token: string, n: number, label?: string, publicKeyHex?:
 }
 
 describe('connect service on real workerd (PAN-2356 WI-3)', () => {
-  it('GET /healthz reports configured: true and turn: true', async () => {
+  it('GET /healthz reports configured, turn, apns and fcm all true', async () => {
     const res = await req('/healthz');
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true, configured: true, turn: true });
+    expect(await res.json()).toEqual({ ok: true, configured: true, turn: true, apns: true, fcm: true });
   }, SLOW);
 
   it('answers 401 to a directory socket the account service rejects', async () => {
@@ -536,5 +591,122 @@ describe('phone clients on real workerd (PAN-4829)', () => {
   it('never logs a phone label and logs hello-client with the client id', () => {
     expect(logs.join('\n')).not.toContain(PHONE_LABEL_MARKER);
     expect(logs.some((line) => line.includes('"hello-client"') && line.includes(clientId(1)))).toBe(true);
+  });
+});
+
+/**
+ * Epic AC-3 (PAN-4823) on workerd. One machine on the 'u-push' account pushes to three phones that
+ * registered and then closed their app: iOS (sandbox), Android, and an iOS phone whose token APNs
+ * reports dead. Every case waits for the push-result with its own requestId.
+ */
+describe('sealed push on real workerd (PAN-4830)', () => {
+  const IOS = 11;
+  const ANDROID = 12;
+  const DEAD = 13;
+  const IOS_TOKEN = 'a1'.repeat(32);
+  const FCM_TOKEN = 'fcm-token:APA91b_push-test';
+  const DEAD_TOKEN = DEAD_TOKEN_PREFIX + 'b'.repeat(60);
+  const SEALED = Buffer.from('sealed push payload for PAN-4830').toString('base64');
+  const COLLAPSE = '9'.repeat(32);
+  let machine: Peer;
+  let seq = 0;
+
+  /** Registers phone `n` for push on its own socket, then closes it: the app is not running. */
+  async function phoneWithPush(token: string, n: number, platform: 'ios' | 'android', register: Frame): Promise<void> {
+    const peer = await openClientSocket(token);
+    peer.send({ ...helloClient(n), platform });
+    await peer.waitFor(isType('welcome-client'));
+    peer.send(register);
+    // Frames on one socket are handled in order, so this answer means the registration is stored.
+    peer.send({ type: 'ice-servers', requestId: `sync-${n}`, relay: false });
+    await peer.waitFor((f) => f['type'] === 'ice-servers' && f['requestId'] === `sync-${n}`);
+    peer.close();
+  }
+
+  /** Sends a push from the machine and returns its push-result. */
+  async function push(to: string): Promise<Frame> {
+    seq += 1;
+    const requestId = seq.toString(16).padStart(32, '0');
+    const mark = machine.frames.length;
+    machine.send({ type: 'push', requestId, to, sealed: SEALED, urgency: 'high', collapseId: COLLAPSE });
+    return machine.waitFor((f) => f['type'] === 'push-result' && f['requestId'] === requestId, mark);
+  }
+
+  beforeAll(async () => {
+    machine = await register(pushToken(1), 61);
+    await phoneWithPush(pushToken(2), IOS, 'ios', { type: 'push-register', platform: 'ios', token: IOS_TOKEN, apsEnvironment: 'sandbox' });
+    await phoneWithPush(pushToken(3), ANDROID, 'android', { type: 'push-register', platform: 'android', token: FCM_TOKEN });
+    await phoneWithPush(pushToken(4), DEAD, 'ios', { type: 'push-register', platform: 'ios', token: DEAD_TOKEN });
+  }, SLOW);
+
+  afterAll(() => {
+    machine?.close();
+  });
+
+  it('delivers an iOS push to the sandbox host with only the placeholder alert and the sealed blob', async () => {
+    const mark = pushRequests.length;
+    expect(await push(clientId(IOS))).toMatchObject({ type: 'push-result', ok: true });
+    const sent = pushRequests.slice(mark);
+    expect(sent.map((r) => r.url)).toEqual([`https://api.sandbox.push.apple.com/3/device/${IOS_TOKEN}`]);
+    const [apns] = sent;
+    expect(JSON.parse(apns.body)).toEqual({
+      aps: { alert: { title: 'Overdeck', body: 'Something needs you' }, 'mutable-content': 1, sound: 'default', 'thread-id': COLLAPSE },
+      s: SEALED,
+    });
+    expect(apns.headers).toMatchObject({ 'apns-push-type': 'alert', 'apns-topic': 'ai.overdeck.app', 'apns-priority': '10', 'apns-collapse-id': COLLAPSE });
+
+    // CP-1: the provider token signed inside workerd verifies with the generated public key.
+    const [scheme, jwt] = (apns.headers['authorization'] ?? '').split(' ');
+    expect(scheme).toBe('bearer');
+    const [header, claims, signature] = jwt.split('.');
+    const decode = (part: string) => JSON.parse(Buffer.from(part, 'base64url').toString('utf8')) as Record<string, unknown>;
+    expect(decode(header)).toEqual({ alg: 'ES256', kid: 'KEYID12345' });
+    expect(decode(claims)).toMatchObject({ iss: 'TEAMID1234' });
+    const valid = await crypto.subtle.verify(
+      { name: 'ECDSA', hash: 'SHA-256' },
+      apnsPublicKey,
+      Buffer.from(signature, 'base64url'),
+      new TextEncoder().encode(`${header}.${claims}`),
+    );
+    expect(valid).toBe(true);
+  }, SLOW);
+
+  it('delivers an Android push as a data-only FCM message after one token exchange', async () => {
+    const mark = pushRequests.length;
+    expect(await push(clientId(ANDROID))).toMatchObject({ type: 'push-result', ok: true });
+    const sent = pushRequests.slice(mark);
+    expect(sent.map((r) => r.url)).toEqual(['https://oauth2.googleapis.com/token', FCM_SEND_URL]);
+    expect(new URLSearchParams(sent[0].body).get('grant_type')).toBe('urn:ietf:params:oauth:grant-type:jwt-bearer');
+    expect(sent[1].headers['authorization']).toBe(`Bearer ${FCM_ACCESS_TOKEN}`);
+    const body = JSON.parse(sent[1].body) as { message: Record<string, unknown> };
+    expect(body).toEqual({
+      message: { token: FCM_TOKEN, data: { s: SEALED }, android: { priority: 'HIGH', ttl: '3600s', collapse_key: COLLAPSE } },
+    });
+    expect(body.message).not.toHaveProperty('notification');
+  }, SLOW);
+
+  it('clears a token APNs reports dead, then answers no_registration without a request', async () => {
+    const mark = pushRequests.length;
+    expect(await push(clientId(DEAD))).toEqual({ type: 'push-result', requestId: expect.any(String), ok: false, error: 'no_registration' });
+    expect(pushRequests.slice(mark).map((r) => r.url)).toEqual([`https://api.push.apple.com/3/device/${DEAD_TOKEN}`]);
+
+    const again = pushRequests.length;
+    expect(await push(clientId(DEAD))).toMatchObject({ ok: false, error: 'no_registration' });
+    expect(pushRequests.length).toBe(again);
+  }, SLOW);
+
+  it('answers unknown_client for a phone the account does not have', async () => {
+    const mark = pushRequests.length;
+    expect(await push(clientId(99))).toMatchObject({ ok: false, error: 'unknown_client' });
+    expect(pushRequests.length).toBe(mark);
+  }, SLOW);
+
+  it('never logs a push token, the sealed payload or a credential, and makes no other outbound request', () => {
+    const text = logs.join('\n');
+    expect(logs.some((line) => line.includes('"push"') && line.includes('"delivered"'))).toBe(true);
+    for (const secret of [IOS_TOKEN, FCM_TOKEN, DEAD_TOKEN, SEALED, FCM_ACCESS_TOKEN, '-----BEGIN']) {
+      expect(text).not.toContain(secret);
+    }
+    expect(unexpectedOutbound).toEqual([]);
   });
 });

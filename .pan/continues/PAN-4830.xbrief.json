@@ -1,0 +1,247 @@
+{
+  "version": "1",
+  "issueId": "PAN-4830",
+  "created": "2026-11-03T14:25:43.002Z",
+  "updated": "2026-11-03T14:59:22.063Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "store-extract": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4830",
+      "claimedAt": "2026-11-03T14:25:43.002Z",
+      "doneAt": "2026-11-03T14:26:54.137Z"
+    },
+    "store-extract.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:27:34.004Z"
+    },
+    "store-extract.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:28:06.697Z"
+    },
+    "store-extract.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:28:24.134Z"
+    },
+    "push-config": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4830",
+      "claimedAt": "2026-11-03T14:28:53.716Z",
+      "doneAt": "2026-11-03T14:30:57.047Z"
+    },
+    "push-config.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:31:14.235Z"
+    },
+    "push-config.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:31:29.305Z"
+    },
+    "push-config.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:31:46.244Z"
+    },
+    "push-config.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:32:01.413Z"
+    },
+    "push-helpers": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4830",
+      "claimedAt": "2026-11-03T14:32:19.104Z",
+      "doneAt": "2026-11-03T14:33:08.832Z"
+    },
+    "push-helpers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:33:22.662Z"
+    },
+    "push-helpers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:33:36.931Z"
+    },
+    "push-helpers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:33:50.711Z"
+    },
+    "apns-sender": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4830",
+      "claimedAt": "2026-11-03T14:36:33.673Z",
+      "doneAt": "2026-11-03T14:37:38.579Z"
+    },
+    "apns-sender.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:37:53.098Z"
+    },
+    "apns-sender.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:38:07.119Z"
+    },
+    "apns-sender.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:38:20.598Z"
+    },
+    "apns-sender.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:38:34.103Z"
+    },
+    "fcm-sender": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4830",
+      "claimedAt": "2026-11-03T14:38:47.406Z",
+      "doneAt": "2026-11-03T14:40:16.985Z"
+    },
+    "fcm-sender.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:40:37.559Z"
+    },
+    "fcm-sender.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:40:52.888Z"
+    },
+    "fcm-sender.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:41:08.752Z"
+    },
+    "fcm-sender.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:41:26.268Z"
+    },
+    "deliver": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4830",
+      "claimedAt": "2026-11-03T14:41:42.053Z",
+      "doneAt": "2026-11-03T14:42:46.793Z"
+    },
+    "deliver.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:43:02.773Z"
+    },
+    "deliver.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:43:18.321Z"
+    },
+    "deliver.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:43:34.625Z"
+    },
+    "deliver.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:43:50.380Z"
+    },
+    "decode-push": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4830",
+      "claimedAt": "2026-11-03T14:44:05.437Z",
+      "doneAt": "2026-11-03T14:45:02.234Z"
+    },
+    "decode-push.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:45:19.202Z"
+    },
+    "decode-push.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:45:37.006Z"
+    },
+    "decode-push.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:45:53.828Z"
+    },
+    "push-registration": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4830",
+      "claimedAt": "2026-11-03T14:46:10.693Z",
+      "doneAt": "2026-11-03T14:49:04.241Z"
+    },
+    "push-registration.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:49:18.820Z"
+    },
+    "push-registration.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:49:34.219Z"
+    },
+    "push-registration.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:49:48.600Z"
+    },
+    "push-registration.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:50:02.966Z"
+    },
+    "push-registration.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:50:19.363Z"
+    },
+    "push-frame": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4830",
+      "claimedAt": "2026-11-03T14:50:35.493Z",
+      "doneAt": "2026-11-03T14:52:59.056Z"
+    },
+    "push-frame.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:53:13.276Z"
+    },
+    "push-frame.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:53:27.442Z"
+    },
+    "push-frame.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:53:41.538Z"
+    },
+    "push-frame.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:53:55.058Z"
+    },
+    "push-frame.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:54:08.763Z"
+    },
+    "push-e2e": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4830",
+      "claimedAt": "2026-11-03T14:54:22.695Z",
+      "doneAt": "2026-11-03T14:56:16.426Z"
+    },
+    "push-e2e.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:56:32.577Z"
+    },
+    "push-e2e.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:56:49.813Z"
+    },
+    "push-e2e.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:57:06.474Z"
+    },
+    "push-e2e.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:57:20.800Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4830",
+      "claimedAt": "2026-11-03T14:57:36.643Z",
+      "doneAt": "2026-11-03T14:58:32.090Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:58:47.312Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:59:05.164Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:59:22.063Z"
+    }
+  }
+}

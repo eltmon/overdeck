@@ -3,7 +3,8 @@
  *
  * PUBLIC_BASE_URL is the only required value: without it every route except /healthz returns 503.
  * Missing TURN secrets are not a 503: the directory and direct connections still work, the relay
- * answers `turn_unavailable`, and /healthz reports `turn: false`.
+ * answers `turn_unavailable`, and /healthz reports `turn: false`. Missing push secrets are not a
+ * 503 either: that platform's pushes answer `delivery_failed` (push/config.ts, PAN-4830).
  */
 import type { ConnectPlan } from '../../../packages/contracts/src/connect.ts';
 import type { AccountBinding } from './account.ts';
@@ -21,6 +22,13 @@ export interface Env {
   TURN_KEY_API_TOKEN?: string;
   /** Positive integer overriding the 50 GB monthly relay cap, for staging tests only. */
   RELAY_CAP_BYTES?: string;
+  /** Worker secrets for iOS push (PAN-4830): the `.p8` auth key PEM, its key id and the team id. */
+  APNS_KEY_P8?: string;
+  APNS_KEY_ID?: string;
+  APNS_TEAM_ID?: string;
+  /** Worker secrets for Android push (PAN-4830): the service-account JSON and the Firebase project id. */
+  FCM_SERVICE_ACCOUNT_JSON?: string;
+  FCM_PROJECT_ID?: string;
 }
 
 /** Time, outbound HTTP and randomness are injected so tests control all three without waiting. */
@@ -51,7 +59,7 @@ export interface Config {
 
 export type ConfigResult = { ok: true; config: Config } | { ok: false; missing: string[] };
 
-function present(value: string | undefined): value is string {
+export function present(value: string | undefined): value is string {
   return typeof value === 'string' && value.trim() !== '';
 }
 

@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { create } from 'zustand';
 import { X } from 'lucide-react';
 
+import { useChannelMediaSrc } from '../../lib/useChannelMediaSrc';
+
 /**
  * PAN-4493: a single shared full-size viewer for a pasted/sent image. Opened
  * from the composer thumbnail or a sent-message attachment via
@@ -28,6 +30,8 @@ export function openImageLightbox(src: string, alt: string): void {
 export function ImageLightboxHost() {
   const image = useImageLightboxStore((s) => s.image);
   const close = useImageLightboxStore((s) => s.close);
+  // PAN-4834 CP-2: in the phone app a machine image loads through the channel.
+  const src = useChannelMediaSrc(image?.src);
 
   useEffect(() => {
     if (!image) return;
@@ -53,7 +57,7 @@ export function ImageLightboxHost() {
         <X size={24} />
       </button>
       <img
-        src={image.src}
+        src={src}
         alt={image.alt}
         className="max-h-full max-w-full object-contain shadow-2xl"
         onClick={(e) => e.stopPropagation()}

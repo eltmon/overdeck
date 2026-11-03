@@ -59,10 +59,26 @@ describe('connect routes (PAN-2356 WI-3)', () => {
   it('GET /healthz reports configuration and TURN without revealing values', async () => {
     const res = await handle(new Request(`${BASE}/healthz`), envWith(), deps);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true, configured: true, turn: false });
+    expect(await res.json()).toEqual({ ok: true, configured: true, turn: false, apns: false, fcm: false });
 
     const withTurn = await handle(new Request(`${BASE}/healthz`), envWith({ TURN_KEY_ID: 'k', TURN_KEY_API_TOKEN: 't' }), deps);
-    expect(await withTurn.json()).toEqual({ ok: true, configured: true, turn: true });
+    expect(await withTurn.json()).toEqual({ ok: true, configured: true, turn: true, apns: false, fcm: false });
+  });
+
+  it('GET /healthz reports APNs and FCM when their secrets parse, without revealing values (PAN-4830)', async () => {
+    const secrets = {
+      APNS_KEY_P8: 'apns-p8-secret-value',
+      APNS_KEY_ID: 'apns-key-id-value',
+      APNS_TEAM_ID: 'apns-team-id-value',
+      FCM_SERVICE_ACCOUNT_JSON: JSON.stringify({ client_email: 'fcm-email-value@test', private_key: 'fcm-private-key-value' }),
+      FCM_PROJECT_ID: 'fcm-project-id-value',
+    };
+    const res = await handle(new Request(`${BASE}/healthz`), envWith(secrets), deps);
+    const text = await res.text();
+    expect(JSON.parse(text)).toEqual({ ok: true, configured: true, turn: false, apns: true, fcm: true });
+    for (const value of ['apns-p8-secret-value', 'apns-key-id-value', 'apns-team-id-value', 'fcm-email-value', 'fcm-private-key-value', 'fcm-project-id-value']) {
+      expect(text).not.toContain(value);
+    }
   });
 
   it('answers an unknown path with 404 JSON and a wrong method with 405', async () => {

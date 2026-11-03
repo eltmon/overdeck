@@ -321,8 +321,8 @@ describe('directory reducer: relay credentials and metering (PAN-2356 WI-7)', ()
   });
 });
 
-describe('directory reducer: push before PAN-4830 (PAN-4828)', () => {
-  it('answers a push frame from a registered machine with bad_frame and keeps state', () => {
+describe('directory reducer: push (PAN-4830)', () => {
+  it('answers a push to a phone the account does not have with unknown_client and keeps state', () => {
     const state = register(1);
     const result = reduce(
       state,
@@ -342,23 +342,28 @@ describe('directory reducer: push before PAN-4830 (PAN-4828)', () => {
     );
     expect(result.state).toBe(state);
     expect(sends(result.effects)).toEqual([
-      { kind: 'send', to: 'self', frame: { type: 'error', code: 'bad_frame', message: 'malformed frame' } },
+      { kind: 'send', to: 'self', frame: { type: 'push-result', requestId: '0'.repeat(32), ok: false, error: 'unknown_client' } },
     ]);
     expect(closes(result.effects)).toEqual([]);
-    expect(result.effects).toContainEqual({ kind: 'log', type: 'push', environmentId: env(1), outcome: 'bad_frame' });
+    expect(result.effects.some((e) => e.kind === 'deliver-push')).toBe(false);
+    expect(result.effects).toContainEqual({
+      kind: 'log',
+      type: 'push',
+      environmentId: env(1),
+      outcome: 'unknown_client',
+      clientId: '00000000-0000-4000-8000-0000000000aa',
+    });
   });
 
-  it('decoder still refuses push until PAN-4830', () => {
-    const decoded = decodeMachineFrame(
-      JSON.stringify({
-        type: 'push',
-        requestId: '0'.repeat(32),
-        to: env(2),
-        sealed: 'AAAA',
-        urgency: 'high',
-        collapseId: '1'.repeat(32),
-      }),
-    );
-    expect(decoded).toEqual({ ok: false, reason: 'bad_frame' });
+  it('decodes a valid push', () => {
+    const frame = {
+      type: 'push',
+      requestId: '0'.repeat(32),
+      to: env(2),
+      sealed: 'AAAA',
+      urgency: 'high',
+      collapseId: '1'.repeat(32),
+    } as const;
+    expect(decodeMachineFrame(JSON.stringify(frame))).toEqual({ ok: true, frame });
   });
 });
