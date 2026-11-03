@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4477",
   "created": "2026-11-03T15:02:33.095Z",
-  "updated": "2026-11-03T15:13:41.815Z",
+  "updated": "2026-11-03T15:13:47.320Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-4477",
       "claimedAt": "2026-11-03T15:10:32.914Z",
       "doneAt": "2026-11-03T15:13:41.815Z"
+    },
+    "hub-pty-attach-extract": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4477",
+      "claimedAt": "2026-11-03T15:13:47.319Z"
     }
   }
 }
