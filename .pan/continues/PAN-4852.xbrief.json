@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4852",
   "created": "2026-11-03T02:45:30.764Z",
-  "updated": "2026-11-03T03:09:28.203Z",
+  "updated": "2026-11-03T03:09:32.689Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -36,6 +36,11 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-4852",
       "claimedAt": "2026-11-03T03:09:28.203Z"
+    },
+    "ox-binary": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4852",
+      "claimedAt": "2026-11-03T03:09:32.689Z"
     }
   }
 }
