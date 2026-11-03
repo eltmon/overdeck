@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4476",
   "created": "2026-11-03T15:05:40.423Z",
-  "updated": "2026-11-03T16:15:16.782Z",
+  "updated": "2026-11-03T16:15:32.064Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -280,6 +280,10 @@
     "viewer-composer.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T16:15:16.782Z"
+    },
+    "viewer-composer.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:15:32.064Z"
     }
   }
 }
