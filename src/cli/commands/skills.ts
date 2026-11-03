@@ -270,6 +270,14 @@ function printPackPreview(preview: PackPreview, notAppliedLabels: NotAppliedLabe
       ['New', listOrNone(preview.diff.newCapabilities)],
     );
   }
+  if (preview.oxBuild) {
+    // PAN-4852 AD-8: the sageox build's commands, the paths it writes and what it downloads, one per line.
+    const section = (label: string, lines: string[]): void =>
+      (lines.length > 0 ? lines : ['none']).forEach((line, i) => rows.push([i === 0 ? label : '', line]));
+    section('Builds', preview.oxBuild.commands.map(command => command.join(' ')));
+    section('Writes', preview.oxBuild.writes);
+    section('Downloads', preview.oxBuild.downloads);
+  }
   console.log(chalk.bold(`Pack ${preview.id}`));
   for (const [label, value] of rows) console.log(`  ${label.padEnd(12)} ${value}`);
   if (runtime) for (const file of executables) console.log(`${' '.repeat(16)}${file}`);

@@ -40,12 +40,19 @@ export interface OxBuildRunner {
 const execFileAsync = promisify(execFile);
 
 /** promisified execFile; stdin is closed at once so `go` never waits on a prompt. */
-const defaultRunner: OxBuildRunner = async (cmd, args, opts) => {
+const execFileRunner: OxBuildRunner = async (cmd, args, opts) => {
   const pending = execFileAsync(cmd, args, { ...opts, maxBuffer: 16 * 1024 * 1024 });
   pending.child.stdin?.end();
   const { stdout } = await pending;
   return { stdout };
 };
+
+let defaultRunner: OxBuildRunner = execFileRunner;
+
+/** Test seam (PAN-4852 WI-3): replace the default runner; `undefined` restores `execFile`. */
+export function __setOxBuildRunnerForTests(run?: OxBuildRunner): void {
+  defaultRunner = run ?? execFileRunner;
+}
 
 /** AD-5: Go's caches, module path and config (telemetry) all live under `goDir`. */
 export function oxBuildEnv(goDir: string, base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {

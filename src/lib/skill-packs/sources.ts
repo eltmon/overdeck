@@ -33,6 +33,7 @@ import {
   buildBrowserRuntime,
   isBrowserReady,
 } from './browser.js';
+import { assertGoAvailable, buildOx, isOxBuildReady, OxBuildError, oxBuildCommands, oxBuildDownloads } from './ox-build.js';
 import { assertRenderable, isRenderReady, RenderError, renderCommand, renderRuntimePack } from './render.js';
 
 export const PACK_ID_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
@@ -71,6 +72,11 @@ export function packCacheDir(id: string): string {
 
 export function packRepoDir(id: string): string {
   return join(packCacheDir(id), 'repo.git');
+}
+
+/** PAN-4852 AD-5: Go's caches and config for the sageox build. */
+export function packGoDir(id: string): string {
+  return join(packCacheDir(id), 'go');
 }
 
 export function packExtractDir(id: string, commit: string): string {
@@ -392,6 +398,8 @@ export interface PackPreview {
   runtime?: { command: string[] };
   /** gstack browser runtime (PAN-4730): the build command, every download, and every path it writes. */
   browser?: { command: string[]; downloads: string[]; writes: string[] };
+  /** sageox (PAN-4852 AD-8): the `go build` commands, every path they write, and what they download. */
+  oxBuild?: { commands: string[][]; writes: string[]; downloads: string[] };
 }
 
 export type ConfirmPack = (preview: PackPreview) => Promise<boolean>;
@@ -429,7 +437,9 @@ async function renderStep<T>(step: () => Promise<T>): Promise<T> {
   try {
     return await step();
   } catch (error) {
-    if (error instanceof RenderError || error instanceof BrowserError) throw new PackSourceError('render', error.message);
+    if (error instanceof RenderError || error instanceof BrowserError || error instanceof OxBuildError) {
+      throw new PackSourceError('render', error.message);
+    }
     throw error;
   }
 }
@@ -474,6 +484,27 @@ async function buildPackBrowser(id: string, dir: string, commit: string): Promis
   );
 }
 
+/** PAN-4852 D5: Overdeck builds `ox` (and its session adapters) for the sageox pack. */
+const buildsOx = (id: string): boolean => id === 'sageox';
+
+/** Before consent (AD-8/AD-9): go is on PATH; returns the build commands, writes and downloads. */
+async function oxBuildPreview(id: string, dir: string): Promise<NonNullable<PackPreview['oxBuild']>> {
+  const goDir = packGoDir(id);
+  await renderStep(() => assertGoAvailable(undefined, goDir));
+  const binDir = join(dir, 'bin');
+  return {
+    commands: oxBuildCommands(binDir),
+    writes: [`${binDir}/`, `${goDir}/`],
+    downloads: await oxBuildDownloads(dir, undefined, goDir),
+  };
+}
+
+/** After consent, before the registry write: build the commit unless its build is already ready. */
+async function buildPackOx(id: string, dir: string, commit: string): Promise<void> {
+  if (await isOxBuildReady(dir, commit)) return;
+  await renderStep(() => buildOx({ extractDir: dir, commit, goDir: packGoDir(id) }));
+}
+
 async function requirePack(id: string): Promise<PackRegistryEntry> {
   if (!PACK_ID_PATTERN.test(id)) throw new PackSourceError('bad-id', `invalid pack id: ${JSON.stringify(id)}`);
   const entry = await getPack(id);
@@ -513,8 +544,10 @@ export async function addPack(
     ...(runtime ? { runtime } : {}),
     ...(pluginRootOf(id) ? { pluginRoot: pluginRootOf(id) } : {}),
   };
+  if (buildsOx(id)) preview.oxBuild = await oxBuildPreview(id, dir);
   if (!(await confirm(preview))) return { written: false, preview };
   if (runtime) await renderPack(id, dir, commit);
+  if (buildsOx(id)) await buildPackOx(id, dir, commit);
   await writePackEntry({ id, url, ref, commit, ...(input.adapter ? { adapter: input.adapter } : {}) });
   return { written: true, preview };
 }
@@ -577,9 +610,11 @@ export async function updatePack(
   if (runtime) preview.runtime = runtime;
   // PAN-4730 D10: consent is recorded, so the new commit's browser runtime joins the same preview and confirmation.
   if (browser) preview.browser = await browserPreview(id, dir, commit);
+  if (buildsOx(id)) preview.oxBuild = await oxBuildPreview(id, dir);
   if (!(await confirm(preview))) return { written: false, preview };
   if (runtime) await renderPack(id, dir, commit);
   if (browser && !(await isBrowserReady(packRenderDir(id, commit)))) await buildPackBrowser(id, dir, commit);
+  if (buildsOx(id)) await buildPackOx(id, dir, commit);
   await writePackEntry({ ...entry, ref, commit });
   return { written: true, preview };
 }
@@ -674,5 +709,7 @@ export async function syncPack(id: string): Promise<{ commit: string; dir: strin
     // PAN-4730 D8: consent is recorded, so sync builds a missing browser runtime without asking.
     if (entry.browser && !(await isBrowserReady(packRenderDir(id, entry.commit)))) await buildPackBrowser(id, dir, entry.commit);
   }
+  // PAN-4852 AD-8: sync builds the already-trusted commit without asking.
+  if (buildsOx(id)) await buildPackOx(id, dir, entry.commit);
   return { commit: entry.commit, dir };
 }
