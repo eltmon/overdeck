@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4882",
   "created": "2026-11-03T06:27:51.535Z",
-  "updated": "2026-11-03T07:52:57.786Z",
+  "updated": "2026-11-03T07:53:18.327Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -192,6 +192,10 @@
     "ssh-vm-setup.ac2": {
       "status": "completed",
       "doneAt": "2026-11-03T07:52:57.786Z"
+    },
+    "ac06-add-managed.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:53:18.327Z"
     }
   }
 }
