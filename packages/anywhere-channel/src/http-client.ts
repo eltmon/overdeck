@@ -22,7 +22,8 @@ import {
 /** The plaintext side of one secure channel; a streamx or Node Duplex satisfies it. */
 export interface ChannelStream {
   write(chunk: Uint8Array): boolean;
-  end(): unknown;
+  /** The optional argument lets streamx's `end(data)` typing satisfy the interface. */
+  end(data?: unknown): unknown;
   destroy(error?: Error): void;
   readonly destroyed: boolean;
   on(event: string, listener: (...args: any[]) => void): unknown;
