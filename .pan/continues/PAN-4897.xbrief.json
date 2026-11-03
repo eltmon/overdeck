@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4897",
   "created": "2026-11-03T14:27:55.739Z",
-  "updated": "2026-11-03T15:02:16.209Z",
+  "updated": "2026-11-03T15:02:35.036Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -78,6 +78,10 @@
     "gateway-probe.ac4": {
       "status": "completed",
       "doneAt": "2026-11-03T15:02:16.208Z"
+    },
+    "supervisor-local-network.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T15:02:35.036Z"
     }
   }
 }
