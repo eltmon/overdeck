@@ -140,7 +140,11 @@ Each tool then calls an ordinary dashboard route over the loopback URL with the
 caller's own Bearer token, so the route that tool proxies enforces its scope
 through this table and a revoked token fails its next request. The one check
 the tool layer adds is `approve` on `answer_question`, because that tool posts
-to the `tell`-scoped message route. The endpoint is stateless (a fresh MCP
+to the `tell`-scoped message route. The server also lists and runs only the
+tools whose `scope` the token satisfies, and `audience: 'agent'` tools only
+for a token that carries `agentId` (PAN-4927 D-14); a hidden tool answers like
+an unknown one. `pan mcp serve` takes the token from `OVERDECK_MCP_TOKEN` or a
+0600 `OVERDECK_MCP_TOKEN_FILE`. The endpoint is stateless (a fresh MCP
 server per `POST`, no session); `GET /mcp` and `DELETE /mcp` answer 405 with
 `Allow: POST`. See [configuration/mcp.mdx](../configuration/mcp.mdx).
 

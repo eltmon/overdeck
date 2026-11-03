@@ -50,6 +50,8 @@ function projectConversation(row: unknown): Record<string, unknown> {
 const listMachines: OverdeckTool = {
   name: 'list_machines',
   description: 'List this machine and its linked machines with their state, load and capability tags.',
+  scope: 'read:state',
+  audience: 'any',
   inputSchema: { type: 'object', properties: {} },
   async run(_args, ctx) {
     return routeResult(await ctx.api.request('GET', '/api/fleet/machines'));
@@ -59,6 +61,8 @@ const listMachines: OverdeckTool = {
 const listConversations: OverdeckTool = {
   name: 'list_conversations',
   description: 'List recent Overdeck conversations on this machine and its linked machines (named @<machine>/<name>) with their status, harness, model and pending input.',
+  scope: 'read:conversations',
+  audience: 'any',
   inputSchema: {
     type: 'object',
     properties: { limit: { type: 'integer', minimum: 1, maximum: 200, description: 'How many rows to return (default 50).' } },
@@ -74,6 +78,8 @@ const listConversations: OverdeckTool = {
 const searchConversations: OverdeckTool = {
   name: 'search_conversations',
   description: 'Search conversations on this machine and every online linked machine by title and content.',
+  scope: 'read:conversations',
+  audience: 'any',
   inputSchema: {
     type: 'object',
     properties: {
@@ -109,6 +115,8 @@ const searchConversations: OverdeckTool = {
 const readConversation: OverdeckTool = {
   name: 'read_conversation',
   description: 'Read the messages of one conversation. Pass the cursor from a previous page as `before` to read older messages.',
+  scope: 'read:conversations',
+  audience: 'any',
   inputSchema: {
     type: 'object',
     properties: {
