@@ -595,7 +595,11 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
       let detail = outcome.detail;
       if (outcome.failure === 'unreachable' && outcome.lanBlocked?.length && this.deps.localNetworkAccess) {
         const access = await this.deps.localNetworkAccess();
-        if (this.stopped || entry.generation !== generation || entry.state === 'revoked' || entry.state === 'unsupported') return;
+        // markUnsupported doesn't bump `generation`, so re-check `entry.state` too; the cast works
+        // around TS treating it as still excluding 'revoked'/'unsupported' from this function's
+        // entry guard, even though either can land here during the await above.
+        const stateNow = entry.state as LinkState;
+        if (this.stopped || entry.generation !== generation || stateNow === 'revoked' || stateNow === 'unsupported') return;
         if (access === 'denied') {
           this.deps.log(`${entry.link.label}: local network check denied; raw detail: ${outcome.detail}`);
           detail = localNetworkBlockedDetail(this.deps.nodePath ?? 'node', outcome.lanBlocked);
