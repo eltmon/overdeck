@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4849",
   "created": "2026-11-03T03:09:47.454Z",
-  "updated": "2026-11-03T05:05:40.887Z",
+  "updated": "2026-11-03T05:06:10.995Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -292,6 +292,10 @@
     "scope-signoff.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T05:05:40.887Z"
+    },
+    "scope-view.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:06:10.994Z"
     }
   }
 }
