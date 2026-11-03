@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4480",
   "created": "2026-11-03T15:56:11.265Z",
-  "updated": "2026-11-03T16:50:10.999Z",
+  "updated": "2026-11-03T16:50:28.464Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -138,6 +138,10 @@
     "register-verbs.ac2": {
       "status": "completed",
       "doneAt": "2026-11-03T16:50:10.999Z"
+    },
+    "register-verbs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:50:28.463Z"
     }
   }
 }
