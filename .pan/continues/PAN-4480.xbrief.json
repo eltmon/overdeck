@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4480",
   "created": "2026-11-03T15:56:11.265Z",
-  "updated": "2026-11-03T15:56:11.265Z",
+  "updated": "2026-11-03T15:57:22.265Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "share-code-leaf": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4480",
-      "claimedAt": "2026-11-03T15:56:11.265Z"
+      "claimedAt": "2026-11-03T15:56:11.265Z",
+      "doneAt": "2026-11-03T15:57:22.265Z"
     }
   }
 }
