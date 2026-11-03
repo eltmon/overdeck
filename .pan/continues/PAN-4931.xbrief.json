@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4931",
   "created": "2026-11-03T21:41:36.078Z",
-  "updated": "2026-11-03T22:08:42.174Z",
+  "updated": "2026-11-03T23:05:37.279Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,10 @@
       "claimedBy": "agent-pan-4931",
       "claimedAt": "2026-11-03T22:07:12.081Z",
       "doneAt": "2026-11-03T22:08:42.174Z"
+    },
+    "tool-scope-audience.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:05:37.279Z"
     }
   }
 }
