@@ -4,6 +4,8 @@
 // Type-only and import-free (D-R3-8): the share Worker imports this file by relative path, so it must
 // never pull a runtime dependency into the Worker bundle. The content wire format (SharedEnvelope and
 // friends) is not here: the share service never carries content. Slice 3 (PAN-4474) adds it.
+// PAN-4473 (slice 2) adds the host dashboard API types at the end of this file: the shapes the
+// browser exchanges with its local dashboard server to create, list and manage shares.
 
 export type ShareProtocolVersion = 1;
 export type ShareScope = { readonly kind: 'conversation'; readonly conversationId: string };
@@ -82,3 +84,28 @@ export type ShareCloseCode =
   | 4010 /* kicked */
   | 4011 /* revoked */
   | 4013 /* room-full or lobby-full */;
+
+// ── Host dashboard API (PAN-4473, slice 2): the browser ⇄ local dashboard server. ──
+// The host token never appears in these types (NFR-1).
+
+/** The host socket's state in this dashboard process. A stale record (no socket) is 'disconnected'. */
+export type ShareConnection = 'connecting' | 'connected' | 'disconnected';
+
+/** The host frames the browser may request in slice 2. */
+export type ShareCommand = Extract<HostFrame, { readonly type: 'admit' | 'kick' | 'revoke' | 'unrevoke' | 'set-contributor' }>;
+
+export interface CreateShareRequest { readonly conversationName: string }
+
+export interface ShareLastError { readonly code: ShareErrorCode | 'replaced'; readonly githubId?: number; readonly at: string }
+
+export interface ShareView {
+  readonly shortCode: string;
+  readonly joinUrl: string;
+  readonly scope: ShareScope;
+  readonly createdAt: string;            // ISO
+  readonly connection: ShareConnection;
+  readonly snapshot: RoomSnapshot | null; // null for a stale record
+  readonly lastError: ShareLastError | null;
+}
+
+export interface ListSharesResponse { readonly shares: readonly ShareView[] }

@@ -779,6 +779,12 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'DELETE /api/triggers/:id',                  kind: 'http', disposition: 'WRITE',       door: 'src/lib/triggers/store.ts' },
   { surface: 'PUT /api/triggers/:id/signing-secret',      kind: 'http', disposition: 'WRITE',       door: 'src/lib/triggers/store.ts' },
 
+  // ── shares.ts ─────────────────────────────────────────────────────────────
+  { surface: 'GET /api/shares',                           kind: 'http', disposition: 'READ',        door: 'src/lib/sharing/share-record.ts' },
+  { surface: 'POST /api/shares',                          kind: 'http', disposition: 'WRITE',       door: 'src/lib/sharing/share-record.ts' },
+  { surface: 'POST /api/shares/:code/commands',           kind: 'http', disposition: 'WRITE',       door: 'src/dashboard/server/services/share-host.ts' },
+  { surface: 'DELETE /api/shares/:code',                  kind: 'http', disposition: 'WRITE',       door: 'src/lib/sharing/share-record.ts' },
+
   // ── workspaces.ts ─────────────────────────────────────────────────────────
   { surface: 'GET /api/workspace-stack-health',                      kind: 'http', disposition: 'AGGREGATE',   door: 'Issues + Agents + stack health' },
   { surface: 'GET /api/workspaces/:issueId',                         kind: 'http', disposition: 'AGGREGATE',   door: 'IssuesResolver.get + AgentsResolver + workspace details' },

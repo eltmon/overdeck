@@ -1,13 +1,15 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T05:18:18.471726Z · model: claude-opus-5-5 · open: 870_
+_Last sequenced: 2026-11-03T06:24:13.693731Z · model: claude-opus-5-5 · open: 873_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4702 | S | critical | ok |  |  | Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs. |
+| 2 | PAN-4881 | S | high | ok |  |  | Order-dependent 401 in projects-rename.test.ts failed the v0.73.1 release full-suite run; make the test hermetic. |
 | 3 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 4 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install aborts workspace creation (since #4163); reproduced 2026-11-02 on botland too, so every polyrepo start fails. |
+| 5 | PAN-4882 | M | high | ok |  |  | Re-run the five v0.73 Anywhere checks fixed after the release run (TURN relay on Fly, AC-4, AC-6, AC-15) on deployed main. |
 | 7 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
 | 8 | PAN-4690 | S | critical | ok |  |  | Review dispatch rewrites the tracked continue file uncommitted, so the dirty-tree gate blocks the review it dispatched |
 | 10 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
@@ -561,6 +563,7 @@ _Last sequenced: 2026-11-03T05:18:18.471726Z · model: claude-opus-5-5 · open: 
 | 564 | PAN-4409 | M | medium | ok |  |  | Overdeck integration on OKF v0.2.0 (injector trust tiers, new verbs); blocked on external eltmon/okf#9 |
 | 565 | PAN-4410 | M | medium | ok |  | PAN-4409 | Migrate eltmon/overdeck-knowledge to OKF v0.2 and refresh stale concepts; last link in the OKF chain |
 | 566 | PAN-2978 | S | medium | ok |  | PAN-2976, PAN-2977 | Opt-in per-agent install recipes for ACP CLIs from the setup UI; deliberately separated for its supply-chain trust decision. |
+| 567 | PAN-4878 | XS | low | ok |  | PAN-4852 | Delete dead ox curl installer in prereqs registry; PAN-4852 builds ox from the pinned fork commit, so ~/.local/bin/ox is never used. |
 | 568 | PAN-1754 | M | medium | ok |  |  | surface + edit the host claude CLI default model (~/.claude/settings.json) from the Settings page |
 | 569 | PAN-1751 | M | medium | ok |  |  | harness picker on every Settings → Roles row (plan/work/review/test/ship/strike), not just Flywheel |
 | 570 | PAN-1750 | M | medium | ok |  |  | UAT assembly/conflict agent |
@@ -882,6 +885,10 @@ _Last sequenced: 2026-11-03T05:18:18.471726Z · model: claude-opus-5-5 · open: 
 
 New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.
 
+### PAN-4881 (rank 2)
+
+New in-pipeline substrate bug: the release job runs the full suite in one job, and leaked internal-token state from another file makes projects-rename.test.ts return 401, which blocked publishing v0.73.1. It is already picked up, so it takes the free rank 2 without moving any other node; no cross-references, so no edges.
+
 ### PAN-4636 (rank 3)
 
 New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.
@@ -889,6 +896,10 @@ New substrate bug with a verified root cause: adoption (PAN-4605) calls startRev
 ### PAN-4553 (rank 4)
 
 Moved from rank 9 to the free rank 4: a 2026-11-02 comment shows the same abort on a second polyrepo project (botland), so the bug now blocks workspace creation for every polyrepo project, not only mind-your-now.
+
+### PAN-4882 (rank 5)
+
+New in-pipeline verification issue: the v0.73.0 acceptance run failed AC-2/3/4/6/15, and the fixes (PAN-4862, PAN-4861, PAN-4859, #4864) are closed, so nothing blocks the re-run. It is already picked up, so it takes the free rank 5 without moving any other node; it shares the release checklist with PAN-4863, recorded as an advisory informs edge.
 
 ### PAN-4733 (rank 7)
 
@@ -1190,14 +1201,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
 
 Triage: verify "running at $0.00 with no capacity fallback" against the current liveness definition. Rank held.
 
-### PAN-3106 (rank 80)
-
-New this pass. shouldHoldForUat is consulted on exactly one merge path, so every other path merges a ready issue without asking whether its project holds for UAT — verified at code level on a real MIN-901 merge. This defeats the batch-train model directly: issues merge one at a time before a generation can assemble them.
-
-### PAN-3100 (rank 81)
-
-New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1205,10 +1208,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T05:18:18.471726Z",
+  "generatedAt": "2026-11-03T06:24:13.693731Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 870,
+  "openCount": 873,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -1220,6 +1223,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "dependsOn": [],
       "why": "Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs.",
       "rationale": "New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4881",
+      "rank": 2,
+      "size": "S",
+      "importance": "high",
+      "score": 82,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Order-dependent 401 in projects-rename.test.ts failed the v0.73.1 release full-suite run; make the test hermetic.",
+      "rationale": "New in-pipeline substrate bug: the release job runs the full suite in one job, and leaked internal-token state from another file makes projects-rename.test.ts return 401, which blocked publishing v0.73.1. It is already picked up, so it takes the free rank 2 without moving any other node; no cross-references, so no edges.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -8182,6 +8198,21 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
+      "issue": "PAN-4878",
+      "rank": 567,
+      "size": "XS",
+      "importance": "low",
+      "score": 30,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4852"
+      ],
+      "why": "Delete dead ox curl installer in prereqs registry; PAN-4852 builds ox from the pinned fork commit, so ~/.local/bin/ox is never used.",
+      "rationale": "New issue placed in a free low-tier slot: a self-contained XS deletion with exact targets, best done after PAN-4852 lands its Overdeck-built ox.",
+      "gate": "auto",
+      "planning": "skip"
+    },
+    {
       "issue": "PAN-1754",
       "rank": 568,
       "size": "M",
@@ -12083,6 +12114,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "rationale": "Rank kept at the bottom: PAN-4820 closed so the dependency is dropped, but the operator still parks this undecided low-priority question.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4882",
+      "rank": 5,
+      "size": "M",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Re-run the five v0.73 Anywhere checks fixed after the release run (TURN relay on Fly, AC-4, AC-6, AC-15) on deployed main.",
+      "rationale": "New in-pipeline verification issue: the v0.73.0 acceptance run failed AC-2/3/4/6/15, and the fixes (PAN-4862, PAN-4861, PAN-4859, #4864) are closed, so nothing blocks the re-run. It is already picked up, so it takes the free rank 5 without moving any other node; it shares the release checklist with PAN-4863, recorded as an advisory informs edge.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13548,6 +13592,20 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-4852",
+      "to": "PAN-4878",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-4882",
+      "to": "PAN-4863",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
     }
   ]
 }
