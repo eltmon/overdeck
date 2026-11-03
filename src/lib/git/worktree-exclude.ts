@@ -15,6 +15,11 @@
  * A block is `# overdeck:<owner> begin`, one pattern per line, then
  * `# overdeck:<owner> end`. Patterns are written as given.
  *
+ * Migration: a Deft install from before PAN-4852 wrote its own
+ * `<gitdir>/info/overdeck-deft-exclude` and pointed the worktree at it. The
+ * first rebuild here carries that file's Deft patterns into a `deft` block, so
+ * repointing `core.excludesFile` never un-hides them.
+ *
  * Async only: every git call goes through execFile.
  */
 import { execFile } from 'node:child_process';
@@ -36,6 +41,9 @@ export interface ExcludeTarget {
 
 /** The worktree exclude file's name under `<gitdir>/info/`. */
 export const WORKTREE_EXCLUDE_NAME = 'overdeck-exclude';
+/** The pre-PAN-4852 Deft-only exclude file under `<gitdir>/info/`. */
+const LEGACY_DEFT_EXCLUDE_NAME = 'overdeck-deft-exclude';
+const LEGACY_DEFT_HEADER = /^# overdeck:deft \S+$/;
 const GLOBAL_COPY_HEADER = '# overdeck: copy of the global excludes file';
 const BLOCK_LINE = /^# overdeck:([a-z]+) (begin|end)$/;
 
@@ -162,6 +170,21 @@ async function effectiveGlobalExcludes(root: string, own: string): Promise<strin
   return (await readText(path)) ?? '';
 }
 
+/**
+ * The Deft patterns of a pre-PAN-4852 install, when the worktree still points
+ * at its legacy file: every line after its `# overdeck:deft <issue>` header.
+ * Null when the worktree points elsewhere or the file has no header.
+ */
+async function legacyDeftPatterns(root: string, own: string): Promise<string[] | null> {
+  const legacy = join(dirname(own), LEGACY_DEFT_EXCLUDE_NAME);
+  const configured = await configGet(root, '--worktree', 'core.excludesFile');
+  if (!configured || resolve(root, expandHome(configured)) !== legacy) return null;
+  const lines = ((await readText(legacy)) ?? '').split('\n');
+  const header = lines.findIndex(line => LEGACY_DEFT_HEADER.test(line));
+  if (header < 0) return null;
+  return lines.slice(header + 1).filter(line => line.trim() !== '');
+}
+
 // ── the API ──────────────────────────────────────────────────────────────
 
 /**
@@ -185,6 +208,10 @@ export async function setExcludeBlock(root: string, owner: ExcludeOwner, pattern
 
   await git(root, ['config', 'extensions.worktreeConfig', 'true']);
   const blocks = parsed.blocks.map(block => (block.owner === owner ? { owner, patterns: [...patterns] } : block));
+  if (owner !== 'deft' && !blocks.some(block => block.owner === 'deft')) {
+    const legacy = await legacyDeftPatterns(root, target.file);
+    if (legacy) blocks.push({ owner: 'deft', patterns: legacy });
+  }
   if (index < 0) blocks.push({ owner, patterns: [...patterns] });
   const globalExcludes = (await effectiveGlobalExcludes(root, target.file)).trimEnd();
   const lines = [

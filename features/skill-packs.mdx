@@ -542,6 +542,8 @@ The Skills page shows the same text on the `sageox` pack row.
    - **Writes:** `<packdir>/<commit>/bin/` and `<packdir>/go/` (Go's build cache, module cache and config), where `<packdir>` is `~/.overdeck/packs/sageox`. Nothing is written to `~/.local/bin`, `~/go` or `~/.cache`.
    - **Downloads:** the Go modules listed in `go.sum` (from `proxy.golang.org`) and, when your Go is older than the fork asks for, the Go toolchain `GOTOOLCHAIN=auto` fetches. At the pinned commit that is `Go toolchain go1.27.3 (GOTOOLCHAIN=auto)`, about 70 MB, into `<packdir>/go/mod`.
 
+   If you added `sageox` before this release, it stays on the commit you pinned then (the old `overdeck/host-managed` head). Move to the current pin with `pan skills pack update sageox --ref 0e6c7e2df8fd89638a2d40db08cc45d4cff05fdc`; your SageOx link files are kept.
+
    The build runs after you confirm and before the pack is registered. `pan skills pack update sageox` shows the preview and builds again when the commit moves. `pan skills pack sync sageox` builds the trusted commit without asking when its build is missing. Launches never build. The repo-writing skills (`ox-cli-init`, `ox-cli-attest`, `ox-cli-skill-manager`, `ox-cli-pr-header`, `ox-cli-plan`, and the `ox-cli-cart*` skills) are opt-in: the pack toggle never turns them on.
 
 2. **Log in to SageOx once**, with the built `ox` (`pan doctor` prints its path):

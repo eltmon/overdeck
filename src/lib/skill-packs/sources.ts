@@ -682,12 +682,6 @@ export async function disablePackBrowser(id: string): Promise<{ changed: boolean
 }
 
 /**
- * PD-11: unregister a pack, clear its global toggle and global per-skill
- * overrides, and delete its cache. Project and issue entries stay (inert).
- * PAN-4852 AD-10: the sageox cache keeps its `bindings/` (SageOx link files need `ox login` and the
- * network to recreate); everything else in it is derived and goes.
- */
-/**
  * Give the owner write access to every directory under `path` (never following
  * symlinks), so a recursive rm can unlink their entries. The Go toolchain that
  * GOTOOLCHAIN=auto unpacks into the sageox pack's module cache has read-only
@@ -707,6 +701,12 @@ async function rmPackTree(path: string): Promise<void> {
   await rm(path, { recursive: true, force: true });
 }
 
+/**
+ * PD-11: unregister a pack, clear its global toggle and global per-skill
+ * overrides, and delete its cache. Project and issue entries stay (inert).
+ * PAN-4852 AD-10: the sageox cache keeps its `bindings/` (SageOx link files need `ox login` and the
+ * network to recreate); everything else in it is derived and goes.
+ */
 export async function removePack(id: string): Promise<{ removed: boolean; keptBindings?: string }> {
   if (!PACK_ID_PATTERN.test(id)) throw new PackSourceError('bad-id', `invalid pack id: ${JSON.stringify(id)}`);
   const removed = (await getPack(id)) !== null;

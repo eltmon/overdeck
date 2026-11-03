@@ -158,3 +158,23 @@ describe('setExcludeBlock in the primary checkout', () => {
     expect(await removeExcludeBlock(main, 'sageox')).toBe(false);
   });
 });
+
+describe('legacy Deft exclude file (pre-PAN-4852)', () => {
+  it('carries its Deft patterns into a deft block when SageOx repoints core.excludesFile', async () => {
+    const legacy = join(main, '.git', 'worktrees', 'wt', 'info', 'overdeck-deft-exclude');
+    write(main, '.git/worktrees/wt/info/overdeck-deft-exclude', '*.global-copy\n# overdeck:deft TST-1\n/.deft/\n/deft-made.md\n');
+    git(main, 'config', 'extensions.worktreeConfig', 'true');
+    git(wt, 'config', '--worktree', 'core.excludesFile', legacy);
+    write(wt, 'deft-made.md', 'x\n');
+    write(wt, '.sageox/config.json', '{}\n');
+    expect(git(wt, 'status', '--porcelain')).not.toContain('deft-made.md');
+
+    await setExcludeBlock(wt, 'sageox', ['/.sageox/']);
+
+    expect(git(wt, 'status', '--porcelain')).toBe('');
+    expect(await readExcludeBlock(wt, 'deft')).toEqual(['/.deft/', '/deft-made.md']);
+    expect(await readExcludeBlock(wt, 'sageox')).toEqual(['/.sageox/']);
+    expect(existsSync(legacy)).toBe(true);
+  });
+});
+

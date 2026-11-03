@@ -16,6 +16,9 @@ PREFIX="${TMPDIR:-/tmp}/tmp."
 
 # The Go toolchain that GOTOOLCHAIN=auto downloads into the module cache is
 # read-only even with GOFLAGS=-modcacherw, so make it writable before removing.
+# The delete names "$H" rather than a literal path because mktemp chooses the
+# name; the case guard below only deletes a path under ${TMPDIR:-/tmp}/tmp.,
+# which is exactly what mktemp -d returned above.
 cleanup() {
   case "$H" in
     "$PREFIX"*) chmod -R u+w -- "$H" && rm -rf -- "$H" ;;
