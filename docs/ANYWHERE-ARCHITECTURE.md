@@ -996,7 +996,9 @@ store under a fresh key, packs it and stops the harness; any failure clears the 
 **adopt** (Continue here against the unpacked store) and **finish**. Settling uses an
 empty in-memory vault index (`settle({ index })`), so the transfer carries the whole
 transcript and never moves the owner's real vault tail; after adopting, the viewer drops
-the transfer store's tail from its own index. Once released, any transfer or adopt
+the transfer store's tail from its own index. The transfer record is titled with the
+owner's conversation title (`recordTitle`), and Continue here copies that title to the
+adopted row, so a pulled conversation keeps its title (PAN-4904). Once released, any transfer or adopt
 failure posts `release/undo`, and the owner resumes. Nothing undoes a release on a
 timer: `pan conv reclaim` does it by hand, refusing while the other machine runs the
 conversation. Adoption mints a new session id, so the pulled row records `pulled_from`;
