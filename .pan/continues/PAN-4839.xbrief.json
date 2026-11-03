@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4839",
   "created": "2026-11-03T21:01:30.274Z",
-  "updated": "2026-11-03T22:14:46.207Z",
+  "updated": "2026-11-03T22:15:02.952Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -216,6 +216,10 @@
     "ios-plugin.ac4": {
       "status": "completed",
       "doneAt": "2026-11-03T22:14:46.207Z"
+    },
+    "ios-widget-target.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:15:02.951Z"
     }
   }
 }
