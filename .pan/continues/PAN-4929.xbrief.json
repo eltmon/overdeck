@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4929",
   "created": "2026-11-03T21:43:38.500Z",
-  "updated": "2026-11-03T21:59:35.739Z",
+  "updated": "2026-11-03T22:01:37.553Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,10 @@
       "claimedBy": "agent-pan-4929",
       "claimedAt": "2026-11-03T21:58:22.397Z",
       "doneAt": "2026-11-03T21:59:35.739Z"
+    },
+    "root-install-guard.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:01:37.552Z"
     }
   }
 }
