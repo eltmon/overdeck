@@ -1,5 +1,5 @@
 /** PAN-4473 WI-8: the share dialog's create, signed-out, copy and end states, and the menu item's runsHere gate. */
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -20,6 +20,10 @@ vi.mock('../shareApi', async (importOriginal) => ({
   sendShareCommand: (code: string, command: unknown) => api.sendShareCommand(code, command),
 }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock('../../../../lib/wsTransport', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  dashboardMutationJsonHeaders: async () => ({ 'Content-Type': 'application/json' }),
+}));
 
 import { toast } from 'sonner';
 import type { Conversation } from '../../../CommandDeck/ConversationList';
@@ -151,5 +155,77 @@ describe('ShareConversationMenuItem (PAN-4473 WI-8)', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'Share this conversation' }));
     expect(useShareDialogStore.getState().target).toEqual({ name: 'conv-a', title: 'Fix' });
     expect(onDone).toHaveBeenCalled();
+  });
+});
+
+describe('ShareDialog suggestions and queue (PAN-4476 WI-14)', () => {
+  const avatar = (id: number) => `https://avatars.githubusercontent.com/u/${id}`;
+  const draft = (githubId: number, login: string, text: string) => ({
+    githubId,
+    login,
+    avatarUrl: avatar(githubId),
+    text,
+    startedAt: '2026-11-03T00:00:00.000Z',
+    updatedAt: '2026-11-03T00:00:01.000Z',
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('lists the drafts and posts a picked, edited draft with its author', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true, position: 1 }), { status: 202 }));
+    vi.stubGlobal('fetch', fetchMock);
+    api.shares = { data: [{ ...SHARE, drafts: [draft(100, 'alice', 'Fix it'), draft(200, 'bob', 'Lint it')] }], isLoading: false, error: null };
+    wrap(<ShareDialog target={{ name: 'conv-a' }} onClose={vi.fn()} />);
+    expect(screen.getByRole('heading', { name: 'Suggestions (2)' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Use suggestion from @alice' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Edit suggestion from @alice' }), { target: { value: 'Fix it carefully' } });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Send suggestion from @alice' })); });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('/api/shares/BCDFGHJK/prompts');
+    expect(init.method).toBe('POST');
+    expect(init.body).toBe('{"text":"Fix it carefully","draftGithubId":100}');
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Queued'));
+  });
+
+  it('shows a refused send under the editor', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: 'queue_full' }), { status: 429 })));
+    api.shares = { data: [{ ...SHARE, drafts: [draft(100, 'alice', 'Fix it')] }], isLoading: false, error: null };
+    wrap(<ShareDialog target={{ name: 'conv-a' }} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Use suggestion from @alice' }));
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Send suggestion from @alice' })); });
+    expect((await screen.findByRole('alert')).textContent).toBe('The queue is full. Try again later.');
+  });
+
+  it('shows the queue line and every queued item', () => {
+    api.shares = {
+      data: [{
+        ...SHARE,
+        queue: {
+          agentWorking: true,
+          delivering: false,
+          items: [
+            { id: 'contributor-1', login: 'alice', avatarUrl: avatar(100), source: 'contributor', text: 'Run the tests', enqueuedAt: '2026-11-03T00:00:00.000Z' },
+            { id: 'controller-2', login: 'bob', avatarUrl: avatar(200), source: 'controller', text: 'Lint it', enqueuedAt: '2026-11-03T00:00:01.000Z' },
+          ],
+        },
+      }],
+      isLoading: false,
+      error: null,
+    };
+    wrap(<ShareDialog target={{ name: 'conv-a' }} onClose={vi.fn()} />);
+    expect(screen.getByText('Agent is working · 2 queued')).toBeTruthy();
+    expect(screen.getByText('Run the tests')).toBeTruthy();
+    expect(screen.getByText('Lint it')).toBeTruthy();
+    expect(screen.getByText('suggested')).toBeTruthy();
+  });
+
+  it('renders no suggestions or queue for a share without them', () => {
+    api.shares = { data: [SHARE], isLoading: false, error: null };
+    wrap(<ShareDialog target={{ name: 'conv-a' }} onClose={vi.fn()} />);
+    expect(screen.queryByRole('heading', { name: /Suggestions/ })).toBeNull();
+    expect(document.querySelector('[data-component="share-queue"]')).toBeNull();
   });
 });

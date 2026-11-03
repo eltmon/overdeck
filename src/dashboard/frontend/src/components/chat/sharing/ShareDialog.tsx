@@ -6,6 +6,10 @@
  * the host socket's connection state, the lobby panel and **End share**. A machine with no
  * overdeck.ai sign-in gets a signed-out panel naming `pan account login`.
  *
+ * Prompts (PAN-4476 WI-14, D-2): under the lobby the dialog shows the queue line, the queued prompts
+ * and the viewers' drafts as a controller-mode `SuggestionList`. **Use** → edit → **Send** posts the
+ * text to `POST /api/shares/:code/prompts` with the draft's author, so the prompt joins the queue.
+ *
  * The share list is polled once a second while the dialog is open (D-6). **End share** asks for
  * confirmation inside this dialog rather than through `useConfirm()`: the confirm dialog renders
  * inside the app root, under this portaled Modal and outside its focus trap.
@@ -21,8 +25,9 @@ import type { Conversation } from '../../CommandDeck/ConversationList';
 import { MenuItemButton } from '../../shared/ContextMenu';
 import { Modal } from '../../shared/Modal';
 import { runsHere } from '../conversationMachineState';
-import { createShare, endShare, sendShareCommand, ShareApiError, SHARES_QUERY_KEY, useShares } from './shareApi';
+import { createShare, endShare, sendShareCommand, sendSharePrompt, ShareApiError, SHARES_QUERY_KEY, useShares } from './shareApi';
 import { SharingLobbyPanel } from './SharingLobbyPanel';
+import { queueStatusText, SuggestionList, type SuggestionItem } from './SuggestionList';
 
 export interface ShareTarget {
   /** The local conversation name. */
@@ -75,6 +80,41 @@ const END_SHARE_QUESTION = 'End this share? Everyone in the room and the lobby i
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+const PROMPT_ERRORS: Record<string, string> = {
+  invalid_prompt: 'Prompts cannot be empty or start with /, ! or #.',
+  too_long: 'Prompts can be at most 8,000 characters.',
+  queue_full: 'The queue is full. Try again later.',
+  share_not_live: 'This share is not live.',
+};
+
+/** The queue line and the queued prompts, read-only (FR-10). Renders nothing for an idle, empty queue. */
+function QueuePanel({ share }: { share: ShareView }) {
+  const queue = share.queue;
+  if (!queue) return null;
+  const line = queueStatusText({ agentWorking: queue.agentWorking, queued: queue.items.length - (queue.delivering ? 1 : 0) });
+  if (!line && queue.items.length === 0) return null;
+  const owner = share.snapshot?.dataOwner.login;
+  return (
+    <section data-component="share-queue">
+      {line ? <p role="status" className="text-xs text-muted-foreground">{line}</p> : null}
+      {queue.items.length > 0 ? (
+        <ul className="mt-1">
+          {queue.items.map((item) => (
+            <li key={item.id} className="flex items-center gap-2 py-0.5">
+              {item.avatarUrl ? <img src={item.avatarUrl} alt="" width={16} height={16} className="h-4 w-4 shrink-0 rounded-sm" /> : null}
+              <span className="shrink-0 font-mono text-xs">{item.login ? `@${item.login}` : 'host'}</span>
+              {item.source === 'controller' && item.login && item.login !== owner ? (
+                <span className="shrink-0 text-[11px] text-muted-foreground">suggested</span>
+              ) : null}
+              <span className="min-w-0 truncate text-xs text-muted-foreground">{item.text}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </section>
+  );
 }
 
 function ConnectionLine({ share }: { share: ShareView }) {
@@ -146,6 +186,17 @@ export function ShareDialog({ target, onClose }: { target: ShareTarget; onClose:
     }
   };
 
+  const onSendSuggestion = async (item: SuggestionItem, text: string) => {
+    if (!share) return;
+    try {
+      await sendSharePrompt(share.shortCode, { text, draftGithubId: item.githubId });
+    } catch (error) {
+      throw new Error(error instanceof ShareApiError ? PROMPT_ERRORS[error.error] ?? error.message : errorMessage(error));
+    }
+    toast.success('Queued');
+    await refresh();
+  };
+
   const onCopy = async () => {
     if (!share) return;
     try {
@@ -179,6 +230,12 @@ export function ShareDialog({ target, onClose }: { target: ShareTarget; onClose:
         </div>
         <ConnectionLine share={share} />
         <SharingLobbyPanel share={share} onCommand={(command) => void onCommand(command)} pending={busy} />
+        <QueuePanel share={share} />
+        <SuggestionList
+          items={(share.drafts ?? []).map((draft) => ({ githubId: draft.githubId, login: draft.login, avatarUrl: draft.avatarUrl, text: draft.text }))}
+          mode="controller"
+          onSend={onSendSuggestion}
+        />
       </div>
     );
   } else if (signedOut) {

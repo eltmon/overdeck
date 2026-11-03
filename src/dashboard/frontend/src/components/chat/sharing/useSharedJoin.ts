@@ -4,14 +4,28 @@
  * `WebRtcViewer`. A join that leaves the live states closes the peer and the stream (D-10). A join
  * the server closed as `away` resumes without a second click (D-7). A peer that becomes `lost` while
  * the join is `admitted` gets a new event stream after 5 s, at most 3 times in a row (PAN-4479 D-8).
+ *
+ * Drafts and prompts (PAN-4476 WI-13): `drafts` holds the other participants' drafts by author;
+ * `setMyDraft` sends the viewer's own draft at most every DRAFT_SEND_MS (trailing); `submitPrompt`
+ * posts a contributor prompt and clears the box. The viewer's own typing is not host content, so it
+ * survives a reconnect, and every new negotiation re-sends it at once (`onReady`).
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { JoinEvent, JoinState, JoinView, PresencePayload, SharedMessage } from '@overdeck/contracts';
+import {
+  sharedPromptRefusal,
+  type DraftPayload,
+  type JoinEvent,
+  type JoinState,
+  type JoinView,
+  type PresencePayload,
+  type SharedMessage,
+} from '@overdeck/contracts';
 
 import * as joinApi from './joinApi';
 import { JoinApiError } from './joinApi';
 import {
   WebRtcViewer,
+  type SubmitAck,
   type ViewerNotice,
   type ViewerPeerPhase,
   type WebRtcViewerCallbacks,
@@ -19,6 +33,9 @@ import {
 } from './webrtc-viewer';
 
 export type SharedJoinPhase = 'checking' | 'confirm' | 'joining' | 'live' | 'replaced-here' | 'error';
+
+/** The longest wait between a keystroke and the draft snapshot it produces (D-11). */
+export const DRAFT_SEND_MS = 150;
 
 export interface SharedJoin {
   phase: SharedJoinPhase;
@@ -30,13 +47,22 @@ export interface SharedJoin {
   hasHistory: boolean;
   presence: PresencePayload | null;
   notices: readonly ViewerNotice[];
+  /** The other participants' drafts, one per author. */
+  drafts: readonly DraftPayload[];
+  myDraft: string;
+  setMyDraft(text: string): void;
+  /** Contributors only: sends `myDraft` as a prompt and clears it. */
+  submitPrompt(): void;
+  submitStatus: SubmitAck | null;
+  /** The host sent this viewer's suggestion. */
+  draftSentNotice: boolean;
   join(): void;
   leave(): void;
   reconnect(): void;
 }
 
 export type JoinApi = Pick<typeof joinApi, 'getJoin' | 'createJoin' | 'postSignal' | 'fetchJoinIceServers' | 'leaveJoin' | 'openJoinEvents'>;
-export type ViewerPeer = Pick<WebRtcViewer, 'onSignal' | 'close'>;
+export type ViewerPeer = Pick<WebRtcViewer, 'onSignal' | 'close' | 'sendDraft' | 'submit'>;
 export type ViewerFactory = (deps: WebRtcViewerDeps, callbacks: WebRtcViewerCallbacks) => ViewerPeer;
 
 /** PAN-4479 D-8: a lost peer while admitted reopens the event stream after this delay… */
@@ -76,6 +102,14 @@ export function useSharedJoin(code: string, deps: { api?: JoinApi; viewer?: View
   /** Bumped by each automatic try so the effect re-arms while the peer stays `lost`. */
   const [autoTick, setAutoTick] = useState(0);
   const autoTries = useRef(0);
+  const [drafts, setDrafts] = useState<readonly DraftPayload[]>([]);
+  const [myDraft, setMyDraftState] = useState('');
+  const [submitStatus, setSubmitStatus] = useState<SubmitAck | null>(null);
+  const [draftSentNotice, setDraftSentNotice] = useState(false);
+  const myDraftRef = useRef('');
+  const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const contributorRef = useRef(false);
+  contributorRef.current = view?.contributor === true;
 
   const viewerRef = useRef<ViewerPeer | null>(null);
   const streamRef = useRef<{ close(): void } | null>(null);
@@ -92,12 +126,27 @@ export function useSharedJoin(code: string, deps: { api?: JoinApi; viewer?: View
     streamRef.current = null;
   }, [closeViewer]);
 
+  const cancelDraftTimer = useCallback(() => {
+    if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+    draftTimerRef.current = null;
+  }, []);
+
+  /** Clears the box locally; the caller decides whether the host needs an empty snapshot. */
+  const clearMyDraft = useCallback(() => {
+    cancelDraftTimer();
+    myDraftRef.current = '';
+    setMyDraftState('');
+  }, [cancelDraftTimer]);
+
   const resetContent = useCallback(() => {
     setPeerPhase('waiting');
     setMessages([]);
     setHasHistory(false);
     setPresence(null);
     setNotices([]);
+    setDrafts([]);
+    setSubmitStatus(null);
+    setDraftSentNotice(false);
   }, []);
 
   const ensureViewer = useCallback((): ViewerPeer => {
@@ -125,11 +174,58 @@ export function useSharedJoin(code: string, deps: { api?: JoinApi; viewer?: View
           if (viewerRef.current !== created || !aliveRef.current) return;
           setNotices((prev) => (prev.some((n) => sameNotice(n, notice)) ? prev : [...prev, notice]));
         },
+        onDraft: (draft) => {
+          if (viewerRef.current !== created || !aliveRef.current) return;
+          setDrafts((prev) => {
+            const index = prev.findIndex((d) => d.authorGithubId === draft.authorGithubId);
+            if (draft.text === '') return index < 0 ? prev : prev.filter((_, i) => i !== index);
+            return index < 0 ? [...prev, draft] : prev.map((d, i) => (i === index ? draft : d));
+          });
+        },
+        onSubmitAck: (ack) => {
+          if (viewerRef.current === created && aliveRef.current) setSubmitStatus(ack);
+        },
+        onDraftSent: () => {
+          if (viewerRef.current !== created || !aliveRef.current) return;
+          setDraftSentNotice(true);
+          clearMyDraft();
+          // A trailing snapshot sent just before the host took the draft would recreate it there.
+          created.sendDraft('');
+        },
+        onReady: () => {
+          if (viewerRef.current === created && aliveRef.current) created.sendDraft(myDraftRef.current);
+        },
       },
     );
     viewerRef.current = created;
     return created;
-  }, [code]);
+  }, [clearMyDraft, code]);
+
+  const setMyDraft = useCallback((text: string) => {
+    myDraftRef.current = text;
+    setMyDraftState(text);
+    setDraftSentNotice(false);
+    if (draftTimerRef.current) return;
+    draftTimerRef.current = setTimeout(() => {
+      draftTimerRef.current = null;
+      viewerRef.current?.sendDraft(myDraftRef.current);
+    }, DRAFT_SEND_MS);
+  }, []);
+
+  const submitPrompt = useCallback(() => {
+    const viewer = viewerRef.current;
+    const text = myDraftRef.current;
+    if (!viewer || !contributorRef.current || sharedPromptRefusal(text) !== null) return;
+    const clientId = crypto.randomUUID();
+    if (!viewer.submit(clientId, text)) {
+      // The channel is not open: keep the text and say the prompt did not go out.
+      setSubmitStatus({ clientId, status: 'rejected' });
+      return;
+    }
+    clearMyDraft();
+    setSubmitStatus(null);
+    viewer.sendDraft('');
+  }, [clearMyDraft]);
 
   const subscribe = useCallback(() => {
     closeLive();
@@ -181,6 +277,7 @@ export function useSharedJoin(code: string, deps: { api?: JoinApi; viewer?: View
   const leave = useCallback(() => {
     closeLive();
     resetContent();
+    clearMyDraft();
     apiRef.current.leaveJoin(code).then(
       () => {
         if (!aliveRef.current) return;
@@ -193,7 +290,7 @@ export function useSharedJoin(code: string, deps: { api?: JoinApi; viewer?: View
         setPhase('error');
       },
     );
-  }, [closeLive, code, resetContent]);
+  }, [clearMyDraft, closeLive, code, resetContent]);
 
   const reconnect = useCallback(() => {
     // A new event stream is a new subscriber; the viewer server restarts the socket so the host
@@ -238,10 +335,29 @@ export function useSharedJoin(code: string, deps: { api?: JoinApi; viewer?: View
       cancelled = true;
       aliveRef.current = false;
       closeLive();
+      cancelDraftTimer();
     };
     // Mount-only per code: join and subscribe are stable for a given code.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code]);
 
-  return { phase, view, apiError, peerPhase, messages, hasHistory, presence, notices, join, leave, reconnect };
+  return {
+    phase,
+    view,
+    apiError,
+    peerPhase,
+    messages,
+    hasHistory,
+    presence,
+    notices,
+    drafts,
+    myDraft,
+    setMyDraft,
+    submitPrompt,
+    submitStatus,
+    draftSentNotice,
+    join,
+    leave,
+    reconnect,
+  };
 }

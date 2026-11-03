@@ -19,11 +19,15 @@
  * `kick` and `revoke` it sends, and closes it when the host entry is dropped. A dropped host socket
  * keeps established peer connections.
  *
+ * Prompts (PAN-4476): every view carries the hub's drafts and queue, and `sendPrompt` queues a
+ * controller send through the live hub (D-1).
+ *
  * Plain async class with injected seams, like `directory-client.ts` (D-8). Nothing here logs.
  */
 import type {
   HostFrame,
   RoomSnapshot,
+  SendSharePromptRequest,
   ServiceToHostFrame,
   ShareCommand,
   ShareConnection,
@@ -135,6 +139,8 @@ function viewOf(shortCode: string, record: ShareRecord, host: ShareHost | undefi
     connection: host ? host.connection : 'disconnected',
     snapshot: host ? host.snapshot : null,
     lastError: host ? host.lastError : null,
+    drafts: host?.hub?.draftsView() ?? [],
+    queue: host?.hub?.queueView() ?? { agentWorking: false, delivering: false, items: [] },
   };
 }
 
@@ -208,6 +214,20 @@ export class ShareManager {
     if (command.type === 'admit') host.hub?.admit(command.githubId);
     else if (command.type === 'kick' || command.type === 'revoke') host.hub?.remove(command.githubId);
     return { status: 202, body: { ok: true } };
+  }
+
+  /** Queues a controller send on the share's live hub (PAN-4476 FR-13). */
+  async sendPrompt(
+    shortCode: string,
+    body: SendSharePromptRequest,
+  ): Promise<{ status: 202 | 400 | 404 | 409 | 429; body: object }> {
+    const records = await this.deps.records.read();
+    if (!(shortCode in records)) return { status: 404, body: { error: 'share_not_found' } };
+    const host = this.hosts.get(shortCode);
+    if (!host?.hub) return { status: 409, body: { error: 'share_not_live' } };
+    const result = host.hub.sendFromController(body, host.snapshot?.dataOwner ?? null);
+    if (result.ok) return { status: 202, body: { ok: true, position: result.position } };
+    return { status: result.reason === 'queue_full' ? 429 : 400, body: { error: result.reason } };
   }
 
   async end(shortCode: string): Promise<{ status: 204 | 404 | 500 | 502; body?: object }> {

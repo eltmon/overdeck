@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ParseResult } from '../../services/conversation/types.js';
 import {
   ConversationBridge,
+  MAX_PENDING_AUTHORS,
   resolveClaudeSessionFile,
   type ConversationBridgeDeps,
   type ConversationSink,
@@ -229,6 +230,76 @@ describe('ConversationBridge', () => {
     h.emit(parseResult([message('b', 'two')], 150));
     expect(h.stop).toHaveBeenCalledTimes(1);
     expect(sink.payloads).toHaveLength(1);
+  });
+});
+
+describe('ConversationBridge author attribution', () => {
+  const alice = { login: 'alice', avatarUrl: 'https://avatars.githubusercontent.com/u/7' };
+  const bob = { login: 'bob', avatarUrl: 'https://avatars.githubusercontent.com/u/8' };
+  const user = (id: string, text: string) => message(id, text, { role: 'user' });
+
+  async function attached() {
+    const h = harness(parseResult([message('a', 'one')], 100));
+    const bridge = new ConversationBridge('conv-a', h.deps);
+    const sink = new RecordingSink();
+    await bridge.attach(sink);
+    return { h, bridge, sink };
+  }
+
+  function authorsOf(sink: RecordingSink): Array<[string, string | undefined]> {
+    return sink.payloads.flatMap((payload) =>
+      payload.kind === 'append' || payload.kind === 'update' ? [[payload.message.id, payload.message.author?.login] as [string, string | undefined]] : [],
+    );
+  }
+
+  it('stamps the correlated appended user message and keeps it in a later history', async () => {
+    const { h, bridge, sink } = await attached();
+    bridge.expectAuthor('Fix it', alice);
+    h.emit(parseResult([message('a', 'one'), user('u1', 'Fix it\n')], 150));
+    expect(sink.payloads.at(-1)).toEqual({
+      kind: 'append',
+      message: { id: 'u1', role: 'user', text: 'Fix it\n', author: alice, createdAt: '2026-11-03T00:00:00Z' },
+    });
+    h.emit(parseResult([user('u1', 'Fix it\n'), message('x', 'reply'), message('y', 'more')], 50));
+    const history = sink.payloads.at(-1);
+    expect(history?.kind).toBe('history');
+    if (history?.kind !== 'history') return;
+    expect(history.messages.find((m) => m.id === 'u1')?.author).toEqual(alice);
+    const later = new RecordingSink();
+    await bridge.attach(later);
+    const laterHistory = later.payloads[0];
+    expect(laterHistory?.kind === 'history' ? laterHistory.messages.find((m) => m.id === 'u1')?.author : null).toEqual(alice);
+  });
+
+  it('does not stamp an assistant message or a user message with different text', async () => {
+    const { h, bridge, sink } = await attached();
+    bridge.expectAuthor('Fix it', alice);
+    h.emit(parseResult([message('b', 'Fix it'), user('u1', 'Something else')], 150));
+    h.emit(parseResult([user('u2', 'Fix it')], 180));
+    expect(authorsOf(sink)).toEqual([['b', undefined], ['u1', undefined], ['u2', 'alice']]);
+  });
+
+  it('does not stamp after the expectation is cancelled', async () => {
+    const { h, bridge, sink } = await attached();
+    const cancel = bridge.expectAuthor('Fix it', alice);
+    cancel();
+    h.emit(parseResult([user('u1', 'Fix it')], 150));
+    expect(authorsOf(sink)).toEqual([['u1', undefined]]);
+  });
+
+  it('stamps two expectations with the same text on two user messages in order', async () => {
+    const { h, bridge, sink } = await attached();
+    bridge.expectAuthor('Same', alice);
+    bridge.expectAuthor('Same', bob);
+    h.emit(parseResult([user('u1', 'Same'), user('u2', 'Same'), user('u3', 'Same')], 150));
+    expect(authorsOf(sink)).toEqual([['u1', 'alice'], ['u2', 'bob'], ['u3', undefined]]);
+  });
+
+  it('drops the oldest expectation past the cap', async () => {
+    const { h, bridge, sink } = await attached();
+    for (let i = 0; i <= MAX_PENDING_AUTHORS; i++) bridge.expectAuthor(`p${i}`, alice);
+    h.emit(parseResult([user('u0', 'p0'), user('u1', 'p1')], 150));
+    expect(authorsOf(sink)).toEqual([['u0', undefined], ['u1', 'alice']]);
   });
 });
 

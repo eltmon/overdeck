@@ -6,14 +6,18 @@ import type {
   IceServer,
   RoomParticipant,
   RoomSnapshot,
+  SendSharePromptRequest,
   ServiceToHostFrame,
+  ShareDraftView,
+  ShareIdentity,
+  ShareQueueView,
   ShareScope,
   SignalData,
 } from '@overdeck/contracts';
 
 import type { AccountRecord } from '../../../../lib/account/store.js';
 import type { ShareRecord } from '../../../../lib/sharing/share-record.js';
-import type { HostHub, PeerHubContext } from '../../sharing/peer-hub.js';
+import type { ControllerSendResult, HostHub, PeerHubContext } from '../../sharing/peer-hub.js';
 import {
   PING_INTERVAL_MS,
   PONG_TIMEOUT_MS,
@@ -468,7 +472,17 @@ describe('ShareManager', () => {
     const h = harness();
     h.store.VWXZ2345 = { scopeKind: 'conversation', scopeId: 'conv-z', hostToken: hostToken(9), joinUrl: `${BASE}/s/VWXZ2345`, createdAt: '2026-11-01T00:00:00.000Z' };
     expect(await h.manager.list()).toEqual([
-      { shortCode: 'VWXZ2345', joinUrl: `${BASE}/s/VWXZ2345`, scope: { kind: 'conversation', conversationId: 'conv-z' }, createdAt: '2026-11-01T00:00:00.000Z', connection: 'disconnected', snapshot: null, lastError: null },
+      {
+        shortCode: 'VWXZ2345',
+        joinUrl: `${BASE}/s/VWXZ2345`,
+        scope: { kind: 'conversation', conversationId: 'conv-z' },
+        createdAt: '2026-11-01T00:00:00.000Z',
+        connection: 'disconnected',
+        snapshot: null,
+        lastError: null,
+        drafts: [],
+        queue: { agentWorking: false, delivering: false, items: [] },
+      },
     ]);
     expect(await h.manager.end('VWXZ2345')).toEqual({ status: 204 });
     expect(h.store).toEqual({});
@@ -533,6 +547,9 @@ describe('ShareManager', () => {
 /** Records every call the manager makes on its hub. */
 class FakeHub implements HostHub {
   readonly calls: Array<[string, ...unknown[]]> = [];
+  drafts: ShareDraftView[] = [];
+  queue: ShareQueueView = { agentWorking: false, delivering: false, items: [] };
+  sendResult: ControllerSendResult = { ok: true, position: 1 };
   constructor(readonly ctx: PeerHubContext, private readonly socketSent: () => number) {}
   admit(githubId: number): void {
     this.calls.push(['admit', githubId, this.socketSent()]);
@@ -551,6 +568,16 @@ class FakeHub implements HostHub {
   }
   onIceServersUnavailable(): void {
     this.calls.push(['onIceServersUnavailable']);
+  }
+  draftsView(): ShareDraftView[] {
+    return this.drafts;
+  }
+  queueView(): ShareQueueView {
+    return this.queue;
+  }
+  sendFromController(input: SendSharePromptRequest, controller: ShareIdentity | null): ControllerSendResult {
+    this.calls.push(['sendFromController', input, controller]);
+    return this.sendResult;
   }
   close(): void {
     this.calls.push(['close']);
@@ -722,5 +749,69 @@ describe('ShareManager WebRTC hub wiring (PAN-4474)', () => {
     stopped.h.manager.stop();
     stopped.h.manager.stop();
     expect(stopped.hub().count('close')).toBe(1);
+  });
+});
+
+describe('ShareManager prompts (PAN-4476)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function promptHarness() {
+    const hubs: FakeHub[] = [];
+    const h = harness({
+      createHub: (ctx) => {
+        const hub = new FakeHub(ctx, () => 0);
+        hubs.push(hub);
+        return hub;
+      },
+    });
+    return { h, hub: () => hubs.at(-1) as FakeHub };
+  }
+
+  it('lists the hub drafts and queue in each view', async () => {
+    const { h, hub } = promptHarness();
+    await createConnected(h);
+    const draft: ShareDraftView = {
+      githubId: 7,
+      login: 'alice',
+      avatarUrl: 'https://a/7',
+      text: 'hi',
+      startedAt: '2026-11-02T00:00:00.000Z',
+      updatedAt: '2026-11-02T00:00:01.000Z',
+    };
+    hub().drafts = [draft];
+    hub().queue = {
+      agentWorking: true,
+      delivering: false,
+      items: [{ id: 'controller-1', login: 'owner', avatarUrl: 'https://a/1', source: 'controller', text: 'Go', enqueuedAt: '2026-11-02T00:00:00.000Z' }],
+    };
+    const [view] = await h.manager.list();
+    expect(view?.drafts).toEqual([draft]);
+    expect(view?.queue).toEqual(hub().queue);
+  });
+
+  it('maps hub outcomes to 202, 400 and 429 and credits the data owner', async () => {
+    const { h, hub } = promptHarness();
+    await createConnected(h);
+    expect(await h.manager.sendPrompt('BCDFGHJK', { text: 'Go', draftGithubId: 7 })).toEqual({ status: 202, body: { ok: true, position: 1 } });
+    expect(hub().calls.at(-1)).toEqual(['sendFromController', { text: 'Go', draftGithubId: 7 }, snapshot('BCDFGHJK').dataOwner]);
+    hub().sendResult = { ok: false, reason: 'invalid_prompt' };
+    expect(await h.manager.sendPrompt('BCDFGHJK', { text: '/clear' })).toEqual({ status: 400, body: { error: 'invalid_prompt' } });
+    hub().sendResult = { ok: false, reason: 'too_long' };
+    expect(await h.manager.sendPrompt('BCDFGHJK', { text: 'x' })).toEqual({ status: 400, body: { error: 'too_long' } });
+    hub().sendResult = { ok: false, reason: 'queue_full' };
+    expect(await h.manager.sendPrompt('BCDFGHJK', { text: 'x' })).toEqual({ status: 429, body: { error: 'queue_full' } });
+  });
+
+  it('answers 404 for an unknown code and 409 for a share with no host entry', async () => {
+    const { h } = promptHarness();
+    expect(await h.manager.sendPrompt('BCDFGHJK', { text: 'Go' })).toEqual({ status: 404, body: { error: 'share_not_found' } });
+    h.store.VWXZ2345 = { scopeKind: 'conversation', scopeId: 'conv-z', hostToken: hostToken(9), joinUrl: `${BASE}/s/VWXZ2345`, createdAt: '2026-11-01T00:00:00.000Z' };
+    expect(await h.manager.sendPrompt('VWXZ2345', { text: 'Go' })).toEqual({ status: 409, body: { error: 'share_not_live' } });
   });
 });

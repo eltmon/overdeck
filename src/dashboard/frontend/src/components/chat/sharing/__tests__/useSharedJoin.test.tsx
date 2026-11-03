@@ -5,6 +5,7 @@ import type { JoinEvent, JoinState, JoinView, SharedMessage, SignalData } from '
 
 import { JoinApiError, type JoinEventHandlers } from '../joinApi';
 import {
+  DRAFT_SEND_MS,
   PEER_AUTO_RECONNECT_DELAY_MS,
   PEER_AUTO_RECONNECT_MAX,
   useSharedJoin,
@@ -24,7 +25,14 @@ function view(state: JoinState): JoinView {
 interface Fakes {
   api: JoinApi;
   streams: { handlers: JoinEventHandlers; closed: boolean }[];
-  viewers: (ViewerPeer & { signals: SignalData[]; closed: boolean; callbacks: WebRtcViewerCallbacks })[];
+  viewers: (ViewerPeer & {
+    signals: SignalData[];
+    closed: boolean;
+    drafts: string[];
+    submits: Array<[string, string]>;
+    submitOpen: boolean;
+    callbacks: WebRtcViewerCallbacks;
+  })[];
   viewer: ViewerFactory;
   createJoin: ReturnType<typeof vi.fn>;
 }
@@ -49,9 +57,18 @@ function fakes(initial: JoinView | null, create: () => Promise<JoinView> = async
     const created = {
       signals: [] as SignalData[],
       closed: false,
+      drafts: [] as string[],
+      submits: [] as Array<[string, string]>,
       callbacks,
       onSignal(data: SignalData) { created.signals.push(data); },
       close() { created.closed = true; },
+      sendDraft(text: string) { created.drafts.push(text); return true; },
+      submitOpen: true,
+      submit(clientId: string, text: string) {
+        if (!created.submitOpen) return false;
+        created.submits.push([clientId, text]);
+        return true;
+      },
     };
     viewers.push(created);
     return created;
@@ -268,5 +285,107 @@ describe('useSharedJoin peer auto-reconnect (PAN-4479 D-8)', () => {
     act(() => peer.callbacks.onPhase('connecting'));
     await advance(60_000);
     expect(f.api.openJoinEvents).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('useSharedJoin drafts and prompts (PAN-4476 WI-13)', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  async function live(contributor = false) {
+    const f = fakes({ ...view('admitted'), contributor });
+    const hook = renderHook(() => useSharedJoin(CODE, { api: f.api, viewer: f.viewer }));
+    await waitFor(() => expect(hook.result.current.phase).toBe('live'));
+    emit(f, { type: 'signal', data: OFFER });
+    const peer = f.viewers.at(-1);
+    if (!peer) throw new Error('no viewer');
+    return { f, peer, result: hook.result };
+  }
+
+  it('sends one draft with the last text 150 ms after three quick keystrokes', async () => {
+    const { peer, result } = await live();
+    vi.useFakeTimers();
+    act(() => result.current.setMyDraft('a'));
+    act(() => { vi.advanceTimersByTime(50); });
+    act(() => result.current.setMyDraft('ab'));
+    act(() => { vi.advanceTimersByTime(50); });
+    act(() => result.current.setMyDraft('abc'));
+    expect(peer.drafts).toEqual([]);
+    act(() => { vi.advanceTimersByTime(DRAFT_SEND_MS - 100); });
+    expect(peer.drafts).toEqual(['abc']);
+    expect(result.current.myDraft).toBe('abc');
+  });
+
+  it('keeps one draft per author and removes it on an empty text', async () => {
+    const { peer, result } = await live();
+    act(() => peer.callbacks.onDraft?.({ authorGithubId: 8, authorLogin: 'bob', text: 'one', updatedAt: 1 }));
+    act(() => peer.callbacks.onDraft?.({ authorGithubId: 9, authorLogin: 'carol', text: 'two', updatedAt: 1 }));
+    act(() => peer.callbacks.onDraft?.({ authorGithubId: 8, authorLogin: 'bob', text: 'one more', updatedAt: 2 }));
+    expect(result.current.drafts.map((d) => d.text)).toEqual(['one more', 'two']);
+    act(() => peer.callbacks.onDraft?.({ authorGithubId: 8, authorLogin: 'bob', text: '', updatedAt: 3 }));
+    expect(result.current.drafts.map((d) => d.authorLogin)).toEqual(['carol']);
+  });
+
+  it('submitPrompt sends the draft with a UUID client id, clears it and sends an empty draft', async () => {
+    const { peer, result } = await live(true);
+    act(() => result.current.setMyDraft('Run the tests'));
+    act(() => result.current.submitPrompt());
+    expect(peer.submits).toHaveLength(1);
+    expect(peer.submits[0]?.[0]).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+    expect(peer.submits[0]?.[1]).toBe('Run the tests');
+    expect(result.current.myDraft).toBe('');
+    expect(peer.drafts).toEqual(['']);
+  });
+
+  it('submitPrompt does nothing for a non-contributor or a refused prompt', async () => {
+    const viewerOnly = await live(false);
+    vi.useFakeTimers();
+    act(() => viewerOnly.result.current.setMyDraft('Run the tests'));
+    act(() => viewerOnly.result.current.submitPrompt());
+    expect(viewerOnly.peer.submits).toEqual([]);
+    vi.useRealTimers();
+    const contributor = await live(true);
+    vi.useFakeTimers();
+    act(() => contributor.result.current.setMyDraft('/clear'));
+    act(() => contributor.result.current.submitPrompt());
+    expect(contributor.peer.submits).toEqual([]);
+  });
+
+  it('records the latest submit ack and the draft-sent notice', async () => {
+    const { peer, result } = await live();
+    act(() => result.current.setMyDraft('my idea'));
+    act(() => peer.callbacks.onSubmitAck?.({ clientId: 'c1', status: 'queued', position: 2 }));
+    expect(result.current.submitStatus).toEqual({ clientId: 'c1', status: 'queued', position: 2 });
+    act(() => peer.callbacks.onDraftSent?.());
+    expect(result.current.draftSentNotice).toBe(true);
+    expect(result.current.myDraft).toBe('');
+    // An empty snapshot clears any draft a late trailing send recreated on the host.
+    expect(peer.drafts.at(-1)).toBe('');
+  });
+
+  it('keeps the text and reports a rejected status when the channel cannot send the submit', async () => {
+    const { peer, result } = await live(true);
+    vi.useFakeTimers();
+    peer.submitOpen = false;
+    act(() => result.current.setMyDraft('Run the tests'));
+    act(() => result.current.submitPrompt());
+    expect(result.current.myDraft).toBe('Run the tests');
+    expect(result.current.submitStatus).toMatchObject({ status: 'rejected' });
+    expect(result.current.submitStatus?.reason).toBeUndefined();
+  });
+
+  it('re-sends the current draft on ready and keeps it across a reconnect', async () => {
+    const { f, peer, result } = await live();
+    vi.useFakeTimers();
+    act(() => result.current.setMyDraft('half typed'));
+    act(() => peer.callbacks.onReady?.());
+    expect(peer.drafts.at(-1)).toBe('half typed');
+    act(() => result.current.reconnect());
+    expect(result.current.myDraft).toBe('half typed');
+    emit(f, { type: 'signal', data: OFFER });
+    const next = f.viewers.at(-1);
+    act(() => next?.callbacks.onReady?.());
+    expect(next?.drafts).toEqual(['half typed']);
   });
 });

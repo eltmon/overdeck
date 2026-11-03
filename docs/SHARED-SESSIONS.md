@@ -194,12 +194,12 @@ Content travels peer-to-peer over WebRTC data channels between the host's dashbo
 
 **Channels.** Every peer connection carries the same five labels:
 
-| Channel | Carries in slice 3 |
+| Channel | Carries |
 | --- | --- |
-| `control` | The hello exchange and hello errors. The only channel the host reads. |
+| `control` | The hello exchange and hello errors; slice 5 adds `submit` (viewer → host), `submit-ack` and `draft-sent` (host → viewer). The host reads it with the 64 Ki inbound cap. |
 | `conversation` | `history` (the stream's full message list, which replaces what the viewer has), then `append` for a new message, `update` for a changed one, or `unavailable` (`transcript_not_found`, `history_too_large`) |
 | `presence` | The roster: the data owner first (`isHost: true`), then every lobby and admitted participant, the controller and the stream list. Sent when the channel opens and again when a snapshot changes it. The block list and `connected` are never sent. |
-| `drafts` | Nothing yet (slice 5) |
+| `drafts` | Draft snapshots both ways (slice 5): viewer → host `DraftUpdate { text }`, host → viewer `DraftPayload` |
 | `terminal` | Nothing yet (slice 6) |
 
 **Envelopes.** Every data-channel message is one encoded `SharedEnvelope` `{ v, ch, streamId, seq, t, payload }` or one fragment of one. `v` is 1. `streamId` is the shared conversation's name. `seq` counts per peer connection, per channel and per stream from 1; fragments do not consume one. An encoded envelope longer than `SHARE_MAX_MESSAGE_CHARS` (32,768 characters) is sent as `SharedChunk` fragments `{ v, chunk: { id, index, count }, data }` in order on the same channel. An envelope longer than `SHARE_MAX_ENVELOPE_CHARS` (32 Mi characters) is never sent; a history that large becomes `unavailable history_too_large`. A channel writer waits while the channel's `bufferedAmount` is above 1 MiB, and a peer whose queued content passes 64 Mi characters is closed.
@@ -258,7 +258,7 @@ Mutations need the dashboard CSRF token; the two `GET /api/joins` routes need a 
 
 **Probe.** `GET /api/share-probe` calls no dashboard auth function, because a cross-origin fetch carries no cookie. The remote request gate still admits it only from a loopback peer, and it is deliberately not in `REMOTE_GATE_ALLOWLIST`, so a LAN host cannot learn that Overdeck runs here. `Access-Control-Allow-Origin` is set only when the request's `Origin` equals the origin of `anywhere.share_url`; `OPTIONS` adds `Access-Control-Allow-Methods: GET` and `Access-Control-Allow-Private-Network: true` for that origin only (the older Private Network Access preflight). Chrome's Local Network Access check instead shows the user a permission prompt; the landing page tells them to choose Allow, and its manual link covers a denied prompt or a dashboard on another port.
 
-**Browser peer.** `components/chat/sharing/webrtc-viewer.ts` (`WebRtcViewer`) answers the host's offer: it fetches ICE servers from the viewer server, buffers early remote candidates until the offer is set, sends its own candidates only after the answer, and reads `control`, `conversation` and `presence` with one `SharedChannelReader` each (`drafts` and `terminal` get no listener yet). It replies to the host hello after `negotiateHello`, rebuilds every message field by field (never `author` or unknown keys), and reports notices: a newer host, an unsupported scope kind, a failed hello, an unavailable or too-large transcript, and a `seq` gap (once per peer). A new offer closes the old peer first.
+**Browser peer.** `components/chat/sharing/webrtc-viewer.ts` (`WebRtcViewer`) answers the host's offer: it fetches ICE servers from the viewer server, buffers early remote candidates until the offer is set, sends its own candidates only after the answer, and reads `control`, `conversation` and `presence` with one `SharedChannelReader` each (slice 5 adds `drafts`; `terminal` gets no listener). It replies to the host hello after `negotiateHello`, rebuilds every message field by field (never unknown keys; `author` only with a string login and an `https://` avatar since slice 5), and reports notices: a newer host, an unsupported scope kind, a failed hello, an unavailable or too-large transcript, and a `seq` gap (once per peer). A new offer closes the old peer first.
 
 **Route and screens.** `App.tsx` renders `SharedConversationRoute` when the hash matches `#/shared/<code>`, before the deck; a same-tab hash change into it reloads the page. `useSharedJoin` reads the join on mount (minting the dashboard session first), shows **Join** for a new or finished join, resumes an `away` join, and subscribes to a live one. `SharedConversationView` shows one screen per state: the confirmation, the lobby, "Connecting to the host…", the conversation through `MessagesTimeline` with an empty work log, the "Host disconnected — reconnecting…" banner, "Connection to the host was lost." with **Reconnect**, and the terminal screens ("Removed by host", "This share has ended.", and the others). The timeline mounts only when admitted and a history arrived, so a lobby viewer never renders host content.
 
@@ -287,6 +287,43 @@ Inside the share service's 5-minute window, a host network drop, a host dashboar
 **After the window.** If the host stays away from the share service for more than 5 minutes, the service deletes the room and its short code answers 404. The next reconnect or re-park removes the record, and the share disappears from `GET /api/shares`. Sharing again creates a new link, and everyone joins through the lobby.
 
 The Miniflare tests `tests/integration/services/share/join-manager.test.ts` (a dropped join socket) and `tests/integration/services/share/host-repark.test.ts` (a host restart inside the window, and a room that is gone) cover these paths on real workerd.
+
+## Prompt drafts, contributor submits and the queue (slice 5, PAN-4476)
+
+Slice 5 lets viewers take part. Every viewer can type a **draft** that the other participants see live; the host can pick a draft, edit it and send it. A **contributor** (a viewer with `contributor: true` in the room snapshot, set by **Admit as contributor** or `set-contributor`) can also send prompts directly. Every shared prompt, from a contributor or from the host's share dialog, goes through one host-side queue that delivers one prompt per agent turn.
+
+**Drafts.** A viewer sends its whole draft as `DraftUpdate { text }` on `drafts`, at most every 150 ms (`DRAFT_SEND_MS`, trailing). The host's `DraftBoard` (`src/dashboard/server/sharing/draft-board.ts`) keeps one draft per author, last write wins, and an empty text deletes it. The host sets `authorGithubId` and `authorLogin` from its own peer identity and snapshot, never from the payload, and stamps `updatedAt` with its own clock. It relays each change as a `DraftPayload` to every **other** negotiated peer at most once per 200 ms per author (`DRAFT_RELAY_MS`, leading and trailing edge); the author never gets its own draft echoed. A peer whose `drafts` channel and hello are both ready first receives the current drafts minus its own. A viewer who leaves the snapshot's admitted set loses their draft, and the deletion (`text: ''`) is relayed at once. A draft longer than 8,000 characters is ignored. The viewer re-sends its current draft after every new negotiation, so a reconnect restores it.
+
+**Contributor gate.** A `control` `{ kind: 'submit', clientId, text }` counts only from a negotiated peer that is eligible (host-admitted, `admitted` and `connected`) and whose snapshot entry has `contributor: true`; anyone else gets `submit-ack rejected not_contributor`. `clientId` is 1–64 characters of `[A-Za-z0-9_-]`; a repeated id from the same peer while its item is still queued is ignored. When a snapshot shows the grant gone (contributor false or no longer admitted), the host drops that author's queued items and answers each `rejected grant_revoked`; the viewer's composer loses **Send prompt** as soon as its `JoinView.contributor` turns false.
+
+**The queue.** `SubmitQueue` (`src/dashboard/server/sharing/submit-queue.ts`) is one strict-FIFO queue per share. Controller sends from the share dialog use it too, so there is one order and one "N queued" count. It delivers through the conversation message door (`handleConversationMessage`, decoded with `decodeDoorResponse`), the same door scheduled messages use. Turn detection is polled: a timer of `QUEUE_TICK_MS` (1 s), re-armed after each tick, reads the transcript's activity (`summarizeConversationActivity`: `isWorking` and the last message id). The state machine:
+
+1. `idle`: when the agent is not working, deliver the head.
+2. `awaiting-start`: wait until a tick reads `working`, or the last message id changed, or `TURN_START_TIMEOUT_MS` (30 s) passed. A fresh prompt is not in the transcript yet, so without this wait the next prompt would land in the same turn.
+3. `awaiting-end`: wait until a tick reads `working === false`, then go back to `idle`; the next delivery happens on the following tick.
+
+A conversation with no readable activity (another harness, or no transcript yet) falls back to one delivery per 30 s.
+
+| Door answer | Outcome |
+| --- | --- |
+| 2xx | `sent`; the queue waits for the turn |
+| 409 (`permission-pending`, `input-target-not-main`) | The item stays at the head and is retried every tick, without a cap |
+| other 4xx | `rejected delivery_refused` |
+| 5xx or a throw | `rejected delivery_unknown`; never re-delivered (at-most-once) |
+
+Limits: 20 items in total (including the one being delivered), 3 queued items per contributor (controller sends count only toward the total), 8,000 characters per prompt (`SHARED_PROMPT_MAX_CHARS`). Inbound `control` and `drafts` messages are reassembled with a 65,536-character cap (`SHARE_MAX_INBOUND_ENVELOPE_CHARS`) instead of the 32 Mi outbound cap, so one viewer cannot make the host buffer megabytes.
+
+**Refused prompts.** `sharedPromptRefusal` (in `sharing-wire.ts`) refuses an empty prompt and a prompt whose first non-whitespace character is `/`, `!` or `#` (`invalid_prompt`), and a prompt over 8,000 characters (`too_long`). The door runs composer commands first (`/compact`, the `/pan` namespace), and Claude Code treats a leading `!` as a shell command and `#` as a memory note; a remote participant must reach none of them. The rule also applies to the host's share-dialog sends. The viewer uses the same helper to disable **Send prompt** early.
+
+**Acks.** A contributor submit is answered on `control` with `submit-ack`: `queued` (with a 1-based `position`), then `sent`, or `rejected` with a reason: `not_contributor`, `invalid_prompt`, `too_long`, `queue_full`, `grant_revoked`, `delivery_refused`, `delivery_unknown`. When the host sends a picked draft, its author gets `control` `{ kind: 'draft-sent' }` and the draft is cleared for everyone.
+
+**Queue status in presence.** Every presence stream carries `agentWorking` and `queued` (the waiting items). Viewers show "Agent is working · N queued", "Agent is working", "N queued" or nothing; the share dialog shows the same line and the queued items. Older viewers ignore the new fields and `control` kinds (`v` stays 1).
+
+**Attribution.** Right before a delivery the hub calls `bridge.expectAuthor(text, author)`. The conversation bridge stamps `SharedMessage.author` (`{ login, avatarUrl }`) on the first appended user message whose trimmed text equals the delivered text, and keeps the stamp in later `history` payloads; viewers show `@login` and the avatar on that message. A rejected delivery cancels the expectation, at most 20 wait at once, and a prompt delivered while no viewer is attached (the bridge is stopped) stays unattributed. If Claude Code stores the prompt with different text, the message has no author; the prompt is never prefixed.
+
+**Host API.** `POST /api/shares/:code/prompts` `{ text, draftGithubId? }` queues a controller send behind the dashboard mutation gate: 202 `{ ok: true, position }`; 400 `invalid_request`, `invalid_prompt` or `too_long`; 404 `share_not_found`; 409 `share_not_live`; 429 `queue_full`. With `draftGithubId` the draft's author is credited and the draft is taken only after the send is queued; otherwise the data owner is. `GET /api/shares` views carry `drafts` (`ShareDraftView[]`, oldest started first) and `queue` (`ShareQueueView`: `agentWorking`, `delivering`, `items`). The share dialog polls them every second and shows the drafts in a controller-mode `SuggestionList` (**Use**, edit, **Send**).
+
+Drafts and the queue are memory only. A host restart or a share end drops them, and items still queued when the hub closes are dropped.
 
 ## Local development
 
