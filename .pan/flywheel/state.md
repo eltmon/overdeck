@@ -599,3 +599,5 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
 - 2026-11-03 ~22:00Z disk 4.5 GB: removed three dangling Docker volumes that hold only rebuildable caches (myn-feature-min-1072_desktop-target 2.34 GB, _desktop-cargo 0.27 GB, myn_feature_min_1039_wave3_fix1_review_node_modules 1.65 GB) -> 9.3 GB. Left the dangling *postgres*/redis volumes alone (data).
 
 - 2026-11-03 23:5xZ operator clicked Merge batch to main on the Merge train page and nothing happened. Cause: two merge paths race (per-PR auto-merge train + UAT batch reconciler); each per-PR merge invalidates the batch, 30 generations today. Filed PAN-4970 (needs-handoff, TENET-10 merge machinery); route through a supervised handoff when a slot frees. Nothing was lost: per-PR train merged #4966/#4969.
+
+- 2026-11-03 operator put PAN-4970 (dual merge paths) into the pipeline via pan start, overriding the TENET-10 handoff routing for this issue.
