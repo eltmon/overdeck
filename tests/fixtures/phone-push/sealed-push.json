@@ -1,0 +1,39 @@
+{
+  "publicKeyHex": "55c0506c70233f01c32633ba683b9099c4d4adb209a046c3470b78788ec3c13f",
+  "secretKeyHex": "f20a2613bdbcce990d0a124d6fc4bf97319d0cccf3f67a2c3fe575b5b99864d2",
+  "cases": [
+    {
+      "name": "question",
+      "payload": {
+        "v": 1,
+        "machine": "env-fixture-1",
+        "kind": "question",
+        "title": "Agent asks: deploy now?",
+        "body": "PAN-1: pick one of 2 options",
+        "url": "/m?subject=conv-1",
+        "tag": "q:conv-1",
+        "issueId": "PAN-1",
+        "ts": "2026-11-03T00:00:00.000Z"
+      },
+      "sealed": "f310G8UoKhpUe2VuN6b4NWMQO2r6Xqjz3X9Cc4j3dhfznLrtxVNoth3aYCmhRYiFkEei/2o8Qu4B7dy7rC4LWUd4/S9b6F3Sx3W3slquo0Cllszl8P3/sZY7x8VSL6ZUnuoJMf4mxbbQ+tzsXJ2AqFMG/l/GSaU4BbaQcy05v5mwEwH288/7/ycAUvNcL/VhsFALyomMt0piPoKzTBa8R0aDTT1jEiUN54LvBSQusu8eBTM8hA9eJLRM8YgRKkH9b1amSvu8bQdrzo5m/2CzmA7t4d9fTs/cvjPaP77lxSSQ2Jw4nNL8qdb6t7Sgi7LaAnwd0flMGDQm/TpbBVuGmSWz86BuhjDL"
+    },
+    {
+      "name": "unicode",
+      "payload": {
+        "v": 1,
+        "machine": "env-fixture-1",
+        "kind": "finished",
+        "title": "Überprüfung ✅ 完了",
+        "body": "Ünïcödé 🚀",
+        "url": "/m",
+        "tag": "f:conv-2",
+        "issueId": null,
+        "ts": "2026-11-03T00:00:01.000Z"
+      },
+      "sealed": "EjoMFEOca08a0QULlDQQ8VxL1ozb0upKborlnG3IaiwVeWhOfftyRndlpp9D/Y+sA2Qw/UQ20mrG9RFJOl7qOSQYLlHDaiDlL4GZgxeV0IFbvLLMRFXXU24UoARuO+5i8l5dRWghn9PgkwLulaFStx1D9KpwCcMJk4vEQ7x8SoZYIFZUBeqLiwr5EWLxq/eFTBlwLsg4J3sK/FvJepNV7dtAxQswBE6XhKb00iwce9m7MDAVQv+9fuI37xf34PzMf2zx2Sb9yTTa6MPx24Scmp1OUq2WMgxdjHCu2dXBVWOZoOBIi07D39+lJA=="
+    }
+  ],
+  "wrongKey": {
+    "sealed": "al/1lqEbxfcHupSaTBSn8351Mwo7inqdb9ZJVR4XcQguZXa+hBviRSoZ6ldXz5cg1V85yBoTxWsh1OF291LFME+NPgz9aa6aFB+xrDAPpxgQp7BeOYzPoooOzzbf9eSmSsviIC5SBxSbNhRM0Ydcnq27zaztBUpI0GuthN6e+H/EzBKonRAuB4Jsz93G4DEmPu+Ui7rNTlyHLL+Y/nEq2DVm78Wdtuqk3QnAUiRPGorGL8/wgnRT0xrhYEAupHIxg8kIwDnyvQjz1Cj/vxbsnK1viPiSYEvQvRpeYi+ouUnz0LfFztD7CXpkjsGB0uEsdkdlvK4WzWPUax02I0ImG835Gd/L5FSr"
+  }
+}

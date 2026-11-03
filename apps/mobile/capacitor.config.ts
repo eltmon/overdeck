@@ -5,7 +5,11 @@ const config: CapacitorConfig = {
   appName: 'Overdeck',
   webDir: 'dist',
   server: { androidScheme: 'https' },
-  plugins: { Browser: { presentationStyle: 'popover' } },
+  plugins: {
+    Browser: { presentationStyle: 'popover' },
+    // Foreground notifications still show, e.g. one from another machine (PAN-4838 D-12).
+    PushNotifications: { presentationOptions: ['alert', 'sound'] },
+  },
 };
 
 export default config;
