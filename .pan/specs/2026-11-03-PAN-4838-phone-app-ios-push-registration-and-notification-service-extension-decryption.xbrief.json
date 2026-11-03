@@ -4,17 +4,17 @@
     "created": "2026-11-03T20:52:44Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4838: Phone app (iOS): push registration and Notification Service Extension decryption",
-    "updated": "2026-11-03T20:58:56.700Z"
+    "updated": "2026-11-03T20:59:53.063Z"
   },
   "plan": {
     "id": "pan-4838",
     "title": "Phone app (iOS): push registration and Notification Service Extension decryption",
-    "status": "proposed",
+    "status": "running",
     "uid": "c20bc3bb-4dfc-496b-aa6d-991c675f3592",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-03T20:52:44Z",
-    "updated": "2026-11-03T20:58:56.700Z",
+    "updated": "2026-11-03T20:59:53.063Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4838",
@@ -920,5 +920,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
