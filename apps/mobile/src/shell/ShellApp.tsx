@@ -1,24 +1,44 @@
 /** The phone app's root: identity, the account, URL opens, and which shell screen shows (PAN-4837). */
 import { App } from '@capacitor/app';
+import { PHONE_PAIR_LINK_PREFIX, parsePhonePairLink } from '@overdeck/contracts';
 import { useCallback, useEffect, useState } from 'react';
 
 import { type DeviceIdentity, loadIdentity } from '../native/keys';
+import { type Connection, createConnection } from './connection';
 import { createDirectory, type ShellDirectory } from './directory';
 import { MachinesScreen } from './MachinesScreen';
+import { PairScreen } from './PairScreen';
+import { pairMachine } from './pairing';
 import { shellPlatform } from './platform';
+import { createRelayMeter } from './relayMeter';
 import { SignInScreen } from './SignInScreen';
 import { completeSignIn, isSignInCallback, startSignIn } from './signIn';
-import { readAccount, readMachines, useShellStore } from './store';
+import { readAccount, readMachines, setCurrentMachineId, useShellStore } from './store';
+import type { PairedMachine } from './types';
 
 type Boot = { kind: 'loading' } | { kind: 'failed'; message: string } | { kind: 'ready'; identity: DeviceIdentity };
 /** Shell screens shown while signed in and no machine view is open. */
-type View = { kind: 'machines' } | { kind: 'pair'; environmentId: string | null } | { kind: 'settings' };
+type View = { kind: 'machines' } | { kind: 'pair'; link: string | null } | { kind: 'settings' };
 
-export default function ShellApp() {
+interface Services {
+  directory: ShellDirectory;
+  connection: Connection;
+}
+
+const errorText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+
+interface ShellAppProps {
+  /** Default `location.assign`: opening a machine reloads the page (C-7). */
+  navigate?: (path: string) => void;
+}
+
+export default function ShellApp({ navigate = (path) => location.assign(path) }: ShellAppProps) {
   const [boot, setBoot] = useState<Boot>({ kind: 'loading' });
   const [signInError, setSignInError] = useState<string | null>(null);
   const [view, setView] = useState<View>({ kind: 'machines' });
-  const [directory, setDirectory] = useState<ShellDirectory | null>(null);
+  const [services, setServices] = useState<Services | null>(null);
+  /** A pair link that arrived before sign-in; it opens the pair screen once signed in. */
+  const [pendingPairLink, setPendingPairLink] = useState<string | null>(null);
   const account = useShellStore((s) => s.account);
   const paired = useShellStore((s) => s.machines);
   const setAccount = useShellStore((s) => s.setAccount);
@@ -26,12 +46,16 @@ export default function ShellApp() {
 
   const handleUrl = useCallback(
     async (url: string) => {
+      if (url.startsWith(PHONE_PAIR_LINK_PREFIX)) {
+        setPendingPairLink(url);
+        return;
+      }
       if (!isSignInCallback(url)) return;
       try {
         setAccount(await completeSignIn(url));
         setSignInError(null);
       } catch (e) {
-        setSignInError(e instanceof Error ? e.message : String(e));
+        setSignInError(errorText(e));
       }
     },
     [setAccount],
@@ -50,7 +74,7 @@ export default function ShellApp() {
         const launch = await App.getLaunchUrl();
         if (!cancelled && launch?.url) await handleUrl(launch.url);
       } catch (e) {
-        if (!cancelled) setBoot({ kind: 'failed', message: e instanceof Error ? e.message : String(e) });
+        if (!cancelled) setBoot({ kind: 'failed', message: errorText(e) });
       }
     })();
     const listener = App.addListener('appUrlOpen', ({ url }) => void handleUrl(url));
@@ -60,23 +84,60 @@ export default function ShellApp() {
     };
   }, [handleUrl, setAccount, setMachines]);
 
+  useEffect(() => {
+    if (account === null || pendingPairLink === null) return;
+    setView({ kind: 'pair', link: pendingPairLink });
+    setPendingPairLink(null);
+  }, [account, pendingPairLink]);
+
   const identity = boot.kind === 'ready' ? boot.identity : null;
   useEffect(() => {
     if (!identity || !account) return;
-    const created = createDirectory({
+    const directory = createDirectory({
       identity,
       accountToken: async () => (await readAccount())?.token ?? null,
       label: account.label,
       platform: shellPlatform(),
     });
-    setDirectory(created);
-    void created.client.start();
+    const meter = createRelayMeter((bytes) => directory.client.send({ type: 'relay-usage', bytes }));
+    setServices({ directory, connection: createConnection({ directory, meter }) });
+    void directory.client.start();
     return () => {
-      created.client.stop();
-      created.dialer.close();
-      setDirectory(null);
+      meter.stop();
+      directory.client.stop();
+      directory.dialer.close();
+      setServices(null);
     };
   }, [identity, account]);
+
+  const labelFor = useCallback(
+    (link: string) => {
+      const environmentId = parsePhonePairLink(link)?.environmentId;
+      return services?.directory.client.machines.find((m) => m.environmentId === environmentId)?.label ?? 'the machine';
+    },
+    [services],
+  );
+
+  const pair = useCallback(
+    (link: string) => {
+      if (!services || !identity || !account) return Promise.reject(new Error('Not signed in.'));
+      return pairMachine(link, {
+        machines: () => services.directory.client.machines,
+        connection: services.connection,
+        identity,
+        phoneLabel: account.label,
+      });
+    },
+    [services, identity, account],
+  );
+
+  const onPaired = useCallback(
+    (machine: PairedMachine) => {
+      setCurrentMachineId(machine.environmentId);
+      navigate('/m');
+    },
+    [navigate],
+  );
 
   return (
     <div data-component="mobile-shell" className="fixed inset-0 flex flex-col bg-background text-foreground">
@@ -86,20 +147,30 @@ export default function ShellApp() {
         </p>
       ) : account === null ? (
         <SignInScreen error={signInError} onSignIn={() => startSignIn(boot.identity, shellPlatform())} />
-      ) : directory === null ? null : view.kind === 'machines' ? (
+      ) : services === null ? null : view.kind === 'machines' ? (
         <MachinesScreen
-          client={directory.client}
+          client={services.directory.client}
           paired={paired}
-          onPair={(machine) => setView({ kind: 'pair', environmentId: machine?.environmentId ?? null })}
+          onPair={() => setView({ kind: 'pair', link: null })}
           onSettings={() => setView({ kind: 'settings' })}
           onSignedOut={() => setAccount(null)}
+          navigate={navigate}
+        />
+      ) : view.kind === 'pair' ? (
+        <PairScreen
+          key={view.link ?? ''}
+          initialLink={view.link}
+          labelFor={labelFor}
+          pair={pair}
+          onPaired={onPaired}
+          onCancel={() => setView({ kind: 'machines' })}
         />
       ) : (
         <section className="flex flex-1 flex-col gap-3 px-4 pt-[calc(env(safe-area-inset-top)+1rem)]">
           <button type="button" onClick={() => setView({ kind: 'machines' })} className="min-h-11 self-start text-sm text-foreground">
             ‹ Machines
           </button>
-          <p className="text-sm text-muted-foreground">{view.kind === 'pair' ? 'Pairing' : 'Settings'} comes in a later build.</p>
+          <p className="text-sm text-muted-foreground">Settings comes in a later build.</p>
         </section>
       )}
     </div>
