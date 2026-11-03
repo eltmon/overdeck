@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4852",
   "created": "2026-11-03T02:45:30.764Z",
-  "updated": "2026-11-03T06:17:40.271Z",
+  "updated": "2026-11-03T09:53:10.608Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -442,6 +442,10 @@
     "docs.ac4": {
       "status": "completed",
       "doneAt": "2026-11-03T06:17:40.271Z"
+    },
+    "codex-hooks.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:53:10.607Z"
     }
   }
 }
