@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4930",
   "created": "2026-11-03T21:47:50.354Z",
-  "updated": "2026-11-03T23:25:43.608Z",
+  "updated": "2026-11-03T23:26:03.691Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -160,6 +160,10 @@
     "revoke-conversation-stop.ac2": {
       "status": "completed",
       "doneAt": "2026-11-03T23:25:43.608Z"
+    },
+    "token-sweep.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:26:03.691Z"
     }
   }
 }
