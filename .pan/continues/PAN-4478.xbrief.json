@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4478",
   "created": "2026-11-03T17:36:37.149Z",
-  "updated": "2026-11-03T18:34:46.421Z",
+  "updated": "2026-11-03T18:35:02.957Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -138,6 +138,10 @@
     "host-gate.ac4": {
       "status": "completed",
       "doneAt": "2026-11-03T18:34:46.421Z"
+    },
+    "viewer-peer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:35:02.957Z"
     }
   }
 }
