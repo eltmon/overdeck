@@ -10,11 +10,12 @@
  *   (browsers) or in the body (`delivery: 'bearer'`, desktop clients). It is
  *   unauthenticated by design and rate limited on failures.
  *
- * - `GET /api/devices` lists paired devices (never their token hashes).
- * - `DELETE /api/devices/:id` revokes one and closes its live WebSocket and
- *   SSE connections. A device may revoke itself but not another device, an
- *   access token may revoke none, and the internal token and root session may
- *   revoke any.
+ * - `GET /api/devices` lists paired devices and paired phones (PAN-4835),
+ *   never their token hashes or key material.
+ * - `DELETE /api/devices/:id` revokes one and closes its live WebSocket, SSE
+ *   and (for a phone) secure-channel connections. A device may revoke itself
+ *   but not another device, an access token may revoke none, and the internal
+ *   token and root session may revoke any.
  *
  * No pairing response is cacheable, and none ever contains the internal token.
  */
@@ -24,6 +25,7 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstab
 import { createAccessToken, listAccessTokens, revokeAccessToken, type PublicAccessTokenRecord } from '../../../lib/access-tokens.js';
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
+import { closeChannelsForPeer } from '../channel-listener.js';
 import { closeDeviceConnections } from '../device-connections.js';
 import { jsonResponse } from '../http-helpers.js';
 import {
@@ -150,6 +152,7 @@ function deviceView(record: PublicAccessTokenRecord) {
   return {
     id: record.id,
     name: record.name,
+    kind: record.kind === 'phone' ? ('phone' as const) : ('device' as const),
     scopes: [...record.scopes],
     createdAt: record.createdAt,
     lastUsedAt: record.lastUsedAt,
@@ -165,7 +168,7 @@ const listDevicesRoute = HttpRouter.add(
     const authError = rejectUnauthorizedDashboardRequest(request);
     if (authError) return noStore(authError);
     const records = yield* Effect.promise(() => listAccessTokens());
-    return noStore(jsonResponse({ devices: records.filter((record) => record.kind === 'device').map(deviceView) }));
+    return noStore(jsonResponse({ devices: records.filter((record) => record.kind === 'device' || record.kind === 'phone').map(deviceView) }));
   }),
 );
 
@@ -184,7 +187,7 @@ const revokeDeviceRoute = HttpRouter.add(
     }
 
     const records = yield* Effect.promise(() => listAccessTokens());
-    const target = records.find((record) => record.id === id && record.kind === 'device');
+    const target = records.find((record) => record.id === id && (record.kind === 'device' || record.kind === 'phone'));
     if (!target) return noStore(jsonResponse({ error: `no paired device with id ${id}` }, { status: 404 }));
 
     if (credential?.kind === 'device' && credential.deviceId !== id) {
@@ -194,10 +197,11 @@ const revokeDeviceRoute = HttpRouter.add(
     const revoked = yield* Effect.promise(() => revokeAccessToken(id));
     if (!revoked) return noStore(jsonResponse({ error: `no paired device with id ${id}` }, { status: 404 }));
     const closed = closeDeviceConnections(id);
+    if (target.kind === 'phone' && target.phoneKey) closeChannelsForPeer(target.phoneKey);
     emitActivityEntry({
       source: 'dashboard',
       level: 'info',
-      message: `Revoked device "${revoked.name}"`,
+      message: target.kind === 'phone' ? `Revoked phone "${revoked.name}"` : `Revoked device "${revoked.name}"`,
       details: JSON.stringify({ deviceId: id, closedConnections: closed }),
     });
     return noStore(jsonResponse({ ok: true, device: deviceView(revoked) }));

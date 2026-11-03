@@ -3,6 +3,8 @@
  * are rate limited on failure, never leak the internal token, and cannot be
  * issued by a paired device or (PAN-2351 D-11) an access token.
  */
+import { createRequire } from 'node:module';
+import { createServer } from 'node:http';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -13,26 +15,33 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../lib/activity-logger.js', () => ({ emitActivityEntry: vi.fn() }));
 
-const { _resetAccessTokensForTests, _settleAccessTokenWritesForTests, createAccessToken } = await import('../../../lib/access-tokens.js');
+const { _resetAccessTokensForTests, _settleAccessTokenWritesForTests, createAccessToken, PHONE_TOKEN_SCOPES, verifyAccessToken } = await import('../../../lib/access-tokens.js');
 const { _resetInternalTokenCacheForTests, INTERNAL_TOKEN_HEADER } = await import('../../../lib/internal-token.js');
 const { _resetDashboardSessionTokenForTests, dashboardCsrfToken } = await import('../routes/dashboard-auth.js');
 const { _resetPairingCredentialsForTests } = await import('../pairing-credentials.js');
 const { pairingRouteLayer } = await import('../routes/pairing.js');
+const { _resetChannelListenerForTests, installChannelListener, liveChannelCount } = await import('../channel-listener.js');
+const { openChannel } = await import('../../../lib/anywhere/channel/open.js');
+type MachineKeyPair = import('../../../lib/anywhere/machine-key.js').MachineKeyPair;
+
+const _require = createRequire(import.meta.url);
+const dh = _require('noise-handshake/dh') as { generateKeyPair(): MachineKeyPair };
 
 const INTERNAL_TOKEN = 'pairing-internal-token-0123456789';
 const originalHome = process.env.OVERDECK_HOME;
 let home: string;
+const cleanups: Array<() => Promise<void> | void> = [];
 
-async function post(path: string, body: unknown, headers: Record<string, string> = {}, peer = '127.0.0.1') {
+async function request(method: string, path: string, body: unknown, headers: Record<string, string> = {}, peer = '127.0.0.1') {
   // The local browser is a loopback peer; PAN-4645 refuses cookie pairing to remote plain-HTTP peers.
-  const request = HttpServerRequest.fromWeb(new Request(`http://localhost${path}`, {
-    method: 'POST',
+  const req = HttpServerRequest.fromWeb(new Request(`http://localhost${path}`, {
+    method,
     headers: { 'Content-Type': 'application/json', ...headers },
-    body: JSON.stringify(body),
+    body: body === undefined ? undefined : JSON.stringify(body),
   })).modify({ remoteAddress: Option.some(peer) });
   const response = await Effect.runPromise(Effect.scoped(Effect.flatMap(
     HttpRouter.toHttpEffect(pairingRouteLayer),
-    (app) => Effect.provideService(app, HttpServerRequest.HttpServerRequest, request),
+    (app) => Effect.provideService(app, HttpServerRequest.HttpServerRequest, req),
   )));
   const raw = response as { status: number; headers: Record<string, string>; body: { body?: Uint8Array } };
   const text = raw.body?.body ? new TextDecoder().decode(raw.body.body) : '';
@@ -43,6 +52,10 @@ async function post(path: string, body: unknown, headers: Record<string, string>
     text,
     json: text ? JSON.parse(text) : null,
   };
+}
+
+function post(path: string, body: unknown, headers: Record<string, string> = {}, peer = '127.0.0.1') {
+  return request('POST', path, body, headers, peer);
 }
 
 async function issue() {
@@ -65,12 +78,15 @@ beforeEach(async () => {
   _resetDashboardSessionTokenForTests();
   _resetAccessTokensForTests();
   _resetPairingCredentialsForTests();
+  _resetChannelListenerForTests();
 });
 
 afterEach(async () => {
   vi.useRealTimers();
+  for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
   await _settleAccessTokenWritesForTests();
   _resetAccessTokensForTests();
+  _resetChannelListenerForTests();
   delete process.env.OVERDECK_INTERNAL_TOKEN;
   _resetInternalTokenCacheForTests();
   _resetDashboardSessionTokenForTests();
@@ -173,5 +189,68 @@ describe('cookie pairing over plain HTTP (PAN-4645 WI-16, D-4645-13)', () => {
     const bearer = await exchange(second, 'bearer', { peer: '192.0.2.44' });
     expect(bearer.status).toBe(200);
     expect(bearer.json.token).toMatch(/^odk_/);
+  });
+});
+
+describe('phones in GET /api/devices and DELETE /api/devices/:id (PAN-4835 WI-9)', () => {
+  function admin(path: string, method = 'GET') {
+    return request(method, path, undefined, { [INTERNAL_TOKEN_HEADER]: INTERNAL_TOKEN });
+  }
+
+  it('lists a device row with kind device and a phone row with kind phone, never key material', async () => {
+    const { token: deviceToken } = await createAccessToken({ name: 'tablet', scopes: ['admin'], kind: 'device' });
+    const { token: phoneToken } = await createAccessToken({
+      name: 'iris', kind: 'phone', scopes: [...PHONE_TOKEN_SCOPES],
+      phoneKey: 'a1'.repeat(32), clientId: '11111111-1111-4111-8111-111111111111', pushKey: 'c3'.repeat(32),
+    });
+    const { json } = await admin('/api/devices');
+    const devices = json.devices as Array<Record<string, unknown>>;
+    const device = devices.find((d) => d.name === 'tablet');
+    const phone = devices.find((d) => d.name === 'iris');
+    expect(device).toMatchObject({ kind: 'device' });
+    expect(phone).toMatchObject({ kind: 'phone' });
+    for (const row of [device, phone]) {
+      expect(row).not.toHaveProperty('tokenHash');
+      expect(row).not.toHaveProperty('phoneKey');
+      expect(row).not.toHaveProperty('pushKey');
+    }
+    expect(verifyAccessToken(deviceToken).ok).toBe(true);
+    expect(verifyAccessToken(phoneToken).ok).toBe(true);
+  });
+
+  it('revokes a phone with a root credential, closing its channels; a token record id still 404s', async () => {
+    const serverKey = dh.generateKeyPair();
+    const phoneKey = dh.generateKeyPair();
+    const phoneHex = phoneKey.publicKey.toString('hex');
+    const { record } = await createAccessToken({
+      name: 'iris', kind: 'phone', scopes: [...PHONE_TOKEN_SCOPES],
+      phoneKey: phoneHex, clientId: '11111111-1111-4111-8111-111111111111',
+    });
+
+    const http = createServer((_req, res) => res.end('ok'));
+    installChannelListener(http, {
+      primary: true,
+      localKey: async () => serverKey,
+      isPinnedPeer: (key) => key === phoneHex,
+      takePairing: () => 'unknown',
+      onPairingFailure: () => undefined,
+      log: () => undefined,
+    });
+    await new Promise<void>((resolve) => http.listen(0, '127.0.0.1', resolve));
+    cleanups.push(() => new Promise<void>((resolve) => http.close(() => resolve())));
+    const channelPort = (http.address() as { port: number }).port;
+    const channel = await openChannel(`tcp://127.0.0.1:${channelPort}`, { mode: 'link', localKey: phoneKey, remoteKeyHex: serverKey.publicKey.toString('hex') });
+    cleanups.push(() => channel.destroy());
+    expect(liveChannelCount()).toBe(1);
+    const channelClosed = new Promise<void>((resolve) => channel.once('close', resolve));
+
+    const res = await admin(`/api/devices/${record.id}`, 'DELETE');
+    expect(res.status).toBe(200);
+    expect(res.json).toMatchObject({ ok: true, device: { id: record.id, kind: 'phone' } });
+    await channelClosed;
+    expect(liveChannelCount()).toBe(0);
+
+    const { record: tokenRecord } = await createAccessToken({ name: 'ci', scopes: ['admin'], kind: 'token' });
+    expect((await admin(`/api/devices/${tokenRecord.id}`, 'DELETE')).status).toBe(404);
   });
 });
