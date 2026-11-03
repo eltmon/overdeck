@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4904",
+  "created": "2026-11-03T15:44:28.853Z",
+  "updated": "2026-11-03T15:44:28.853Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "codex-injected-prefixes": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4904",
+      "claimedAt": "2026-11-03T15:44:28.853Z"
+    }
+  }
+}
