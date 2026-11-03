@@ -76,7 +76,8 @@ export const SSH_MACHINE_ERROR_STATUS: Record<SshMachineErrorCode, number> = {
 
 export const VERSION_PROBE_TIMEOUT_MS = 20_000;
 export const HELPER_START_TIMEOUT_MS = 150_000;
-export const HELPER_STOP_TIMEOUT_MS = 45_000;
+// D-4861-6: lock wait 30 s + supervisor stop and probe + dashboard grace 10 s.
+export const HELPER_STOP_TIMEOUT_MS = 60_000;
 
 /** The parts of the forward supervisor the service uses. */
 export type SshForwards = Pick<SshForwardSupervisor, 'ensure' | 'stopForward' | 'status'>;

@@ -403,7 +403,7 @@ User-facing pages: the `## SSH machines` section of `configuration/linked-machin
    stops; their server never does).
 
 A failure after step 5 stops the forward, deletes the provisional record and, when the
-helper reported `managed`, runs `ssh-helper stop` (45 s, best effort). At boot, a record
+helper reported `managed`, runs `ssh-helper stop` (60 s, best effort). At boot, a record
 whose link id is still null (the dashboard died mid-add) is deleted.
 
 ### The remote command (D-4404-4, D-4404-5)
