@@ -32,7 +32,7 @@ import { signOffDisposition } from '../../../lib/deft/signoff.js';
 import { clearDeftPendingCache } from '../../../lib/deft/pending.js';
 import { clearDeftModeCache, readDeftIssueState, summarizeDeftIssueState } from '../../../lib/deft/state-reader.js';
 import { parseIssueId } from '../../../lib/issue-id.js';
-import { getIssueWorkspacePath } from '../../../lib/overdeck/issue-projects.js';
+import { getIssueWorkspacePath, resolveProjectForIssue } from '../../../lib/overdeck/issue-projects.js';
 import { PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
 import { listProjectsAsync } from '../../../lib/projects.js';
 import { planHomeFor, readIssueFile } from '../../../lib/skill-overrides/issue-file.js';
@@ -224,6 +224,10 @@ const postPipelineRoute = HttpRouter.add(
     }
     if (body['start'] !== undefined && typeof body['start'] !== 'boolean') {
       return jsonResponse({ error: 'start must be a boolean' }, { status: 400 });
+    }
+    // A registered project must own the issue; its workspace may not exist yet (use creates it).
+    if (!resolveProjectForIssue(issueId)) {
+      return jsonResponse({ error: `no registered project owns ${issueId}` }, { status: 404 });
     }
     if (runningSwitches.has(issueId)) {
       return jsonResponse({ error: `a pipeline switch for ${issueId} is already running` }, { status: 409 });

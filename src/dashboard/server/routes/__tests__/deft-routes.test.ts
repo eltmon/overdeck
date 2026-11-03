@@ -19,13 +19,17 @@ const GOLDEN_PATH = fileURLToPath(new URL('../../../../lib/deft/__tests__/fixtur
 const mocks = vi.hoisted(() => ({
   isDeftPipelineIssue: vi.fn(),
   getIssueWorkspacePath: vi.fn(),
+  resolveProjectForIssue: vi.fn(),
   listProjectsAsync: vi.fn(),
   emitActivityEntry: vi.fn(),
   deliverAgentMessage: vi.fn(),
 }));
 
 vi.mock('../../../../lib/deft/issue-pipeline.js', () => ({ isDeftPipelineIssue: mocks.isDeftPipelineIssue }));
-vi.mock('../../../../lib/overdeck/issue-projects.js', () => ({ getIssueWorkspacePath: mocks.getIssueWorkspacePath }));
+vi.mock('../../../../lib/overdeck/issue-projects.js', () => ({
+  getIssueWorkspacePath: mocks.getIssueWorkspacePath,
+  resolveProjectForIssue: mocks.resolveProjectForIssue,
+}));
 vi.mock('../../../../lib/deft/archive.js', () => ({ isNativeDirectiveProject: async () => false }));
 vi.mock('../../../../lib/activity-logger.js', () => ({ emitActivityEntry: mocks.emitActivityEntry }));
 vi.mock('../../../../lib/agents/delivery.js', () => ({ deliverAgentMessage: mocks.deliverAgentMessage }));
@@ -80,6 +84,7 @@ beforeEach(() => {
   setDeftPipelineSpawnerForTests(spawner);
   mocks.isDeftPipelineIssue.mockResolvedValue(true);
   mocks.getIssueWorkspacePath.mockReturnValue(FIXTURE_DIR);
+  mocks.resolveProjectForIssue.mockReturnValue({ name: 'p', path: '/tmp/p' });
   mocks.listProjectsAsync.mockResolvedValue([]);
 });
 
@@ -163,6 +168,18 @@ describe('POST /api/issues/:id/pipeline', () => {
     expect((await call('POST', '/api/issues/PAN-1/pipeline', { body: { pipeline: 'other' } })).status).toBe(400);
     expect((await call('POST', '/api/issues/PAN-1/pipeline', { body: { pipeline: 'deft', start: 'yes' } })).status).toBe(400);
     expect(spawner).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 and spawns nothing for an issue no registered project owns', async () => {
+    mocks.resolveProjectForIssue.mockReturnValue(null);
+    const res = await call('POST', '/api/issues/PAN-1/pipeline', { body: { pipeline: 'deft' } });
+    expect(res).toEqual({ status: 404, json: { error: 'no registered project owns PAN-1' } });
+    expect(spawner).not.toHaveBeenCalled();
+  });
+
+  it('accepts an issue with a registered project but no workspace yet', async () => {
+    mocks.getIssueWorkspacePath.mockReturnValue(null);
+    expect((await call('POST', '/api/issues/PAN-1/pipeline', { body: { pipeline: 'deft' } })).status).toBe(202);
   });
 
   it('answers 202 and spawns pan skills deft use once', async () => {
