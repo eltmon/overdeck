@@ -30,7 +30,11 @@ export interface BrowserJoinDeps {
   clearInterval: typeof clearInterval;
 }
 
-export type BrowserJoinState = Exclude<JoinState, 'away'>;
+/**
+ * `away` (the viewer server's grace timer) and `reconnecting` (its backoff retry, PAN-4479) belong
+ * to the viewer server; a browser join restarts with the restart dance or ends `disconnected`.
+ */
+export type BrowserJoinState = Exclude<JoinState, 'away' | 'reconnecting'>;
 
 export interface BrowserJoinView {
   state: BrowserJoinState;
