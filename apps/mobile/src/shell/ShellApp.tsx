@@ -6,6 +6,8 @@ import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { type DeviceIdentity, loadIdentity } from '../native/keys';
 import { type Connection, createConnection } from './connection';
 import { createDirectory, type ShellDirectory } from './directory';
+import { resetTransport } from '../../../../src/dashboard/frontend/src/lib/wsTransport';
+import { installResumeHandler } from './lifecycle';
 import { MachinesScreen } from './MachinesScreen';
 import { MachineView } from './MachineView';
 import { PairScreen } from './PairScreen';
@@ -105,9 +107,12 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
       platform: shellPlatform(),
     });
     const meter = createRelayMeter((bytes) => directory.client.send({ type: 'relay-usage', bytes }));
-    setServices({ directory, connection: createConnection({ directory, meter }) });
+    const connection = createConnection({ directory, meter });
+    setServices({ directory, connection });
     void directory.client.start();
+    const uninstallResume = installResumeHandler(() => ({ directory: directory.client, connection, resetTransport: () => resetTransport() }));
     return () => {
+      uninstallResume();
       meter.stop();
       directory.client.stop();
       directory.dialer.close();

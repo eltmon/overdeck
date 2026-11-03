@@ -11,6 +11,7 @@ import { ImageLightboxHost } from '../../../../src/dashboard/frontend/src/compon
 import { DialogProvider } from '../../../../src/dashboard/frontend/src/components/DialogProvider';
 import MobileApp from '../../../../src/dashboard/frontend/src/components/mobile/MobileApp';
 import { installQueryRecovery } from '../../../../src/dashboard/frontend/src/lib/queryRecovery';
+import { UpdatingBanner } from './UpdatingBanner';
 
 function isNetworkError(error: unknown): boolean {
   if (!(error instanceof TypeError)) return false;
@@ -56,6 +57,7 @@ export function MachineView({ label, onMachines }: MachineViewProps) {
           }
         />
         <ImageLightboxHost />
+        <UpdatingBanner />
       </DialogProvider>
     </QueryClientProvider>
   );
