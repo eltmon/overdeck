@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4929",
   "created": "2026-11-03T21:43:38.500Z",
-  "updated": "2026-11-03T21:58:22.397Z",
+  "updated": "2026-11-03T21:59:35.739Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -28,9 +28,10 @@
       "doneAt": "2026-11-03T21:58:16.532Z"
     },
     "docs-polyrepo-install": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4929",
-      "claimedAt": "2026-11-03T21:58:22.397Z"
+      "claimedAt": "2026-11-03T21:58:22.397Z",
+      "doneAt": "2026-11-03T21:59:35.739Z"
     }
   }
 }
