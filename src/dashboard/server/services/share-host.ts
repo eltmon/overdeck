@@ -15,9 +15,15 @@
  * Keepalive (D-11): a WebSocket protocol ping every 30 s; 75 s without a pong terminates the
  * socket and marks the share `disconnected`.
  *
+ * WebRTC (PAN-4474): each live host gets a `PeerHub` (`../sharing/peer-hub.ts`). The manager routes
+ * `signal`, `ice-servers` and `error turn_unavailable` frames to it, tells it about every `admit`,
+ * `kick` and `revoke` it sends, and closes it when the host entry is dropped. A dropped host socket
+ * keeps established peer connections.
+ *
  * Plain async class with injected seams, like `directory-client.ts` (D-8). Nothing here logs.
  */
 import type {
+  HostFrame,
   RoomSnapshot,
   ServiceToHostFrame,
   ShareCommand,
@@ -42,6 +48,7 @@ import {
   readShareUrl,
   type ShareUrlResult,
 } from '../../../lib/sharing/share-service.js';
+import { PeerHub, productionPeerHubDeps, type HostHub, type PeerHubContext } from '../sharing/peer-hub.js';
 
 export const PING_INTERVAL_MS = 30_000;
 export const PONG_TIMEOUT_MS = 75_000;
@@ -69,6 +76,8 @@ export interface ShareManagerDeps {
   records: { read: typeof readShareRecords; put: typeof putShareRecord; remove: typeof removeShareRecord };
   openSocket(url: string, headers: Record<string, string>): ShareSocket;
   now(): Date;
+  /** Builds the share's WebRTC hub (PAN-4474). Absent: no hub, signaling frames are ignored. */
+  createHub?(ctx: PeerHubContext): HostHub;
 }
 
 export type CreateShareOutcome =
@@ -86,6 +95,7 @@ interface ShareHost {
   lastError: ShareLastError | null;
   pingTimer: NodeJS.Timeout | null;
   pongTimer: NodeJS.Timeout | null;
+  hub: HostHub | null;
 }
 
 const CLOSE_ROOM_ENDED = 4004;
@@ -179,6 +189,8 @@ export class ShareManager {
     } catch {
       return { status: 409, body: { error: 'share_not_connected' } };
     }
+    if (command.type === 'admit') host.hub?.admit(command.githubId);
+    else if (command.type === 'kick' || command.type === 'revoke') host.hub?.remove(command.githubId);
     return { status: 202, body: { ok: true } };
   }
 
@@ -269,8 +281,14 @@ export class ShareManager {
       lastError: null,
       pingTimer: null,
       pongTimer: null,
+      hub: null,
     };
     this.hosts.set(shortCode, host);
+    host.hub = this.deps.createHub?.({
+      shortCode,
+      scope: { kind: 'conversation', conversationId: record.scopeId },
+      sendFrame: (frame) => this.sendHostFrame(host, frame),
+    }) ?? null;
     const current = () => this.hosts.get(shortCode) === host && host.connection !== 'disconnected';
 
     socket.on('open', () => {
@@ -321,12 +339,30 @@ export class ShareManager {
     if (frame.type === 'room' && typeof frame.snapshot === 'object' && frame.snapshot !== null) {
       host.snapshot = frame.snapshot;
       host.connection = 'connected';
+      host.hub?.onSnapshot(frame.snapshot);
+    } else if (frame.type === 'signal' && typeof frame.githubId === 'number' && typeof frame.data === 'object' && frame.data !== null) {
+      host.hub?.onSignal(frame.githubId, frame.data);
+    } else if (frame.type === 'ice-servers' && Array.isArray(frame.iceServers)) {
+      host.hub?.onIceServers(frame.iceServers);
     } else if (frame.type === 'error' && typeof frame.code === 'string') {
       host.lastError = typeof frame.githubId === 'number'
         ? { code: frame.code, githubId: frame.githubId, at: this.deps.now().toISOString() }
         : { code: frame.code, at: this.deps.now().toISOString() };
+      if (frame.code === 'turn_unavailable') host.hub?.onIceServersUnavailable();
     }
-    // `signal` and `ice-servers` belong to slice 3 (PAN-4474); unknown types are ignored.
+    // Unknown types are ignored.
+  }
+
+  /** Sends one host frame for the hub; false when this host's socket cannot send. */
+  private sendHostFrame(host: ShareHost, frame: HostFrame): boolean {
+    if (this.hosts.get(host.shortCode) !== host || host.connection === 'disconnected') return false;
+    if (host.socket.readyState !== WebSocket.OPEN) return false;
+    try {
+      host.socket.send(JSON.stringify(frame));
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private startKeepalive(host: ShareHost): void {
@@ -368,6 +404,7 @@ export class ShareManager {
     this.hosts.delete(shortCode);
     host.connection = 'disconnected';
     this.stopKeepalive(host);
+    host.hub?.close();
     if (how !== 'none') this.shut(host.socket, how);
   }
 
@@ -400,6 +437,7 @@ function productionDeps(): ShareManagerDeps {
     records: { read: readShareRecords, put: putShareRecord, remove: removeShareRecord },
     openSocket: defaultOpenSocket,
     now: () => new Date(),
+    createHub: (ctx) => new PeerHub(ctx, productionPeerHubDeps(ctx.scope.conversationId)),
   };
 }
 

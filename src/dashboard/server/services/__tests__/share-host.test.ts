@@ -1,10 +1,18 @@
 import { EventEmitter } from 'node:events';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WebSocket } from 'ws';
-import type { CreateRoomResponse, RoomSnapshot, ServiceToHostFrame, ShareScope } from '@overdeck/contracts';
+import type {
+  CreateRoomResponse,
+  IceServer,
+  RoomSnapshot,
+  ServiceToHostFrame,
+  ShareScope,
+  SignalData,
+} from '@overdeck/contracts';
 
 import type { AccountRecord } from '../../../../lib/account/store.js';
 import type { ShareRecord } from '../../../../lib/sharing/share-record.js';
+import type { HostHub, PeerHubContext } from '../../sharing/peer-hub.js';
 import {
   PING_INTERVAL_MS,
   PONG_TIMEOUT_MS,
@@ -359,5 +367,141 @@ describe('ShareManager', () => {
     expect(views).toHaveLength(3);
     expect(views[0]?.shortCode).toBe('VWXZ2345');
     expect(JSON.stringify(views)).not.toMatch(/odh_[0-9a-f]{64}/);
+  });
+});
+
+/** Records every call the manager makes on its hub. */
+class FakeHub implements HostHub {
+  readonly calls: Array<[string, ...unknown[]]> = [];
+  constructor(readonly ctx: PeerHubContext, private readonly socketSent: () => number) {}
+  admit(githubId: number): void {
+    this.calls.push(['admit', githubId, this.socketSent()]);
+  }
+  remove(githubId: number): void {
+    this.calls.push(['remove', githubId]);
+  }
+  onSnapshot(value: RoomSnapshot): void {
+    this.calls.push(['onSnapshot', value]);
+  }
+  onSignal(githubId: number, data: SignalData): void {
+    this.calls.push(['onSignal', githubId, data]);
+  }
+  onIceServers(iceServers: readonly IceServer[]): void {
+    this.calls.push(['onIceServers', iceServers]);
+  }
+  onIceServersUnavailable(): void {
+    this.calls.push(['onIceServersUnavailable']);
+  }
+  close(): void {
+    this.calls.push(['close']);
+  }
+  count(name: string): number {
+    return this.calls.filter(([call]) => call === name).length;
+  }
+}
+
+describe('ShareManager WebRTC hub wiring (PAN-4474)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function hubHarness() {
+    const hubs: FakeHub[] = [];
+    let h: Harness | null = null;
+    h = harness({
+      createHub: (ctx) => {
+        const hub = new FakeHub(ctx, () => (h?.sockets.at(-1)?.sent.length ?? 0));
+        hubs.push(hub);
+        return hub;
+      },
+    });
+    return { h, hubs, hub: () => hubs.at(-1) as FakeHub };
+  }
+
+  it('creates one hub per created share with its scope and short code', async () => {
+    const { h, hubs } = hubHarness();
+    await createConnected(h);
+    await h.manager.create({ kind: 'conversation', conversationId: 'conv-b' });
+    expect(hubs.map((hub) => [hub.ctx.shortCode, hub.ctx.scope])).toEqual([
+      ['BCDFGHJK', SCOPE],
+      ['LMNPQRST', { kind: 'conversation', conversationId: 'conv-b' }],
+    ]);
+  });
+
+  it('routes room, signal and ice-servers frames to the hub', async () => {
+    const { h, hub } = hubHarness();
+    const socket = await createConnected(h);
+    const data: SignalData = { sdp: { type: 'answer', sdp: 'answer-sdp' } };
+    socket.deliver({ type: 'signal', githubId: 7, data });
+    socket.deliver({ type: 'ice-servers', iceServers: [{ urls: ['stun:x'] }] });
+    socket.emit('message', Buffer.from(JSON.stringify({ type: 'signal', githubId: '7', data })), false);
+    expect(hub().calls).toEqual([
+      ['onSnapshot', snapshot('BCDFGHJK')],
+      ['onSignal', 7, data],
+      ['onIceServers', [{ urls: ['stun:x'] }]],
+    ]);
+  });
+
+  it('tells the hub that TURN is unavailable and still records lastError', async () => {
+    const { h, hub } = hubHarness();
+    const socket = await createConnected(h);
+    socket.deliver({ type: 'error', code: 'turn_unavailable' });
+    expect(hub().count('onIceServersUnavailable')).toBe(1);
+    const [view] = await h.manager.list();
+    expect(view?.lastError).toMatchObject({ code: 'turn_unavailable' });
+  });
+
+  it('calls admit after the frame was sent, remove for kick and revoke, and nothing else', async () => {
+    const { h, hub } = hubHarness();
+    await createConnected(h);
+    await h.manager.command('BCDFGHJK', { type: 'admit', githubId: 7 });
+    await h.manager.command('BCDFGHJK', { type: 'set-contributor', githubId: 7, contributor: true });
+    await h.manager.command('BCDFGHJK', { type: 'unrevoke', githubId: 8 });
+    await h.manager.command('BCDFGHJK', { type: 'kick', githubId: 7 });
+    await h.manager.command('BCDFGHJK', { type: 'revoke', githubId: 9 });
+    expect(hub().calls.slice(1)).toEqual([
+      ['admit', 7, 1],
+      ['remove', 7],
+      ['remove', 9],
+    ]);
+  });
+
+  it('sends hub frames as JSON while connected and refuses them after the socket closes', async () => {
+    const { h, hub } = hubHarness();
+    const socket = await createConnected(h);
+    expect(hub().ctx.sendFrame({ type: 'ice-servers' })).toBe(true);
+    expect(socket.sent).toEqual([JSON.stringify({ type: 'ice-servers' })]);
+    socket.drop(1006);
+    expect(hub().ctx.sendFrame({ type: 'ice-servers' })).toBe(false);
+    expect(socket.sent).toHaveLength(1);
+  });
+
+  it('keeps the hub on close 1006 and closes it once on close 4004', async () => {
+    const { h, hub } = hubHarness();
+    const socket = await createConnected(h);
+    socket.drop(1006);
+    expect(hub().count('close')).toBe(0);
+
+    const second = hubHarness();
+    const other = await createConnected(second.h);
+    other.drop(4004);
+    expect(second.hub().count('close')).toBe(1);
+  });
+
+  it('closes the hub once on end and on stop', async () => {
+    const ended = hubHarness();
+    await createConnected(ended.h);
+    expect(await ended.h.manager.end('BCDFGHJK')).toEqual({ status: 204 });
+    expect(ended.hub().count('close')).toBe(1);
+
+    const stopped = hubHarness();
+    await createConnected(stopped.h);
+    stopped.h.manager.stop();
+    stopped.h.manager.stop();
+    expect(stopped.hub().count('close')).toBe(1);
   });
 });

@@ -86,7 +86,10 @@ Origin, then session cookie or internal token — see [DASHBOARD-AUTH.md](DASHBO
   which holds one host WebSocket per live room to the share service. The record file door and
   the share service HTTP client live in `src/lib/sharing/`. The host token stays on the
   server; the browser sees `ShareView`s only. See "Host side in the dashboard" in
-  [SHARED-SESSIONS.md](SHARED-SESSIONS.md).
+  [SHARED-SESSIONS.md](SHARED-SESSIONS.md). PAN-4474 adds `src/dashboard/server/sharing/` —
+  `peer-hub.ts` (one werift `RTCPeerConnection` per admitted viewer), `conversation-bridge.ts`
+  (history backfill, then live append/update from `watchConversation`) and `channel-writer.ts` —
+  wired into `ShareManager`.
 - Companion terminals (PAN-3974, PAN-3835): an OpenCode or Codex conversation's TERMINAL
   streams a separate `companion-<ownerSession>` tmux session running `opencode attach` or
   `codex resume --remote` against the conversation's own runtime, opened through
