@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4861",
   "created": "2026-11-02T23:50:27.148Z",
-  "updated": "2026-11-03T00:08:13.925Z",
+  "updated": "2026-11-03T00:08:27.950Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,6 +50,10 @@
     "stop-timeout-60s.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T00:08:13.924Z"
+    },
+    "stop-timeout-60s.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:08:27.949Z"
     }
   }
 }
