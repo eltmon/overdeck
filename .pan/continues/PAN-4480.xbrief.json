@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4480",
   "created": "2026-11-03T15:56:11.265Z",
-  "updated": "2026-11-03T16:50:28.464Z",
+  "updated": "2026-11-03T16:50:47.416Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -142,6 +142,10 @@
     "register-verbs.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T16:50:28.463Z"
+    },
+    "invite-page-join-commands.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:50:47.416Z"
     }
   }
 }
