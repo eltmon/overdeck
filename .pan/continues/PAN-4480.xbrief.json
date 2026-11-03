@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4480",
   "created": "2026-11-03T15:56:11.265Z",
-  "updated": "2026-11-03T16:52:10.709Z",
+  "updated": "2026-11-03T16:52:28.117Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -166,6 +166,10 @@
     "cold-start-test.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T16:52:10.708Z"
+    },
+    "cold-start-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:52:28.116Z"
     }
   }
 }
