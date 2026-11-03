@@ -1,0 +1,359 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-03T20:13:10Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4925: CI test-shard 3/4 intermittently fails with 'Worker exited unexpectedly' while every test passes",
+    "updated": "2026-11-03T20:24:53.412Z"
+  },
+  "plan": {
+    "id": "pan-4925",
+    "title": "CI test-shard 3/4 intermittently fails with 'Worker exited unexpectedly' while every test passes",
+    "status": "proposed",
+    "uid": "2321b3bb-e21d-4bba-af10-6a837c5fccbe",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-03T20:13:10Z",
+    "updated": "2026-11-03T20:24:53.412Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4925",
+        "label": "PAN-4925",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4926",
+        "label": "PAN-4926 (follow-up: production stopSmeeProcess PID reuse)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "ci",
+      "flaky-test",
+      "vitest",
+      "test-infra",
+      "smee"
+    ],
+    "narratives": {
+      "Problem": "CI test-shard 3/4 fails about 1 run in 4 with 'Worker exited unexpectedly' while every reported test passes, turning main red and holding merges and deploys. The unreported file in both failed runs is tests/unit/lib/smee-process.test.ts. Its test 'stopSmeeProcess > stops running process and removes pidfile' mocks node:fs to return the fixture PID '12345' but does not mock process.kill, so the real stopSmeeProcess() probes and then SIGTERMs whatever host process holds PID 12345. On CI that was the vitest fork running the test, so the worker killed itself (exit 143, no log line). A PID-namespace repro (unshare -rpf --mount-proc, ns_last_pid=12344) shows a sleep at PID 12345 dying with exit 143 from that one test.",
+      "Proposal": "Spy process.kill in the stopSmeeProcess tests and assert the probe and SIGTERM through the spy (WI-1). Add a root-project setupFiles guard, tests/setup/no-worker-signals.ts, that refuses non-zero signals to process.pid, process.ppid, 0 and -1 with a [test-guard] error and fails the test from afterEach even when the code under test swallows the error, plus a meta test (WI-2). Document the fixture-PID rule and the comm -3 diagnosis recipe in docs/TESTING.md and the codebase map (WI-3). Prove the fix with the PID-namespace before/after repro and 5 consecutive green shard-3 reruns on the PR (WI-4). Full detail in .pan/drafts/PAN-4925.md.",
+      "NonGoals": "- No change to src/lib/smee.ts; the production PID-reuse bug in stopSmeeProcess is tracked by PAN-4926\n- No quarantine, .skip, .skipIf or .only\n- No change to maxWorkers, pool, retry, --max-old-space-size or any heap setting\n- No change to .github/workflows/ci.yml and no CI-only per-worker reporter\n- No sibling-worker protection in the guard (no /proc reads)\n- No sweep of the other test files that carry literal PIDs without a process.kill spy\n- No guard in the frontend or desktop Vitest projects\n- No exemption list in the guard: a test the guard trips is fixed by spying process.kill\n- No new bundled rule in sync-sources/rules/"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix the test, not src/lib/smee.ts; file the production PID-reuse bug as PAN-4926",
+        "rationale": "The issue allows fixing either the test or the code under test. The test is what signals a real host PID; the production change alters pan down behavior and deserves its own review, so it was filed separately."
+      },
+      {
+        "summary": "Add a self-signal test guard in tests/setup/",
+        "rationale": "It converts the next self-signal into a named [test-guard] failure instead of an unattributed worker exit, follows the existing no-real-home-writes.ts pattern, and a repo grep shows no current test sends a non-zero signal to its own worker."
+      },
+      {
+        "summary": "Guard protects process.pid, process.ppid, 0 and -1 only; no sibling-worker check",
+        "rationale": "Both CI failures were self-signals; a sibling check needs per-call /proc reads and is Linux-only."
+      },
+      {
+        "summary": "No CI-only per-worker reporter",
+        "rationale": "Diffing the sorted '✓ root <file>' lines of a failed and a passing attempt already names the unreported file; the recipe is documented instead."
+      },
+      {
+        "summary": "Keep the issue's 5-rerun criterion but treat the PID-namespace repro as the proof",
+        "rationale": "At a ~25% failure rate, 5 green runs happen about 24% of the time with the bug still present; the deterministic repro shows the cause and the fix."
+      }
+    ],
+    "items": [
+      {
+        "id": "fix-smee-stop-test",
+        "title": "Spy process.kill in the stopSmeeProcess tests",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T20:13:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4925",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/smee-process.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/smee-process.test.ts",
+            "timeout 170 unshare -rpf --mount-proc bash -c 'echo 12344 > /proc/sys/kernel/ns_last_pid; sleep 120 & S=$!; echo \"victim pid=$S\"; npx vitest run tests/unit/lib/smee-process.test.ts --reporter=dot 2>&1 | grep -E \"Tests \"; sleep 0.5; if kill -0 $S 2>/dev/null; then echo \"victim ALIVE\"; else wait $S; echo \"victim DEAD exit=$?\"; fi'",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "smee-process.test.ts reports 11 passed",
+            "repro prints 'victim pid=12345' and 'victim ALIVE' (before the fix it printed 'victim DEAD exit=143')",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1. In tests/unit/lib/smee-process.test.ts, describe('stopSmeeProcess'): in 'stops running process and removes pidfile' (line 235) add const killSpy = vi.spyOn(process, 'kill').mockReturnValue(true) before stopSmeeProcess(), assert killSpy was called with (12345, 0) and (12345, 'SIGTERM'), keep the unlink and log assertions, and restore the spy. Add a short comment naming PAN-4925 and why the spy is required. In 'is safe when pidfile is missing' (line 249) add the same spy and assert it was not called. Do not modify src/lib/smee.ts."
+        },
+        "items": [
+          {
+            "id": "fix-smee-stop-test.ac1",
+            "title": "Given the fixed test file, when `npx vitest run tests/unit/lib/smee-process.test.ts` runs, then it reports 11 passed tests and 'stops running process and removes pidfile' asserts process.kill calls (12345, 0) and (12345, 'SIGTERM') through a vi.spyOn spy",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-smee-stop-test.ac2",
+            "title": "Given a sleep holding PID 12345 in an unshare PID namespace, when the PRD's repro command runs the smee test file, then it prints 'victim pid=12345' and 'victim ALIVE' instead of 'victim DEAD exit=143'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-smee-stop-test.ac3",
+            "title": "Given the branch diff, when it is inspected, then src/lib/smee.ts is unchanged and the test file adds no .skip, .skipIf or .only",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "worker-signal-guard",
+        "title": "Add the self-signal test guard to root setupFiles",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T20:13:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4925",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/setup/worker-signal-guard.ts",
+            "tests/setup/no-worker-signals.ts",
+            "vitest.config.ts",
+            "tests/meta/no-worker-signals.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/meta/no-worker-signals.test.ts",
+            "npx vitest run tests/unit/lib/smee-process.test.ts tests/meta/no-real-overdeck-home.test.ts src/cli/commands/__tests__/skills-pack-browser.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "no-worker-signals.test.ts passes every test",
+            "the three neighbor files pass with the guard loaded",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2 exactly. (1) Create tests/setup/worker-signal-guard.ts, a pure module with no vitest import and no global side effects, exporting KillFn, createWorkerSignalGuard({ kill, protectedPids }) -> { kill, drainRefusals, assertNoPendingRefusals }, and installWorkerSignalGuard(target, registerAfterEach). guard.kill refuses a non-zero signal (an omitted signal means SIGTERM and counts) to a protected PID: it records the message '[test-guard] refused process.kill(<pid>, <signal>): that PID is this Vitest worker, the Vitest main process, or a process group — spy process.kill in the test (PAN-4925)', console.error's it, throws Error(message), and never calls the wrapped kill; every other call returns the wrapped kill's result. assertNoPendingRefusals drains and throws one Error joining pending refusals. installWorkerSignalGuard installs once per target via target[Symbol.for('overdeck.test.noWorkerSignals')], protecting [pid, ppid, 0, -1, -pid, -ppid], replacing target.kill, and registering one hook that calls assertNoPendingRefusals. (2) Create tests/setup/no-worker-signals.ts that only calls installWorkerSignalGuard(process, afterEach). (3) Add it to vitest.config.ts setupFiles directly after 'tests/setup/no-real-home-writes.ts'. (4) Create tests/meta/no-worker-signals.test.ts with runtime checks only (no source reads, no skip/only). All refusal checks go through createWorkerSignalGuard with fakeKill = vi.fn(() => true) and synthetic PIDs 1001 (worker) and 1000 (parent), and installer checks use a fake target { pid: 1001, ppid: 1000, kill: fakeKill } with a fake registerAfterEach. Live checks in the real worker are limited to: the installed guard exists on process under the symbol key and process.kill is its kill; process.kill(process.pid, 0) returns true; a spawned node child receives SIGTERM. No test sends a non-zero signal to the real process.pid, process.ppid, 0 or -1. Implementation checkpoint: if CI shows another test failing with [test-guard], fix that test by spying process.kill in its own commit with this item's Item: trailer; never add an exemption."
+        },
+        "items": [
+          {
+            "id": "worker-signal-guard.ac1",
+            "title": "Given createWorkerSignalGuard with a fake kill and protected PIDs 1001, 1000, 0, -1, when guard.kill is called with SIGTERM or SIGKILL or no signal on any protected PID, then it throws an Error starting with '[test-guard]' that names the PID, and the fake kill is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "worker-signal-guard.ac2",
+            "title": "Given the same guard, when guard.kill(1001, 0) or guard.kill(4242, 'SIGTERM') is called, then it returns true, forwards the same arguments to the fake kill, and drainRefusals() returns an empty array",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "worker-signal-guard.ac3",
+            "title": "Given a refusal swallowed by try/catch, when assertNoPendingRefusals() runs, then it throws a '[test-guard]' error once and a second call returns without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "worker-signal-guard.ac4",
+            "title": "Given a fake target and a fake registerAfterEach, when installWorkerSignalGuard is called twice, then both calls return the same guard, exactly one hook is registered, and that hook throws '[test-guard]' after a refusal swallowed through target.kill",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "worker-signal-guard.ac5",
+            "title": "Given vitest.config.ts lists 'tests/setup/no-worker-signals.ts' right after 'tests/setup/no-real-home-writes.ts', when tests/meta/no-worker-signals.test.ts runs, then process.kill is the installed guard's kill, signal 0 to process.pid returns true, and a spawned child exits with signal SIGTERM",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-signals-fixture-pids",
+        "title": "Document the fixture-PID rule and the worker-exit diagnosis recipe",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T20:13:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4925",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/TESTING.md",
+            ".overdeck/context/codebase/conventions.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "rg -n '^### Signals and fixture PIDs' docs/TESTING.md",
+            "rg -n 'no-worker-signals' docs/TESTING.md .overdeck/context/codebase/conventions.md",
+            "grep -c 'last-verified' .overdeck/context/codebase/conventions.md"
+          ],
+          "expected_outputs": [
+            "one heading line located between '### Real-process fixtures' and '## Dashboard UI Testing'",
+            "at least one match in each of the two files",
+            "the count prints 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. In docs/TESTING.md add '### Signals and fixture PIDs' directly after the '### Real-process fixtures' subsection and before '## Dashboard UI Testing'. It states: code under test that calls process.kill with a fixture PID signals the real host process holding that PID, so the test must vi.spyOn(process, 'kill') and assert through the spy; tests/setup/no-worker-signals.ts (logic in tests/setup/worker-signal-guard.ts) refuses non-zero signals to the worker, the Vitest main process, PID 0 and PID -1 with a '[test-guard] refused process.kill(...)' error and fails the test even when the code catches it, and it does not protect other workers; to diagnose 'Worker exited unexpectedly' with every test green, strip ANSI from a failed and a passing shard log, sort the '✓  root  <file>' lines of each, and comm -3 them, as PAN-4925 did to find tests/unit/lib/smee-process.test.ts. Use the guard's exact final message prefix from worker-signal-guard. In .overdeck/context/codebase/conventions.md under '## Testing' add one bullet listing the root setupFiles in order and saying the two guards throw [test-guard] errors; keep exactly one <!-- last-verified: --> line, dated 2026-11-03 or later."
+        },
+        "items": [
+          {
+            "id": "docs-signals-fixture-pids.ac1",
+            "title": "Given docs/TESTING.md, when a reader opens '### Signals and fixture PIDs', then it sits between '### Real-process fixtures' and '## Dashboard UI Testing' and tells them to vi.spyOn(process, 'kill') when code under test signals a fixture PID",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-signals-fixture-pids.ac2",
+            "title": "Given that subsection, when a reader looks for the guard and the diagnosis, then it names tests/setup/no-worker-signals.ts, quotes the '[test-guard] refused process.kill' prefix, states that other workers are not protected, and gives the comm -3 recipe for finding the unreported file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-signals-fixture-pids.ac3",
+            "title": "Given .overdeck/context/codebase/conventions.md, when its '## Testing' section is read, then it lists tests/setup/no-worker-signals.ts among the root setupFiles and the file contains exactly one last-verified line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-proof",
+        "title": "Prove the fix on CI and record the evidence in the PR",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T20:13:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4925",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/smee-process.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "gh run rerun <run-id> --job <test-shard-3-job-id> -R eltmon/overdeck",
+            "gh run view <run-id> -R eltmon/overdeck --json jobs"
+          ],
+          "expected_outputs": [
+            "5 consecutive test-shard (3/4) attempts on the PR head conclude success",
+            "no attempt log contains 'Worker exited unexpectedly'"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ],
+          "acJustification": "Verification-only item with no code change; its two criteria are the issue's own acceptance."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4. After every other item is pushed, write the PR description: name tests/unit/lib/smee-process.test.ts and the cause (real SIGTERM to fixture PID 12345, which on CI was the fork itself), cite failed jobs 126126802200 (run 41696065261) and 126159340636 (run 41705426909) and the '✓ root' diff, and paste the PID-namespace repro output before ('victim DEAD exit=143') and after ('victim ALIVE'). Re-run test-shard (3/4) on the PR head until 5 consecutive attempts pass, reading the whole job set each time, and list each attempt's job ID and conclusion in the PR. If an attempt fails with 'Worker exited unexpectedly', diff its '✓ root' lines against a passing attempt, name the unreported file in the PR and stop for review instead of re-running past it. Files: the PR description only. files_scope names the file under proof; no edit to it is expected unless a rerun exposes a residual cause, which stops for review first."
+        },
+        "items": [
+          {
+            "id": "ci-proof.ac1",
+            "title": "Given the PR, when its description is read, then it names tests/unit/lib/smee-process.test.ts, the real SIGTERM to PID 12345, jobs 126126802200 and 126159340636, and the repro output before and after the fix",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-proof.ac2",
+            "title": "Given the PR head, when test-shard (3/4) is re-run, then 5 consecutive attempts conclude success with no 'Worker exited unexpectedly' error, and the PR description lists each attempt's job ID",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "worker-signal-guard",
+        "to": "docs-signals-fixture-pids",
+        "type": "blocks"
+      },
+      {
+        "from": "fix-smee-stop-test",
+        "to": "ci-proof",
+        "type": "blocks"
+      },
+      {
+        "from": "worker-signal-guard",
+        "to": "ci-proof",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-signals-fixture-pids",
+        "to": "ci-proof",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-03-PAN-4925-ci-test-shard-3-4-intermittently-fails-with-worker-exited-unexpectedly-while-every-test-passes.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
