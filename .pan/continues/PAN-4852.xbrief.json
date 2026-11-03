@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4852",
   "created": "2026-11-03T02:45:30.764Z",
-  "updated": "2026-11-03T03:21:35.362Z",
+  "updated": "2026-11-03T03:21:39.865Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -75,6 +75,11 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-4852",
       "claimedAt": "2026-11-03T03:21:35.362Z"
+    },
+    "merge-gate-wiring": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4852",
+      "claimedAt": "2026-11-03T03:21:39.865Z"
     }
   }
 }
