@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4917",
   "created": "2026-11-03T18:32:48.231Z",
-  "updated": "2026-11-03T19:17:20.735Z",
+  "updated": "2026-11-03T19:17:36.498Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -82,6 +82,10 @@
     "check-failures-module.ac4": {
       "status": "completed",
       "doneAt": "2026-11-03T19:17:20.734Z"
+    },
+    "repair-gate-unfinished-checks.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T19:17:36.498Z"
     }
   }
 }
