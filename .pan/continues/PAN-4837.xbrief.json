@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4837",
   "created": "2026-11-03T16:16:59.604Z",
-  "updated": "2026-11-03T17:47:01.620Z",
+  "updated": "2026-11-03T17:48:06.326Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -148,9 +148,10 @@
       "doneAt": "2026-11-03T17:46:55.923Z"
     },
     "ci-android": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4837",
-      "claimedAt": "2026-11-03T17:47:01.620Z"
+      "claimedAt": "2026-11-03T17:47:01.620Z",
+      "doneAt": "2026-11-03T17:48:06.326Z"
     }
   }
 }
