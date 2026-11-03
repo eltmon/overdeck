@@ -20,6 +20,7 @@ import {
   SharedChannelReader,
   type ConversationPayload,
   type IceServer,
+  type PresenceParticipant,
   type PresencePayload,
   type SharedEnvelope,
   type SharedHello,
@@ -90,11 +91,33 @@ export function readSharedMessage(value: unknown): SharedMessage | null {
   return message;
 }
 
-function readPresence(value: unknown): PresencePayload | null {
+function readParticipant(value: unknown): PresenceParticipant | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const raw = value as Record<string, unknown>;
+  if (typeof raw.githubId !== 'number' || !Number.isSafeInteger(raw.githubId)) return null;
+  if (typeof raw.login !== 'string' || typeof raw.avatarUrl !== 'string') return null;
+  if (raw.state !== 'lobby' && raw.state !== 'admitted') return null;
+  if (typeof raw.contributor !== 'boolean' || typeof raw.isHost !== 'boolean') return null;
+  return { githubId: raw.githubId, login: raw.login, avatarUrl: raw.avatarUrl, state: raw.state, contributor: raw.contributor, isHost: raw.isHost };
+}
+
+function readStream(value: unknown): PresencePayload['streams'][number] | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const raw = value as Record<string, unknown>;
+  if (typeof raw.streamId !== 'string' || typeof raw.label !== 'string' || raw.kind !== 'conversation') return null;
+  return { streamId: raw.streamId, label: raw.label, kind: 'conversation' };
+}
+
+/** A presence payload rebuilt field by field; malformed participants and streams are dropped. */
+export function readPresence(value: unknown): PresencePayload | null {
   if (typeof value !== 'object' || value === null) return null;
   const raw = value as Record<string, unknown>;
   if (!Array.isArray(raw.participants) || typeof raw.controllerGithubId !== 'number' || !Array.isArray(raw.streams)) return null;
-  return value as PresencePayload;
+  return {
+    controllerGithubId: raw.controllerGithubId,
+    participants: raw.participants.flatMap((p) => readParticipant(p) ?? []),
+    streams: raw.streams.flatMap((s) => readStream(s) ?? []),
+  };
 }
 
 export class WebRtcViewer {

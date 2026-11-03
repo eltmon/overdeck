@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { IceServer, SharedEnvelope, SharedMessage, SignalData } from '@overdeck/contracts';
 
-import { WebRtcViewer, type ViewerNotice, type ViewerPeerPhase, type WebRtcViewerCallbacks } from '../webrtc-viewer';
+import { readPresence, WebRtcViewer, type ViewerNotice, type ViewerPeerPhase, type WebRtcViewerCallbacks } from '../webrtc-viewer';
 
 type Listener = (event: never) => void;
 
@@ -273,6 +273,20 @@ describe('WebRtcViewer (PAN-4475 WI-8)', () => {
     const presence = { controllerGithubId: 1, participants: [], streams: [{ streamId: 'conv-a', label: 'Fix it', kind: 'conversation' }] };
     peer.fireDataChannel('presence').receive(envelope('presence', 1, presence));
     expect(h.callbacks.onPresence).toHaveBeenCalledWith(presence);
+  });
+
+  it('rebuilds presence field by field and drops malformed participants and streams', () => {
+    const host = { githubId: 1, login: 'owner', avatarUrl: 'https://avatars.githubusercontent.com/u/1', state: 'admitted', contributor: false, isHost: true };
+    expect(readPresence({
+      controllerGithubId: 1,
+      participants: [null, 'x', { ...host, login: 7 }, { ...host, state: 'gone' }, { ...host, extra: 'secret' }],
+      streams: [null, { streamId: 'conv-a', label: 5, kind: 'conversation' }, { streamId: 'conv-a', label: 'Fix it', kind: 'conversation', extra: 1 }],
+    })).toEqual({
+      controllerGithubId: 1,
+      participants: [host],
+      streams: [{ streamId: 'conv-a', label: 'Fix it', kind: 'conversation' }],
+    });
+    expect(readPresence({ controllerGithubId: 1, participants: 'nope', streams: [] })).toBeNull();
   });
 
   it('reports phase connected, then lost when the peer fails', async () => {
