@@ -4,17 +4,17 @@
     "created": "2026-11-03T06:01:57Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4882: Post-release v0.73 Anywhere gap checks: PAN-4862 live relay on Fly and re-run the five fixed acceptance checks",
-    "updated": "2026-11-03T06:08:34.650Z"
+    "updated": "2026-11-03T06:27:25.840Z"
   },
   "plan": {
     "id": "pan-4882",
     "title": "Post-release v0.73 Anywhere gap checks: PAN-4862 live relay on Fly and re-run the five fixed acceptance checks",
-    "status": "proposed",
+    "status": "running",
     "uid": "b479d149-be5b-465a-b3fb-30197314609d",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-03T06:01:57Z",
-    "updated": "2026-11-03T06:08:34.650Z",
+    "updated": "2026-11-03T06:27:25.840Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4882",
@@ -1200,5 +1200,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
