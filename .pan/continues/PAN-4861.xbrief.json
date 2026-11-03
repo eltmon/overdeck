@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4861",
   "created": "2026-11-02T23:50:27.148Z",
-  "updated": "2026-11-03T00:08:42.419Z",
+  "updated": "2026-11-03T00:08:57.778Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -58,6 +58,10 @@
     "docs-supervisor-stop.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T00:08:42.419Z"
+    },
+    "docs-supervisor-stop.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:08:57.778Z"
     }
   }
 }
