@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4474",
   "created": "2026-11-03T06:56:27.161Z",
-  "updated": "2026-11-03T07:09:54.102Z",
+  "updated": "2026-11-03T07:13:07.178Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-11-03T07:09:49.192Z"
     },
     "werift-spike": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4474",
-      "claimedAt": "2026-11-03T07:09:54.101Z"
+      "claimedAt": "2026-11-03T07:09:54.101Z",
+      "doneAt": "2026-11-03T07:13:07.178Z"
     }
   }
 }
