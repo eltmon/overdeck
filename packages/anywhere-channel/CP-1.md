@@ -21,9 +21,9 @@ Android emulator.
 | Playwright Chromium, CDP `Emulation.setCPUThrottlingRate` rate 4 | HeadlessChrome/153.0.8010.12 | 82 | 200 | pass |
 | Playwright WebKit | Version/26.6 Safari/605.1.15 (WebKit 26.6) | 31 | 44 | pass |
 | Android emulator `galaxyA16` (android-36 google_apis x86_64), Chrome | Chrome/133.0.0.0 Mobile Safari/537.36 (Android 10; K) | 155 | 234 | pass (under 2 s) |
-| iOS Simulator | not run | — | — | deferred |
+| iOS Simulator `iPhone 17 Pro` (iOS 26.5 runtime), Mobile Safari, Mac rig (Xcode 26.6), 2026-11-03, PAN-4837 | Version/26.5 Mobile/15E148 Safari/604.1 (the UA says "iPhone OS 18_7") | 217 | 416 | pass (under 2 s) |
 
-iOS Simulator leg deferred to PAN-4837 (W-APP1); Playwright WebKit stands in.
+The iOS Simulator leg was run later, by PAN-4837 (W-APP1), against this harness on `feature/pan-4837`.
 
 ## How to reproduce
 
@@ -34,6 +34,12 @@ iOS Simulator leg deferred to PAN-4837 (W-APP1); Playwright WebKit stands in.
   `npx tsx packages/anywhere-channel/cp1/serve.ts --host 0.0.0.0 --port <port>`, then
   `adb shell am start -a android.intent.action.VIEW -d "http://10.0.2.2:<port>/?ws=ws%3A%2F%2F10.0.2.2%3A<port>%2Fchannel&code=<code>" com.android.chrome`.
   The server prints the result and exits. Stop the emulator with `adb emu kill`.
+- iOS Simulator (PAN-4837): on this host run `npx tsx packages/anywhere-channel/cp1/serve.ts --host 127.0.0.1 --port <port>`;
+  open a reverse tunnel so the Mac reaches it (`ssh -f -N -o BatchMode=yes -i ~/.ssh/gauntlet_air -R <port>:127.0.0.1:<port> eltmon@<rig-ip>`;
+  the Simulator shares the Mac's network); on the rig create and boot a dedicated Simulator
+  (`xcrun simctl create cp1 'iPhone 17 Pro'`, `xcrun simctl boot <udid>`) and run
+  `xcrun simctl openurl <udid> "<the page URL serve.ts prints>"`. Use the UDID, not `booted`: other work may
+  have Simulators booted on the rig. Close the tunnel and delete the Simulator afterwards.
 
 ## Notes from the run
 
