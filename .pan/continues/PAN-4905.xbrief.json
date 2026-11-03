@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4905",
   "created": "2026-11-03T15:51:11.476Z",
-  "updated": "2026-11-03T16:18:14.082Z",
+  "updated": "2026-11-03T16:22:11.167Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -40,9 +40,10 @@
       "doneAt": "2026-11-03T16:18:06.444Z"
     },
     "enable-remote-route": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4905",
-      "claimedAt": "2026-11-03T16:18:14.082Z"
+      "claimedAt": "2026-11-03T16:18:14.082Z",
+      "doneAt": "2026-11-03T16:22:11.167Z"
     }
   }
 }
