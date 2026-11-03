@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4888",
   "created": "2026-11-03T08:25:32.067Z",
-  "updated": "2026-11-03T09:16:44.189Z",
+  "updated": "2026-11-03T09:17:09.977Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -100,6 +100,10 @@
     "cli-build-sha-lines.ac2": {
       "status": "completed",
       "doneAt": "2026-11-03T09:16:44.188Z"
+    },
+    "docs-supersede.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:17:09.976Z"
     }
   }
 }
