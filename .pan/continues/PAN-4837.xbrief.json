@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4837",
   "created": "2026-11-03T16:16:59.604Z",
-  "updated": "2026-11-03T19:23:15.223Z",
+  "updated": "2026-11-03T19:23:29.410Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -512,6 +512,10 @@
     "mobile-docs.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T19:23:15.223Z"
+    },
+    "mobile-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T19:23:29.410Z"
     }
   }
 }
