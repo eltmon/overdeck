@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T20:54:23.054933Z · model: claude-opus-5-5 · open: 866_
+_Last sequenced: 2026-11-03T20:56:11.922834Z · model: claude-opus-5-5 · open: 864_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -417,7 +417,6 @@ _Last sequenced: 2026-11-03T20:54:23.054933Z · model: claude-opus-5-5 · open: 
 | 416 | PAN-3016 | M | medium | ok |  |  | Operator ask: every view should be URL-addressable; cockpit tabs, stage panes and several drawers are still local state. |
 | 417 | PAN-3890 | S | medium | ok |  |  | opencode provider stream errors (rate limit) are invisible in the feed and never retried; first message dies silently |
 | 418 | PAN-3822 | L | medium | ok |  |  | PRD landed (12 items, FR-1..14): link PRs to conversations via branch detection + explicit override; unblocks PAN-3920 |
-| 419 | PAN-4479 | M | medium | ok |  |  | Shared Sessions slice 8: host reconnect inside the 5-minute window and viewer auto-restore |
 | 421 | PAN-1673 | S | medium | ok |  |  | Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
 | 422 | PAN-1669 | S | medium | ok |  |  | restart-with-model doesn't emit a live event |
 | 423 | PAN-1668 | S | medium | ok |  |  | right-click 'restart with <model>' carries model only, never harness |
@@ -447,7 +446,7 @@ _Last sequenced: 2026-11-03T20:54:23.054933Z · model: claude-opus-5-5 · open: 
 | 448 | PAN-4151 | L | medium | needs-refinement |  | PAN-3822 | Deferred remainder of PAN-3822/#4067: GitLab MR sync, PR page + search, handoff link copy, diffstat, link-dialog a11y, sync throttle |
 | 449 | PAN-1330 | S | medium | ok |  |  | CLI cannot address planning-*/specialist-* sessions |
 | 450 | PAN-4481 | M | medium | ok |  |  | Shared Sessions slice 10: hosted web join page; awaits operator decision OD-1 on sign-in without a local install |
-| 451 | PAN-4482 | S | medium | ok |  | PAN-4479, PAN-4481 | Shared Sessions slice 11: signaling-privacy e2e, forced-TURN check (operator checkpoint) and full AC sweep |
+| 451 | PAN-4482 | S | medium | ok |  | PAN-4481 | Shared Sessions slice 11: signaling-privacy e2e, forced-TURN check (operator checkpoint) and full AC sweep |
 | 452 | PAN-1226 | L | medium | ok |  |  | PAN-1148 unified-dashboard redesign |
 | 453 | PAN-1173 | S | medium | ok |  |  | pan show <bare-number> derives wrong agent ID for PAN-prefixed issues |
 | 454 | PAN-1154 | M | medium | ok |  |  | pan up does not kill existing port holders |
@@ -863,12 +862,11 @@ _Last sequenced: 2026-11-03T20:54:23.054933Z · model: claude-opus-5-5 · open: 
 | 871 | PAN-4592 | M | low | ok |  | PAN-4590 | pan semgrep ci-setup opens a PR adding a Semgrep Actions workflow + failure relay; needs gate mode from PAN-4590. |
 | 872 | PAN-4594 | M | low | ok |  | PAN-4590 | Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590. |
 | 873 | PAN-4593 | L | low | needs-refinement |  | PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
-| 875 | PAN-4837 | L | medium | ok |  |  | Phone app W-APP1: Capacitor 8 apps/mobile shell, sign-in, machines, QR pairing, keys plugin; needs PAN-4834. |
-| 876 | PAN-4838 | M | medium | ok |  | PAN-4837 | Phone app W-IOS1: APNs registration and Notification Service Extension that decrypts sealed alerts. |
-| 877 | PAN-4840 | M | medium | ok |  | PAN-4837 | Phone app W-AND1: FCM FirebaseMessagingService decrypts sealed data payloads and posts notifications. |
+| 876 | PAN-4838 | M | medium | ok |  |  | Phone app W-IOS1: APNs registration and Notification Service Extension that decrypts sealed alerts. |
+| 877 | PAN-4840 | M | medium | ok |  |  | Phone app W-AND1: FCM FirebaseMessagingService decrypts sealed data payloads and posts notifications. |
 | 878 | PAN-4841 | M | medium | ok |  |  | Phone app W-REL1: Apple/Firebase/Play/Cloudflare setup and first store builds; operator approves purchases. |
 | 879 | PAN-4839 | S | low | ok |  | PAN-4838 | Phone app W-IOS2: counts-only Live Activity, on by default with a Settings off switch; OD-1 settled; after PAN-4838. |
-| 880 | PAN-4842 | S | medium | ok |  | PAN-4837 | Phone app W-DOC: phone-app.mdx and updates to Anywhere, push, tailscale and service docs; finished last. |
+| 880 | PAN-4842 | S | medium | ok |  |  | Phone app W-DOC: phone-app.mdx and updates to Anywhere, push, tailscale and service docs; finished last. |
 | 881 | PAN-4851 | S | low | needs-refinement |  |  | Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them |
 | 882 | PAN-4887 | M | medium | ok |  |  | Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); PAN-4835 merged. |
 
@@ -1201,10 +1199,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T20:54:23.054933Z",
+  "generatedAt": "2026-11-03T20:56:11.922834Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 866,
+  "openCount": 864,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -6367,18 +6365,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
-      "issue": "PAN-4479",
-      "rank": 419,
-      "size": "M",
-      "importance": "medium",
-      "score": 54,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Shared Sessions slice 8: host reconnect inside the 5-minute window and viewer auto-restore",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1673",
       "rank": 421,
       "size": "S",
@@ -6744,7 +6730,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "score": 50,
       "condition": "ok",
       "dependsOn": [
-        "PAN-4479",
         "PAN-4481"
       ],
       "why": "Shared Sessions slice 11: signaling-privacy e2e, forced-TURN check (operator checkpoint) and full AC sweep",
@@ -11855,28 +11840,13 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
-      "issue": "PAN-4837",
-      "rank": 875,
-      "size": "L",
-      "importance": "medium",
-      "score": 34,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Phone app W-APP1: Capacitor 8 apps/mobile shell, sign-in, machines, QR pairing, keys plugin; needs PAN-4834.",
-      "rationale": "PAN-4835 merged in #4894, so only the in-pipeline PAN-4834 still gates it; rank held because the shell work is still blocked on that channel client.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4838",
       "rank": 876,
       "size": "M",
       "importance": "medium",
       "score": 30,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4837"
-      ],
+      "dependsOn": [],
       "why": "Phone app W-IOS1: APNs registration and Notification Service Extension that decrypts sealed alerts.",
       "rationale": "PAN-4830 and PAN-4843 closed; rank unchanged because the remaining dependency PAN-4837 is still in the work phase.",
       "gate": "auto",
@@ -11889,9 +11859,7 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "importance": "medium",
       "score": 30,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4837"
-      ],
+      "dependsOn": [],
       "why": "Phone app W-AND1: FCM FirebaseMessagingService decrypts sealed data payloads and posts notifications.",
       "rationale": "PAN-4830 and PAN-4843 closed; rank unchanged because the remaining dependency PAN-4837 is still in the work phase.",
       "gate": "auto",
@@ -11932,9 +11900,7 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "importance": "medium",
       "score": 26,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4837"
-      ],
+      "dependsOn": [],
       "why": "Phone app W-DOC: phone-app.mdx and updates to Anywhere, push, tailscale and service docs; finished last.",
       "rationale": "PAN-4774 (Anywhere release AC run) closed as completed, so that dependency is removed; rank held because the phone-app epic is feature work that still ranks below substrate items.",
       "gate": "auto",
@@ -12815,13 +12781,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "confidence": 1
     },
     {
-      "from": "PAN-4479",
-      "to": "PAN-4482",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4481",
       "to": "PAN-4482",
       "type": "unblocks",
@@ -13082,24 +13041,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
     },
     {
       "from": "PAN-4823",
-      "to": "PAN-4837",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4823",
       "to": "PAN-4838",
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-4837",
-      "to": "PAN-4838",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.9
     },
     {
       "from": "PAN-4823",
@@ -13107,13 +13052,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-4837",
-      "to": "PAN-4840",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.9
     },
     {
       "from": "PAN-4823",
@@ -13142,13 +13080,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-4837",
-      "to": "PAN-4842",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.9
     },
     {
       "from": "PAN-4838",
