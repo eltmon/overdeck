@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4882",
   "created": "2026-11-03T06:27:51.535Z",
-  "updated": "2026-11-03T06:50:47.773Z",
+  "updated": "2026-11-03T06:50:59.184Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -48,6 +48,11 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-4882",
       "claimedAt": "2026-11-03T06:47:55.458Z"
+    },
+    "ac04-remote-worker": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4882",
+      "claimedAt": "2026-11-03T06:50:59.184Z"
     }
   }
 }
