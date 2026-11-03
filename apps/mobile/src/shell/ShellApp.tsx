@@ -1,7 +1,7 @@
 /** The phone app's root: identity, the account, URL opens, and which shell screen shows (PAN-4837). */
 import { App } from '@capacitor/app';
 import { PHONE_PAIR_LINK_PREFIX, parsePhonePairLink } from '@overdeck/contracts';
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 import { type DeviceIdentity, loadIdentity } from '../native/keys';
 import { type PushController, pushSupported, startPush } from '../native/push';
@@ -11,6 +11,7 @@ import { resetTransport } from '../../../../src/dashboard/frontend/src/lib/wsTra
 import { installResumeHandler } from './lifecycle';
 import { MachinesScreen } from './MachinesScreen';
 import { MachineView } from './MachineView';
+import { installNotificationTap } from './notificationTap';
 import { PairScreen } from './PairScreen';
 import { pairMachine } from './pairing';
 import { shellPlatform } from './platform';
@@ -120,6 +121,30 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
     setView({ kind: 'pair', link: pendingPairLink });
     setPendingPairLink(null);
   }, [account, pendingPairLink]);
+
+  // After boot, so the plugin's retained cold-launch tap finds the paired machines in the store (FR-8).
+  const booted = boot.kind === 'ready';
+  // The default `navigate` is a new function each render; the listener reads the latest one.
+  const navigateRef = useRef(navigate);
+  useEffect(() => {
+    navigateRef.current = navigate;
+  }, [navigate]);
+  useEffect(() => {
+    if (!booted || !pushSupported()) return;
+    return installNotificationTap({
+      paired: () => useShellStore.getState().machines,
+      signedIn: () => useShellStore.getState().account !== null,
+      open: (target) => {
+        if (target.kind === 'machine') {
+          setCurrentMachineId(target.environmentId);
+          navigateRef.current(target.path);
+        } else {
+          setCurrentMachineId(null);
+          navigateRef.current('/');
+        }
+      },
+    });
+  }, [booted]);
 
   const identity = boot.kind === 'ready' ? boot.identity : null;
   useEffect(() => {
