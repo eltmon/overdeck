@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4838",
   "created": "2026-11-03T21:01:46.602Z",
-  "updated": "2026-11-03T21:02:05.343Z",
+  "updated": "2026-11-03T21:05:26.454Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-4838",
       "claimedAt": "2026-11-03T21:01:46.602Z",
       "doneAt": "2026-11-03T21:02:05.343Z"
+    },
+    "overdeck-push-package": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4838",
+      "claimedAt": "2026-11-03T21:05:26.454Z"
     }
   }
 }
