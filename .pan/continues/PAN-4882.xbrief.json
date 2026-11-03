@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4882",
   "created": "2026-11-03T06:27:51.535Z",
-  "updated": "2026-11-03T06:58:26.027Z",
+  "updated": "2026-11-03T07:35:02.138Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-11-03T06:31:19.891Z"
     },
     "relay-vm-signin": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4882",
-      "claimedAt": "2026-11-03T06:31:29.520Z"
+      "claimedAt": "2026-11-03T06:31:29.520Z",
+      "doneAt": "2026-11-03T07:35:02.138Z"
     },
     "ssh-vm-setup": {
       "status": "completed",
