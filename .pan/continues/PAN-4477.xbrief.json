@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4477",
   "created": "2026-11-03T15:02:33.095Z",
-  "updated": "2026-11-03T16:49:02.392Z",
+  "updated": "2026-11-03T16:53:39.126Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -12,6 +12,11 @@
       "reason": "feedback",
       "note": "[2026-11-03T16:49Z] ci-monitor → FAILED — seq 1",
       "timestamp": "2026-11-03T16:49:02.392Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-03T16:53:39.126Z"
     }
   ],
   "items": {
@@ -266,13 +271,6 @@
       "doneAt": "2026-11-03T16:40:10.048Z"
     }
   },
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "ci-monitor",
-      "outcome": "failed",
-      "timestamp": "2026-11-03T16:49:02Z",
-      "markdownBody": "# CI Failure Feedback for PAN-4477\n\nPull request: https://github.com/eltmon/overdeck/pull/4913 (head `22031cd3`)\n\nSource: check_run:test-shard (1/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-shard (1/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/126060599380/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/41677111348/job/126060599380  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/integration/services/share/peer-hub.test.ts\u001b[2m > \u001b[22mPeerHub through the share service on real workerd (PAN-4474)\u001b[2m > \u001b[22moffers only after admission, streams history and a live append, and drops the peer on kick\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/integration/services/share/peer-hub.test.ts\u001b[2m > \u001b[22mPeerHub through the share service on real workerd (PAN-4474)\u001b[2m > \u001b[22moffers only after admission, streams history and a live append, and drops the peer on kick\n\u001b[31m\u001b[1mTypeError\u001b[22m: Cannot read properties of undefined (reading 'close')\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m PeerHub.close src/dashboard/server/sharing/peer-hub.ts:\u001b[2m228:24\u001b[22m\u001b[39m\n    \u001b[90m226|\u001b[39m     \u001b[35mif\u001b[39m (\u001b[35mthis\u001b[39m\u001b[33m.\u001b[39mpendingIce) \u001b[35mthis\u001b[39m\u001b[33m.\u001b[39m\u001b[34mresolveIce\u001b[39m(\u001b[35mthis\u001b[39m\u001b[33m.\u001b[39mpendingIce\u001b[33m,\u001b[39m [])\u001b[33m;\u001b[39m\n    \u001b[90m227|\u001b[39m     \u001b[35mthis\u001b[39m\u001b[33m.\u001b[39mdeps\u001b[33m.\u001b[39mbridge\u001b[33m.\u001b[39m\u001b[34mclose\u001b[39m()\u001b[33m;\u001b[39m\n    \u001b[90m228|\u001b[39m     \u001b[35mthis\u001b[39m\u001b[33m.\u001b[39mdeps\u001b[33m.\u001b[39mterminal\u001b[33m.\u001b[39m\u001b[34mclose\u001b[39m()\u001b[33m;\u001b[39m\n    \u001b[90m   |\u001b[39m                        \u001b[31m^\u001b[39m\n    \u001b[90m229|\u001b[39m   }\n    \u001b[90m230|\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m ShareManager.dropHost src/dashboard/server/services/share-host.ts:\u001b[2m407:15\u001b[22m\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m ShareManager.stop src/dashboard/server/services/share-host.ts:\u001b[2m212:53\u001b[22m\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m tests/integration/services/share/peer-hub.test.ts:\u001b[2m322:15\u001b[22m\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\u001b[22m\u001b[39m\n\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m576 passed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[33m2 skipped\u001b[39m\u001b[90m (579)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
-    }
-  ]
+  "feedback": [],
+  "agentModel": "claude-opus-5-5"
 }
