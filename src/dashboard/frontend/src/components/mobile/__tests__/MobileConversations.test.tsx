@@ -5,8 +5,10 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { MobileConversations } from '../MobileConversations';
 
 vi.mock('../../chat/ConversationPanel', () => ({
-  ConversationPanel: ({ conversation }: { conversation: { title: string } }) => (
-    <div data-testid="conversation-panel">{conversation.title}</div>
+  ConversationPanel: ({ conversation }: { conversation: { title: string; name: string; id: number; origin?: string } }) => (
+    <div data-testid="conversation-panel" data-name={conversation.name} data-id={String(conversation.id)} data-origin={conversation.origin ?? ''}>
+      {conversation.title}
+    </div>
   ),
 }));
 
@@ -71,5 +73,42 @@ describe('MobileConversations', () => {
     expect(String((fetchMock.mock.calls[0] as unknown[])[0])).toBe('/api/conversations/7');
     fireEvent.click(screen.getByRole('button', { name: 'Back' }));
     expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  const linkedRows = [
+    row(4, 'Local', '2026-11-01T00:00:00.000Z'),
+    row(-1, 'Remote', '2026-11-01T00:00:00.000Z', {
+      name: '@env-a/conv-9',
+      origin: 'linked',
+      remoteName: 'conv-9',
+      machineLabel: 'laptop',
+    }),
+  ];
+
+  it('loads a linked conversation from the merged list', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify(linkedRows), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    renderWithQuery(<MobileConversations conversationId="@env-a/conv-9" onOpen={() => {}} onBack={() => {}} />);
+    const panel = await screen.findByTestId('conversation-panel');
+    expect(panel).toHaveAttribute('data-name', '@env-a/conv-9');
+    expect(panel).toHaveAttribute('data-id', '-1');
+    expect(panel).toHaveAttribute('data-origin', 'linked');
+    const urls = fetchMock.mock.calls.map((call) => String(call[0]));
+    expect(urls.every((url) => url === '/api/conversations')).toBe(true);
+    expect(urls).not.toContain('/api/conversations/%40env-a%2Fconv-9');
+  });
+
+  it('resolves a linked key by machine label', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(linkedRows), { status: 200 })));
+    renderWithQuery(<MobileConversations conversationId="@laptop/conv-9" onOpen={() => {}} onBack={() => {}} />);
+    const panel = await screen.findByTestId('conversation-panel');
+    expect(panel).toHaveAttribute('data-name', '@env-a/conv-9');
+  });
+
+  it('shows the load error when no linked row matches', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify([row(4, 'Local', '2026-11-01T00:00:00.000Z')]), { status: 200 })));
+    renderWithQuery(<MobileConversations conversationId="@env-b/conv-9" onOpen={() => {}} onBack={() => {}} />);
+    expect(await screen.findByText(/Couldn.t load this conversation/)).toBeInTheDocument();
+    expect(screen.queryByTestId('conversation-panel')).not.toBeInTheDocument();
   });
 });
