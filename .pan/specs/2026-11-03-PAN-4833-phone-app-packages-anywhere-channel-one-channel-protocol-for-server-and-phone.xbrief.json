@@ -4,17 +4,17 @@
     "created": "2026-11-03T04:46:34Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4833: Phone app: packages/anywhere-channel, one channel protocol for server and phone",
-    "updated": "2026-11-03T04:50:14.834Z"
+    "updated": "2026-11-03T04:52:20.187Z"
   },
   "plan": {
     "id": "pan-4833",
     "title": "Phone app: packages/anywhere-channel, one channel protocol for server and phone",
-    "status": "proposed",
+    "status": "running",
     "uid": "6702638b-ca3f-4972-95e6-f44d92315bee",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-03T04:46:34Z",
-    "updated": "2026-11-03T04:50:14.834Z",
+    "updated": "2026-11-03T04:52:20.187Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4833",
@@ -994,5 +994,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
