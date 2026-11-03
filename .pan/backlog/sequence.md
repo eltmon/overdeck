@@ -1,12 +1,13 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T23:56:45.789276Z · model: claude-opus-5-5 · open: 892_
+_Last sequenced: 2026-11-03T23:58:48.986051Z · model: claude-opus-5-5 · open: 893_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4702 | S | critical | ok |  |  | Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs. |
 | 2 | PAN-4961 | M | critical | ok |  |  | Disk floor checked once per creation; 6 concurrent starts took 15 GB to 4.9 GB, near the point where SQLite/git writes fail for every agent. |
+| 3 | PAN-4970 | M | high | ok |  |  | Per-PR auto-merge and UAT batch reconciler race on same PRs: 30 generations invalidated in a day; Merge batch button silently 409s. |
 | 4 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 5 | PAN-4553 | S | critical | ok |  |  | Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges. |
 | 6 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
@@ -908,6 +909,10 @@ New substrate bug in the merge door: on 2026-11-01 it refused three approved, gr
 
 New substrate-improvement bug reproduced 2026-11-03: checkDiskFloor in workspace-manager/create.ts runs before bun install, the Docker stack and its ~1.94 GB node_modules volume, so six Flywheel starts in a few minutes each passed the 10 GiB floor and together drove free space from 15 GB to 4.9 GB. Below about 2 GB every agent hits ENOSPC (the PAN-1674 failure the floor exists to prevent), so this threatens the whole pipeline and takes the free rank 2 without moving any other node. The fix and its acceptance test are concrete, so condition is ok.
 
+### PAN-4970 (rank 3)
+
+New in-pipeline substrate-improvement bug filed 2026-11-03: the per-PR auto-merge train and the UAT batch reconciler both act on the same ready Overdeck PRs, so every per-PR merge invalidates the current batch and the Merge train page offers a promote action that returns 409 without telling the operator. PRs still land through the per-PR path, so this is high rather than critical, but it makes merge ownership and deploy units unclear. It takes the free rank 3 because in-pipeline work is pinned at the top, and no other node moves. The fix direction and acceptance tests are concrete, so condition is ok.
+
 ### PAN-4636 (rank 4)
 
 New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.
@@ -1216,10 +1221,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 
 New this pass. shouldHoldForUat is consulted on exactly one merge path, so every other path merges a ready issue without asking whether its project holds for UAT — verified at code level on a real MIN-901 merge. This defeats the batch-train model directly: issues merge one at a time before a generation can assemble them.
 
-### PAN-3100 (rank 81)
-
-New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1227,10 +1228,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T23:56:45.789276Z",
+  "generatedAt": "2026-11-03T23:58:48.986051Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 892,
+  "openCount": 893,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -12413,6 +12414,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "dependsOn": [],
       "why": "Disk floor checked once per creation; 6 concurrent starts took 15 GB to 4.9 GB, near the point where SQLite/git writes fail for every agent.",
       "rationale": "New substrate-improvement bug reproduced 2026-11-03: checkDiskFloor in workspace-manager/create.ts runs before bun install, the Docker stack and its ~1.94 GB node_modules volume, so six Flywheel starts in a few minutes each passed the 10 GiB floor and together drove free space from 15 GB to 4.9 GB. Below about 2 GB every agent hits ENOSPC (the PAN-1674 failure the floor exists to prevent), so this threatens the whole pipeline and takes the free rank 2 without moving any other node. The fix and its acceptance test are concrete, so condition is ok.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4970",
+      "rank": 3,
+      "size": "M",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Per-PR auto-merge and UAT batch reconciler race on same PRs: 30 generations invalidated in a day; Merge batch button silently 409s.",
+      "rationale": "New in-pipeline substrate-improvement bug filed 2026-11-03: the per-PR auto-merge train and the UAT batch reconciler both act on the same ready Overdeck PRs, so every per-PR merge invalidates the current batch and the Merge train page offers a promote action that returns 409 without telling the operator. PRs still land through the per-PR path, so this is high rather than critical, but it makes merge ownership and deploy units unclear. It takes the free rank 3 because in-pipeline work is pinned at the top, and no other node moves. The fix direction and acceptance tests are concrete, so condition is ok.",
       "gate": "auto",
       "planning": "auto"
     }
