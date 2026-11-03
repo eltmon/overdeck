@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4830",
   "created": "2026-11-03T14:25:43.002Z",
-  "updated": "2026-11-03T14:43:18.321Z",
+  "updated": "2026-11-03T14:43:34.625Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -124,6 +124,10 @@
     "deliver.ac2": {
       "status": "completed",
       "doneAt": "2026-11-03T14:43:18.321Z"
+    },
+    "deliver.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:43:34.625Z"
     }
   }
 }
