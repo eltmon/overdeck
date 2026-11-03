@@ -4,17 +4,17 @@
     "created": "2026-11-03T03:32:18Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4872: New conversation on another machine shows this machine's working directory",
-    "updated": "2026-11-03T03:34:26.308Z"
+    "updated": "2026-11-03T03:35:20.270Z"
   },
   "plan": {
     "id": "pan-4872",
     "title": "New conversation on another machine shows this machine's working directory",
-    "status": "proposed",
+    "status": "running",
     "uid": "a5bd812d-cee7-4d6c-a268-724087d2670e",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-03T03:32:18Z",
-    "updated": "2026-11-03T03:34:26.308Z",
+    "updated": "2026-11-03T03:35:20.270Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4872",
@@ -208,5 +208,5 @@
     ],
     "edges": []
   },
-  "status": "proposed"
+  "status": "active"
 }
