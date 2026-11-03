@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4830",
   "created": "2026-11-03T14:25:43.002Z",
-  "updated": "2026-11-03T14:33:50.712Z",
+  "updated": "2026-11-03T14:36:33.674Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -66,6 +66,11 @@
     "push-helpers.ac3": {
       "status": "completed",
       "doneAt": "2026-11-03T14:33:50.711Z"
+    },
+    "apns-sender": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4830",
+      "claimedAt": "2026-11-03T14:36:33.673Z"
     }
   }
 }
