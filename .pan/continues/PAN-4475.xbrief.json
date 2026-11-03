@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4475",
   "created": "2026-11-03T09:11:44.436Z",
-  "updated": "2026-11-03T13:49:46.027Z",
+  "updated": "2026-11-03T13:49:58.835Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -192,6 +192,10 @@
     "share-probe-route.ac4": {
       "status": "completed",
       "doneAt": "2026-11-03T13:49:46.027Z"
+    },
+    "landing-detect.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T13:49:58.835Z"
     }
   },
   "agentModel": "claude-opus-5-5"
