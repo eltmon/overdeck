@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4905",
   "created": "2026-11-03T15:51:11.476Z",
-  "updated": "2026-11-03T16:45:54.475Z",
+  "updated": "2026-11-03T16:46:11.130Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -118,6 +118,10 @@
     "enable-remote-route.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T16:45:54.474Z"
+    },
+    "enable-remote-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:46:11.130Z"
     }
   }
 }
