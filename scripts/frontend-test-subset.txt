@@ -13,6 +13,7 @@ src/__tests__/overlay-tokens.test.ts
 src/components/Agents/directory/directory-tree.test.ts
 src/components/Agents/live/live-model.test.ts
 src/components/CommandDeck/CommandDeck.test.tsx
+src/components/CommandDeck/ProjectTree/FeatureItem.linkedConversation.test.tsx
 src/components/CommandDeck/ProjectTree/FeatureItem.pullRequest.test.tsx
 src/components/CommandDeck/ProjectTree/featureStateBadge.test.ts
 src/components/CommandDeck/__tests__/CommandDeck.render-count.test.tsx
@@ -48,6 +49,7 @@ src/components/Settings/__tests__/ColorThemeEditorPreview.test.tsx
 src/components/Settings/__tests__/ColorThemeImportPreview.test.tsx
 src/components/Settings/__tests__/ColorThemeSection.test.tsx
 src/components/Settings/__tests__/ModelPresetsBar.test.tsx
+src/components/Settings/__tests__/gemini-qwen-glm-catalog.test.ts
 src/components/Settings/anywhere/__tests__/AddSshMachineDialog.test.tsx
 src/components/Settings/anywhere/__tests__/AddTriggerDialog.test.tsx
 src/components/Settings/anywhere/__tests__/AccessTokensPanel.test.tsx
@@ -163,6 +165,7 @@ src/components/sessionFeed/__tests__/useActivityEntryFeed.test.ts
 src/components/sessionFeed/__tests__/useConversationFeed.test.ts
 src/components/sessionFeed/__tests__/useMergedFeed.test.ts
 src/components/shared/ModelPicker/ModelPicker.render.test.tsx
+src/components/shared/ModelPicker/__tests__/harnessRows.test.ts
 src/components/shared/__tests__/Modal.test.tsx
 src/components/sidebar/__tests__/AddProjectToMachineDialog.test.tsx
 src/components/simple/SimpleQuestionCard.test.tsx

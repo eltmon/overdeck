@@ -1,13 +1,18 @@
 import { describe, it, expect } from 'vitest';
 import { modelSupportsImages, MODEL_CAPABILITIES } from '../../src/lib/model-capabilities.js';
 
-// PAN-1685: image-attach guard for text-only models. mimo-v2.5-pro is proven
+// PAN-1685: image-attach guard for text-only models. mimo-v2.5-pro was proven
 // text-only on the Xiaomi Token-Plan endpoint (404 "No endpoints found that
-// support image input"); mimo-v2.5 accepts images on the same endpoint.
+// support image input"); mimo-v2.5 accepted images on the same endpoint. Both
+// were retired 2026-10-21 (PAN-4825); their capability rows stay as history.
 describe('modelSupportsImages', () => {
-  it('returns false for the proven text-only model (mimo-v2.5-pro)', () => {
+  it('returns false for a proven text-only model (glm-5.3)', () => {
     expect(MODEL_CAPABILITIES['mimo-v2.5-pro'].supportsImages).toBe(false);
-    expect(modelSupportsImages('mimo-v2.5-pro')).toBe(false);
+    expect(modelSupportsImages('glm-5.3')).toBe(false);
+  });
+
+  it('resolves a retired id to its unaudited successor before checking (mimo-v2.5-pro → mimo-v2.6-pro)', () => {
+    expect(modelSupportsImages('mimo-v2.5-pro')).toBe(true);
   });
 
   it('returns true for the multimodal sibling (mimo-v2.5)', () => {

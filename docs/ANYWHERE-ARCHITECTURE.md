@@ -12,8 +12,11 @@ routes, two-screen approval and the webhook inbox (sections below; the Worker is
 
 ## Running the two-machine smoke
 
-The live check for this layer is a script, not a CI job (D-4645-22): it binds two
-LAN-visible ports for a few seconds and needs a built tree.
+AC-1 of the release criteria runs in CI as
+`tests/integration/anywhere/two-machine-ac1.slow.test.ts` (the `test-e2e` job, PAN-4774): two
+peer dashboards on free ports with a fake `claude`. The full smoke below stays a script (it binds
+two LAN-visible ports and needs a built tree). The whole release run, AC-1 to AC-15, is in the
+[release checklist](ANYWHERE-RELEASE-CHECKLIST.md).
 
 ```bash
 npm run build
@@ -28,7 +31,7 @@ step, each named in the output:
 
 | Step | What it asserts |
 | --- | --- |
-| `fake-clis` | fresh homes, each with a fake `HOME`, a fake npm prefix holding fake `claude` 2.1.0 and `codex` 0.150.0, and a fake `npm`; the servers run on a hard link to Node in `.tmp/anywhere-node/bin` (see below) |
+| `fake-clis` | fresh homes, each with a fake `HOME`, a fake npm prefix holding fake `claude` 2.1.0 and `codex` 0.150.0, and a fake `npm` (B's prefix also holds a `docker` that exits 1); the servers run on a hard link to Node in `.tmp/anywhere-node/bin` (see below) |
 | `start` | both servers answer `GET /api/environment` within 90 s |
 | `proxy` | a byte-logging TCP proxy on a free loopback port fronts B |
 | `pair+link` | `pan pair --url http://127.0.0.1:<proxy> --json` on B, `pan machines link <url> --allow-loopback --json` on A; B holds the reverse link |
@@ -42,6 +45,7 @@ step, each named in the output:
 | `tell-once` | a repeated `pan tell … --message-id` replays the first answer; the same id with other text is refused (the seeded conversation has no live pane, so that answer is a failed delivery; `remote-reply` checks delivery) |
 | `released-409` | with `released_to` set on B, a message through A answers 409 `conversation-released` |
 | `forward` | `pan machines forward` reaches a dev server on B; B's dashboard port is refused |
+| `needs-docker` | (#4774) B carries no `docker` tag; `POST /api/fleet/placement` on A with `needs: ['docker']` picks A, and `pan lane start --machine auto --needs docker --json` on A launches the lane on A, which is then stopped and reaped. Skipped, with a logged reason, when this host's `docker info` fails |
 | `lane-remote` | (#4638) `pan lane start --role play --machine <B> --json` on A, under a root conversation on A, answers with B as the machine and a null id (B's `projects.yaml` puts the lanes root under B's fake `HOME`) |
 | `lane-report` | `pan lane report --status done` inside the lane on B; `pan lane wait <name>` on A exits 0 with the body within 20 s, and `pan lane list --json` on A lists the lane on B |
 | `lane-nest` | A's `GET /api/conversations` lists `@<B>/<name>` with A's root conversation id as `parentConversationId` and `gauntletRun` `smoke` |
@@ -49,6 +53,7 @@ step, each named in the output:
 | `kill B` | after `SIGKILL`, A shows the link offline within 30 s |
 | `restart B` | A shows it online again within 60 s |
 | `no-http` | the proxy capture starts with the channel preamble byte `0x00` and contains no `HTTP/1.1` |
+| `hold` | (`--hold`, #4774) keeps both servers and B's dev server up, prints the `HOLD` line and waits for `SIGINT` or `SIGTERM` |
 | `stop` | both servers stopped; nothing outside `.tmp/anywhere-a|b` touched |
 
 The servers run with `HOME=<home>/fakehome`, `PATH=<home>/npm/bin:/usr/local/bin:/usr/bin:/bin`
@@ -65,7 +70,14 @@ B then answers 409 `conversation-released`); its harnesses run on the smoke home
 tmux sockets. It keeps the real `HOME` and `PATH` (Claude Code needs its login and
 binary), so it skips `versions` and `update-all`.
 `--inject-plain-http` sends one plain request through the proxy so the detector's
-failure path can be checked (it then fails at `no-http`). The work agent runs the
+failure path can be checked (it then fails at `no-http`).
+`--hold` keeps the pair for browser checks (PAN-4774): after `no-http` it restarts B if
+it is down, keeps B's `forward` dev server (`hello from b`) running, prints
+`HOLD a=http://127.0.0.1:3041 b=http://127.0.0.1:3042 dev=<port> conversation=@<B>/smoke-desk`,
+and cleans up on `SIGINT` or `SIGTERM` (exit 0). The servers always start through
+`.tmp/anywhere-node/serve.js`, a symlink to `dist/dashboard/server.js`, because the host's
+orphan reaper matches `dist/dashboard/server.js` in a command line and would kill a held
+server after 120 s. The work agent runs the
 script before `pan done` and pastes the output into the PR description.
 
 ## Running the directory smoke
@@ -290,7 +302,8 @@ Cloudflare Durable Object per account that knows the account's machines and intr
 - **WebRTC transport** (`src/lib/anywhere/channel/rtc-transport.ts`, `rtc-duplex.ts`, werift
   0.25.1, bundled): one peer connection per (peer, relay, purpose), shared by every dial; each
   dial opens an ordered `ovdl` data channel wrapped as a `Duplex` (16 KiB messages, backpressure
-  above 1 MiB). Either side may open channels on an existing connection, so both accept them.
+  above 1 MiB). werift reads a single TURN URL per peer connection, so the relay route orders its
+  list first (see "Relay and metering" below). Either side may open channels on an existing connection, so both accept them.
   The offer, answer and ICE candidates ride the directory socket as `signal` frames; the
   Durable Object stamps `from` from the sender's socket.
 - **Routes** (`directory-rtc.ts`, `directory-routes.ts`): `rtc://<id>` (kind `direct`) and
@@ -341,7 +354,12 @@ Linking two machines of one account with no pairing code, confirmed on both scre
 
 A relay-plan account (`tester` until billing) may dial `rtc+turn://`: the initiator asks the
 directory for TURN credentials (`ice-servers { relay: true }`, Cloudflare Realtime, 600 s TTL)
-and sets `iceTransportPolicy: 'relay'`. The directory refuses with `relay_not_allowed` (free),
+and sets `iceTransportPolicy: 'relay'`. Both ends pass the credential list through
+`relayIceServers` (`src/lib/anywhere/channel/relay-ice-servers.ts`, PAN-4862). It puts `turns:` on
+port 443 first, then other `turns:`, then `turn:` over TCP, then `turn:` over UDP, and drops STUN
+URLs. werift 0.25.1 uses only the first TURN URL, and when UDP is blocked its UDP-to-TCP fallback
+starts after about 6.35 s, which the 10 s relay probe cannot afford. Dropping STUN also spares the
+responder a 5 s wait for a server-reflexive candidate on a UDP-blocked network. The directory refuses with `relay_not_allowed` (free),
 `relay_cap_reached` (month total at 50 GB) or `turn_unavailable` (no TURN secrets), and the
 dialer fails with `ChannelOpenError('unreachable', …)`. `relay-client.ts` meters every relay
 data channel this machine dialed (the responder never reports, so each channel counts once)
@@ -403,7 +421,7 @@ User-facing pages: the `## SSH machines` section of `configuration/linked-machin
    stops; their server never does).
 
 A failure after step 5 stops the forward, deletes the provisional record and, when the
-helper reported `managed`, runs `ssh-helper stop` (45 s, best effort). At boot, a record
+helper reported `managed`, runs `ssh-helper stop` (60 s, best effort). At boot, a record
 whose link id is still null (the dashboard died mid-add) is deleted.
 
 ### The remote command (D-4404-4, D-4404-5)
@@ -438,7 +456,7 @@ linking side keeps `busy` and `start-failed` and maps the rest to `helper-failed
   `{ v: 1, pid, apiPort, version, startedAt, startedBy }`, written after the helper starts a
   server. `startedBy` is the linking machine's environment id.
 
-### Adopt and stop rules (D-4404-7, D-4404-8)
+### Adopt and stop rules (D-4404-7, D-4404-8, D-4861-1)
 
 **Start.** The helper reads the API port from the host's `config.toml` (as `pan up` does)
 and polls `/api/health`. A dashboard that answers with a `pid` is adopted: `managed` when
@@ -451,11 +469,18 @@ reports `managed`; no health is `start-failed` with the last 20 output lines.
 **Stop**, under the remote lock, in order: no health ⇒ `not-running` (marker deleted); no
 marker or another linker ⇒ `external`; marker pid differs from the health pid ⇒
 `restarted` (marker deleted); the host's `GET /api/machines` lists an active inbound
-machine other than the linker ⇒ `in-use`; otherwise `SIGTERM` to that pid, `SIGKILL`
-after 10 s, marker deleted, `stopped`. Only the dashboard process is signalled; `pan down`
-is not used because it also stops Traefik and review sessions this machine did not start.
-The linking side runs stop only for a `managed` record when the operator did not ask to
-keep the server; an unreachable host gives `stop-failed` and the removal goes on.
+machine other than the linker ⇒ `in-use`; otherwise the helper stops the host's
+supervisor first (D-4861-1), the same way `pan down` does (the `overdeck-supervisor.service`
+user unit when active, else the `supervisor.pid` process), because the supervisor restarts
+a dashboard it watches within about 30 s. If a supervisor still answers `/health` on the
+supervisor port after 3 s (for example the launchd agent that `pan connect` loads), the
+helper answers `stop-failed`, keeps the marker and leaves the server running. Otherwise
+`SIGTERM` to the dashboard pid, `SIGKILL` after 10 s, marker deleted, `stopped`. Other
+sidecars (CLIProxy, Traefik, smee) are left running and `pan down` is not used, because it
+also stops review sessions this machine did not start. A `pan connect` host whose unit is
+enabled gets the unit stopped; it starts again at the next boot. The linking side runs stop
+only for a `managed` record when the operator did not ask to keep the server, and waits up
+to 60 s for it; an unreachable host gives `stop-failed` and the removal goes on.
 
 ### Forward supervisor (D-4404-10)
 
@@ -580,10 +605,10 @@ Update all, the update dialog and `pan update` reinstall into the same runtime (
 A Fly machine is a Fly.io VM that runs `pan serve` and is linked one way from home
 (W-FLY2, epic FR-18, D-12; issue PRD `.pan/drafts/PAN-4652.md`). It is an ordinary linked
 machine: its conversations stream into home's list with a `fly-<machineId>` chip and come
-home with **Pull here**. It is a different thing from a remote work agent VM
-(`pan start --remote`, `src/lib/remote/remote-agents.ts`), which runs Claude Code in raw
-tmux and no Overdeck server; moving those onto this path is
-[PAN-4734](https://github.com/eltmon/overdeck/issues/4734). User-facing pages: the
+home with **Pull here**. Since [PAN-4734](https://github.com/eltmon/overdeck/issues/4734)
+it also hosts `pan start --remote` work agents (`### Work agents (PAN-4734)` below). A
+legacy remote work agent VM (`src/lib/remote/remote-agents.ts`, created before PAN-4734)
+runs Claude Code in raw tmux and no Overdeck server. User-facing pages: the
 `## Fly machines` section of `configuration/linked-machines.mdx` and `add-fly` in
 `cli/machines.mdx`.
 
@@ -596,6 +621,10 @@ tmux and no Overdeck server; moving those onto this path is
 | `${OVERDECK_HOME}/fly-machines.json` (0600, atomic; a corrupt file throws and is never rewritten) | `src/lib/anywhere/fly/machine-store.ts` |
 | `addFlyMachine`, `startFlyConversation`, `removeFlyMachineForLink` (unlink hook) | `src/dashboard/server/services/fly-machine-service.ts` |
 | `POST /api/machines/fly` | `src/dashboard/server/routes/machines-fly.ts` |
+| `startFlyWorkAgent` (PAN-4734) | `src/dashboard/server/services/fly-work-agent-service.ts` |
+| `POST /api/remote/work-agents` (PAN-4734) | `src/dashboard/server/routes/remote-work-agents.ts` |
+| `pan start --remote`, `--machine fly` (PAN-4734) | `src/cli/commands/start-remote.ts` |
+| The issue worktree on the VM, `ensureFlyWorkspace` (PAN-4734) | `src/lib/anywhere/fly/project.ts` |
 | `pan machines add-fly` | `src/cli/commands/machines-fly.ts` |
 | Heartbeat, sweep and Codex sign-in sync loops | `src/lib/remote/fly-machine-loops.ts` (registered in `src/lib/cloister/hygiene-scheduler.ts`) |
 | Credential refresh | `src/lib/remote/remote-credential-refresh.ts` (Fly machine names join the remote agents' VMs) |
@@ -792,12 +821,58 @@ non-Claude harness stays `false`.
 No `auth.json` content, token or base64 of either appears in a log line, an activity entry
 or an error: the VM read and push helpers name only the path and the exit code.
 
+### Work agents (PAN-4734)
+
+`pan start <id> --remote` and `pan start <id> --machine fly` run the work agent as a
+conversation on a new Fly machine (issue PRD `.pan/drafts/PAN-4734.md`; closes PAN-1775).
+
+- **The work door.** The CLI (`startRemoteWorkAgent`) refuses the durable tier, an issue
+  with legacy remote workspace metadata and a feature branch that is not on origin after
+  its push. It then posts `POST /api/remote/work-agents` with no client timeout, because
+  provisioning needs the link supervisor (`notifyLinksChanged`) and the link pool. The
+  route refuses a channel caller (403), as every operator machines route does.
+- **The service (`startFlyWorkAgent`).** It refuses an unknown project (404), a
+  non-Anthropic model (400 `harness-unsupported`) and an agent whose remote-state is
+  `running` or under 30 minutes `starting` (409) before any VM exists. It saves remote-state
+  `starting` with `linked: true` and `vmName: ''`, runs `addFlyMachine({ projectKey,
+  harness: 'claude-code' })`, adds the worktree `/workspace/<project>/workspaces/feature-<issue>`
+  with `git worktree add` on the pushed branch (not `pan workspace create`, whose 10 GiB
+  disk floor a Fly rootfs may not meet), copies home's `continue.json` and the skills,
+  starts the conversation through the link with `cwd` and `issueId`, installs the push
+  daemon in the worktree and saves `running`. The first message is the REMOTE work
+  prompt, or a pointer to `/workspace/.pan/prompts/agent-<issue>.md` when the prompt is
+  over 50,000 characters. A failure after provisioning unlinks the machine (which destroys
+  it through the unlink hook) and saves `error`. Non-operator starts run inside the
+  auto-spawn consent claim.
+- **Remote-state's linked fields.** `linked`, `environmentId`, `linkId`, `flyMachineId`,
+  `conversationName`, `tmuxSession` (`conv-<name>`), `tmuxSocket` (`overdeck`, the VM
+  server's default instance), `projectKey` and `workdir`; `vmName` is the Fly machine name.
+  `FlyProvider.resolveVm` resolves that name through `fly-machines.json`, so exec reaches
+  the machine in whatever app provisioned it.
+- **Tmux target resolution.** `remoteTmuxTarget(agentId)` returns `{ session: tmuxSession ??
+  agentId, socket: tmuxSocket }`. Output capture, `pan tell`, keyed delivery, `pan kill`
+  and the reap's probe address that target; a legacy state produces the old commands byte
+  for byte, so callers are unchanged.
+- **Loop rules.** The spend cap's agent count, the remote heartbeat and the credential
+  refresh's agent list skip a linked state, because its Fly machine record already counts,
+  heartbeats and syncs the VM (FR-10). `sweepFlyMachines` never idle-removes a machine whose
+  environment hosts a linked agent that is `starting` or `running` (FR-11); gone and
+  never-linked machines are removed as before.
+- **The reap.** On `REMOTE_DONE` and a pushed branch it copies
+  `<workdir>/.overdeck/continue.json` home, hands the branch to review, kills the session and
+  destroys, unlinks and forgets the Fly machine through `destroyAndForgetFlyMachine`. It
+  never calls `fly.deleteVm` or deletes workspace metadata for a linked agent. On a crash it
+  salvages the worktree and stops the machine; the sweep removes it once the state is no
+  longer active.
+- **The issue tree.** Resource discovery lists every cached linked conversation with an
+  `issueId` and no `releasedTo` under that issue with `origin: 'linked'`, and the tree row
+  opens `/conv/@<environmentId>/<name>`.
+
 ### Split
 
-`pan start --remote` work agents moving onto this path, and their session rows (closing
-PAN-1775), are [PAN-4734](https://github.com/eltmon/overdeck/issues/4734). The Machine
-field, **Fly (new VM)** and `--machine fly` are #4651; lanes on Fly are #4638. Codex on
-Fly is #4296 (above); other harnesses cannot run on a Fly machine.
+The Machine field, **Fly (new VM)** and `--machine fly` for other commands are #4651;
+lanes on Fly are #4638. Codex on Fly is #4296 (above); other harnesses cannot run on a Fly
+machine, and Codex does not run as a Fly work agent.
 
 ## Decisions added by sibling issues
 

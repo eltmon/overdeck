@@ -4,6 +4,7 @@
  *   pan skills deft status [--project <key>] [--json]
  *   pan skills deft enable --project <key> [--yes]
  *   pan skills deft disable --project <key>
+ *   pan skills deft use|back|save|show <issue>   (PAN-4820, ./skills-deft-pipeline.ts)
  *
  * Status is derived on every run: detection, the deft pack registry entry,
  * the skill map, managed mode, and the ownership report. Enable stores only
@@ -15,6 +16,7 @@
  */
 import chalk from 'chalk';
 import type { Command } from 'commander';
+import { registerSkillsDeftPipelineCommands } from './skills-deft-pipeline.js';
 
 interface StatusOptions { project?: string; json?: boolean }
 interface EnableOptions { project: string; yes?: boolean }
@@ -146,7 +148,7 @@ export async function skillsDeftDisableCommand(options: DisableOptions): Promise
 
 /** Registers `pan skills deft` under the `skills` command. */
 export function registerSkillsDeftCommands(skills: Command): void {
-  const deft = skills.command('deft').description('Deft Directive detection, ownership report, and managed mode');
+  const deft = skills.command('deft').description('Deft Directive detection, managed mode, and running an issue on Deft');
   deft.command('status').description('Show Directive detection, the deft pack, the skill map, managed mode, and the ownership report')
     .option('--project <key>', 'Registered project (default: the current repo)').option('--json', 'Output as JSON')
     .action(skillsDeftStatusCommand);
@@ -156,4 +158,5 @@ export function registerSkillsDeftCommands(skills: Command): void {
   deft.command('disable').description('Disable Deft managed mode; project files are untouched')
     .requiredOption('--project <key>', 'Registered project')
     .action(skillsDeftDisableCommand);
+  registerSkillsDeftPipelineCommands(deft);
 }

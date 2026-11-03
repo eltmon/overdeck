@@ -1,0 +1,111 @@
+{
+  "version": "1",
+  "issueId": "PAN-4821",
+  "created": "2026-11-02T16:00:29.674Z",
+  "updated": "2026-11-02T17:21:20.877Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "wi1-no-error-cache": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4821",
+      "claimedAt": "2026-11-02T16:00:29.674Z",
+      "doneAt": "2026-11-02T16:20:01.523Z"
+    },
+    "wi2-pr-read-helper": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4821",
+      "claimedAt": "2026-11-02T16:20:06.428Z",
+      "doneAt": "2026-11-02T16:36:31.618Z"
+    },
+    "wi3-verdict-read-error": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4821",
+      "claimedAt": "2026-11-02T16:36:36.491Z",
+      "doneAt": "2026-11-02T16:50:26.125Z"
+    },
+    "wi4-merged-row-retry": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4821",
+      "claimedAt": "2026-11-02T16:50:33.309Z",
+      "doneAt": "2026-11-02T17:03:17.786Z"
+    },
+    "wi5-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4821",
+      "claimedAt": "2026-11-02T17:03:23.644Z",
+      "doneAt": "2026-11-02T17:14:15.505Z"
+    },
+    "wi1-no-error-cache.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:15:47.270Z"
+    },
+    "wi1-no-error-cache.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:16:08.719Z"
+    },
+    "wi1-no-error-cache.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:16:29.608Z"
+    },
+    "wi2-pr-read-helper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:16:48.933Z"
+    },
+    "wi2-pr-read-helper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:17:10.758Z"
+    },
+    "wi2-pr-read-helper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:17:30.367Z"
+    },
+    "wi2-pr-read-helper.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:18:06.364Z"
+    },
+    "wi3-verdict-read-error.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:18:33.115Z"
+    },
+    "wi3-verdict-read-error.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:18:52.104Z"
+    },
+    "wi3-verdict-read-error.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:19:12.033Z"
+    },
+    "wi3-verdict-read-error.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:19:31.339Z"
+    },
+    "wi3-verdict-read-error.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:19:48.749Z"
+    },
+    "wi4-merged-row-retry.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:20:07.152Z"
+    },
+    "wi4-merged-row-retry.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:20:25.444Z"
+    },
+    "wi4-merged-row-retry.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:20:43.671Z"
+    },
+    "wi5-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:21:01.967Z"
+    },
+    "wi5-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:21:20.877Z"
+    }
+  }
+}

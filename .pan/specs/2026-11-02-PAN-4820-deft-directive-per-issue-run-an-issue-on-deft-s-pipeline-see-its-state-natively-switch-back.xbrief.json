@@ -1,0 +1,1322 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T16:07:07Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4820: Deft Directive per issue: run an issue on Deft's pipeline, see its state natively, switch back",
+    "updated": "2026-11-02T17:12:41.751Z"
+  },
+  "plan": {
+    "id": "pan-4820",
+    "title": "Deft Directive per issue: run an issue on Deft's pipeline, see its state natively, switch back",
+    "status": "running",
+    "uid": "26fdfa8a-8859-4a36-a483-3d9265d3b1a0",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-11-02T16:07:07Z",
+    "updated": "2026-11-02T17:12:41.751Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4820",
+        "label": "PAN-4820",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4820.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "deft",
+      "skill-packs",
+      "merge-gate",
+      "dashboard",
+      "pipeline"
+    ],
+    "metadata": {
+      "sizeJustification": "Split on 2026-11-02 at the operator's request: this issue keeps the per-issue Deft pipeline core (WI-0 to WI-14, WI-30); the dashboard surfaces WI-15 to WI-29 moved to PAN-4849, blocked by this issue.",
+      "canonicalFilename": "2026-11-02-PAN-4820-deft-directive-per-issue-run-an-issue-on-deft-s-pipeline-see-its-state-natively-switch-back.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "An operator cannot run a single issue on Deft Directive's own pipeline inside Overdeck. The docs say Overdeck never runs a Deft CLI and does not target 'Full Deft'. A Directive install would land tracked files in the PR, Overdeck would dispatch its own review and test agents, the PR could never reach awaiting merge without an Overdeck approval, and none of Deft's state (scopes, escalations, heartbeats, gates) shows on the dashboard.",
+      "Proposal": "Store `pipeline: deft` in the issue override file. `pan skills deft use` installs Directive into that issue's worktree only and hides every change with a worktree-scoped exclude file, skip-worktree flags and a worktree-scoped core.hooksPath, recorded in a snapshot. A lift keeps rebase and sync-main working. Deft issues get Deft's build kickoff, no Overdeck review, test or verification, an approval waiver, a merge guard against deposit paths, drift and a stale state archive in every merge door, and an auto-merge hold when Deft requires a human merge. `pan skills deft back` saves Deft state on the feature branch and undoes the install exactly. A file-only state reader feeds the board, Needs-you, the question dialog, agent tiles, the xBRIEF tab, the DAG, the gates panel, a new Decisions tab with policy, a drift badge, an approved-scope check and finish-loop progress. Full detail: .pan/drafts/PAN-4820.md.",
+      "NonGoals": "- A Deft fork with host-supplied install path or DEFT_ORCHESTRATOR support (Option 2).\n- Any contact with upstream deftai (fork-first policy).\n- A project-level Deft pipeline default.\n- A cross-issue Deft plan graph.\n- Remote (Fly) workspaces and polyrepo workspaces in Deft mode.\n- Harnesses other than Claude Code and Codex; deterministic menus in the dialog for Codex.\n- The dashboard server running any Deft CLI or execSync; it reads Directive files with async fs and writes only escalation resolutions and disposition sign-offs.\n- Changing the read-only deft pack's host notice, skill map, or its CLI deny for Overdeck-pipeline issues.\n- Merging any Deft install path into the repository.\n- Raising any file-size allowlist cap; editing src/cli/commands/start.ts.\n- Running Overdeck review, test, or verification agents for a Deft-pipeline issue.\n- Using directive uninstall; undo is snapshot-based."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Install runs via `npx --yes @deftai/directive install --yes --root <worktree>` (plain `directive` when on PATH), 10-minute async timeout, only from `pan skills deft use`, never inside `pan workspace create`.",
+        "rationale": "Install needs npm and the network; the workspace-create path has a 60 s timeout. (AD-1, AD-2)"
+      },
+      {
+        "summary": "A Deft issue without a workspace xBRIEF gets a one-item stand-in plan (plan.metadata.deftPlaceholder true) so the existing start checks pass; `back` deletes it.",
+        "rationale": "start.ts has 2 lines of file-size room; this avoids editing it. (AD-3)"
+      },
+      {
+        "summary": "Deft issues waive approval at head in the merge gate and derive `ready` without an Overdeck approval; every other merge check still applies.",
+        "rationale": "No Overdeck reviewer runs for Deft issues (D6), so nothing would ever approve; the strike-merge waiver is the precedent. (AD-4)"
+      },
+      {
+        "summary": "Overdeck's verification gate is skipped for Deft issues; startRequestReviewPipeline returns early before journaling.",
+        "rationale": "Deft's pre-push hook enforces pre-pr:run and CI gates the merge; journaling review.requested would make the Deacon re-request every tick. (AD-5)"
+      },
+      {
+        "summary": "Gate telemetry comes from Deft's run summary (DEFT_RUN_SUMMARY_PATH via a literal allowlist token), not a PostToolUse hook.",
+        "rationale": "Deft v0.129.3 installs no PostToolUse hook; the run summary carries per-gate status for Claude Code and Codex. (AD-9)"
+      },
+      {
+        "summary": "Escalation answers rewrite the escalation file in place (status resolved + resolution) atomically, then notify the agent with deliverAgentMessage.",
+        "rationale": "Matches deft escalation:resolve semantics without the server running a Deft CLI; the agent polls the file. (AD-10)"
+      },
+      {
+        "summary": "Deterministic menus are parsed from the Claude Code transcript's last assistant text and answered with the exact label; Codex agents keep the plain-text menu in v1.",
+        "rationale": "Herdr panes expose no text to the server; the generic answer path wraps answers in Q:/A: prose. (AD-11)"
+      },
+      {
+        "summary": "Acceptance sign-off writes provenance { kind: human-event, actor: overdeck:<operator> } into the scope item's disposition.",
+        "rationale": "Deft accepts dispositions only with non-agent provenance; that is a human sign-off in Deft's terms. (AD-12)"
+      },
+      {
+        "summary": "The Deft state archive is written by `pan skills deft save` into .pan/deft/<ISSUE>/{scopes,decisions,approved-scope,escalations}/ on the feature branch; the merge guard refuses a stale archive.",
+        "rationale": "D5 requires saving at completion and switch-back; an explicit guarded step avoids Overdeck racing the agent's commits, and the folder names never match the guard's xbrief/ prefix. (AD-13)"
+      },
+      {
+        "summary": "requireHumanMerge: typed boolean wins, malformed → true, absent → autoDeployOnMerge === true, missing file → true; DEFT_ALLOW_BOT_MERGE ignored.",
+        "rationale": "D6 says on or unknown ⇒ no auto-merge; Deft's own order applies when the file exists. (AD-15)"
+      },
+      {
+        "summary": "Polyrepo and remote (Fly) workspaces are refused in v1.",
+        "rationale": "Issue out-of-scope list; a polyrepo plan home is not the worktree. (AD-16)"
+      },
+      {
+        "summary": "Skip-worktree files and Deft's pre-push hook are lifted around rebaseFeatureBranch and sync-main, with a 3-way git merge-file re-apply.",
+        "rationale": "Probed: rebase and merge abort when main changed a skip-worktree file; Overdeck's own pushes would hit Deft's pre-push hook. (AD-7, AD-8)"
+      },
+      {
+        "summary": "One xBRIEF with sizeJustification rather than sibling issues.",
+        "rationale": "The issue's acceptance binds every dashboard surface to this issue and auto mode may not re-scope it; the PRD's section 11 names the clean split for the operator. (AD-21)"
+      }
+    ],
+    "items": [
+      {
+        "id": "live-install-probe",
+        "title": "Probe directive install live in a scratch worktree",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T16:07:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "spike",
+          "issueLabel": "pan-4820",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/drafts/PAN-4820.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'core.hooksPath' .pan/drafts/PAN-4820.md"
+          ],
+          "expected_outputs": [
+            "the grep prints a count of at least 2 after the probe notes are appended"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-0: in the scratchpad, create a scratch repo with .claude/settings.json, .gitignore, package.json and bun.lockb, add one worktree, run `npx --yes @deftai/directive install --yes --root <worktree>`, and record exit code, duration, porcelain before/after (with --ignored=matching), the shared core.hooksPath value, the package manager chosen, whether package-lock.json appeared, and whether .claude/settings.json changed. Append the results under '## Implementation notes' in .pan/drafts/PAN-4820.md. If the install fails or hangs past 10 minutes, record that and keep WI-2's injected-runner design (the stated fallback)."
+        },
+        "items": [
+          {
+            "id": "live-install-probe.ac1",
+            "title": "Given the probe ran, the PRD's Implementation notes section records the install exit code and duration",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-install-probe.ac2",
+            "title": "The Implementation notes section contains the porcelain path list before and after the install",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-install-probe.ac3",
+            "title": "The Implementation notes section contains the shared core.hooksPath value after install and whether package-lock.json was created",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "issue-pipeline-field",
+        "title": "Add the pipeline key to the issue override file",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T16:07:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4820",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-overrides/store.ts",
+            "src/lib/deft/issue-pipeline.ts",
+            "src/lib/deft/__tests__/issue-pipeline.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/deft/__tests__/issue-pipeline.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "src/lib/deft/__tests__/issue-pipeline.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ],
+          "foundationFor": [
+            "merge-gate-wiring",
+            "derived-ready",
+            "no-review-dispatch",
+            "auto-merge-hold",
+            "launch-in-deft-mode",
+            "deft-kickoff",
+            "switch-use-back",
+            "deft-routes"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-1: extend IssueOverrides with pipeline?: 'deft', parse it in readIssueFile, write it in renderIssueFile, keep the file when only pipeline is set in persistIssueFile, export setIssuePipeline(issueId, 'deft'|'overdeck') committing through the plan-artifact door, and add src/lib/deft/issue-pipeline.ts with readIssuePipeline and isDeftPipelineIssue (async fs, errors read as 'overdeck')."
+        },
+        "items": [
+          {
+            "id": "issue-pipeline-field.ac1",
+            "title": "Given an issue file with pipeline: deft, a pack toggle write through setSkillOverride preserves the pipeline: deft line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-pipeline-field.ac2",
+            "title": "setIssuePipeline(id, 'overdeck') deletes the issue file when no skills or packs remain",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-pipeline-field.ac3",
+            "title": "readIssuePipeline returns 'overdeck' when the issue file is missing and 'deft' when it contains pipeline: deft",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "install-and-hide",
+        "title": "Install Directive into one worktree and hide it from git",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T16:07:07Z",
+        "metadata": {
+          "difficulty": "expert",
+          "kind": "backend",
+          "issueLabel": "pan-4820",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/deft/install.ts",
+            "src/lib/deft/install-snapshot.ts",
+            "src/lib/deft/__tests__/install.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/deft/__tests__/install.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "src/lib/deft/__tests__/install.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3"
+          ],
+          "foundationFor": [
+            "uninstall-restore",
+            "lift-around-git-ops",
+            "merge-guard-core",
+            "deft-kickoff",
+            "switch-use-back"
+          ],
+          "parallelSafeReason": "new module with no shared files; only its own test file"
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-2 exactly: installDeftIntoWorktree records the before state, runs the injected install (default npx --yes @deftai/directive install --yes --root <worktree>, 10 min, async execFile), restores the shared core.hooksPath, enables extensions.worktreeConfig and sets the worktree hooksPath, runs git reset -q and installPreRebaseHook, computes createdPaths/modifiedTracked/modifiedUntracked/touchedPreexisting (hashing every tracked, untracked and ignored file in the before listing), writes the worktree exclude file seeded with the global excludes plus the /.overdeck/deft-install.json, /.overdeck/deft-run-summary.jsonl and /.overdeck/deft-lift/ lines, sets skip-worktree flags, writes .overdeck/deft-install.json atomically, and asserts no porcelain line appears that was not present before the install. It refuses only staged or unmerged changes."
+        },
+        "items": [
+          {
+            "id": "install-and-hide.ac1",
+            "title": "Given a fake install that writes a deposit and runs git add -A plus git config core.hooksPath .githooks, git status --porcelain in the install worktree prints nothing afterwards",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "install-and-hide.ac2",
+            "title": "After the install, the sibling worktree returns no core.hooksPath value and git ls-files -v shows no S entry there",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "install-and-hide.ac3",
+            "title": "After the install, git config --local --get core.hooksPath exits 1 when it was unset before the install",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "install-and-hide.ac4",
+            "title": "The snapshot file records every created path, every modified tracked path, and an ignored pre-existing .claude/settings.json that install changed, each with its pre-install content",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "uninstall-restore",
+        "title": "Remove a temporary install and restore pre-install content",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T16:07:07Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4820",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/deft/uninstall.ts",
+            "src/lib/deft/__tests__/uninstall.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/deft/__tests__/uninstall.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "src/lib/deft/__tests__/uninstall.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ],
+          "parallelSafeReason": "new module; reads the snapshot type only"
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-3: removeDeftInstall(worktree) clears skip-worktree flags and writes back restoreContent for modified tracked files, deletes each createdPaths entry only after checking it resolves inside the worktree, writes back modifiedUntracked bytes, removes only <entry>/@deftai/ for touchedPreexisting entries, deletes .overdeck/deft-run-summary.jsonl and .overdeck/deft-lift/, unsets the worktree core.hooksPath and core.excludesFile, deletes the exclude file, re-runs installPreRebaseHook, and deletes the snapshot file. extensions.worktreeConfig stays on."
+        },
+        "items": [
+          {
+            "id": "uninstall-restore.ac1",
+            "title": "Given a fixture install, removeDeftInstall deletes every created path listed in the snapshot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uninstall-restore.ac2",
+            "title": "After removeDeftInstall, git ls-files -v shows no S entry and git config --worktree --get core.hooksPath exits 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uninstall-restore.ac3",
+            "title": "removeDeftInstall preserves a pre-install edit: a tracked file that was dirty before the install contains its pre-install bytes afterwards, not the HEAD content",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uninstall-restore.ac4",
+            "title": "A createdPaths entry that resolves outside the worktree is refused and nothing outside the worktree is deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lift-around-git-ops",
+        "title": "Lift the hidden install around rebase and sync-main",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T16:07:07Z",
+        "metadata": {
+          "difficulty": "expert",
+          "kind": "backend",
+          "issueLabel": "pan-4820",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/deft/lift.ts",
+            "src/lib/cloister/merge-rebase.ts",
+            "src/lib/cloister/sync-main-workspace.ts",
+            "src/lib/deft/__tests__/lift.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/deft/__tests__/lift.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "src/lib/deft/__tests__/lift.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ],
+          "parallelSafeReason": "touches merge-rebase.ts and sync-main-workspace.ts, which no other item edits"
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-4: withDeftInstallLifted(worktree, targetRef, fn) is a no-op without a snapshot, refuses when targetRef tracks a created path, otherwise clears skip-worktree, checks out HEAD versions, unsets the worktree hooksPath, runs fn, and in finally re-applies (saved bytes when the base blob is unchanged, else git merge-file -p on three temp files written under .overdeck/deft-lift/; conflicts keep saved bytes and record liftConflicts), then restores skip-worktree and hooksPath and rewrites the snapshot. Wrap rebaseFeatureBranchBody in rebaseFeatureBranch and each syncRepo call in syncMainAcrossWorkspaceRepos."
+        },
+        "items": [
+          {
+            "id": "lift-around-git-ops.ac1",
+            "title": "Given main changed a skip-worktree file after install, a rebase inside withDeftInstallLifted completes and git status --porcelain prints nothing afterwards",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lift-around-git-ops.ac2",
+            "title": "After the lifted rebase, the hidden file contains both main's change and the install's change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lift-around-git-ops.ac3",
+            "title": "withDeftInstallLifted refuses with a DeftLiftError when the target ref tracks a created install path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lift-around-git-ops.ac4",
+            "title": "Without a snapshot file, withDeftInstallLifted returns fn's result and runs no git command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "merge-guard-core",
+        "title": "Decide what the Deft merge guard refuses",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T16:07:07Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4820",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/deft/merge-guard.ts",
+            "src/lib/deft/__tests__/merge-guard.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/deft/__tests__/merge-guard.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "src/lib/deft/__tests__/merge-guard.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ],
+          "parallelSafeReason": "new module; consumes the snapshot and archive APIs only"
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-5: the pure evaluateDeftMergeGuard with the ordered rules (Directive project allows; drift refuses; repo-root deposit prefixes, pointer-skill, slash-wrapper and hook-script patterns, and the AGENTS.md/package.json/Taskfile.yml/.gitignore content checks refuse; a stale archive refuses), plus readPrChangedPaths, readHeadFile, detectDrift, raiseDeftDriftDecision and deftMergeGuardForIssue, which fails closed when the head or the diff cannot be read."
+        },
+        "items": [
+          {
+            "id": "merge-guard-core.ac1",
+            "title": "evaluateDeftMergeGuard refuses a changed-path list containing .githooks/pre-push and returns that path in paths",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-guard-core.ac2",
+            "title": "evaluateDeftMergeGuard accepts .pan/deft/PAN-1/scopes/active/x.xbrief.json as a changed path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-guard-core.ac3",
+            "title": "Given AGENTS.md at the head contains <!-- deft:managed-section, the guard refuses a diff that changes AGENTS.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-guard-core.ac4",
+            "title": "Given directiveProject is true, the guard returns ok for a diff containing xbrief/active/a.xbrief.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-guard-core.ac5",
+            "title": "deftMergeGuardForIssue refuses with 'merge guard could not read' when git diff fails",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "merge-gate-wiring",
+        "title": "Wire the guard and the approval waiver into every merge door",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T16:07:07Z",
+        "metadata": {
+          "difficulty": "expert",
+          "kind": "backend",
+          "issueLabel": "pan-4820",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/cloister/merge-gate.ts",
+            "src/dashboard/server/routes/workspaces/merge-strike.ts",
+            "src/dashboard/server/routes/workspaces/merge-ops.ts",
+            "src/lib/deft/__tests__/merge-gate-deft.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/deft/__tests__/merge-gate-deft.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "src/lib/deft/__tests__/merge-gate-deft.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6"
+          ],
+          "foundationFor": [
+            "derived-ready",
+            "auto-merge-hold"
+          ],
+          "parallelSafeReason": "sole editor of merge-gate.ts, merge-strike.ts and merge-ops.ts"
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-6: evaluateIssueMergeGate defaults requireApprovalAtHead to !isDeftPipelineIssue(issueId), runs deftMergeGuardForIssue for Deft issues and returns ready:false with the guard reason and deftDrift; forgeMergeGate raises one idempotent operator decision for drift; the forge-merge route refuses a Deft PR the guard refuses with 409 and refused:true. Overdeck issues keep requiring approval at head."
+        },
+        "items": [
+          {
+            "id": "merge-gate-wiring.ac1",
+            "title": "Given a Deft issue with a green, mergeable PR and no approval, evaluateIssueMergeGate returns ready true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-gate-wiring.ac2",
+            "title": "Given a Deft PR whose diff contains .githooks/pre-push, evaluateIssueMergeGate returns ready false with the guard reason",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-gate-wiring.ac3",
+            "title": "Given an Overdeck issue with no approval at head, evaluateIssueMergeGate still returns ready false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-gate-wiring.ac4",
+            "title": "POST /api/issues/:id/forge-merge refuses a Deft PR the guard refuses with status 409 and refused true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "derived-ready",
+        "title": "Derive awaiting-merge for a Deft PR without approval",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T16:07:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4820",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/derived-issue-state.ts",
+            "src/lib/deft/__tests__/derived-ready.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/deft/__tests__/derived-ready.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "src/lib/deft/__tests__/derived-ready.test.ts passes",
+            "typecheck completes without errors",
+            "file-size guard passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-7: add the deftPipeline fact and the isDeftPipeline loader dep, set it in loadIssueStateFacts and loadIssueStatesForProject, and treat deftPipeline as approved in deriveState. The file must stay at or under 1000 lines."
+        },
+        "items": [
+          {
+            "id": "derived-ready.ac1",
+            "title": "Given facts with deftPipeline true, an open green mergeable PR and no approval, deriveIssueState returns state ready",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "derived-ready.ac2",
+            "title": "Given the same facts without deftPipeline, deriveIssueState returns state in-review",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "derived-ready.ac3",
+            "title": "bash scripts/lint-file-size.sh exits 0 with derived-issue-state.ts at or under 1000 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "no-review-dispatch",
+        "title": "Keep Overdeck review, test and verification off for Deft issues",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T16:07:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4820",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/workspaces/review-pipeline.ts",
+            "src/lib/cloister/review-agent.ts",
+            "src/lib/agents/spawn.ts",
+            "src/lib/deft/role-refusal.ts",
+            "src/lib/deft/__tests__/role-refusal.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/deft/__tests__/role-refusal.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "src/lib/deft/__tests__/role-refusal.test.ts passes",
+            "typecheck completes without errors",
+            "file-size guard passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-8: startRequestReviewPipeline returns { started:false, reason:'deft-pipeline' } before transitionIssueToInReview and before journaling; spawnReviewRoleForIssueBody returns success with an activity entry before spawning; spawnRun calls assertRoleRunsOnPipeline, which throws DeftPipelineRoleRefusedError for review and test on Deft issues. spawn.ts may grow by at most 5 lines."
+        },
+        "items": [
+          {
+            "id": "no-review-dispatch.ac1",
+            "title": "Given a Deft issue, startRequestReviewPipeline returns reason deft-pipeline and appends no review.requested journal entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "no-review-dispatch.ac2",
+            "title": "assertRoleRunsOnPipeline throws DeftPipelineRoleRefusedError for roles review and test on a Deft issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "no-review-dispatch.ac3",
+            "title": "assertRoleRunsOnPipeline returns without throwing for role work on a Deft issue and for role review on an Overdeck issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "no-review-dispatch.ac4",
+            "title": "bash scripts/lint-file-size.sh exits 0 after the spawn.ts and review-pipeline.ts edits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "auto-merge-hold",
+        "title": "Hold auto-merge when Deft requires a human merge",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T16:07:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4820",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/deft/policy.ts",
+            "src/dashboard/server/routes/merge-train.ts",
+            "src/dashboard/server/services/auto-merge-scheduler.ts",
+            "src/dashboard/server/services/auto-merge-executor.ts",
+            "src/lib/deft/__tests__/policy.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/deft/__tests__/policy.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "src/lib/deft/__tests__/policy.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-9: readDeftPolicy and requireHumanMergeOf apply AD-15 (typed boolean wins; malformed is true; absent follows autoDeployOnMerge; missing file is true); deftAutoMergeHold(issueId) returns a reason for Deft issues that require a human merge; the schedule route refuses with 412, the scheduler skips the issue, and the executor records blocked without calling triggerMerge."
+        },
+        "items": [
+          {
+            "id": "auto-merge-hold.ac1",
+            "title": "requireHumanMergeOf returns true for a malformed value, for a missing file, and for absent with autoDeployOnMerge true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-merge-hold.ac2",
+            "title": "requireHumanMergeOf returns false when requireHumanMerge is absent and autoDeployOnMerge is not true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-merge-hold.ac3",
+            "title": "Given a held Deft issue, postAutoMergeSchedulePayload returns status 412 with the hold reason",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-merge-hold.ac4",
+            "title": "Given a held Deft issue, scheduleReadyAutoMerges creates no auto-merge row for it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "launch-in-deft-mode",
+        "title": "Launch Deft-pipeline agents without the read-only pack",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T16:07:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4820",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/deft/launch.ts",
+            "src/lib/skill-overrides/launch.ts",
+            "src/lib/skill-overrides/launcher-lines.ts",
+            "src/lib/deft/__tests__/launch.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/deft/__tests__/launch.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "src/lib/deft/__tests__/launch.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-10: resolveDeftLaunch takes the issue pipeline; in Deft mode it sets no kill switch, no flag, no orchestrator, no deny, no hidden skills, and runSummary true; applyDeftLaunch writes DEFT_RUN_SUMMARY_PATH=overdeck; the launcher allowlist maps that literal token to export DEFT_RUN_SUMMARY_PATH=\"$PWD/.overdeck/deft-run-summary.jsonl\" for Claude and Codex; resolveLaunchPackSelection drops the deft pack for Deft-pipeline issues."
+        },
+        "items": [
+          {
+            "id": "launch-in-deft-mode.ac1",
+            "title": "Given a Deft-pipeline issue in a worktree with a deposit and the deft pack explicitly off, resolveDeftLaunch returns killSwitch false and denyCli false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-in-deft-mode.ac2",
+            "title": "applyDeftLaunch writes an env file that contains the line DEFT_RUN_SUMMARY_PATH=overdeck for a Deft-pipeline plan",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-in-deft-mode.ac3",
+            "title": "The launcher line for the env file contains the case DEFT_RUN_SUMMARY_PATH=overdeck and no other new case",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-in-deft-mode.ac4",
+            "title": "resolveLaunchPackSelection returns a selection without the deft pack for a Deft-pipeline issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deft-kickoff",
+        "title": "Kick off Deft-pipeline work agents with Deft's build flow",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T16:07:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4820",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/deft/kickoff.ts",
+            "src/lib/cloister/prompts/work-deft.md",
+            "src/lib/cloister/work-agent-prompt.ts",
+            "src/lib/deft/__tests__/kickoff.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/deft/__tests__/kickoff.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "src/lib/deft/__tests__/kickoff.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-11: buildWorkAgentPrompt returns buildDeftWorkAgentPrompt(ctx) for Deft issues; that function throws DeftNotInstalledError when a non-Directive worktree has no snapshot, else renders the new work-deft.md template with ISSUE_ID, ISSUE_ID_LOWER, WORKSPACE_PATH, BRANCH_NAME and HIDDEN_PATHS. The template carries the seven sentences listed in WI-11, including the instruction to use pan sync-main instead of git rebase. Confirm the build copies prompts/*.md so work-deft.md reaches dist/dashboard/prompts/. Revision (operator, 2026-11-02): the third template sentence is now: \"After the PR is open, if the repository has a bot reviewer that `deft-directive-review-cycle` supports (Greptile today), run that skill until it exits. Otherwise stop. Never merge: a person merges through Overdeck.\""
+        },
+        "items": [
+          {
+            "id": "deft-kickoff.ac1",
+            "title": "Given a Deft issue with a snapshot, buildWorkAgentPrompt returns text that contains deft-directive-build and pan skills deft save and does not contain pan task",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deft-kickoff.ac2",
+            "title": "Given an Overdeck issue, buildWorkAgentPrompt still renders the work template",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deft-kickoff.ac3",
+            "title": "Given a Deft issue in a non-Directive worktree without a snapshot, buildWorkAgentPrompt throws DeftNotInstalledError",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "state-archive",
+        "title": "Save Deft state to the feature branch and check it is current",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T16:07:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4820",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/deft/archive.ts",
+            "src/lib/deft/__tests__/archive.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/deft/__tests__/archive.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "src/lib/deft/__tests__/archive.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-12: planDeftArchive maps scope, decision, approved-scope and escalation files to .pan/deft/<ISSUE>/{scopes/<folder>,decisions,approved-scope,escalations}/; saveDeftState replaces that folder, stages it, and commits 'chore(deft): save Deft state for <ISSUE>' only when something is staged; isDeftArchiveCurrent compares the planned set and bytes with the tree at a head sha; Directive projects plan nothing and are always current."
+        },
+        "items": [
+          {
+            "id": "state-archive.ac1",
+            "title": "saveDeftState commits the archive and isDeftArchiveCurrent returns true for the new HEAD",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "state-archive.ac2",
+            "title": "After a scope file changes, isDeftArchiveCurrent returns false for the same HEAD",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "state-archive.ac3",
+            "title": "planDeftArchive returns no archive path starting with xbrief/ or .deft/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "switch-use-back",
+        "title": "Switch an issue to Deft and back",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T16:07:07Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4820",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/deft/switch.ts",
+            "src/lib/deft/__tests__/switch.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/deft/__tests__/switch.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "src/lib/deft/__tests__/switch.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "FR-11"
+          ],
+          "parallelSafeReason": "new module; composes earlier modules through injected deps"
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-13: useDeftPipeline refuses polyrepo and remote workspaces, stops the issue's agents, sets the pipeline, creates the workspace (pan workspace create, 5 min), installs, writes the stand-in plan with plan.metadata.deftPlaceholder true when none exists, and rolls back on failure; backToOverdeck stops agents, saves state, removes the install, resets the pipeline, deletes the stand-in plan, and returns next: pan start <ID>."
+        },
+        "items": [
+          {
+            "id": "switch-use-back.ac1",
+            "title": "Given an install failure after the pipeline was set, useDeftPipeline resets the pipeline to overdeck and rethrows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "switch-use-back.ac2",
+            "title": "useDeftPipeline refuses a polyrepo project with the AD-16 message and writes nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "switch-use-back.ac3",
+            "title": "Given injected deps, the recorded call log contains stop, save, remove, and setIssuePipeline('overdeck') in that order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "switch-use-back.ac4",
+            "title": "backToOverdeck deletes the workspace plan only when it carries the Deft stand-in marker and keeps any other plan",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-skills-deft-pipeline",
+        "title": "Add pan skills deft use, back, save and show",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T16:07:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4820",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/skills-deft-pipeline.ts",
+            "src/cli/commands/skills-deft.ts",
+            "src/lib/deft/__tests__/skills-deft-pipeline.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/deft/__tests__/skills-deft-pipeline.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "src/lib/deft/__tests__/skills-deft-pipeline.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-14: registerSkillsDeftPipelineCommands registers use <issue> [--start] [--json], back <issue> [--json], save <issue>, and show <issue> [--json] under pan skills deft, each calling its lib function with the issue id upper-cased, printing the PRD's messages, and exiting 1 with the message on stderr on refusal."
+        },
+        "items": [
+          {
+            "id": "cli-skills-deft-pipeline.ac1",
+            "title": "pan skills deft use pan-7 calls useDeftPipeline with PAN-7 and prints 'Deft pipeline on for PAN-7'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-skills-deft-pipeline.ac2",
+            "title": "pan skills deft back PAN-7 prints 'Next: pan start PAN-7 (plans first)' after a successful switch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-skills-deft-pipeline.ac3",
+            "title": "Given useDeftPipeline throws, pan skills deft use exits 1 and prints the error on stderr",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-skills-deft-pipeline.ac4",
+            "title": "pan skills deft --help prints use, back, save and show next to status, enable and disable",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document the per-issue Deft pipeline",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T16:07:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-4820",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/skill-packs.mdx",
+            "docs/SKILL-PACKS.md",
+            "CHANGELOG.md",
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'Running an issue on Deft' features/skill-packs.mdx",
+            "grep -c 'PAN-4820' CHANGELOG.md"
+          ],
+          "expected_outputs": [
+            "each grep prints a count of at least 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-30: change the level table row and the 'never runs a Deft CLI' sentence in features/skill-packs.mdx, add the '#### Running an issue on Deft' section (commands, install and hide, merge guard, approval and auto-merge, network, limits), point the managed-mode 'never runs directive init' sentence at it, list every new src/lib/deft module in docs/SKILL-PACKS.md, add the Unreleased changelog entry, and extend the codebase map's Deft sentence. The dashboard parts of the docs (menu actions, dashboard surfaces, new routes) belong to PAN-4849."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "features/skill-packs.mdx contains the heading '#### Running an issue on Deft' and no longer contains 'Overdeck does not target this level'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "docs/SKILL-PACKS.md contains install.ts, uninstall.ts, lift.ts, merge-guard.ts, archive.ts, switch.ts and state-reader.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "CHANGELOG.md contains '### Added: Deft pipeline per issue' under Unreleased with a PAN-4820 bullet",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac4",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains /api/issues/:id/deft and /api/issues/:id/pipeline",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "issue-pipeline-field",
+        "to": "merge-gate-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "issue-pipeline-field",
+        "to": "derived-ready",
+        "type": "blocks"
+      },
+      {
+        "from": "issue-pipeline-field",
+        "to": "no-review-dispatch",
+        "type": "blocks"
+      },
+      {
+        "from": "issue-pipeline-field",
+        "to": "auto-merge-hold",
+        "type": "blocks"
+      },
+      {
+        "from": "issue-pipeline-field",
+        "to": "launch-in-deft-mode",
+        "type": "blocks"
+      },
+      {
+        "from": "issue-pipeline-field",
+        "to": "deft-kickoff",
+        "type": "blocks"
+      },
+      {
+        "from": "issue-pipeline-field",
+        "to": "switch-use-back",
+        "type": "blocks"
+      },
+      {
+        "from": "live-install-probe",
+        "to": "install-and-hide",
+        "type": "blocks"
+      },
+      {
+        "from": "install-and-hide",
+        "to": "uninstall-restore",
+        "type": "blocks"
+      },
+      {
+        "from": "install-and-hide",
+        "to": "lift-around-git-ops",
+        "type": "blocks"
+      },
+      {
+        "from": "install-and-hide",
+        "to": "merge-guard-core",
+        "type": "blocks"
+      },
+      {
+        "from": "install-and-hide",
+        "to": "deft-kickoff",
+        "type": "blocks"
+      },
+      {
+        "from": "install-and-hide",
+        "to": "switch-use-back",
+        "type": "blocks"
+      },
+      {
+        "from": "uninstall-restore",
+        "to": "switch-use-back",
+        "type": "blocks"
+      },
+      {
+        "from": "state-archive",
+        "to": "merge-guard-core",
+        "type": "blocks"
+      },
+      {
+        "from": "state-archive",
+        "to": "switch-use-back",
+        "type": "blocks"
+      },
+      {
+        "from": "merge-guard-core",
+        "to": "merge-gate-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "merge-guard-core",
+        "to": "cli-skills-deft-pipeline",
+        "type": "blocks"
+      },
+      {
+        "from": "switch-use-back",
+        "to": "cli-skills-deft-pipeline",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-skills-deft-pipeline",
+        "to": "docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

@@ -296,7 +296,7 @@ describe('removeSshMachineForLink (FR-5)', () => {
     const h = harness([storedRecord()]);
     expect(await removeSshMachineForLink({ id: 'link-old' }, { keepServer: false }, h.deps)).toEqual({ stopped: true, reason: 'stopped' });
     expect(h.ops).toEqual(['ssh stop', 'stopForward rec-old', 'remove rec-old']);
-    expect(h.sshCalls[0]!.timeoutMs).toBe(45_000);
+    expect(h.sshCalls[0]!.timeoutMs).toBe(60_000);
   });
 
   it('never runs the helper for an external record', async () => {

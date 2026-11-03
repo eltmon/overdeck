@@ -28,6 +28,8 @@ const mocks = vi.hoisted(() => {
     requestReviewThroughRoute: vi.fn(),
     copiesRun: [] as string[],
     deleteWorkspaceMetadata: vi.fn(),
+    listFlyMachines: vi.fn(),
+    destroyAndForgetFlyMachine: vi.fn(),
   };
 });
 
@@ -58,6 +60,18 @@ vi.mock('../../../src/lib/remote/remote-agents.js', () => ({
   getRemoteAgentOutput: mocks.getRemoteAgentOutput,
   sendToRemoteAgent: mocks.sendToRemoteAgent,
   killRemoteAgent: mocks.killRemoteAgent,
+  remoteTmuxTarget: (agentId: string) => {
+    const state = mocks.states.get(agentId);
+    return { session: state?.tmuxSession ?? agentId, socket: state?.tmuxSocket };
+  },
+}));
+
+vi.mock('../../../src/lib/anywhere/fly/machine-store.js', () => ({
+  listFlyMachines: mocks.listFlyMachines,
+}));
+
+vi.mock('../../../src/lib/remote/fly-machine-loops.js', () => ({
+  destroyAndForgetFlyMachine: mocks.destroyAndForgetFlyMachine,
 }));
 
 vi.mock('../../../src/lib/projects.js', () => ({
@@ -132,6 +146,8 @@ describe('reapCompletedRemoteAgents classification', () => {
     mocks.sendToRemoteAgent.mockReset();
     mocks.killRemoteAgent.mockReset().mockResolvedValue(undefined);
     mocks.deleteWorkspaceMetadata.mockReset();
+    mocks.listFlyMachines.mockReset().mockResolvedValue([]);
+    mocks.destroyAndForgetFlyMachine.mockReset().mockResolvedValue({ destroyed: true, line: 'destroyed fly-m1: work agent handed to review' });
     mocks.requestReviewThroughRoute.mockReset().mockResolvedValue({ requested: true });
     // `git ls-remote` finds the feature branch on origin.
     mocks.exec.mockReset().mockImplementation((cmd: string, _opts: unknown, cb: (err: Error | null, out: unknown) => void) => {
@@ -273,5 +289,87 @@ describe('reapCompletedRemoteAgents classification', () => {
 
     expect(results[0].status).toBe('handed-off');
     expect(results[0].details.some((detail) => detail.includes('pan review request'))).toBe(true);
+  });
+
+  describe('linked work agent (PAN-4734)', () => {
+    const WORKDIR = '/workspace/overdeck/workspaces/feature-pan-11';
+    const linkedState = () => ({
+      ...remoteState('PAN-11'),
+      vmName: 'overdeck-machine-1a2b3c4d',
+      linked: true as const,
+      environmentId: 'env-1',
+      linkId: 'link-1',
+      flyMachineId: 'm1',
+      conversationName: '20261102-1234',
+      tmuxSession: 'conv-20261102-1234',
+      tmuxSocket: 'overdeck',
+      projectKey: 'overdeck',
+      workdir: WORKDIR,
+    });
+    const flyRecord = { id: 'rec-1', machineId: 'm1', machineName: 'overdeck-machine-1a2b3c4d', label: 'fly-m1', linkId: 'link-1' };
+
+    it('probes the conversation session on the VM socket', async () => {
+      mocks.states.set('agent-pan-11', linkedState());
+      scriptExec({ session: 'exists', sentinel: 'absent' });
+
+      const results = await reapCompletedRemoteAgents();
+
+      expect(results[0].status).toBe('still-running');
+      const probe = mocks.fly.ssh.mock.calls.map(([, command]) => String(command)).find((command) => command.includes('has-session'));
+      expect(probe).toContain(`'tmux' '-L' 'overdeck'`);
+      expect(probe).toContain(`'has-session' '-t' 'conv-20261102-1234'`);
+    });
+
+    it('hands off to review, destroys and forgets its Fly machine, and never deletes a legacy VM', async () => {
+      mocks.states.set('agent-pan-11', linkedState());
+      mocks.listFlyMachines.mockResolvedValue([{ ...flyRecord, machineId: 'other' }, flyRecord]);
+      scriptExec({ session: 'exists', sentinel: 'present' });
+
+      const results = await reapCompletedRemoteAgents();
+
+      expect(results[0].status).toBe('handed-off');
+      expect(mocks.killRemoteAgent).toHaveBeenCalledWith('agent-pan-11', 'overdeck-machine-1a2b3c4d');
+      expect(mocks.destroyAndForgetFlyMachine).toHaveBeenCalledTimes(1);
+      expect(mocks.destroyAndForgetFlyMachine).toHaveBeenCalledWith(flyRecord, 'work agent handed to review');
+      expect(mocks.fly.deleteVm).not.toHaveBeenCalled();
+      expect(mocks.deleteWorkspaceMetadata).not.toHaveBeenCalled();
+      expect(mocks.requestReviewThroughRoute).toHaveBeenCalledWith('PAN-11', { source: 'remote-reap', message: expect.any(String) });
+      expect(mocks.saveRemoteAgentState).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-pan-11', status: 'stopped' }));
+      expect(results[0].details).toContain('destroyed fly-m1: work agent handed to review');
+    });
+
+    it('copies the continue file from the worktree into the local .overdeck/', async () => {
+      mocks.states.set('agent-pan-11', linkedState());
+      scriptExec({ session: 'exists', sentinel: 'present' });
+
+      await reapCompletedRemoteAgents();
+
+      const copy = mocks.fly.copyFromVm.mock.calls.find(([, remotePath]) => String(remotePath).endsWith('continue.json'));
+      expect(copy?.[1]).toBe(`${WORKDIR}/.overdeck/continue.json`);
+      expect(String(copy?.[2])).toMatch(/workspaces\/feature-pan-11\/\.overdeck\/continue\.json$/);
+    });
+
+    it('counts a missing Fly record as a machine already gone', async () => {
+      mocks.states.set('agent-pan-11', linkedState());
+      scriptExec({ session: 'exists', sentinel: 'present' });
+
+      const results = await reapCompletedRemoteAgents();
+
+      expect(results[0].status).toBe('handed-off');
+      expect(mocks.destroyAndForgetFlyMachine).not.toHaveBeenCalled();
+      expect(results[0].details).toContain('Fly machine m1 is already gone');
+    });
+
+    it('salvages the worktree, not /workspace, on the crash path', async () => {
+      mocks.states.set('agent-pan-11', linkedState());
+      scriptExec({ session: 'not-found', sentinel: 'absent' });
+
+      const results = await reapCompletedRemoteAgents();
+
+      expect(results[0].status).toBe('error');
+      const salvage = mocks.fly.ssh.mock.calls.map(([, command]) => String(command)).find((command) => command.includes('salvage checkpoint'));
+      expect(salvage).toMatch(new RegExp(`^cd ${WORKDIR} && git add -A`));
+      expect(mocks.destroyAndForgetFlyMachine).not.toHaveBeenCalled();
+    });
   });
 });

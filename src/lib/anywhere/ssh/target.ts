@@ -76,6 +76,38 @@ export function isValidSshDestination(input: string): boolean {
   return destinationProblem(input.trim()) === null;
 }
 
+export interface ParsedSshDestination {
+  /** Login user, when the destination names one. */
+  user?: string;
+  /** Host name, alias or IP; an IPv6 literal without its brackets. */
+  host: string;
+  /** Port, only for `ssh://…:port`. */
+  port?: number;
+}
+
+/** Split a destination (validated first, D-4404-6) into user, host and port. Throws `bad-destination`. */
+export function parseSshDestination(input: string): ParsedSshDestination {
+  const dest = validateSshDestination(input);
+  const rest = dest.startsWith(SSH_URL_PREFIX) ? dest.slice(SSH_URL_PREFIX.length) : dest;
+  const at = rest.indexOf('@');
+  const user = at >= 0 ? rest.slice(0, at) : undefined;
+  let hostPort = at >= 0 ? rest.slice(at + 1) : rest;
+  let port: number | undefined;
+  if (hostPort.startsWith('[')) {
+    const close = hostPort.indexOf(']');
+    const tail = hostPort.slice(close + 1);
+    if (tail.startsWith(':')) port = Number(tail.slice(1));
+    hostPort = hostPort.slice(1, close);
+  } else {
+    const colon = hostPort.lastIndexOf(':');
+    if (colon >= 0) {
+      port = Number(hostPort.slice(colon + 1));
+      hostPort = hostPort.slice(0, colon);
+    }
+  }
+  return { ...(user !== undefined ? { user } : {}), host: hostPort, ...(port !== undefined ? { port } : {}) };
+}
+
 /** Key of the local host lock: the destination lowercased without `ssh://`. */
 export function sshLockKey(dest: string): string {
   const lower = dest.trim().toLowerCase();

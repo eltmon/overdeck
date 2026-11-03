@@ -1,0 +1,832 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T16:27:04Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4825: fix(models): replace dead MiMo/Groq/Cerebras ids; refresh MiniMax, xAI, Mistral, Meta, Kimi K2.8",
+    "updated": "2026-11-02T16:35:03.670Z"
+  },
+  "plan": {
+    "id": "pan-4825",
+    "title": "fix(models): replace dead MiMo/Groq/Cerebras ids; refresh MiniMax, xAI, Mistral, Meta, Kimi K2.8",
+    "status": "running",
+    "uid": "412d5139-1d0c-472c-b36e-af81361aea15",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-02T16:27:04Z",
+    "updated": "2026-11-02T16:35:03.670Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4825",
+        "label": "PAN-4825",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4825.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "models",
+      "providers",
+      "catalog",
+      "deprecations",
+      "kimi",
+      "groq",
+      "cerebras",
+      "mimo"
+    ],
+    "metadata": {
+      "sizeJustification": "A model-catalog refresh necessarily edits the same fixed registry files (providers.ts, settings.ts, model-deprecations.ts, model-capability-additions.ts, cost.ts, model-capability-class.ts, model-fallback.ts, modelCatalog.ts) once per provider, plus each provider's existing tests and docs. The operator already split the 2026-11 audit into three provider-grouped sibling issues (PAN-4825/4826/4827); splitting further would multiply merge conflicts in the same files without making any slice independently more reviewable. Items are per-provider vertical slices chained because they mutate the same files.",
+      "canonicalFilename": "2026-11-02-PAN-4825-fix-models-replace-dead-mimo-groq-cerebras-ids-refresh-minimax-xai-mistral-meta-kimi-k2-8.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "PROVIDERS.mimo, groq and cerebras ship only provider-retired model ids, including in tierModels and haikuModel, so every launch and every Claude Code subagent on those providers fails today. The MiMo connection test probes a dead id. MiniMax, xAI, Mistral, Meta (Muse) and Kimi entries are stale: current models are missing, and kimi-code/kimi-for-coding still reports K2.7 facts although the Kimi CLI now serves K2.8 Preview with a 1M window and low/high/max effort.",
+      "Proposal": "Per provider, retire dead ids through single-hop MODEL_DEPRECATIONS rows to live replacements (MiMo V2.6, Groq openai/gpt-oss-120b|20b, Cerebras gpt-oss-120b), keep their historical capability/cost/class/routing rows, and repoint tierModels/haikuModel. Add the new current models (MiMo V2.6 x3, Groq gpt-oss x2, Cerebras gpt-oss-120b, mistral-large-4-0, grok-4.7, grok-4.3, MiniMax-M3.1-Flash) with capability, cost, class, MODEL_PROVIDERS, FALLBACK_MAP and picker rows. Add a Groq slash carve-out ahead of the OpenRouter catch-all. Add max effort to Muse Wonder/Spark 1.3. Update kimi-code/kimi-for-coding to K2.8 Preview (1048576 context, canonical effort translated by kimi-effort.ts). Record every verified fact and every unverified skip in docs/MODEL-CONTEXT-AUDIT.md and the PR body. Full detail: .pan/drafts/PAN-4825.md.",
+      "NonGoals": "- Editing providers outside mimo, groq, cerebras, minimax, xai, mistral, meta, kimi (OpenAI, Anthropic, Google, DashScope, Z.AI, Nous, OpenRouter, QuantumLlama, OpenCode, Ollama belong to sibling issues or are untouched)\n- Editing changelog.mdx\n- Adding long-context tier logic to calculateCost in src/lib/cost.ts (tiers go in capability notes only)\n- Adding 'minimal' to Overdeck's EffortLevel, or relaxing the Muse/Pi harness effort rows past xhigh\n- Making omp/pi launch Groq slash ids (qualifying them as groq/openai/...)\n- Changing tierModels for xai, mistral, kimi or meta; changing mistral-large-latest, mistral-small-latest or codestral-latest\n- Setting supportsImages on any new model without a live probe; adding K2.8 Preview pricing\n- Adding Groq qwen/qwen3-32b or qwen/qwen3.6-27b\n- Changing the frontend timeline provider label for slash ids (Stage/HomePane/Timeline.tsx)\n- Adding any hardcoded default/fallback model literal; growing src/lib/model-capabilities.ts past 1422 lines or src/dashboard/server/routes/settings.ts past 1104 lines; raising scripts/file-size-allowlist.txt"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Retired ids stay in their type unions, routing lists, capability/cost/class rows; they leave models, haikuModel, tierModels, settings lists, MODEL_API_IDS and pickers.",
+        "rationale": "Matches the issue's decision rule 2 and the existing OpenAI/Kimi retirement precedent; MODEL_CAPABILITIES is Record<ModelId,...>, so historical rows require the ids to stay in the union."
+      },
+      {
+        "summary": "Groq ids openai/gpt-oss-120b|20b get an explicit carve-out before the slash OpenRouter catch-all in getProviderForModel and isOpenRouterModel.",
+        "rationale": "Without it both ids route to OpenRouter; qwen/qwen3.6-plus -> Nous is the existing precedent. Other openai/* ids keep routing to OpenRouter."
+      },
+      {
+        "summary": "Add GroqModel, CerebrasModel and MistralModel unions (new ids only) to ModelId and extend ModelCapability.provider with groq|cerebras|mistral.",
+        "rationale": "The issue requires capability rows for every new model, and MODEL_DEPRECATIONS targets are typed ModelId."
+      },
+      {
+        "summary": "Mistral Large 4 uses the versioned API name mistral-large-4-0; mistral-large-latest is left unchanged.",
+        "rationale": "docs.mistral.ai lists mistral-large-4 and mistral-large-4-0; the versioned name keeps the price row stable. No official page says what mistral-large-latest resolves to."
+      },
+      {
+        "summary": "Groq qwen-qwq-32b and gemma2-9b-it migrate to the issue's gpt-oss targets, not Groq's 2025 recommendations.",
+        "rationale": "Groq's Gemma recommendation (llama-3.1-8b-instant) is itself dead, and qwen/qwen3-32b would add an unrequested model; single-hop targets must be live. The ledger records the deviation."
+      },
+      {
+        "summary": "MiniMax M2.7 stays live by default; the work agent retires it only if an official MiniMax page states it is retired or unavailable.",
+        "rationale": "Official pricing and models pages were silent on 2026-11-02; only third-party sources report a 2026-11-18 retirement. Issue rule 1 forbids acting on unofficial facts."
+      },
+      {
+        "summary": "Muse gets max for muse-wonder-1.0 and muse-spark-1.3; minimal is not added.",
+        "rationale": "dev.meta.ai/docs/reasoning confirms max for those two models; Overdeck's EffortLevel union has no minimal. The Muse harness row still caps launches at xhigh."
+      },
+      {
+        "summary": "Same-line successors inherit predecessor skill scores; new lines get the Muse 'unranked' pattern (all zero except context-length).",
+        "rationale": "Follows the additions-file convention and keeps new models opt-in so the skill router never picks them automatically."
+      },
+      {
+        "summary": "New assertions go in a new test file src/lib/__tests__/model-catalog-refresh-pan-4825.test.ts.",
+        "rationale": "Sibling issues PAN-4826/4827 edit model-catalog-audit.test.ts concurrently; a separate file avoids merge conflicts."
+      },
+      {
+        "summary": "Only native kimi-code/kimi-for-coding changes to K2.8 facts; claude-route kimi-k2.7-code/kimi-for-coding keep 262144 context and no effort, notes only.",
+        "rationale": "The K2.8 facts were verified via the native CLI only; the claude route was not re-verified."
+      }
+    ],
+    "items": [
+      {
+        "id": "mimo-v26",
+        "title": "Replace retired MiMo V2.5 ids with the V2.6 series",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T16:27:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4825",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/settings.ts",
+            "src/lib/providers.ts",
+            "src/lib/model-deprecations.ts",
+            "src/lib/model-capability-additions.ts",
+            "src/lib/cost.ts",
+            "src/lib/model-capability-class.ts",
+            "src/lib/model-fallback.ts",
+            "src/dashboard/frontend/src/components/Settings/modelCatalog.ts",
+            "src/dashboard/server/routes/settings.ts",
+            "src/lib/overdeck/conversation-message.ts",
+            "src/lib/__tests__/model-catalog-refresh-pan-4825.test.ts",
+            "src/lib/__tests__/model-catalog-audit.test.ts",
+            "src/lib/__tests__/settings-model-catalog.test.ts",
+            "src/lib/__tests__/permission-mode-leak.test.ts",
+            "tests/lib/providers.test.ts",
+            "tests/lib/agents-auth-routing.test.ts",
+            "tests/lib/model-supports-images.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/model-catalog-refresh-pan-4825.test.ts src/lib/__tests__/model-catalog-audit.test.ts src/lib/__tests__/settings-model-catalog.test.ts src/lib/__tests__/permission-mode-leak.test.ts tests/lib/providers.test.ts tests/lib/agents-auth-routing.test.ts tests/lib/model-supports-images.test.ts src/lib/__tests__/model-capability-class.test.ts tests/lib/model-fallback.test.ts",
+            "wc -l src/dashboard/server/routes/settings.ts",
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/__tests__/SettingsPage.test.ts src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx src/components/Settings/sections/__tests__/tiered-crews.test.ts src/components/chat/__tests__/ModelPicker.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "all named vitest files pass",
+            "routes/settings.ts is at most 1104 lines",
+            "frontend Settings/picker tests pass with the changed MODELS_BY_PROVIDER groups"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 exactly. Re-open https://mimo.mi.com/docs/en-US/price/pay-as-you-go and the V2.6 model pages first; read mimo-v2.6-flash's context window from https://mimo.mi.com/models/en-US/mimo-v2.6-flash. Retire mimo-v2.5-pro -> mimo-v2.6-pro and mimo-v2.5 -> mimo-v2.6-flash; add mimo-v2.6-pro, mimo-v2.6-flash, mimo-v2.6-pro-ultraspeed with capability (additions file), cost, class, MODEL_PROVIDERS, FALLBACK_MAP and picker rows; set tierModels {opus: v2.6-pro, sonnet: v2.6-pro, haiku: v2.6-flash} and haikuModel v2.6-flash; update the settings route probe/default/MODEL_API_IDS without growing the file; drop the retired id from the conversation-message image error; update the named tests and create the refresh test file."
+        },
+        "items": [
+          {
+            "id": "mimo-v26.ac1",
+            "title": "Given the refresh test, when it reads PROVIDERS.mimo, then models equals the three V2.6 ids and models, haikuModel and tierModels contain no key of MODEL_DEPRECATIONS",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mimo-v26.ac2",
+            "title": "resolveModelId('mimo-v2.5-pro') returns 'mimo-v2.6-pro' and resolveModelId('mimo-v2.5') returns 'mimo-v2.6-flash', asserted in the refresh test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mimo-v26.ac3",
+            "title": "For each V2.6 id, getProviderForModel returns 'mimo', hasModelCapability returns true, getPricing('custom', id) returns a row with that model, and MODEL_CAPABILITY_CLASSES has a row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mimo-v26.ac4",
+            "title": "getProviderEnv(PROVIDERS.mimo, key) emits ANTHROPIC_DEFAULT_OPUS_MODEL 'mimo-v2.6-pro' and ANTHROPIC_DEFAULT_HAIKU_MODEL 'mimo-v2.6-flash' (tests/lib/providers.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mimo-v26.ac5",
+            "title": "The MiMo connection test in routes/settings.ts probes 'mimo-v2.6-pro', the file stays at or below 1104 lines, and no file under src/ names mimo-v2.5 outside historical capability, class, fallback, type, routing and deprecation rows and tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "groq-gpt-oss",
+        "title": "Retire dead Groq ids to gpt-oss and route the slash ids to Groq",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T16:27:04Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4825",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "cerebras-gpt-oss",
+            "mistral-large-4"
+          ],
+          "files_scope": [
+            "src/lib/settings.ts",
+            "src/lib/model-capability-types.ts",
+            "src/lib/providers.ts",
+            "src/lib/model-fallback.ts",
+            "src/lib/model-deprecations.ts",
+            "src/lib/model-capability-additions.ts",
+            "src/lib/cost.ts",
+            "src/lib/model-capability-class.ts",
+            "src/dashboard/frontend/src/components/Settings/modelCatalog.ts",
+            "src/lib/__tests__/providers-ohmypi.test.ts",
+            "src/lib/__tests__/model-catalog-refresh-pan-4825.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/model-catalog-refresh-pan-4825.test.ts src/lib/__tests__/providers-ohmypi.test.ts src/lib/__tests__/model-capability-class.test.ts tests/lib/model-fallback.test.ts tests/lib/providers.test.ts src/lib/__tests__/settings-model-catalog.test.ts tests/lib/model-deprecation.test.ts",
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/__tests__/SettingsPage.test.ts src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx src/components/Settings/sections/__tests__/tiered-crews.test.ts src/components/chat/__tests__/ModelPicker.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "all named vitest files pass",
+            "frontend Settings/picker tests pass with the changed MODELS_BY_PROVIDER groups"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-1"
+          ],
+          "parallelSafeReason": "Runs in its own slot only after mimo-v26 completes (blocks edge); its later dependents wait on it through the chain, so no concurrent item edits the same registry files."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. Re-open https://console.groq.com/docs/deprecations and https://console.groq.com/docs/models. Add GroqModel to ModelId and extend ModelCapability.provider with 'groq' | 'cerebras' | 'mistral'. Set PROVIDERS.groq models to ['openai/gpt-oss-120b','openai/gpt-oss-20b'], tierModels {opus:120b, sonnet:120b, haiku:20b}, haikuModel 20b. Add the carve-out for both ids before the opencode/slash checks in getProviderForModel, and exclude them in isOpenRouterModel via a GROQ_SLASH_MODEL_IDS set. Retire the four dead ids (llama-3.3-70b-versatile, qwen-qwq-32b -> 120b; llama-3.1-8b-instant, gemma2-9b-it -> 20b) keeping them in the Groq routing list. Add unranked capability rows, cost rows keyed by the full id, class (120b workhorse, 20b small), MODEL_PROVIDERS, FALLBACK_MAP and a groq picker group."
+        },
+        "items": [
+          {
+            "id": "groq-gpt-oss.ac1",
+            "title": "getProviderForModel('openai/gpt-oss-120b').name and getModelProvider('openai/gpt-oss-20b') both return 'groq', and isOpenRouterModel returns false for both ids",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "groq-gpt-oss.ac2",
+            "title": "getProviderForModel('openai/gpt-oss-safeguard-20b').name still returns 'openrouter' (other openai/ ids are not captured)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "groq-gpt-oss.ac3",
+            "title": "MODEL_DEPRECATIONS maps llama-3.3-70b-versatile and qwen-qwq-32b to 'openai/gpt-oss-120b' and llama-3.1-8b-instant and gemma2-9b-it to 'openai/gpt-oss-20b', and getProviderForModel('llama-3.3-70b-versatile') still returns 'groq'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "groq-gpt-oss.ac4",
+            "title": "The refresh test reads PROVIDERS.groq and it contains tierModels {opus:'openai/gpt-oss-120b', sonnet:'openai/gpt-oss-120b', haiku:'openai/gpt-oss-20b'} and haikuModel 'openai/gpt-oss-20b'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "groq-gpt-oss.ac5",
+            "title": "For both gpt-oss ids, hasModelCapability returns true with contextWindow 131072, getPricing('custom', id) returns a row for that id, MODEL_CAPABILITY_CLASSES contains a row, and MODELS_BY_PROVIDER.groq contains a picker row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cerebras-gpt-oss",
+        "title": "Retire every Cerebras Llama id to gpt-oss-120b",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T16:27:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4825",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/settings.ts",
+            "src/lib/providers.ts",
+            "src/lib/model-deprecations.ts",
+            "src/lib/model-fallback.ts",
+            "src/lib/model-capability-additions.ts",
+            "src/lib/cost.ts",
+            "src/lib/model-capability-class.ts",
+            "src/dashboard/frontend/src/components/Settings/modelCatalog.ts",
+            "src/lib/__tests__/providers-ohmypi.test.ts",
+            "src/lib/__tests__/model-catalog-refresh-pan-4825.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/model-catalog-refresh-pan-4825.test.ts src/lib/__tests__/providers-ohmypi.test.ts src/lib/__tests__/model-capability-class.test.ts tests/lib/model-fallback.test.ts",
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/__tests__/SettingsPage.test.ts src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx src/components/Settings/sections/__tests__/tiered-crews.test.ts src/components/chat/__tests__/ModelPicker.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "all named vitest files pass",
+            "frontend Settings/picker tests pass with the changed MODELS_BY_PROVIDER groups"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. Re-open https://inference-docs.cerebras.ai/support/deprecation and https://inference-docs.cerebras.ai/models/openai-oss. Add CerebrasModel = 'gpt-oss-120b' to ModelId. Set PROVIDERS.cerebras models ['gpt-oss-120b'], all three tierModels and haikuModel 'gpt-oss-120b'. Retire llama3.3-70b, llama-3.3-70b, llama3.1-70b, llama3.1-8b -> gpt-oss-120b and keep all four in the Cerebras routing list. Add the capability row (contextWindow 131072, maxOutputTokens 40000, unranked), cost row, class workhorse, MODEL_PROVIDERS 'cerebras' (required so getModelProvider does not fall to the gpt- prefix), FALLBACK_MAP and a cerebras picker group."
+        },
+        "items": [
+          {
+            "id": "cerebras-gpt-oss.ac1",
+            "title": "The refresh test reads PROVIDERS.cerebras and it contains models ['gpt-oss-120b'] only, with every tierModels slot and haikuModel set to 'gpt-oss-120b'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cerebras-gpt-oss.ac2",
+            "title": "resolveModelId returns 'gpt-oss-120b' for llama3.3-70b, llama-3.3-70b, llama3.1-70b and llama3.1-8b, and getProviderForModel returns 'cerebras' for each of them",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cerebras-gpt-oss.ac3",
+            "title": "getProviderForModel('gpt-oss-120b').name returns 'cerebras' and getModelProvider('gpt-oss-120b') returns 'cerebras', not 'openai'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mistral-large-4",
+        "title": "Add Mistral Large 4 as mistral-large-4-0",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T16:27:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4825",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/settings.ts",
+            "src/lib/providers.ts",
+            "src/lib/model-capability-additions.ts",
+            "src/lib/cost.ts",
+            "src/lib/model-capability-class.ts",
+            "src/lib/model-fallback.ts",
+            "src/dashboard/frontend/src/components/Settings/modelCatalog.ts",
+            "src/dashboard/frontend/src/components/Settings/sections/tiered-crews.ts",
+            "src/lib/__tests__/model-catalog-refresh-pan-4825.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/model-catalog-refresh-pan-4825.test.ts src/lib/__tests__/model-capability-class.test.ts tests/lib/model-fallback.test.ts",
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/sections/__tests__/tiered-crews.test.ts",
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/__tests__/SettingsPage.test.ts src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx src/components/Settings/sections/__tests__/tiered-crews.test.ts src/components/chat/__tests__/ModelPicker.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "all named vitest files pass",
+            "frontend Settings/picker tests pass with the changed MODELS_BY_PROVIDER groups"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4. Re-open https://docs.mistral.ai/models/mistral-large-4-0.md. Add MistralModel = 'mistral-large-4-0' to ModelId; append it to PROVIDERS.mistral.models and the Mistral routing list; tierModels and the -latest ids are unchanged. Add the capability row (provider 'mistral', 1000000 context, unranked, notes: Public Preview, $0.07 cached, alias mistral-large-4), cost row (0.0007/0.0021/cacheRead 0.00007), class frontier, MODEL_PROVIDERS, FALLBACK_MAP and a mistral picker group. Correct the stale tiered-crews.ts comment (lines 285-289); code unchanged."
+        },
+        "items": [
+          {
+            "id": "mistral-large-4.ac1",
+            "title": "getProviderForModel('mistral-large-4-0').name returns 'mistral' and PROVIDERS.mistral.tierModels is unchanged (opus and sonnet 'mistral-large-latest', haiku 'mistral-small-latest')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mistral-large-4.ac2",
+            "title": "getModelCapability('mistral-large-4-0').contextWindow returns 1000000, getPricing('custom', 'mistral-large-4-0') returns inputPer1k 0.0007, and MODEL_CAPABILITY_CLASSES and MODELS_BY_PROVIDER.mistral each contain a row for it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "xai-grok-47-43",
+        "title": "Add xAI grok-4.7 and grok-4.3",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T16:27:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4825",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/settings.ts",
+            "src/lib/providers.ts",
+            "src/lib/model-capability-additions.ts",
+            "src/lib/cost.ts",
+            "src/lib/model-capability-class.ts",
+            "src/lib/model-fallback.ts",
+            "src/dashboard/frontend/src/components/Settings/modelCatalog.ts",
+            "src/lib/__tests__/model-catalog-refresh-pan-4825.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/model-catalog-refresh-pan-4825.test.ts src/lib/__tests__/model-capability-class.test.ts tests/lib/model-fallback.test.ts tests/lib/providers.test.ts",
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/__tests__/SettingsPage.test.ts src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx src/components/Settings/sections/__tests__/tiered-crews.test.ts src/components/chat/__tests__/ModelPicker.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "all named vitest files pass",
+            "frontend Settings/picker tests pass with the changed MODELS_BY_PROVIDER groups"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5. Re-open https://docs.x.ai/docs/models. Extend GrokModel with 'grok-4.7' | 'grok-4.3'; add both to PROVIDERS.xai.models and the xAI routing list; tierModels stays grok-build-0.1. Add capability rows (grok-4.7: 500000 context, cost 4; grok-4.3: 1000000 context, cost 1.875; unranked; notes state that a prompt reaching 200K tokens bills all tokens at double), cost rows with cache reads, class (4.7 frontier, 4.3 workhorse), MODEL_PROVIDERS, FALLBACK_MAP and two picker rows."
+        },
+        "items": [
+          {
+            "id": "xai-grok-47-43.ac1",
+            "title": "getProviderForModel returns 'xai' for grok-4.7 and grok-4.3, and PROVIDERS.xai.tierModels still names grok-build-0.1 in all three slots",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "xai-grok-47-43.ac2",
+            "title": "getModelCapability('grok-4.7').contextWindow returns 500000 and its notes contain the 200K double rate; getModelCapability('grok-4.3').contextWindow returns 1000000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "xai-grok-47-43.ac3",
+            "title": "getPricing('custom', 'grok-4.7') returns inputPer1k 0.002 and outputPer1k 0.006, and both ids have class and MODELS_BY_PROVIDER.xai rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "minimax-m31-flash",
+        "title": "Add MiniMax-M3.1-Flash and record the M3 long-context price",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T16:27:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4825",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/settings.ts",
+            "src/lib/providers.ts",
+            "src/lib/model-capability-additions.ts",
+            "src/lib/model-capabilities.ts",
+            "src/lib/cost.ts",
+            "src/lib/model-capability-class.ts",
+            "src/lib/model-fallback.ts",
+            "src/lib/model-deprecations.ts",
+            "src/dashboard/frontend/src/components/Settings/modelCatalog.ts",
+            "src/dashboard/server/routes/settings.ts",
+            "src/lib/__tests__/settings-model-catalog.test.ts",
+            "src/lib/__tests__/model-catalog-refresh-pan-4825.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/model-catalog-refresh-pan-4825.test.ts src/lib/__tests__/settings-model-catalog.test.ts src/lib/__tests__/model-capabilities.test.ts src/lib/__tests__/model-capability-class.test.ts tests/lib/providers.test.ts tests/lib/settings.test.ts",
+            "wc -l src/lib/model-capabilities.ts src/dashboard/server/routes/settings.ts",
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/__tests__/SettingsPage.test.ts src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx src/components/Settings/sections/__tests__/tiered-crews.test.ts src/components/chat/__tests__/ModelPicker.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "all named vitest files pass",
+            "model-capabilities.ts at most 1422 lines and routes/settings.ts at most 1104 lines",
+            "frontend Settings/picker tests pass with the changed MODELS_BY_PROVIDER groups"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-6. Re-open https://platform.minimax.io/docs/guides/pricing and https://platform.minimax.io/docs/guides/models-intro. Add MiniMax-M3.1-Flash (type, models, routing list, settings list, capability row inheriting MiniMax-M3 skills with 1000000 context and cost 0.375, cost row 0.00015/0.0006/cacheRead 0.000015, class workhorse, MODEL_PROVIDERS, FALLBACK_MAP, picker row, MODEL_API_IDS on the MiniMax-M3 line). Edit the MiniMax-M3 capability row in place so its notes record the >512K price ($0.60/$2.40/$0.12) without adding lines; the cost.ts M3 row is unchanged. Implementation checkpoint (PRD Decision 6): if an official MiniMax page states M2.7 is retired or unavailable, retire minimax-m2.7 -> MiniMax-M3 and minimax-m2.7-highspeed -> MiniMax-M3.1-Flash and set tierModels {opus: M3, sonnet: M3, haiku: M3.1-Flash}, haikuModel M3.1-Flash, probe default MiniMax-M3; otherwise (fallback) leave M2.7 unchanged."
+        },
+        "items": [
+          {
+            "id": "minimax-m31-flash.ac1",
+            "title": "getProviderForModel('MiniMax-M3.1-Flash').name returns 'minimax', and getAvailableModelsApi().minimax contains a row named 'MiniMax M3.1 Flash (1M context)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "minimax-m31-flash.ac2",
+            "title": "MODEL_CAPABILITIES['MiniMax-M3'].notes contains '512K' and '$2.40', and getPricing('custom', 'MiniMax-M3') still returns inputPer1k 0.0003",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "minimax-m31-flash.ac3",
+            "title": "wc -l reports src/lib/model-capabilities.ts at most 1422 lines and src/dashboard/server/routes/settings.ts at most 1104 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "minimax-m31-flash.ac4",
+            "title": "Given the M2.7 checkpoint outcome, PROVIDERS.minimax.tierModels and haikuModel contain no key of MODEL_DEPRECATIONS, asserted in the refresh test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "muse-max-effort",
+        "title": "Record max effort for Muse Wonder 1.0 and Muse Spark 1.3",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-11-02T16:27:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4825",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/model-capability-additions.ts",
+            "src/lib/__tests__/settings-model-catalog.test.ts",
+            "src/lib/__tests__/model-catalog-refresh-pan-4825.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/model-catalog-refresh-pan-4825.test.ts src/lib/__tests__/settings-model-catalog.test.ts src/lib/__tests__/muse-support.test.ts"
+          ],
+          "expected_outputs": [
+            "all named vitest files pass, including muse-support.test.ts 'max clamps to xhigh' cases unchanged"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-7. Re-open https://dev.meta.ai/docs/reasoning. Change effortLevels to ['low','medium','high','xhigh','max'] for muse-wonder-1.0 and muse-spark-1.3 in model-capability-additions.ts; leave muse-spark-1.3-contributor at four levels. Do not add 'minimal'. Append the source and harness-cap note to both rows' notes. Patch the expected muse-spark-1.3 row in settings-model-catalog.test.ts. Do not edit muse-support.test.ts."
+        },
+        "items": [
+          {
+            "id": "muse-max-effort.ac1",
+            "title": "getModelEffortLevels('muse-wonder-1.0') and getModelEffortLevels('muse-spark-1.3') each return a list that contains 'max', and getModelEffortLevels('muse-spark-1.3-contributor') returns a list without 'max'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "muse-max-effort.ac2",
+            "title": "src/lib/__tests__/muse-support.test.ts passes unchanged, so a muse launch with requested max still emits --reasoning-effort 'xhigh'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "kimi-k28-preview",
+        "title": "Update kimi-code/kimi-for-coding to K2.8 Preview with native effort",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T16:27:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4825",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/model-capabilities.ts",
+            "src/lib/kimi-effort.ts",
+            "src/lib/acp/kimi.ts",
+            "src/dashboard/frontend/src/components/shared/ModelPicker/harnessRows.ts",
+            "src/dashboard/frontend/src/components/shared/ModelPicker/__tests__/harnessRows.test.ts",
+            "src/dashboard/frontend/src/components/Settings/modelCatalog.ts",
+            "scripts/frontend-test-subset.txt",
+            "src/lib/__tests__/kimi-effort.test.ts",
+            "src/lib/__tests__/model-catalog-audit.test.ts",
+            "src/lib/__tests__/settings-model-catalog.test.ts",
+            "src/lib/__tests__/model-catalog-refresh-pan-4825.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/kimi-effort.test.ts src/lib/__tests__/model-catalog-audit.test.ts src/lib/__tests__/settings-model-catalog.test.ts src/lib/__tests__/model-catalog-refresh-pan-4825.test.ts src/lib/acp/__tests__/host.test.ts src/lib/acp/__tests__/kimi.test.ts src/lib/runtimes/__tests__/acp.test.ts src/lib/__tests__/launcher-generator.test.ts src/lib/__tests__/config-yaml-roles.test.ts tests/lib/providers.test.ts",
+            "cd src/dashboard/frontend && npx vitest run src/components/shared/ModelPicker/__tests__/harnessRows.test.ts",
+            "wc -l src/lib/model-capabilities.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "all named vitest files pass",
+            "model-capabilities.ts at most 1422 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-8. Re-run `kimi provider list --json` if the kimi binary is installed and confirm kimi-for-coding's displayName, maxContextSize and supportEfforts. Edit the kimi-code/kimi-for-coding row in model-capabilities.ts in place (displayName 'Kimi K2.8 Preview', contextWindow 1048576, five canonical effortLevels, context-length 100, new notes); rename the -highspeed displayName to 'Kimi K2.7 Code Highspeed'. Add 'kimi-code/kimi-for-coding' to the resolveKimiNativeEffort gate list and update its comment/errors. In harnessRows.ts return KIMI_NATIVE_EFFORT_LEVELS for kimi-code/kimi-for-coding and [] only for -highspeed. Update claude-route notes (kimi-k2.7-code capability notes, acp/kimi.ts doc lines 57-58, modelCatalog kimi-k2.7-code description) without behavior change. Update the named tests, add the harnessRows test, and list it in scripts/frontend-test-subset.txt."
+        },
+        "items": [
+          {
+            "id": "kimi-k28-preview.ac1",
+            "title": "getModelCapability('kimi-code/kimi-for-coding').contextWindow returns 1048576 and its displayName is 'Kimi K2.8 Preview'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kimi-k28-preview.ac2",
+            "title": "resolveKimiNativeEffort('kimi-code/kimi-for-coding', 'medium') returns 'high', and resolveKimiNativeEffort('kimi-code/kimi-for-coding-highspeed', 'high') returns undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kimi-k28-preview.ac3",
+            "title": "A kimi-code launcher script for kimi-code/kimi-for-coding with effort 'high' contains export KIMI_MODEL_THINKING_EFFORT='high'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kimi-k28-preview.ac4",
+            "title": "pickerEffortLevels('kimi-code/kimi-for-coding') returns KIMI_NATIVE_EFFORT_LEVELS and pickerEffortLevels('kimi-code/kimi-for-coding-highspeed') returns [], asserted by the new harnessRows test listed in scripts/frontend-test-subset.txt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kimi-k28-preview.ac5",
+            "title": "resolveKimiNativeEffort('kimi-k2.7-code', 'high') still returns undefined and MODEL_CAPABILITIES['kimi-k2.7-code'].contextWindow is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-ledger",
+        "title": "Write the verification ledger and update docs naming the changed models",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T16:27:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4825",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/MODEL-CONTEXT-AUDIT.md",
+            "configuration/harnesses.mdx",
+            "reference/harness-landscape.mdx",
+            "features/conversations.mdx",
+            "docs/ohmypi-capabilities.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git grep -n -E 'mimo-v2\\.5|llama-3\\.1-8b-instant|llama-3\\.3-70b-versatile|qwen-qwq-32b|gemma2-9b-it|llama3\\.1-8b|llama3\\.3-70b|llama3\\.1-70b' -- '*.mdx' ':!changelog.mdx'",
+            "grep -n 'November 2026 refresh (PAN-4825)' docs/MODEL-CONTEXT-AUDIT.md",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "the git grep prints no line that offers a retired id as a current choice",
+            "the audit doc contains the PAN-4825 section heading",
+            "lint exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-9. Add '## November 2026 refresh (PAN-4825)' to docs/MODEL-CONTEXT-AUDIT.md with Verified (fact + URL for every row of the PRD's verified-facts table, as finally re-verified), Changed, and Not changed (unverified) lists, and replace the stale MiMo V2.5 source bullet. Update configuration/harnesses.mdx (kimi-for-coding K2.8 Preview sentence after the native alias list, effort table row names, Muse max sentence), reference/harness-landscape.mdx lines 122 and 138, features/conversations.mdx:240 example, and docs/ohmypi-capabilities.md lines 74/76. Run the git grep for every retired and new id and fix any remaining hit presenting a retired id as selectable. Do not edit changelog.mdx. Paste the ledger section into the PR body."
+        },
+        "items": [
+          {
+            "id": "docs-ledger.ac1",
+            "title": "docs/MODEL-CONTEXT-AUDIT.md contains a 'November 2026 refresh (PAN-4825)' section with Verified, Changed and Not changed (unverified) lists, and every Verified entry carries an https URL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-ledger.ac2",
+            "title": "git grep for the retired MiMo, Groq and Cerebras ids across *.mdx (excluding changelog.mdx) returns no line presenting them as currently selectable, and changelog.mdx is unchanged in the diff",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-ledger.ac3",
+            "title": "reference/harness-landscape.mdx and configuration/harnesses.mdx each contains text stating that kimi-for-coding is K2.8 Preview with a 1,048,576-token context and low/high/max effort, and that K2.7 Code Highspeed has no adjustable effort",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-ledger.ac4",
+            "title": "The PR body contains the same Verified, Changed and Not changed (unverified) lists as the audit doc section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "mimo-v26",
+        "to": "groq-gpt-oss",
+        "type": "blocks"
+      },
+      {
+        "from": "groq-gpt-oss",
+        "to": "cerebras-gpt-oss",
+        "type": "blocks"
+      },
+      {
+        "from": "cerebras-gpt-oss",
+        "to": "mistral-large-4",
+        "type": "blocks"
+      },
+      {
+        "from": "mistral-large-4",
+        "to": "xai-grok-47-43",
+        "type": "blocks"
+      },
+      {
+        "from": "xai-grok-47-43",
+        "to": "minimax-m31-flash",
+        "type": "blocks"
+      },
+      {
+        "from": "minimax-m31-flash",
+        "to": "muse-max-effort",
+        "type": "blocks"
+      },
+      {
+        "from": "muse-max-effort",
+        "to": "kimi-k28-preview",
+        "type": "blocks"
+      },
+      {
+        "from": "kimi-k28-preview",
+        "to": "docs-ledger",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

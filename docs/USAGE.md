@@ -152,22 +152,29 @@ Overdeck supports multiple AI model providers through direct Anthropic-compatibl
 
 **Anthropic** (via Claude Code / Claude API)
 - `claude-opus-4-6` - Most capable, best for planning and complex tasks
-- `claude-sonnet-4-5` - Balanced performance and cost
+- `claude-sonnet-4-6` - Balanced performance and cost
 - `claude-haiku-4-5` - Fast and cost-effective for simple tasks
 
 **OpenAI**
-- `gpt-5.2-codex` - Agentic coding and research
-- `o3-deep-research` - Deep research capabilities
-- `gpt-4o` - General-purpose model
-- `gpt-4o-mini` - Faster, more cost-effective variant
+- `gpt-5.6-sol` - Default OpenAI model
+- `gpt-6-astra` - Most capable OpenAI model (opt-in)
+- `gpt-5.6-luna` - Fast and cost-effective
 
 **Google (Gemini)**
-- `gemini-3-pro-preview` - Supports `thinking_level: high|low`
-- `gemini-3-flash-preview` - Supports `thinking_level: minimal|low|medium|high`
+- `gemini-4-argon` - Flagship model
+- `gemini-3.8-flash` - Fast tier
+- `gemini-3.6-flash` - Fast tier
+- `gemini-3.5-flash-lite` - Budget tier
+- `gemini-3.1-pro-preview` - Flagship tier
+- `gemini-3-flash-preview` - Fast tier; supports `thinking_level: minimal|low|medium|high`
+- `gemini-3.1-flash-lite` - Budget tier
 
 **Z.AI**
-- `glm-4.7` - General-purpose model
-- `glm-4.7-flash` - Faster variant
+- `glm-5.3` - Flagship model
+- `glm-5.3-flash` - Fast tier
+- `glm-5.3-flashx` - Fast tier, higher speed
+- `glm-5.2` - Previous flagship
+- `glm-5.1` - Previous flagship
 
 #### Configuration via Dashboard
 

@@ -65,6 +65,7 @@ import {
   loadIssueStatesForProject,
 } from '../services/derived-issue-state.js';
 import { evaluateIssueMergeGate, type MergeGateResult } from '../../../lib/cloister/merge-gate.js';
+import { deftAutoMergeHold } from '../../../lib/deft/policy.js';
 import { getSharedIssueService } from '../services/issue-service-singleton.js';
 import type { PipelineMembership } from '../../../lib/pipeline-membership.js';
 
@@ -516,6 +517,8 @@ export interface AutoMergeScheduleDeps {
   getIssueLabels?: (issueId: string) => readonly string[];
   /** #3983: true when the cached tracker row says the issue is closed. */
   isIssueClosed?: (issueId: string) => boolean;
+  /** PAN-4820: the Deft human-merge hold; `deftAutoMergeHold` by default. */
+  deftHold?: (issueId: string) => Promise<string | null>;
 }
 
 /**
@@ -622,6 +625,8 @@ export async function postAutoMergeSchedulePayload(payload: unknown, deps: AutoM
 
   const refusal = autoMergePolicyRefusal(issueId, deps);
   if (refusal) return refusal;
+  const hold = await (deps.deftHold ?? deftAutoMergeHold)(issueId);
+  if (hold) return { status: 412, body: { error: hold } };
 
   // #3983: the automatic path needs an approval bound to the PR head.
   const gate = await (deps.mergeGate ?? ((id: string) => evaluateIssueMergeGate(id)))(issueId);

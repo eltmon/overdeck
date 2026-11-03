@@ -74,4 +74,6 @@
   store there, seed `localStorage['pan-snapshot-cache-v1']` with `addInitScript` and close
   `/ws/rpc` (`pan-4523-river-bands.spec.ts`); never add a production store hook.
 
+- Issue IDs are `LETTERS-NUMBER`: `parseIssueId` (`src/lib/issue-id.ts`) and dozens of path/session regexes assume a letters-only prefix, so project issue prefixes must be letters only; use `issue_pattern` for other ID shapes (PAN-4860).
+
 <!-- last-verified: 2026-11-02 -->

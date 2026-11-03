@@ -268,3 +268,26 @@ describe('continueHere (PAN-4437 WI-4)', () => {
     expect(h.mocks.adoptRecord).not.toHaveBeenCalled();
   });
 });
+
+describe('OVERDECK_TEST_ADOPT_SKIP_SAVED_CWD smoke hook (PAN-4774 WI-1)', () => {
+  const CHECKOUT = '/home/a/widget';
+  const OTHER_PROJECTS = [{ key: 'widget', config: { name: 'widget', path: CHECKOUT, github_repo: 'acme/widget' } as ProjectConfig }];
+
+  it('ac1: with the variable set, the target is the git-origin project, not the saved cwd', async () => {
+    const h = harness(record(), { existing: [CWD, CHECKOUT], projects: OTHER_PROJECTS });
+    const deps = { ...h.deps, env: { OVERDECK_TEST_ADOPT_SKIP_SAVED_CWD: '1' } };
+    expect((await previewContinue(VAULT_ID, deps)).body).toMatchObject({ target: { cwd: CHECKOUT, source: 'project', projectKey: 'widget' } });
+    const result = await continueHere(VAULT_ID, { expectedOwnerToken: TOKEN }, deps);
+    expect(result).toMatchObject({ status: 200, body: { conversation: { cwd: CHECKOUT } } });
+    expect(h.mocks.adoptRecord).toHaveBeenCalledWith(expect.objectContaining({ targetCwd: CHECKOUT }));
+  });
+
+  it('ac2: without the variable, the saved cwd still wins', async () => {
+    const h = harness(record(), { existing: [CWD, CHECKOUT], projects: OTHER_PROJECTS });
+    const deps = { ...h.deps, env: {} };
+    expect((await previewContinue(VAULT_ID, deps)).body).toMatchObject({ target: { cwd: CWD, source: 'saved-cwd' } });
+    const result = await continueHere(VAULT_ID, { expectedOwnerToken: TOKEN }, deps);
+    expect(result).toMatchObject({ status: 200, body: { conversation: { cwd: CWD } } });
+    expect(h.mocks.adoptRecord).toHaveBeenCalledWith(expect.objectContaining({ targetCwd: CWD }));
+  });
+});

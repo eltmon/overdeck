@@ -139,6 +139,18 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   [#4847](https://github.com/eltmon/overdeck/issues/4847) (automatic reap
   skips the review request when an unrelated process leaves a tracked
   workspace file dirty at hand-off).
+- **Remote tmux helpers resolve their target from remote-state** — `getRemoteAgentOutput`,
+  `sendToRemoteAgent(Keyed)`, `killRemoteAgent`, `isRemoteAgentRunning` and the reap's
+  `probeRemoteSession` address `remoteTmuxTarget(agentId)`: a linked work agent's
+  `conv-<name>` on the VM's `overdeck` socket (PAN-4734), else the legacy `agent-<issue>` on
+  home's `getManagedTmuxSocketName()` (`overdeck-<hash>` on a non-default `OVERDECK_HOME`).
+  New code that runs commands in an agent's VM session must use the target, never the agent
+  id. Linked remote-state is also skipped by the spend cap's agent count, the remote heartbeat
+  and the credential refresh (its Fly machine record covers the VM), and the Fly idle sweep
+  never removes a machine hosting a `starting`/`running` linked agent. The legacy VM still
+  disagrees with its prompt about the continue file: `createRemoteWorkspace` writes
+  `/workspace/.pan/continue.json` but the REMOTE prompt names
+  `<workspace>/.overdeck/continue.json`.
 - **Fresh Claude Code state shows startup dialogs that eat the first message** — every
   Fly VM starts with an empty `~/.claude.json` (exec shell `HOME=/`). Each dialog
   Claude Code can show at launch must be pre-answered in
@@ -583,4 +595,25 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   the patrol now confirms through it before ending a row. On the Fly VM the census
   disagreed because tmux without a UTF-8 locale prints `-F` tabs as `_`: any new
   multi-field `-F` reader must pass `-u` (see `listAllPaneRecords` in `src/lib/tmux.ts`).
+- **DoD gate: a failed forge read is not absence** (PAN-4821) — `fetchIssuePullRequest` returns
+  `{ pr: null }` for "no PR" and `{ pr: null, error }` for a failed read. The DoD verdict rows must keep
+  them apart: absence may be waived (strike path, tracker-closed settlement), a failed read may not.
+  Never cache an `error` response in the PR-tab cache, and never collapse a read error to `null`.
+- **The supervisor restarts any dashboard it watches** (PAN-4861) — `dist/supervisor/server.js`
+  (port `dashboardApiPort + 1`) runs `pan restart --dashboard` after 3 failed `/api/health` polls
+  and has no "stopped on purpose" state. Anything that stops a dashboard and wants it to stay
+  stopped must stop the supervisor first, as `pan down` does (`stopSupervisorUnitIfActive()`,
+  else `stopSupervisorProcess()`). The SSH helper's managed stop (`src/lib/anywhere/ssh/helper.ts`)
+  follows this rule after PAN-4861.
+- **One-host two-dashboard tests: pull adopts into the owner's checkout** (PAN-4774) — `resolveTarget`
+  (`src/dashboard/server/services/vault-continue.ts`) prefers the record's saved `cwd` when it exists,
+  and on one host the owner's checkout exists for the puller too, so a WIP bundle is never applied
+  (`isWipPresent` is true). A test proving "pulled with uncommitted changes" must adopt elsewhere.
+  Also keep test `OVERDECK_HOME`s short: `${OVERDECK_HOME}/sockets/pty-conv-<name>.sock` over ~107
+  bytes makes the PTY supervisor exit and kills the harness.
+- **werift reads one TURN URL** (PAN-4862) — werift 0.25.1 `parseIceServers` keeps only the first
+  `turn:`/`turns:` URL, and a blocked UDP allocation falls back to TCP only after ~6.35 s, while
+  `setLocalDescription` waits for gathering. Passing Cloudflare's list as-is (UDP first) makes the relay
+  route miss its 10 s budget on UDP-blocked networks. The relay route's list goes through
+  `relayIceServers` (`src/lib/anywhere/channel/relay-ice-servers.ts`: TLS 443 first, no STUN) on both ends.
 <!-- last-verified: 2026-11-02 -->

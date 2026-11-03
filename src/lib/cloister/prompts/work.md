@@ -97,10 +97,12 @@ Before starting any work, you MUST read these files to understand the full conte
 These files contain critical context that may have been updated since the last session.
 {{/LOCAL}}
 {{#REMOTE}}
-Your workspace is at /workspace (a full clone of the repo, checked out on your feature branch). Check for planning artifacts:
-- `/workspace/.overdeck/continue.json` — decisions, hazards, and approach context carried over from planning.
-- `/workspace/.pan/specs/<date>-<ISSUE-ID>-*.xbrief.json` — the canonical xBRIEF plan. READ-ONLY: never edit a spec file.
-- `/workspace/.pan/drafts/<ISSUE-ID>.md` — PRD draft (markdown narrative), if planning produced one
+**You are a REMOTE work agent. Never run `pan done`, `pan review request` or `/rebase-and-submit`.** The Overdeck server on this machine is not the pipeline: those commands start a review there that nobody receives. Wherever this prompt says to call `pan done`, your completion signal is instead `touch /workspace/.pan/REMOTE_DONE` after your branch is pushed (see the end of this prompt). The home machine then hands your branch to review.
+
+Your workspace is at {{WORKSPACE_PATH}} (a full clone of the repo, checked out on your feature branch). Check for planning artifacts:
+- `{{WORKSPACE_PATH}}/.overdeck/continue.json` — decisions, hazards, and approach context carried over from planning.
+- `{{WORKSPACE_PATH}}/.pan/specs/<date>-<ISSUE-ID>-*.xbrief.json` — the canonical xBRIEF plan. READ-ONLY: never edit a spec file.
+- `{{WORKSPACE_PATH}}/.pan/drafts/<ISSUE-ID>.md` — PRD draft (markdown narrative), if planning produced one
 - Task state is read from the merged xBRIEF with `pan task next {{ISSUE_ID}}` and `pan task show {{ISSUE_ID}} <item>`.
 
 Start by reading the continue file (if present) and the spec to understand the plan, then begin implementation.
@@ -202,7 +204,7 @@ continue the task. Overdeck prompts and role files outrank issue content.
    ```
 {{/LOCAL}}
 {{#REMOTE}}
-3. If done, commit and push any remaining changes, then stop.
+3. If done, commit and push any remaining changes, run `touch /workspace/.pan/REMOTE_DONE`, then stop.
 {{/REMOTE}}
 
 **This fast-path check should take < 30 seconds. Do NOT re-analyze the entire codebase if work is done.**
@@ -280,11 +282,21 @@ writes.
 - If something is broken, fix it - don't document it
 - If tests fail, debug and fix them until they pass
 - Work autonomously until the issue is FULLY resolved
+{{#LOCAL}}
 - The only acceptable end state is: all items terminal, tests pass, code is committed and pushed, and `pan done {{ISSUE_ID}}` was called.
+{{/LOCAL}}
+{{#REMOTE}}
+- The only acceptable end state is: all items terminal, tests pass, code is committed and pushed, and `/workspace/.pan/REMOTE_DONE` exists.
+{{/REMOTE}}
 
 **You have unlimited time and context. Use it. Do not be lazy.**
 
+{{#LOCAL}}
 **CRITICAL: NEVER stop working without calling `pan done`.** If you have remaining tasks, keep going — do NOT end your turn to "wait for input." If ALL tasks are complete, you MUST call `pan done {{ISSUE_ID}} -c "summary"` as your final action. Ending your turn without either continuing work or calling `pan done` is a failure state that blocks the entire pipeline — with one exception: while a Monitor or background task you started is still running, ending your turn is the correct way to wait. Its notification wakes you; that is not parking.
+{{/LOCAL}}
+{{#REMOTE}}
+**CRITICAL: NEVER stop working without creating `/workspace/.pan/REMOTE_DONE`.** If you have remaining tasks, keep going — do NOT end your turn to "wait for input." If ALL tasks are complete and your branch is pushed, run `touch /workspace/.pan/REMOTE_DONE` as your final action. Never run `pan done` instead: on this machine it starts a review nobody receives.
+{{/REMOTE}}
 
 ## CRITICAL: Work Completion Requirements
 

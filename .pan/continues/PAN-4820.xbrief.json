@@ -1,0 +1,357 @@
+{
+  "version": "1",
+  "issueId": "PAN-4820",
+  "created": "2026-11-02T17:12:56.970Z",
+  "updated": "2026-11-02T20:06:42.358Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-02T18:58Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-11-02T18:58:12.131Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-02T20:01Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-11-02T20:01:56.707Z"
+    }
+  ],
+  "items": {
+    "live-install-probe": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4820",
+      "claimedAt": "2026-11-02T17:12:56.970Z",
+      "doneAt": "2026-11-02T17:16:58.907Z"
+    },
+    "issue-pipeline-field": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4820",
+      "claimedAt": "2026-11-02T17:17:26.980Z",
+      "doneAt": "2026-11-02T17:30:41.942Z"
+    },
+    "live-install-probe.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:18:18.185Z"
+    },
+    "live-install-probe.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:19:31.427Z"
+    },
+    "live-install-probe.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:20:05.903Z"
+    },
+    "issue-pipeline-field.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:31:26.131Z"
+    },
+    "issue-pipeline-field.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:31:41.752Z"
+    },
+    "issue-pipeline-field.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:31:57.429Z"
+    },
+    "install-and-hide": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:38:22.493Z"
+    },
+    "install-and-hide.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:38:42.975Z"
+    },
+    "install-and-hide.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:39:00.762Z"
+    },
+    "install-and-hide.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:39:18.228Z"
+    },
+    "install-and-hide.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:39:36.280Z"
+    },
+    "uninstall-restore": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4820",
+      "claimedAt": "2026-11-02T17:39:44.111Z",
+      "doneAt": "2026-11-02T17:44:00.015Z"
+    },
+    "uninstall-restore.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:41:46.886Z"
+    },
+    "uninstall-restore.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:42:09.066Z"
+    },
+    "uninstall-restore.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:42:27.381Z"
+    },
+    "uninstall-restore.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:42:44.660Z"
+    },
+    "lift-around-git-ops": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:47:28.005Z"
+    },
+    "lift-around-git-ops.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:47:45.444Z"
+    },
+    "lift-around-git-ops.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:48:01.787Z"
+    },
+    "lift-around-git-ops.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:48:17.825Z"
+    },
+    "lift-around-git-ops.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:48:35.137Z"
+    },
+    "state-archive": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4820",
+      "claimedAt": "2026-11-02T17:49:17.151Z",
+      "doneAt": "2026-11-02T17:50:52.321Z"
+    },
+    "state-archive.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:51:08.629Z"
+    },
+    "state-archive.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:51:24.468Z"
+    },
+    "state-archive.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:51:39.461Z"
+    },
+    "merge-guard-core": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4820",
+      "claimedAt": "2026-11-02T17:53:52.956Z",
+      "doneAt": "2026-11-02T17:54:09.956Z"
+    },
+    "merge-guard-core.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:54:27.387Z"
+    },
+    "merge-guard-core.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:54:44.271Z"
+    },
+    "merge-guard-core.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:54:59.892Z"
+    },
+    "merge-guard-core.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:55:16.483Z"
+    },
+    "merge-guard-core.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:55:33.385Z"
+    },
+    "merge-gate-wiring": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4820",
+      "claimedAt": "2026-11-02T17:55:40.717Z",
+      "doneAt": "2026-11-02T18:00:02.600Z"
+    },
+    "merge-gate-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:00:20.328Z"
+    },
+    "merge-gate-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:00:38.463Z"
+    },
+    "merge-gate-wiring.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:00:55.813Z"
+    },
+    "merge-gate-wiring.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:01:12.556Z"
+    },
+    "derived-ready": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4820",
+      "claimedAt": "2026-11-02T18:04:53.977Z",
+      "doneAt": "2026-11-02T18:06:53.672Z"
+    },
+    "derived-ready.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:07:08.957Z"
+    },
+    "derived-ready.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:07:24.671Z"
+    },
+    "derived-ready.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:07:40.301Z"
+    },
+    "no-review-dispatch": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4820",
+      "claimedAt": "2026-11-02T18:07:45.672Z",
+      "doneAt": "2026-11-02T18:14:57.954Z"
+    },
+    "no-review-dispatch.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:15:14.228Z"
+    },
+    "no-review-dispatch.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:15:31.853Z"
+    },
+    "no-review-dispatch.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:15:48.566Z"
+    },
+    "no-review-dispatch.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:16:05.170Z"
+    },
+    "auto-merge-hold": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4820",
+      "claimedAt": "2026-11-02T18:16:10.444Z",
+      "doneAt": "2026-11-02T18:19:16.122Z"
+    },
+    "auto-merge-hold.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:19:32.127Z"
+    },
+    "auto-merge-hold.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:19:48.611Z"
+    },
+    "auto-merge-hold.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:20:06.210Z"
+    },
+    "auto-merge-hold.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:20:23.730Z"
+    },
+    "launch-in-deft-mode": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4820",
+      "claimedAt": "2026-11-02T18:20:30.365Z",
+      "doneAt": "2026-11-02T18:25:16.096Z"
+    },
+    "launch-in-deft-mode.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:26:02.464Z"
+    },
+    "launch-in-deft-mode.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:26:17.863Z"
+    },
+    "launch-in-deft-mode.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:26:33.312Z"
+    },
+    "launch-in-deft-mode.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:26:50.202Z"
+    },
+    "deft-kickoff": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4820",
+      "claimedAt": "2026-11-02T18:26:56.104Z",
+      "doneAt": "2026-11-02T18:31:07.452Z"
+    },
+    "deft-kickoff.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:31:24.131Z"
+    },
+    "deft-kickoff.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:31:39.363Z"
+    },
+    "deft-kickoff.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:31:56.047Z"
+    },
+    "switch-use-back": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4820",
+      "claimedAt": "2026-11-02T18:32:00.862Z",
+      "doneAt": "2026-11-02T18:34:46.567Z"
+    },
+    "switch-use-back.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:35:02.171Z"
+    },
+    "switch-use-back.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:35:18.938Z"
+    },
+    "switch-use-back.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:35:36.007Z"
+    },
+    "switch-use-back.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:35:55.203Z"
+    },
+    "cli-skills-deft-pipeline": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4820",
+      "claimedAt": "2026-11-02T18:36:01.524Z",
+      "doneAt": "2026-11-02T18:38:49.902Z"
+    },
+    "cli-skills-deft-pipeline.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:39:06.663Z"
+    },
+    "cli-skills-deft-pipeline.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:39:23.306Z"
+    },
+    "cli-skills-deft-pipeline.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:39:40.623Z"
+    },
+    "cli-skills-deft-pipeline.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:39:58.409Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4820",
+      "claimedAt": "2026-11-02T18:40:04.091Z",
+      "doneAt": "2026-11-02T18:42:09.762Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:42:26.853Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:42:44.585Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:43:01.127Z"
+    },
+    "docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:43:17.946Z"
+    }
+  },
+  "feedback": []
+}

@@ -1,0 +1,1575 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T20:50:37Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4774: Run the Overdeck Anywhere release acceptance criteria on integrated main",
+    "updated": "2026-11-02T21:00:09.574Z"
+  },
+  "plan": {
+    "id": "pan-4774",
+    "title": "Run the Overdeck Anywhere release acceptance criteria on integrated main",
+    "status": "running",
+    "uid": "3bea81a8-0d7f-48da-97ba-f4be1b065ef7",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-02T20:50:37Z",
+    "updated": "2026-11-02T21:00:09.574Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4774",
+        "label": "PAN-4774",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4774.md",
+        "label": "PRD",
+        "type": "document"
+      },
+      {
+        "uri": ".pan/drafts/pan-2350.md",
+        "label": "Anywhere PRD (release ACs)",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "anywhere",
+      "release",
+      "acceptance",
+      "fly",
+      "ci",
+      "verification"
+    ],
+    "metadata": {
+      "sizeJustification": "This is a release acceptance run, not a feature: it necessarily touches one test hook (src/dashboard), the CI workflow, two test helpers and one test, the smoke script, per-AC evidence files under .pan/uat/pan-4774/, and three docs. The issue asks for one run with one closing comment covering AC-1..AC-15, so splitting into sibling issues would break the single status report; most of the surface is evidence files, not code.",
+      "canonicalFilename": "2026-11-02-PAN-4774-run-the-overdeck-anywhere-release-acceptance-criteria-on-integrated-main.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Every Overdeck Anywhere work item merged, but no one has run the release acceptance criteria AC-1..AC-15 (.pan/drafts/pan-2350.md) end to end on integrated main; each issue verified only its own slice.",
+      "Proposal": "Add one CI-run Node test for AC-1 (two dist dashboards with separate OVERDECK_HOMEs, a scripted fake claude, a one-env-var adopt hook so the pull applies into a distinct checkout) that also checks AC-14 and the local half of AC-2; extend the two-machine smoke with needs-docker and --hold; run every local criterion with the smoke and isolated Playwright; run the infrastructure criteria on real Fly VMs, the hosted directory and a peer test dashboard, destroying every VM; record one evidence file per criterion under .pan/uat/pan-4774/; write docs/ANYWHERE-RELEASE-CHECKLIST.md; post a closing comment giving every AC passed, failed (with issue) or approximated (with what was not covered).",
+      "NonGoals": "- No user-facing feature work; the only src/ change is the D-2 test-only env hook, and failures beyond the D-4 fix threshold become new issues\n- No phone push test; AC-7 is reported as approximated (desktop Chrome, no phone), never passed\n- No new route exposing channel byte counters; AC-14 is measured at the proxy\n- No edit of the operator's home config.yaml, projects.yaml or ~/.ssh/config, and no stop/restart of the home dashboard\n- No copying of account.json between machines; each machine signs in with its own device flow\n- No committed Docker images or Fly app configs for AC-6/AC-10; their text lives in the checklist\n- The full two-machine smoke is not added to CI; only the AC-1 test runs in CI\n- No skipIf/.only in the new test; no loosening of the 15 s or byte-budget bounds to make it pass\n- No Fly machine or volume left running after its item ends"
+    },
+    "autoDecisions": [
+      {
+        "summary": "The AC-1 CI test is a vitest .slow.test.ts run by its own step in the test-e2e job, with tmux installed in that step.",
+        "rationale": "vitest.config.ts excludes *.slow.test.ts unless VITEST_INCLUDE_SLOW=1, shards use 5 s default timeouts, CI has no tmux, and the test-skip gate forbids skipIf; a dedicated step makes it blocking through test-all-passed."
+      },
+      {
+        "summary": "Add the test-only env var OVERDECK_TEST_ADOPT_SKIP_SAVED_CWD to resolveTarget so the single-host pull applies the WIP bundle into A's own checkout.",
+        "rationale": "On one host A adopts into B's checkout and nothing is applied; the transfer store's key is in memory only, and a mount namespace needs sudo. Precedent: OVERDECK_TEST_FORCE_CPU_SATURATED in machine-load.ts."
+      },
+      {
+        "summary": "Measure AC-14 at the byte-counting proxy in front of B rather than exposing ChannelSocket counters.",
+        "rationale": "Proxy bytes include channel framing, so they bound the channel counters from above; no new route is needed."
+      },
+      {
+        "summary": "AC-2 local half uses the proxy capture; the relay half uses tcpdump as root inside the AC-3 Fly VM.",
+        "rationale": "sudo needs a password on this host and tcpdump has no capabilities; the issue allows the channel frame dump when tcpdump is unavailable."
+      },
+      {
+        "summary": "AC-10 runs on a throwaway systemd image with a volume at /home and the packed integrated-main tarball, with an approximated fallback if systemd cannot run as PID 1 on Fly.",
+        "rationale": "The pan-workspace image has no systemd, pan connect needs a systemd user manager with lingering, and the Fly rootfs resets on restart; the issue tests integrated main, not the published package."
+      },
+      {
+        "summary": "AC-4's three machines are the home dashboard plus two Fly VMs.",
+        "rationale": "A peer dashboard on the same host is not a separate machine; the issue requires Fly among the three."
+      },
+      {
+        "summary": "AC-7 and AC-11 run against peer test dashboards; AC-11's sealed-storage half is evidenced by directory-smoke.mjs step inbox under Miniflare.",
+        "rationale": "Stopping or subscribing the home dashboard would change operator state; production Durable Object storage cannot be inspected."
+      },
+      {
+        "summary": "Directory-registering items (AC-3 VM, AC-10 VPS, AC-11 peer) run serially and each forgets its machine.",
+        "rationale": "The account's plan tier is unknown and a free account allows 3 machines."
+      },
+      {
+        "summary": "Fix-or-file threshold: fix here when at most two source files, under 60 added lines, one subsystem, with a failing-first unit test; otherwise file an issue with step, command, output and commit.",
+        "rationale": "The issue says fix small local failures and file larger ones; a numeric threshold removes the judgment call."
+      },
+      {
+        "summary": "AC-5 and AC-4 use a temporary throwaway project pan4774-anywhere-smoke (a fresh clone of an unregistered public eltmon repo), removed after AC-4.",
+        "rationale": "Every registered home project is a primary checkout, and pulling into a clean target checks out the snapshot's branch there (wip-apply.ts), which would drift a primary checkout."
+      },
+      {
+        "summary": "Evidence files live in .pan/uat/pan-4774/, one per run item.",
+        "rationale": "Precedent .pan/uat/pan-4743/ and .pan/notes/pan-4320-live-verification.md; one file per item avoids shared-file edges between independent runs."
+      }
+    ],
+    "items": [
+      {
+        "id": "adopt-skip-saved-cwd-hook",
+        "title": "Add the OVERDECK_TEST_ADOPT_SKIP_SAVED_CWD test hook to resolveTarget",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T20:50:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4774",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/vault-continue.ts",
+            "tests/unit/dashboard/server/services/vault-continue.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/services/vault-continue.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vault-continue.test.ts passes including the two new hook cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In src/dashboard/server/services/vault-continue.ts add `env: NodeJS.ProcessEnv` to VaultContinueDeps (interface at line ~72) and `env: process.env` to the defaults object (next to `pathIsDirectory: pathIsDirectoryDefault,`). In resolveTarget (anchor `async function resolveTarget(record: SessionRecord, deps: VaultContinueDeps)`) compute `const skipSavedCwd = deps.env['OVERDECK_TEST_ADOPT_SKIP_SAVED_CWD'] === '1';` and guard the saved-cwd branch with `!skipSavedCwd &&`, with the two-line comment from the PRD naming PAN-4774. Mention the hook in the module header, mirroring OVERDECK_TEST_FORCE_CPU_SATURATED in machine-load.ts. Add two cases to tests/unit/dashboard/server/services/vault-continue.test.ts."
+        },
+        "items": [
+          {
+            "id": "adopt-skip-saved-cwd-hook.ac1",
+            "title": "Given a record whose saved cwd exists and a registered project matching its git origin, when continueHere runs with deps.env OVERDECK_TEST_ADOPT_SKIP_SAVED_CWD=1, then the resolved target is the project path with source 'project'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "adopt-skip-saved-cwd-hook.ac2",
+            "title": "Given the same record and project without the variable, when continueHere runs, then the resolved target remains the saved cwd with source 'saved-cwd' (existing behavior preserved).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "adopt-skip-saved-cwd-hook.ac3",
+            "title": "`npm run typecheck` exits 0 with the new `env` dep added to VaultContinueDeps.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ac1-fake-claude",
+        "title": "Add the fake claude harness helper for the AC-1 CI test",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T20:50:37Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4774",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/helpers/anywhere/fake-claude.ts",
+            "tests/helpers/anywhere/__tests__/fake-claude.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/helpers/anywhere/__tests__/fake-claude.test.ts"
+          ],
+          "expected_outputs": [
+            "fake-claude.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Create tests/helpers/anywhere/fake-claude.ts exporting installFakeClaude(home, nodePath) that writes <home>/bin/claude (#!/bin/sh, 0755) and <home>/bin/fake-claude-writer.mjs exactly as the PRD describes: --version prints '2.1.0 (Claude Code)'; --session-id writes the initial JSONL at $HOME/.claude/projects/<cwd encoded: every char outside [a-zA-Z0-9-] -> '-'>/<id>.jsonl; --resume leaves it; prints '❯ ', loops on read, strips bracketed-paste markers, appends each line to $HOME/fake-claude-input.log and appends a user line and an assistant line 'fake-reply:<text>' to the JSONL; never exits. JSONL lines carry type, uuid, sessionId, cwd, timestamp, message and NO model field. Add the unit test that spawns it."
+        },
+        "items": [
+          {
+            "id": "ac1-fake-claude.ac1",
+            "title": "Given the fake started with --session-id <uuid> in a temp cwd, when 'hello' is written to its stdin, then its JSONL has 4 lines and the last assistant line contains 'fake-reply:hello'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac1-fake-claude.ac2",
+            "title": "Given the same run, the input log at $HOME/fake-claude-input.log contains 'hello' and the fake prints '❯' after start-up.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac1-fake-claude.ac3",
+            "title": "Given `claude --version`, the fake prints '2.1.0 (Claude Code)' and exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ac1-two-dashboards",
+        "title": "Add the two-dashboard harness helper for the AC-1 CI test",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T20:50:37Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-4774",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/helpers/anywhere/two-dashboards.ts",
+            "tests/helpers/anywhere/__tests__/two-dashboards.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/helpers/anywhere/__tests__/two-dashboards.test.ts"
+          ],
+          "expected_outputs": [
+            "two-dashboards.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-3",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "ac1-ci-test"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Port the two-machine smoke's serverEnv/startServer/waitListening/stopServer/cliRaw/cli/startProxy/pollUntil/isolatedNode helpers (scripts/anywhere/two-machine-smoke.mjs lines 209-360) to TypeScript in tests/helpers/anywhere/two-dashboards.ts with the PRD differences: short homes from mkdtempSync(join(tmpdir(),'odk-a-'|'odk-b-')) (pty socket path stays under 107 bytes), free ports from listen(0), hard-linked Node in a temp dir, env scrubbed of OVERDECK_INTERNAL_TOKEN, OVERDECK_AGENT_ID, OVERDECK_DASHBOARD_SPAWNED_BY, DASHBOARD_URL, HOST, SHELL, NODE_ENV and every VITEST* key; HOME=<home>/fakehome, PATH=<home>/bin:/usr/local/bin:/usr/bin:/bin, OVERDECK_TERMINAL_BACKEND=tmux, OVERDECK_TMUX_SOCKET_NAME=odk-<a|b>-<pid>, OVERDECK_DISABLE_DEACON=1, OVERDECK_ANYWHERE_SUPERVISOR=1, OVERDECK_NO_RESUME=1, and on A only OVERDECK_TEST_ADOPT_SKIP_SAVED_CWD=1. HOST stays unset (0.0.0.0) so B's reverse link reaches A's advertised private address. Export pure functions buildServerEnv(base, opts), assertPreconditions({ serverPath, hasTmux }) (throws 'dist/dashboard/server.js is missing; run npm run build' / 'tmux is not installed; install tmux', never skips) and removeTestHome(path) (refuses any path not directly under os.tmpdir() whose basename does not start with 'odk-'), plus startPair() returning { a, b, proxy, cli, cliJson, api, stop } and pollUntil. startPair calls installFakeClaude for both homes. stop() SIGTERMs servers (SIGKILL after 3 s), kills both tmux servers, closes the proxy and calls removeTestHome. Unit-test the three pure functions in tests/helpers/anywhere/__tests__/two-dashboards.test.ts."
+        },
+        "items": [
+          {
+            "id": "ac1-two-dashboards.ac1",
+            "title": "Given a base env containing VITEST_POOL_ID, HOST and SHELL, buildServerEnv returns an env with none of those keys and with OVERDECK_TERMINAL_BACKEND=tmux and OVERDECK_ANYWHERE_SUPERVISOR=1.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac1-two-dashboards.ac2",
+            "title": "buildServerEnv returns OVERDECK_TEST_ADOPT_SKIP_SAVED_CWD=1 for machine A and an env without that key for machine B.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac1-two-dashboards.ac3",
+            "title": "assertPreconditions throws an error whose message contains 'npm run build' when the server path does not exist, and one containing 'install tmux' when tmux is absent.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac1-two-dashboards.ac4",
+            "title": "removeTestHome rejects '/home/runner' and a tmpdir path not starting with 'odk-' and removes a tmpdir path starting with 'odk-'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ac1-ci-test",
+        "title": "Add the AC-1 two-machine slow test under tests/integration/anywhere",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T20:50:37Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-4774",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/integration/anywhere/two-machine-ac1.slow.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build",
+            "VITEST_INCLUDE_SLOW=1 npx vitest run tests/integration/anywhere/two-machine-ac1.slow.test.ts"
+          ],
+          "expected_outputs": [
+            "7 tests passed",
+            "no odk-* directories left under /tmp"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Write tests/integration/anywhere/two-machine-ac1.slow.test.ts with beforeAll(startPair, 120 s), afterAll(stop) and the seven ordered tests from the PRD with their explicit timeouts: links both ways (both 'online' within 15 s of the link command), lists each other's conversations within 15 s (seeded rows on both sides; assert @<B>/<name> on A and @<A>/<name> on B), opens within the NFR-9 budget (proxy bytes from B > 0 and <= 1114112 for a >2 MiB transcript), remote-controls a live fake-claude conversation on B (delivery method set to 'tmux'; B's input log contains 'ping-4774'; A's /messages contains 'fake-reply:ping-4774' within 30 s; match substrings), pulls it with uncommitted changes (A's own clone at <A>/live with the same origin https://github.com/smoke/repo.git registered in A's projects.yaml; `pan conv pull @<B>/<name> --stop-turn --json` state 'done'; the new row's cwd is <A>/live and <A>/live/uncommitted.txt has the written text), the old owner refuses new turns (409 conversation-released on B directly and through A), nothing crossed in plaintext (capture[0] === 0x00 and no 'HTTP/1.1'). No skipIf, no .only, no source-file reads. If the 15 s conversation-list bound fails on integrated main, that is an AC-1 finding: apply the D-4 fix-or-file rule instead of loosening the bound."
+        },
+        "items": [
+          {
+            "id": "ac1-ci-test.ac1",
+            "title": "Given a built tree, `VITEST_INCLUDE_SLOW=1 npx vitest run tests/integration/anywhere/two-machine-ac1.slow.test.ts` exits 0 and prints '7 passed'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac1-ci-test.ac2",
+            "title": "When the pull test runs, it fails unless <A>/live/uncommitted.txt contains the text written on B and A's new conversation row's cwd is <A>/live, a directory distinct from B's checkout.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac1-ci-test.ac3",
+            "title": "When a message is sent on B to the pulled conversation, B returns HTTP 409 with code 'conversation-released' and the test fails on any other answer.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac1-ci-test.ac4",
+            "title": "The open-budget test fails when the proxy counts more than 1114112 bytes from B during the open.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac1-ci-test.ac5",
+            "title": "The test file contains no skipIf and no .only.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-run-ac1-test",
+        "title": "Run the AC-1 slow test in the CI test-e2e job with tmux installed",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T20:50:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-4774",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".github/workflows/ci.yml"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'two-machine-ac1.slow.test.ts' .github/workflows/ci.yml"
+          ],
+          "expected_outputs": [
+            "one match inside the test-e2e job"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. In .github/workflows/ci.yml job test-e2e, insert after the step named 'Resource discovery benchmark' a step 'Anywhere AC-1 two-machine test' that runs `sudo apt-get update && sudo apt-get install -y tmux`, `tmux -V`, and `VITEST_INCLUDE_SLOW=1 npx vitest run tests/integration/anywhere/two-machine-ac1.slow.test.ts`. It runs before the job starts its own dashboard on :3011. From this commit on, every push of feature/pan-4774 must go over the SSH remote (the gh OAuth token lacks the workflow scope, so HTTPS pushes of the branch are refused once the branch contains a workflow change), including later `pan task done` pushes."
+        },
+        "items": [
+          {
+            "id": "ci-run-ac1-test.ac1",
+            "title": "The PR's test-e2e job log shows the step 'Anywhere AC-1 two-machine test' printing a tmux version and '7 passed'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-run-ac1-test.ac2",
+            "title": "A failure of that step fails the test-e2e job, so test-all-passed reports failure (the step has no continue-on-error).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "smoke-needs-docker",
+        "title": "Add a needs-docker step to the two-machine smoke",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T20:50:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4774",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/anywhere/two-machine-smoke.mjs",
+            "docs/ANYWHERE-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build",
+            "node scripts/anywhere/two-machine-smoke.mjs"
+          ],
+          "expected_outputs": [
+            "output contains 'step needs-docker' and the script exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. In scripts/anywhere/two-machine-smoke.mjs, in fakeClis for B only and only when not --live-claude, write <B>/npm/bin/docker as '#!/bin/sh\\nexit 1\\n' (0755) so B has no docker capability. Add step 'needs-docker' after 'needs' inside fleetWorkSteps: if `docker info` fails on this host, log 'needs-docker skipped: no docker on A' and continue; else POST /api/fleet/placement on A with { gitOrigin: null, needs: ['docker'] } must pick A, and `pan lane start --role play --machine auto --needs docker --json` on A must name A; then `pan lane stop` and `pan lane reap` that lane. Add the step to the header comment and a row to the steps table in docs/ANYWHERE-ARCHITECTURE.md 'Running the two-machine smoke'."
+        },
+        "items": [
+          {
+            "id": "smoke-needs-docker.ac1",
+            "title": "Running `node scripts/anywhere/two-machine-smoke.mjs` on a host with docker prints 'step needs-docker' and exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "smoke-needs-docker.ac2",
+            "title": "In that run, placement with needs ['docker'] returns A's environmentId, and the lane started with --needs docker names A as its machine.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "smoke-needs-docker.ac3",
+            "title": "docs/ANYWHERE-ARCHITECTURE.md's smoke steps table contains a needs-docker row stating B has no docker and Auto picks A.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "smoke-hold",
+        "title": "Add a --hold mode to the two-machine smoke for browser checks",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T20:50:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4774",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/anywhere/two-machine-smoke.mjs",
+            "docs/ANYWHERE-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build",
+            "node scripts/anywhere/two-machine-smoke.mjs --hold"
+          ],
+          "expected_outputs": [
+            "a HOLD line is printed; servers answer until SIGINT"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Add `--hold` to scripts/anywhere/two-machine-smoke.mjs: after the no-http step and before stop, restart B without OVERDECK_TEST_FORCE_CPU_SATURATED if it is not running, start a dev server on B answering 'hello from b', print 'HOLD a=http://127.0.0.1:3041 b=http://127.0.0.1:3042 dev=<port> conversation=@<B env>/smoke-desk', then wait for SIGINT/SIGTERM and run cleanup. Start servers through .tmp/anywhere-node/serve.js, a symlink to dist/dashboard/server.js created in isolatedNode, so the host orphan reaper (matching dist/dashboard/server.js in the command line) does not kill a held server after 120 s. Document --hold in the header and in docs/ANYWHERE-ARCHITECTURE.md."
+        },
+        "items": [
+          {
+            "id": "smoke-hold.ac1",
+            "title": "Running the smoke with --hold prints a line starting 'HOLD a=http://127.0.0.1:3041' and both URLs answer GET /api/environment with 200 three minutes later.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "smoke-hold.ac2",
+            "title": "Sending SIGINT to the held smoke stops both servers and the script exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "smoke-hold.ac3",
+            "title": "When held, `ps -o args` for each spawned server shows .tmp/anywhere-node/serve.js and contains no dist/dashboard/server.js.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "run-local-smoke",
+        "title": "Run the fake-CLI two-machine smoke on integrated main and record AC evidence",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T20:50:37Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4774",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/uat/pan-4774/local-smoke.md",
+            ".pan/uat/pan-4774/local-smoke.log"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run build",
+            "node scripts/anywhere/two-machine-smoke.mjs",
+            "grep -E '^Status: (passed|failed|approximated)' .pan/uat/pan-4774/local-smoke.md"
+          ],
+          "expected_outputs": [
+            "smoke exits 0",
+            "a Status line is present"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. `npm run build`; `node scripts/anywhere/two-machine-smoke.mjs` (expect exit 0) and `node scripts/anywhere/two-machine-smoke.mjs --inject-plain-http` (expect exit 1 at no-http). Write local-smoke.md with the commit, both exit codes and the step-to-AC table from the PRD: no-http -> AC-2 local; remote-worker, worker-offline, lane-* -> AC-4 local; auto, needs-docker -> AC-9; mcp -> AC-12 (name the route the Copy MCP URL button uses to mint the token and confirm the smoke uses the same route); forward -> AC-13 CLI half; open-budget -> AC-14 (bytes measured); tell-once -> W-CONV7, usage -> W-WORK7, compare -> W-WORK8, versions + update-all -> W-LINK7 harness half (AC-15). Save the full redacted output as local-smoke.log. Evidence rules for every run item: name the commit tested (git rev-parse --short HEAD), paste the exact commands and the relevant output (trimmed, tokens replaced with <redacted>), end the file with one line 'Status: passed|failed|approximated', and apply the PRD D-4 fix-or-file rule to every failure (a fix is a separate commit with a unit test; otherwise `gh issue create` with the AC, failing step, command, output and commit, and link it). Commit only the evidence file(s) (plus any D-4 fix) with the Item trailer."
+        },
+        "items": [
+          {
+            "id": "run-local-smoke.ac1",
+            "title": "local-smoke.md records exit 0 for the plain run and exit 1 at step no-http for the --inject-plain-http run.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "run-local-smoke.ac2",
+            "title": "local-smoke.md records a mapping of each of AC-2 (local), AC-4 (local), AC-9, AC-12, AC-13 (CLI), AC-14 and AC-15 (W-CONV7, W-WORK7, W-WORK8, W-LINK7) to a named smoke step with its result.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "run-local-smoke.ac3",
+            "title": "local-smoke.md records the open-budget bytes measured next to the 1114112-byte budget.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "run-local-smoke.ac4",
+            "title": "local-smoke.md contains a final 'Status:' line and records a fix commit or an issue URL for every failing step.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "run-live-claude-smoke",
+        "title": "Run the two-machine smoke with --live-claude and record real-model AC-1 evidence",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T20:50:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4774",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/uat/pan-4774/live-claude-smoke.md",
+            ".pan/uat/pan-4774/live-claude-smoke.log"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "node scripts/anywhere/two-machine-smoke.mjs --live-claude",
+            "grep -E '^Status: (passed|failed|approximated)' .pan/uat/pan-4774/live-claude-smoke.md"
+          ],
+          "expected_outputs": [
+            "smoke exits 0 or the failure is filed",
+            "a Status line is present"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. `node scripts/anywhere/two-machine-smoke.mjs --live-claude` with the real Claude Code login (small model cost). Record remote-reply (the '9300' answer reached A) and pull (uncommitted.txt present, B answers 409 conversation-released) results. This is the real-model complement to the CI test for AC-1. Evidence rules for every run item: name the commit tested (git rev-parse --short HEAD), paste the exact commands and the relevant output (trimmed, tokens replaced with <redacted>), end the file with one line 'Status: passed|failed|approximated', and apply the PRD D-4 fix-or-file rule to every failure (a fix is a separate commit with a unit test; otherwise `gh issue create` with the AC, failing step, command, output and commit, and link it). Commit only the evidence file(s) (plus any D-4 fix) with the Item trailer."
+        },
+        "items": [
+          {
+            "id": "run-live-claude-smoke.ac1",
+            "title": "live-claude-smoke.md records the remote-reply step result and the reply text seen on A.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "run-live-claude-smoke.ac2",
+            "title": "live-claude-smoke.md records the pull job JSON with state 'done' and B's 409 conversation-released answer, or the failure with its D-4 disposition.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "run-live-claude-smoke.ac3",
+            "title": "live-claude-smoke.md contains a final 'Status:' line.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ac13-open-preview-ui",
+        "title": "Check Open preview in a browser against a held two-machine pair (AC-13 UI)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T20:50:37Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4774",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/uat/pan-4774/ac-13-open-preview.md",
+            ".pan/uat/pan-4774/ac-13-open-preview.png"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "test -f .pan/uat/pan-4774/ac-13-open-preview.png",
+            "grep -E '^Status: (passed|failed|approximated)' .pan/uat/pan-4774/ac-13-open-preview.md"
+          ],
+          "expected_outputs": [
+            "screenshot exists",
+            "a Status line is present"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. Start `node scripts/anywhere/two-machine-smoke.mjs --hold` in the background and wait for the HOLD line. With Playwright Chromium and an isolated userDataDir under .tmp/pan-4774/pw-ac13 (never another agent's browser), open A's /conv/@<B env>/smoke-desk, use Open preview for the dev port from the HOLD line, and assert the preview shows 'hello from b'. Screenshot it. Stop the held smoke with SIGINT. Evidence rules for every run item: name the commit tested (git rev-parse --short HEAD), paste the exact commands and the relevant output (trimmed, tokens replaced with <redacted>), end the file with one line 'Status: passed|failed|approximated', and apply the PRD D-4 fix-or-file rule to every failure (a fix is a separate commit with a unit test; otherwise `gh issue create` with the AC, failing step, command, output and commit, and link it). Commit only the evidence file(s) (plus any D-4 fix) with the Item trailer."
+        },
+        "items": [
+          {
+            "id": "ac13-open-preview-ui.ac1",
+            "title": "ac-13-open-preview.png shows the preview rendering 'hello from b' on A's dashboard.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac13-open-preview-ui.ac2",
+            "title": "ac-13-open-preview.md records the URL opened, the dev port, the preview URL and ends with a 'Status:' line.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ac15-open-in-editor",
+        "title": "Check Open in editor for a linked conversation (AC-15 W-CONV9)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T20:50:37Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4774",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/uat/pan-4774/ac-15-open-in-editor.md",
+            ".pan/uat/pan-4774/ac-15-open-in-editor.png"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "grep -E '^Status: (passed|failed|approximated)' .pan/uat/pan-4774/ac-15-open-in-editor.md"
+          ],
+          "expected_outputs": [
+            "a Status line is present"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11. Start the smoke with --hold. Write .tmp/anywhere-a/npm/bin/code (0755) that appends \"$@\" to .tmp/anywhere-a/code-argv.log. In an isolated Playwright browser (userDataDir .tmp/pan-4774/pw-ac15) on A, choose Open in editor for @<B env>/smoke-desk. Pass when code-argv.log holds '--remote ssh-remote+<host> <B checkout path>'. If the UI refuses because a loopback-linked machine has no SSH host, record the exact message and apply D-4 (W-CONV9's Done-when names the desk host). Stop the held smoke. Evidence rules for every run item: name the commit tested (git rev-parse --short HEAD), paste the exact commands and the relevant output (trimmed, tokens replaced with <redacted>), end the file with one line 'Status: passed|failed|approximated', and apply the PRD D-4 fix-or-file rule to every failure (a fix is a separate commit with a unit test; otherwise `gh issue create` with the AC, failing step, command, output and commit, and link it). Commit only the evidence file(s) (plus any D-4 fix) with the Item trailer."
+        },
+        "items": [
+          {
+            "id": "ac15-open-in-editor.ac1",
+            "title": "ac-15-open-in-editor.md records the argv line the fake code logged, or the exact refusal text with its D-4 disposition.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac15-open-in-editor.ac2",
+            "title": "ac-15-open-in-editor.png shows the Open in editor control on A for the linked conversation.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac15-open-in-editor.ac3",
+            "title": "ac-15-open-in-editor.md contains a final 'Status:' line.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ac05-fly-conversation",
+        "title": "Run a conversation on a Fly VM, stream it at home and pull it home (AC-5)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T20:50:37Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-4774",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/uat/pan-4774/ac-05-fly-conversation.md",
+            ".pan/uat/pan-4774/ac-05-*.png"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "grep -E '^Status: (passed|failed|approximated)' .pan/uat/pan-4774/ac-05-fly-conversation.md"
+          ],
+          "expected_outputs": [
+            "a Status line is present",
+            "no leftover Fly machine"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "NFR-1",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-12 and D-6. First set up the D-15 throwaway project (PRD D-15): pick the smallest public eltmon repo that no registered project names in github_repo (`gh repo list eltmon --visibility public --limit 200 --json nameWithOwner,diskUsage`), clone it to /home/eltmon/Projects/pan4774-anywhere-smoke and register it as project pan4774-anywhere-smoke; NEVER use a registered project (each is a primary checkout, and a pull into a clean target checks out the snapshot branch there). Against the home dashboard: `pan machines add-fly --project pan4774-anywhere-smoke --message \"Answer with one short line: hello from Fly.\"`; confirm the reply streams at home (isolated Playwright screenshot of /conv/@<fly env>/<conv> plus the /messages text); write an uncommitted file in the VM checkout via `fly ssh console`; `pan conv pull @<fly label>/<conv> --stop-turn --json` -> state 'done' and the file exists under /home/eltmon/Projects/pan4774-anywhere-smoke (or a worktree of it) as the job reports; the VM answers 409 conversation-released; `pan machines unlink <fly label>` destroys the VM. Leave the throwaway project registered for ac04-fly-worker-lanes. If the VM's pan lacks integrated-main code, switch to the peer-test-dashboard recipe (docs/fly-provider.md Live verification, memory live-fly-check-test-home) and never edit the home config.yaml. Evidence rules for every run item: name the commit tested (git rev-parse --short HEAD), paste the exact commands and the relevant output (trimmed, tokens replaced with <redacted>), end the file with one line 'Status: passed|failed|approximated', and apply the PRD D-4 fix-or-file rule to every failure (a fix is a separate commit with a unit test; otherwise `gh issue create` with the AC, failing step, command, output and commit, and link it). Commit only the evidence file(s) (plus any D-4 fix) with the Item trailer."
+        },
+        "items": [
+          {
+            "id": "ac05-fly-conversation.ac1",
+            "title": "ac-05-fly-conversation.md records the Fly machine id, the /conv/@<env>/<name> URL and the streamed reply text.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac05-fly-conversation.ac2",
+            "title": "ac-05-fly-conversation.md records the pull target directory, which is under /home/eltmon/Projects/pan4774-anywhere-smoke and is no registered primary checkout.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac05-fly-conversation.ac3",
+            "title": "ac-05-fly-conversation.md records the pull JSON with state 'done', the home checkout path holding the uncommitted file, and the VM's 409 conversation-released answer.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac05-fly-conversation.ac4",
+            "title": "ac-05-fly-conversation.md records `fly machines list` output in which the test machine no longer appears, and ends with a 'Status:' line.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ac04-fly-worker-lanes",
+        "title": "Run a remote worker and a three-machine gauntlet with Fly (AC-4 Fly half)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T20:50:37Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-4774",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/uat/pan-4774/ac-04-fly-worker-lanes.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "grep -E '^Status: (passed|failed|approximated)' .pan/uat/pan-4774/ac-04-fly-worker-lanes.md"
+          ],
+          "expected_outputs": [
+            "a Status line is present"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-13 and D-14. Create two VMs with `pan machines add-fly --project pan4774-anywhere-smoke` (the D-15 throwaway project set up by ac05-fly-conversation). `pan worker run --machine <fly1> --detach \"<bounded task that writes a one-line report>\"` then `pan worker wait <id>` prints the report from fly1. Under one root conversation on home start three lanes (`pan lane start --role play --machine <home|fly1|fly2> --json`), have each report done, `pan lane wait <name>` returns each body, `pan lane list --json` lists all three; stop and reap all lanes; unlink both VMs; then remove the pan4774-anywhere-smoke project registration and delete /home/eltmon/Projects/pan4774-anywhere-smoke (literal path in rm). Evidence rules for every run item: name the commit tested (git rev-parse --short HEAD), paste the exact commands and the relevant output (trimmed, tokens replaced with <redacted>), end the file with one line 'Status: passed|failed|approximated', and apply the PRD D-4 fix-or-file rule to every failure (a fix is a separate commit with a unit test; otherwise `gh issue create` with the AC, failing step, command, output and commit, and link it). Commit only the evidence file(s) (plus any D-4 fix) with the Item trailer."
+        },
+        "items": [
+          {
+            "id": "ac04-fly-worker-lanes.ac1",
+            "title": "ac-04-fly-worker-lanes.md records the worker report printed by `pan worker wait` from the Fly machine.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac04-fly-worker-lanes.ac2",
+            "title": "ac-04-fly-worker-lanes.md records `pan lane list --json` listing three lanes on three distinct machines including a Fly machine, each with a returned report.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac04-fly-worker-lanes.ac3",
+            "title": "ac-04-fly-worker-lanes.md records `fly machines list` with neither VM present, `pan projects list` without pan4774-anywhere-smoke, and ends with a 'Status:' line.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ac03-direct-relay",
+        "title": "Link a Fly VM over a direct route, then through TURN with UDP blocked (AC-3, AC-2 relay)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T20:50:37Z",
+        "metadata": {
+          "difficulty": "expert",
+          "kind": "test",
+          "issueLabel": "pan-4774",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/uat/pan-4774/ac-03-direct-relay.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "grep -E '^Status: (passed|failed|approximated)' .pan/uat/pan-4774/ac-03-direct-relay.md"
+          ],
+          "expected_outputs": [
+            "a Status line is present"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-14, D-5, D-8. Create the VM with `fly machine run` (pan-workspace image, shared-cpu-1x) and start `pan serve` on it by hand; do NOT use `pan machines add-fly`, because that links over the Fly public-link route, which outranks a directory route and hides whether rtc:// works. Link it only through the directory. `pan account login` on the VM: send the device code and URL with `pan tell conv-flywheel \"<code> <url>\"` (Bash sandbox disabled) and wait for approval. Join through the directory (join/approve/accept). With no Tailscale on either side, `pan machines list --json` on home shows a current route starting rtc://. Inside the VM block UDP except DNS (`iptables -A OUTPUT -p udp --dport 53 -j ACCEPT; iptables -A INPUT -p udp --sport 53 -j ACCEPT; iptables -A OUTPUT -p udp -j DROP; iptables -A INPUT -p udp -j DROP`, so connect.overdeck.ai still resolves through Fly's resolver), re-establish the link, and show it runs over the relay (Using relay, bytes used rising). Run `tcpdump -i any -w /tmp/relay.pcap` in the VM while a conversation open crosses the relay with a marker string; `strings /tmp/relay.pcap | grep -c -e <marker> -e 'HTTP/1.1'` must print 0. If the account is refused relay, record the exact message: status 'approximated' for the relay clause unless the account is meant to be relay-eligible (then D-4). Cleanup: `pan machines forget`, unlink, destroy the VM. Evidence rules for every run item: name the commit tested (git rev-parse --short HEAD), paste the exact commands and the relevant output (trimmed, tokens replaced with <redacted>), end the file with one line 'Status: passed|failed|approximated', and apply the PRD D-4 fix-or-file rule to every failure (a fix is a separate commit with a unit test; otherwise `gh issue create` with the AC, failing step, command, output and commit, and link it). Commit only the evidence file(s) (plus any D-4 fix) with the Item trailer."
+        },
+        "items": [
+          {
+            "id": "ac03-direct-relay.ac1",
+            "title": "ac-03-direct-relay.md records a home `pan machines list --json` route beginning rtc:// for the VM before UDP was blocked.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac03-direct-relay.ac2",
+            "title": "ac-03-direct-relay.md records the route state after UDP was blocked: either relay in use with bytes used, or the exact refusal text.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac03-direct-relay.ac3",
+            "title": "ac-03-direct-relay.md records the pcap scan count for the marker and 'HTTP/1.1' (expected 0) as the AC-2 relay half.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac03-direct-relay.ac4",
+            "title": "ac-03-direct-relay.md records the VM forgotten in the directory and destroyed, and ends with a 'Status:' line.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ac03-tailscale",
+        "title": "Record the orchestrator's Set up Tailscale result (AC-3 Tailscale)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T20:50:37Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "test",
+          "issueLabel": "pan-4774",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/uat/pan-4774/ac-03-tailscale.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -E '^Status: (passed|failed|approximated)' .pan/uat/pan-4774/ac-03-tailscale.md"
+          ],
+          "expected_outputs": [
+            "a Status line is present"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-15, D-12. After ac03-direct-relay, run (sandbox disabled) `pan tell conv-flywheel \"PAN-4774: please run Set up Tailscale on this host now (AC-3) and reply with the installed version, the signed-in tailnet, and whether another machine linked over the tailnet.\"` and record the reply verbatim (redacted) plus `tailscale status` output. If the tell fails, post the same request as a comment on PAN-4774 and wait for the reply there. Evidence rules for every run item: name the commit tested (git rev-parse --short HEAD), paste the exact commands and the relevant output (trimmed, tokens replaced with <redacted>), end the file with one line 'Status: passed|failed|approximated', and apply the PRD D-4 fix-or-file rule to every failure (a fix is a separate commit with a unit test; otherwise `gh issue create` with the AC, failing step, command, output and commit, and link it). Commit only the evidence file(s) (plus any D-4 fix) with the Item trailer."
+        },
+        "items": [
+          {
+            "id": "ac03-tailscale.ac1",
+            "title": "ac-03-tailscale.md records the orchestrator's reply and the `tailscale status` output from this host.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac03-tailscale.ac2",
+            "title": "ac-03-tailscale.md ends with 'Status: passed' only when install, sign-in and a tailnet link all happened, otherwise 'Status: approximated' naming the missing part.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ac10-vps-connect",
+        "title": "Set up a fresh Fly 'VPS' with npx connect and survive logout and restart (AC-10)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T20:50:37Z",
+        "metadata": {
+          "difficulty": "expert",
+          "kind": "test",
+          "issueLabel": "pan-4774",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/uat/pan-4774/ac-10-vps-connect.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "grep -E '^Status: (passed|failed|approximated)' .pan/uat/pan-4774/ac-10-vps-connect.md"
+          ],
+          "expected_outputs": [
+            "a Status line is present"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-16 and D-7. First run `fly ssh console -a <any app with a running machine> -C 'cat /proc/1/comm'`: if PID 1 is Fly's own init and the docs say an image cannot replace it, skip the image builds and apply the D-7 fallback immediately (approximated + filed issue). Otherwise build the throwaway VPS image (ubuntu:24.04 + systemd as PID 1 via /sbin/init + openssh-server + Node 22 + user vps; volume at /home; /var/lib/systemd/linger symlinked to /home/.linger) and push it to the Fly registry (run `fly auth docker` right before push, verify the digest). Create the machine with the volume. `npm pack` integrated main, copy the tgz to the VM, and as vps run `npx ./overdeck-core-<version>.tgz connect`; complete its pairing/directory approval with home (device flow via `pan tell conv-flywheel`). Record `loginctl show-user vps -p Linger`, end the SSH session, `fly machine restart <id>`, and poll home's `pan machines list --json` until the VPS is online (120 s). Implementation checkpoint: if systemd does not reach running/degraded as PID 1 after two attempts, status approximated, record how far connect got, and file 'Run AC-10 on a real VPS'. Cleanup: forget, unlink, destroy machine and volume. Evidence rules for every run item: name the commit tested (git rev-parse --short HEAD), paste the exact commands and the relevant output (trimmed, tokens replaced with <redacted>), end the file with one line 'Status: passed|failed|approximated', and apply the PRD D-4 fix-or-file rule to every failure (a fix is a separate commit with a unit test; otherwise `gh issue create` with the AC, failing step, command, output and commit, and link it). Commit only the evidence file(s) (plus any D-4 fix) with the Item trailer."
+        },
+        "items": [
+          {
+            "id": "ac10-vps-connect.ac1",
+            "title": "ac-10-vps-connect.md contains the Dockerfile used and the `connect` output with the link redacted.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac10-vps-connect.ac2",
+            "title": "ac-10-vps-connect.md records Linger=yes for user vps and the `fly machine restart` command and timestamp.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac10-vps-connect.ac3",
+            "title": "ac-10-vps-connect.md records home's `pan machines list --json` entry for the VPS as online after the restart, or the checkpoint fallback with the filed issue.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac10-vps-connect.ac4",
+            "title": "ac-10-vps-connect.md records `fly machines list` and `fly volumes list` with neither resource present, and ends with a 'Status:' line.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ac06-ssh-host",
+        "title": "Add and remove an SSH host from a browser (AC-6)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T20:50:37Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-4774",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/uat/pan-4774/ac-06-ssh-host.md",
+            ".pan/uat/pan-4774/ac-06-*.png"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "grep -E '^Status: (passed|failed|approximated)' .pan/uat/pan-4774/ac-06-ssh-host.md"
+          ],
+          "expected_outputs": [
+            "a Status line is present"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-17 and D-9. Fly VM with openssh-server, Node 22 and the packed integrated-main @overdeck/core installed globally; a throwaway SSH key under .tmp/pan-4774/ssh/ authorized on the VM. `fly proxy 10022:22 -a <app> -s`. In an isolated Playwright browser on the home dashboard: Settings -> Anywhere -> Machines -> add SSH host ssh://root@127.0.0.1:10022; it shows online. Remove it; inside the VM `pgrep -f 'pan serve'` prints nothing (Overdeck-started server stopped). Start `pan serve` on the VM yourself, add the host again, remove it, and the server still runs (reason external). No ~/.ssh/config edit; if ssh-add was used, `ssh-add -d` the key afterwards. Destroy the VM and delete the throwaway key. Evidence rules for every run item: name the commit tested (git rev-parse --short HEAD), paste the exact commands and the relevant output (trimmed, tokens replaced with <redacted>), end the file with one line 'Status: passed|failed|approximated', and apply the PRD D-4 fix-or-file rule to every failure (a fix is a separate commit with a unit test; otherwise `gh issue create` with the AC, failing step, command, output and commit, and link it). Commit only the evidence file(s) (plus any D-4 fix) with the Item trailer."
+        },
+        "items": [
+          {
+            "id": "ac06-ssh-host.ac1",
+            "title": "ac-06-ssh-host.md records the SSH host shown online after adding it from the browser, with a screenshot ac-06-online.png.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac06-ssh-host.ac2",
+            "title": "ac-06-ssh-host.md records that removal stopped the server Overdeck started (empty pgrep) and kept the externally started server running.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac06-ssh-host.ac3",
+            "title": "ac-06-ssh-host.md records the VM destroyed and the throwaway key deleted, and ends with a 'Status:' line.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ac07-push",
+        "title": "Measure push to a desktop Chrome PWA subscription (AC-7, approximated)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T20:50:37Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-4774",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/uat/pan-4774/ac-07-push.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "grep -F 'Status: approximated: desktop Chrome, no phone' .pan/uat/pan-4774/ac-07-push.md"
+          ],
+          "expected_outputs": [
+            "the approximated Status line is present"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-18 and D-10. Peer test dashboard (own OVERDECK_HOME under .tmp/pan-4774/push-home, port 3942, started through a symlink path). google-chrome via Playwright channel 'chrome', headed with DISPLAY=:1, isolated userDataDir .tmp/pan-4774/chrome, notifications granted; subscribe from Settings; hook the service worker's push event and measure POST /api/push/test -> push event. Register a second subscription whose endpoint is a local capture HTTP server and assert the captured request has Content-Encoding: aes128gcm and a body that does not contain the notification title. Remove both subscriptions; stop the peer dashboard. Evidence rules for every run item: name the commit tested (git rev-parse --short HEAD), paste the exact commands and the relevant output (trimmed, tokens replaced with <redacted>), end the file with one line 'Status: passed|failed|approximated', and apply the PRD D-4 fix-or-file rule to every failure (a fix is a separate commit with a unit test; otherwise `gh issue create` with the AC, failing step, command, output and commit, and link it). Commit only the evidence file(s) (plus any D-4 fix) with the Item trailer. The Status line is always 'Status: approximated: desktop Chrome, no phone'."
+        },
+        "items": [
+          {
+            "id": "ac07-push.ac1",
+            "title": "ac-07-push.md records the measured milliseconds from POST /api/push/test to the service worker push event.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac07-push.ac2",
+            "title": "ac-07-push.md records the captured request's Content-Encoding header and the first 64 body bytes in hex, and states the title string is absent from the body.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac07-push.ac3",
+            "title": "ac-07-push.md contains the final line 'Status: approximated: desktop Chrome, no phone'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ac11-webhook-inbox",
+        "title": "Deliver a signed webhook through the directory inbox while the target is stopped (AC-11)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T20:50:37Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-4774",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/uat/pan-4774/ac-11-webhook-inbox.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "grep -E '^Status: (passed|failed|approximated)' .pan/uat/pan-4774/ac-11-webhook-inbox.md"
+          ],
+          "expected_outputs": [
+            "a Status line is present"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-19 and D-11. Peer test dashboard (own OVERDECK_HOME under .tmp/pan-4774/inbox-home, port 3943, started through a symlink path); device-flow sign-in via `pan tell conv-flywheel`; register a small project; `pan triggers add --project <p> --inbox` with a GitHub signature secret; stop the peer server; POST a GitHub ping-shaped JSON with X-GitHub-Event and X-Hub-Signature-256 (HMAC-SHA256 of the exact body) to the inbox URL (expect 202); wait 30 s; start the peer server; assert the trigger's conversation starts within 60 s. Then `node scripts/anywhere/directory-smoke.mjs` and cite step 'inbox' as the sealed-bytes evidence (production Durable Object storage cannot be inspected). Cleanup: remove the trigger, forget the peer machine in the directory, stop the server. Evidence rules for every run item: name the commit tested (git rev-parse --short HEAD), paste the exact commands and the relevant output (trimmed, tokens replaced with <redacted>), end the file with one line 'Status: passed|failed|approximated', and apply the PRD D-4 fix-or-file rule to every failure (a fix is a separate commit with a unit test; otherwise `gh issue create` with the AC, failing step, command, output and commit, and link it). Commit only the evidence file(s) (plus any D-4 fix) with the Item trailer."
+        },
+        "items": [
+          {
+            "id": "ac11-webhook-inbox.ac1",
+            "title": "ac-11-webhook-inbox.md records the inbox POST status 202 and the time the target was stopped and restarted.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac11-webhook-inbox.ac2",
+            "title": "ac-11-webhook-inbox.md records the conversation the trigger started and the seconds between restart and its start (60 s bound).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac11-webhook-inbox.ac3",
+            "title": "ac-11-webhook-inbox.md records the directory-smoke run's exit code 0 and its 'inbox' step output as the sealed-bytes half, and ends with a 'Status:' line.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ac08-wdoc",
+        "title": "Check the W-DOC deliverables and fix stale 'planned' labels in anywhere.mdx (AC-8)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T20:50:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4774",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/uat/pan-4774/ac-08-wdoc.md",
+            "anywhere.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'Still planned: Fly work agents' anywhere.mdx || true",
+            "grep -E '^Status: (passed|failed|approximated)' .pan/uat/pan-4774/ac-08-wdoc.md"
+          ],
+          "expected_outputs": [
+            "0",
+            "a Status line is present"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-20. For each W-DOC deliverable in .pan/drafts/pan-2350.md lines 489-506, record exists/correct in ac-08-wdoc.md. In anywhere.mdx replace each 'planned' label that names a shipped Anywhere feature, at least line ~220 'Still planned: Fly work agents as linked conversations on the VM's server' (shipped by PAN-4734, see docs/ANYWHERE-ARCHITECTURE.md '### Work agents (PAN-4734)'); keep 'planned' for the hosted vault, billing and other unshipped items. Check that the four superseded drafts (pan-2352, pan-2355, pan-2356, pan-3513) carry the header. Evidence rules for every run item: name the commit tested (git rev-parse --short HEAD), paste the exact commands and the relevant output (trimmed, tokens replaced with <redacted>), end the file with one line 'Status: passed|failed|approximated', and apply the PRD D-4 fix-or-file rule to every failure (a fix is a separate commit with a unit test; otherwise `gh issue create` with the AC, failing step, command, output and commit, and link it). Commit only the evidence file(s) (plus any D-4 fix) with the Item trailer."
+        },
+        "items": [
+          {
+            "id": "ac08-wdoc.ac1",
+            "title": "ac-08-wdoc.md records every W-DOC deliverable with its file path and a present/absent result.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac08-wdoc.ac2",
+            "title": "anywhere.mdx no longer contains the string 'Still planned: Fly work agents'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac08-wdoc.ac3",
+            "title": "ac-08-wdoc.md contains a final 'Status:' line.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "release-checklist-doc",
+        "title": "Write docs/ANYWHERE-RELEASE-CHECKLIST.md and link it from CLAUDE.md and the architecture doc",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T20:50:37Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-4774",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ANYWHERE-RELEASE-CHECKLIST.md",
+            "CLAUDE.md",
+            "docs/ANYWHERE-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -cE '^## AC-([1-9]|1[0-5])\\b' docs/ANYWHERE-RELEASE-CHECKLIST.md",
+            "grep -c 'ANYWHERE-RELEASE-CHECKLIST.md' CLAUDE.md docs/ANYWHERE-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "15",
+            "each file reports at least 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-21. Create docs/ANYWHERE-RELEASE-CHECKLIST.md: purpose, prerequisites (built tree, flyctl logged in, signed-in account, device codes via `pan tell conv-flywheel`), then one '## AC-N' section per criterion AC-1..AC-15 with the exact commands taken from the evidence files, expected output, cleanup, and this run's status with date and commit; include the D-7 VPS Dockerfile and the D-10 Playwright outline. Add to CLAUDE.md's topic index, directly under the docs/ANYWHERE-ARCHITECTURE.md row: '| Anywhere release checklist (AC-1 to AC-15) | [docs/ANYWHERE-RELEASE-CHECKLIST.md](docs/ANYWHERE-RELEASE-CHECKLIST.md) |'. In docs/ANYWHERE-ARCHITECTURE.md 'Running the two-machine smoke', replace the sentence 'The live check for this layer is a script, not a CI job (D-4645-22)' with one saying AC-1 runs in CI as tests/integration/anywhere/two-machine-ac1.slow.test.ts in the test-e2e job while the full smoke stays a script, and link the checklist."
+        },
+        "items": [
+          {
+            "id": "release-checklist-doc.ac1",
+            "title": "docs/ANYWHERE-RELEASE-CHECKLIST.md contains exactly 15 headings matching '^## AC-([1-9]|1[0-5])\\b'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "release-checklist-doc.ac2",
+            "title": "`grep -c 'docs/ANYWHERE-RELEASE-CHECKLIST.md' CLAUDE.md` prints at least 1 and the row sits in the Topic Index table.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "release-checklist-doc.ac3",
+            "title": "docs/ANYWHERE-ARCHITECTURE.md contains tests/integration/anywhere/two-machine-ac1.slow.test.ts and a link to ANYWHERE-RELEASE-CHECKLIST.md.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "closing-status",
+        "title": "Post the closing status comment for AC-1 to AC-15 on PAN-4774",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T20:50:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4774",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/uat/pan-4774/STATUS.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -cE '^\\| AC-([1-9]|1[0-5]) ' .pan/uat/pan-4774/STATUS.md",
+            "gh issue view 4774 --comments"
+          ],
+          "expected_outputs": [
+            "15",
+            "the status comment is listed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-22. Write .pan/uat/pan-4774/STATUS.md: a table of 15 rows (AC-1..AC-15), each with one status from {passed, failed, approximated}, the evidence file as a GitHub link on feature/pan-4774, the fix commit or filed issue, and for approximated what was not covered (AC-7: 'desktop Chrome, no phone'). AC-1 cites the test-e2e job URL that ran the AC-1 test. Append `fly machines list` and `fly volumes list` for every Fly app used, showing nothing this run created. Define each status term in one line at the top (operator-facing message must stand alone). Post with `gh issue comment 4774 --body-file .pan/uat/pan-4774/STATUS.md`. Commit STATUS.md."
+        },
+        "items": [
+          {
+            "id": "closing-status.ac1",
+            "title": "STATUS.md contains 15 AC rows and every status cell is exactly one of passed, failed, approximated.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "closing-status.ac2",
+            "title": "`gh issue view 4774 --comments` shows the posted comment with the same 15 rows.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "closing-status.ac3",
+            "title": "STATUS.md contains an issue URL or fix commit in every 'failed' row and the uncovered part in every 'approximated' row.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "adopt-skip-saved-cwd-hook",
+        "to": "ac1-ci-test",
+        "type": "blocks"
+      },
+      {
+        "from": "ac1-fake-claude",
+        "to": "ac1-ci-test",
+        "type": "blocks"
+      },
+      {
+        "from": "ac1-two-dashboards",
+        "to": "ac1-ci-test",
+        "type": "blocks"
+      },
+      {
+        "from": "ac1-ci-test",
+        "to": "ci-run-ac1-test",
+        "type": "blocks"
+      },
+      {
+        "from": "smoke-needs-docker",
+        "to": "smoke-hold",
+        "type": "blocks"
+      },
+      {
+        "from": "smoke-hold",
+        "to": "run-local-smoke",
+        "type": "blocks"
+      },
+      {
+        "from": "run-local-smoke",
+        "to": "run-live-claude-smoke",
+        "type": "blocks"
+      },
+      {
+        "from": "run-live-claude-smoke",
+        "to": "ac13-open-preview-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "ac13-open-preview-ui",
+        "to": "ac15-open-in-editor",
+        "type": "blocks"
+      },
+      {
+        "from": "ac03-direct-relay",
+        "to": "ac03-tailscale",
+        "type": "blocks"
+      },
+      {
+        "from": "ac05-fly-conversation",
+        "to": "ac04-fly-worker-lanes",
+        "type": "blocks"
+      },
+      {
+        "from": "ac03-direct-relay",
+        "to": "ac10-vps-connect",
+        "type": "blocks"
+      },
+      {
+        "from": "ac10-vps-connect",
+        "to": "ac11-webhook-inbox",
+        "type": "blocks"
+      },
+      {
+        "from": "ci-run-ac1-test",
+        "to": "release-checklist-doc",
+        "type": "blocks"
+      },
+      {
+        "from": "ac15-open-in-editor",
+        "to": "release-checklist-doc",
+        "type": "blocks"
+      },
+      {
+        "from": "ac05-fly-conversation",
+        "to": "release-checklist-doc",
+        "type": "blocks"
+      },
+      {
+        "from": "ac04-fly-worker-lanes",
+        "to": "release-checklist-doc",
+        "type": "blocks"
+      },
+      {
+        "from": "ac03-tailscale",
+        "to": "release-checklist-doc",
+        "type": "blocks"
+      },
+      {
+        "from": "ac11-webhook-inbox",
+        "to": "release-checklist-doc",
+        "type": "blocks"
+      },
+      {
+        "from": "ac06-ssh-host",
+        "to": "release-checklist-doc",
+        "type": "blocks"
+      },
+      {
+        "from": "ac07-push",
+        "to": "release-checklist-doc",
+        "type": "blocks"
+      },
+      {
+        "from": "ac08-wdoc",
+        "to": "release-checklist-doc",
+        "type": "blocks"
+      },
+      {
+        "from": "release-checklist-doc",
+        "to": "closing-status",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

@@ -57,6 +57,7 @@ import {
   promptGuardGitEnv,
 } from '../../../../src/lib/projects/create.js';
 import { getProjectSync, PROJECTS_CONFIG_FILE, invalidateProjectsConfigCache } from '../../../../src/lib/projects.js';
+import { parseIssueId } from '../../../../src/lib/issue-id.js';
 
 function realPathOf(p: string): string {
   return realpathSync(p);
@@ -660,6 +661,62 @@ describe('resolveProjectCreateIntent', () => {
     });
 
     expect(intent.proposedIssuePrefix).toBe('THISISAVER'); // first 10 chars
+  });
+
+  it('strips digits from a name-derived issue prefix so parseIssueId accepts it', async () => {
+    const intent = await resolveProjectCreateIntent({
+      mode: 'new',
+      name: 'abc123-x',
+      homeBoundary: true,
+      homeDir: TEST_HOME,
+    });
+
+    expect(intent.proposedIssuePrefix).toBe('ABCX');
+    expect(intent.findings.filter((f) => f.code === 'issue-prefix-invalid')).toHaveLength(0);
+    expect(parseIssueId('ABCX-1')).toMatchObject({ prefix: 'ABCX', format: 'standard' });
+  });
+
+  it('strips digits from a longer digit-bearing name before truncating to 10 chars', async () => {
+    const intent = await resolveProjectCreateIntent({
+      mode: 'new',
+      name: 'pan4774-anywhere-smoke',
+      homeBoundary: true,
+      homeDir: TEST_HOME,
+    });
+
+    expect(intent.proposedIssuePrefix).toBe('PANANYWHER');
+  });
+
+  it('rejects an explicit issue prefix containing digits', async () => {
+    const intent = await resolveProjectCreateIntent({
+      mode: 'new',
+      name: 'valid-name',
+      issuePrefix: 'BAD1',
+      homeBoundary: true,
+      homeDir: TEST_HOME,
+    });
+
+    expect(intent.findings).toContainEqual(
+      expect.objectContaining({ code: 'issue-prefix-invalid', detail: 'BAD1' }),
+    );
+    expect(intent.proposedIssuePrefix).toBeNull();
+    const finding = intent.findings.find((f) => f.code === 'issue-prefix-invalid');
+    expect(finding?.message).toContain('uppercase letters');
+    expect(finding?.message).not.toContain('letters and digits');
+  });
+
+  it('rejects an all-digit name with an empty proposed prefix', async () => {
+    const intent = await resolveProjectCreateIntent({
+      mode: 'new',
+      name: '2048',
+      homeBoundary: true,
+      homeDir: TEST_HOME,
+    });
+
+    expect(intent.findings).toContainEqual(
+      expect.objectContaining({ code: 'issue-prefix-invalid', detail: '' }),
+    );
+    expect(intent.proposedIssuePrefix).toBeNull();
   });
 
   it('sets willCreateMainWorkspace correctly', async () => {

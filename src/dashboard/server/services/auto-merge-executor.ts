@@ -14,6 +14,7 @@ import { isAutoMergeEligible, type AutoMergeEligibility } from '../../../lib/clo
 import { isPeerDashboardProcess } from '../../../lib/boot-gates.js';
 import { isMergeTrainEnabled } from '../../../lib/overdeck/control-settings.js';
 import { evaluateIssueMergeGate } from '../../../lib/cloister/merge-gate.js';
+import { deftAutoMergeHold } from '../../../lib/deft/policy.js';
 import type { MergeReadiness, PrFacts } from '../../../lib/cloister/pr-facts.js';
 
 export const AUTO_MERGE_EXECUTOR_INTERVAL_MS = 30_000;
@@ -66,6 +67,8 @@ export interface AutoMergeExecutorDeps {
   /** The merge train must be on for auto-merge to act. */
   isPaused?: () => boolean;
   isEligible?: (issueId: string) => Promise<AutoMergeEligibility>;
+  /** PAN-4820: the Deft human-merge hold; `deftAutoMergeHold` by default. */
+  deftHold?: (issueId: string) => Promise<string | null>;
   /** The one merge gate (#4040); `evaluateIssueMergeGate` by default. */
   mergeGate?: (issueId: string) => Promise<MergeReadiness & { facts: Pick<PrFacts, 'headSha'> }>;
   hasPendingDeploy?: () => Promise<boolean>;
@@ -201,6 +204,15 @@ export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): P
     const eligibility = await (deps.isEligible ?? isAutoMergeEligible)(entry.issueId);
     if (!eligibility.eligible) {
       if (!(deps.markBlocked ?? markBlocked)(entry.id, eligibility.reason)) {
+        log(`[auto-merge] lost block race for ${entry.issueId} (#${entry.id}), skipping`);
+      }
+      continue;
+    }
+
+    // PAN-4820: a Deft issue whose policy requires a human merge is never merged automatically.
+    const hold = await (deps.deftHold ?? deftAutoMergeHold)(entry.issueId);
+    if (hold) {
+      if (!(deps.markBlocked ?? markBlocked)(entry.id, hold)) {
         log(`[auto-merge] lost block race for ${entry.issueId} (#${entry.id}), skipping`);
       }
       continue;

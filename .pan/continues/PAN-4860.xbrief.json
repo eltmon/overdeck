@@ -1,0 +1,53 @@
+{
+  "version": "1",
+  "issueId": "PAN-4860",
+  "created": "2026-11-02T23:44:02.512Z",
+  "updated": "2026-11-03T00:05:11.307Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "letters-only-prefix": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4860",
+      "claimedAt": "2026-11-02T23:44:02.512Z",
+      "doneAt": "2026-11-02T23:46:31.787Z"
+    },
+    "docs-letters-only-prefix": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4860",
+      "claimedAt": "2026-11-02T23:46:39.674Z",
+      "doneAt": "2026-11-02T23:48:00.725Z"
+    },
+    "letters-only-prefix.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:03:32.005Z"
+    },
+    "letters-only-prefix.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:03:51.839Z"
+    },
+    "letters-only-prefix.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:04:09.266Z"
+    },
+    "letters-only-prefix.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:04:25.173Z"
+    },
+    "docs-letters-only-prefix.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:04:42.247Z"
+    },
+    "docs-letters-only-prefix.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:04:56.522Z"
+    },
+    "docs-letters-only-prefix.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:05:11.306Z"
+    }
+  }
+}

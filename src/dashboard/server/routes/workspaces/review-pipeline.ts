@@ -52,6 +52,7 @@ import {
   type StartRequestReviewOutcome,
 } from '../../../../lib/cloister/request-review-pipeline.js';
 import { appendPipelineEntry } from '../../../../lib/cloister/pipeline-journal.js';
+import { isDeftPipelineIssue } from '../../../../lib/deft/issue-pipeline.js';
 import { refreshIssuePullRequestStateNow } from '../../services/issue-pr-refresh.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { rejectUnsafeDashboardMutationRequest } from '../dashboard-auth.js';
@@ -245,6 +246,7 @@ export async function startRequestReviewPipeline(
   }
 
   if (!resolveProjectFromIssueSync(issueId)) return { started: false, reason: 'no-project' };
+  if (await isDeftPipelineIssue(issueId)) return { started: false, reason: 'deft-pipeline' }; // PAN-4820 (AD-5)
 
   transitionIssueToInReview(issueId, workspacePath).catch((err: unknown) => {
     console.warn(
@@ -942,6 +944,8 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
           },
           { status: 500 }
         );
+      case 'deft-pipeline':
+        return jsonResponse({ success: false, error: `${canonicalIssueId} runs on Deft; Overdeck review is off` }, { status: 409 });
       case 'already-running':
         return jsonResponse({
           success: true,

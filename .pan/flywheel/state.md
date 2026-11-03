@@ -533,3 +533,23 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
 - HOLD all 15 children (4828 4829 4830 4831 4833 4834 4835 4836 4843 4837 4838 4839 4840 4841 4842): never pan start any until PAN-4774 (Anywhere release acceptance) passes AND the release ships.
 - After release, start in PRD build order (.pan/drafts/pan-4823.md): wave 1 = 4828, 4831, 4833; wave 2 = 4829, 4835; wave 3 = 4834, 4830, 4836, 4843; wave 4 = 4837; wave 5 = 4838, 4840, 4839.
 - PAN-4841 (store/console setup) and PAN-4842 (docs) are orchestrator-driven: never start them.
+
+## 2026-11-02 17:35Z — operator queue: Shared Sessions remaining slices
+- share.overdeck.ai is deployed and smoke-tested; slice 1 is live.
+- HOLD every remaining slice until the Anywhere release ships (same hold as PAN-4823). They may run alongside the PAN-4823 phone-app issues (separate code areas).
+- Order (per each issue's Depends-on): PAN-4473 -> PAN-4474 -> PAN-4475; then PAN-4476, PAN-4477, PAN-4479, PAN-4480 in parallel; then PAN-4478 (needs 4476); PAN-4482 last (needs all).
+- PAN-4481 (hosted web join page): HOLD for an operator decision; start only when the operator gives the answer.
+- 2026-11-02 operator decision: PAN-4481 (hosted web join page) = BUILD IT. Hold released: queue it after PAN-4475 with slices 4476/4477/4479/4480 (still only after the Anywhere release ships). Conflict rule: PAN-4481 and phone-app PAN-4831 both touch services/account/src/pkce.ts, so never run them at the same time; start whichever comes second only after the first has merged.
+
+## 2026-11-02 20:32Z — Fly queue done; PAN-4774 started
+- All Anywhere Fly prerequisites merged and deployed (build 194adf91f96). Started PAN-4774 (release acceptance run); the operator's hosted-services and `pan account login` device-flow note was posted as an issue comment and sent to the planner. When the agent sends a device code, the Flywheel approves it (operator-authorized). PAN-4823 phone-app and Shared Sessions slices stay held until PAN-4774 passes and the release ships.
+
+## 2026-11-02 23:40Z — PAN-4774 acceptance result: not releasable yet
+- PAN-4774 posted AC-1..AC-15: 7 passed, 5 failed, 3 approximated. Defects filed: PAN-4859 (Open in editor targets ssh-remote+127.0.0.1), PAN-4860 (issue prefix with digits), PAN-4861 (removed SSH host's dashboard restarted by pan up supervisor), PAN-4862 (relay uses only UDP TURN URL), PAN-4863 (AC-10 needs a real VPS after a release that ships connect). Started 4859/4860/4861/4862; 4863 is operator/infra.
+- AC-3 Tailscale-on-this-host is blocked on the operator decision (Flywheel declined to install system software / sign into the tailnet without authorization).
+- Release still gated: PAN-4823 phone app and Shared Sessions slices stay held until the Anywhere release ships.
+
+## 2026-11-03 02:28Z — Anywhere fixes deployed and closed
+- Build 530ee175e8c is live and includes all PAN-4774 fixes: PAN-4774 (#4864), 4859 (#4867), 4860 (#4865), 4861 (#4866), 4862 (#4868). All five closed out; close-out PR lookup worked first try (PAN-4821 fix live).
+- Deploy note: a reload started by another session held the restart lock ~2h with a pre-merge build; after the operator approved it, a second reload was needed. Starting a reload while another is pending is refused ("restart in progress"), so check the lock holder's build before telling the operator one approval ships everything.
+- Release gate remaining (operator): AC-3 Tailscale on this host, AC-10 real VPS (PAN-4863), PAN-4862 live Fly relay check (device code needs operator OK), then `pan release stable`. PAN-4823 phone app and Shared Sessions slices start after the release ships.

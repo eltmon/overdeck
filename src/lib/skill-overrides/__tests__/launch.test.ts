@@ -5,17 +5,24 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { loadSkillOverrideLayers, listPackCatalog, overdeckHome, getSupervisedConversationByTmuxSession } = await vi.hoisted(async () => {
+const { loadSkillOverrideLayers, listPackCatalog, overdeckHome, getSupervisedConversationByTmuxSession, readIssuePipeline } = await vi.hoisted(async () => {
   const fs = await import('node:fs');
   const os = await import('node:os');
   const path = await import('node:path');
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-launch-home-'));
   process.env.OVERDECK_HOME = home;
-  return { loadSkillOverrideLayers: vi.fn(), listPackCatalog: vi.fn(), overdeckHome: home, getSupervisedConversationByTmuxSession: vi.fn() };
+  return {
+    loadSkillOverrideLayers: vi.fn(),
+    listPackCatalog: vi.fn(),
+    overdeckHome: home,
+    getSupervisedConversationByTmuxSession: vi.fn(),
+    readIssuePipeline: vi.fn(async () => 'overdeck'),
+  };
 });
 
 vi.mock('../store.js', () => ({ loadSkillOverrideLayers }));
 vi.mock('../catalog.js', () => ({ listPackCatalog }));
+vi.mock('../../deft/issue-pipeline.js', () => ({ readIssuePipeline }));
 vi.mock('../../overdeck/conversations.js', () => ({ getSupervisedConversationByTmuxSession }));
 vi.mock('../../projects.js', () => ({ resolveProjectKeyForCwdAsync: vi.fn(async () => 'proj') }));
 vi.mock('node:child_process', async importOriginal => {
@@ -201,7 +208,7 @@ describe('launcherSkillOverrideLines', () => {
     expect(line).toBe(
       `pan skills launch-settings --harness codex --cwd '/w' --issue 'PAN-1' --codex-home "$CODEX_HOME" || echo "[launcher] WARNING: skill overrides not applied" >&2`,
     );
-    expect(deft).toBe(deftEnvReadLine('"$CODEX_HOME/overdeck-deft.env"'));
+    expect(deft).toBe(deftEnvReadLine('"$CODEX_HOME/overdeck-deft.env"', '/w'));
   });
 
   it('exports only the two allowlisted Deft assignments and never sources the file (PAN-3943)', async () => {
@@ -210,7 +217,7 @@ describe('launcherSkillOverrideLines', () => {
     const canary = join(dir, 'pwned');
     const report = `printf '%s|%s|%s' "\${DEFT_DIRECTIVE_DISABLE-unset}" "\${DEFT_ORCHESTRATOR-unset}" "\${EVIL-unset}"`;
     const read = (): string =>
-      execFileSync('bash', ['-c', `${deftEnvReadLine(`'${file}'`)}\n${report}`], {
+      execFileSync('bash', ['-c', `${deftEnvReadLine(`'${file}'`, dir)}\n${report}`], {
         encoding: 'utf8',
         env: { PATH: process.env.PATH ?? '' },
       });
@@ -224,6 +231,26 @@ describe('launcherSkillOverrideLines', () => {
       await writeFile(file, 'DEFT_DIRECTIVE_DISABLE=1\nDEFT_ORCHESTRATOR=overdeck\n');
       expect(read()).toBe('1|overdeck|unset');
       expect(existsSync(canary)).toBe(false);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('maps only the literal run-summary token to the working dir, not $PWD (PAN-4820)', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'deft-env-'));
+    const file = join(dir, 'deft.env');
+    const read = (): string =>
+      execFileSync('bash', ['-c', `${deftEnvReadLine(`'${file}'`, dir)}\nprintf '%s' "\${DEFT_RUN_SUMMARY_PATH-unset}"`], {
+        encoding: 'utf8',
+        cwd: tmpdir(),
+        env: { PATH: process.env.PATH ?? '' },
+      });
+    try {
+      await writeFile(file, 'DEFT_RUN_SUMMARY_PATH=/etc/passwd\nDEFT_RUN_SUMMARY_PATH=overdeck2\n');
+      expect(read()).toBe('unset');
+      await writeFile(file, 'DEFT_RUN_SUMMARY_PATH=overdeck\n');
+      expect(read()).toBe(join(dir, '.overdeck', 'deft-run-summary.jsonl'));
+      expect(deftEnvReadLine('f', '/w').match(/\) export /g)).toHaveLength(3);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -257,7 +284,7 @@ describe('launcherSkillOverrideLines', () => {
     expect(lines[2]).toBe(
       `if [ -d '/h/launch/k/skill-packs' ]; then PAN_SKILL_PLUGIN_DIR='/h/launch/k/skill-packs'; else PAN_SKILL_PLUGIN_DIR=''; fi`,
     );
-    expect(lines[3]).toBe(deftEnvReadLine(`'/h/launch/k/deft.env'`));
+    expect(lines[3]).toBe(deftEnvReadLine(`'/h/launch/k/deft.env'`, '/w'));
     const codex = launcherSkillOverrideLines({ harness: 'codex', workingDir: '/w', pluginLink: '/h/x' });
     expect(codex.join('\n')).not.toContain('--plugin-link');
   });
@@ -366,6 +393,27 @@ describe('skill pack launch (PAN-4334)', () => {
     const text = await readFile(join(link, 'deft', 'skills', 'glossary', 'SKILL.md'), 'utf8');
     expect(text).toMatch(/^---\nname: glossary\n/);
     expect(text).toContain('<!-- overdeck:deft-host-notice v1 -->');
+  });
+
+  it('leaves the deft pack out for an issue on Deft\'s pipeline (PAN-4820)', async () => {
+    const base = catalogEntry(true);
+    listPackCatalog.mockResolvedValue([
+      base,
+      {
+        ...base,
+        id: 'deft',
+        url: 'https://github.com/eltmon/directive',
+        adapter: 'deft-readonly',
+        manifest: { ...base.manifest!, skills: [skill('glossary', 'content/skills/deft-directive-glossary')], pluginName: null },
+      },
+    ]);
+    loadSkillOverrideLayers.mockResolvedValue({ global: {}, packs: { global: { deft: true, mattpocock: true } } });
+    readIssuePipeline.mockResolvedValueOnce('deft');
+
+    const { selection } = await resolveLaunchPackSelection(ctx);
+
+    expect(readIssuePipeline).toHaveBeenCalledWith('PAN-1');
+    expect(selection.packs.map(pack => pack.id)).toEqual(['mattpocock']);
   });
 
   it('removes the link when the issue turns the pack off', async () => {

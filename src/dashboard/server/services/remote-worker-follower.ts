@@ -7,7 +7,10 @@
  * - While the owner's link is online it polls `GET /api/workers/<remoteId>/status?after=<lastSeq>`
  *   every 5 s, mirrors each new report with the owner's `seq`, and records the
  *   idle age and last-seen time. A confirmed-dead worker becomes `exited` with
- *   its last assistant message.
+ *   its last assistant message, but only once it was seen alive or the startup
+ *   grace (`WAIT_STARTUP_GRACE_MS`, as `pan worker wait` uses) has passed since
+ *   the stand-in was created: until the launcher starts the harness, the
+ *   owner's liveness reads `runtime-missing`, which counts as dead (PAN-4774).
  * - When the link is not online or a call fails, it backs off 1 s doubling to
  *   300 s (±20 % jitter) and sets `unreachableSince`. It never gives up on its
  *   own: a sleeping desktop delays the report, never fails it.
@@ -21,6 +24,7 @@
  */
 import { isAlive, isConfirmedDead } from '../../../lib/agents/liveness.js';
 import type { WorkerReport } from '../../../lib/agents/worker/report.js';
+import { WAIT_STARTUP_GRACE_MS } from '../../../lib/agents/worker/wait.js';
 import {
   listRemoteStandIns,
   mirrorRemoteReport,
@@ -79,6 +83,7 @@ interface Tracked {
   timer: NodeJS.Timeout | null;
   failures: number;
   parentDeadPolls: number;
+  seenAlive: boolean;
 }
 
 export class RemoteWorkerFollower {
@@ -98,7 +103,7 @@ export class RemoteWorkerFollower {
   /** Follow one stand-in (a new delegation, or one found at start); polls at once. */
   track(localId: string): void {
     if (this.stopped || this.tracked.has(localId)) return;
-    this.tracked.set(localId, { timer: null, failures: 0, parentDeadPolls: 0 });
+    this.tracked.set(localId, { timer: null, failures: 0, parentDeadPolls: 0, seenAlive: false });
     this.schedule(localId, 0);
   }
 
@@ -173,7 +178,9 @@ export class RemoteWorkerFollower {
     let next: RemoteStandIn = {
       ...standIn, lastSeq, idleAgeMs: status.idleAgeMs, lastSeenAt: this.deps.now().toISOString(), unreachableSince: null,
     };
-    if (status.liveness.confirmedDead) {
+    if (status.liveness.alive) entry.seenAlive = true;
+    const pastStartup = entry.seenAlive || this.deps.now().getTime() - Date.parse(standIn.createdAt) >= WAIT_STARTUP_GRACE_MS;
+    if (status.liveness.confirmedDead && pastStartup) {
       next = { ...next, state: 'exited', lastAssistantMessage: status.lastAssistantMessage };
       await this.deps.write(localId, next);
       return this.finish(localId);

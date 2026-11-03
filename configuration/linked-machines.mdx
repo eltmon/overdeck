@@ -87,10 +87,12 @@ The row of an SSH machine shows `SSH <host> · forward <state> · <launch>`:
 - **Already running** (`external`): the host's server was running before. Removing the
   machine never stops it.
 
-Removal stops only the dashboard process. Sidecars that `pan up` started on the host (the
-supervisor, CLIProxy) keep running. A server is also left running when another machine
-holds an active link to it (`in-use`), or when it was restarted since this machine started
-it.
+Removal stops the dashboard and the supervisor that `pan up` runs next to it (the
+supervisor would otherwise restart the dashboard). Other sidecars that `pan up` started on
+the host (CLIProxy) keep running. If the host's supervisor cannot be stopped (on a Mac, the
+launchd agent that `pan connect` installs), the server is left running. A server is also
+left running when another machine holds an active link to it (`in-use`), or when it was
+restarted since this machine started it.
 
 ### The forward
 
@@ -151,8 +153,8 @@ The conversation then streams in this dashboard like any linked conversation: us
 
 ### Setup
 
-Fly machines use the same `[remote]` and `[remote.fly]` settings as remote work agents
-(`pan start --remote`):
+Fly machines use the `[remote]` and `[remote.fly]` settings, which `pan start --remote`
+also uses to start [work agents on Fly](#work-agents-on-fly):
 
 - `remote.enabled = true` in `~/.overdeck/config.toml`.
 - A Fly token: `fly auth login`, or `FLY_API_TOKEN` (or the variable that
@@ -186,6 +188,34 @@ Its conversations go with it. [Pull here](#pull-here) first to keep one.
 
 Fly machines count toward `remote.max_concurrent_agents`, the same cap as remote work
 agents; `add-fly` refuses with `cap-reached` when it is full (0 or unset means no cap).
+
+### Work agents on Fly
+
+`pan start <id> --remote`, or `pan start <id> --machine fly`, starts the issue's work agent
+on a new Fly machine:
+
+```bash
+pan start PAN-123 --remote
+pan start PAN-123 --machine fly
+```
+
+- The command pushes the feature branch, then asks the running dashboard to start a Fly
+  machine with the project, add the issue's worktree there and start the work agent as a
+  conversation in it. It waits 5–15 minutes and prints the conversation's URL. It needs
+  `pan up`.
+- The transcript streams in this dashboard while the agent works, with the `fly-<machineId>`
+  chip. The issue's row in the project tree lists the conversation and opens it.
+- `pan tell <id>`, `pan kill <id>` and the dashboard's output view reach the agent's session
+  on the Fly machine.
+- When the agent finishes and touches its done marker, the reap hands the branch to review
+  here, then destroys the Fly machine. While the agent works, the idle sweep leaves the
+  machine alone.
+- [Pull here](#pull-here) is not for work agents: pulling the conversation home stops the
+  agent from continuing, and the reap will not hand it to review.
+- Claude Code with an Anthropic model only; Codex is not supported as a Fly work agent. The
+  durable tier (`--tier durable`, or `remote.resiliency_tier = "durable"`) is refused.
+- An issue that still has a remote workspace from before this change is refused; destroy
+  it with `pan workspace destroy <id>` first.
 
 ### Codex
 
@@ -271,7 +301,8 @@ overdeck.ai account, you can also link them without a pairing link: click **Link
 **Settings → Anywhere → Directory** (or run `pan machines join`), then approve on the other
 machine after checking that both screens show the same six-digit code. The directory also adds
 `direct` routes (`rtc://<environment id>`, a peer-to-peer WebRTC path) and, on the relay plan,
-`relay` routes (`rtc+turn://<environment id>`, through a TURN relay). They are tried only when
+`relay` routes (`rtc+turn://<environment id>`, through a TURN relay). The relay tries the TURN
+server over TLS on port 443 first, so a network that blocks UDP can still reach it. These routes are tried only when
 no LAN, Tailscale, SSH or public route answers, appear with the source `directory`, and are
 never saved with the link. See
 [Find your machines through overdeck.ai](/configuration/remote-access#find-your-machines-through-overdeck-ai).
@@ -380,11 +411,14 @@ operator-level link.
 ## Open in editor
 
 On a linked conversation, **Open in editor** opens the owner's checkout in your local
-editor over remote SSH: `code --remote ssh-remote+<host> <cwd>`. The host is the link's
-`ssh` route when there is one, else its Tailscale (`tailnet`) route's host name; a link
-with neither cannot do this (`no-ssh-host`). VS Code, VS Code Insiders and VSCodium are
-supported. Cursor and Windsurf are shown disabled: their remote-SSH launch could not be
-verified.
+editor over remote SSH: `code --remote ssh-remote+<authority> <cwd>`. For a machine added
+as an SSH machine, the host is the destination you added it with (for example
+`ssh-remote+root@build-box`), never the local port forward; otherwise it's the link's
+Tailscale (`tailnet`) host name. A link with neither cannot do this (`no-ssh-host`). A
+destination with a port, an IPv6 address or an uppercase letter is passed in Remote-SSH's
+encoded form (hex of `{"hostName","user","port"}`), so the command line shows a long hex
+string. VS Code, VS Code Insiders and VSCodium are supported. Cursor and Windsurf are
+shown disabled: their remote-SSH launch could not be verified.
 
 ## Fleet versions and Update all
 
