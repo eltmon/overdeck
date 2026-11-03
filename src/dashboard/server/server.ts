@@ -45,7 +45,7 @@ import { currentApprovalService } from './services/directory-approval.js';
 import { getOverdeckVersion } from './routes/misc/shared.js';
 import { hostsMachineLinks } from '../../lib/boot-gates.js';
 import { ensureMachineKey } from '../../lib/anywhere/machine-key.js';
-import { findActiveMachineTokenByKey } from '../../lib/access-tokens.js';
+import { findActiveChannelTokenByKey } from '../../lib/access-tokens.js';
 import { websocketRpcRouteLayer } from './ws-rpc.js'
 import { issuesRouteLayer } from './routes/issues.js'
 import { testRemovalWaiverRouteLayer } from './routes/test-removal-waiver.js'
@@ -180,12 +180,12 @@ const HttpServerLive = Layer.unwrap(
       setupAutoPresoWebSocket(nodeServer);
       // PAN-4645: secure machine channels on the dashboard port (the primary, or a
       // peer-mode dashboard that opted in; see hostsMachineLinks). An IK initiator is
-      // pinned when an active machine token is bound to its key; a pairing initiator
-      // must name a live `pan pair` credential.
+      // pinned when an active machine or phone token is bound to its key (PAN-4835); a
+      // pairing initiator must name a live `pan pair` credential.
       installChannelListener(nodeServer, {
         primary: hostsMachineLinks(),
         localKey: ensureMachineKey,
-        isPinnedPeer: (remoteKeyHex) => findActiveMachineTokenByKey(remoteKeyHex) !== null,
+        isPinnedPeer: (remoteKeyHex) => findActiveChannelTokenByKey(remoteKeyHex) !== null,
         takePairing: (pairingId) => {
           const taken = takePairingById(pairingId);
           return taken === 'unknown' || taken === 'expired' ? 'unknown' : taken;
