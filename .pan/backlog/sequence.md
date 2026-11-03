@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T13:36:31.606391Z · model: claude-opus-5-5 · open: 870_
+_Last sequenced: 2026-11-03T13:38:04.391241Z · model: claude-opus-5-5 · open: 867_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -8,8 +8,6 @@ _Last sequenced: 2026-11-03T13:36:31.606391Z · model: claude-opus-5-5 · open: 
 | 1 | PAN-4702 | S | critical | ok |  |  | Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs. |
 | 3 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 4 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install aborts workspace creation (since #4163); reproduced 2026-11-02 on botland too, so every polyrepo start fails. |
-| 5 | PAN-4882 | M | high | ok |  |  | Re-run the five v0.73 Anywhere checks fixed after the release run (TURN relay on Fly, AC-4, AC-6, AC-15) on deployed main. |
-| 6 | PAN-4888 | M | high | ok |  |  | pan reload: a held reload blocks newer ones and ships a stale build, so the operator approves restarts twice. |
 | 7 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
 | 8 | PAN-4690 | S | critical | ok |  |  | Review dispatch rewrites the tracked continue file uncommitted, so the dirty-tree gate blocks the review it dispatched |
 | 10 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
@@ -664,7 +662,6 @@ _Last sequenced: 2026-11-03T13:36:31.606391Z · model: claude-opus-5-5 · open: 
 | 668 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
 | 669 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
 | 670 | PAN-4760 | S | low | ok |  | PAN-4638 | Live 3-machine gauntlet check moved out of PAN-4638; needs its release, pan reload, a linked laptop rig and Fly setup by the operator. |
-| 671 | PAN-4829 | M | medium | ok |  |  | Phone app W-CON2: phones join the directory as clients (cap 5, not counted as machines), bearer subprotocol; needs PAN-4828. |
 | 672 | PAN-2084 | M | low | ok |  |  | Auto-create lightweight conversation worktrees on project chats |
 | 673 | PAN-2083 | M | low | ok |  | PAN-1592 | Composer: a failed first send leaves the text in BOTH the composer box and the retry outbox |
 | 674 | PAN-2082 | M | low | ok |  |  | Composer: a single send failure clears ALL in-flight optimistic bubbles (and strips siblings' compaction net) |
@@ -867,7 +864,7 @@ _Last sequenced: 2026-11-03T13:36:31.606391Z · model: claude-opus-5-5 · open: 
 | 872 | PAN-4594 | M | low | ok |  | PAN-4590 | Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590. |
 | 873 | PAN-4593 | L | low | needs-refinement |  | PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
 | 874 | PAN-4843 | M | medium | ok |  | PAN-4835 | Phone app W-MAC3: native PushProvider seals needs-you alerts to each phone push key via directory; needs PAN-4835. |
-| 875 | PAN-4837 | L | medium | ok |  | PAN-4834, PAN-4829, PAN-4835 | Phone app W-APP1: Capacitor 8 apps/mobile shell, sign-in, machines, QR pairing, keys plugin; CP-3/CP-4. |
+| 875 | PAN-4837 | L | medium | ok |  | PAN-4834, PAN-4835 | Phone app W-APP1: Capacitor 8 apps/mobile shell, sign-in, machines, QR pairing, keys plugin; CP-3/CP-4. |
 | 876 | PAN-4838 | M | medium | ok |  | PAN-4837, PAN-4830, PAN-4843 | Phone app W-IOS1: APNs registration and Notification Service Extension that decrypts sealed alerts. |
 | 877 | PAN-4840 | M | medium | ok |  | PAN-4837, PAN-4830, PAN-4843 | Phone app W-AND1: FCM FirebaseMessagingService decrypts sealed data payloads and posts notifications. |
 | 878 | PAN-4841 | M | medium | ok |  |  | Phone app W-REL1: Apple/Firebase/Play/Cloudflare setup and first store builds; operator approves purchases. |
@@ -889,14 +886,6 @@ New substrate bug with a verified root cause: adoption (PAN-4605) calls startRev
 ### PAN-4553 (rank 4)
 
 Moved from rank 9 to the free rank 4: a 2026-11-02 comment shows the same abort on a second polyrepo project (botland), so the bug now blocks workspace creation for every polyrepo project, not only mind-your-now.
-
-### PAN-4882 (rank 5)
-
-New in-pipeline verification issue: the v0.73.0 acceptance run failed AC-2/3/4/6/15, and the fixes (PAN-4862, PAN-4861, PAN-4859, #4864) are closed, so nothing blocks the re-run. It is already picked up, so it takes the free rank 5 without moving any other node; it shares the release checklist with PAN-4863, recorded as an advisory informs edge.
-
-### PAN-4888 (rank 6)
-
-New in-pipeline substrate bug in the deploy path: reload.ts drops a newer reload while an older one holds the restart lock, and the holder deploys the build frozen at request time, which happened twice on 2026-11-03. It takes the free rank 6 so no pinned or ranked node moves; the body names no blocking cross-references.
 
 ### PAN-4733 (rank 7)
 
@@ -1198,6 +1187,14 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 
 New this pass. shouldHoldForUat is consulted on exactly one merge path, so every other path merges a ready issue without asking whether its project holds for UAT — verified at code level on a real MIN-901 merge. This defeats the batch-train model directly: issues merge one at a time before a generation can assemble them.
 
+### PAN-3100 (rank 81)
+
+New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.
+
+### PAN-4213 (rank 82)
+
+Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066 merged, so these seven follow-ups now harden code that is on main. Items 2 and 5 are real merge-path correctness hazards: a success status can sit on a head that never landed, and git reset --keep can move an agent commit off its branch. Each item names its file, so the work is well defined and is now startable.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1205,10 +1202,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T13:36:31.606391Z",
+  "generatedAt": "2026-11-03T13:38:04.391241Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 870,
+  "openCount": 867,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -9391,19 +9388,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "planning": "auto"
     },
     {
-      "issue": "PAN-4829",
-      "rank": 671,
-      "size": "M",
-      "importance": "medium",
-      "score": 36,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Phone app W-CON2: phones join the directory as clients (cap 5, not counted as machines), bearer subprotocol; needs PAN-4828.",
-      "rationale": "PAN-4774 (Anywhere release AC run) closed as completed, so that dependency is removed; rank held because the phone-app epic is feature work that still ranks below substrate items.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2084",
       "rank": 672,
       "size": "M",
@@ -11909,11 +11893,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "condition": "ok",
       "dependsOn": [
         "PAN-4834",
-        "PAN-4829",
         "PAN-4835"
       ],
       "why": "Phone app W-APP1: Capacitor 8 apps/mobile shell, sign-in, machines, QR pairing, keys plugin; CP-3/CP-4.",
-      "rationale": "PAN-4774 (Anywhere release AC run) closed as completed, so that dependency is removed; rank held because the phone-app epic is feature work that still ranks below substrate items.",
+      "rationale": "Dependency PAN-4829 (phone directory clients) closed; rank held because PAN-4834 and PAN-4835 still block it.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12008,19 +11991,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "planning": "auto"
     },
     {
-      "issue": "PAN-4882",
-      "rank": 5,
-      "size": "M",
-      "importance": "high",
-      "score": 70,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Re-run the five v0.73 Anywhere checks fixed after the release run (TURN relay on Fly, AC-4, AC-6, AC-15) on deployed main.",
-      "rationale": "New in-pipeline verification issue: the v0.73.0 acceptance run failed AC-2/3/4/6/15, and the fixes (PAN-4862, PAN-4861, PAN-4859, #4864) are closed, so nothing blocks the re-run. It is already picked up, so it takes the free rank 5 without moving any other node; it shares the release checklist with PAN-4863, recorded as an advisory informs edge.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4885",
       "rank": 147,
       "size": "S",
@@ -12058,19 +12028,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       ],
       "why": "Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); machines stay refused.",
       "rationale": "New child of the phone-app epic PAN-4823, split from PAN-4835 and explicitly sequenced after it; placed at the tail of the phone-app chain so no existing rank moves.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4888",
-      "rank": 6,
-      "size": "M",
-      "importance": "high",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan reload: a held reload blocks newer ones and ships a stale build, so the operator approves restarts twice.",
-      "rationale": "New in-pipeline substrate bug in the deploy path: reload.ts drops a newer reload while an older one holds the restart lock, and the holder deploys the build frozen at request time, which happened twice on 2026-11-03. It takes the free rank 6 so no pinned or ranked node moves; the body names no blocking cross-references.",
       "gate": "auto",
       "planning": "auto"
     }
@@ -13240,13 +13197,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "from": "PAN-4823",
-      "to": "PAN-4829",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4823",
       "to": "PAN-4830",
       "type": "contains",
       "source": "github-ref",
@@ -13303,13 +13253,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "from": "PAN-4834",
-      "to": "PAN-4837",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.9
-    },
-    {
-      "from": "PAN-4829",
       "to": "PAN-4837",
       "type": "unblocks",
       "source": "ai-inferred",
@@ -13447,27 +13390,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.7
-    },
-    {
-      "from": "PAN-4882",
-      "to": "PAN-4863",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
-    },
-    {
-      "from": "PAN-4882",
-      "to": "PAN-4886",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-4882",
-      "to": "PAN-4885",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.3
     },
     {
       "from": "PAN-4823",
