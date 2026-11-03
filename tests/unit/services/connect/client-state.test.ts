@@ -329,3 +329,91 @@ describe('directory reducer: machine changes reach phones (PAN-4829 WI-5)', () =
     expect(toClients(cancel.effects)).toEqual([]);
   });
 });
+
+const PUSH_TOKEN = 'f0'.repeat(32);
+type PushFrame = Extract<ClientToDirectoryFrame, { type: 'push-register' | 'push-unregister' }>;
+
+function pushFrame(state: DirectoryState, clientId: string, frame: PushFrame) {
+  return reduceClient(state, { kind: 'client-frame', clientId, frame }, ctx());
+}
+
+function androidPhone(state: DirectoryState, n: number): DirectoryState {
+  const frame = { ...helloClientFrame(n), platform: 'android' as const };
+  return reduceClient(state, { kind: 'hello-client', registeredAs: null, identity: FREE, frame }, ctx()).state;
+}
+
+const pushOf = (state: DirectoryState, clientId: string) => state.clients.find((c) => c.clientId === clientId)?.push;
+
+describe('client reducer: push registration (PAN-4830 WI-8)', () => {
+  it('stores an iOS registration as production when apsEnvironment is absent', () => {
+    const { state, effects } = pushFrame(phones(EMPTY_DIRECTORY, 1), cid(1), { type: 'push-register', platform: 'ios', token: PUSH_TOKEN });
+    const registration = { platform: 'ios', token: PUSH_TOKEN, apsEnvironment: 'production' };
+    expect(pushOf(state, cid(1))).toEqual(registration);
+    expect(effects).toEqual([
+      { kind: 'put-client-push', clientId: cid(1), registration },
+      { kind: 'log', type: 'push-register', environmentId: null, outcome: 'registered', clientId: cid(1) },
+    ]);
+  });
+
+  it('keeps a sandbox apsEnvironment and stores null for Android', () => {
+    const ios = pushFrame(phones(EMPTY_DIRECTORY, 1), cid(1), { type: 'push-register', platform: 'ios', token: PUSH_TOKEN, apsEnvironment: 'sandbox' });
+    expect(pushOf(ios.state, cid(1))).toEqual({ platform: 'ios', token: PUSH_TOKEN, apsEnvironment: 'sandbox' });
+    const android = pushFrame(androidPhone(EMPTY_DIRECTORY, 2), cid(2), { type: 'push-register', platform: 'android', token: 'fcm:token' });
+    expect(pushOf(android.state, cid(2))).toEqual({ platform: 'android', token: 'fcm:token', apsEnvironment: null });
+    expect(android.effects).toContainEqual({ kind: 'put-client-push', clientId: cid(2), registration: { platform: 'android', token: 'fcm:token', apsEnvironment: null } });
+  });
+
+  it('refuses a register whose platform differs from the phone, and stores nothing', () => {
+    const before = phones(EMPTY_DIRECTORY, 1);
+    const { state, effects } = pushFrame(before, cid(1), { type: 'push-register', platform: 'android', token: PUSH_TOKEN });
+    expect(state).toBe(before);
+    expect(effects).toEqual([
+      { kind: 'send', to: 'self', frame: { type: 'error', code: 'bad_frame', message: 'push platform does not match the phone' } },
+      { kind: 'log', type: 'push-register', environmentId: null, outcome: 'platform_mismatch', clientId: cid(1) },
+    ]);
+  });
+
+  it('clears the registration on push-unregister', () => {
+    const registered = pushFrame(phones(EMPTY_DIRECTORY, 1), cid(1), { type: 'push-register', platform: 'ios', token: PUSH_TOKEN }).state;
+    const { state, effects } = pushFrame(registered, cid(1), { type: 'push-unregister' });
+    expect(pushOf(state, cid(1))).toBeNull();
+    expect(effects).toEqual([
+      { kind: 'put-client-push', clientId: cid(1), registration: null },
+      { kind: 'log', type: 'push-unregister', environmentId: null, outcome: 'unregistered', clientId: cid(1) },
+    ]);
+  });
+
+  it('keeps the registration through a second hello-client and emits no put-client-push', () => {
+    const registered = pushFrame(phones(EMPTY_DIRECTORY, 1), cid(1), { type: 'push-register', platform: 'ios', token: PUSH_TOKEN }).state;
+    const { state, effects } = helloClient(registered, 1);
+    expect(pushOf(state, cid(1))).toEqual({ platform: 'ios', token: PUSH_TOKEN, apsEnvironment: 'production' });
+    expect(effects.some((e) => e.kind === 'put-client-push')).toBe(false);
+    expect(effects.find((e) => e.kind === 'put-client')).toMatchObject({ row: { push: { token: PUSH_TOKEN } } });
+  });
+
+  it('starts a new phone with no registration', () => {
+    expect(pushOf(phones(EMPTY_DIRECTORY, 1), cid(1))).toBeNull();
+  });
+
+  it('answers a frame from a phone with no row without changing state', () => {
+    const { state, effects } = pushFrame(EMPTY_DIRECTORY, cid(9), { type: 'push-register', platform: 'ios', token: PUSH_TOKEN });
+    expect(state).toBe(EMPTY_DIRECTORY);
+    expect(effects).toEqual([{ kind: 'log', type: 'push-register', environmentId: null, outcome: 'unknown_client', clientId: cid(9) }]);
+  });
+
+  it('never logs the push token', () => {
+    let state = phones(EMPTY_DIRECTORY, 1);
+    const all: DirectoryEffect[] = [];
+    for (const frame of [
+      { type: 'push-register', platform: 'ios', token: PUSH_TOKEN },
+      { type: 'push-register', platform: 'android', token: PUSH_TOKEN },
+      { type: 'push-unregister' },
+    ] as const) {
+      const result = pushFrame(state, cid(1), frame);
+      state = result.state;
+      all.push(...result.effects);
+    }
+    expect(logs(all)).toHaveLength(3);
+    expect(JSON.stringify(logs(all))).not.toContain(PUSH_TOKEN);
+  });
+});

@@ -23,6 +23,7 @@ import type {
   MachineToDirectoryFrame,
 } from '../../../packages/contracts/src/connect.ts';
 import { iceServersAnswer, relayUsageAnswer } from './ice-relay.ts';
+import type { PushRegistration } from './push/config.ts';
 import { relayStatusOf } from './relay-meter.ts';
 import type { RelayUsage } from './relay-meter.ts';
 
@@ -53,6 +54,8 @@ export interface ClientRow {
   readonly registeredAt: number;
   /** Unix milliseconds. */
   readonly lastSeenAt: number;
+  /** The phone's APNs or FCM token (PAN-4830); written only by `push-register` and `push-unregister`. */
+  readonly push: PushRegistration | null;
 }
 
 /** A pending approval request (D-2356-9): a row of the `approvals` table. */
@@ -157,6 +160,8 @@ export type DirectoryEffect =
   | { readonly kind: 'put-client'; readonly row: ClientRow }
   | { readonly kind: 'delete-client'; readonly clientId: string }
   | { readonly kind: 'register-client'; readonly clientId: string }
+  /** Store or clear a phone's push registration (PAN-4830 D-5); `put-client` never touches it. */
+  | { readonly kind: 'put-client-push'; readonly clientId: string; readonly registration: PushRegistration | null }
   | { readonly kind: 'send'; readonly to: Target; readonly frame: DirectoryToMachineFrame | DirectoryToClientFrame }
   | { readonly kind: 'close'; readonly to: Target; readonly code: number; readonly reason: string }
   | {

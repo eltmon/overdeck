@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MACHINE_TAG, roleOf } from '../../../../services/connect/src/directory.ts';
-import { PUT_CLIENT_SQL, SCHEMA } from '../../../../services/connect/src/directory-store.ts';
+import { PUT_CLIENT_PUSH_SQL, PUT_CLIENT_SQL, SCHEMA } from '../../../../services/connect/src/directory-store.ts';
 import type { ConnectIdentity } from '../../../../services/connect/src/env.ts';
 import { logFrame } from '../../../../services/connect/src/log.ts';
 
@@ -29,6 +29,13 @@ describe('directory glue for phone clients (PAN-4829 WI-6)', () => {
       expect(create).toMatch(new RegExp(`${column} TEXT\\s*[,)]`));
       expect(PUT_CLIENT_SQL).not.toContain(column);
     }
+  });
+
+  it('writes the push registration with its own statement that names exactly the three push columns (PAN-4830 D-5)', () => {
+    expect(PUT_CLIENT_PUSH_SQL).toBe('UPDATE clients SET push_platform = ?, push_token = ?, aps_environment = ? WHERE client_id = ?');
+    const assigned = /SET (.*) WHERE/.exec(PUT_CLIENT_PUSH_SQL)?.[1].split(',').map((part) => part.trim().split(' ')[0]);
+    expect(assigned).toEqual(PUSH_COLUMNS);
+    for (const column of PUSH_COLUMNS) expect(PUT_CLIENT_SQL).not.toContain(column);
   });
 
   it('logs the client id only when one is given', () => {

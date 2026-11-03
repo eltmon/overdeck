@@ -14,7 +14,7 @@ import { reduceClient } from './client-state.ts';
 import type { ClientEvent } from './client-state.ts';
 import { EMPTY_DIRECTORY, reduce } from './directory-state.ts';
 import type { DirectoryEffect, DirectoryEvent, DirectoryState, ReduceContext, Target } from './directory-state.ts';
-import { loadDirectory, PUT_CLIENT_SQL, SCHEMA } from './directory-store.ts';
+import { loadDirectory, PUT_CLIENT_PUSH_SQL, PUT_CLIENT_SQL, SCHEMA } from './directory-store.ts';
 import type { ConnectIdentity, Deps, Env } from './env.ts';
 import { HDR_IDENTITY, HDR_INBOX_HEADERS, HDR_INBOX_SECRET_HASH, INTERNAL, parseConfig, parseTurnConfig } from './env.ts';
 import { keyFingerprint } from './fingerprint.ts';
@@ -321,6 +321,7 @@ export class DirectoryHost {
       'inbox-nack': 0,
       'inbox-forget': 0,
       'put-client': 0,
+      'put-client-push': 0,
       'delete-client': 0,
       register: 1,
       'register-client': 1,
@@ -429,6 +430,11 @@ export class DirectoryHost {
         case 'put-client': {
           const r = e.row;
           sql.exec(PUT_CLIENT_SQL, r.clientId, r.label, r.publicKeyHex, r.platform, r.appVersion, r.deviceId, r.registeredAt, r.lastSeenAt);
+          break;
+        }
+        case 'put-client-push': {
+          const r = e.registration;
+          sql.exec(PUT_CLIENT_PUSH_SQL, r?.platform ?? null, r?.token ?? null, r?.apsEnvironment ?? null, e.clientId);
           break;
         }
         case 'delete-client':

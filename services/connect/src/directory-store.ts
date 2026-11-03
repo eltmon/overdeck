@@ -6,6 +6,7 @@
  */
 import type { ConnectPlan, DirectoryEndpoint } from '../../../packages/contracts/src/connect.ts';
 import type { ApprovalRow, ClientRow, DirectoryState, MachineRow } from './directory-state.ts';
+import type { PushRegistration } from './push/config.ts';
 import type { RelayUsage } from './relay-meter.ts';
 
 export const SCHEMA = [
@@ -29,8 +30,8 @@ export const SCHEMA = [
     expires_at INTEGER NOT NULL
   )`,
   `CREATE TABLE IF NOT EXISTS relay_usage (month TEXT PRIMARY KEY, bytes INTEGER NOT NULL)`,
-  // Phones (PAN-4829). The push columns are for PAN-4830: `CREATE TABLE IF NOT EXISTS` cannot add
-  // columns to a table that already exists, so they are created now and never written here.
+  // Phones (PAN-4829). The push columns hold the phone's push registration (PAN-4830) and are
+  // written only by PUT_CLIENT_PUSH_SQL.
   `CREATE TABLE IF NOT EXISTS clients (
     client_id TEXT PRIMARY KEY,
     label TEXT NOT NULL,
@@ -53,6 +54,9 @@ export const PUT_CLIENT_SQL = `INSERT INTO clients (client_id, label, public_key
     platform = excluded.platform, app_version = excluded.app_version, device_id = excluded.device_id,
     last_seen_at = excluded.last_seen_at`;
 
+/** A phone's push registration (PAN-4830 D-5): `push-register` sets it, `push-unregister` and a dead token clear it. */
+export const PUT_CLIENT_PUSH_SQL = 'UPDATE clients SET push_platform = ?, push_token = ?, aps_environment = ? WHERE client_id = ?';
+
 interface ClientSqlRow {
   client_id: string;
   label: string;
@@ -62,6 +66,9 @@ interface ClientSqlRow {
   device_id: string;
   registered_at: number;
   last_seen_at: number;
+  push_platform: string | null;
+  push_token: string | null;
+  aps_environment: string | null;
   [key: string]: SqlStorageValue;
 }
 
@@ -85,6 +92,16 @@ interface MachineSqlRow {
   registered_at: number;
   last_seen_at: number;
   [key: string]: SqlStorageValue;
+}
+
+/** The row's push registration, or null when the push columns are empty or unrecognised. */
+function pushOf(r: ClientSqlRow): PushRegistration | null {
+  if (typeof r.push_token !== 'string' || r.push_token === '') return null;
+  if (r.push_platform === 'ios') {
+    return { platform: 'ios', token: r.push_token, apsEnvironment: r.aps_environment === 'sandbox' ? 'sandbox' : 'production' };
+  }
+  if (r.push_platform === 'android') return { platform: 'android', token: r.push_token, apsEnvironment: null };
+  return null;
 }
 
 /** Rebuilds the reducer state from the tables, oldest first. */
@@ -131,6 +148,7 @@ export function loadDirectory(sql: SqlStorage): DirectoryState {
           deviceId: r.device_id,
           registeredAt: r.registered_at,
           lastSeenAt: r.last_seen_at,
+          push: pushOf(r),
         }]
         : []);
   return { plan, machines, clients, approvals, relay };
