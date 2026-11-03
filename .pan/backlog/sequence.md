@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T09:49:58.114278Z · model: claude-opus-5-5 · open: 877_
+_Last sequenced: 2026-11-03T09:52:06.564575Z · model: claude-opus-5-5 · open: 875_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -22,7 +22,6 @@ _Last sequenced: 2026-11-03T09:49:58.114278Z · model: claude-opus-5-5 · open: 
 | 15 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
 | 16 | PAN-4551 | L | high | ok |  |  | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
 | 17 | PAN-4671 | M | high | ok |  |  | CodeRabbit comments posted after the reviewer snapshot merge unseen; deliver late ones to the work agent at merge. Needs handoff. |
-| 17 | PAN-4773 | S | high | ok |  |  | Route CodeRabbit findings to the work agent; agent fixes or replies with reason. Operator dropped the merge hold. Handoff. |
 | 18 | PAN-4674 | S | high | ok |  |  | Operator can't remove a configured crew (Fable expert) in Settings tiered execution; removal or model change doesn't persist |
 | 19 | PAN-4673 | S | high | ok |  |  | Model Routing selects truncate model names (Opus 5.5 shows as Opus 5): narrow column plus repeated provider prefix in option text |
 | 20 | PAN-4675 | S | critical | ok |  |  | One transient gh label timeout aborts post-merge lifecycle; merge door replies Already merged, so the issue can never close. |
@@ -602,7 +601,6 @@ _Last sequenced: 2026-11-03T09:49:58.114278Z · model: claude-opus-5-5 · open: 
 | 600 | PAN-958 | M | medium | ok |  |  | Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
 | 601 | PAN-949 | M | medium | ok |  |  | feat: add conversation for project from sidebar |
 | 602 | PAN-3157 | XS | medium | ok |  |  | Rescoped: Awareness rail should show conv-flywheel as the Flywheel with its last tick (derive-status.ts) and link to /flywheel. |
-| 603 | PAN-4828 | S | medium | ok |  |  | Phone app W-CON1: contracts for directory client role and sealed push frames; first in build order; PAN-4774 done. |
 | 604 | PAN-947 | M | medium | ok |  |  | feat: project management actions in unified sidebar |
 | 605 | PAN-938 | M | medium | ok |  |  | Fizzy visual pipeline |
 | 606 | PAN-903 | M | medium | ok |  |  | Detect ~/.claude.json corruption on startup and surface it in the dashboard |
@@ -670,7 +668,7 @@ _Last sequenced: 2026-11-03T09:49:58.114278Z · model: claude-opus-5-5 · open: 
 | 668 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
 | 669 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
 | 670 | PAN-4760 | S | low | ok |  | PAN-4638 | Live 3-machine gauntlet check moved out of PAN-4638; needs its release, pan reload, a linked laptop rig and Fly setup by the operator. |
-| 671 | PAN-4829 | M | medium | ok |  | PAN-4828 | Phone app W-CON2: phones join the directory as clients (cap 5, not counted as machines), bearer subprotocol; needs PAN-4828. |
+| 671 | PAN-4829 | M | medium | ok |  |  | Phone app W-CON2: phones join the directory as clients (cap 5, not counted as machines), bearer subprotocol; needs PAN-4828. |
 | 672 | PAN-2084 | M | low | ok |  |  | Auto-create lightweight conversation worktrees on project chats |
 | 673 | PAN-2083 | M | low | ok |  | PAN-1592 | Composer: a failed first send leaves the text in BOTH the composer box and the retry outbox |
 | 674 | PAN-2082 | M | low | ok |  |  | Composer: a single send failure clears ALL in-flight optimistic bubbles (and strips siblings' compaction net) |
@@ -685,7 +683,7 @@ _Last sequenced: 2026-11-03T09:49:58.114278Z · model: claude-opus-5-5 · open: 
 | 683 | PAN-1983 | L | low | ok |  |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
 | 684 | PAN-2672 | S | low | needs-refinement |  |  | Transcript half reported fixed; parent-stays-ended half moved to PAN-4485. Verify on current build, then close. |
 | 685 | PAN-1958 | M | low | ok |  |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
-| 686 | PAN-4830 | M | medium | ok |  | PAN-4828 | Phone app W-CON3: directory delivers sealed push to APNs/FCM, placeholder-only bodies, dead-token cleanup; needs PAN-4828. |
+| 686 | PAN-4830 | M | medium | ok |  |  | Phone app W-CON3: directory delivers sealed push to APNs/FCM, placeholder-only bodies, dead-token cleanup; PAN-4828 done. |
 | 687 | PAN-1907 | M | low | ok |  |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every… |
 | 688 | PAN-1895 | M | low | ok |  |  | Spawn work agents from issue workspace slide-out |
 | 689 | PAN-1878 | M | low | ok |  |  | process: bake 'docs updated' into acceptance criteria / definition-of-done in role + planning prompts |
@@ -827,7 +825,7 @@ _Last sequenced: 2026-11-03T09:49:58.114278Z · model: claude-opus-5-5 · open: 
 | 825 | PAN-3244 | S | low | stale |  |  | Stale: targets the deploy-patrol deploy window deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 826 | PAN-2775 | S | low | needs-refinement |  |  | Stale: targets boot-correlated reaping (boot reconciliation) deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 827 | PAN-4833 | M | medium | ok |  |  | Phone app W-WEB1: move noise/wire behind a crypto port into packages/anywhere-channel; browser channel; CP-1. |
-| 828 | PAN-4835 | M | medium | ok |  | PAN-4828 | Phone app W-MAC1: phone access-token kind, pairing exchange, self-revoke and push-key routes, phone scopes. |
+| 828 | PAN-4835 | M | medium | ok |  |  | Phone app W-MAC1: phone access-token kind, pairing exchange, self-revoke and push-key routes, phone scopes. |
 | 829 | PAN-3505 | XS | low | needs-refinement |  |  | Stale: targets the flywheel state write door deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 830 | PAN-4834 | M | medium | ok |  | PAN-4833 | Phone app W-WEB2: HTTP/1.1 and WebSocket clients inside the channel plus fetch/WS shims; needs PAN-4833. |
 | 831 | PAN-4836 | S | medium | ok |  | PAN-4835 | Phone app W-MAC2: "Overdeck app" pairing QR tab in Settings > Anywhere with paired-phone list; needs PAN-4835. |
@@ -873,7 +871,7 @@ _Last sequenced: 2026-11-03T09:49:58.114278Z · model: claude-opus-5-5 · open: 
 | 871 | PAN-4592 | M | low | ok |  | PAN-4590 | pan semgrep ci-setup opens a PR adding a Semgrep Actions workflow + failure relay; needs gate mode from PAN-4590. |
 | 872 | PAN-4594 | M | low | ok |  | PAN-4590 | Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590. |
 | 873 | PAN-4593 | L | low | needs-refinement |  | PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
-| 874 | PAN-4843 | M | medium | ok |  | PAN-4828, PAN-4835 | Phone app W-MAC3: native PushProvider seals needs-you alerts to each phone push key via directory. |
+| 874 | PAN-4843 | M | medium | ok |  | PAN-4835 | Phone app W-MAC3: native PushProvider seals needs-you alerts to each phone push key via directory; needs PAN-4835. |
 | 875 | PAN-4837 | L | medium | ok |  | PAN-4834, PAN-4829, PAN-4831, PAN-4835 | Phone app W-APP1: Capacitor 8 apps/mobile shell, sign-in, machines, QR pairing, keys plugin; CP-3/CP-4. |
 | 876 | PAN-4838 | M | medium | ok |  | PAN-4837, PAN-4830, PAN-4843 | Phone app W-IOS1: APNs registration and Notification Service Extension that decrypts sealed alerts. |
 | 877 | PAN-4840 | M | medium | ok |  | PAN-4837, PAN-4830, PAN-4843 | Phone app W-AND1: FCM FirebaseMessagingService decrypts sealed data payloads and posts notifications. |
@@ -952,10 +950,6 @@ Moves 705 importing files off a four-month-old beta onto the supported line, whi
 ### PAN-4671 (rank 17)
 
 New substrate fix to the merge door that closes the gap which let PAN-4672's findings merge unreviewed; advisory-only with a clear design and ACs, but TENET-10 requires a supervised handoff.
-
-### PAN-4773 (rank 17)
-
-Operator comment on 2026-11-03 narrowed scope: no auto-merge hold, only route each CodeRabbit finding to the work agent through the feedback-routing door, where the agent fixes it or replies with a reason. Size drops M to S; rank 17 is kept because it still removes repeated manual Flywheel relays and is already being built through a supervised merge-systems handoff (TENET-10). It still overlaps PAN-4671 (late CodeRabbit comments).
 
 ### PAN-4674 (rank 18)
 
@@ -1205,6 +1199,10 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
 
 New this pass. The deployment gate's queue message is unusually good — it names the holders, the queue age, and warns against forcing — and it promises a 'next verification boundary' trigger that does not exist. Every holder cleared and the deploy never fired; the live build stayed stale for 35 minutes until a manual reload. A correct-sounding instruction that cannot happen is worse than no message.
 
+### PAN-3118 (rank 79)
+
+Triage: verify "running at $0.00 with no capacity fallback" against the current liveness definition. Rank held.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1212,10 +1210,10 @@ New this pass. The deployment gate's queue message is unusually good — it name
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T09:49:58.114278Z",
+  "generatedAt": "2026-11-03T09:52:06.564575Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 877,
+  "openCount": 875,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -1409,19 +1407,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "dependsOn": [],
       "why": "CodeRabbit comments posted after the reviewer snapshot merge unseen; deliver late ones to the work agent at merge. Needs handoff.",
       "rationale": "New substrate fix to the merge door that closes the gap which let PAN-4672's findings merge unreviewed; advisory-only with a clear design and ACs, but TENET-10 requires a supervised handoff.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4773",
-      "rank": 17,
-      "size": "S",
-      "importance": "high",
-      "score": 74,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Route CodeRabbit findings to the work agent; agent fixes or replies with reason. Operator dropped the merge hold. Handoff.",
-      "rationale": "Operator comment on 2026-11-03 narrowed scope: no auto-merge hold, only route each CodeRabbit finding to the work agent through the feedback-routing door, where the agent fixes it or replies with a reason. Size drops M to S; rank 17 is kept because it still removes repeated manual Flywheel relays and is already being built through a supervised merge-systems handoff (TENET-10). It still overlaps PAN-4671 (late CodeRabbit comments).",
       "gate": "auto",
       "planning": "auto"
     },
@@ -8641,19 +8626,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "planning": "auto"
     },
     {
-      "issue": "PAN-4828",
-      "rank": 603,
-      "size": "S",
-      "importance": "medium",
-      "score": 40,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Phone app W-CON1: contracts for directory client role and sealed push frames; first in build order; PAN-4774 done.",
-      "rationale": "PAN-4774 (Anywhere release AC run) closed as completed, so that dependency is removed; rank held because the phone-app epic is feature work that still ranks below substrate items.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-947",
       "rank": 604,
       "size": "M",
@@ -9486,9 +9458,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "importance": "medium",
       "score": 36,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4828"
-      ],
+      "dependsOn": [],
       "why": "Phone app W-CON2: phones join the directory as clients (cap 5, not counted as machines), bearer subprotocol; needs PAN-4828.",
       "rationale": "PAN-4774 (Anywhere release AC run) closed as completed, so that dependency is removed; rank held because the phone-app epic is feature work that still ranks below substrate items.",
       "gate": "auto",
@@ -9675,11 +9645,9 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "importance": "medium",
       "score": 34,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4828"
-      ],
-      "why": "Phone app W-CON3: directory delivers sealed push to APNs/FCM, placeholder-only bodies, dead-token cleanup; needs PAN-4828.",
-      "rationale": "PAN-4774 (Anywhere release AC run) closed as completed, so that dependency is removed; rank held because the phone-app epic is feature work that still ranks below substrate items.",
+      "dependsOn": [],
+      "why": "Phone app W-CON3: directory delivers sealed push to APNs/FCM, placeholder-only bodies, dead-token cleanup; PAN-4828 done.",
+      "rationale": "PAN-4828 (phone-app contracts) closed as completed, so that dependency is removed; rank held because the phone-app epic is feature work that still ranks below substrate items.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11412,9 +11380,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "importance": "medium",
       "score": 36,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4828"
-      ],
+      "dependsOn": [],
       "why": "Phone app W-MAC1: phone access-token kind, pairing exchange, self-revoke and push-key routes, phone scopes.",
       "rationale": "PAN-4774 (Anywhere release AC run) closed as completed, so that dependency is removed; rank held because the phone-app epic is feature work that still ranks below substrate items.",
       "gate": "auto",
@@ -12003,11 +11969,10 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "score": 32,
       "condition": "ok",
       "dependsOn": [
-        "PAN-4828",
         "PAN-4835"
       ],
-      "why": "Phone app W-MAC3: native PushProvider seals needs-you alerts to each phone push key via directory.",
-      "rationale": "PAN-4774 (Anywhere release AC run) closed as completed, so that dependency is removed; rank held because the phone-app epic is feature work that still ranks below substrate items.",
+      "why": "Phone app W-MAC3: native PushProvider seals needs-you alerts to each phone push key via directory; needs PAN-4835.",
+      "rationale": "PAN-4828 (phone-app contracts) closed as completed, so that dependency is removed; rank held because the phone-app epic is feature work that still ranks below substrate items.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13358,13 +13323,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "confidence": 1
     },
     {
-      "from": "PAN-4671",
-      "to": "PAN-4773",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
       "from": "PAN-4811",
       "to": "PAN-4638",
       "type": "informs",
@@ -13384,13 +13342,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
-    },
-    {
-      "from": "PAN-4823",
-      "to": "PAN-4828",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
     },
     {
       "from": "PAN-4823",
@@ -13414,20 +13365,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "confidence": 1
     },
     {
-      "from": "PAN-4828",
-      "to": "PAN-4829",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.9
-    },
-    {
-      "from": "PAN-4828",
-      "to": "PAN-4830",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.9
-    },
-    {
       "from": "PAN-4823",
       "to": "PAN-4833",
       "type": "contains",
@@ -13440,13 +13377,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-4828",
-      "to": "PAN-4835",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.9
     },
     {
       "from": "PAN-4823",
@@ -13482,13 +13412,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-4828",
-      "to": "PAN-4843",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.9
     },
     {
       "from": "PAN-4835",
