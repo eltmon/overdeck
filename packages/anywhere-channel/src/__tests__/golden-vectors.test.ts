@@ -19,6 +19,9 @@ import {
 } from '@overdeck/anywhere-channel';
 import { nodeCrypto } from '@overdeck/anywhere-channel/node';
 
+import type { CryptoPort } from '../crypto-port.js';
+import { webCrypto } from '../crypto-web.js';
+
 const CODE = 'odp_' + '0123456789abcdef'.repeat(4);
 const ID = '00112233445566778899aabbccddeeff';
 const H = Buffer.alloc(32, 0x11);
@@ -28,12 +31,6 @@ const N2 = Buffer.alloc(32, 0x33);
 const hex = (bytes: Uint8Array): string => Buffer.from(bytes).toString('hex');
 
 describe('channel golden vectors', () => {
-  it('pairingSecrets derives the pinned psk and pairing id', () => {
-    const secrets = pairingSecrets(nodeCrypto, CODE);
-    expect(hex(secrets.psk)).toBe('fa159b7cec33c9ba81b087f2b4df399f1f8010f621c729668ce0888feeab9eab');
-    expect(secrets.pairingId).toBe('459da3680c207caad2eabda9f4f1f320');
-  });
-
   it('prologueFor encodes each mode', () => {
     expect(hex(prologueFor('link', null))).toBe('6f7665726465636b2d6c696e6b2f31000100');
     expect(hex(prologueFor('pairing', ID))).toBe(
@@ -66,9 +63,20 @@ describe('channel golden vectors', () => {
     expect(hex(encodeRefusal({ code: REFUSAL_CODES.pairingRefused }))).toBe('00000003');
     expect(hex(encodeRefusal({ code: REFUSAL_CODES.busy }))).toBe('00000004');
   });
+});
+
+describe.each<[string, CryptoPort]>([
+  ['node', nodeCrypto],
+  ['web', webCrypto],
+])('channel golden vectors on the %s crypto port', (_name, crypto) => {
+  it('pairingSecrets derives the pinned psk and pairing id', () => {
+    const secrets = pairingSecrets(crypto, CODE);
+    expect(hex(secrets.psk)).toBe('fa159b7cec33c9ba81b087f2b4df399f1f8010f621c729668ce0888feeab9eab');
+    expect(secrets.pairingId).toBe('459da3680c207caad2eabda9f4f1f320');
+  });
 
   it('approvalCommitment and approvalSas derive the pinned values', () => {
-    expect(hex(approvalCommitment(nodeCrypto, H, N1))).toBe('df77002e0a3d334790fd3b7890ce65bd06dbfaf3e3b36a7048cd4a09cee7d40e');
-    expect(approvalSas(nodeCrypto, H, N1, N2)).toBe('553 891');
+    expect(hex(approvalCommitment(crypto, H, N1))).toBe('df77002e0a3d334790fd3b7890ce65bd06dbfaf3e3b36a7048cd4a09cee7d40e');
+    expect(approvalSas(crypto, H, N1, N2)).toBe('553 891');
   });
 });
