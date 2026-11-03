@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4888",
   "created": "2026-11-03T08:25:32.067Z",
-  "updated": "2026-11-03T08:39:29.532Z",
+  "updated": "2026-11-03T08:42:07.029Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,9 +46,10 @@
       "doneAt": "2026-11-03T08:39:24.348Z"
     },
     "reload-holder-yield": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4888",
-      "claimedAt": "2026-11-03T08:39:29.532Z"
+      "claimedAt": "2026-11-03T08:39:29.532Z",
+      "doneAt": "2026-11-03T08:42:07.028Z"
     }
   }
 }
