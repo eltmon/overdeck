@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4829",
   "created": "2026-11-03T07:49:13.339Z",
-  "updated": "2026-11-03T08:22:30.359Z",
+  "updated": "2026-11-03T08:22:50.937Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -144,6 +144,10 @@
     "do-glue.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T08:22:30.359Z"
+    },
+    "do-glue.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:22:50.937Z"
     }
   }
 }
