@@ -4,17 +4,17 @@
     "created": "2026-11-03T21:37:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4952: Agent MCP and bots (W-INT0): Shared Overdeck skill text",
-    "updated": "2026-11-03T21:40:41.621Z"
+    "updated": "2026-11-03T21:41:59.507Z"
   },
   "plan": {
     "id": "pan-4952",
     "title": "Agent MCP and bots (W-INT0): Shared Overdeck skill text",
-    "status": "proposed",
+    "status": "running",
     "uid": "9e85dfdb-0184-42ea-a227-f5756bc7a4f2",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-03T21:37:00Z",
-    "updated": "2026-11-03T21:40:41.621Z",
+    "updated": "2026-11-03T21:41:59.507Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4952",
@@ -376,5 +376,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
