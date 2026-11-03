@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4925",
   "created": "2026-11-03T20:26:03.235Z",
-  "updated": "2026-11-03T20:50:30.222Z",
+  "updated": "2026-11-03T20:50:55.479Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -67,6 +67,10 @@
     "docs-signals-fixture-pids.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T20:50:30.222Z"
+    },
+    "docs-signals-fixture-pids.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T20:50:55.479Z"
     }
   }
 }
