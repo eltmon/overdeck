@@ -6,7 +6,7 @@
 import type { IceServer, JoinEvent, JoinIceServersResponse, JoinView, SignalData } from '@overdeck/contracts';
 
 import { fetchWithTimeout } from '../../../lib/apiFetch';
-import { dashboardMutationJsonHeaders } from '../../../lib/wsTransport';
+import { dashboardMutationJsonHeaders, ensureDashboardSession } from '../../../lib/wsTransport';
 
 const SHORT_CODE_ALPHABET = 'BCDFGHJKLMNPQRSTVWXZ23456789';
 
@@ -45,7 +45,9 @@ function joinPath(code: string, suffix = ''): string {
   return `/api/joins/${encodeURIComponent(code)}${suffix}`;
 }
 
+/** Mints the session cookie first: the standalone route reads the join before anything else does. */
 export async function getJoin(code: string): Promise<JoinView | null> {
+  await ensureDashboardSession();
   const response = await fetchWithTimeout(joinPath(code));
   if (response.status === 404) return null;
   if (!response.ok) throw await failure(response);
