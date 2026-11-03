@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4869",
   "created": "2026-11-03T03:24:34.404Z",
-  "updated": "2026-11-03T03:48:31.527Z",
+  "updated": "2026-11-03T03:48:32.745Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -89,6 +89,11 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-4869",
       "claimedAt": "2026-11-03T03:48:31.527Z"
+    },
+    "settings-link-from-any-page.ac1": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4869",
+      "claimedAt": "2026-11-03T03:48:32.745Z"
     }
   }
 }
