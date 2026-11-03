@@ -12,6 +12,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { CLIENT_LIMIT_MESSAGE } from '../../../../packages/contracts/src/connect.ts';
 import { openSealed } from '../../../../src/lib/anywhere/sealed-box.ts';
 
 const execFileAsync = promisify(execFile);
@@ -36,6 +37,8 @@ const SLOW = 60_000;
 const freeToken = (n: number) => 'odd_' + n.toString(16).padStart(64, 'f');
 const TESTER_TOKEN = 'odd_' + 'e'.repeat(64);
 const TESTER_TOKEN_2 = 'odd_' + 'e'.repeat(63) + 'd';
+/** Phone tests (PAN-4829) use their own free account, 'u-phones', so earlier tests' machines do not matter. */
+const phoneToken = (n: number) => 'odd_' + n.toString(16).padStart(64, '7');
 /** A second tester account whose relay allowance the cap test spends. */
 const RELAY_TOKEN = 'odd_' + 'c'.repeat(64);
 
@@ -48,6 +51,9 @@ export class AccountRpc extends WorkerEntrypoint {
     }
     if (token === ${JSON.stringify(RELAY_TOKEN)}) {
       return { ok: true, userId: 'u-relay', githubId: 3, deviceId: 'd-relay', entitlement: { plan: 'tester', maxDevices: null } };
+    }
+    if (/^odd_7+[0-9a-f]$/.test(token)) {
+      return { ok: true, userId: 'u-phones', githubId: 4, deviceId: 'd-p' + token.slice(-1), entitlement: { plan: 'free', maxDevices: 3 } };
     }
     if (/^odd_f+[0-9a-f]$/.test(token)) {
       return { ok: true, userId: 'u-free', githubId: 1, deviceId: 'd-' + token.slice(-1), entitlement: { plan: 'free', maxDevices: 3 } };
@@ -402,4 +408,133 @@ describe('connect service on real workerd (PAN-2356 WI-3)', () => {
     expect(logs.join('\n')).not.toContain(marker);
     peer.close();
   }, SLOW);
+});
+
+const PHONE_LABEL_MARKER = 'PHONE-LABEL-MARKER-4829';
+const clientId = (n: number) => `00000000-0000-4000-9000-${n.toString(16).padStart(12, '0')}`;
+const helloClient = (n: number): Frame => ({
+  type: 'hello-client',
+  protocol: 1,
+  clientId: clientId(n),
+  label: `${PHONE_LABEL_MARKER} phone-${n}`,
+  publicKeyHex: (0xa0 + n).toString(16).repeat(32),
+  appVersion: '1.0.0',
+  platform: 'ios',
+});
+
+/** Registers phone `n` on a fresh bearer-subprotocol socket and waits for its welcome-client. */
+async function registerPhone(token: string, n: number): Promise<{ peer: Peer; welcome: Frame }> {
+  const peer = await openClientSocket(token);
+  peer.send(helloClient(n));
+  const welcome = await peer.waitFor(isType('welcome-client'));
+  return { peer, welcome };
+}
+
+/**
+ * Epic AC-2 (PAN-4823) on workerd. The tests run in order and share the 'u-phones' account: three
+ * machines stay online for the whole block, and phone rows persist between tests as they would in
+ * production. Every phone socket is closed at the end of its test.
+ */
+describe('phone clients on real workerd (PAN-4829)', () => {
+  const MACHINES = [41, 42, 43];
+  let machines: Peer[] = [];
+  const SESSION = '5'.repeat(32);
+
+  beforeAll(async () => {
+    machines = [];
+    for (const [i, n] of MACHINES.entries()) machines.push(await register(phoneToken(i + 1), n));
+  }, SLOW);
+
+  afterAll(() => {
+    for (const peer of machines) peer.close();
+  });
+
+  it('registers a phone beside 3 free machines without using a machine slot', async () => {
+    const { peer: phone, welcome } = await registerPhone(phoneToken(4), 1);
+    expect(welcome).toMatchObject({ type: 'welcome-client', protocol: 1, plan: 'free', relayAllowed: false });
+    const listed = welcome['machines'] as Array<{ environmentId: string; online: boolean }>;
+    expect(listed.map((m) => [m.environmentId, m.online])).toEqual(MACHINES.map((n) => [envId(n), true]));
+
+    const fourth = await openSocket(phoneToken(5));
+    fourth.send(hello(44));
+    expect((await fourth.waitClose()).code).toBe(4009);
+    phone.close();
+  }, SLOW);
+
+  it('caps an account at 5 phones with client_limit and 4013, and replaces a phone socket with 4011', async () => {
+    const phones: Peer[] = [];
+    for (let n = 2; n <= 5; n++) phones.push((await registerPhone(phoneToken(n + 3), n)).peer);
+
+    const sixth = await openClientSocket(phoneToken(9));
+    sixth.send(helloClient(6));
+    expect(await sixth.waitFor(isType('error'))).toEqual({ type: 'error', code: 'client_limit', message: CLIENT_LIMIT_MESSAGE });
+    expect((await sixth.waitClose()).code).toBe(4013);
+
+    const first = (await registerPhone(phoneToken(4), 1)).peer;
+    const second = (await registerPhone(phoneToken(4), 1)).peer;
+    expect((await first.waitClose()).code).toBe(4011);
+
+    second.close();
+    for (const peer of phones) peer.close();
+  }, SLOW);
+
+  it('sends machine changes to phones and never lists a phone to machines', async () => {
+    const phone1 = (await registerPhone(phoneToken(4), 1)).peer;
+    const phone2 = (await registerPhone(phoneToken(5), 2)).peer;
+    const marks = machines.map((m) => m.frames.length);
+    const phoneMarks = [phone1.frames.length, phone2.frames.length];
+
+    machines[0]?.send({ type: 'endpoints', endpoints: [{ kind: 'lan', url: 'tcp://10.0.0.41:3011' }] });
+    const isChange = (f: Frame) => f['type'] === 'directory' && JSON.stringify(f).includes('10.0.0.41');
+    const seenByMachine = await machines[1]?.waitFor(isChange, marks[1]);
+    await machines[2]?.waitFor(isChange, marks[2]);
+    expect(await phone1.waitFor(isChange, phoneMarks[0])).toEqual(seenByMachine);
+    expect(await phone2.waitFor(isChange, phoneMarks[1])).toEqual(seenByMachine);
+
+    const machineViews = machines.flatMap((m) => m.frames.filter((f) => f['type'] === 'welcome' || f['type'] === 'directory'));
+    expect(machineViews.length).toBeGreaterThan(0);
+    const text = JSON.stringify(machineViews);
+    for (let n = 1; n <= 6; n++) expect(text).not.toContain(clientId(n));
+
+    phone1.close();
+    phone2.close();
+  }, SLOW);
+
+  it('routes link signals both ways with the sender stamped, and refuses phone to phone', async () => {
+    const phone = (await registerPhone(phoneToken(4), 1)).peer;
+    const machine = machines[0] as Peer;
+    const offer = { sdp: { type: 'offer', sdp: 'v=0 offer' } };
+    const answer = { sdp: { type: 'answer', sdp: 'v=0 answer' } };
+
+    const mark = machine.frames.length;
+    phone.send({ type: 'signal', to: envId(41), session: SESSION, purpose: 'link', relay: false, data: offer });
+    expect(await machine.waitFor(isType('signal'), mark)).toEqual({
+      type: 'signal', from: clientId(1), session: SESSION, purpose: 'link', relay: false, data: offer,
+    });
+
+    const phoneMark = phone.frames.length;
+    machine.send({ type: 'signal', to: clientId(1), session: SESSION, purpose: 'link', relay: false, data: answer });
+    expect(await phone.waitFor(isType('signal'), phoneMark)).toEqual({
+      type: 'signal', from: envId(41), session: SESSION, purpose: 'link', relay: false, data: answer,
+    });
+
+    const errorMark = phone.frames.length;
+    phone.send({ type: 'signal', to: clientId(2), session: SESSION, purpose: 'link', relay: false, data: offer });
+    expect(await phone.waitFor(isType('error'), errorMark)).toMatchObject({ code: 'bad_frame', session: SESSION });
+    phone.close();
+  }, SLOW);
+
+  it('forgets a phone with 4012 and frees its slot', async () => {
+    const phone = (await registerPhone(phoneToken(5), 2)).peer;
+    phone.send({ type: 'forget-client' });
+    expect((await phone.waitClose()).code).toBe(4012);
+
+    const replacement = (await registerPhone(phoneToken(9), 7)).peer;
+    replacement.close();
+  }, SLOW);
+
+  it('never logs a phone label and logs hello-client with the client id', () => {
+    expect(logs.join('\n')).not.toContain(PHONE_LABEL_MARKER);
+    expect(logs.some((line) => line.includes('"hello-client"') && line.includes(clientId(1)))).toBe(true);
+  });
 });
