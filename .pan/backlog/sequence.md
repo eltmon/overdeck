@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T19:49:06.002075Z · model: claude-opus-5-5 · open: 863_
+_Last sequenced: 2026-11-03T19:50:43.316819Z · model: claude-opus-5-5 · open: 864_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -516,6 +516,7 @@ _Last sequenced: 2026-11-03T19:49:06.002075Z · model: claude-opus-5-5 · open: 
 | 520 | PAN-3772 | XS | medium | ok |  |  | Conv view renders Claude Code's synthetic 'no visible output' nudge as an operator message; should read as plumbing. |
 | 521 | PAN-3853 | S | medium | needs-refinement |  |  | Review synthesizer self-declared an operator override; that override door was deleted by the cut — verify on the PR-review path |
 | 522 | PAN-3830 | S | medium | ok |  |  | OpenCode provider: curate picker models via Settings favorites (OpenRouter pattern) instead of listing every discovered model |
+| 523 | PAN-4924 | S | medium | ok |  |  | linked-machines.mdx promises switch model for running conversations; dashboard disables it. Fix docs or add the control. |
 | 524 | PAN-4367 | M | medium | ok |  |  | Replace inherited capability scores for Sonnet 5.5, GPT-6 Sol/Luna with measured ones; eval harness has closed |
 | 525 | PAN-2443 | M | medium | ok |  |  | OpenTelemetry GenAI semconv |
 | 526 | PAN-2442 | M | medium | ok |  |  | Agent Client Protocol (ACP) as Overdeck's structured control plane |
@@ -1198,10 +1199,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T19:49:06.002075Z",
+  "generatedAt": "2026-11-03T19:50:43.316819Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 863,
+  "openCount": 864,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -11949,6 +11950,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "rationale": "PAN-4835 merged in #4894, which clears its only dependency; rank held because the Anywhere phone epic is low-impact relative to substrate work above it.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4924",
+      "rank": 523,
+      "size": "S",
+      "importance": "medium",
+      "score": 45,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "linked-machines.mdx promises switch model for running conversations; dashboard disables it. Fix docs or add the control.",
+      "rationale": "New issue since the prior run: a docs-versus-UI mismatch found while filming the Anywhere video; it takes free rank 523 beside the related composer model-switching work (PAN-2626) so no other node moves.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13169,6 +13183,13 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.8
+    },
+    {
+      "from": "PAN-2626",
+      "to": "PAN-4924",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
     }
   ]
 }
