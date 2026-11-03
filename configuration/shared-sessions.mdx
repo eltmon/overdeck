@@ -19,7 +19,10 @@ In this release:
 
 - Only Claude Code conversations can be shared.
 - Viewers see the messages. Tool calls, thinking, the work log, cost and context usage are
-  not shared.
+  not shared in the conversation view.
+- Every admitted viewer can also open the **Terminal** view and watch the conversation's
+  live terminal, read-only. Anything that terminal shows is visible to them, including tool
+  calls or thinking the agent prints there.
 - Viewers can suggest prompts. Contributors can also send prompts straight to the
   conversation.
 
@@ -111,6 +114,10 @@ prompts run on your machine, with your agent's permissions.
   conversation until the host admits you.
 - The conversation itself, with the conversation's title, the host and the number of
   people watching in the header. New messages appear as the host's agent writes them.
+- A **Conversation** / **Terminal** toggle once you are connected. **Terminal** shows the
+  host's live terminal for that conversation. It is read-only: nothing you type reaches the
+  host's machine. **The host's terminal is not running.** means the conversation has no live
+  terminal; **The host's terminal session ended.** means it stopped while you watched.
 - **Host disconnected — reconnecting…**: the host's machine lost its connection to the
   share service. You keep the messages you already have.
 - **Connection to the host was lost.**: the direct connection to the host dropped. Click

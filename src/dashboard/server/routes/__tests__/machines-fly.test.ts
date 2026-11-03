@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   addFlyMachine: vi.fn(),
   channelOfRequest: vi.fn(),
   emitActivityEntry: vi.fn(),
+  enableRemoteInConfigToml: vi.fn(),
 }));
 
 vi.mock('../../services/fly-machine-service.js', async (importOriginal) => ({
@@ -24,15 +25,20 @@ vi.mock('../dashboard-auth.js', async (importOriginal) => ({
   rejectUnsafeDashboardMutationRequest: () => null,
 }));
 vi.mock('../../../../lib/activity-logger.js', () => ({ emitActivityEntry: mocks.emitActivityEntry }));
+vi.mock('../../../../lib/remote-enabled.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../lib/remote-enabled.js')>()),
+  enableRemoteInConfigToml: mocks.enableRemoteInConfigToml,
+}));
 
 const { FlyMachineError } = await import('../../../../lib/anywhere/fly/provision.js');
-const { machinesFlyRouteLayer } = await import('../machines-fly.js');
+const { RemoteEnableError } = await import('../../../../lib/remote-enabled.js');
+const { machinesFlyRouteLayer, machinesFlyEnableRemoteRouteLayer } = await import('../machines-fly.js');
 
 const ENV = '3f2c1b7e-9a4d-4c2b-8e1f-0a1b2c3d4e5f';
 
-async function call(body?: unknown): Promise<{ status: number; body: any }> {
+async function call(body?: unknown, path = '/api/machines/fly', layer = machinesFlyRouteLayer): Promise<{ status: number; body: any }> {
   const req = HttpServerRequest.fromWeb(
-    new Request('http://localhost/api/machines/fly', {
+    new Request(`http://localhost${path}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: body === undefined ? undefined : typeof body === 'string' ? body : JSON.stringify(body),
@@ -40,7 +46,7 @@ async function call(body?: unknown): Promise<{ status: number; body: any }> {
   );
   const response = await Effect.runPromise(
     Effect.scoped(
-      Effect.flatMap(HttpRouter.toHttpEffect(machinesFlyRouteLayer), (app) =>
+      Effect.flatMap(HttpRouter.toHttpEffect(layer), (app) =>
         Effect.provideService(app, HttpServerRequest.HttpServerRequest, req),
       ),
     ),
@@ -48,6 +54,10 @@ async function call(body?: unknown): Promise<{ status: number; body: any }> {
   const responseBody = response.body as { body?: Uint8Array } | null;
   const text = responseBody?.body ? new TextDecoder().decode(responseBody.body) : '{}';
   return { status: response.status, body: JSON.parse(text) };
+}
+
+async function callEnableRemote(): Promise<{ status: number; body: any }> {
+  return call(undefined, '/api/machines/fly/enable-remote', machinesFlyEnableRemoteRouteLayer);
 }
 
 beforeEach(() => {
@@ -103,5 +113,29 @@ describe('POST /api/machines/fly (PAN-4652 WI-13)', () => {
       { notifyLinksChanged: expect.any(Function) },
     );
     expect(mocks.emitActivityEntry).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('POST /api/machines/fly/enable-remote (PAN-4905)', () => {
+  it('refuses a request that arrives through a secure channel', async () => {
+    mocks.channelOfRequest.mockReturnValue({ mode: 'link' });
+    expect((await callEnableRemote()).status).toBe(403);
+    expect(mocks.enableRemoteInConfigToml).not.toHaveBeenCalled();
+  });
+
+  it('answers 200 with changed and configFile, and logs activity when changed', async () => {
+    mocks.enableRemoteInConfigToml.mockResolvedValue({ changed: true, path: '/home/x/.overdeck/config.toml' });
+    const { status, body } = await callEnableRemote();
+    expect(status).toBe(200);
+    expect(body).toMatchObject({ ok: true, changed: true, configFile: '/home/x/.overdeck/config.toml' });
+    expect(mocks.emitActivityEntry).toHaveBeenCalledTimes(1);
+  });
+
+  it('maps RemoteEnableError to 409 without logging activity', async () => {
+    mocks.enableRemoteInConfigToml.mockRejectedValue(new RemoteEnableError('config.toml does not parse, so nothing was changed: bad'));
+    const { status, body } = await callEnableRemote();
+    expect(status).toBe(409);
+    expect(body).toMatchObject({ error: 'remote-enable-failed', message: 'config.toml does not parse, so nothing was changed: bad' });
+    expect(mocks.emitActivityEntry).not.toHaveBeenCalled();
   });
 });

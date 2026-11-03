@@ -80,6 +80,11 @@ export async function addFlyMachine(input: { projectKey?: string; region?: strin
   }));
 }
 
+/** PAN-4905: POST /api/machines/fly/enable-remote sets [remote] enabled = true in config.toml. */
+export async function enableRemote(): Promise<ApiResult<{ ok: true; changed: boolean; configFile: string }>> {
+  return readResult(await fetch('/api/machines/fly/enable-remote', { method: 'POST', headers: await dashboardMutationJsonHeaders() }));
+}
+
 export async function unlinkMachine(id: string): Promise<ApiResult<{ ok: true; peerNotified: boolean }>> {
   return readResult(await fetch(`/api/machines/${encodeURIComponent(id)}`, {
     method: 'DELETE',

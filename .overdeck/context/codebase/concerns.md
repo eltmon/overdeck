@@ -121,6 +121,11 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   (PAN-4429) can be 1.5–7.5GB each. Overdeck no longer creates or deletes them
   (they may be the user's own); `.gitignore` keeps them untracked. Don't copy or
   back up old workspaces blindly.
+- **`remote.enabled` lives only in config.toml** — `loadConfig()` reads `[remote] enabled`
+  from `~/.overdeck/config.toml` and overlays only `resiliency_tier` / `max_concurrent_agents`
+  from config.yaml's `remote:` section; an `enabled` key in config.yaml is ignored. Any
+  "remote is off" message must name config.toml and the line `enabled = true` under `[remote]`
+  (PAN-4905). The live setup verb is `pan admin remote setup`, not `pan remote setup`.
 - **Fly Machine rootfs resets on every start** — the rootfs is rebuilt from the
   image on stop/start and on `restart.on-failure`. The ephemeral tier mitigates this
   with a VM-side continuous commit+push heartbeat daemon plus per-bead push
@@ -642,3 +647,4 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   the zero-install `npx @overdeck/core join <CODE>` on the share invite page works. A bin with a
   different target breaks it with "could not determine executable to run".
 <!-- last-verified: 2026-11-03 -->
+<!-- last-verified: 2026-11-03 (PAN-4905) -->
