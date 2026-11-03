@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4477",
   "created": "2026-11-03T15:02:33.095Z",
-  "updated": "2026-11-03T15:26:24.497Z",
+  "updated": "2026-11-03T15:26:30.869Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,11 @@
       "claimedBy": "agent-pan-4477",
       "claimedAt": "2026-11-03T15:23:48.518Z",
       "doneAt": "2026-11-03T15:26:24.496Z"
+    },
+    "peer-hub-terminal": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4477",
+      "claimedAt": "2026-11-03T15:26:30.869Z"
     }
   }
 }
