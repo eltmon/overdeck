@@ -2,12 +2,23 @@
   "version": "1",
   "issueId": "PAN-4839",
   "created": "2026-11-03T21:01:30.274Z",
-  "updated": "2026-11-03T22:18:29.178Z",
+  "updated": "2026-11-03T23:13:43.975Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-03T23:12Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-03T23:12:33.006Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-03T23:13Z] coderabbit → FINDINGS — seq 2",
+      "timestamp": "2026-11-03T23:13:43.974Z"
+    }
+  ],
   "items": {
     "contracts": {
       "status": "completed",
@@ -268,5 +279,21 @@
     "acceptance.ac1": {
       "status": "cancelled"
     }
-  }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-03T23:12:33Z",
+      "markdownBody": "# CI Failure Feedback for PAN-4839\n\nPull request: https://github.com/eltmon/overdeck/pull/4964 (head `c68f2ca4`)\n\nSource: check_run:test-shard (3/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-shard (3/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/126266089032/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/41736245470/job/126266089032  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/dashboard/server/services/__tests__/conversation-lifecycle.test.ts\u001b[2m > \u001b[22mConversationLifecycleService — pollConversations on a Herdr host (PAN-3921)\u001b[2m > \u001b[22mkeeps an active conversation whose Herdr agent is idle, and resurrects an ended one\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/dashboard/server/services/__tests__/conversation-lifecycle.test.ts\u001b[2m > \u001b[22mConversationLifecycleService — pollConversations on a Herdr host (PAN-3921)\u001b[2m > \u001b[22mkeeps an active conversation whose Herdr agent is idle, and resurrects an ended one\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected \"vi.fn()\" to be called with arguments: [ 'latched' ]\u001b[90m\n\nNumber of calls: \u001b[1m0\u001b[22m\n\u001b[31m\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m src/dashboard/server/services/__tests__/conversation-lifecycle.test.ts:\u001b[2m1070:41\u001b[22m\u001b[39m\n    \u001b[90m1068|\u001b[39m\n    \u001b[90m1069|\u001b[39m     \u001b[34mexpect\u001b[39m(mockMarkConversationEnded)\u001b[33m.\u001b[39mnot\u001b[33m.\u001b[39m\u001b[34mtoHaveBeenCalled\u001b[39m()\u001b[33m;\u001b[39m\n    \u001b[90m1070|\u001b[39m     expect(mockMarkConversationRunning).toHaveBeenCalledWith('latched'…\n    \u001b[90m   |\u001b[39m                                         \u001b[31m^\u001b[39m\n    \u001b[90m1071|\u001b[39m     expect(mockMarkConversationRunning).not.toHaveBeenCalledWith('live…\n    \u001b[90m1072|\u001b[39m   })\u001b[33m;\u001b[39m\n\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m583 passed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[33m1 skipped\u001b[39m\u001b[90m (585)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    },
+    {
+      "seq": 2,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-03T23:13:43Z",
+      "markdownBody": "# CodeRabbit findings for PAN-4839 (PR #4964)\n\nCodeRabbit posted 1 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4461586529 · apps/mobile/src/shell/ShellApp.tsx:151 [Minor]: Refresh `liveActivityStatus` on resume. The Settings row can show a stale iOS permission state.\n  https://github.com/eltmon/overdeck/pull/4964#discussion_r4461586529\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/4964/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-4839`.\n   If you only replied, you are done.\n5. If PR #4964 has already merged when you read this, nothing more lands on it: open a follow-up issue\n   for the findings you agree with instead of pushing."
+    }
+  ]
 }
