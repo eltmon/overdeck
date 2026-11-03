@@ -102,6 +102,34 @@ the focused file with `--detectAsyncLeaks` to verify that no work remains after
 the test finishes. Do not disable unhandled-error reporting or reduce the
 repository's two-worker CI concurrency to hide a leak.
 
+### Shared worker home and the internal token
+
+`tests/setup/overdeck-home.ts` sets `OVERDECK_HOME` to
+`<run root>/worker-<VITEST_POOL_ID>`. Every test file that runs in the same
+Vitest pool slot shares that one directory, and files persist there between
+test files.
+
+Mocking the `OVERDECK_HOME` or `CONFIG_DIR` constants exported from
+`paths.js` does not move the token file: `src/lib/internal-token.ts` resolves
+it through `getOverdeckHome()`, which reads the `OVERDECK_HOME` env var at
+call time, not the mocked constant.
+
+The token file `<OVERDECK_HOME>/internal-token` wins over
+`OVERDECK_INTERNAL_TOKEN` (PAN-4628) — the env var is read only when no file
+exists. A test that authenticates with an env token must therefore delete the
+file before it resets the token cache, and again after the test, or a
+sibling test in the same worker can leave a token file that 401s it:
+
+```typescript
+rmSync(join(getOverdeckHome(), 'internal-token'), { force: true });
+_resetInternalTokenCacheForTests();
+```
+
+The setup file also deletes the worker-home token file once, before each test
+file starts (PAN-4881). That only protects against leaks *between* files in
+the same pool slot — the per-test cleanup above still covers leaks *within*
+one file.
+
 ### Real-process fixtures
 
 A fixture that spawns a real child process to stand in for a target state
