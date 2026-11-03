@@ -1,0 +1,434 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-03T18:20:05Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4917: CI trailer gate times out on full-history checkout; cancelled check blocks merges and conflict repair",
+    "updated": "2026-11-03T18:31:31.895Z"
+  },
+  "plan": {
+    "id": "pan-4917",
+    "title": "CI trailer gate times out on full-history checkout; cancelled check blocks merges and conflict repair",
+    "status": "proposed",
+    "uid": "0aff8622-a4ab-43fe-8001-574c87b5861f",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-03T18:20:05Z",
+    "updated": "2026-11-03T18:31:31.895Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4917",
+        "label": "PAN-4917",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "ci",
+      "github-actions",
+      "conflict-repair",
+      "merge-gate",
+      "pr-facts"
+    ],
+    "narratives": {
+      "Problem": "The CI job 'Prompt change trailer gate' checks out with fetch-depth: 0 under a 5-minute cap. fetch-depth: 0 fetches all ~716 branches and ~588 tags, including the archived overdeck-state branch (~195k commits, ~391k trees not on main), so the checkout sometimes takes over 5 minutes and the job is cancelled (main run 41686923189, PRs #4911 and #4915 on 2026-11-03). A job killed by its own timeout reports conclusion CANCELLED, which makes the head red, and evaluateConflictRepairGate declines repair for any red head, so approved conflicting PRs #4911 and #4915 never got a sync-main repair. The decline reason did not name the red check.",
+      "Proposal": "(1) Give scripts/check-prompt-change-trailer.sh a --fetch mode that fetches only main and HEAD, blobless and tagless, unshallowing a shallow clone, and fails loudly if the clone stays shallow or origin/main is missing; extend its --self-test with file:// shallow-clone cases. (2) Make the CI prompt-gate job a one-commit checkout that runs the script with --fetch, with timeout-minutes 20. (3) Move per-check failure listing into a new leaf module cloister/check-failures.ts (listFailedChecks, listFailedTestChecks, FailedCheck, re-exported from pr-facts.ts so pr-facts.ts shrinks under the file-size ceiling) and add PrFacts.checkFailures for GitHub. (4) In evaluateConflictRepairGate, a red head whose failing checks all concluded CANCELLED, TIMED_OUT or STALE no longer declines repair; any other failure still declines, and the reason names every failing check with its conclusion. (5) Document both changes.",
+      "NonGoals": "- Do not change lint-group (core)'s fetch-depth: 0 checkout (PAN-2227); it is a possible follow-up.\n- Do not change the merge gate (evaluateMergeReadiness, evaluateIssueMergeGate) or summarizeStatusCheckRollup: a cancelled check still blocks merging and still makes checks 'red'.\n- Do not automatically re-run cancelled checks.\n- Do not change the pan reload rule that refuses a cancelled main CI run.\n- Do not add GitLab per-job check detail; a red GitLab head still declines repair.\n- Do not change which files the trailer script watches or its trailer regex, and do not change npm run lint:prompt-trailer.\n- Do not rename the CI job's display name 'Prompt change trailer gate'.\n- Do not fetch, modify or delete the overdeck-state branch.\n- Do not write tests that read ci.yml or source text to assert its shape.\n- Do not fix the no-argument script's existing missing-base-ref path (exit 128); CI with --fetch asserts origin/main first.\n- Do not fall back to fetch-depth: 0 in the prompt-gate job under any circumstance."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Use a targeted blobless fetch of main and HEAD (script --fetch mode) instead of the issue's option of fetch-depth: 0 plus filter: blob:none",
+        "rationale": "Measured at planning time: fetch-depth: 0 fetches every branch, and overdeck-state alone is ~195k commits and ~391k trees, so blob:none still sends ~700k objects. main plus HEAD blobless is ~118k objects / ~16 MiB and does not grow with branch count. The issue's own fix direction allows 'or fetch only what the script needs'. A prototype passed on a file:// shallow clone."
+      },
+      {
+        "summary": "Put the fetch in the script, not inline in the workflow YAML",
+        "rationale": "One source of truth that the script's --self-test (already run by tests/unit/scripts/check-prompt-change-trailer.test.ts in CI) can exercise; source-grep tests of ci.yml are rejected by repo lint."
+      },
+      {
+        "summary": "Raise the job's timeout-minutes from 5 to 20",
+        "rationale": "The issue asks for the same headroom as peers; build and lint-group use 20 (test shards use 30), and 20 keeps the PAN-1651 wall-clock cap meaningful for a job this small."
+      },
+      {
+        "summary": "Treat CANCELLED, TIMED_OUT and STALE check conclusions as 'not run' for conflict repair only",
+        "rationale": "Verified that a job killed by timeout-minutes reports conclusion cancelled, identical to a superseded run, so the rule must be by conclusion. Such checks judged nothing; the repair pushes a new head that CI runs again, and the unchanged merge gate re-judges CI there. PAN-4451 already waives pending/absent CI in this gate."
+      },
+      {
+        "summary": "Decline reasons keep the prefix 'CI checks failing on PR HEAD <sha>' and append ': <name> (<CONCLUSION>), ...'",
+        "rationale": "The issue's minimum ask is that the reason names the red check; keeping the prefix keeps the existing test and log readers stable."
+      },
+      {
+        "summary": "Extract FailedCheck/listFailedTestChecks/new listFailedChecks into cloister/check-failures.ts",
+        "rationale": "pr-facts.ts is 988 lines against the 1000-line ceiling; extraction shrinks it and keeps every existing import working through re-exports."
+      },
+      {
+        "summary": "Rename the CI step (not the job) to name the flywheel skill instead of docs/flywheel-brief.md",
+        "rationale": "The script watches sync-sources/skills/pan-flywheel/SKILL.md; the step name was stale. The job name is the rollup check name and must stay."
+      }
+    ],
+    "items": [
+      {
+        "id": "trailer-fetch-mode",
+        "title": "Add a --fetch mode and its self-test cases to the prompt trailer script",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T18:20:05Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-4917",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "scripts/check-prompt-change-trailer.sh"
+          ],
+          "verify_commands": [
+            "bash scripts/check-prompt-change-trailer.sh --self-test",
+            "npx vitest run tests/unit/scripts/check-prompt-change-trailer.test.ts",
+            "bash scripts/check-prompt-change-trailer.sh"
+          ],
+          "expected_outputs": [
+            "--self-test prints 'prompt-trailer: self-test passed' and exits 0",
+            "tests/unit/scripts/check-prompt-change-trailer.test.ts reports 1 passed test",
+            "the no-argument run in the workspace exits 0 with the same output as before the change"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 (.pan/drafts/PAN-4917.md) exactly. Edit only scripts/check-prompt-change-trailer.sh. (1) Add the fetch_history function from the PRD after resolve_merge_base: it derives remote and branch from BASE_REF, adds --unshallow only when `git rev-parse --is-shallow-repository` prints true, runs `git fetch --no-tags --filter=blob:none [--unshallow] <remote> +refs/heads/<branch>:refs/remotes/<remote>/<branch> \"$(git rev-parse HEAD)\"` INSIDE `if ! git fetch ...; then fail \"history fetch failed from $remote\"; exit 1; fi` (the script runs under set -e, so a bare failing fetch would exit 128 without our message), then calls fail and exits 1 if the clone is still shallow or BASE_REF does not resolve. (2) Add the `--fetch` dispatch before the final `check` call, after the existing --self-test dispatch. (3) In self_test add `git branch no-trailer` right after the commit 'update flywheel prompt', and after the third scenario add the PRD's block: checkout main, set uploadpack.allowFilter and uploadpack.allowReachableSHA1InWant, loop over no-trailer:fail topic:pass main:pass cloning `--depth 1 --branch <b> file://$tmp $tmp/clone-<b>`, asserting the clone is shallow, running the script with --fetch, comparing pass/fail, asserting the clone is no longer shallow; then the clone-broken case (origin set to file://$tmp/missing must exit exactly 1 and its output must contain 'prompt-trailer: history fetch failed'). Clones stay inside $tmp; add no new rm commands. The no-argument check path must stay byte-for-byte the same in behavior. A scratch prototype of exactly this code passed --self-test at planning time."
+        },
+        "items": [
+          {
+            "id": "trailer-fetch-mode.ac1",
+            "title": "Given the edited script, when `bash scripts/check-prompt-change-trailer.sh --self-test` runs, then it prints 'prompt-trailer: self-test passed' and exits 0 after the no-trailer:fail, topic:pass, main:pass and clone-broken cases",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "trailer-fetch-mode.ac2",
+            "title": "Given a shallow file:// clone of a branch that changes roles/*.md without a Prompt-Change trailer, when the script runs with --fetch, then it exits 1 printing 'prompt-trailer: FAILED' and `git rev-parse --is-shallow-repository` in that clone prints false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "trailer-fetch-mode.ac3",
+            "title": "Given a shallow clone whose origin points at a missing repository, when the script runs with --fetch, then it exits 1 and prints 'prompt-trailer: history fetch failed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "trailer-fetch-mode.ac4",
+            "title": "When the script runs with no argument in a full local clone, then it prints the same 'prompt-trailer:' lines and exits with the same code as the origin/main version of the script",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-prompt-gate-fetch",
+        "title": "Switch the CI prompt-gate job to a one-commit checkout plus the script's --fetch",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T18:20:05Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-4917",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            ".github/workflows/ci.yml"
+          ],
+          "verify_commands": [
+            "git diff origin/main -- .github/workflows/ci.yml",
+            "gh pr checks --json name,state,startedAt,completedAt"
+          ],
+          "expected_outputs": [
+            "the diff touches only the prompt-gate job: timeout-minutes 20, no fetch-depth: 0, run line ends with --fetch, step renamed",
+            "the 'Prompt change trailer gate' check on the PR head concludes success with completedAt minus startedAt under 3 minutes"
+          ],
+          "traces": [
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. Edit only the prompt-gate job in .github/workflows/ci.yml (grep anchor 'name: Prompt change trailer gate') to the PRD's 'After' block: keep `name: Prompt change trailer gate` unchanged (it is the rollup check name), set `timeout-minutes: 20` with the PAN-1651/PAN-4917 comment, make the checkout a plain `- uses: actions/checkout@v4` with no `with:` block and the PAN-4917 comment, rename the step to 'Check Prompt-Change trailer for roles/ and the flywheel skill', and run `bash scripts/check-prompt-change-trailer.sh --fetch`. Touch no other job. PUSH OVER SSH: the gh OAuth token lacks the workflow scope, so push with `git push git@github.com:eltmon/overdeck.git HEAD:feature/pan-4917`. After CI runs on the PR, read the job log and timing (`gh pr checks <pr> --json name,state,startedAt,completedAt` or `gh api repos/eltmon/overdeck/commits/<head>/check-runs`). FALLBACK (implementation checkpoint): if the log shows `not our ref` for the SHA want, keep the fetch targeted: in fetch_history replace the last fetch argument with `\"${PROMPT_CHANGE_FETCH_REF:-$(git rev-parse HEAD)}\"` and give the CI step `env: PROMPT_CHANGE_FETCH_REF: ${{ github.ref }}`, re-run the self-test, and confirm the timing bound. NEVER fall back to fetch-depth: 0 (with or without filter: blob:none); it fetches overdeck-state again. Record the fallback and error text in the PR body."
+        },
+        "items": [
+          {
+            "id": "ci-prompt-gate-fetch.ac1",
+            "title": "Given the edited ci.yml, the prompt-gate job contains `name: Prompt change trailer gate`, `timeout-minutes: 20`, a checkout with no `fetch-depth: 0`, and a run step `bash scripts/check-prompt-change-trailer.sh --fetch`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-prompt-gate-fetch.ac2",
+            "title": "When CI runs on the PR head, then the 'Prompt change trailer gate' check concludes success in under 3 minutes and its log prints 'prompt-trailer: no roles/*.md or sync-sources/skills/pan-flywheel/SKILL.md changes; ok'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-prompt-gate-fetch.ac3",
+            "title": "Given `git diff origin/main -- .github/workflows/ci.yml`, then the diff contains changes only inside the prompt-gate job",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "check-failures-module",
+        "title": "Extract per-check failures into cloister/check-failures.ts and expose PrFacts.checkFailures",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T18:20:05Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4917",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "foundationFor": [
+            "repair-gate-unfinished-checks"
+          ],
+          "files_scope": [
+            "src/lib/cloister/check-failures.ts",
+            "src/lib/cloister/pr-facts.ts",
+            "src/lib/cloister/__tests__/check-failures.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/check-failures.test.ts src/lib/cloister/__tests__/pr-facts-test-checks.test.ts src/lib/cloister/__tests__/pr-facts-status-context.test.ts src/lib/cloister/__tests__/pr-facts-ci-test-job.test.ts",
+            "bash scripts/lint-file-size.sh",
+            "npm run lint:circular",
+            "npm run typecheck",
+            "wc -l < src/lib/cloister/pr-facts.ts"
+          ],
+          "expected_outputs": [
+            "all four test files pass",
+            "file-size guard prints '✓ file-size guard passed'",
+            "lint:circular exits 0",
+            "typecheck completes without errors",
+            "pr-facts.ts line count is 988 or lower"
+          ],
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. Create src/lib/cloister/check-failures.ts with the PRD's header comment, a type-only import of IssuePullRequestData from '../overdeck/pull-requests.js', isCiTestRollupCheck from './verification-tests-mode.js', the FailedCheck interface moved verbatim from pr-facts.ts, a private normalize helper, `listFailedChecks(rollup, include = () => true)` whose loop body is moved verbatim from pr-facts.ts listFailedTestChecks (grep anchor 'const failure = (verdict: string): FailedCheck => ({') with `if (!include(check)) continue;`, and `listFailedTestChecks(rollup)` returning `listFailedChecks(rollup, isCiTestRollupCheck)`. In pr-facts.ts delete the FailedCheck interface and listFailedTestChecks, keep normalize, add `import { listFailedChecks, listFailedTestChecks, type FailedCheck } from './check-failures.js';` and `export { listFailedChecks, listFailedTestChecks, type FailedCheck } from './check-failures.js';`, add the optional field `checkFailures?: readonly FailedCheck[];` (doc comment 'PAN-4917: every failing check on the head, with its conclusion. GitHub only.') right after testCheckFailures in PrFacts, and add `checkFailures: listFailedChecks(pr.statusCheckRollup),` right before `testCheckFailures:` in the GitHub facts builder. Do not set it in emptyPrFacts or the GitLab builder. check-failures.ts must import nothing from pr-facts.ts. Write src/lib/cloister/__tests__/check-failures.test.ts with the four PRD cases, using the prFixture/getPrFacts pattern of pr-facts-ci-test-job.test.ts."
+        },
+        "items": [
+          {
+            "id": "check-failures-module.ac1",
+            "title": "Given a rollup with a CANCELLED 'Prompt change trailer gate' check run and a SUCCESS 'test' run, when listFailedChecks runs, then it returns exactly [{ name: 'Prompt change trailer gate', conclusion: 'CANCELLED' }]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "check-failures-module.ac2",
+            "title": "Given a GitHub PR fixture with that rollup, when getPrFacts runs, then it returns checks 'red' and checkFailures containing the CANCELLED 'Prompt change trailer gate' row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "check-failures-module.ac3",
+            "title": "Given a rollup with a CANCELLED 'lint' run and a FAILURE 'test' run, when listFailedTestChecks runs, then it returns only the 'test' row, and the existing pr-facts-test-checks and pr-facts-status-context tests still pass unedited",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "check-failures-module.ac4",
+            "title": "When `bash scripts/lint-file-size.sh` and `npm run lint:circular` run, then both exit 0 and `wc -l < src/lib/cloister/pr-facts.ts` prints 988 or lower",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "repair-gate-unfinished-checks",
+        "title": "Let the conflict-repair gate waive cancelled or timed-out checks and name failing checks in its decline reason",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T18:20:05Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4917",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/lib/cloister/merge-gate.ts",
+            "src/lib/cloister/__tests__/merge-gate-conflict-repair.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/merge-gate-conflict-repair.test.ts src/lib/cloister/__tests__/merge-gate.test.ts src/lib/cloister/__tests__/conflict-repair.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all three test files pass, including the new unfinished-check cases",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-8",
+            "FR-9",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4. In src/lib/cloister/merge-gate.ts add `UNFINISHED_CHECK_CONCLUSIONS = new Set(['CANCELLED', 'TIMED_OUT', 'STALE'])` and the private `redHeadDeclineReason(facts)` from the PRD above evaluateConflictRepairGate. Replace the `if (facts.checks === 'red') { return ... }` block in evaluateConflictRepairGate with the PRD's version (decline only when redHeadDeclineReason returns a string) and its updated PAN-4451/PAN-4917 comment. In the function's JSDoc change 'Red checks still disqualify.' to 'Red checks still disqualify, unless every failing check was cancelled, timed out or went stale (PAN-4917).' Do not change evaluateIssueMergeGate, evaluateMergeReadiness or summarizeStatusCheckRollup. In merge-gate-conflict-repair.test.ts add the three PRD cases with the existing conflictingFacts/gateDeps helpers and add `expect(result.reason).toBe(`CI checks failing on PR HEAD ${HEAD}`)` to the existing 'is not conflicting when checks are red' case."
+        },
+        "items": [
+          {
+            "id": "repair-gate-unfinished-checks.ac1",
+            "title": "Given a conflicting approved PR with checks 'red' and checkFailures all CANCELLED or TIMED_OUT, when evaluateConflictRepairGate runs, then it returns conflicting true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "repair-gate-unfinished-checks.ac2",
+            "title": "Given checkFailures [Prompt change trailer gate CANCELLED, test FAILURE], when evaluateConflictRepairGate runs, then it returns conflicting false with reason exactly 'CI checks failing on PR HEAD <head>: Prompt change trailer gate (CANCELLED), test (FAILURE)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "repair-gate-unfinished-checks.ac3",
+            "title": "Given checks 'red' with no checkFailures field, when evaluateConflictRepairGate runs, then it returns conflicting false with reason exactly 'CI checks failing on PR HEAD <head>'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "repair-gate-unfinished-checks.ac4",
+            "title": "Given checkFailures [dagger/test ERROR], when evaluateConflictRepairGate runs, then it returns conflicting false and the reason ends with ': dagger/test (ERROR)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-ci-gate-and-repair",
+        "title": "Document the --fetch trailer gate and the unfinished-check repair rule",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T18:20:05Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4917",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md",
+            "evals/README.md",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n 'PAN-4917' docs/PIPELINE-GATES.md evals/README.md .overdeck/context/codebase/architecture.md"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "grep prints at least one PAN-4917 line for each of the three files"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "FR-8",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5. (1) docs/PIPELINE-GATES.md, section '## Conflict repair (PAN-4384)', paragraph 'The predicate.': after the sentence ending 'a red head stays on the CI-failure feedback path.' insert the PRD's quoted paragraph about CANCELLED/TIMED_OUT/STALE checks, PrFacts.checkFailures in cloister/check-failures.ts, GitLab, and PR #4911/#4915. In the 'Declined heads are logged.' paragraph add the PRD's sentence that a red-head reason names each failing check with its conclusion. (2) evals/README.md, section '### CI prompt gate': append the PRD's paragraph about the one-commit checkout, --fetch fetching only main and HEAD without blobs or tags, failing when still shallow, the overdeck-state cost, and local `npm run lint:prompt-trailer` running without --fetch. (3) .overdeck/context/codebase/architecture.md: at the end of the paragraph with grep anchor 'CI test-job classification (`verification.tests: ci`, PAN-3965) lives in' add the PRD's sentence about cloister/check-failures.ts, and update the file's single `<!-- last-verified: -->` line date. Keep exactly one last-verified line."
+        },
+        "items": [
+          {
+            "id": "docs-ci-gate-and-repair.ac1",
+            "title": "Given docs/PIPELINE-GATES.md, the 'Conflict repair (PAN-4384)' section contains a sentence stating that failing checks which all concluded CANCELLED, TIMED_OUT or STALE do not disqualify repair, and a sentence stating that decline reasons name each failing check with its conclusion",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-ci-gate-and-repair.ac2",
+            "title": "Given evals/README.md, the 'CI prompt gate' section contains a paragraph stating that CI runs the script with --fetch and fetches only main and HEAD, without blobs or tags",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-ci-gate-and-repair.ac3",
+            "title": "When `npm run lint:docs` runs, then it exits 0, and `grep -c 'last-verified' .overdeck/context/codebase/architecture.md` prints 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "trailer-fetch-mode",
+        "to": "ci-prompt-gate-fetch",
+        "type": "blocks"
+      },
+      {
+        "from": "check-failures-module",
+        "to": "repair-gate-unfinished-checks",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-03-PAN-4917-ci-trailer-gate-times-out-on-full-history-checkout-cancelled-check-blocks-merges-and-conflict-repair.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
