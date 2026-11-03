@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4888",
   "created": "2026-11-03T08:25:32.067Z",
-  "updated": "2026-11-03T09:21:53.314Z",
+  "updated": "2026-11-03T09:22:16.545Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -152,6 +152,10 @@
     "gate-yield-hook.ac5": {
       "status": "completed",
       "doneAt": "2026-11-03T09:21:53.313Z"
+    },
+    "lock-target-record.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:22:16.544Z"
     }
   }
 }
