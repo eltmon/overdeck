@@ -5,11 +5,13 @@
  * the pure reducer in directory-state.ts. Per event: reduce → persist → register → send → close,
  * so a crash never announces a machine that storage lacks.
  *
- * Internal requests arrive only from routes.ts through the Durable Object stub, so the identity
- * header is trusted here; the public `Authorization` header is never read.
+ * Internal requests arrive only through the Durable Object stub — from routes.ts, or from the
+ * account Worker's cross-script binding on the ACCOUNT_PATHS (PAN-4959) — so the identity header is
+ * trusted here; the public `Authorization` header is never read.
  * This module uses Web APIs only; src/index.ts owns the `cloudflare:workers` import.
  */
 import type { DirectoryToClientFrame, DirectoryToMachineFrame } from '../../../packages/contracts/src/connect.ts';
+import { ACCOUNT_PATHS, accountView } from './account-view.ts';
 import { reduceClient } from './client-state.ts';
 import type { ClientEvent } from './client-state.ts';
 import { EMPTY_DIRECTORY, reduce } from './directory-state.ts';
@@ -130,6 +132,10 @@ export class DirectoryHost {
   async fetch(req: Request): Promise<Response> {
     const { pathname } = new URL(req.url);
     if (pathname === INTERNAL.inbox && req.method === 'POST') return this.intake(req);
+    if (pathname === ACCOUNT_PATHS.view && req.method === 'GET') {
+      const online = new Set(this.registered().map((r) => r.environmentId));
+      return json(accountView(this.state, online, this.deps.now(), relayCapBytes(this.env.RELAY_CAP_BYTES)));
+    }
     if (pathname !== INTERNAL.socket || !isWebSocketUpgrade(req)) return new Response(null, { status: 404 });
     const identity = parseIdentity(req.headers.get(HDR_IDENTITY));
     if (!identity) return new Response(null, { status: 400 });

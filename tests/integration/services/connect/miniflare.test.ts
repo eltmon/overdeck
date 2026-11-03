@@ -43,6 +43,8 @@ const phoneToken = (n: number) => 'odd_' + n.toString(16).padStart(64, '7');
 const pushToken = (n: number) => 'odd_' + n.toString(16).padStart(64, '6');
 /** A second tester account whose relay allowance the cap test spends. */
 const RELAY_TOKEN = 'odd_' + 'c'.repeat(64);
+/** A tester account whose Directory DO the account-view test reads through the DO stub (PAN-4959). */
+const VIEW_TOKEN = 'odd_' + 'a'.repeat(64);
 
 const ACCOUNT_STUB = `
 import { WorkerEntrypoint } from 'cloudflare:workers';
@@ -53,6 +55,9 @@ export class AccountRpc extends WorkerEntrypoint {
     }
     if (token === ${JSON.stringify(RELAY_TOKEN)}) {
       return { ok: true, userId: 'u-relay', githubId: 3, deviceId: 'd-relay', entitlement: { plan: 'tester', maxDevices: null } };
+    }
+    if (token === ${JSON.stringify(VIEW_TOKEN)}) {
+      return { ok: true, userId: 'u-view', githubId: 6, deviceId: 'd-view', entitlement: { plan: 'tester', maxDevices: null } };
     }
     if (/^odd_6+[0-9a-f]$/.test(token)) {
       return { ok: true, userId: 'u-push', githubId: 5, deviceId: 'd-u' + token.slice(-1), entitlement: { plan: 'free', maxDevices: 3 } };
@@ -404,6 +409,23 @@ describe('connect service on real workerd (PAN-2356 WI-3)', () => {
       requestId: 'r-2',
     });
     expect(unexpectedOutbound).toEqual([]);
+    a.close();
+    b.close();
+  }, SLOW);
+
+  it('answers GET /account-view on the account DO stub with both machines online (PAN-4959 WI-1)', async () => {
+    const a = await register(VIEW_TOKEN, 31);
+    const b = await register(VIEW_TOKEN, 32);
+    const ns = await mf.getDurableObjectNamespace('DIRECTORY');
+    const res = await ns.get(ns.idFromName('u-view')).fetch('https://directory/account-view');
+    expect(res.status).toBe(200);
+    const view = (await res.json()) as { machines: Frame[]; relay: Frame };
+    expect(view.machines).toEqual([
+      expect.objectContaining({ environmentId: envId(31), label: 'machine-31', online: true, serverVersion: '0.72.0', deviceId: 'd-view' }),
+      expect.objectContaining({ environmentId: envId(32), label: 'machine-32', online: true, serverVersion: '0.72.0', deviceId: 'd-view' }),
+    ]);
+    for (const m of view.machines) expect(new Date(String(m['lastSeenAt'])).toISOString()).toBe(m['lastSeenAt']);
+    expect(view.relay).toMatchObject({ bytesUsed: 0, capBytes: RELAY_CAP, stopped: false });
     a.close();
     b.close();
   }, SLOW);
