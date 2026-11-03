@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4835",
   "created": "2026-11-03T07:59:34.235Z",
-  "updated": "2026-11-03T10:09:45.326Z",
+  "updated": "2026-11-03T10:10:09.276Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -188,6 +188,10 @@
     "phones-exchange-route.ac5": {
       "status": "completed",
       "doneAt": "2026-11-03T10:09:45.326Z"
+    },
+    "phones-self-routes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T10:10:09.275Z"
     }
   }
 }
