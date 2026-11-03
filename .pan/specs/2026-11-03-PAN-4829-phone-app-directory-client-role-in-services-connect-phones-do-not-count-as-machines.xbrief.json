@@ -4,17 +4,17 @@
     "created": "2026-11-03T07:42:47Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4829: Phone app: directory client role in services/connect (phones do not count as machines)",
-    "updated": "2026-11-03T07:47:32.446Z"
+    "updated": "2026-11-03T07:48:55.887Z"
   },
   "plan": {
     "id": "pan-4829",
     "title": "Phone app: directory client role in services/connect (phones do not count as machines)",
-    "status": "proposed",
+    "status": "running",
     "uid": "c32e27c6-c0e8-4100-acf7-7bd5f7c0bc18",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-03T07:42:47Z",
-    "updated": "2026-11-03T07:47:32.446Z",
+    "updated": "2026-11-03T07:48:55.887Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4829",
@@ -747,5 +747,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
