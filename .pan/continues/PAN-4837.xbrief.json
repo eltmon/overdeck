@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4837",
   "created": "2026-11-03T16:16:59.604Z",
-  "updated": "2026-11-03T18:57:05.882Z",
+  "updated": "2026-11-03T18:57:38.787Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -272,6 +272,10 @@
     "keys-android.ac4": {
       "status": "completed",
       "doneAt": "2026-11-03T18:57:05.882Z"
+    },
+    "keys-ios.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T18:57:38.786Z"
     }
   }
 }
