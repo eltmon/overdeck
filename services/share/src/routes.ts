@@ -3,49 +3,22 @@
  *
  * Order per request: match path → 404; match method → 405 with Allow; config gate → 503 for
  * everything but /healthz; 16 KiB body guard → 413; handler.
- * Every response is built by json() or withSecurityHeaders(), so each one carries
+ * Every response is built by json() or withSecurityHeaders() (http.ts), so each one carries
  * `Cache-Control: no-store` and `X-Content-Type-Options: nosniff`.
  */
 import type { CreateRoomResponse, RoomSnapshot, ShareScope } from '../../../packages/contracts/src/sharing.ts';
 import { verifyIdentity } from './account.ts';
 import { newHostToken, newShortCode, normalizeShortCode, sha256Hex } from './codes.ts';
-import type { Config, Deps, Env, RoomInitBody, RoomStatusBody } from './env.ts';
-import { HDR_HOST_TOKEN_HASH, HDR_IDENTITY, INTERNAL, parseConfig, parseTurnConfig } from './env.ts';
+import type { Deps, Env, RoomInitBody, RoomStatusBody } from './env.ts';
+import { HDR_HOST_TOKEN_HASH, HDR_IDENTITY, INTERNAL, parseConfig, parseTurnConfig, parseWebConfig } from './env.ts';
+import { json, withSecurityHeaders, type Handler, type RequestContext } from './http.ts';
 import { endedPage, invitePage } from './pages.ts';
+import { webCallback, webSession, webSignIn, webSignOut } from './web-auth.ts';
 
 export const MAX_BODY_BYTES = 16 * 1024;
 
-const COMMON_HEADERS: Record<string, string> = {
-  'Cache-Control': 'no-store',
-  'X-Content-Type-Options': 'nosniff',
-};
-
-export function json(body: unknown, status = 200, extra?: HeadersInit): Response {
-  const headers = new Headers({ ...COMMON_HEADERS, 'Content-Type': 'application/json; charset=utf-8' });
-  if (extra) new Headers(extra).forEach((value, key) => headers.set(key, value));
-  return new Response(JSON.stringify(body), { status, headers });
-}
-
-/**
- * Stamps the common headers onto a response a handler built itself (an HTML page, a 204).
- * A 101 WebSocket upgrade is returned untouched: its headers belong to the handshake.
- */
-export function withSecurityHeaders(res: Response): Response {
-  if (res.status === 101) return res;
-  const out = new Response(res.body, res);
-  for (const [key, value] of Object.entries(COMMON_HEADERS)) out.headers.set(key, value);
-  return out;
-}
-
-/** Per-request context handed to every handler. */
-export interface RequestContext {
-  env: Env;
-  config: Config;
-  deps: Deps;
-  params: Record<string, string>;
-}
-
-export type Handler = (req: Request, rc: RequestContext) => Promise<Response>;
+export { json, withSecurityHeaders } from './http.ts';
+export type { Handler, RequestContext } from './http.ts';
 
 interface Route {
   method: string;
@@ -53,9 +26,9 @@ interface Route {
   handler: Handler;
 }
 
-/** GET /healthz: liveness, whether PUBLIC_BASE_URL is set, and whether TURN is available; reveals no value. */
+/** GET /healthz: liveness, whether PUBLIC_BASE_URL is set, and whether TURN and web join are available; reveals no value. */
 function healthz(env: Env): Response {
-  return json({ ok: true, configured: parseConfig(env).ok, turn: parseTurnConfig(env) !== null });
+  return json({ ok: true, configured: parseConfig(env).ok, turn: parseTurnConfig(env) !== null, web: parseWebConfig(env) !== null });
 }
 
 /** The room's Durable Object stub; one object per short code. */
@@ -203,6 +176,10 @@ const ROUTES: Route[] = [
   { method: 'GET', pattern: '/v1/rooms/:code/host', handler: hostSocket },
   { method: 'GET', pattern: '/v1/rooms/:code/join', handler: joinSocket },
   { method: 'GET', pattern: '/s/:code', handler: landingPage },
+  { method: 'GET', pattern: '/auth/signin', handler: webSignIn },
+  { method: 'GET', pattern: '/auth/callback', handler: webCallback },
+  { method: 'POST', pattern: '/auth/signout', handler: webSignOut },
+  { method: 'GET', pattern: '/v1/web/session', handler: webSession },
 ];
 
 function matchPattern(pattern: string, pathname: string): Record<string, string> | null {

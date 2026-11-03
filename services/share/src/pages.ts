@@ -104,6 +104,11 @@ export function invitePage(shortCode: string, nonce: string): Response {
   return page('Shared conversation', body, 200, invitePageCsp(nonce));
 }
 
+/** A plain page with no script (the web sign-in outcomes, PAN-4481). Callers escape every value in `bodyHtml`. */
+export function messagePage(title: string, bodyHtml: string, status: number): Response {
+  return page(title, bodyHtml, status, HTML_CSP);
+}
+
 /** 404 for an unknown, ended or malformed code. Says nothing about whether the code ever existed. */
 export function endedPage(): Response {
   return page('Share link ended', '<h1>This share link has ended or does not exist.</h1>', 404, HTML_CSP);

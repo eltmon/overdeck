@@ -212,7 +212,7 @@ describe('share service on real workerd (PAN-658 share-room-do)', () => {
   it('GET /healthz reports configured: true and turn: true', async () => {
     const res = await req('/healthz');
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true, configured: true, turn: true });
+    expect(await res.json()).toEqual({ ok: true, configured: true, turn: true, web: false });
   }, SLOW);
 
   it('refuses a non-upgrade request with 426 and an unknown protocol version with 400', async () => {

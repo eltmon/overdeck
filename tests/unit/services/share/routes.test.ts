@@ -108,21 +108,21 @@ describe('share service route table (PAN-658 share-scaffold)', () => {
     const env = makeEnv({ PUBLIC_BASE_URL: undefined, TURN_KEY_ID: undefined, TURN_KEY_API_TOKEN: undefined });
     const res = await call('GET', '/healthz', env);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true, configured: false, turn: false });
+    expect(await res.json()).toEqual({ ok: true, configured: false, turn: false, web: false });
   });
 
   it('GET /healthz reports configured=true once PUBLIC_BASE_URL is set', async () => {
     const res = await call('GET', '/healthz', makeEnv({ TURN_KEY_ID: undefined }));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true, configured: true, turn: false });
+    expect(await res.json()).toEqual({ ok: true, configured: true, turn: false, web: false });
   });
 
   it('GET /healthz reports turn=true only when both TURN secrets are set', async () => {
     const res = await call('GET', '/healthz');
-    expect(await res.json()).toEqual({ ok: true, configured: true, turn: true });
+    expect(await res.json()).toEqual({ ok: true, configured: true, turn: true, web: false });
 
     const blank = await call('GET', '/healthz', makeEnv({ TURN_KEY_API_TOKEN: '  ' }));
-    expect(await blank.json()).toEqual({ ok: true, configured: true, turn: false });
+    expect(await blank.json()).toEqual({ ok: true, configured: true, turn: false, web: false });
   });
 
   it('an unknown path returns 404 not_found', async () => {
@@ -147,11 +147,11 @@ describe('share service route table (PAN-658 share-scaffold)', () => {
     expect(parseConfig(makeEnv({ PUBLIC_BASE_URL: undefined }))).toEqual({ ok: false, missing: ['PUBLIC_BASE_URL'] });
     expect(parseConfig(makeEnv({ PUBLIC_BASE_URL: 'https://share.test//', TURN_KEY_ID: undefined }))).toEqual({
       ok: true,
-      config: { publicBaseUrl: 'https://share.test', turn: null },
+      config: { publicBaseUrl: 'https://share.test', turn: null, web: null },
     });
     expect(parseConfig(makeEnv())).toEqual({
       ok: true,
-      config: { publicBaseUrl: TEST_BASE_URL, turn: { keyId: 'turn-key-id', apiToken: 'turn-api-token' } },
+      config: { publicBaseUrl: TEST_BASE_URL, turn: { keyId: 'turn-key-id', apiToken: 'turn-api-token' }, web: null },
     });
   });
 
