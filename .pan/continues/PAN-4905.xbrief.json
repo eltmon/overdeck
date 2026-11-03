@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4905",
   "created": "2026-11-03T15:51:11.476Z",
-  "updated": "2026-11-03T15:56:35.502Z",
+  "updated": "2026-11-03T15:56:49.924Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-4905",
       "claimedAt": "2026-11-03T15:51:11.476Z",
       "doneAt": "2026-11-03T15:56:35.502Z"
+    },
+    "toml-enable-writer": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4905",
+      "claimedAt": "2026-11-03T15:56:49.924Z"
     }
   }
 }
