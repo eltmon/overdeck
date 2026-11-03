@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4834",
   "created": "2026-11-03T14:27:37.940Z",
-  "updated": "2026-11-03T14:49:06.521Z",
+  "updated": "2026-11-03T14:51:14.743Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,9 +46,10 @@
       "doneAt": "2026-11-03T14:49:01.718Z"
     },
     "phone-channel-integration": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4834",
-      "claimedAt": "2026-11-03T14:49:06.521Z"
+      "claimedAt": "2026-11-03T14:49:06.521Z",
+      "doneAt": "2026-11-03T14:51:14.743Z"
     }
   }
 }
