@@ -1,0 +1,474 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-03T21:36:04Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4931: Agent MCP and bots (W-MCP1): Tool module: visibility, methods, token file",
+    "updated": "2026-11-03T21:39:53.501Z"
+  },
+  "plan": {
+    "id": "pan-4931",
+    "title": "Agent MCP and bots (W-MCP1): Tool module: visibility, methods, token file",
+    "status": "proposed",
+    "uid": "a6a2a122-cd51-4d4d-964d-e5306e7ef938",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-03T21:36:04Z",
+    "updated": "2026-11-03T21:39:53.501Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4931",
+        "label": "PAN-4931",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4931.md",
+        "label": "PRD draft (.pan/drafts/PAN-4931.md)",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/pan-4927.md",
+        "label": "Epic PRD PAN-4927, work item W-MCP1",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "mcp",
+      "access-tokens",
+      "cli",
+      "pan-4927"
+    ],
+    "narratives": {
+      "Problem": "The Overdeck MCP server (src/lib/mcp/) lists all ten tools to every caller, even tools whose route the token cannot use, and it has no way to keep future agent-only tools away from outside clients. Its dashboard client supports only GET and POST without an abort signal. pan mcp serve reads its token only from OVERDECK_MCP_TOKEN, but managed agents (PAN-4927 W-INJ*) will receive the token as a 0600 file.",
+      "Proposal": "Give every OverdeckTool a scope (the scope of the route it calls) and an audience ('any' | 'agent'), and McpToolContext an isAgent flag set from the token's agentId through one structural helper hasAgentId. Filter tools/list and tools/call through visibleTools(ctx, tools = ALL_TOOLS): a hidden tool answers 'Unknown tool <name>'. Widen DashboardApi.request to GET/POST/PUT/PATCH/DELETE with an optional { signal }. Let pan mcp serve read OVERDECK_MCP_TOKEN_FILE through one async file handle and refuse any mode with group or other bits. Update configuration/mcp.mdx and docs/DASHBOARD-AUTH.md. The PRD .pan/drafts/PAN-4931.md holds exact code, messages and the list of existing tests to update.",
+      "NonGoals": "- Do not edit src/lib/access-tokens.ts or src/dashboard/server/routes/dashboard-auth.ts, and do not widen AccessTokenRecord, CreateAccessTokenInput or DashboardCredential (PAN-4930 W-TOK1 owns them).\n- Do not add any agent-only tool, /api/self route or MCP injection into agents.\n- Do not change any route scope, route-scopes.ts row or route handler behavior.\n- Do not remove the in-tool approve check in answer_question or the MISSING_APPROVE_TEXT export.\n- Do not delete the existing 403-to-missingScope tool tests; re-scope them.\n- No Windows ACL check for the token file.\n- Do not write the new cli/mcp.mdx page or the other PAN-4927 W-DOC changes."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Read agentId structurally with hasAgentId(value: object) instead of using record.agentId / credential.agentId typed fields.",
+        "rationale": "PAN-4930 (W-TOK1) adds those fields and is unstarted; the issue says W-MCP1 depends on nothing, so the code must compile and work in either merge order without touching PAN-4930's files."
+      },
+      {
+        "summary": "Keep the in-tool approve check in answer_question and test it through a direct run() call.",
+        "rationale": "Visibility now hides the tool without approve, so the check is defense in depth; removing it is not asked for and would weaken the tool if visibility ever regressed."
+      },
+      {
+        "summary": "Make visibleTools and createOverdeckMcpServer take an optional tool list defaulting to ALL_TOOLS.",
+        "rationale": "No real audience:'agent' tool exists in this issue, so the agent-only AC needs a synthetic tool in tests; production callers never pass the argument."
+      },
+      {
+        "summary": "Update the pan mcp serve description to name OVERDECK_MCP_TOKEN_FILE and regenerate the composer-command manifest.",
+        "rationale": "A stale description misleads users; lint:slash-commands fails CI unless the generated manifest matches."
+      },
+      {
+        "summary": "Rethrow the original error when an aborted signal causes the fetch failure, instead of the 'dashboard unreachable' wrapping.",
+        "rationale": "An abort is a caller decision, not an outage; wait tools need to tell the two apart."
+      },
+      {
+        "summary": "Exact stderr texts for the token-file failure cases are fixed in PRD D-6.",
+        "rationale": "The epic PRD names only the mode message; fixing all texts lets tests assert them and removes executor judgment."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Small: 16 files, all inside the MCP module, its two transports, their tests and two doc pages.",
+      "canonicalFilename": "2026-11-03-PAN-4931-agent-mcp-and-bots-w-mcp1-tool-module-visibility-methods-token-file.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "tool-scope-audience",
+        "title": "Add scope, audience and isAgent to the MCP tool types and annotate the ten tools",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T21:36:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4931",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "visible-tools-filter",
+            "serve-token-file"
+          ],
+          "files_scope": [
+            "src/lib/mcp/tool.ts",
+            "src/lib/mcp/server.ts",
+            "src/lib/mcp/tools-read.ts",
+            "src/lib/mcp/tools-write.ts",
+            "src/lib/mcp/tools-approve.ts",
+            "src/cli/commands/mcp.ts",
+            "src/dashboard/server/routes/mcp.ts",
+            "tests/unit/lib/mcp/harness.ts",
+            "tests/unit/lib/mcp/tool-annotations.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/mcp/ tests/unit/cli/mcp.test.ts src/dashboard/server/__tests__/mcp-route.test.ts src/dashboard/server/__tests__/mcp-acceptance.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tests/unit/lib/mcp/tool-annotations.test.ts passes and every pre-existing MCP test still passes unchanged"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-9",
+            "NFR-2",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4931.md WI-1 steps 1-7. In src/lib/mcp/tool.ts add `scope: AccessTokenScope` and `audience: 'any' | 'agent'` to OverdeckTool, required `isAgent: boolean` to McpToolContext, and export `hasAgentId(value: object): boolean` exactly as PRD D-1 (`'agentId' in value && typeof value.agentId === 'string' && value.agentId.length > 0`). Give the ten tools `audience: 'any'` and the scope from PRD Facts table 3 (list_machines read:state; list_conversations, search_conversations, read_conversation, list_pending_input read:conversations; send_message tell; start_conversation, start_worker operate; answer_question, answer_permission approve). Re-export hasAgentId from server.ts. Pass `isAgent: hasAgentId(record)` in src/cli/commands/mcp.ts and `isAgent: hasAgentId(credential)` through serveMcpRequest in src/dashboard/server/routes/mcp.ts. Give tests/unit/lib/mcp/harness.ts connectClient an `isAgent = false` parameter. No filtering yet: behavior is unchanged. Do not edit access-tokens.ts or dashboard-auth.ts."
+        },
+        "items": [
+          {
+            "id": "tool-scope-audience.ac1",
+            "title": "Given ALL_TOOLS, when tool-annotations.test.ts runs, then every tool has audience 'any' and each single-route tool's scope equals requiredScopeFor(method, path) of its route from route-scopes.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tool-scope-audience.ac2",
+            "title": "Given the tool list, when tool-annotations.test.ts reads answer_question.scope and answer_permission.scope, then both return 'approve'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tool-scope-audience.ac3",
+            "title": "hasAgentId returns true for { kind: 'token', agentId: 'agent-pan-1' } and returns false for { kind: 'token' }, { agentId: '' } and { agentId: 42 }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tool-scope-audience.ac4",
+            "title": "Both transports pass isAgent from hasAgentId to createOverdeckMcpServer, and the git diff shows no change to src/lib/access-tokens.ts or src/dashboard/server/routes/dashboard-auth.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "visible-tools-filter",
+        "title": "Filter tools/list and tools/call through visibleTools",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T21:36:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4931",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/mcp/server.ts",
+            "tests/unit/lib/mcp/harness.ts",
+            "tests/unit/lib/mcp/visibility.test.ts",
+            "tests/unit/lib/mcp/tools-read.test.ts",
+            "tests/unit/lib/mcp/tools-write.test.ts",
+            "tests/unit/lib/mcp/tools-approve.test.ts",
+            "src/dashboard/server/__tests__/mcp-acceptance.test.ts",
+            "src/dashboard/server/__tests__/mcp-route.test.ts",
+            "tests/unit/cli/mcp.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/mcp/ tests/unit/cli/mcp.test.ts src/dashboard/server/__tests__/mcp-route.test.ts src/dashboard/server/__tests__/mcp-acceptance.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tests/unit/lib/mcp/visibility.test.ts passes along with the seven updated tests named in the PRD table"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-3",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2 steps 1-6. In src/lib/mcp/server.ts add `export function visibleTools(ctx: Pick<McpToolContext, 'scopes' | 'isAgent'>, tools: readonly OverdeckTool[] = ALL_TOOLS): OverdeckTool[]` returning tools where `scopeSatisfies(ctx.scopes, tool.scope) && (tool.audience === 'any' || ctx.isAgent)`. Change createOverdeckMcpServer to `(ctx, tools = ALL_TOOLS)`, compute visible once, and build both the ListTools answer and byName from it so a hidden tool answers the existing `Unknown tool <name>`. Update the module header. Extend harness connectClient with an optional tools argument. Write tests/unit/lib/mcp/visibility.test.ts with the synthetic agent_probe tool from the PRD. Update the seven existing tests exactly as the PRD table 'Existing tests the visibility filter breaks' says; re-scope the 403-to-missingScope tests instead of deleting them, and test MISSING_APPROVE_TEXT through a direct run() call. In visibility.test.ts use the full non-admin set ['read:state','read:conversations','operate','approve'] for the all-ten case, not ['admin'] (both transports refuse admin before a server is built)."
+        },
+        "items": [
+          {
+            "id": "visible-tools-filter.ac1",
+            "title": "Given a token with only read:state, when tools/list runs, then it returns exactly ['list_machines']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "visible-tools-filter.ac2",
+            "title": "Given the synthetic audience:'agent' tool, when isAgent is false then tools/list omits it and tools/call returns isError with text 'Unknown tool agent_probe'; when isAgent is true then tools/list includes it and the call returns { ok: true }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "visible-tools-filter.ac3",
+            "title": "Given a read:conversations token, when it calls answer_permission, then the result text is 'Unknown tool answer_permission' and the fake dashboard API records zero calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "visible-tools-filter.ac4",
+            "title": "Given the default MCP scopes (read:state, read:conversations, operate), when mcp-route.test.ts calls tools/list, then it returns 8 tools without answer_question and answer_permission; given a read:conversations stdio token, tests/unit/cli/mcp.test.ts tools/list returns list_conversations, search_conversations, read_conversation, list_pending_input",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dashboard-api-methods",
+        "title": "Widen DashboardApi.request to PUT, PATCH and DELETE with an optional abort signal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T21:36:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4931",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/mcp/dashboard-api.ts",
+            "tests/unit/lib/mcp/harness.ts",
+            "tests/unit/lib/mcp/dashboard-api.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/mcp/"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tests/unit/lib/mcp/dashboard-api.test.ts passes and the other tests/unit/lib/mcp tests still pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3 steps 1-3. In src/lib/mcp/dashboard-api.ts export `type DashboardApiMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'` and `interface DashboardRequestInit { signal?: AbortSignal }`; change the interface to `request(method: DashboardApiMethod, path: string, body?: unknown, init?: DashboardRequestInit)`. In createFetchDashboardApi send a JSON body (`body ?? {}`) and Content-Type for every method except GET and DELETE, pass the signal into fetch's init, and in the catch rethrow the original error when the signal is aborted (otherwise keep the 'Overdeck dashboard unreachable at <baseUrl>: <message>' wrapping). Change harness RecordedCall.method to DashboardApiMethod. Write tests/unit/lib/mcp/dashboard-api.test.ts with a fake fetchImpl; use an already-aborted AbortController, never AbortSignal.timeout or real delays."
+        },
+        "items": [
+          {
+            "id": "dashboard-api-methods.ac1",
+            "title": "Given a DELETE or GET request, when the fake fetch records its init, then init.body is undefined and no Content-Type header is sent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-api-methods.ac2",
+            "title": "Given PUT, PATCH or POST with { a: 1 }, then init.body equals '{\"a\":1}' with Content-Type application/json, and PATCH with no body sends '{}'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-api-methods.ac3",
+            "title": "Given an aborted signal and a fetch that rejects with an AbortError, then request rejects with an error named AbortError; a non-abort rejection still produces 'Overdeck dashboard unreachable at http://dash: boom'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "serve-token-file",
+        "title": "Let pan mcp serve read a 0600 OVERDECK_MCP_TOKEN_FILE",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T21:36:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4931",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/mcp.ts",
+            "tests/unit/cli/mcp.test.ts",
+            "packages/contracts/src/composer-commands.generated.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npm run build:cli && bash scripts/lint-slash-commands.sh",
+            "npx vitest run tests/unit/cli/mcp.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "npm run lint completes without errors",
+            "lint-slash-commands prints 'composer-command manifest matches the CLI registry'",
+            "tests/unit/cli/mcp.test.ts passes including the five new token-file tests"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "NFR-1",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4 steps 1-5. Add a private async readServeToken(deps) in src/cli/commands/mcp.ts: use OVERDECK_MCP_TOKEN when non-empty after trim; otherwise open the file named by OVERDECK_MCP_TOKEN_FILE with `open` from node:fs/promises (dynamic import), check `(mode & 0o077) !== 0` on handle.stat(), read with handle.readFile('utf8'), trim, and close in finally. Use exactly the stderr texts of PRD D-6 (neither set; could not be read; must be mode 0600 with the octal mode and a chmod hint; is empty). Keep the existing three refusal messages and verification order. Update the module header. Change the serve .description to the PRD D-8 text, then run `npm run build:cli && npm run generate:slash-commands` and commit the regenerated packages/contracts/src/composer-commands.generated.ts in the same commit. Add the five tests from PRD WI-4 step 5; always chmod token files explicitly after writing them (umask). No *Sync fs calls."
+        },
+        "items": [
+          {
+            "id": "serve-token-file.ac1",
+            "title": "Given only OVERDECK_MCP_TOKEN_FILE pointing at a mode-0600 file with a valid token, when runMcpServe runs, then it serves tools/list and resolves 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "serve-token-file.ac2",
+            "title": "Given the same file chmod 0644, then runMcpServe resolves 1 and stderr contains 'OVERDECK_MCP_TOKEN_FILE must be mode 0600'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "serve-token-file.ac3",
+            "title": "Given OVERDECK_MCP_TOKEN holds a valid token and the file holds a revoked one, then runMcpServe serves with the environment token (env wins)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "serve-token-file.ac4",
+            "title": "Given a missing file path or an empty 0600 file, then runMcpServe resolves 1 with stderr containing 'could not be read' or 'is empty' respectively",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "serve-token-file.ac5",
+            "title": "After npm run build:cli, scripts/lint-slash-commands.sh exits 0 and the generated manifest entry for pan-mcp-serve contains OVERDECK_MCP_TOKEN_FILE",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mcp-docs",
+        "title": "Document tool visibility and the token file in configuration/mcp.mdx and docs/DASHBOARD-AUTH.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T21:36:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4931",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/mcp.mdx",
+            "docs/DASHBOARD-AUTH.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5 changes 1-5. In configuration/mcp.mdx: after the Tools table add the visibility paragraph (tools/list shows only tools whose scope the token holds; a read:state token sees only list_machines; a hidden tool answers 'Unknown tool <name>'; agent tools are listed only to agent tokens); replace lines 39-40 so a route 403 is described as still possible for a listed tool; rewrite 'Over stdio' so pan mcp serve reads OVERDECK_MCP_TOKEN or, when unset, the 0600 file OVERDECK_MCP_TOKEN_FILE, with the chmod 600 example and the extended exit-1 list. In docs/DASHBOARD-AUTH.md /mcp subsection add the visibility sentence (scope and audience 'agent', PAN-4927 D-14) and the token-file sentence. Leave cli/mcp.mdx, the line-11 fix and agent-tool sections to PAN-4927 W-DOC."
+        },
+        "items": [
+          {
+            "id": "mcp-docs.ac1",
+            "title": "configuration/mcp.mdx 'Over stdio' names OVERDECK_MCP_TOKEN_FILE, states the file must be mode 0600, and shows a chmod 600 example",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-docs.ac2",
+            "title": "configuration/mcp.mdx states that tools/list shows only tools the token's scope covers and that a hidden tool returns 'Unknown tool <name>'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-docs.ac3",
+            "title": "docs/DASHBOARD-AUTH.md /mcp subsection describes scope and audience visibility and the OVERDECK_MCP_TOKEN_FILE source, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "tool-scope-audience",
+        "to": "visible-tools-filter",
+        "type": "blocks"
+      },
+      {
+        "from": "tool-scope-audience",
+        "to": "serve-token-file",
+        "type": "blocks"
+      },
+      {
+        "from": "visible-tools-filter",
+        "to": "serve-token-file",
+        "type": "blocks"
+      },
+      {
+        "from": "tool-scope-audience",
+        "to": "dashboard-api-methods",
+        "type": "blocks"
+      },
+      {
+        "from": "visible-tools-filter",
+        "to": "dashboard-api-methods",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
