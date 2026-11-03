@@ -69,6 +69,7 @@ describe('resolveOxBinary', () => {
     expect(result).toEqual({
       ok: false,
       reason: 'not-built',
+      commit: OTHER,
       message: 'ox is not built for the sageox pack (bbbbbbb); run pan skills pack sync sageox',
     });
   });

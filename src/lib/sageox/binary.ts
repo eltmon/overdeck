@@ -13,7 +13,8 @@ const PACK_ID = 'sageox';
 
 export type OxBinary =
   | { ok: true; bin: string; binDir: string; commit: string }
-  | { ok: false; reason: 'not-registered' | 'not-built'; message: string };
+  | { ok: false; reason: 'not-registered'; message: string }
+  | { ok: false; reason: 'not-built'; commit: string; message: string };
 
 export async function resolveOxBinary(
   deps: { getPack?: typeof getPack; isReady?: typeof isOxBuildReady } = {},
@@ -31,6 +32,7 @@ export async function resolveOxBinary(
     return {
       ok: false,
       reason: 'not-built',
+      commit: entry.commit,
       message: `ox is not built for the sageox pack (${entry.commit.slice(0, 7)}); run pan skills pack sync sageox`,
     };
   }
