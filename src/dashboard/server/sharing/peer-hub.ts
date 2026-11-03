@@ -25,6 +25,13 @@
  * and hello are both ready; such a peer first gets the current drafts (minus its own). A viewer who
  * leaves the snapshot's admitted set loses their draft.
  *
+ * Prompts (FR-5..FR-10, D-1, D-10): a `control` `submit` from a negotiated, eligible viewer whose
+ * snapshot entry is `contributor` goes into the share's SubmitQueue; anyone else is answered
+ * `rejected not_contributor`. Controller sends from ShareManager use the same queue. Each contributor
+ * submit is acknowledged `queued`, then `sent` or `rejected`; a snapshot that removes the grant drops
+ * the author's queued items as `grant_revoked`. Right before a delivery the bridge is told whom to
+ * credit, and presence carries the queue's `agentWorking` and `queued`.
+ *
  * Presence (FR-9, D-17, D-18): a negotiated peer's `presence` channel carries the roster (data owner
  * first), the controller and the stream when it opens, and again after every snapshot that changes
  * them. The block list and `connected` never cross the wire.
@@ -42,12 +49,16 @@ import {
   type ControlPayload,
   type ConversationPayload,
   type DraftPayload,
+  type SendSharePromptRequest,
   type HostFrame,
   type IceServer,
   type PresencePayload,
   type RoomSnapshot,
   type ShareDraftView,
+  type ShareIdentity,
+  type ShareQueueView,
   type ShareScope,
+  type SharedSubmitReason,
   type SharedChannel,
   type SharedHello,
   type SignalData,
@@ -62,9 +73,16 @@ import {
   type ConversationSink,
 } from './conversation-bridge.js';
 import { DraftBoard } from './draft-board.js';
+import { productionSubmitQueueDeps, SubmitQueue, type QueuedPrompt, type SubmitQueueDeps } from './submit-queue.js';
 
 export const ICE_SERVERS_TIMEOUT_MS = 5_000;
 export const ICE_SERVERS_CACHE_MS = 50 * 60_000;
+/** A contributor submit's client id (D-12). */
+const CLIENT_ID = /^[A-Za-z0-9_-]{1,64}$/;
+
+export type ControllerSendResult =
+  | { ok: true; position: number }
+  | { ok: false; reason: 'invalid_prompt' | 'too_long' | 'queue_full' };
 
 /** What the hub needs from ShareManager. `sendFrame` returns false when the host socket cannot send. */
 export interface PeerHubContext {
@@ -109,6 +127,9 @@ export interface HostHub {
   onIceServersUnavailable(): void;
   /** The viewers' current drafts, oldest started first (PAN-4476). */
   draftsView(): ShareDraftView[];
+  queueView(): ShareQueueView;
+  /** Queues a controller send; `draftGithubId` credits and clears that viewer's draft (D-1). */
+  sendFromController(input: SendSharePromptRequest, controller: ShareIdentity | null): ControllerSendResult;
   close(): void;
 }
 
@@ -116,7 +137,12 @@ export interface PeerHubDeps {
   createPeerConnection(config: {
     iceServers: Array<{ urls: string[]; username?: string; credential?: string }>;
   }): HubPeerConnection;
-  bridge: { attach(sink: ConversationSink): Promise<() => void>; close(): void };
+  bridge: {
+    attach(sink: ConversationSink): Promise<() => void>;
+    expectAuthor(text: string, author: { login: string; avatarUrl: string }): () => void;
+    close(): void;
+  };
+  queue: SubmitQueueDeps;
   streamLabel(): Promise<string>;
   now(): number;
 }
@@ -139,6 +165,8 @@ interface PeerEntry {
   readonly draftReader: SharedChannelReader;
   /** The current drafts were sent; later relays follow. */
   draftsSynced: boolean;
+  /** Client ids this peer has queued; a repeat is ignored while the item waits (D-12). */
+  readonly pendingAcks: Set<string>;
   localSent: boolean;
   remoteSet: boolean;
   helloState: 'waiting' | 'negotiated' | 'failed';
@@ -167,6 +195,8 @@ export class PeerHub implements HostHub {
   private labelValue: string | null = null;
   private readonly hostHello: SharedHello;
   private readonly drafts: DraftBoard;
+  private readonly queue: SubmitQueue;
+  private queueStatus = { agentWorking: false, queued: 0 };
 
   constructor(
     private readonly ctx: PeerHubContext,
@@ -175,6 +205,15 @@ export class PeerHub implements HostHub {
     this.label = deps.streamLabel().catch(() => ctx.scope.conversationId);
     this.hostHello = { v: SHARED_WIRE_VERSION, scopeKinds: SHARED_SCOPE_KINDS, scope: ctx.scope };
     this.drafts = new DraftBoard({ now: () => deps.now(), onRelay: (payload) => this.relayDraft(payload) });
+    this.queue = new SubmitQueue(deps.queue, {
+      onDelivering: (item) =>
+        item.author ? deps.bridge.expectAuthor(item.text, { login: item.author.login, avatarUrl: item.author.avatarUrl }) : () => undefined,
+      onOutcome: (item, outcome) => this.onOutcome(item, outcome),
+      onStatus: (status) => {
+        this.queueStatus = status;
+        for (const entry of [...this.peers.values()]) this.maybeSendPresence(entry);
+      },
+    });
   }
 
   /** Live (not closed) peer connections, for tests and diagnostics. */
@@ -197,6 +236,7 @@ export class PeerHub implements HostHub {
 
   onSnapshot(snapshot: RoomSnapshot): void {
     if (this.closed) return;
+    const previous = this.snapshot;
     this.snapshot = snapshot;
     const listed = new Set(snapshot.participants.map((participant) => participant.githubId));
     for (const githubId of [...this.hostAdmitted]) {
@@ -207,6 +247,7 @@ export class PeerHub implements HostHub {
     for (const draft of this.drafts.list()) {
       if (!admitted.has(draft.githubId)) this.drafts.remove(draft.githubId);
     }
+    this.dropRevoked(previous, snapshot);
     for (const entry of [...this.peers.values()]) this.maybeSendPresence(entry);
   }
 
@@ -232,11 +273,30 @@ export class PeerHub implements HostHub {
     return this.drafts.list();
   }
 
+  queueView(): ShareQueueView {
+    return this.queue.view();
+  }
+
+  sendFromController(input: SendSharePromptRequest, controller: ShareIdentity | null): ControllerSendResult {
+    const draft = input.draftGithubId === undefined ? undefined : this.drafts.list().find((d) => d.githubId === input.draftGithubId);
+    const author = draft ? { githubId: draft.githubId, login: draft.login, avatarUrl: draft.avatarUrl } : controller;
+    const result = this.queue.enqueue({ clientId: null, source: 'controller', author, text: input.text });
+    if (!result.ok) return result;
+    // The draft is cleared only once its send is queued, so a refused send keeps it.
+    if (draft) {
+      this.drafts.take(draft.githubId);
+      const entry = this.peers.get(draft.githubId);
+      if (entry) this.sendEnvelope(entry, 'control', { kind: 'draft-sent' });
+    }
+    return { ok: true, position: result.position };
+  }
+
   close(): void {
     if (this.closed) return;
     this.closed = true;
     for (const entry of [...this.peers.values()]) this.closePeer(entry);
     this.drafts.close();
+    this.queue.close();
     this.hostAdmitted.clear();
     if (this.pendingIce) this.resolveIce(this.pendingIce, []);
     this.deps.bridge.close();
@@ -270,6 +330,7 @@ export class PeerHub implements HostHub {
       reader: new SharedChannelReader(SHARE_MAX_INBOUND_ENVELOPE_CHARS),
       draftReader: new SharedChannelReader(SHARE_MAX_INBOUND_ENVELOPE_CHARS),
       draftsSynced: false,
+      pendingAcks: new Set(),
       localSent: false,
       remoteSet: false,
       helloState: 'waiting',
@@ -416,12 +477,17 @@ export class PeerHub implements HostHub {
     if (entry.closed || typeof data !== 'string') return;
     const result = entry.reader.read(data);
     if (result.kind !== 'envelope' || result.envelope.ch !== 'control') return;
-    const payload = result.envelope.payload as { kind?: unknown; hello?: unknown } | null;
-    if (typeof payload !== 'object' || payload === null || payload.kind !== 'hello') return;
-    if (entry.helloState !== 'waiting') return;
+    const payload = result.envelope.payload as { kind?: unknown; hello?: unknown; clientId?: unknown; text?: unknown } | null;
+    if (typeof payload !== 'object' || payload === null) return;
+    if (payload.kind === 'submit') {
+      if (entry.helloState === 'negotiated') this.onSubmit(entry, payload.clientId, payload.text);
+      return;
+    }
+    if (payload.kind !== 'hello' || entry.helloState !== 'waiting') return;
     const negotiated = negotiateHello(this.hostHello, payload.hello);
     if (negotiated.ok) {
       entry.helloState = 'negotiated';
+      this.queue.setWatching(true);
       this.maybeAttachConversation(entry);
       this.maybeSendPresence(entry);
       this.maybeSyncDrafts(entry);
@@ -429,6 +495,53 @@ export class PeerHub implements HostHub {
       entry.helloState = 'failed';
       this.sendEnvelope(entry, 'control', { kind: 'error', code: negotiated.code });
     }
+  }
+
+  private onSubmit(entry: PeerEntry, clientId: unknown, text: unknown): void {
+    if (typeof clientId !== 'string' || !CLIENT_ID.test(clientId) || typeof text !== 'string') return;
+    if (entry.pendingAcks.has(clientId)) return;
+    const participant = this.snapshot?.participants.find((p) => p.githubId === entry.githubId);
+    const eligible = participant !== undefined && this.hostAdmitted.has(participant.githubId)
+      && participant.state === 'admitted' && participant.connected;
+    if (!eligible || !participant.contributor) {
+      this.sendAck(entry, { kind: 'submit-ack', clientId, status: 'rejected', reason: 'not_contributor' });
+      return;
+    }
+    const author = { githubId: participant.githubId, login: participant.login, avatarUrl: participant.avatarUrl };
+    const result = this.queue.enqueue({ clientId, source: 'contributor', author, text });
+    if (result.ok) {
+      entry.pendingAcks.add(clientId);
+      this.sendAck(entry, { kind: 'submit-ack', clientId, status: 'queued', position: result.position });
+    } else {
+      this.sendAck(entry, { kind: 'submit-ack', clientId, status: 'rejected', reason: result.reason });
+    }
+  }
+
+  private onOutcome(item: QueuedPrompt, outcome: 'sent' | SharedSubmitReason): void {
+    if (item.source !== 'contributor' || !item.author || item.clientId === null) return;
+    const entry = this.peers.get(item.author.githubId);
+    if (!entry) return;
+    entry.pendingAcks.delete(item.clientId);
+    this.sendAck(
+      entry,
+      outcome === 'sent'
+        ? { kind: 'submit-ack', clientId: item.clientId, status: 'sent' }
+        : { kind: 'submit-ack', clientId: item.clientId, status: 'rejected', reason: outcome },
+    );
+  }
+
+  /** Drops the queued items of every author who is no longer an admitted contributor (FR-7). */
+  private dropRevoked(previous: RoomSnapshot | null, snapshot: RoomSnapshot): void {
+    const allowed = new Set(snapshot.participants.filter((p) => p.state === 'admitted' && p.contributor).map((p) => p.githubId));
+    const ids = new Set([...(previous?.participants ?? []), ...snapshot.participants].map((p) => p.githubId));
+    for (const githubId of ids) {
+      if (allowed.has(githubId)) continue;
+      for (const item of this.queue.dropAuthor(githubId)) this.onOutcome(item, 'grant_revoked');
+    }
+  }
+
+  private sendAck(entry: PeerEntry, ack: Extract<ControlPayload, { kind: 'submit-ack' }>): void {
+    if (!entry.closed) this.sendEnvelope(entry, 'control', ack);
   }
 
   private onDraftMessage(entry: PeerEntry, data: string | Buffer): void {
@@ -471,7 +584,7 @@ export class PeerHub implements HostHub {
   private maybeSendPresence(entry: PeerEntry): void {
     if (entry.closed || entry.helloState !== 'negotiated' || !entry.open.has('presence')) return;
     if (this.snapshot === null || this.labelValue === null) return;
-    const presence = presenceOf(this.snapshot, this.ctx.scope, this.labelValue);
+    const presence = presenceOf(this.snapshot, this.ctx.scope, this.labelValue, this.queueStatus);
     const json = JSON.stringify(presence);
     if (json === entry.presenceSent) return;
     entry.presenceSent = json;
@@ -505,6 +618,7 @@ export class PeerHub implements HostHub {
     if (entry.closed) return;
     entry.closed = true;
     if (this.peers.get(entry.githubId) === entry) this.peers.delete(entry.githubId);
+    if (![...this.peers.values()].some((peer) => peer.helloState === 'negotiated')) this.queue.setWatching(false);
     entry.detachConversation?.();
     entry.detachConversation = null;
     for (const writer of entry.writers.values()) writer.close();
@@ -524,7 +638,12 @@ export class PeerHub implements HostHub {
 }
 
 /** The roster a viewer sees: the data owner first, then every snapshot participant; built field by field. */
-export function presenceOf(snapshot: RoomSnapshot, scope: ShareScope, label: string): PresencePayload {
+export function presenceOf(
+  snapshot: RoomSnapshot,
+  scope: ShareScope,
+  label: string,
+  status: { agentWorking: boolean; queued: number } = { agentWorking: false, queued: 0 },
+): PresencePayload {
   const owner = snapshot.dataOwner;
   return {
     controllerGithubId: snapshot.controllerGithubId,
@@ -546,7 +665,9 @@ export function presenceOf(snapshot: RoomSnapshot, scope: ShareScope, label: str
         isHost: false,
       })),
     ],
-    streams: [{ streamId: scope.conversationId, label, kind: 'conversation' }],
+    streams: [
+      { streamId: scope.conversationId, label, kind: 'conversation', agentWorking: status.agentWorking, queued: status.queued },
+    ],
   };
 }
 
@@ -554,6 +675,7 @@ export function productionPeerHubDeps(conversationName: string): PeerHubDeps {
   return {
     createPeerConnection: (config) => new RTCPeerConnection(config) as unknown as HubPeerConnection,
     bridge: new ConversationBridge(conversationName, productionBridgeDeps()),
+    queue: productionSubmitQueueDeps(conversationName),
     streamLabel: () => conversationLabel(conversationName),
     now: () => Date.now(),
   };

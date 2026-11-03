@@ -105,6 +105,11 @@ async function start(): Promise<{ emit: (result: ParseResult) => void; viewer: L
     {
       createPeerConnection: (config) => new RTCPeerConnection(config) as unknown as HubPeerConnection,
       bridge,
+      queue: {
+        deliver: async () => ({ status: 200, body: {} }),
+        activity: async () => ({ working: false, lastMessageId: null }),
+        now: () => Date.now(),
+      },
       streamLabel: async () => 'Fixture',
       now: () => Date.now(),
     },

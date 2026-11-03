@@ -18,6 +18,7 @@ import {
   type HubPeerConnection,
   type PeerHubDeps,
 } from '../peer-hub.js';
+import { QUEUE_TICK_MS, type SubmitQueueDeps } from '../submit-queue.js';
 
 const scope: ShareScope = { kind: 'conversation', conversationId: 'conv-a' };
 
@@ -133,6 +134,13 @@ function snapshot(...participants: RoomParticipant[]): RoomSnapshot {
   };
 }
 
+/** Every hub a test built; closed after each test so no queue ticker outlives it. */
+const hubs: PeerHub[] = [];
+
+afterEach(() => {
+  for (const hub of hubs.splice(0)) hub.close();
+});
+
 /** Lets the hub's promise chains (ICE wait, label, offer) run; setImmediate stays real. */
 const settle = () => new Promise<void>((resolve) => setImmediate(resolve));
 
@@ -142,11 +150,21 @@ function setup(
     streamLabel?: () => Promise<string>;
     onPeer?: (peer: FakePeer) => void;
     attach?: PeerHubDeps['bridge']['attach'];
+    queue?: Partial<SubmitQueueDeps>;
   } = {},
 ) {
   const frames: HostFrame[] = [];
   const peers: FakePeer[] = [];
-  const bridge = { attach: vi.fn(options.attach ?? (async () => () => undefined)), close: vi.fn() };
+  const bridge = {
+    attach: vi.fn(options.attach ?? (async () => () => undefined)),
+    expectAuthor: vi.fn((_text: string, _author: { login: string; avatarUrl: string }) => () => undefined),
+    close: vi.fn(),
+  };
+  const queue = {
+    deliver: vi.fn(options.queue?.deliver ?? (async () => ({ status: 200, body: {} }))),
+    activity: vi.fn(options.queue?.activity ?? (async () => ({ working: false, lastMessageId: null }))),
+    now: options.queue?.now ?? (() => Date.now()),
+  };
   const deps: PeerHubDeps = {
     createPeerConnection: (config) => {
       const peer = new FakePeer(config);
@@ -155,6 +173,7 @@ function setup(
       return peer;
     },
     bridge,
+    queue,
     streamLabel: options.streamLabel ?? (async () => 'Fixture conversation'),
     now: () => Date.now(),
   };
@@ -169,9 +188,10 @@ function setup(
     },
     deps,
   );
+  hubs.push(hub);
   const ofType = <T extends HostFrame['type']>(type: T) =>
     frames.filter((frame): frame is Extract<HostFrame, { type: T }> => frame.type === type);
-  return { hub, frames, peers, bridge, ofType };
+  return { hub, frames, peers, bridge, queue, ofType };
 }
 
 /** Admits a viewer and brings its peer connection up to a sent offer. */
@@ -607,7 +627,7 @@ describe('PeerHub presence', () => {
             { githubId: 1, login: 'owner', avatarUrl: 'https://a/1', state: 'admitted', contributor: false, isHost: true },
             { githubId: 7, login: 'user7', avatarUrl: 'https://a/7', state: 'admitted', contributor: false, isHost: false },
           ],
-          streams: [{ streamId: 'conv-a', label: 'Fixture conversation', kind: 'conversation' }],
+          streams: [{ streamId: 'conv-a', label: 'Fixture conversation', kind: 'conversation', agentWorking: false, queued: 0 }],
         },
       },
     ]);
@@ -643,7 +663,7 @@ describe('PeerHub presence', () => {
     const s = setup({ streamLabel: async () => Promise.reject(new Error('db down')) });
     const peer = await negotiatedWithPresence(s);
     const payload = envelopes(peer.channel('presence'))[0]?.payload as { streams: unknown };
-    expect(payload.streams).toEqual([{ streamId: 'conv-a', label: 'conv-a', kind: 'conversation' }]);
+    expect(payload.streams).toEqual([{ streamId: 'conv-a', label: 'conv-a', kind: 'conversation', agentWorking: false, queued: 0 }]);
   });
 });
 
@@ -741,5 +761,150 @@ describe('PeerHub drafts', () => {
     seven.channel('drafts').onMessage.emit(viewerDraft({ text: 5 }));
     seven.channel('drafts').onMessage.emit(Buffer.from(viewerDraft({ text: 'binary' })));
     expect(s.hub.draftsView()).toEqual([]);
+  });
+});
+
+function viewerSubmit(clientId: string, text: string, seq = 2): string {
+  return JSON.stringify({ v: 1, ch: 'control', streamId: 'conv-a', seq, t: 1, payload: { kind: 'submit', clientId, text } });
+}
+
+const controlPayloads = (peer: FakePeer) => envelopes(peer.channel('control')).map((e) => e.payload as Record<string, unknown>).slice(1);
+
+describe('PeerHub prompts', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const contributor = (githubId: number): RoomParticipant => ({ ...participant(githubId, 'admitted'), contributor: true });
+  const owner = { githubId: 1, login: 'owner', avatarUrl: 'https://a/1' };
+
+  /** Admits the participants and brings each peer to a sent offer, in order. */
+  async function viewers(s: ReturnType<typeof setup>, ...participants: RoomParticipant[]): Promise<FakePeer[]> {
+    for (const p of participants) s.hub.admit(p.githubId);
+    s.hub.onSnapshot(snapshot(...participants));
+    await settle();
+    s.hub.onIceServers([]);
+    await settle();
+    return s.peers.slice();
+  }
+
+  function negotiate(peer: FakePeer): void {
+    peer.channel('control').open();
+    peer.channel('control').onMessage.emit(viewerHello());
+  }
+
+  it('acknowledges a contributor submit queued, then sent, and credits the author before delivery', async () => {
+    const s = setup();
+    const [seven] = await viewers(s, contributor(7));
+    if (!seven) throw new Error('no peer');
+    negotiate(seven);
+    seven.channel('control').onMessage.emit(viewerSubmit('c1', 'Do it'));
+    expect(controlPayloads(seven)).toEqual([{ kind: 'submit-ack', clientId: 'c1', status: 'queued', position: 1 }]);
+    await vi.advanceTimersByTimeAsync(QUEUE_TICK_MS);
+    expect(s.queue.deliver).toHaveBeenCalledWith('Do it');
+    expect(s.bridge.expectAuthor).toHaveBeenCalledWith('Do it', { login: 'user7', avatarUrl: 'https://a/7' });
+    expect(s.bridge.expectAuthor.mock.invocationCallOrder[0]).toBeLessThan(s.queue.deliver.mock.invocationCallOrder[0] ?? 0);
+    expect(controlPayloads(seven).at(-1)).toEqual({ kind: 'submit-ack', clientId: 'c1', status: 'sent' });
+    expect(envelopes(seven.channel('control')).map((e) => e.seq)).toEqual([1, 2, 3]);
+  });
+
+  it('rejects a non-contributor submit and never delivers it', async () => {
+    const s = setup();
+    const [seven] = await viewers(s, participant(7, 'admitted'));
+    if (!seven) throw new Error('no peer');
+    negotiate(seven);
+    seven.channel('control').onMessage.emit(viewerSubmit('c1', 'Do it'));
+    expect(controlPayloads(seven)).toEqual([{ kind: 'submit-ack', clientId: 'c1', status: 'rejected', reason: 'not_contributor' }]);
+    await vi.advanceTimersByTimeAsync(QUEUE_TICK_MS * 3);
+    expect(s.queue.deliver).not.toHaveBeenCalled();
+  });
+
+  it('ignores a submit before the hello and a submit with a bad client id', async () => {
+    const s = setup();
+    const [seven] = await viewers(s, contributor(7));
+    if (!seven) throw new Error('no peer');
+    seven.channel('control').open();
+    seven.channel('control').onMessage.emit(viewerSubmit('c1', 'Too early', 1));
+    seven.channel('control').onMessage.emit(viewerHello());
+    seven.channel('control').onMessage.emit(viewerSubmit('a b', 'Bad id'));
+    seven.channel('control').onMessage.emit(viewerSubmit('x'.repeat(65), 'Long id'));
+    expect(controlPayloads(seven)).toEqual([]);
+    expect(s.hub.queueView().items).toEqual([]);
+  });
+
+  it('ignores a repeated client id while its item is still queued', async () => {
+    const s = setup({ queue: { activity: async () => ({ working: true, lastMessageId: null }) } });
+    const [seven] = await viewers(s, contributor(7));
+    if (!seven) throw new Error('no peer');
+    negotiate(seven);
+    seven.channel('control').onMessage.emit(viewerSubmit('c1', 'Do it'));
+    seven.channel('control').onMessage.emit(viewerSubmit('c1', 'Do it', 3));
+    expect(controlPayloads(seven)).toHaveLength(1);
+    expect(s.hub.queueView().items).toHaveLength(1);
+  });
+
+  it('rejects queued items as grant_revoked when a snapshot removes the contributor grant (FR-7)', async () => {
+    const s = setup({ queue: { activity: async () => ({ working: true, lastMessageId: null }) } });
+    const [seven] = await viewers(s, contributor(7));
+    if (!seven) throw new Error('no peer');
+    negotiate(seven);
+    seven.channel('control').onMessage.emit(viewerSubmit('c1', 'Do it'));
+    s.hub.onSnapshot(snapshot(participant(7, 'admitted')));
+    expect(controlPayloads(seven).at(-1)).toEqual({ kind: 'submit-ack', clientId: 'c1', status: 'rejected', reason: 'grant_revoked' });
+    expect(s.hub.queueView().items).toEqual([]);
+  });
+
+  it('carries agentWorking and queued in presence after the status changes (FR-10)', async () => {
+    const s = setup({ queue: { activity: async () => ({ working: true, lastMessageId: null }) } });
+    const [seven] = await viewers(s, contributor(7));
+    if (!seven) throw new Error('no peer');
+    negotiate(seven);
+    seven.channel('presence').open();
+    seven.channel('control').onMessage.emit(viewerSubmit('c1', 'One'));
+    seven.channel('control').onMessage.emit(viewerSubmit('c2', 'Two', 3));
+    await vi.advanceTimersByTimeAsync(QUEUE_TICK_MS);
+    const last = envelopes(seven.channel('presence')).at(-1)?.payload as { streams: Array<Record<string, unknown>> };
+    expect(last.streams[0]).toMatchObject({ agentWorking: true, queued: 2 });
+  });
+
+  it('sends a picked draft for its author: draft-sent to the author, deletion to the others', async () => {
+    const s = setup();
+    const [seven, eight] = await viewers(s, participant(7, 'admitted'), participant(8, 'admitted'));
+    if (!seven || !eight) throw new Error('no peers');
+    for (const peer of [seven, eight]) {
+      negotiate(peer);
+      peer.channel('drafts').open();
+    }
+    seven.channel('drafts').onMessage.emit(viewerDraft({ text: 'from seven' }));
+    await vi.advanceTimersByTimeAsync(500);
+    expect(s.hub.sendFromController({ text: 'edited', draftGithubId: 7 }, owner)).toEqual({ ok: true, position: 1 });
+    expect(controlPayloads(seven)).toEqual([{ kind: 'draft-sent' }]);
+    expect(draftsSent(eight).map((p) => p.text)).toEqual(['from seven', '']);
+    expect(s.hub.queueView().items).toEqual([expect.objectContaining({ login: 'user7', source: 'controller', text: 'edited' })]);
+    await vi.advanceTimersByTimeAsync(QUEUE_TICK_MS);
+    expect(s.bridge.expectAuthor).toHaveBeenCalledWith('edited', { login: 'user7', avatarUrl: 'https://a/7' });
+    expect(s.queue.deliver).toHaveBeenCalledWith('edited');
+  });
+
+  it('refuses a controller command prefix and keeps the picked draft', async () => {
+    const s = setup();
+    const [seven] = await viewers(s, participant(7, 'admitted'));
+    if (!seven) throw new Error('no peer');
+    negotiate(seven);
+    seven.channel('drafts').onMessage.emit(viewerDraft({ text: 'keep me' }));
+    expect(s.hub.sendFromController({ text: '!rm' }, owner)).toEqual({ ok: false, reason: 'invalid_prompt' });
+    expect(s.hub.sendFromController({ text: '/clear', draftGithubId: 7 }, owner)).toEqual({ ok: false, reason: 'invalid_prompt' });
+    expect(s.hub.draftsView().map((d) => d.text)).toEqual(['keep me']);
+    expect(controlPayloads(seven)).toEqual([]);
+  });
+
+  it('credits a controller send without a draft to the data owner', async () => {
+    const s = setup();
+    expect(s.hub.sendFromController({ text: 'From the host' }, owner)).toEqual({ ok: true, position: 1 });
+    expect(s.hub.queueView().items).toEqual([expect.objectContaining({ login: 'owner', source: 'controller' })]);
   });
 });
