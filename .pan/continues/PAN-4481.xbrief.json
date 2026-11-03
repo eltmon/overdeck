@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4481",
   "created": "2026-11-03T15:57:16.582Z",
-  "updated": "2026-11-03T16:56:37.141Z",
+  "updated": "2026-11-03T16:56:51.159Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -156,6 +156,10 @@
     "share-web-build.ac4": {
       "status": "completed",
       "doneAt": "2026-11-03T16:56:37.141Z"
+    },
+    "web-join-socket.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:56:51.159Z"
     }
   }
 }
