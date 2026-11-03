@@ -87,10 +87,12 @@ The row of an SSH machine shows `SSH <host> · forward <state> · <launch>`:
 - **Already running** (`external`): the host's server was running before. Removing the
   machine never stops it.
 
-Removal stops only the dashboard process. Sidecars that `pan up` started on the host (the
-supervisor, CLIProxy) keep running. A server is also left running when another machine
-holds an active link to it (`in-use`), or when it was restarted since this machine started
-it.
+Removal stops the dashboard and the supervisor that `pan up` runs next to it (the
+supervisor would otherwise restart the dashboard). Other sidecars that `pan up` started on
+the host (CLIProxy) keep running. If the host's supervisor cannot be stopped (on a Mac, the
+launchd agent that `pan connect` installs), the server is left running. A server is also
+left running when another machine holds an active link to it (`in-use`), or when it was
+restarted since this machine started it.
 
 ### The forward
 

@@ -13,7 +13,8 @@
  *   POST /restart-dashboard  → 202 Accepted; spawns `pan restart --dashboard`
  *
  * Started by `pan up` via `startSupervisorProcessSync()` in `src/lib/supervisor.ts`.
- * Stopped by `pan down`. Independent of the dashboard's own lifecycle.
+ * Stopped by `pan down`, and by `pan machines ssh-helper stop` when a linked machine
+ * removes a server it started (PAN-4861). Independent of the dashboard's own lifecycle.
  */
 
 import * as http from 'node:http';

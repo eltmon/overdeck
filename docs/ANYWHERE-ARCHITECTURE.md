@@ -438,7 +438,7 @@ linking side keeps `busy` and `start-failed` and maps the rest to `helper-failed
   `{ v: 1, pid, apiPort, version, startedAt, startedBy }`, written after the helper starts a
   server. `startedBy` is the linking machine's environment id.
 
-### Adopt and stop rules (D-4404-7, D-4404-8)
+### Adopt and stop rules (D-4404-7, D-4404-8, D-4861-1)
 
 **Start.** The helper reads the API port from the host's `config.toml` (as `pan up` does)
 and polls `/api/health`. A dashboard that answers with a `pid` is adopted: `managed` when
@@ -451,11 +451,18 @@ reports `managed`; no health is `start-failed` with the last 20 output lines.
 **Stop**, under the remote lock, in order: no health ⇒ `not-running` (marker deleted); no
 marker or another linker ⇒ `external`; marker pid differs from the health pid ⇒
 `restarted` (marker deleted); the host's `GET /api/machines` lists an active inbound
-machine other than the linker ⇒ `in-use`; otherwise `SIGTERM` to that pid, `SIGKILL`
-after 10 s, marker deleted, `stopped`. Only the dashboard process is signalled; `pan down`
-is not used because it also stops Traefik and review sessions this machine did not start.
-The linking side runs stop only for a `managed` record when the operator did not ask to
-keep the server; an unreachable host gives `stop-failed` and the removal goes on.
+machine other than the linker ⇒ `in-use`; otherwise the helper stops the host's
+supervisor first (D-4861-1), the same way `pan down` does (the `overdeck-supervisor.service`
+user unit when active, else the `supervisor.pid` process), because the supervisor restarts
+a dashboard it watches within about 30 s. If a supervisor still answers `/health` on the
+supervisor port after 3 s (for example the launchd agent that `pan connect` loads), the
+helper answers `stop-failed`, keeps the marker and leaves the server running. Otherwise
+`SIGTERM` to the dashboard pid, `SIGKILL` after 10 s, marker deleted, `stopped`. Other
+sidecars (CLIProxy, Traefik, smee) are left running and `pan down` is not used, because it
+also stops review sessions this machine did not start. A `pan connect` host whose unit is
+enabled gets the unit stopped; it starts again at the next boot. The linking side runs stop
+only for a `managed` record when the operator did not ask to keep the server, and waits up
+to 60 s for it; an unreachable host gives `stop-failed` and the removal goes on.
 
 ### Forward supervisor (D-4404-10)
 

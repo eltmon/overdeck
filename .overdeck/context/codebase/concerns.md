@@ -599,4 +599,10 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   `{ pr: null }` for "no PR" and `{ pr: null, error }` for a failed read. The DoD verdict rows must keep
   them apart: absence may be waived (strike path, tracker-closed settlement), a failed read may not.
   Never cache an `error` response in the PR-tab cache, and never collapse a read error to `null`.
+- **The supervisor restarts any dashboard it watches** (PAN-4861) — `dist/supervisor/server.js`
+  (port `dashboardApiPort + 1`) runs `pan restart --dashboard` after 3 failed `/api/health` polls
+  and has no "stopped on purpose" state. Anything that stops a dashboard and wants it to stay
+  stopped must stop the supervisor first, as `pan down` does (`stopSupervisorUnitIfActive()`,
+  else `stopSupervisorProcess()`). The SSH helper's managed stop (`src/lib/anywhere/ssh/helper.ts`)
+  follows this rule after PAN-4861.
 <!-- last-verified: 2026-11-02 -->
