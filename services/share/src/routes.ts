@@ -3,49 +3,22 @@
  *
  * Order per request: match path → 404; match method → 405 with Allow; config gate → 503 for
  * everything but /healthz; 16 KiB body guard → 413; handler.
- * Every response is built by json() or withSecurityHeaders(), so each one carries
+ * Every response is built by json() or withSecurityHeaders() (http.ts), so each one carries
  * `Cache-Control: no-store` and `X-Content-Type-Options: nosniff`.
  */
 import type { CreateRoomResponse, RoomSnapshot, ShareScope } from '../../../packages/contracts/src/sharing.ts';
-import { verifyIdentity } from './account.ts';
+import { verifyDeviceIdentity, verifyIdentity } from './account.ts';
 import { newHostToken, newShortCode, normalizeShortCode, sha256Hex } from './codes.ts';
-import type { Config, Deps, Env, RoomInitBody, RoomStatusBody } from './env.ts';
-import { HDR_HOST_TOKEN_HASH, HDR_IDENTITY, INTERNAL, parseConfig, parseTurnConfig } from './env.ts';
+import type { Deps, Env, RoomInitBody, RoomStatusBody } from './env.ts';
+import { HDR_HOST_TOKEN_HASH, HDR_IDENTITY, INTERNAL, missingWebConfig, parseConfig, parseTurnConfig, parseWebConfig } from './env.ts';
+import { json, withSecurityHeaders, type Handler, type RequestContext } from './http.ts';
 import { endedPage, invitePage } from './pages.ts';
+import { readWebSession, webCallback, webSession, webSignIn, webSignOut } from './web-auth.ts';
 
 export const MAX_BODY_BYTES = 16 * 1024;
 
-const COMMON_HEADERS: Record<string, string> = {
-  'Cache-Control': 'no-store',
-  'X-Content-Type-Options': 'nosniff',
-};
-
-export function json(body: unknown, status = 200, extra?: HeadersInit): Response {
-  const headers = new Headers({ ...COMMON_HEADERS, 'Content-Type': 'application/json; charset=utf-8' });
-  if (extra) new Headers(extra).forEach((value, key) => headers.set(key, value));
-  return new Response(JSON.stringify(body), { status, headers });
-}
-
-/**
- * Stamps the common headers onto a response a handler built itself (an HTML page, a 204).
- * A 101 WebSocket upgrade is returned untouched: its headers belong to the handshake.
- */
-export function withSecurityHeaders(res: Response): Response {
-  if (res.status === 101) return res;
-  const out = new Response(res.body, res);
-  for (const [key, value] of Object.entries(COMMON_HEADERS)) out.headers.set(key, value);
-  return out;
-}
-
-/** Per-request context handed to every handler. */
-export interface RequestContext {
-  env: Env;
-  config: Config;
-  deps: Deps;
-  params: Record<string, string>;
-}
-
-export type Handler = (req: Request, rc: RequestContext) => Promise<Response>;
+export { json, withSecurityHeaders } from './http.ts';
+export type { Handler, RequestContext } from './http.ts';
 
 interface Route {
   method: string;
@@ -53,9 +26,9 @@ interface Route {
   handler: Handler;
 }
 
-/** GET /healthz: liveness, whether PUBLIC_BASE_URL is set, and whether TURN is available; reveals no value. */
+/** GET /healthz: liveness, whether PUBLIC_BASE_URL is set, and whether TURN and web join are available; reveals no value. */
 function healthz(env: Env): Response {
-  return json({ ok: true, configured: parseConfig(env).ok, turn: parseTurnConfig(env) !== null });
+  return json({ ok: true, configured: parseConfig(env).ok, turn: parseTurnConfig(env) !== null, web: parseWebConfig(env) !== null });
 }
 
 /** The room's Durable Object stub; one object per short code. */
@@ -184,6 +157,26 @@ const joinSocket: Handler = async (req, rc) => {
   return forwardUpgrade(rc.env, shortCode, INTERNAL.join, { [HDR_IDENTITY]: JSON.stringify(verified.identity) });
 };
 
+/**
+ * GET /v1/rooms/:code/web-join: the hosted viewer's signaling socket, authorized by the web session
+ * cookie and a same-origin `Origin` (cross-site WebSocket hijacking defence, PAN-4481 D-5). It never
+ * reads `Authorization`, so `/join` stays the only bearer path. The room sees the same identity
+ * header as for `/join`, so room rules are unchanged.
+ */
+const webJoinSocket: Handler = async (req, rc) => {
+  const refused = upgradeRefusal(req);
+  if (refused) return refused;
+  if (!rc.config.web) return json({ error: 'not_configured', missing: missingWebConfig(rc.env) }, 503);
+  if (req.headers.get('Origin') !== rc.config.publicBaseUrl) return json({ error: 'forbidden_origin' }, 403);
+  const token = await readWebSession(req, rc);
+  if (!token) return json({ error: 'invalid_token' }, 401);
+  const verified = await verifyDeviceIdentity(rc.env, token);
+  if (!verified.ok) return json({ error: verified.error }, verified.status);
+  const shortCode = normalizeShortCode(rc.params['code'] ?? '');
+  if (!shortCode) return json({ error: 'not_found' }, 404);
+  return forwardUpgrade(rc.env, shortCode, INTERNAL.join, { [HDR_IDENTITY]: JSON.stringify(verified.identity) });
+};
+
 /** GET /s/:code: the invite landing page. It never reveals room data. */
 const landingPage: Handler = async (_req, rc) => {
   const shortCode = normalizeShortCode(rc.params['code'] ?? '');
@@ -193,7 +186,15 @@ const landingPage: Handler = async (_req, rc) => {
   const { status } = (await res.json()) as RoomStatusBody;
   if (status !== 'active') return endedPage();
   const nonce = btoa(String.fromCharCode(...rc.deps.randomBytes(16)));
-  return invitePage(shortCode, nonce);
+  return invitePage(shortCode, nonce, rc.config.web ? { publicBaseUrl: rc.config.publicBaseUrl } : null);
+};
+
+/** GET /viewer/viewer.js: the hosted viewer bundle from the static assets (PAN-4481 FR-15). */
+const viewerAsset: Handler = async (req, rc) => {
+  if (!rc.env.ASSETS) return json({ error: 'not_found' }, 404);
+  const res = await rc.env.ASSETS.fetch(new Request(new URL('/viewer/viewer.js', req.url)));
+  if (res.status !== 200) return json({ error: 'not_found' }, 404);
+  return new Response(res.body, { status: 200, headers: { 'Content-Type': 'text/javascript; charset=utf-8' } });
 };
 
 const ROUTES: Route[] = [
@@ -202,7 +203,13 @@ const ROUTES: Route[] = [
   { method: 'DELETE', pattern: '/v1/rooms/:code', handler: deleteRoom },
   { method: 'GET', pattern: '/v1/rooms/:code/host', handler: hostSocket },
   { method: 'GET', pattern: '/v1/rooms/:code/join', handler: joinSocket },
+  { method: 'GET', pattern: '/v1/rooms/:code/web-join', handler: webJoinSocket },
   { method: 'GET', pattern: '/s/:code', handler: landingPage },
+  { method: 'GET', pattern: '/viewer/viewer.js', handler: viewerAsset },
+  { method: 'GET', pattern: '/auth/signin', handler: webSignIn },
+  { method: 'GET', pattern: '/auth/callback', handler: webCallback },
+  { method: 'POST', pattern: '/auth/signout', handler: webSignOut },
+  { method: 'GET', pattern: '/v1/web/session', handler: webSession },
 ];
 
 function matchPattern(pattern: string, pathname: string): Record<string, string> | null {

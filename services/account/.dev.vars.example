@@ -3,3 +3,5 @@
 GITHUB_CLIENT_ID=your-github-oauth-app-client-id
 GITHUB_CLIENT_SECRET=your-github-oauth-app-client-secret
 OWNER_GITHUB_ID=123456
+# The local share Worker, whose /auth/callback is accepted as a PKCE redirect (PAN-4481).
+SHARE_BASE_URL=http://localhost:8787
