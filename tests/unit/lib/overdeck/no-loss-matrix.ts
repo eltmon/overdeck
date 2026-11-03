@@ -43,6 +43,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   // ── restart-gate.ts (PAN-3729/PAN-3731) ───────────────────────────────────
   { surface: 'POST /api/restart-gate/requests',               kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'RestartGate service; upsert + poll + TTL refresh, outside 8 remodel domains' },
   { surface: 'POST /api/restart-gate/claim',                  kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'RestartGate service; exclusive right to restart, outside 8 remodel domains' },
+  { surface: 'POST /api/restart-gate/withdraw',               kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'RestartGate service; a superseded reload leaves the gate unless an approval covers it (PAN-4888), outside 8 remodel domains' },
   { surface: 'POST /api/restart-gate/approve',                kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'RestartGate service; operator approval, outside 8 remodel domains' },
   { surface: 'GET /api/restart-gate',                         kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'RestartGate service; read door for the current gate, outside 8 remodel domains' },
   { surface: 'GET /api/github-quota',                         kind: 'http', disposition: 'READ',       door: 'refreshGitHubQuotaSnapshot (PAN-4264); the same snapshot as the read model githubQuota' },

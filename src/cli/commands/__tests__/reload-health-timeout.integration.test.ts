@@ -29,6 +29,12 @@ vi.mock('../../../lib/restart-lock.js', () => ({
   readRestartLockHolder: mocks.readRestartLockHolder,
 }));
 
+// PAN-4888: never touch the real ~/.overdeck/reload-supersede/.
+vi.mock('../../../lib/deploy/reload-supersede.js', () => ({
+  acquireReloadLock: async () => ({ kind: 'acquired', lock: await mocks.acquireRestartLock() }),
+  reloadSupersedeDetail: async () => null,
+}));
+
 vi.mock('../../../lib/restart-status.js', () => ({
   writeRestartStatus: mocks.writeRestartStatus,
 }));
@@ -45,6 +51,9 @@ vi.mock('../../../lib/deploy/agent-restart-gate.js', () => ({
 vi.mock('../../../lib/deploy/build-from-origin.js', async (importActual) => ({
   ...(await importActual<typeof import('../../../lib/deploy/build-from-origin.js')>()),
   buildDashboardFromOriginMain: mocks.buildDashboardFromOriginMain,
+  // PAN-4888: the spread real module would otherwise run a real `git fetch`.
+  resolveOriginMainSha: vi.fn(async () => 'a'.repeat(40)),
+  isAncestorCommit: vi.fn(async () => true),
   removeDashboardDeployment: mocks.removeDashboardDeployment,
   runGitAsync: mocks.runGitAsync,
   sweepDashboardDeployments: mocks.sweepDashboardDeployments,
@@ -63,6 +72,7 @@ vi.mock('../../../lib/platform-lifecycle.js', async (importActual) => ({
 // waits on; no old dashboard runs here, so report none.
 vi.mock('../../../lib/deploy/running-boot-gates.js', () => ({
   readRunningDashboardBootGates: async () => ({ gates: null, reason: 'no dashboard in this test' }),
+  readRunningBuildCommit: vi.fn(async () => null),
 }));
 
 vi.mock('../restart.js', () => ({

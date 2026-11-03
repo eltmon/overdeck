@@ -29,6 +29,19 @@ pan reload --force   # explicit operator bypass of the deploy-window gate
 
 Without `--resume`/`--no-resume`, `pan reload` keeps the running dashboard's resume gate (PAN-3899). Before it restarts anything it reads the gate from `/api/health` (`bootGates`, or the server's env markers for an older server), retrying once with a longer budget, and hands it to the replacement, so a deploy keeps the resume choice of the last `pan restart`. Only a dashboard of this checkout counts. The Deacon gate is not carried: reload always boots Deacon on, and stamps the resolved gates into the new server's env, so a stray `OVERDECK_DISABLE_DEACON` in the invoking shell cannot change it. It prints `Boot gates: …` and then where the resume gate came from. When the gate cannot be read (no answer, a non-JSON body, another checkout on the port), it says why and uses the default, `resume=on`. `OVERDECK_NO_RESUME`/`OVERDECK_RESUME` in the invoking shell do not affect `pan reload`; pass `--no-resume` instead.
 
+## Concurrent reloads
+
+A `pan reload` fetches and resolves `origin/main` before it takes the restart lock, records that commit in the lock, and builds exactly that commit (PAN-4888). What a second reload does depends on who holds the lock:
+
+- **A waiting reload of an older commit:** the newer reload asks it to step aside, waits up to 20 minutes for the lock, then builds its own commit and asks for approval itself. The replaced reload restores the previous build, restarts nothing, records no restart status, and exits 0.
+- **A waiting reload of the same or a newer commit:** the second reload exits 0 without building, because the waiting one already ships everything it would.
+- **A waiting reload whose history diverged** (for example after a force-push to `main`): the second reload is refused with exit 2 and a `have diverged` message.
+- **`pan restart`, the supervisor, `pan connect`, or a reload started by an older CLI:** the second reload is refused with exit 2, `restart in progress (held by PID <pid> (<caller>))`, as before. A `--skip-build` reload is refused the same way.
+
+A reload whose request the operator already approved is never replaced. The replaced reload leaves the restart gate through an atomic withdraw (`POST /api/restart-gate/withdraw`) that the server refuses once an approval covers the request; it then restarts as approved. When a `pan dev` session owns the dashboard, `pan reload` signals it without fetching anything.
+
+The restart banner shows `build <sha12>` for each waiting request, so an approval never ships a build you cannot see.
+
 ## Notes
 
 - Do not use `pkill`, `fuser`, or manual port cleanup. The command uses the dashboard lifecycle code.

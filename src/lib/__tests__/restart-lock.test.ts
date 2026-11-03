@@ -11,7 +11,7 @@ function lockPath(): string {
   return join(testHome, 'restart.lock');
 }
 
-function writeLock(holder: { pid: number; ts: number; caller: string }) {
+function writeLock(holder: { pid: number; ts: number; caller: string; [key: string]: unknown }) {
   mkdirSync(testHome, { recursive: true });
   writeFileSync(lockPath(), `${JSON.stringify(holder)}\n`, 'utf8');
 }
@@ -119,5 +119,40 @@ describe('restart lock', () => {
 
     expect(await readRestartLockHolder()).toEqual({ pid: process.pid, ts, caller: 'reader' });
     expect(readFileSync(lockPath(), 'utf8')).toContain('reader');
+  });
+
+  it('records targetSha and supersedable and reads them back', async () => {
+    const handle = await acquireRestartLock('pan reload', { targetSha: 'abc', supersedable: true });
+    expect(handle).not.toBeNull();
+
+    expect(await readRestartLockHolder()).toMatchObject({
+      pid: process.pid,
+      caller: 'pan reload',
+      targetSha: 'abc',
+      supersedable: true,
+    });
+    await handle?.release();
+  });
+
+  it('keeps targetSha and supersedable across a heartbeat refresh', async () => {
+    const handle = await acquireRestartLock('pan reload', { targetSha: 'abc', supersedable: true });
+    expect(handle).not.toBeNull();
+    const before = JSON.parse(readFileSync(lockPath(), 'utf8')) as { ts: number };
+    const now = vi.spyOn(Date, 'now').mockReturnValue(before.ts + 1_000);
+
+    await handle?.refresh();
+    now.mockRestore();
+
+    const holder = await readRestartLockHolder();
+    expect(holder?.ts).toBeGreaterThan(before.ts);
+    expect(holder).toMatchObject({ targetSha: 'abc', supersedable: true });
+    await handle?.release();
+  });
+
+  it('drops a non-string targetSha and a non-true supersedable', async () => {
+    const ts = Date.now();
+    writeLock({ pid: process.pid, ts, caller: 'pan reload', targetSha: 42, supersedable: 'yes' });
+
+    expect(await readRestartLockHolder()).toEqual({ pid: process.pid, ts, caller: 'pan reload' });
   });
 });

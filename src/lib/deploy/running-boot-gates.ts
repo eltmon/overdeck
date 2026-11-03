@@ -85,6 +85,24 @@ function describeError(error: unknown): string {
 }
 
 /**
+ * The commit the running dashboard was built from (`/api/health` `buildCommit`,
+ * the full `git rev-parse HEAD` of its build worktree), or null when the
+ * dashboard does not answer within the budget or reports none (PAN-4888).
+ */
+export async function readRunningBuildCommit(
+  apiPort: number,
+  deps: { readonly fetchHealth?: (url: string, timeoutMs: number) => Promise<unknown>; readonly timeoutMs?: number } = {},
+): Promise<string | null> {
+  try {
+    const body = await (deps.fetchHealth ?? fetchHealthBody)(`http://127.0.0.1:${apiPort}/api/health`, deps.timeoutMs ?? 3_000);
+    const commit = (body as { buildCommit?: unknown } | null)?.buildCommit;
+    return typeof commit === 'string' && commit.trim() ? commit.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * The boot gates of the dashboard serving `apiPort`. Misses (with the reason)
  * when no dashboard answers within two tries, the answer is not JSON, it
  * serves another checkout than `repoRoot`, or its gates cannot be read.
