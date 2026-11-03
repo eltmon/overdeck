@@ -6,6 +6,10 @@ describe('describePendingInput', () => {
     expect(describePendingInput(['rateLimit'])).toBe(PENDING_INPUT_KIND_LABEL.rateLimit);
   });
 
+  it('returns the human label for the deftExternal kind (PAN-4849)', () => {
+    expect(describePendingInput(['deftExternal'])).toBe('Deft: waiting on external');
+  });
+
   it('returns the human label for the paneQuestion kind', () => {
     expect(describePendingInput(['paneQuestion'])).toBe(PENDING_INPUT_KIND_LABEL.paneQuestion);
   });

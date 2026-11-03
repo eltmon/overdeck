@@ -90,6 +90,32 @@ describe('DecisionsPanel', () => {
     expect(container.querySelector('[data-decision-id="agent-pan-2748"][data-blocking="true"]')).toBeNull();
   });
 
+  it('shows SLA and dangerous chips for a Deft escalation only (PAN-4849)', () => {
+    const deftDecision = {
+      ...agentDecision,
+      id: 'agent-pan-1',
+      label: 'PAN-1',
+      pendingAskUserQuestion: {
+        toolUseId: 'deft-escalation:esc-20261102120000-aaaaaa',
+        askedAt: '2026-11-02T12:00:00Z',
+        questions: [{
+          question: 'Run the database migration',
+          header: 'cmd_approval',
+          context: 'npm run migrate drops the old table.\n\nSLA 1h (due 2026-11-02T13:00:00.000Z)\nDANGEROUS',
+          options: [{ label: 'Approve' }],
+        }],
+      },
+    };
+    vi.spyOn(useDecisionsModule, 'useDecisions').mockReturnValue([deftDecision, conversationDecision]);
+    const { container } = renderWithQuery(<DecisionsPanel />);
+    const deftRow = container.querySelector('[data-decision-id="agent-pan-1"]') as HTMLElement;
+    expect(deftRow.textContent).toContain('SLA 1h');
+    expect(deftRow.textContent).toContain('dangerous');
+    const otherRow = container.querySelector('[data-decision-id="conv-20260716-6155"]') as HTMLElement;
+    expect(otherRow.textContent).not.toContain('SLA');
+    expect(otherRow.textContent).not.toContain('dangerous');
+  });
+
   it('shows the actual question text, not just the kind', () => {
     vi.spyOn(useDecisionsModule, 'useDecisions').mockReturnValue([agentDecision]);
     renderWithQuery(<DecisionsPanel />);
