@@ -659,7 +659,6 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   (or one bin is named `core`). `package.json` maps `overdeck` and `pan` to `./dist/cli/index.js`, so
   the zero-install `npx @overdeck/core join <CODE>` on the share invite page works. A bin with a
   different target breaks it with "could not determine executable to run".
-<!-- last-verified: 2026-11-03 -->
 - **Fixture PIDs reach the real `process.kill`** (PAN-4925) — code such as `src/lib/smee.ts`
   `stopSmeeProcess()` probes and signals the PID it reads from a pidfile. A test that mocks
   `node:fs` to return a fixture PID (`'12345'`) but does not spy `process.kill` sends a real
