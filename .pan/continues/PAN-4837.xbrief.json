@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4837",
   "created": "2026-11-03T16:16:59.604Z",
-  "updated": "2026-11-03T17:45:27.748Z",
+  "updated": "2026-11-03T17:46:55.923Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -142,9 +142,10 @@
       "doneAt": "2026-11-03T17:45:21.568Z"
     },
     "foreground-reconnect": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4837",
-      "claimedAt": "2026-11-03T17:45:27.748Z"
+      "claimedAt": "2026-11-03T17:45:27.748Z",
+      "doneAt": "2026-11-03T17:46:55.923Z"
     }
   }
 }
