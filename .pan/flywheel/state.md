@@ -559,3 +559,8 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
 - Release: ship as-is as v0.73.0; the Flywheel cuts it (`pan release stable --version 0.73.0`, then push main and the tag), but HOLD until the operator sends "go release". Known post-release gaps: AC-3 Tailscale on this host, AC-10 VPS (PAN-4863), PAN-4862 live relay re-check.
 - After the release ships: start PAN-4823 phone-app wave 1 (4828, 4831, 4833) and Shared Sessions PAN-4473, per the recorded orders and the PAN-4481/PAN-4831 pkce.ts conflict rule.
 - Standing rule (operator memory operator-decides-only-real-tradeoffs): decide routine pipeline and policy questions myself; only product direction, money, unapproved external publication or irreversible actions go to the operator. Fly device-code approvals: ask in this conversation, not via the operator dashboard.
+
+## 2026-11-03 03:40Z — v0.73.0 cut
+- Operator said "go release". Changelog drafted by a subagent (no "t3code"; features spelled out), finalized and committed (f92fcebfa65); `pan release stable --version 0.73.0 --skip-tests` (main CI already green on 04f8bccc9df; host must not run the full suite) made 7de98491242 + tag v0.73.0. PAN-4869 had no PR yet, so it goes in the next release.
+- Gotchas: `pan release` needs a fully clean tree including untracked files (moved two .impeccable tool folders aside and restored them); the agent main-push guard refuses the release commit (package.json version bumps) — operator-directed release pushes use OVERDECK_OPERATOR_PUSH=1.
+- Next: when the Release workflow publishes, start PAN-4823 wave 1 (4828, 4831, 4833) and Shared Sessions PAN-4473.
