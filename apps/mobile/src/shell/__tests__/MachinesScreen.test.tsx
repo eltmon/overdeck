@@ -57,10 +57,22 @@ describe('MachinesScreen', () => {
     expect(screen.getByText('Paired')).toBeTruthy();
   });
 
-  it('shows the update text for a machine older than MIN_PAN_VERSION', () => {
-    const client = fakeClient('online', [machine('e-old', 'old', { serverVersion: '0.73.1' })]);
-    render(<MachinesScreen client={client} paired={[]} onPair={noop} onSettings={noop} onSignedOut={noop} />);
+  it('shows the update text for an unpaired machine older than MIN_PAN_VERSION and still lets it pair', () => {
+    const onPair = vi.fn();
+    const old = machine('e-old', 'old', { serverVersion: '0.73.1' });
+    render(<MachinesScreen client={fakeClient('online', [old])} paired={[]} onPair={onPair} onSettings={noop} onSignedOut={noop} />);
     expect(screen.getByText('Update Overdeck on old to use the app (pan 0.74.0 or later).')).toBeTruthy();
+    fireEvent.click(screen.getByText('old'));
+    expect(onPair).toHaveBeenCalledWith(old);
+  });
+
+  it('opens a paired machine whose reported version is older, without the update text', () => {
+    const navigate = vi.fn();
+    const client = fakeClient('online', [machine('e-dev', 'dev', { serverVersion: '0.73.1' })]);
+    render(<MachinesScreen client={client} paired={[paired('e-dev', 'dev')]} onPair={noop} onSettings={noop} onSignedOut={noop} navigate={navigate} />);
+    expect(screen.queryByText(/Update Overdeck/)).toBeNull();
+    fireEvent.click(screen.getByText('dev'));
+    expect(navigate).toHaveBeenCalledWith('/m');
   });
 
   it('shows the connecting line and the refusal text', () => {

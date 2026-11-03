@@ -77,8 +77,10 @@ export function MachinesScreen({ client, paired, onPair, onSettings, onSignedOut
       <ul className="min-h-0 flex-1 overflow-y-auto pb-[env(safe-area-inset-bottom)]">
         {rows.map((machine) => {
           const isPaired = pairedIds.has(machine.environmentId);
-          const outdated = isOutdated(machine);
-          const disabled = outdated || (isPaired && !machine.online);
+          // Advisory only: a development build ahead of the last release reports the old version.
+          // Pairing checks the machine's capabilities, and a paired machine has already passed.
+          const outdated = !isPaired && isOutdated(machine);
+          const disabled = isPaired && !machine.online;
           return (
             <li key={machine.environmentId} className="border-b border-border">
               <button
