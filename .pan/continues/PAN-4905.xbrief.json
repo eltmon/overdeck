@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4905",
   "created": "2026-11-03T15:51:11.476Z",
-  "updated": "2026-11-03T16:44:12.530Z",
+  "updated": "2026-11-03T16:44:31.714Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -94,6 +94,10 @@
     "fly-refusal-message.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T16:44:12.529Z"
+    },
+    "fly-refusal-message.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:44:31.714Z"
     }
   }
 }
