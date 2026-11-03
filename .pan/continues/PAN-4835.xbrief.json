@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4835",
   "created": "2026-11-03T07:59:34.235Z",
-  "updated": "2026-11-03T10:13:40.290Z",
+  "updated": "2026-11-03T10:14:00.517Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -228,6 +228,10 @@
     "phone-app-capability.ac1": {
       "status": "completed",
       "doneAt": "2026-11-03T10:13:40.289Z"
+    },
+    "phone-app-capability.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T10:14:00.516Z"
     }
   }
 }
