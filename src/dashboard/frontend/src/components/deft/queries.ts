@@ -33,6 +33,8 @@ export function useDeftIssues() {
     queryKey: DEFT_ISSUES_QUERY_KEY,
     queryFn: () => fetchJson<{ issues: DeftIssueSummary[] }>('/api/deft/issues'),
     refetchInterval: 30_000,
+    // A failed list reads as "not Deft"; every issue menu shares this one query.
+    retry: false,
   });
 }
 
