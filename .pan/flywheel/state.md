@@ -584,3 +584,5 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
 - 2026-11-03 PAN-4918 (six Anywhere UI polish issues) is owned by conversation 20261103-87f8; the Flywheel does not start it.
 
 - 2026-11-03 PAN-4925 filed + started: CI test-shard 3/4 intermittently ends with 'Worker exited unexpectedly' while all tests pass (2 of 8 main runs: c61fa3e86e9 attempt 1, 96d40a2186b attempt 1), no OOM/signal marker in the log. Each one turns main red; re-ran the shard once. Recurrence = class, so filed instead of re-running silently.
+
+- 2026-11-03 PAN-4903 (#4907): verification passed 16:05Z, reviewer agent-pan-4903-review started 16:06Z, then nothing for 5h; review dir had only context.json (no report). Hypothesis: the reviewer session hung or died across the day's reloads without the review convergence gate re-dispatching it. First recovery: pan review restart PAN-4903. If it stalls the same way again, file the class (a reviewer with no report for hours is not re-dispatched).
