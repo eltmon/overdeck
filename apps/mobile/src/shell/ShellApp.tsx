@@ -14,8 +14,10 @@ import { shellPlatform } from './platform';
 import { createRelayMeter } from './relayMeter';
 import { RemovedScreen } from './RemovedScreen';
 import { lastDialError, onSessionChange, setSession } from './session';
+import { SettingsScreen } from './SettingsScreen';
 import { SignInScreen } from './SignInScreen';
 import { completeSignIn, isSignInCallback, startSignIn } from './signIn';
+import { deleteAccountDevice, removeSelfOver, resetAllKeys, signOut } from './signOut';
 import { currentMachineId, readAccount, readMachines, setCurrentMachineId, useShellStore, writeMachines } from './store';
 import type { PairedMachine } from './types';
 
@@ -158,13 +160,28 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
   }, []);
 
   const forget = useCallback(
-    async (environmentId: string) => {
+    async (environmentId: string, next: View = { kind: 'machines' }) => {
       const remaining = paired.filter((m) => m.environmentId !== environmentId);
       await writeMachines(remaining);
       setMachines(remaining);
-      leaveMachine({ kind: 'machines' });
+      leaveMachine(next);
     },
     [paired, setMachines, leaveMachine],
+  );
+
+  const runSignOut = useCallback(
+    () =>
+      signOut({
+        machines: paired,
+        account,
+        removeSelf: services ? removeSelfOver(services.connection) : () => Promise.reject(new Error('no connection')),
+        directory: services?.directory.client ?? null,
+        deleteDevice: (record) => deleteAccountDevice(record),
+        resetKeys: resetAllKeys,
+        clearStorage: () => localStorage.clear(),
+        reload: () => navigate('/'),
+      }),
+    [paired, account, services, navigate],
   );
 
   const onPaired = useCallback(
@@ -218,12 +235,13 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
           onCancel={() => setView({ kind: 'machines' })}
         />
       ) : (
-        <section className="flex flex-1 flex-col gap-3 px-4 pt-[calc(env(safe-area-inset-top)+1rem)]">
-          <button type="button" onClick={() => setView({ kind: 'machines' })} className="min-h-11 self-start text-sm text-foreground">
-            ‹ Machines
-          </button>
-          <p className="text-sm text-muted-foreground">Settings comes in a later build.</p>
-        </section>
+        <SettingsScreen
+          account={account}
+          machines={paired}
+          onForget={(environmentId) => void forget(environmentId, { kind: 'settings' })}
+          onSignOut={runSignOut}
+          onBack={() => setView({ kind: 'machines' })}
+        />
       )}
     </div>
   );
