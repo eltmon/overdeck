@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4830",
   "created": "2026-11-03T14:25:43.002Z",
-  "updated": "2026-11-03T14:38:34.103Z",
+  "updated": "2026-11-03T14:38:47.406Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -88,6 +88,11 @@
     "apns-sender.ac4": {
       "status": "completed",
       "doneAt": "2026-11-03T14:38:34.103Z"
+    },
+    "fcm-sender": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4830",
+      "claimedAt": "2026-11-03T14:38:47.406Z"
     }
   }
 }
