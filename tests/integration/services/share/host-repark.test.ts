@@ -163,6 +163,12 @@ async function startHost(conversationId: string): Promise<Host> {
         parseInitial: (sessionFile) => parseEntireConversation(sessionFile, { flushPendingToolUse: false }),
         watch: () => ({ stop: () => undefined }),
       }),
+      queue: {
+        deliver: async () => ({ status: 200, body: {} }),
+        activity: async () => ({ working: false, lastMessageId: null }),
+        now: () => Date.now(),
+      },
+      terminal: { attach: async () => () => undefined, close: () => undefined },
       streamLabel: async () => 'Fixture',
       now: () => Date.now(),
     }),
