@@ -2,7 +2,8 @@
  * The foreground resume path (PAN-4837 FR-13, epic CP-3). When the app returns to the foreground
  * the directory socket restarts (its back-off resets), every peer connection is dropped and the
  * remembered routes forgotten, and the RPC transport resets, so fresh data arrives without waiting
- * out a dead socket. `resumedAt` drives the "Updating…" banner.
+ * out a dead socket. `resumedAt` drives the "Updating…" banner. On iOS it also restarts the Live
+ * Activity and registers its token again (PAN-4839 FR-6).
  */
 import { App } from '@capacitor/app';
 import { useSyncExternalStore } from 'react';
@@ -15,6 +16,7 @@ export interface ResumeTargets {
   directory: { stop(): void; start(): Promise<void> } | null;
   connection: Pick<Connection, 'forgetRoutes'> | null;
   resetTransport(): void;
+  liveActivity?: { refresh(): Promise<void> } | null;
 }
 
 let resumedAt: number | null = null;
@@ -45,6 +47,7 @@ export function resume(targets: ResumeTargets): void {
   }
   targets.connection?.forgetRoutes();
   targets.resetTransport();
+  void targets.liveActivity?.refresh();
   markResumed();
 }
 

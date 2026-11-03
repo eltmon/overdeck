@@ -7,6 +7,14 @@ const harness = vi.hoisted(() => ({
   dialKind: 'removed' as 'removed' | 'no-path',
   launchUrl: undefined as string | undefined,
   urlListeners: [] as Array<(event: { url: string }) => void>,
+  platform: 'android' as 'ios' | 'android',
+  sent: [] as Array<{ type: string }>,
+  liveActivity: {
+    status: vi.fn(async () => ({ supported: true, enabled: true })),
+    start: vi.fn(async () => ({ started: true })),
+    end: vi.fn(async () => undefined),
+    addListener: vi.fn(async () => ({ remove: vi.fn(async () => undefined) })),
+  },
 }));
 
 vi.mock('@capacitor/app', () => ({
@@ -22,9 +30,22 @@ vi.mock('../../native/keys', async () => {
   const { OverdeckKeysWeb } = await import('../../native/keys-web');
   return { OverdeckKeys: new OverdeckKeysWeb(), loadIdentity: async () => IDENTITY };
 });
+vi.mock('../platform', () => ({ shellPlatform: () => harness.platform }));
+vi.mock('../../native/liveActivity', () => ({ OverdeckLiveActivity: harness.liveActivity }));
 vi.mock('../directory', () => ({
   createDirectory: () => ({
-    client: { state: 'online', machines: [], refusal: null, onStateChange: () => () => undefined, start: vi.fn(async () => undefined), stop: vi.fn(), send: vi.fn(() => true) },
+    client: {
+      state: 'online',
+      machines: [],
+      refusal: null,
+      onStateChange: () => () => undefined,
+      start: vi.fn(async () => undefined),
+      stop: vi.fn(),
+      send: vi.fn((frame: { type: string }) => {
+        harness.sent.push(frame);
+        return true;
+      }),
+    },
     dialer: { close: vi.fn() },
     relayStopped: () => false,
   }),
@@ -86,6 +107,9 @@ beforeEach(async () => {
   harness.dialKind = 'removed';
   harness.launchUrl = undefined;
   harness.urlListeners.length = 0;
+  harness.platform = 'android';
+  harness.sent.length = 0;
+  for (const fn of Object.values(harness.liveActivity)) fn.mockClear();
   sessionStorage.clear();
   localStorage.clear();
   useShellStore.setState({ account: null, machines: [] });
@@ -145,5 +169,36 @@ describe('ShellApp machine view', () => {
     render(<ShellApp navigate={() => undefined} />);
     expect(await screen.findByText('Machines')).toBeTruthy();
     expect(screen.queryByPlaceholderText('ai.overdeck.app:/pair#…')).toBeNull();
+  });
+});
+
+describe('ShellApp Live Activity (PAN-4839 WI-10)', () => {
+  beforeEach(() => {
+    localStorage.removeItem(CURRENT_MACHINE_KEY);
+    history.replaceState(null, '', '/');
+  });
+
+  it('starts the card on iOS, and the Settings switch ends it and unregisters', async () => {
+    harness.platform = 'ios';
+    render(<ShellApp navigate={() => undefined} />);
+    const settings = await screen.findByText('Settings');
+    await act(async () => settings.click());
+    const toggle = await screen.findByRole('switch', { name: 'Live Activity' });
+    expect(harness.liveActivity.start).toHaveBeenCalledTimes(1);
+    await act(async () => toggle.click());
+    expect(harness.liveActivity.end).toHaveBeenCalledTimes(1);
+    expect(harness.sent).toContainEqual({ type: 'activity-unregister' });
+    expect(localStorage.getItem('overdeck.liveActivity')).toBe('off');
+    expect(screen.getByRole('switch', { name: 'Live Activity' }).getAttribute('aria-checked')).toBe('false');
+  });
+
+  it('shows no Live Activity row and never calls the plugin on Android', async () => {
+    render(<ShellApp navigate={() => undefined} />);
+    const settings = await screen.findByText('Settings');
+    await act(async () => settings.click());
+    await screen.findByText('Paired machines');
+    expect(screen.queryByText('Live Activity')).toBeNull();
+    expect(harness.liveActivity.status).not.toHaveBeenCalled();
+    expect(harness.liveActivity.start).not.toHaveBeenCalled();
   });
 });

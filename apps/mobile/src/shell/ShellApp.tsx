@@ -4,10 +4,12 @@ import { PHONE_PAIR_LINK_PREFIX, parsePhonePairLink } from '@overdeck/contracts'
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 
 import { type DeviceIdentity, loadIdentity } from '../native/keys';
+import { type LiveActivityStatus, OverdeckLiveActivity } from '../native/liveActivity';
 import { type Connection, createConnection } from './connection';
 import { createDirectory, type ShellDirectory } from './directory';
 import { resetTransport } from '../../../../src/dashboard/frontend/src/lib/wsTransport';
 import { installResumeHandler } from './lifecycle';
+import { createLiveActivityController, type LiveActivityController, liveActivityEnabled, setLiveActivityEnabled } from './liveActivity';
 import { MachinesScreen } from './MachinesScreen';
 import { MachineView } from './MachineView';
 import { PairScreen } from './PairScreen';
@@ -30,6 +32,7 @@ type View = { kind: 'machines' } | { kind: 'pair'; link: string | null } | { kin
 interface Services {
   directory: ShellDirectory;
   connection: Connection;
+  liveActivity: LiveActivityController;
 }
 
 const errorText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
@@ -68,6 +71,9 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
   const paired = useShellStore((s) => s.machines);
   const setAccount = useShellStore((s) => s.setAccount);
   const setMachines = useShellStore((s) => s.setMachines);
+  /** iOS only (PAN-4839): read once for the Settings row. */
+  const [liveActivityStatus, setLiveActivityStatus] = useState<LiveActivityStatus | null>(null);
+  const [liveActivityOn, setLiveActivityOn] = useState(liveActivityEnabled);
 
   const handleUrl = useCallback(
     async (url: string) => {
@@ -129,11 +135,23 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
     });
     const meter = createRelayMeter((bytes) => directory.client.send({ type: 'relay-usage', bytes }));
     const connection = createConnection({ directory, meter });
-    setServices({ directory, connection });
+    const platform = shellPlatform();
+    const liveActivity = createLiveActivityController({ plugin: OverdeckLiveActivity, directory: directory.client, platform });
+    setServices({ directory, connection, liveActivity });
     void directory.client.start();
-    const uninstallResume = installResumeHandler(() => ({ directory: directory.client, connection, resetTransport: () => resetTransport() }));
+    void liveActivity.refresh();
+    if (platform === 'ios') {
+      OverdeckLiveActivity.status().then(setLiveActivityStatus, (e: unknown) => console.warn('[live-activity] status failed', e));
+    }
+    const uninstallResume = installResumeHandler(() => ({
+      directory: directory.client,
+      connection,
+      resetTransport: () => resetTransport(),
+      liveActivity,
+    }));
     return () => {
       uninstallResume();
+      liveActivity.dispose();
       meter.stop();
       directory.client.stop();
       directory.dialer.close();
@@ -203,12 +221,26 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
         removeSelf: services ? removeSelfOver(services.connection) : () => Promise.reject(new Error('no connection')),
         directory: services?.directory.client ?? null,
         deleteDevice: (record) => deleteAccountDevice(record),
+        endLiveActivity: shellPlatform() === 'ios' ? () => OverdeckLiveActivity.end() : undefined,
         resetKeys: resetAllKeys,
         clearStorage: () => localStorage.clear(),
         reload: () => navigate('/'),
       }),
     [paired, account, services, navigate],
   );
+
+  const liveActivitySetting = liveActivityStatus && services
+    ? {
+      available: liveActivityStatus.supported,
+      allowed: liveActivityStatus.enabled,
+      enabled: liveActivityOn,
+      onChange: (on: boolean) => {
+        setLiveActivityEnabled(on);
+        setLiveActivityOn(on);
+        void (on ? services.liveActivity.refresh() : services.liveActivity.disable());
+      },
+    }
+    : null;
 
   const onPaired = useCallback(
     (machine: PairedMachine) => {
@@ -274,6 +306,7 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
         <SettingsScreen
           account={account}
           machines={paired}
+          liveActivity={liveActivitySetting}
           onForget={(environmentId) => void forget(environmentId, { kind: 'settings' })}
           onSignOut={runSignOut}
           onBack={() => setView({ kind: 'machines' })}
