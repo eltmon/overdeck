@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4837",
   "created": "2026-11-03T16:16:59.604Z",
-  "updated": "2026-11-03T19:03:56.472Z",
+  "updated": "2026-11-03T19:04:27.582Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -328,6 +328,10 @@
     "machines-screen.ac4": {
       "status": "completed",
       "doneAt": "2026-11-03T19:03:56.472Z"
+    },
+    "qr-scanner-extract.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T19:04:27.582Z"
     }
   }
 }
