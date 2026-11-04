@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4841",
   "created": "2026-11-04T10:01:07.580Z",
-  "updated": "2026-11-04T10:13:26.541Z",
+  "updated": "2026-11-04T10:15:12.314Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,9 +46,10 @@
       "doneAt": "2026-11-04T10:13:21.340Z"
     },
     "rel-ios-rig-script": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4841",
-      "claimedAt": "2026-11-04T10:13:26.541Z"
+      "claimedAt": "2026-11-04T10:13:26.541Z",
+      "doneAt": "2026-11-04T10:15:12.314Z"
     }
   }
 }
