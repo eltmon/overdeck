@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4840",
   "created": "2026-11-03T20:58:06.302Z",
-  "updated": "2026-11-04T18:13:21.821Z",
+  "updated": "2026-11-04T18:32:20.195Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -64,7 +64,7 @@
     "device-acceptance": {
       "status": "pending",
       "claimedBy": "agent-pan-4840",
-      "claimedAt": "2026-11-04T18:13:21.821Z"
+      "claimedAt": "2026-11-04T18:32:20.194Z"
     }
   }
 }
