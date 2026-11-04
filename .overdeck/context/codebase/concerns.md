@@ -709,6 +709,14 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   "Input must be provided"); `--mcp-config <configs...>` is declared variadic the same way in `claude --help`. Launchers that end with `"$prompt"` must
   emit the equals form (`--allowedTools=mcp__overdeck`, `--mcp-config=<path>`) or put another flag
   between. Two equals-form `--mcp-config=` flags both load.
+- **Codex blocks un-annotated MCP tools** (PAN-4933 planning, Codex CLI 0.159.0) — an MCP tool without a
+  `readOnlyHint` annotation needs approval: under `approval_policy = "never"` the call fails with "MCP tool call
+  requires approval, but approval policy is never" (observed through `codex exec`), and under `on-request` the TUI
+  would prompt (inferred; `codex exec` forces `never`), which wedges an unattended agent. Overdeck's tools carry no annotations, so a server Overdeck provisions into a Codex
+  `config.toml` must set `default_tools_approval_mode = "approve"` in its `[mcp_servers.<name>]` table. Codex
+  refuses the whole config (the agent never starts) if that key holds anything but `auto`, `prompt`, `writes` or
+  `approve`; unknown keys in the table are ignored.
+<!-- last-verified: 2026-11-04 (PAN-4482, PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4930, PAN-4931, PAN-4932, PAN-4933) -->
 - **ACP agents spawn stdio MCP servers from `session/new` and `session/load`** (PAN-4934 planning probe) —
   opencode 1.18.31 and kimi 2.0.2 both start a stdio `mcpServers` entry, pass its `env` array, keep the
   inherited `PATH`/`HOME`, and call `initialize` then `tools/list`, on a new session and on a load. Both

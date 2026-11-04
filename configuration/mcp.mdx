@@ -252,10 +252,10 @@ does not trust gets 400. A Tailscale Funnel request gets 404.
 
 ## Agents get these tools
 
-Every Claude Code, Kimi Code ACP (`acp`) and OpenCode (`opencode`) agent that
-Overdeck launches on this machine starts with the `overdeck` server: work agents, role runs (plan, review, test, ship, worker and
-the others), planning sessions and conversations. You do not create a token for
-them.
+Every Claude Code, Codex, Kimi Code ACP (`acp`) and OpenCode (`opencode`) agent
+that Overdeck launches on this machine starts with the `overdeck` server: work
+agents, role runs (plan, review, test, ship, worker and the others), planning
+sessions and conversations. You do not create a token for them.
 
 Each agent holds its own agent token. It sits in `mcp-token` (mode 0600), next
 to `overdeck-mcp.json`, in `~/.overdeck/agents/<id>/` for an agent or
@@ -271,6 +271,18 @@ An ACP agent gets the same `overdeck-mcp.json`. The launcher passes
 `--mcp-config <file>` to the ACP host, which sends the server to the agent in
 `session/new` and `session/load`. The ACP host approves the agent's permission
 requests itself, so no allow-list is needed.
+
+A Codex agent gets the server differently: Codex has no CLI flag for an
+MCP allow-list, so instead of a launcher flag it gets an
+`[mcp_servers.overdeck]` table written directly into
+`~/.overdeck/agents/<id>/codex-home-v2/config.toml` (or
+`~/.overdeck/agents/conv-<name>/codex-home-v2/config.toml` for a
+conversation), alongside any MCP servers the role itself declares. The table
+names only the token file in its `env`, never the token. It also carries
+`default_tools_approval_mode = "approve"`, because Overdeck's MCP tools carry
+no `readOnlyHint` annotations — without that key, Codex refuses every
+model-initiated call with "MCP tool call requires approval, but approval
+policy is never" under `approval_policy = "never"`.
 
 The token's scopes follow the agent's role:
 
@@ -294,7 +306,7 @@ mcp:
 
 These launches get no server: Docker workspaces (`OVERDECK_DOCKER_WORKSPACE=1`
 or `PAN_DOCKER=1`), bare conversations, Fly machines, and harnesses other than
-Claude Code, `acp` and `opencode` (Codex follows). When the token cannot be
+Claude Code, Codex, `acp` and `opencode`. When the token cannot be
 minted or the config cannot be written, the agent starts without the server and
 the log shows one `[agent-injection] overdeck MCP skipped for <id>: <reason>`
 warning. The agent can still reach Overdeck through `pan`.
