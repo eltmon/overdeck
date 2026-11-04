@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4953",
   "created": "2026-11-04T13:46:40.439Z",
-  "updated": "2026-11-04T14:30:19.126Z",
+  "updated": "2026-11-04T14:30:34.834Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -172,6 +172,10 @@
     "cp9-verification.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T14:30:19.125Z"
+    },
+    "cp9-verification.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:30:34.834Z"
     }
   }
 }
