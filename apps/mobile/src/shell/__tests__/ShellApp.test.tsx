@@ -16,6 +16,9 @@ const harness = vi.hoisted(() => ({
     end: vi.fn(async () => undefined),
     addListener: vi.fn(async () => ({ remove: vi.fn(async () => undefined) })),
   },
+  appearance: {
+    set: vi.fn(async () => undefined),
+  },
 }));
 
 vi.mock('@capacitor/app', () => ({
@@ -34,6 +37,7 @@ vi.mock('../../native/keys', async () => {
 });
 vi.mock('../platform', () => ({ shellPlatform: () => harness.platform }));
 vi.mock('../../native/liveActivity', () => ({ OverdeckLiveActivity: harness.liveActivity }));
+vi.mock('../../native/appearance', () => ({ OverdeckAppearance: harness.appearance }));
 vi.mock('../directory', () => ({
   createDirectory: () => ({
     client: {
@@ -113,6 +117,7 @@ beforeEach(async () => {
   harness.platform = 'android';
   harness.sent.length = 0;
   for (const fn of Object.values(harness.liveActivity)) fn.mockClear();
+  for (const fn of Object.values(harness.appearance)) fn.mockClear();
   sessionStorage.clear();
   localStorage.clear();
   useShellStore.setState({ account: null, machines: [] });
@@ -236,5 +241,38 @@ describe('ShellApp Live Activity (PAN-4839 WI-10)', () => {
     expect(screen.queryByText('Live Activity')).toBeNull();
     expect(harness.liveActivity.status).not.toHaveBeenCalled();
     expect(harness.liveActivity.start).not.toHaveBeenCalled();
+  });
+});
+
+describe('ShellApp appearance (PAN-5041 WI-5)', () => {
+  beforeEach(() => {
+    localStorage.removeItem(CURRENT_MACHINE_KEY);
+    history.replaceState(null, '', '/');
+    (globalThis as { __OVERDECK_NATIVE__?: boolean }).__OVERDECK_NATIVE__ = true;
+  });
+
+  afterEach(() => {
+    delete (globalThis as { __OVERDECK_NATIVE__?: boolean }).__OVERDECK_NATIVE__;
+    vi.unstubAllGlobals();
+  });
+
+  it('applies the native plugin on boot, and tapping Light updates the theme and the plugin with no server sync', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<ShellApp navigate={() => undefined} />);
+    await screen.findByText('Machines');
+    expect(harness.appearance.set).toHaveBeenCalledWith({ appearance: 'system' });
+
+    const settings = await screen.findByText('Settings');
+    await act(async () => settings.click());
+
+    const light = await screen.findByRole('radio', { name: /^Light/ });
+    await act(async () => light.click());
+
+    expect(document.documentElement.classList.contains('dark')).toBe(false);
+    expect(localStorage.getItem('overdeck.appearance')).toBe('light');
+    expect(harness.appearance.set).toHaveBeenCalledWith({ appearance: 'light' });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

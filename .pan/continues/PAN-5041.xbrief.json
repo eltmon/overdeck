@@ -1,0 +1,216 @@
+{
+  "version": "1",
+  "issueId": "PAN-5041",
+  "created": "2026-11-04T17:22:54.161Z",
+  "updated": "2026-11-04T18:41:36.817Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-04T18:41Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-04T18:41:36.817Z"
+    }
+  ],
+  "items": {
+    "wi1-usetheme-settheme": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5041",
+      "claimedAt": "2026-11-04T17:22:54.161Z",
+      "doneAt": "2026-11-04T17:25:43.054Z"
+    },
+    "wi2-appearance-store": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5041",
+      "claimedAt": "2026-11-04T17:25:50.620Z",
+      "doneAt": "2026-11-04T17:29:40.221Z"
+    },
+    "wi3-boot-script": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5041",
+      "claimedAt": "2026-11-04T17:29:46.339Z",
+      "doneAt": "2026-11-04T17:31:20.110Z"
+    },
+    "wi4-settings-row": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5041",
+      "claimedAt": "2026-11-04T17:31:26.238Z",
+      "doneAt": "2026-11-04T17:34:37.687Z"
+    },
+    "wi5-shellapp-wiring": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5041",
+      "claimedAt": "2026-11-04T17:34:44.664Z",
+      "doneAt": "2026-11-04T17:37:26.321Z"
+    },
+    "wi6-ios-plugin": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5041",
+      "claimedAt": "2026-11-04T17:37:32.594Z",
+      "doneAt": "2026-11-04T17:41:00.087Z"
+    },
+    "wi7-android-plugin": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5041",
+      "claimedAt": "2026-11-04T17:41:06.138Z",
+      "doneAt": "2026-11-04T17:43:35.514Z"
+    },
+    "wi8-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5041",
+      "claimedAt": "2026-11-04T17:43:42.341Z",
+      "doneAt": "2026-11-04T17:45:19.594Z"
+    },
+    "wi9-simulator-acceptance": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:08:22.940Z"
+    },
+    "wi1-usetheme-settheme.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:10:50.272Z"
+    },
+    "wi1-usetheme-settheme.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:11:07.599Z"
+    },
+    "wi1-usetheme-settheme.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:11:24.139Z"
+    },
+    "wi2-appearance-store.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:11:41.501Z"
+    },
+    "wi2-appearance-store.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:11:57.996Z"
+    },
+    "wi2-appearance-store.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:12:13.941Z"
+    },
+    "wi2-appearance-store.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:12:31.516Z"
+    },
+    "wi2-appearance-store.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:12:45.220Z"
+    },
+    "wi3-boot-script.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:12:59.161Z"
+    },
+    "wi3-boot-script.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:13:13.119Z"
+    },
+    "wi3-boot-script.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:13:28.074Z"
+    },
+    "wi3-boot-script.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:13:43.392Z"
+    },
+    "wi4-settings-row.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:14:05.574Z"
+    },
+    "wi4-settings-row.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:14:27.194Z"
+    },
+    "wi4-settings-row.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:14:45.628Z"
+    },
+    "wi5-shellapp-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:15:01.983Z"
+    },
+    "wi5-shellapp-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:15:18.952Z"
+    },
+    "wi5-shellapp-wiring.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:15:39.516Z"
+    },
+    "wi6-ios-plugin.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:16:00.915Z"
+    },
+    "wi6-ios-plugin.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:16:19.324Z"
+    },
+    "wi6-ios-plugin.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:16:37.350Z"
+    },
+    "wi6-ios-plugin.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:16:58.849Z"
+    },
+    "wi7-android-plugin.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:17:22.625Z"
+    },
+    "wi7-android-plugin.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:17:46.006Z"
+    },
+    "wi7-android-plugin.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:18:17.142Z"
+    },
+    "wi7-android-plugin.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:18:39.638Z"
+    },
+    "wi8-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:19:05.886Z"
+    },
+    "wi8-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:19:31.305Z"
+    },
+    "wi8-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:19:56.404Z"
+    },
+    "wi9-simulator-acceptance.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:20:20.745Z"
+    },
+    "wi9-simulator-acceptance.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:29:11.763Z"
+    },
+    "wi9-simulator-acceptance.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:29:38.861Z"
+    },
+    "wi9-simulator-acceptance.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:29:54.921Z"
+    },
+    "wi9-simulator-acceptance.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:30:10.906Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-04T18:41:36Z",
+      "markdownBody": "# CodeRabbit findings for PAN-5041 (PR #5047)\n\nCodeRabbit posted 2 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4471729717 · configuration/phone.mdx:129 [Minor]: Distinguish the native app from the browser phone view.\n  https://github.com/eltmon/overdeck/pull/5047#discussion_r4471729717\n- Thread 4471729731 · src/dashboard/frontend/src/hooks/useTheme.ts:74 [Minor]: Guard the `localStorage.setItem` call in `setTheme`.\n  https://github.com/eltmon/overdeck/pull/5047#discussion_r4471729731\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5047/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-5041`.\n   If you only replied, you are done.\n5. If PR #5047 has already merged when you read this, nothing more lands on it: open a follow-up issue\n   for the findings you agree with instead of pushing."
+    }
+  ]
+}

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from '
 import { type DeviceIdentity, loadIdentity } from '../native/keys';
 import { type LiveActivityStatus, OverdeckLiveActivity } from '../native/liveActivity';
 import { type PushController, pushSupported, startPush, usePushState } from '../native/push';
+import { defaultAppearanceDeps, installAppearance, useAppearance, writeAppearance } from './appearance';
 import { type Connection, createConnection } from './connection';
 import { createDirectory, type ShellDirectory } from './directory';
 import { resetTransport } from '../../../../src/dashboard/frontend/src/lib/wsTransport';
@@ -72,6 +73,10 @@ interface ShellAppProps {
 }
 
 export default function ShellApp({ navigate = (path) => location.assign(path) }: ShellAppProps) {
+  // Runs in every boot state, including the sign-in screen (PAN-5041).
+  useEffect(() => installAppearance(defaultAppearanceDeps()), []);
+  const appearance = useAppearance();
+
   const [boot, setBoot] = useState<Boot>({ kind: 'loading' });
   const [signInError, setSignInError] = useState<string | null>(null);
   const [view, setView] = useState<View>({ kind: 'machines' });
@@ -410,6 +415,8 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
           onForget={(environmentId) => void forget(environmentId, { kind: 'settings' })}
           onSignOut={runSignOut}
           onBack={() => setView({ kind: 'machines' })}
+          appearance={appearance}
+          onAppearanceChange={writeAppearance}
           notifications={
             push && pushState
               ? {
