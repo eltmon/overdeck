@@ -148,6 +148,9 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   // PAN-4927 W-SEC1: secret requests; the handler also requires an agent token (D-10).
   { method: 'POST', path: '/api/self/secret-requests', scope: 'tell' },
   { method: 'GET', path: '/api/self/secret-requests/:id/wait', scope: 'read:state' },
+  // PAN-4927 W-LINK1: machine-link requests; the handler also requires an agent token (D-10).
+  { method: 'POST', path: '/api/self/machine-link-requests', scope: 'tell' },
+  { method: 'GET', path: '/api/self/machine-link-requests/:id/wait', scope: 'read:state' },
   { method: 'GET', path: '/api/agent-requests', scope: 'read:conversations' },
   // POST /api/agent-requests/:id/secret and /decline have no row: root credentials only (D-4).
   // PAN-4650 WI-9: the owner's half of Pull here (a linked machine's operator only, checked by the routes).

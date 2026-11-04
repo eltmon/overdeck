@@ -534,6 +534,8 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/self/worker-report',               kind: 'http', disposition: 'WRITE',       door: 'services/self-jobs.start worker-report -> pan worker report <caller id> --status=<s> --stdin, worker agent tokens only (PAN-4927 W-SELF2)' },
   { surface: 'POST /api/self/secret-requests',             kind: 'http', disposition: 'WRITE',       door: 'services/agent-requests.createSecret, agent tokens only (PAN-4927 W-SEC1)' },
   { surface: 'GET /api/self/secret-requests/:id/wait',     kind: 'http', disposition: 'READ',        door: 'services/agent-requests.wait (at most 50 s), owner-only, agent tokens only (PAN-4927 W-SEC1)' },
+  { surface: 'POST /api/self/machine-link-requests',       kind: 'http', disposition: 'WRITE',       door: 'services/agent-requests.createMachineLink, agent tokens only (PAN-4927 W-LINK1)' },
+  { surface: 'GET /api/self/machine-link-requests/:id/wait', kind: 'http', disposition: 'READ',      door: 'services/agent-requests.wait (at most 50 s), owner-only, machine-link kind only, agent tokens only (PAN-4927 W-LINK1)' },
   { surface: 'GET /api/agent-requests',                    kind: 'http', disposition: 'READ',        door: 'services/agent-requests.listPending, no values (PAN-4927 W-SEC1)' },
   { surface: 'POST /api/agent-requests/:id/secret',        kind: 'http', disposition: 'WRITE',       door: 'services/agent-requests.writeAgentSecretFile + settle, root credentials only (PAN-4927 W-SEC1)' },
   { surface: 'POST /api/agent-requests/:id/decline',       kind: 'http', disposition: 'WRITE',       door: 'services/agent-requests.settle, root credentials only (PAN-4927 W-SEC1)' },
