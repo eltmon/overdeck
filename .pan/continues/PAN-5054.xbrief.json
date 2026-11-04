@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5054",
   "created": "2026-11-04T19:57:03.624Z",
-  "updated": "2026-11-04T20:18:09.154Z",
+  "updated": "2026-11-04T20:18:21.843Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,6 +80,10 @@
     "evidence-merge-test.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T20:18:09.154Z"
+    },
+    "merge-workflow-doc.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T20:18:21.843Z"
     }
   }
 }
