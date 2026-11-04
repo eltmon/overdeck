@@ -226,3 +226,52 @@ describe('failure logging (PAN-5018 FR-1)', () => {
     expect(log).toHaveBeenLastCalledWith('link desk: secure open failed over relay (protocol): bad frame');
   });
 });
+
+describe('debug error codes and eviction (PAN-5018 FR-2, FR-3)', () => {
+  const failingOpen = (code: ChannelOpenErrorCode) =>
+    vi.fn(async () => {
+      throw new ChannelOpenError(code, 'refused');
+    });
+
+  it('appends the code to the text when showErrorCodes is on', async () => {
+    const f = fakeDirectory({ relayAllowed: false, direct: 'ok' });
+    const connection = createConnection({ directory: f.directory, meter, openSecureChannel: failingOpen('timeout'), log: vi.fn(), showErrorCodes: true });
+    const error = await rejection(connection.openLink(MACHINE));
+    expect(error.message).toBe('Could not open a secure channel to desk. (timeout)');
+  });
+
+  it('keeps the text unchanged when showErrorCodes is off', async () => {
+    const f = fakeDirectory({ relayAllowed: false, direct: 'ok' });
+    const connection = createConnection({ directory: f.directory, meter, openSecureChannel: failingOpen('timeout'), log: vi.fn(), showErrorCodes: false });
+    const error = await rejection(connection.openLink(MACHINE));
+    expect(error.message).toBe('Could not open a secure channel to desk.');
+  });
+
+  it("closes the machine's peer connections after a handshake timeout", async () => {
+    const f = fakeDirectory({ relayAllowed: true, direct: 'fail', relay: 'ok' });
+    const connection = createConnection({ directory: f.directory, meter, openSecureChannel: failingOpen('timeout'), log: vi.fn() });
+    await rejection(connection.openLink(MACHINE));
+    expect(f.dialer.close).toHaveBeenCalledWith(MACHINE.environmentId);
+    expect(f.dials.map((d) => d.relay)).toEqual([false, true]);
+    await connection.dialRaw(MACHINE.environmentId, 'desk');
+    expect(f.dials.map((d) => d.relay)).toEqual([false, true, false, true]);
+  });
+
+  it('closes the peer connections after a protocol failure while pairing', async () => {
+    const f = fakeDirectory({ relayAllowed: false, direct: 'ok' });
+    const connection = createConnection({ directory: f.directory, meter, openSecureChannel: failingOpen('protocol'), log: vi.fn() });
+    const localKey = { publicKey: new Uint8Array(32), secretKey: new Uint8Array(32) };
+    await rejection(connection.openPairing(MACHINE.environmentId, 'desk', 'odp_test', localKey));
+    expect(f.dialer.close).toHaveBeenCalledWith(MACHINE.environmentId);
+  });
+
+  it.each<ChannelOpenErrorCode>(['unknown-peer', 'pairing-refused', 'identity-refused', 'unsupported', 'busy'])(
+    'keeps the peer connection after %s',
+    async (code) => {
+      const f = fakeDirectory({ relayAllowed: false, direct: 'ok' });
+      const connection = createConnection({ directory: f.directory, meter, openSecureChannel: failingOpen(code), log: vi.fn() });
+      await rejection(connection.openLink(MACHINE));
+      expect(f.dialer.close).not.toHaveBeenCalled();
+    },
+  );
+});

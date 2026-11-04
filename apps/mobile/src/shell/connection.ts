@@ -5,13 +5,15 @@
  * through TURN when the directory allows the relay and this month's allowance is not used. The route
  * that worked is remembered per machine until `forgetRoutes()`. Every relayed raw channel is metered.
  * Failures become a {@link ConnectionError} whose message is the exact text the shell shows. Each
- * failed dial and secure open is also logged with its code and route (PAN-5018 FR-1).
+ * failed dial and secure open is also logged with its code and route (PAN-5018 FR-1). A handshake
+ * that times out or breaks protocol on an open raw channel means the peer connection under it is
+ * suspect, so the phone closes its connections to that machine and forgets the route (FR-3, D-5).
  */
 import { ChannelOpenError, type MachineDialer, openSecureChannel, type RtcDuplexWeb, type SecureChannel, type StaticKeyPair } from '@overdeck/anywhere-channel/web';
 import type { DirectoryWebClient } from '@overdeck/anywhere-channel/web';
 import { hexToBytes } from '@noble/hashes/utils.js';
 
-import { MIN_PAN_VERSION } from './config';
+import { DEBUG_ERRORS, MIN_PAN_VERSION } from './config';
 import type { RelayMeter } from './relayMeter';
 import type { PairedMachine } from './types';
 
@@ -55,6 +57,8 @@ export interface ConnectionDeps {
   openSecureChannel?: typeof openSecureChannel;
   /** Diagnostic lines; never given keys, tokens or SDP. Default `console.warn` with an `[overdeck] ` prefix. */
   log?: (message: string) => void;
+  /** Append ` (<code>)` to a failed secure open's text. Default {@link DEBUG_ERRORS}. */
+  showErrorCodes?: boolean;
 }
 
 type Route = 'direct' | 'relay';
@@ -70,24 +74,30 @@ export interface Connection {
   forgetRoutes(): void;
 }
 
-/** The {@link ConnectionError} for a channel that failed to open. */
-export function channelError(error: unknown, label: string): ConnectionError {
+/** The {@link ConnectionError} for a channel that failed to open; `showCode` appends the `ChannelOpenError` code. */
+export function channelError(error: unknown, label: string, showCode = false): ConnectionError {
   if (error instanceof ConnectionError) return error;
+  const text = (message: string): string => (showCode && error instanceof ChannelOpenError ? `${message} (${error.code})` : message);
   if (error instanceof ChannelOpenError) {
     switch (error.code) {
       case 'unknown-peer':
-        return new ConnectionError('removed', connectionText.removed(label), { cause: error });
+        return new ConnectionError('removed', text(connectionText.removed(label)), { cause: error });
       case 'pairing-refused':
-        return new ConnectionError('pairing-refused', connectionText.pairingRefused(label), { cause: error });
+        return new ConnectionError('pairing-refused', text(connectionText.pairingRefused(label)), { cause: error });
       case 'identity-refused':
-        return new ConnectionError('identity', connectionText.identity(label), { cause: error });
+        return new ConnectionError('identity', text(connectionText.identity(label)), { cause: error });
       case 'unsupported':
-        return new ConnectionError('outdated', connectionText.outdated(label), { cause: error });
+        return new ConnectionError('outdated', text(connectionText.outdated(label)), { cause: error });
       default:
         break;
     }
   }
-  return new ConnectionError('other', connectionText.channelFailed(label), { cause: error });
+  return new ConnectionError('other', text(connectionText.channelFailed(label)), { cause: error });
+}
+
+/** A raw channel opened but the handshake got no valid reply: the peer connection under it is suspect (D-5). */
+function suspectsPeerConnection(error: unknown): boolean {
+  return error instanceof ChannelOpenError && (error.code === 'timeout' || error.code === 'protocol');
 }
 
 /** The code a log line names: the `ChannelOpenError` code, the `ConnectionError` kind, else the error name. */
@@ -106,6 +116,7 @@ export function createConnection({
   meter,
   openSecureChannel: open = openSecureChannel,
   log = (message) => console.warn(`[overdeck] ${message}`),
+  showErrorCodes = DEBUG_ERRORS,
 }: ConnectionDeps): Connection {
   /** environment id → whether the route that last worked was the relay. */
   const routes = new Map<string, boolean>();
@@ -157,13 +168,17 @@ export function createConnection({
     return (await dialRawWithRoute(environmentId, label, opts)).raw;
   }
 
-  async function secure<T>(raw: RtcDuplexWeb, label: string, route: Route, run: () => Promise<T>): Promise<T> {
+  async function secure<T>(raw: RtcDuplexWeb, environmentId: string, label: string, route: Route, run: () => Promise<T>): Promise<T> {
     try {
       return await run();
     } catch (error) {
       raw.destroy();
       log(`link ${label}: secure open failed over ${route} (${errorCode(error)}): ${errorMessage(error)}`);
-      throw channelError(error, label);
+      if (suspectsPeerConnection(error)) {
+        routes.delete(environmentId);
+        directory.dialer.close(environmentId);
+      }
+      throw channelError(error, label, showErrorCodes);
     }
   }
 
@@ -172,14 +187,14 @@ export function createConnection({
     async openLink(machine, opts = {}) {
       const { raw, route } = await dialRawWithRoute(machine.environmentId, machine.label, opts);
       const localKey = { publicKey: hexToBytes(machine.linkPublicKeyHex), secretKey: hexToBytes(machine.linkSecretKeyHex) };
-      const { stream } = await secure(raw, machine.label, route, () =>
+      const { stream } = await secure(raw, machine.environmentId, machine.label, route, () =>
         open(raw, { mode: 'link', localKey, remoteKeyHex: machine.machineKeyHex, ...(opts.signal ? { signal: opts.signal } : {}) }, machine.label),
       );
       return stream;
     },
     async openPairing(environmentId, label, code, localKey, opts = {}) {
       const { raw, route } = await dialRawWithRoute(environmentId, label, opts);
-      return secure(raw, label, route, () =>
+      return secure(raw, environmentId, label, route, () =>
         open(raw, { mode: 'pairing', localKey, pairingCode: code, ...(opts.signal ? { signal: opts.signal } : {}) }, label),
       );
     },
