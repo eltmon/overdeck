@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5041",
   "created": "2026-11-04T17:22:54.161Z",
-  "updated": "2026-11-04T18:12:45.221Z",
+  "updated": "2026-11-04T18:12:59.161Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -92,6 +92,10 @@
     "wi2-appearance-store.ac5": {
       "status": "completed",
       "doneAt": "2026-11-04T18:12:45.220Z"
+    },
+    "wi3-boot-script.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:12:59.161Z"
     }
   }
 }
