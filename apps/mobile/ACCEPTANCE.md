@@ -253,6 +253,10 @@ answered:
   "ai.overdeck.app (unreviewed)".
 - Includes PAN-4840 (Android push decryption): no. PAN-4840 was still open, so this build has the
   FCM config but not the handler (D-6); a later build ships it.
+- Later builds on the same track (same signing key): **1.0 (2)**, 2026-11-04, with `main` merged in
+  (PAN-5018 link fixes, PAN-5019 notification controls, PAN-5016 telemetry events), and **1.0 (3)**,
+  2026-11-04, adding the pair-link fix. Both "Available to internal testers"; neither includes
+  PAN-4840.
 
 ### TestFlight
 
@@ -269,6 +273,9 @@ answered:
   as exempt (mass-market), so `usesNonExemptEncryption` is false; internal build state
   READY_FOR_BETA_TESTING; in the internal group "Operator" (automatic distribution on), whose
   tester (the operator) is INVITED.
+- Later builds, each processed VALID, exempt (mass-market) and in beta testing for "Operator":
+  **1.0 (2)**, 2026-11-04, with `main` merged in (PAN-5018, PAN-5019, PAN-5016), and **1.0 (3)**,
+  2026-11-04, adding the pair-link fix. 1.0 (3) is the build the device checks below ran on.
 
 ### Simulator check before the device run (2026-11-04)
 

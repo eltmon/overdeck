@@ -21,6 +21,16 @@ The plan is the [PAN-4841 PRD](../../.pan/drafts/PAN-4841.md).
 
 ## Operator checklist
 
+> **Status, 2026-11-04 (PAN-4841).** The operator decided the agent does the console steps itself,
+> with the operator only signing in. The agent completed A1–A6, F1–F4 and P1–P3 that way: Firebase
+> through gcloud and the Firebase API, Apple and Play in a headed Chromium (profile
+> `~/.overdeck/browser-profiles/pan-4841`), and the App Store Connect API where it works. The push
+> values were produced directly into `~/.overdeck/secrets/` (mode 0600), so the secret requests
+> below (C1) were not used. **Still open, operator only:** K1 (back up the upload key and its
+> password) and P4 (Play "App content"; its privacy-policy URL goes live when
+> eltmon/overdeck-landing#7 merges). The App Store name is "Overdeck Anywhere" because "Overdeck" was
+> taken.
+
 Do the steps in order within each group. The A, F and P groups are independent of each other.
 
 - **A1** developer.apple.com → Identifiers: register `ai.overdeck.app` (enable **Push Notifications**), `ai.overdeck.app.NotificationService`, `ai.overdeck.app.widgets`. No App Groups.
@@ -41,6 +51,9 @@ Do the steps in order within each group. The A, F and P groups are independent o
 - **K1** Copy the content of `~/.overdeck/secrets/android-upload.password` into your password manager, entry "Overdeck Android upload key", and back up `~/.overdeck/secrets/android-upload.jks` with it.
 
 ## Secrets the agent requests
+
+These are the values the connect Worker needs. On 2026-11-04 the agent produced them itself (see
+the status note above); the secret-request flow below is the fallback when it cannot.
 
 The agent asks for each value through a secret request in the Overdeck dashboard. You type or paste
 the value there; it never appears in chat, the repo, a commit or an issue comment.
