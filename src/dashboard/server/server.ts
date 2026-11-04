@@ -59,6 +59,7 @@ import { workersRegisterRouteLayer } from './routes/workers-register.js'
 import { workersRouteLayer } from './routes/workers.js'
 import { selfJobsRouteLayer } from './routes/self-jobs.js'
 import { selfRequestsRouteLayer } from './routes/self-requests.js'
+import { agentRequestsRouteLayer } from './routes/agent-requests.js'
 import { lanesRouteLayer } from './routes/lanes.js'
 import { workspacesRouteLayer } from './routes/workspaces.js'
 import { workspaceRegistryRouteLayer } from './routes/workspace-registry.js'
@@ -375,6 +376,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   workersRouteLayer,
   selfJobsRouteLayer,
   selfRequestsRouteLayer,
+  agentRequestsRouteLayer,
   lanesRouteLayer,
   workspacesRouteLayer,
   workspaceRegistryRouteLayer,
