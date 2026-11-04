@@ -749,7 +749,10 @@ the entry after it.
 **Recording retries transient forge failures (PAN-4263).** `pan admin
 specialists done` finds the PR through `discoverArtifact` (`lib/forge.ts`),
 which retries a rate-limit, network or 502/503/504 failure twice, after 2 s
-and 8 s (`lib/forge-transient.ts`). A lookup that still fails is reported as
+and 8 s (`lib/forge-transient.ts`). A 502/503/504 counts in any of gh's
+wordings (`HTTP 502`, `failed: 502`, `non-200 OK status code: 502`), and so
+does GitHub's GraphQL `Something went wrong while executing your query`
+(PAN-5015). A 500 does not. A lookup that still fails is reported as
 `Couldn't reach <forge> to find the review artifact for <branch>: <reason>`,
 never as "No open review artifact": only gh's own "no pull requests found"
 answer (or an empty `glab mr list`) means there is no PR, and a closed PR on
