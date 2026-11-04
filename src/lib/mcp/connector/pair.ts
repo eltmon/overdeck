@@ -8,12 +8,18 @@
  * descriptor key differs from the string's `k` is refused before anything is written. On
  * success the new link key, `pairing.json` and (when absent) `local-token` are written; the
  * local token survives a re-pair so bot configs keep working. No token is ever printed.
+ *
+ * `logout` (FR-9, D-18) undoes it in order, each remote step best effort: `DELETE
+ * /api/connectors/self` over a link channel, `forget-client` to the directory, revoke the
+ * overdeck.ai device, then delete the four home files. A failed step prints one line and never
+ * stops the next; the exit code is 0 once the files are gone.
  */
 import { request as httpRequest } from 'node:http';
 import { hostname } from 'node:os';
 import { join } from 'node:path';
 
 import { generateStaticKeyPair } from '@overdeck/anywhere-channel';
+import { revokeDevice } from '../../account/client.js';
 import { clientLabel, type DirectoryWebClient } from '@overdeck/anywhere-channel/web';
 import { parseConnectorPairLink } from '@overdeck/contracts';
 
@@ -21,30 +27,42 @@ import { channelAgent } from '../../anywhere/channel/channel-agent.js';
 import type { ChannelSocket } from '../../anywhere/channel/channel-socket.js';
 import { openChannel, setRtcDialer } from '../../anywhere/channel/open.js';
 import type { ConnectorIo } from './account.js';
-import { noDirectPathMessage } from './channel-api.js';
+import type { linkFetch } from '../../anywhere/link-client.js';
+import { ConnectorLink, createConnectorDashboardApi, noDirectPathMessage } from './channel-api.js';
 import { type ConnectorRtc, createConnectorRtc } from './dial.js';
 import { createConnectorDirectory, machineInDirectory, waitDirectoryOnline } from './directory.js';
 import {
   type ConnectorAccount,
   type ConnectorIdentity,
+  type ConnectorPairing,
   DEFAULT_CONNECTOR_PORT,
   ensureIdentity,
   ensureLocalToken,
   readAccount,
+  readIdentity,
+  readLocalToken,
+  readPairing,
+  removeConnectorFiles,
   replaceLinkKey,
   writePairing,
 } from './home.js';
 
 export const PAIR_CHANNEL_TIMEOUT_MS = 15_000;
 export const EXCHANGE_TIMEOUT_MS = 15_000;
+export const LOGOUT_CONNECT_TIMEOUT_MS = 15_000;
+export const LOGOUT_REQUEST_TIMEOUT_MS = 5_000;
 
 export const KEY_MISMATCH_MESSAGE = "The machine's key does not match the pairing string; ask for a new one in Connect a bot.";
 
 export interface ConnectorDeps {
   createDirectory(input: { account: ConnectorAccount; identity: ConnectorIdentity; label: string; appVersion: string }): DirectoryWebClient;
   createRtc(directory: DirectoryWebClient): ConnectorRtc;
+  /** Opens every secure channel the connector dials: the pairing channel and the link probes. */
   openPairingChannel: typeof openChannel;
   now(): Date;
+  /** Logout only; tests inject them. */
+  revokeDevice?: typeof revokeDevice;
+  linkFetch?: typeof linkFetch;
 }
 
 export function defaultConnectorDeps(): ConnectorDeps {
@@ -250,4 +268,118 @@ export async function runConnectorPair(
     rtc?.stop();
     directory.stop();
   }
+}
+
+/** Resolves with the promise's value, or with `fallback` after `ms`. */
+function within<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<T>((resolve) => {
+    timer = setTimeout(() => resolve(fallback), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+/** A record that cannot be read is treated as absent: logout deletes it anyway. */
+async function readOrNull<T>(read: () => Promise<T | null>, io: ConnectorIo): Promise<T | null> {
+  try {
+    return await read();
+  } catch (error) {
+    io.err(errorText(error));
+    return null;
+  }
+}
+
+/** The machine closes the caller's channel as it revokes, so a reset after sending counts as done. */
+function droppedAfterSend(error: unknown): boolean {
+  const code = (error as NodeJS.ErrnoException | null)?.code;
+  return code === 'ECONNRESET' || code === 'EPIPE' || (error instanceof Error && error.message === 'socket hang up');
+}
+
+async function removeFromMachine(
+  input: { pairing: ConnectorPairing; identity: ConnectorIdentity; directory: DirectoryWebClient },
+  deps: ConnectorDeps,
+): Promise<string | null> {
+  const { pairing, identity, directory } = input;
+  if (directory.state !== 'online') return 'the overdeck.ai directory is not reachable';
+  const found = machineInDirectory(directory, pairing.environmentId);
+  if (!found.ok) return found.error;
+  const rtc = deps.createRtc(directory);
+  setRtcDialer(rtc.dialer);
+  const link = new ConnectorLink({ pairing, identity, rtc, directory, openProbe: deps.openPairingChannel });
+  try {
+    await within(link.connect(), LOGOUT_CONNECT_TIMEOUT_MS, undefined);
+    if (!link.health().ok) return link.lastError() ?? 'no route to the machine';
+    const api = createConnectorDashboardApi(link, deps.linkFetch ? { linkFetch: deps.linkFetch } : {});
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), LOGOUT_REQUEST_TIMEOUT_MS);
+    try {
+      const answer = await api.request('DELETE', '/api/connectors/self', undefined, { signal: controller.signal });
+      if (answer.status === 200) return null;
+      const error = (answer.json as { error?: unknown } | null)?.error;
+      return `HTTP ${answer.status}${typeof error === 'string' ? ` ${error}` : ''}`;
+    } catch (error) {
+      if (droppedAfterSend(error)) return null;
+      return controller.signal.aborted ? `no answer within ${LOGOUT_REQUEST_TIMEOUT_MS / 1000} s` : errorText(error);
+    } finally {
+      clearTimeout(timer);
+    }
+  } finally {
+    link.stop();
+    setRtcDialer(null);
+    rtc.stop();
+  }
+}
+
+export async function runConnectorLogout(
+  opts: { home: string; label?: string; appVersion: string },
+  io: ConnectorIo,
+  deps: ConnectorDeps = defaultConnectorDeps(),
+): Promise<number> {
+  const pairing = await readOrNull(() => readPairing(opts.home), io);
+  const account = await readOrNull(() => readAccount(opts.home), io);
+  const identity = await readOrNull(() => readIdentity(opts.home), io);
+  const localToken = await readOrNull(() => readLocalToken(opts.home), io);
+  if (!pairing && !account && !identity && !localToken) {
+    await removeConnectorFiles(opts.home);
+    io.out('Not signed in.');
+    return 0;
+  }
+
+  let directory: DirectoryWebClient | null = null;
+  try {
+    if (account && identity) {
+      directory = deps.createDirectory({ account, identity, label: connectorLabel(opts.label, identity.clientId), appVersion: opts.appVersion });
+      try {
+        await directory.start();
+        await waitDirectoryOnline(directory);
+      } catch (error) {
+        io.err(`Could not reach the overdeck.ai directory: ${errorText(error)}`);
+      }
+    }
+
+    if (pairing) {
+      const reason =
+        directory && identity ? await removeFromMachine({ pairing, identity, directory }, deps).catch(errorText) : 'not signed in to overdeck.ai';
+      if (reason === null) io.out(`Removed this connector from ${pairing.machineLabel}.`);
+      else io.err(`Could not reach ${pairing.machineLabel} (${reason}); remove the connector there in Settings → Anywhere → Bots.`);
+    }
+
+    if (directory?.state === 'online') directory.send({ type: 'forget-client' });
+
+    if (account) {
+      const revoke = deps.revokeDevice ?? revokeDevice;
+      const outcome = await within(
+        revoke(account.baseUrl, account.accessToken, account.deviceId).catch((error: unknown) => ({ ok: false as const, detail: errorText(error) })),
+        LOGOUT_REQUEST_TIMEOUT_MS,
+        { ok: false as const, detail: `no answer within ${LOGOUT_REQUEST_TIMEOUT_MS / 1000} s` },
+      );
+      if (!outcome.ok) io.err(`Could not revoke this device at ${account.baseUrl} (${outcome.detail}).`);
+    }
+  } finally {
+    directory?.stop();
+  }
+
+  await removeConnectorFiles(opts.home);
+  io.out(`Signed out; deleted ${opts.home} files.`);
+  return 0;
 }

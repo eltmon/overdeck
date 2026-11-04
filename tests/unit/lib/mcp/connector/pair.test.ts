@@ -14,8 +14,16 @@ import type { ChannelSocket } from '../../../../../src/lib/anywhere/channel/chan
 import { ChannelOpenError, setRtcDialer, type TransportUrl } from '../../../../../src/lib/anywhere/channel/open.js';
 import type { ConnectorIo } from '../../../../../src/lib/mcp/connector/account.js';
 import type { ConnectorRtc } from '../../../../../src/lib/mcp/connector/dial.js';
-import { ensureIdentity, readIdentity, readPairing, writeAccount } from '../../../../../src/lib/mcp/connector/home.js';
-import { type ConnectorDeps, runConnectorPair } from '../../../../../src/lib/mcp/connector/pair.js';
+import { _resetLinkClientForTests, linkFetch } from '../../../../../src/lib/anywhere/link-client.js';
+import {
+  ensureIdentity,
+  ensureLocalToken,
+  readIdentity,
+  readPairing,
+  writeAccount,
+  writePairing,
+} from '../../../../../src/lib/mcp/connector/home.js';
+import { type ConnectorDeps, runConnectorLogout, runConnectorPair } from '../../../../../src/lib/mcp/connector/pair.js';
 
 const ENV = '0f1e2d3c-4b5a-4978-8695-a4b3c2d1e0f9';
 const MACHINE_KEY = 'ab'.repeat(32);
@@ -131,6 +139,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  _resetLinkClientForTests();
   setRtcDialer(null);
   server?.close();
   await rm(root, { recursive: true, force: true });
@@ -255,5 +264,115 @@ describe('runConnectorPair', () => {
     const io = recordingIo();
     expect(await run(deps({ machines: [] }), io)).toBe(1);
     expect(io.err_.join('\n')).toContain('does not include machine');
+  });
+});
+
+describe('runConnectorLogout', () => {
+  function logoutDirectory(state: 'online' | 'refused') {
+    const sent: unknown[] = [];
+    const directory = {
+      state: 'off' as string,
+      refusal: state === 'refused' ? 'overdeck.ai rejected this sign-in; sign in again' : null,
+      machines: [MACHINE],
+      relayAllowed: false,
+      start: vi.fn(async () => {
+        directory.state = state;
+      }),
+      stop: vi.fn(() => {
+        directory.state = 'off';
+      }),
+      send: vi.fn((frame: unknown) => {
+        if (directory.state !== 'online') return false;
+        sent.push(frame);
+        return true;
+      }),
+      onStateChange: () => () => undefined,
+    };
+    return { directory, sent };
+  }
+
+  /** An http.Agent whose connections are duplex pairs into the test server, so the real linkFetch builds the request. */
+  function serverAgent(): http.Agent {
+    const agent = new http.Agent();
+    agent.createConnection = (() => {
+      const [a, b] = duplexPair();
+      a.once('close', () => b.destroy());
+      b.once('close', () => a.destroy());
+      server.emit('connection', a);
+      return Object.assign(b, { setKeepAlive: () => b, setNoDelay: () => b, setTimeout: () => b, ref: () => b, unref: () => b });
+    }) as unknown as http.Agent['createConnection'];
+    return agent;
+  }
+
+  async function seedAll(): Promise<void> {
+    await signIn();
+    await ensureIdentity(home);
+    await ensureLocalToken(home);
+    await writePairing(home, {
+      v: 1,
+      environmentId: ENV,
+      machineKeyHex: MACHINE_KEY,
+      machineLabel: 'studio',
+      token: CONNECTOR_TOKEN,
+      tokenId: 'tok-1',
+      scopes: ['read:state'],
+      pairedAt: '2026-11-04T00:00:00.000Z',
+    });
+  }
+
+  function logoutDeps(state: 'online' | 'refused', revoke: () => Promise<unknown>) {
+    const { directory, sent } = logoutDirectory(state);
+    const agent = serverAgent();
+    const d: ConnectorDeps = {
+      ...deps(),
+      createDirectory: () => directory as unknown as DirectoryWebClient,
+      revokeDevice: vi.fn(revoke) as unknown as ConnectorDeps['revokeDevice'],
+      linkFetch: (env, path, init = {}) => linkFetch(env, path, { ...init, agent }),
+    };
+    return { d, sent, directory };
+  }
+
+  let headers: http.IncomingHttpHeaders[];
+
+  beforeEach(() => {
+    headers = [];
+    server.on('request', (req: http.IncomingMessage) => headers.push(req.headers));
+    answer = { status: 200, body: { ok: true } };
+  });
+
+  it('deletes every file and exits 0 when every remote step fails', async () => {
+    await seedAll();
+    const io = recordingIo();
+    const { d, sent } = logoutDeps('refused', async () => {
+      throw new Error('network down');
+    });
+    expect(await runConnectorLogout({ home, appVersion: '0.74.0' }, io, d)).toBe(0);
+    for (const name of ['account.json', 'identity.json', 'pairing.json', 'local-token']) {
+      expect(existsSync(join(home, name))).toBe(false);
+    }
+    expect(sent).toEqual([]);
+    expect(io.err_.join('\n')).toContain('remove the connector there in Settings');
+    expect(io.err_.join('\n')).toContain('Could not revoke this device');
+    expect(io.out_.at(-1)).toBe(`Signed out; deleted ${home} files.`);
+  });
+
+  it('removes the connector from the machine with its token and no body, then forgets the client', async () => {
+    await seedAll();
+    const io = recordingIo();
+    const { d, sent } = logoutDeps('online', async () => ({ ok: true, status: 204 }));
+    expect(await runConnectorLogout({ home, appVersion: '0.74.0' }, io, d)).toBe(0);
+    expect(received).toEqual([{ method: 'DELETE', url: '/api/connectors/self', body: null }]);
+    expect(headers[0]?.authorization).toBe(`Bearer ${CONNECTOR_TOKEN}`);
+    expect(headers[0]?.['content-length']).toBeUndefined();
+    expect(sent).toEqual([{ type: 'forget-client' }]);
+    expect(d.revokeDevice).toHaveBeenCalledWith('https://account.example', `odd_${'1'.repeat(64)}`, 'dev-1');
+    expect(io.out_).toContain('Removed this connector from studio.');
+    expect(existsSync(join(home, 'pairing.json'))).toBe(false);
+  });
+
+  it('prints Not signed in for an empty home', async () => {
+    const io = recordingIo();
+    expect(await runConnectorLogout({ home, appVersion: '0.74.0' }, io, deps())).toBe(0);
+    expect(io.out_).toEqual(['Not signed in.']);
   });
 });
