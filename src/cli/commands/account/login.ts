@@ -1,7 +1,7 @@
 /**
  * `pan account login`: the RFC 8628 device flow against the overdeck.ai account service
- * (PRD PAN-4330 W-4, D-1, D-4, D-7, D-8). Sign-in is optional (NFR-3); nothing else in the
- * CLI reads the token file this writes.
+ * (PRD PAN-4330 W-4, D-1, D-4, D-7, D-8). Sign-in is optional (NFR-3); pan join (PAN-4480)
+ * runs this flow when the machine is not signed in.
  */
 import { AccountClientError, getMe, platformString, pollForToken, requestDeviceCode, resolveBaseUrl } from '../../../lib/account/client.js';
 import { readAccount, writeAccount } from '../../../lib/account/store.js';

@@ -6,12 +6,15 @@
  *   1. `agent.enrichment_changed` — agent questions (including `pan ask`
  *      decisions), plan approvals and permission prompts.
  *   2. The conversation pending-input feed, scanned every 5 s, but only while a
- *      push target exists (a Web Push subscription or a ready ntfy topic).
+ *      push target exists (a Web Push subscription, a ready ntfy topic, or a
+ *      phone with a push key while the directory is online).
  *   3. Instant wake: the AskUserQuestion hook heartbeat and
  *      `conversation.permission_changed` (waiting) call `wakeNeedsYouPush()`,
  *      which after a 500 ms debounce scans conversations and polls enrichment.
  *   4. Edge events: `agent.heartbeat_dead` and selected `pipeline.journal`
  *      entries (finished / failed).
+ *
+ * Providers: Web Push, optional ntfy, and the Overdeck app (`native`, PAN-4843).
  *
  * Runs in the primary dashboard only; a peer would send every push twice.
  * Nothing here throws into the event-store subscriber.
@@ -26,12 +29,14 @@ import {
   type EnrichmentPayloadLike,
 } from '../../../lib/push/classify.js';
 import { createNeedsYouDispatcher, type DispatcherStats, type NeedsYouDispatcher } from '../../../lib/push/dispatcher.js';
+import { createNativePushProvider, nativePushPhones } from '../../../lib/push/native-provider.js';
 import { createNtfyProvider } from '../../../lib/push/ntfy-provider.js';
 import { listPushSubscriptions } from '../../../lib/push/subscription-store.js';
 import type { ProviderSendOutcome, PushProvider } from '../../../lib/push/types.js';
 import { createWebPushProvider } from '../../../lib/push/webpush-provider.js';
 import { getEventStore, type EventStore, type Unsubscribe } from '../event-store.js';
 import { pollEnrichmentNow } from './agent-enrichment-service.js';
+import { currentDirectoryClient } from './directory-client.js';
 
 export const CONVERSATION_SCAN_INTERVAL_MS = 5_000;
 export const WAKE_DEBOUNCE_MS = 500;
@@ -52,6 +57,7 @@ export interface PushStatus {
     }>;
   };
   ntfy: { state: 'off' | 'misconfigured' | 'ready'; reason?: string; host?: string; topicHint?: string };
+  native: { phones: number; directoryOnline: boolean };
   stats: DispatcherStats;
 }
 
@@ -69,8 +75,8 @@ let state: ServiceState | null = null;
 
 const readPushConfig = () => loadConfigSync().config.push;
 
-function defaultProviders(): PushProvider[] {
-  return [createWebPushProvider(), createNtfyProvider()];
+export function defaultProviders(): PushProvider[] {
+  return [createWebPushProvider(), createNtfyProvider(), createNativePushProvider({ directory: currentDirectoryClient })];
 }
 
 const EMPTY_STATS: DispatcherStats = { sent: 0, dropped: 0, rateLimited: 0, lastError: null, byProvider: {} };
@@ -210,6 +216,7 @@ export async function getNeedsYouPushStatus(callerDeviceId: string | null = null
       })),
     },
     ntfy,
+    native: { phones: nativePushPhones().length, directoryOnline: currentDirectoryClient()?.isOnline() ?? false },
     stats: state?.dispatcher.stats() ?? EMPTY_STATS,
   };
 }

@@ -1,0 +1,657 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T00:17:24Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4939: Agent MCP and bots (W-SCHED1): Scheduled messages and recurring schedules",
+    "updated": "2026-11-04T00:21:13.339Z"
+  },
+  "plan": {
+    "id": "pan-4939",
+    "title": "Agent MCP and bots (W-SCHED1): Scheduled messages and recurring schedules",
+    "status": "running",
+    "uid": "f1ae4547-9b34-40f8-93f0-f6daeae6d96f",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-04T00:17:24Z",
+    "updated": "2026-11-04T00:21:13.339Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4939",
+        "label": "PAN-4939",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4927",
+        "label": "PAN-4927 (epic)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4939.md",
+        "label": "PRD PAN-4939",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/pan-4927.md",
+        "label": "Epic PRD, section W-SCHED1",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "mcp",
+      "scheduling",
+      "route-scopes",
+      "pan-4927"
+    ],
+    "narratives": {
+      "Problem": "Agents and bots cannot manage a conversation's one-shot scheduled messages (PAN-4641) or recurring schedules (PAN-4640) through the Overdeck MCP server: there are no schedule tools, and the four /api/conversations/:name/schedules routes have no route-scope row, so they need admin and every scoped token is refused.",
+      "Proposal": "Add four route-scope rows (GET read:conversations; POST, PATCH /:id, DELETE /:id tell) and a new src/lib/mcp/tools-schedule.ts with five audience 'any' tools over the existing routes: schedule_message, schedule_recurring, list_scheduled, update_scheduled, delete_scheduled (kind once|recurring picks the route). Register them in ALL_TOOLS between the write and approval tools, update the count tests, prove epic AC-10, and document the tools and scopes. No new route and no library change.",
+      "NonGoals": "- No clock-time one-shot message: schedule_message has no sendAt/time argument; the once kind stays usage-limit based.\n- No cron presets (hourly/daily/weekly) in the tools and no import of @overdeck/contracts into src/lib/mcp/.\n- No 'self' default for the conversation argument; it is always required.\n- No new HTTP route, no change to src/dashboard/server/routes/*, no change to no-loss-matrix.ts.\n- No change to the schedule doors (conversation-schedules.ts, conversation-scheduled-messages.ts) or the scheduled-message tick.\n- No pan CLI change.\n- No audience 'agent' schedule tools.\n- No change to src/lib/mcp/tool.ts (helpers stay local to tools-schedule.ts).\n- No instructions-block text (W-INJ4) and no epic-wide doc pass (W-DOC)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "schedule_message takes only { conversation, message }; no time field.",
+        "rationale": "POST /api/conversations/:name/scheduled-messages reads only body.message and computes not_before from the usage limit (computeNotBefore, conversation-scheduled-messages.ts:58); a time field would need a new door, which the epic does not ask for."
+      },
+      {
+        "summary": "conversation is a required argument on every schedule tool.",
+        "rationale": "McpToolContext carries no caller identity, and the epic gives these tools audience 'any' (bots use them), so a self default is not available."
+      },
+      {
+        "summary": "schedule_recurring accepts cron only, no presets.",
+        "rationale": "presetToCron lives in @overdeck/contracts and src/lib/mcp/server.ts:15-16 limits the module's imports; cron examples in the description cover the presets."
+      },
+      {
+        "summary": "list_scheduled returns { once, recurring, onceSupported, usageLimit } and fails as a whole when either GET fails.",
+        "rationale": "The epic names { once, recurring }; the extra two fields come free from the GET and tell the caller when a once message fires; an all-or-nothing answer prevents an agent from reading a failed half as empty."
+      },
+      {
+        "summary": "update_scheduled/delete_scheduled refuse fields of the other kind; the tools do not duplicate route validation.",
+        "rationale": "A silently ignored field misleads the caller; route validators stay the one authority (epic NFR-1)."
+      },
+      {
+        "summary": "The positive-integer id helper is private to tools-schedule.ts.",
+        "rationale": "tool.ts is shared with in-flight siblings W-SELF1, W-DEL1, W-APPR1; not editing it avoids merge conflicts."
+      },
+      {
+        "summary": "ALL_TOOLS order is read, write, schedule, approve.",
+        "rationale": "Keeps the approval tools last, matching the existing 'close the list' test intent."
+      },
+      {
+        "summary": "Epic AC-10's 'token with tell' is tested as a read:conversations + tell token.",
+        "rationale": "scopeSatisfies does not let tell satisfy read:conversations, so a tell-only token cannot list; the bot and agent default scopes include both."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Small: 12 files, one subsystem (the MCP tool module) plus one route-scope table and three doc pages; no new route.",
+      "canonicalFilename": "2026-11-04-PAN-4939-agent-mcp-and-bots-w-sched1-scheduled-messages-and-recurring-schedules.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "schedule-route-scopes",
+        "title": "Add route-scope rows for the four recurring-schedule routes",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T00:17:24Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4939",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/route-scopes.ts",
+            "src/dashboard/server/__tests__/route-scopes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/__tests__/route-scopes.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "route-scopes.test.ts (including the new 'maps the recurring-schedule routes (PAN-4927 W-SCHED1)' test) and no-loss-matrix.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "schedule-recurring-tool",
+            "list-scheduled-tool",
+            "update-scheduled-tool",
+            "delete-scheduled-tool",
+            "register-schedule-tools"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4939.md WI-1. In src/dashboard/server/route-scopes.ts insert, directly after the row `{ method: 'DELETE', path: '/api/conversations/:name/scheduled-messages/:id', scope: 'tell' }`, a comment `// PAN-4927 W-SCHED1: recurring schedules (PAN-4640), for the MCP schedule tools.` and four rows: GET /api/conversations/:name/schedules read:conversations; POST /api/conversations/:name/schedules tell; PATCH /api/conversations/:name/schedules/:id tell; DELETE /api/conversations/:name/schedules/:id tell. In src/dashboard/server/__tests__/route-scopes.test.ts add the test `maps the recurring-schedule routes (PAN-4927 W-SCHED1)` with the seven requiredScopeFor assertions listed in the PRD (including the linked `/api/conversations/@desk/conv-a/schedules` POST -> tell, PUT .../schedules/3 -> admin, DELETE .../schedules (no id) -> admin). Do not touch tests/unit/lib/overdeck/no-loss-matrix.ts: its rows already exist at lines 251-254. Do not touch any routes/ file."
+        },
+        "items": [
+          {
+            "id": "schedule-route-scopes.ac1",
+            "title": "Given the new rows, when requiredScopeFor('GET', '/api/conversations/conv-a/schedules') runs, then it returns read:conversations, and POST .../schedules, PATCH .../schedules/3 and DELETE .../schedules/3 each return tell",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schedule-route-scopes.ac2",
+            "title": "Given a linked path, when requiredScopeFor('POST', '/api/conversations/@desk/conv-a/schedules') runs, then it returns tell; and PUT .../schedules/3 still returns admin",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schedule-route-scopes.ac3",
+            "title": "Given the no-loss matrix, when route-scopes.test.ts 'lists only surfaces that exist in the no-loss matrix' runs, then it passes with the four new rows and git diff shows no change under src/dashboard/server/routes/ or no-loss-matrix.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "schedule-message-tool",
+        "title": "Create tools-schedule.ts with the schedule_message tool",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T00:17:24Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4939",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/mcp/tools-schedule.ts",
+            "tests/unit/lib/mcp/tools-schedule.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/mcp/tools-schedule.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tools-schedule.test.ts passes its four schedule_message tests"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-8",
+            "NFR-1",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4939.md WI-2 and decisions D-2, D-5, D-8, D-10. Create src/lib/mcp/tools-schedule.ts importing only from './tool.js' (never @overdeck/contracts or dashboard code). Add the module header from the PRD, private helpers conversationPath(name) = `/api/conversations/${encodeURIComponent(name)}`, requiredId(args) (positive safe integer, error 'id must be a positive integer'), and CONVERSATION_PROPERTY. Add tool schedule_message (scope 'tell', audience 'any', schema {conversation, message} both required) whose description says it queues a message for a Claude Code conversation that Overdeck sends after the usage limit resets, or within a minute when not limited; at most 20 queued; /pan commands refused. It POSTs { message } to `${conversationPath(c)}/scheduled-messages` and returns routeResult. Export `SCHEDULE_TOOLS: readonly OverdeckTool[] = [scheduleMessage]`. Do NOT add it to ALL_TOOLS (item register-schedule-tools does that). Create tests/unit/lib/mcp/tools-schedule.test.ts using harness.ts connectClient(api, ['read:conversations','tell'], false, SCHEDULE_TOOLS) with the four tests named in the PRD. Never add a time argument (H-2)."
+        },
+        "items": [
+          {
+            "id": "schedule-message-tool.ac1",
+            "title": "Given a fake API answering 201, when schedule_message is called with conversation 'conv-a' and message 'later', then the API records exactly one call POST /api/conversations/conv-a/scheduled-messages with body { message: 'later' } and the tool returns that 201 JSON",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schedule-message-tool.ac2",
+            "title": "Given conversation '@desk/conv-a', when schedule_message is called, then the recorded path is /api/conversations/%40desk%2Fconv-a/scheduled-messages",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schedule-message-tool.ac3",
+            "title": "Given the route answers 422 'scheduling is supported only for Claude Code conversations', when schedule_message is called, then the tool result has isError true and its text contains that route error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schedule-message-tool.ac4",
+            "title": "Given no message argument, when schedule_message is called, then it returns a tool error and the fake API records zero calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "schedule-recurring-tool",
+        "title": "Add the schedule_recurring tool",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T00:17:24Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4939",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/mcp/tools-schedule.ts",
+            "tests/unit/lib/mcp/tools-schedule.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/mcp/tools-schedule.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tools-schedule.test.ts passes including the schedule_recurring tests"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-8",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4939.md WI-3 and D-4, D-5. In src/lib/mcp/tools-schedule.ts add tool schedule_recurring (scope 'tell', audience 'any') with the PRD description (5-field cron with the example `0 9 * * 1-5`, runs at least 15 minutes apart, agent conversations and Session Vault copies refused, max 20). Schema: conversation, prompt, cron required strings; timeZone optional string described as 'An IANA time zone such as America/New_York; omit for the Overdeck machine's zone'; enabled optional boolean. Validate required strings with requiredString, timeZone with optionalString, enabled must be boolean when present (error 'enabled must be a boolean'). POST to `${conversationPath(c)}/schedules` a body of {prompt, cron} plus timeZone/enabled only when present. No preset argument and no presetToCron import. Append to SCHEDULE_TOOLS after schedule_message. Add the three tests named in the PRD to tests/unit/lib/mcp/tools-schedule.test.ts."
+        },
+        "items": [
+          {
+            "id": "schedule-recurring-tool.ac1",
+            "title": "Given a call with conversation, prompt and cron only, when schedule_recurring runs, then the recorded call is POST /api/conversations/conv-a/schedules with body exactly { prompt, cron } and no timeZone or enabled key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schedule-recurring-tool.ac2",
+            "title": "Given timeZone 'America/New_York' and enabled false, when schedule_recurring runs, then the recorded body contains those two keys with those values",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schedule-recurring-tool.ac3",
+            "title": "Given enabled 'yes', when schedule_recurring runs, then it returns a tool error and records zero calls; and a route 409 agent-conversation answer becomes a tool error containing the route text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "list-scheduled-tool",
+        "title": "Add the list_scheduled tool",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T00:17:24Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4939",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/mcp/tools-schedule.ts",
+            "tests/unit/lib/mcp/tools-schedule.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/mcp/tools-schedule.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tools-schedule.test.ts passes including the list_scheduled tests"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-8",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4939.md WI-4 and D-6. In src/lib/mcp/tools-schedule.ts add tool list_scheduled (scope 'read:conversations', audience 'any', schema {conversation} required). Send GET `${base}/scheduled-messages` and GET `${base}/schedules` with Promise.all; if the first is not isOk return routeErrorResult(first); else if the second is not isOk return routeErrorResult(second); else return jsonResult({ once: messages ?? [], recurring: schedules ?? [], onceSupported: supported ?? false, usageLimit: limit ?? null }) exactly as the PRD snippet. Never return a partial result. Append to SCHEDULE_TOOLS after schedule_recurring. Add the three tests named in the PRD to tests/unit/lib/mcp/tools-schedule.test.ts."
+        },
+        "items": [
+          {
+            "id": "list-scheduled-tool.ac1",
+            "title": "Given both GETs answer 200, when list_scheduled runs, then it returns { once, recurring, onceSupported, usageLimit } built from messages, schedules, supported and limit, and the API records two GET calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "list-scheduled-tool.ac2",
+            "title": "Given the scheduled-messages GET answers 404, when list_scheduled runs, then it returns a tool error containing 'HTTP 404'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "list-scheduled-tool.ac3",
+            "title": "Given the scheduled-messages GET answers 200 and the schedules GET answers 403 insufficient_scope, when list_scheduled runs, then it returns a tool error containing 'HTTP 403' and no once or recurring data",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "update-scheduled-tool",
+        "title": "Add the update_scheduled tool",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T00:17:24Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4939",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/mcp/tools-schedule.ts",
+            "tests/unit/lib/mcp/tools-schedule.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/mcp/tools-schedule.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tools-schedule.test.ts passes including the update_scheduled tests"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-8",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4939.md WI-5 and D-7, D-8. In src/lib/mcp/tools-schedule.ts add private requiredKind(args) (error 'kind must be once or recurring') and tool update_scheduled (scope 'tell', audience 'any'). Schema: conversation string, kind enum ['once','recurring'], id integer (all required); message, prompt, cron, timeZone strings and enabled boolean optional. kind once: if any of prompt/cron/timeZone/enabled is present return tool error 'prompt, cron, timeZone and enabled apply only to kind recurring'; message required; PATCH `${base}/scheduled-messages/${id}` with { message }. kind recurring: if message present return tool error 'message applies only to kind once'; copy present prompt/cron/timeZone (strings) and enabled (boolean, else 'enabled must be a boolean') into the body; PATCH `${base}/schedules/${id}` even when the body is empty (the route answers 400). Return routeResult. Append to SCHEDULE_TOOLS after list_scheduled. Add the five tests named in the PRD to tests/unit/lib/mcp/tools-schedule.test.ts."
+        },
+        "items": [
+          {
+            "id": "update-scheduled-tool.ac1",
+            "title": "Given kind once, id 4 and message 'new', when update_scheduled runs, then the recorded call is PATCH /api/conversations/conv-a/scheduled-messages/4 with body { message: 'new' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "update-scheduled-tool.ac2",
+            "title": "Given kind recurring, id 3 and enabled false only, when update_scheduled runs, then the recorded call is PATCH /api/conversations/conv-a/schedules/3 with body exactly { enabled: false }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "update-scheduled-tool.ac3",
+            "title": "Given kind once with cron, or kind recurring with message, when update_scheduled runs, then it returns the cross-kind tool error and records zero calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "update-scheduled-tool.ac4",
+            "title": "Given id 0 or kind 'later', when update_scheduled runs, then it returns a tool error and records zero calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "delete-scheduled-tool",
+        "title": "Add the delete_scheduled tool",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T00:17:24Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4939",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/mcp/tools-schedule.ts",
+            "tests/unit/lib/mcp/tools-schedule.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/mcp/tools-schedule.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tools-schedule.test.ts passes including the delete_scheduled tests"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-8",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4939.md WI-6. In src/lib/mcp/tools-schedule.ts add tool delete_scheduled (scope 'tell', audience 'any', schema conversation, kind enum, id integer all required, description from the PRD). Reuse requiredKind and requiredId. Call ctx.api.request('DELETE', path) with no body, where path is `${base}/scheduled-messages/${id}` for once and `${base}/schedules/${id}` for recurring. Return routeResult. Append to SCHEDULE_TOOLS last, giving the final order schedule_message, schedule_recurring, list_scheduled, update_scheduled, delete_scheduled. Add the three tests named in the PRD to tests/unit/lib/mcp/tools-schedule.test.ts."
+        },
+        "items": [
+          {
+            "id": "delete-scheduled-tool.ac1",
+            "title": "Given kind once and id 7, when delete_scheduled runs, then the API records exactly DELETE /api/conversations/conv-a/scheduled-messages/7 with no body field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-scheduled-tool.ac2",
+            "title": "Given kind recurring and id 3, when delete_scheduled runs, then the API records DELETE /api/conversations/conv-a/schedules/3",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-scheduled-tool.ac3",
+            "title": "Given the route answers 409 'The message was already sent', when delete_scheduled runs, then it returns a tool error containing 'HTTP 409' and that text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "register-schedule-tools",
+        "title": "Register SCHEDULE_TOOLS in ALL_TOOLS and prove epic AC-10",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T00:17:24Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4939",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/mcp/server.ts",
+            "tests/unit/lib/mcp/tools-approve.test.ts",
+            "tests/unit/lib/mcp/visibility.test.ts",
+            "tests/unit/lib/mcp/tool-annotations.test.ts",
+            "tests/unit/cli/mcp.test.ts",
+            "tests/unit/lib/mcp/tools-schedule.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run tests/unit/lib/mcp/ tests/unit/cli/mcp.test.ts src/dashboard/server/__tests__/mcp-route.test.ts src/dashboard/server/__tests__/mcp-acceptance.test.ts src/dashboard/server/__tests__/route-scopes.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck and lint complete without errors",
+            "every test under tests/unit/lib/mcp/ plus tests/unit/cli/mcp.test.ts, mcp-route.test.ts, mcp-acceptance.test.ts and route-scopes.test.ts pass, including the two AC-10 tests in tools-schedule.test.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4939.md WI-7 and D-9. Rebase on origin/main first (H-1: W-SELF1/W-DEL1/W-APPR1 may have added tools; keep theirs and recompute expected lists and counts from the merged ALL_TOOLS). In src/lib/mcp/server.ts import SCHEDULE_TOOLS from './tools-schedule.js' and set ALL_TOOLS = [...READ_TOOLS, ...WRITE_TOOLS, ...SCHEDULE_TOOLS, ...APPROVE_TOOLS]. Update tests/unit/lib/mcp/tools-approve.test.ts to the 15-name list from the PRD and retitle it 'the approval tools close the list'; visibility.test.ts toHaveLength(8) -> 13 and retitle 'adding approve lists every tool'; tool-annotations.test.ts SINGLE_ROUTE_PATHS gains schedule_message and schedule_recurring, plus a test that list_scheduled/update_scheduled/delete_scheduled scopes equal requiredScopeFor for every route each calls. In tests/unit/lib/mcp/tools-schedule.test.ts add the two AC-10 tests with the real ALL_TOOLS (connectClient without a tools argument). Also update tests/unit/cli/mcp.test.ts: its three assertions of a read:conversations-only token's tool list (['list_conversations', 'search_conversations', 'read_conversation', 'list_pending_input'], near lines 131, 143, 162) become ['list_conversations', 'search_conversations', 'read_conversation', 'list_scheduled', 'list_pending_input']."
+        },
+        "items": [
+          {
+            "id": "register-schedule-tools.ac1",
+            "title": "Given ALL_TOOLS, when tools-approve.test.ts runs, then ALL_TOOLS names equal list_machines, list_conversations, search_conversations, read_conversation, send_message, start_conversation, start_worker, schedule_message, schedule_recurring, list_scheduled, update_scheduled, delete_scheduled, list_pending_input, answer_question, answer_permission (plus any sibling tools merged first)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "register-schedule-tools.ac2",
+            "title": "Given a token with read:conversations and tell, when the client lists tools and then calls schedule_message, schedule_recurring, list_scheduled and delete_scheduled for both kinds, then all five schedule tools are listed and the API records 2 POST, 2 GET and 2 DELETE calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "register-schedule-tools.ac3",
+            "title": "Given a token with only read:conversations, when the client lists tools (in tools-schedule.test.ts and in the three pan mcp serve tests of tests/unit/cli/mcp.test.ts), then the list is list_conversations, search_conversations, read_conversation, list_scheduled, list_pending_input, and calling schedule_message returns 'Unknown tool schedule_message' with zero API calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "register-schedule-tools.ac4",
+            "title": "Given tool-annotations.test.ts, when it runs, then each schedule tool's scope equals requiredScopeFor for every route that tool calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "schedule-tools-docs",
+        "title": "Document the schedule tools and the scope changes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T00:17:24Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4939",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/mcp.mdx",
+            "configuration/remote-access.mdx",
+            "features/conversations.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -c schedule_recurring configuration/mcp.mdx"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors",
+            "grep prints 2 or more"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4939.md WI-8 exactly. configuration/mcp.mdx: add the five rows (schedule_message tell, schedule_recurring tell, list_scheduled read:conversations, update_scheduled tell, delete_scheduled tell) after the start_worker row of the Tools table with the PRD's wording (once = sent after the usage limit resets, or at once if not limited; recurring = 5-field cron, 15-minute spacing, default zone = the Overdeck machine's); in 'Fleet reach' add the schedule tools to the tools that take @<machine>/<name> and the sentence that an older linked machine answers 403 insufficient_scope for recurring schedules. configuration/remote-access.mdx scope table: extend the read:conversations and tell rows with scheduled messages and schedules per the PRD. features/conversations.mdx 'Scheduled runs': after the 'at most 20 schedules' paragraph add the sentence linking to /configuration/mcp. Never describe the once kind as sending at a chosen time."
+        },
+        "items": [
+          {
+            "id": "schedule-tools-docs.ac1",
+            "title": "Given configuration/mcp.mdx, when a reader opens the Tools table, then it shows rows for schedule_message, schedule_recurring, list_scheduled, update_scheduled and delete_scheduled with scopes tell, tell, read:conversations, tell, tell",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schedule-tools-docs.ac2",
+            "title": "Given configuration/remote-access.mdx, when a reader opens the scope table, then the read:conversations and tell rows name a conversation's scheduled messages and schedules",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schedule-tools-docs.ac3",
+            "title": "Given features/conversations.mdx 'Scheduled runs', when a reader opens it, then it names the four recurring-schedule tools and links /configuration/mcp, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "schedule-message-tool",
+        "to": "schedule-recurring-tool",
+        "type": "blocks"
+      },
+      {
+        "from": "schedule-recurring-tool",
+        "to": "list-scheduled-tool",
+        "type": "blocks"
+      },
+      {
+        "from": "list-scheduled-tool",
+        "to": "update-scheduled-tool",
+        "type": "blocks"
+      },
+      {
+        "from": "update-scheduled-tool",
+        "to": "delete-scheduled-tool",
+        "type": "blocks"
+      },
+      {
+        "from": "delete-scheduled-tool",
+        "to": "register-schedule-tools",
+        "type": "blocks"
+      },
+      {
+        "from": "schedule-route-scopes",
+        "to": "register-schedule-tools",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

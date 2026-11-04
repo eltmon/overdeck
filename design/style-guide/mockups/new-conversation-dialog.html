@@ -1,0 +1,551 @@
+<!doctype html>
+<html lang="en" data-theme="broadsheet">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>New Conversation Dialog</title>
+<style>
+@font-face { font-family: "Geist Variable"; src: url("fonts/Geist-Variable.woff2") format("woff2"); font-weight: 100 900; }
+@font-face { font-family: "Geist Mono Variable"; src: url("fonts/GeistMono-Variable.woff2") format("woff2"); font-weight: 100 900; }
+
+/* ── Broadsheet tokens, copied from src/dashboard/frontend/src/index.css ── */
+:root {
+  color-scheme: light;
+  --font-sans: "Geist Variable", system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", "SF Mono", ui-monospace, monospace;
+  --font-mono-ui: "SFMono-Regular", "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
+  --radius: 0.375rem;
+  --background: hsl(0 0% 96.5%);
+  --foreground: hsl(35 10% 14%);
+  --card: hsl(30 8% 94.5%);
+  --popover: hsl(30 8% 94.5%);
+  --muted: hsl(30 8% 94.5%);
+  --muted-foreground: hsl(35 5% 42%);
+  --body-foreground: hsl(35 8% 28%);
+  --faint-foreground: hsl(35 3% 62%);
+  --border: hsl(30 4% 88.5%);
+  --accent: color-mix(in srgb, black 4%, transparent);
+  --primary: oklch(0.488 0.217 264);
+  --primary-foreground: #ffffff;
+  --primary-ink: oklch(0.42 0.19 264);
+  --destructive: #ef4444;
+  --destructive-foreground: #b91c1c;
+  --wash: color-mix(in srgb, hsl(30 6% 75%) 55%, transparent);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-overlay: 0 16px 48px rgba(0, 0, 0, 0.18), 0 4px 12px rgba(0, 0, 0, 0.1);
+
+  /* ── PROPOSED: three new theme tokens for every modal ── */
+  --surface-overlay: hsl(40 18% 99.3%);          /* lighter than --background, so it rises */
+  --surface-overlay-field: hsl(30 10% 96.8%);    /* inset field well inside the modal */
+  --border-overlay: hsl(30 5% 82%);
+  --overlay-scrim: hsl(35 14% 9% / 0.44);
+}
+.dark {
+  color-scheme: dark;
+  --background: hsl(0 0% 12.5%);
+  --foreground: hsl(30 8% 94%);
+  --card: hsl(0 0% 17%);
+  --popover: hsl(0 0% 18%);
+  --muted: hsl(0 0% 15%);
+  --muted-foreground: hsl(30 2% 66%);
+  --body-foreground: hsl(30 2% 88%);
+  --faint-foreground: hsl(30 1% 48%);
+  --border: hsl(0 0% 22.7%);
+  --accent: color-mix(in srgb, white 6%, transparent);
+  --primary: oklch(0.588 0.217 264);
+  --primary-ink: oklch(0.7 0.19 264);
+  --destructive-foreground: #fca5a5;
+  --wash: color-mix(in srgb, hsl(30 4% 38%) 50%, transparent);
+  --shadow-overlay: 0 16px 48px rgba(0, 0, 0, 0.45), 0 4px 12px rgba(0, 0, 0, 0.25);
+
+  --surface-overlay: hsl(30 3% 18.5%);
+  --surface-overlay-field: hsl(0 0% 14.5%);
+  --border-overlay: hsl(30 3% 27%);
+  --overlay-scrim: hsl(0 0% 0% / 0.56);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  color: var(--foreground);
+  background:
+    radial-gradient(130% 190% at 0% 0%, var(--wash) 0%, transparent 55%),
+    var(--background);
+  overflow: hidden;
+}
+::selection { background: color-mix(in srgb, var(--primary) 22%, transparent); }
+
+/* ── Mockup control bar (not part of the design) ── */
+.mock-bar {
+  position: fixed; z-index: 500; bottom: 12px; left: 12px;
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: center;
+  max-width: calc(100vw - 20px);
+  padding: 6px 8px; border-radius: 8px;
+  background: #1b1a18; color: #eee; font: 500 11px/1 var(--font-sans);
+  box-shadow: 0 6px 24px rgba(0,0,0,.3);
+}
+.mock-bar .seg { display: inline-flex; border-radius: 5px; background: #2c2a27; padding: 2px; }
+.mock-bar button {
+  font: inherit; color: #bbb; background: none; border: 0; padding: 5px 9px; border-radius: 4px; cursor: pointer;
+}
+.mock-bar button[aria-pressed="true"] { background: #f4f1ec; color: #1b1a18; }
+.mock-bar .sep { width: 1px; height: 18px; background: #3a3834; }
+
+/* ── Fake app behind the dialog, at true token lightness ── */
+.app { position: fixed; inset: 0; display: grid; grid-template-columns: 280px 1fr; grid-template-rows: 44px 1fr; }
+.topbar { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; padding: 0 14px; border-bottom: 1px solid var(--border); }
+.search { flex: 0 1 380px; height: 28px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); color: var(--faint-foreground); padding: 0 10px; display: flex; align-items: center; font-size: 12px; }
+.topbar .spacer { flex: 1; }
+.pill { font: 500 11px/1 var(--font-sans); padding: 6px 9px; border: 1px solid var(--border); border-radius: var(--radius); color: var(--muted-foreground); }
+.pill.live { color: hsl(152 60% 32%); border-color: color-mix(in srgb, hsl(152 60% 40%) 32%, transparent); background: color-mix(in srgb, hsl(152 60% 40%) 8%, transparent); }
+.dark .pill.live { color: hsl(152 50% 60%); }
+.sidebar { border-right: 1px solid var(--border); padding: 10px 8px; overflow: hidden; }
+.side-item { padding: 7px 10px; border-radius: var(--radius); margin-bottom: 2px; }
+.side-item b { display: block; font-weight: 550; font-size: 12.5px; color: var(--foreground); }
+.side-item span { font: 11px var(--font-mono-ui); color: var(--faint-foreground); }
+.side-item.on { background: var(--card); box-shadow: var(--shadow-sm); }
+.main { padding: 0; overflow: hidden; display: flex; flex-direction: column; }
+.tabs { display: flex; gap: 2px; padding: 8px 14px 0; border-bottom: 1px solid var(--border); }
+.tab { padding: 7px 12px; font-size: 12px; color: var(--muted-foreground); border-radius: var(--radius) var(--radius) 0 0; }
+.tab.on { background: var(--card); color: var(--foreground); font-weight: 550; }
+.convo { padding: 22px 28px; max-width: 760px; color: var(--body-foreground); }
+.convo p { margin: 0 0 14px; }
+.convo code { font: 12px var(--font-mono); background: var(--card); border: 1px solid var(--border); padding: 1px 5px; border-radius: 4px; color: var(--foreground); }
+.convo pre { font: 12px/1.6 var(--font-mono); background: var(--card); border: 1px solid var(--border); padding: 12px 14px; border-radius: var(--radius); color: var(--foreground); margin: 0 0 14px; }
+
+/* ════════════════ BEFORE: today's CSS, verbatim ════════════════ */
+.before .backdrop { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgb(0 0 0 / 0.32); }
+.before .dialog { display: flex; flex-direction: column; width: 100%; max-width: 560px; max-height: calc(100vh - 32px); border: 1px solid var(--border); border-radius: 4px; background: var(--popover); color: var(--foreground); font-size: 13px; }
+.before .header { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.before .title { flex: 1; margin: 0; font-size: 14px; font-weight: 500; }
+.before .iconButton { display: inline-flex; padding: 4px; border: none; background: transparent; color: var(--muted-foreground); }
+.before .body { display: flex; flex-direction: column; gap: 10px; padding: 12px 16px; overflow-y: auto; }
+.before .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.before .group { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; border: none; }
+.before .label { font-size: 12px; font-weight: 500; white-space: nowrap; flex-shrink: 0; padding: 0; }
+.before .control { flex: 1; min-width: 0; padding: 6px 10px; font-size: 12px; font-family: inherit; border: 1px solid var(--border); border-radius: 4px; background: var(--background); color: var(--foreground); }
+.before .hint { margin: 0; font-size: 11px; line-height: 1.35; color: var(--muted-foreground); }
+.before .check { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.before .effort { display: flex; flex: 1; align-items: center; gap: 8px; }
+.before .textarea { width: 100%; padding: 6px 10px; font-size: 12px; font-family: inherit; border: 1px solid var(--border); border-radius: 4px; background: var(--background); color: var(--foreground); }
+.before .footer { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--border); }
+.before .btn { padding: 6px 14px; font: 12px var(--font-sans); border-radius: 4px; border: 1px solid var(--border); background: transparent; color: var(--foreground); }
+.before .btn.primary { border-color: var(--primary); background: var(--primary); color: var(--primary-foreground); }
+.before .skills { border: 1px solid var(--border); border-radius: 4px; }
+.before .skills div { display: flex; justify-content: space-between; padding: 6px 10px; border-top: 1px solid var(--border); font-size: 12px; }
+.before .skills div:first-child { border-top: 0; }
+.before .skills small { color: var(--muted-foreground); font-size: 11px; }
+
+/* ════════════════ AFTER: proposed ════════════════ */
+.after .backdrop {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px 16px;
+  background: var(--overlay-scrim);
+  animation: scrim-in 160ms cubic-bezier(.16,1,.3,1);
+}
+@keyframes scrim-in { from { opacity: 0; } }
+@keyframes rise { from { opacity: 0; transform: translateY(6px) scale(.985); } }
+@media (prefers-reduced-motion: reduce) { .after .backdrop, .after .dialog { animation: none; } }
+
+.after .dialog {
+  display: flex; flex-direction: column;
+  width: 100%; max-width: 600px; max-height: calc(100vh - 48px);
+  border: 1px solid var(--border-overlay);
+  border-radius: 10px;
+  background: var(--surface-overlay);
+  color: var(--foreground);
+  box-shadow: var(--shadow-overlay), inset 0 1px 0 color-mix(in srgb, white 5%, transparent);
+  animation: rise 220ms cubic-bezier(.16,1,.3,1);
+  overflow: hidden;
+}
+.after .head { display: flex; align-items: flex-start; gap: 12px; padding: 18px 20px 14px; }
+.after .head h2 { margin: 0; font-size: 16px; font-weight: 620; letter-spacing: -0.012em; line-height: 1.3; }
+.after .head p { margin: 3px 0 0; font-size: 12.5px; color: var(--muted-foreground); line-height: 1.45; }
+.after .head .titles { flex: 1; min-width: 0; }
+.after .x {
+  flex-shrink: 0; display: grid; place-items: center; width: 28px; height: 28px; margin: -4px -6px 0 0;
+  border: 0; border-radius: 6px; background: transparent; color: var(--muted-foreground); cursor: pointer;
+}
+.after .x:hover { background: var(--accent); color: var(--foreground); }
+
+.after .scroll { overflow-y: auto; padding: 0 20px 4px; border-top: 1px solid var(--border-overlay); scrollbar-width: thin; scrollbar-color: var(--border-overlay) transparent; }
+.after section { padding: 16px 0 18px; border-bottom: 1px solid color-mix(in srgb, var(--border-overlay) 70%, transparent); }
+.after section:last-child { border-bottom: 0; }
+.after h3 { margin: 0 0 12px; font-size: 12.5px; font-weight: 600; color: var(--foreground); letter-spacing: -0.005em; }
+.after h3 .aside { font-weight: 400; color: var(--muted-foreground); margin-left: 6px; }
+
+.after .grid { display: grid; grid-template-columns: 124px minmax(0, 1fr); gap: 10px 16px; align-items: center; }
+.after .grid > label, .after .grid > .lbl { font-size: 12.5px; color: var(--body-foreground); font-weight: 500; }
+.after .full { grid-column: 1 / -1; }
+
+.after .field { position: relative; display: flex; align-items: center; min-width: 0; }
+.after .input, .after .select, .after textarea {
+  width: 100%; min-width: 0; height: 32px; padding: 0 10px;
+  font: 13px var(--font-sans); color: var(--foreground);
+  background: var(--surface-overlay-field);
+  border: 1px solid var(--border-overlay); border-radius: 6px;
+  transition: border-color 120ms, box-shadow 120ms, background 120ms;
+}
+.after .input.mono { font: 12px var(--font-mono-ui); }
+.after .select { appearance: none; padding-right: 30px; cursor: pointer; }
+.after .field .chev { position: absolute; right: 10px; pointer-events: none; color: var(--muted-foreground); }
+.after .field .meta { position: absolute; right: 30px; pointer-events: none; font: 11.5px var(--font-mono-ui); color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
+.after .field .lead { position: absolute; left: 10px; pointer-events: none; color: var(--muted-foreground); display: flex; }
+.after .field .lead + .input, .after .field .lead + .select { padding-left: 31px; }
+.after .input:hover, .after .select:hover, .after textarea:hover { border-color: color-mix(in srgb, var(--border-overlay), var(--foreground) 18%); }
+.after .input:focus-visible, .after .select:focus-visible, .after textarea:focus-visible {
+  outline: none; border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 20%, transparent);
+  background: var(--surface-overlay);
+}
+.after .input:disabled { color: var(--muted-foreground); background: transparent; border-style: dashed; cursor: not-allowed; }
+.after .input::placeholder, .after textarea::placeholder { color: var(--muted-foreground); opacity: 1; }
+.after textarea { height: auto; min-height: 76px; padding: 8px 10px; line-height: 1.5; resize: vertical; display: block; }
+.after .harness-glyph { color: #d97757; }
+
+/* Effort: a segmented control shows every level and the default at once. */
+.after .segmented { display: inline-flex; padding: 2px; gap: 2px; border-radius: 7px; background: var(--surface-overlay-field); border: 1px solid var(--border-overlay); }
+.after .segmented button {
+  position: relative; min-width: 58px; height: 26px; padding: 0 10px; border: 0; border-radius: 5px;
+  font: 500 12px var(--font-sans); color: var(--muted-foreground); background: transparent; cursor: pointer;
+}
+.after .segmented button:hover { color: var(--foreground); }
+.after .segmented button[aria-checked="true"] { background: var(--surface-overlay); color: var(--foreground); box-shadow: var(--shadow-sm), 0 0 0 1px var(--border-overlay); }
+.dark .after .segmented button[aria-checked="true"] { background: hsl(30 3% 26%); }
+.after .segmented button .dflt { position: absolute; left: 50%; bottom: 2px; width: 3px; height: 3px; margin-left: -1.5px; border-radius: 50%; background: currentColor; opacity: .55; }
+.after .segmented button:focus-visible, .after .switch:focus-visible, .after .linkbtn:focus-visible, .after .btn:focus-visible, .after .x:focus-visible, .after .tri button:focus-visible {
+  outline: 2px solid var(--primary); outline-offset: 2px;
+}
+.after .effort-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.after .hint { font-size: 12px; color: var(--muted-foreground); line-height: 1.5; }
+
+/* Context: whole-row switches with the consequence written next to them. */
+.after .opt { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 16px; align-items: start; padding: 10px 0; }
+.after .opt + .opt { border-top: 1px dashed color-mix(in srgb, var(--border-overlay) 80%, transparent); }
+.after .opt b { font-weight: 550; font-size: 13px; }
+.after .opt .tag { margin-left: 6px; font: 11px var(--font-mono-ui); color: var(--muted-foreground); border: 1px solid var(--border-overlay); padding: 1px 5px; border-radius: 3px; vertical-align: 1px; }
+.after .opt p { grid-column: 1; margin: 0; font-size: 12px; line-height: 1.5; color: var(--muted-foreground); max-width: 62ch; }
+.after .opt code { font: 11px var(--font-mono-ui); color: var(--body-foreground); }
+.after .switch {
+  grid-column: 2; grid-row: 1 / span 2; align-self: center;
+  position: relative; width: 34px; height: 20px; border: 0; border-radius: 10px; cursor: pointer;
+  background: color-mix(in srgb, var(--foreground) 18%, transparent);
+  transition: background 140ms;
+}
+.after .switch::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform 160ms cubic-bezier(.16,1,.3,1);
+}
+.after .switch[aria-checked="true"] { background: var(--primary); }
+.after .switch[aria-checked="true"]::after { transform: translateX(14px); }
+
+/* Skills: collapsed to one summary line until the operator overrides something. */
+.after .skills-sum { display: flex; align-items: center; gap: 12px; }
+.after .skills-sum .text { flex: 1; min-width: 0; font-size: 12.5px; color: var(--body-foreground); }
+.after .skills-sum .text span { color: var(--muted-foreground); }
+.after .linkbtn { border: 1px solid var(--border-overlay); background: var(--surface-overlay); color: var(--foreground); font: 500 12px var(--font-sans); height: 28px; padding: 0 10px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.after .linkbtn:hover { background: var(--surface-overlay-field); }
+.after .skills-panel { margin-top: 12px; display: none; }
+.after.skills-open .skills-panel { display: block; }
+.after .packs { margin-top: 8px; border: 1px solid var(--border-overlay); border-radius: 6px; overflow: hidden; background: var(--surface-overlay); }
+.after .pack { display: flex; align-items: center; gap: 8px; padding: 0 10px; height: 32px; border-top: 1px solid var(--border-overlay); font-size: 12.5px; cursor: pointer; }
+.after .pack:first-child { border-top: 0; }
+.after .pack:hover { background: var(--surface-overlay-field); }
+.after .pack .n { margin-left: auto; font: 11.5px var(--font-mono-ui); color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
+.after .pack svg { color: var(--muted-foreground); }
+.after .skill { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 12px; align-items: center; padding: 7px 10px 7px 30px; border-top: 1px solid color-mix(in srgb, var(--border-overlay) 60%, transparent); background: var(--surface-overlay-field); }
+.after .skill .nm { font: 12px var(--font-mono-ui); color: var(--foreground); }
+.after .skill .ds { display: block; font: 11.5px var(--font-sans); color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.after .skill .inh { font-size: 11px; color: var(--muted-foreground); white-space: nowrap; }
+.after .tri { display: inline-flex; border: 1px solid var(--border-overlay); border-radius: 5px; overflow: hidden; }
+.after .tri button { border: 0; background: var(--surface-overlay); color: var(--muted-foreground); font: 500 11px var(--font-sans); padding: 3px 8px; cursor: pointer; }
+.after .tri button + button { border-left: 1px solid var(--border-overlay); }
+.after .tri button[aria-checked="true"] { background: var(--foreground); color: var(--surface-overlay); }
+
+.after .error {
+  display: none; margin: 0 20px 12px; padding: 9px 12px; border-radius: 6px; font-size: 12.5px; line-height: 1.5;
+  color: var(--destructive-foreground);
+  background: color-mix(in srgb, var(--destructive) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--destructive) 32%, transparent);
+}
+.after.show-error .error { display: block; }
+
+.after .foot {
+  display: flex; align-items: center; gap: 12px; padding: 12px 20px;
+  border-top: 1px solid var(--border-overlay);
+  background: color-mix(in srgb, var(--surface-overlay-field) 60%, var(--surface-overlay));
+}
+.after .summary { flex: 1; min-width: 0; font: 11.5px var(--font-mono-ui); color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.after .summary i { font-style: normal; color: var(--faint-foreground); margin: 0 6px; }
+.after .btn { height: 32px; padding: 0 14px; border-radius: 6px; font: 500 13px var(--font-sans); cursor: pointer; border: 1px solid var(--border-overlay); background: var(--surface-overlay); color: var(--foreground); }
+.after .btn:hover { background: var(--surface-overlay-field); }
+.after .btn.primary { border-color: transparent; background: var(--primary); color: var(--primary-foreground); padding: 0 16px; box-shadow: 0 1px 2px color-mix(in srgb, var(--primary) 40%, transparent), inset 0 1px 0 rgb(255 255 255 / .14); }
+.after .btn.primary:hover { background: color-mix(in srgb, var(--primary), black 10%); }
+
+/* Phone width */
+@media (max-width: 600px) {
+  .app { grid-template-columns: 1fr; }
+  .sidebar { display: none; }
+  .after .backdrop { align-items: flex-end; padding: 12px 0 0; }
+  .after .dialog { max-height: calc(100vh - 12px); border-radius: 12px 12px 0 0; border-bottom: 0; }
+  .after .head, .after .foot { padding-left: 16px; padding-right: 16px; }
+  .after .scroll { padding: 0 16px 4px; }
+  .after .grid { grid-template-columns: 1fr; gap: 4px; }
+  .after .grid > label, .after .grid > .lbl { margin-top: 8px; }
+  .after .grid > label:first-child { margin-top: 0; }
+  .after .segmented { display: flex; width: 100%; }
+  .after .segmented button { flex: 1; min-width: 0; padding: 0 4px; }
+  .after .summary { display: none; }
+  .mock-bar { display: none; }
+  .after .error { margin: 0 16px 12px; }
+  .after .foot { justify-content: flex-end; }
+  .after .skill { grid-template-columns: minmax(0,1fr) auto; padding-left: 12px; }
+  .after .skill .inh { display: none; }
+}
+
+/* Variant switching */
+body:not(.show-before) .before { display: none; }
+body.show-before .after { display: none; }
+</style>
+</head>
+<body>
+
+<div class="mock-bar" role="toolbar" aria-label="Mockup controls">
+  <span class="seg"><button data-set="variant" data-val="after" aria-pressed="true">Proposed</button><button data-set="variant" data-val="before" aria-pressed="false">Today</button></span>
+  <span class="seg"><button data-set="mode" data-val="light" aria-pressed="true">Light</button><button data-set="mode" data-val="dark" aria-pressed="false">Dark</button></span>
+  <span class="sep"></span>
+  <span class="seg"><button data-toggle="skills-open" aria-pressed="false">Skills open</button><button data-toggle="show-error" aria-pressed="false">Error</button></span>
+</div>
+
+<!-- Fake Command Deck behind the modal -->
+<div class="app" aria-hidden="true">
+  <div class="topbar">
+    <div class="search">Search conversations, issues, commands</div>
+    <div class="spacer"></div>
+    <span class="pill live">● 5 agents</span><span class="pill">Stop all</span>
+  </div>
+  <aside class="sidebar">
+    <div class="side-item on"><b>Deploy pstack and gstack skill bundles</b><span>Claude Code · opus-5-5</span></div>
+    <div class="side-item"><b>Plan migration and testing strategy</b><span>opus-5-5</span></div>
+    <div class="side-item"><b>Investigate stall during experiment</b><span>Claude Code · opus-5-5</span></div>
+    <div class="side-item"><b>Theme import fixes and docs</b><span>Claude Code · opus-5-5</span></div>
+    <div class="side-item"><b>Release notes for v0.72.0</b><span>fable-5-1</span></div>
+    <div class="side-item"><b>Flywheel</b><span>Claude Code · sonnet-5-5</span></div>
+  </aside>
+  <main class="main">
+    <div class="tabs"><span class="tab">Settlement</span><span class="tab on">Deploy pstack and gstack</span><span class="tab">About</span><span class="tab">Tools</span></div>
+    <div class="convo">
+      <p>Pushed as commit <code>ae5650f</code>. The skills pack change landed in commit <code>de10db0</code>, which includes the manifest and the install path fix.</p>
+      <p>The issue is still open on GitHub. <code>pan skills pack browser gstack on</code> downloads the browse, design and PDF tools on first use, so the first build ran twice against an empty home directory.</p>
+      <pre>pan skills pack gstack on --project t2o-structured-editor
+pan skills pack pstack on --project t2o-structured-editor</pre>
+      <p><code>pan skills pack gc</code> didn't remove the old pack directory because its cleanup races background writers. Nothing was sent upstream.</p>
+    </div>
+  </main>
+</div>
+
+<!-- ═════════ TODAY ═════════ -->
+<div class="before">
+  <div class="backdrop">
+    <form class="dialog" role="dialog" aria-label="New conversation with options (today)">
+      <div class="header"><h2 class="title">New conversation with options</h2><button type="button" class="iconButton" aria-label="Close">✕</button></div>
+      <div class="body">
+        <label class="row"><span class="label">Project</span><select class="control"><option>t2o-structured-editor</option></select></label>
+        <label class="row"><span class="label">Machine</span><select class="control"><option>This machine</option></select></label>
+        <label class="row"><span class="label">Working directory</span><input class="control" value="/home/eltmon/Projects/t2o-structured-editor"></label>
+        <label class="row"><span class="label">Model</span><select class="control"><option>Claude Opus 5.5 (1M context) — $12/1M</option></select></label>
+        <label class="row"><span class="label">Harness</span><select class="control"><option>Claude Code</option></select></label>
+        <div class="row"><span class="label">Effort</span><div class="effort"><select class="control"><option>high</option></select><span class="hint">Default: high (default)</span></div></div>
+        <fieldset class="group"><legend class="label">Context</legend>
+          <label class="check"><input type="checkbox"> No context</label>
+          <p class="hint">New conversations start without Overdeck context: no bundled rules, session briefing, memory injection or resume message. Faster to spawn.</p>
+          <label class="check"><input type="checkbox"> Skip CLAUDE.md</label>
+          <p class="hint">Claude Code skips ~/.claude/CLAUDE.md, project CLAUDE.md files and auto memory (CLAUDE_CODE_DISABLE_CLAUDE_MDS).</p>
+        </fieldset>
+        <div class="group"><span class="label">Skills</span><input class="control" placeholder="Filter skills by name or description">
+          <div class="skills"><div>› Overdeck <small>116 on · 116</small></div><div>› Personal <small>72 on · 72</small></div><div>› gstack <small>0 on · 36</small></div><div>› impeccable <small>0 on · 1</small></div><div>› mattpocock <small>0 on · 25</small></div><div>› pstack <small>0 on · 58</small></div></div>
+        </div>
+        <div class="group"><span class="label">Linked issue</span><input class="control" placeholder="Search issues"></div>
+        <label class="group"><span class="label">First message</span><textarea class="textarea" rows="3" placeholder="Optional"></textarea></label>
+      </div>
+      <div class="footer"><button type="button" class="btn">Cancel</button><button type="button" class="btn primary">Create</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- ═════════ PROPOSED ═════════ -->
+<div class="after" id="after">
+  <div class="backdrop">
+    <form class="dialog" role="dialog" aria-modal="true" aria-labelledby="nc-title" aria-describedby="nc-sub" onsubmit="return false">
+      <div class="head">
+        <div class="titles">
+          <h2 id="nc-title">New conversation</h2>
+          <p id="nc-sub">These choices apply to this conversation only. Your sidebar defaults stay the same.</p>
+        </div>
+        <button type="button" class="x" aria-label="Close">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div class="scroll">
+        <section aria-labelledby="s-where">
+          <h3 id="s-where">Where it runs</h3>
+          <div class="grid">
+            <label for="f-project">Project</label>
+            <div class="field">
+              <select id="f-project" class="select"><option>t2o-structured-editor</option><option>overdeck</option><option>No project</option></select>
+              <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+            </div>
+            <label for="f-machine">Machine</label>
+            <div class="field">
+              <select id="f-machine" class="select"><option>This machine</option><option>Auto</option><option>mac-rig</option></select>
+              <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+            </div>
+            <label for="f-cwd">Working directory</label>
+            <div class="field">
+              <span class="lead"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>
+              <input id="f-cwd" class="input mono" value="/home/eltmon/Projects/t2o-structured-editor" spellcheck="false">
+            </div>
+          </div>
+        </section>
+
+        <section aria-labelledby="s-agent">
+          <h3 id="s-agent">Agent</h3>
+          <div class="grid">
+            <label for="f-model">Model</label>
+            <div class="field">
+              <select id="f-model" class="select"><option>Claude Opus 5.5 (1M context)</option><option>Claude Sonnet 5.5</option><option>Claude Fable 5.1</option></select>
+              <span class="meta">$12/1M</span>
+              <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+            </div>
+            <label for="f-harness">Harness</label>
+            <div class="field">
+              <span class="lead harness-glyph"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l1.6 6.1 5.6-3-3 5.6 6.1 1.6-6.1 1.6 3 5.6-5.6-3L12 21.5l-1.6-6.1-5.6 3 3-5.6L1.7 12l6.1-1.6-3-5.6 5.6 3z"/></svg></span>
+              <select id="f-harness" class="select"><option>Claude Code</option><option>Codex</option><option>Pi</option></select>
+              <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+            </div>
+            <span class="lbl" id="l-effort">Effort</span>
+            <div class="effort-row">
+              <div class="segmented" role="radiogroup" aria-labelledby="l-effort" id="effort">
+                <button type="button" role="radio" aria-checked="false">low</button>
+                <button type="button" role="radio" aria-checked="false">medium</button>
+                <button type="button" role="radio" aria-checked="true">high<span class="dflt" title="Default"></span></button>
+                <button type="button" role="radio" aria-checked="false">xhigh</button>
+                <button type="button" role="radio" aria-checked="false">max</button>
+              </div>
+              <span class="hint">Default: high (default)</span>
+            </div>
+          </div>
+        </section>
+
+        <section aria-labelledby="s-task">
+          <h3 id="s-task">Task <span class="aside">Both optional</span></h3>
+          <div class="grid">
+            <label for="f-issue">Linked issue</label>
+            <div class="field">
+              <span class="lead"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span>
+              <input id="f-issue" class="input" placeholder="Search issues">
+            </div>
+            <label class="full" for="f-msg" style="margin-top:4px">First message</label>
+            <textarea id="f-msg" class="full" rows="3" placeholder="Sent as soon as the conversation starts"></textarea>
+          </div>
+        </section>
+
+        <section aria-labelledby="s-context">
+          <h3 id="s-context">Context</h3>
+          <div class="opt">
+            <b id="o-bare">No context</b>
+            <button type="button" class="switch" role="switch" aria-checked="false" aria-labelledby="o-bare" aria-describedby="o-bare-d"></button>
+            <p id="o-bare-d">New conversations start without Overdeck context: no bundled rules, session briefing, memory injection or resume message. Faster to spawn.</p>
+          </div>
+          <div class="opt">
+            <b id="o-md">Skip CLAUDE.md <span class="tag">Claude Code</span></b>
+            <button type="button" class="switch" role="switch" aria-checked="false" aria-labelledby="o-md" aria-describedby="o-md-d"></button>
+            <p id="o-md-d">Claude Code skips <code>~/.claude/CLAUDE.md</code>, project CLAUDE.md files and auto memory (<code>CLAUDE_CODE_DISABLE_CLAUDE_MDS</code>).</p>
+          </div>
+        </section>
+
+        <section aria-labelledby="s-skills">
+          <h3 id="s-skills">Skills</h3>
+          <div class="skills-sum">
+            <div class="text" id="skills-text">188 of 308 skills on <span>· inherited from project and global settings, no overrides</span></div>
+            <button type="button" class="linkbtn" id="skills-btn" aria-expanded="false" aria-controls="skills-panel">Customize</button>
+          </div>
+          <div class="skills-panel" id="skills-panel">
+            <div class="field">
+              <span class="lead"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span>
+              <input class="input" placeholder="Filter skills by name or description" aria-label="Filter skills">
+            </div>
+            <div class="packs">
+              <div class="pack"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m6 9 6 6 6-6"/></svg>Overdeck<span class="n">116 on · 116</span></div>
+              <div class="skill"><div><span class="nm">pan-start</span><span class="ds">Spawn a work agent for an issue in its own pane and workspace</span></div><span class="inh">On · global</span><div class="tri" role="radiogroup" aria-label="pan-start"><button type="button" role="radio" aria-checked="true">Inherit</button><button type="button" role="radio" aria-checked="false">On</button><button type="button" role="radio" aria-checked="false">Off</button></div></div>
+              <div class="skill"><div><span class="nm">pan-flywheel</span><span class="ds">Run the Fix-All Flywheel as a loop skill</span></div><span class="inh">On · global</span><div class="tri" role="radiogroup" aria-label="pan-flywheel"><button type="button" role="radio" aria-checked="false">Inherit</button><button type="button" role="radio" aria-checked="false">On</button><button type="button" role="radio" aria-checked="true">Off</button></div></div>
+              <div class="pack"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m9 6 6 6-6 6"/></svg>Personal<span class="n">72 on · 72</span></div>
+              <div class="pack"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m9 6 6 6-6 6"/></svg>gstack<span class="n">0 on · 36</span></div>
+              <div class="pack"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m9 6 6 6-6 6"/></svg>impeccable<span class="n">0 on · 1</span></div>
+              <div class="pack"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m9 6 6 6-6 6"/></svg>mattpocock<span class="n">0 on · 25</span></div>
+              <div class="pack"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m9 6 6 6-6 6"/></svg>pstack<span class="n">0 on · 58</span></div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+
+      <p class="error" role="alert">Could not create the conversation: the working directory /home/eltmon/Projects/t2o-structured-editor does not exist on this machine. Pick another directory or another machine.</p>
+      <div class="foot">
+        <div class="summary" id="summary">opus-5-5<i>·</i>Claude Code<i>·</i>high<i>·</i>t2o-structured-editor</div>
+        <button type="button" class="btn">Cancel</button>
+        <button type="submit" class="btn primary" aria-label="Create conversation">Create</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+const root = document.documentElement, body = document.body, after = document.getElementById('after');
+const params = new URLSearchParams(location.search);
+function press(sel, on) { document.querySelectorAll(sel).forEach(b => b.setAttribute('aria-pressed', String(on(b)))); }
+function setVariant(v) { body.classList.toggle('show-before', v === 'before'); press('[data-set="variant"]', b => b.dataset.val === v); }
+function setMode(m) { root.classList.toggle('dark', m === 'dark'); press('[data-set="mode"]', b => b.dataset.val === m); }
+function setToggle(name, on) {
+  after.classList.toggle(name, on);
+  press(`[data-toggle="${name}"]`, () => on);
+  if (name === 'skills-open') {
+    const btn = document.getElementById('skills-btn');
+    btn.setAttribute('aria-expanded', String(on));
+    btn.textContent = on ? 'Done' : 'Customize';
+    document.getElementById('skills-text').innerHTML = on
+      ? '187 of 308 skills on <span>· 1 override in this conversation</span>'
+      : '188 of 308 skills on <span>· inherited from project and global settings, no overrides</span>';
+  }
+}
+document.querySelectorAll('[data-set="variant"]').forEach(b => b.onclick = () => setVariant(b.dataset.val));
+document.querySelectorAll('[data-set="mode"]').forEach(b => b.onclick = () => setMode(b.dataset.val));
+document.querySelectorAll('[data-toggle]').forEach(b => b.onclick = () => setToggle(b.dataset.toggle, !after.classList.contains(b.dataset.toggle)));
+document.getElementById('skills-btn').onclick = () => setToggle('skills-open', !after.classList.contains('skills-open'));
+
+function radioGroup(group, onPick) {
+  group.querySelectorAll('[role="radio"]').forEach(btn => btn.onclick = () => {
+    group.querySelectorAll('[role="radio"]').forEach(o => o.setAttribute('aria-checked', String(o === btn)));
+    onPick && onPick(btn);
+  });
+}
+radioGroup(document.getElementById('effort'), btn => {
+  const s = document.getElementById('summary');
+  s.innerHTML = s.innerHTML.replace(/(Claude Code<i>·<\/i>)[a-z]+/, `$1${btn.firstChild.textContent}`);
+});
+document.querySelectorAll('.tri').forEach(g => radioGroup(g));
+document.querySelectorAll('.switch').forEach(s => s.onclick = () => s.setAttribute('aria-checked', String(s.getAttribute('aria-checked') !== 'true')));
+
+setVariant(params.get('v') || 'after');
+setMode(params.get('mode') || 'light');
+if (params.has('skills')) setToggle('skills-open', true);
+if (params.has('error')) setToggle('show-error', true);
+</script>
+</body>
+</html>

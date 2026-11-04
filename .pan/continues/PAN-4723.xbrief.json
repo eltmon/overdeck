@@ -1,0 +1,81 @@
+{
+  "version": "1",
+  "issueId": "PAN-4723",
+  "created": "2026-11-01T15:14:51.273Z",
+  "updated": "2026-11-01T15:55:29.951Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-5",
+      "timestamp": "2026-11-01T15:42:24.566Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-01T15:52Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-11-01T15:52:36.548Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-01T15:55:29.951Z"
+    }
+  ],
+  "items": {
+    "mock-disk-floor-create-workspace-row": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4723",
+      "claimedAt": "2026-11-01T15:14:51.273Z",
+      "doneAt": "2026-11-01T15:16:06.577Z"
+    },
+    "mock-disk-floor-create-resume-setup": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4723",
+      "claimedAt": "2026-11-01T15:16:19.109Z",
+      "doneAt": "2026-11-01T15:17:19.581Z"
+    },
+    "mock-disk-floor-workspace-manager-test": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4723",
+      "claimedAt": "2026-11-01T15:17:23.748Z",
+      "doneAt": "2026-11-01T15:18:27.020Z"
+    },
+    "mock-disk-floor-create-workspace-row.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T15:44:23.420Z"
+    },
+    "mock-disk-floor-create-workspace-row.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T15:44:36.828Z"
+    },
+    "mock-disk-floor-create-workspace-row.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T15:44:50.314Z"
+    },
+    "mock-disk-floor-create-workspace-row.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T15:45:01.699Z"
+    },
+    "mock-disk-floor-create-resume-setup.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T15:45:14.715Z"
+    },
+    "mock-disk-floor-create-resume-setup.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T15:45:28.197Z"
+    },
+    "mock-disk-floor-workspace-manager-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T15:45:41.922Z"
+    },
+    "mock-disk-floor-workspace-manager-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T15:45:55.477Z"
+    }
+  },
+  "agentModel": "claude-opus-5-5",
+  "feedback": []
+}

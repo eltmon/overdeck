@@ -1,0 +1,5 @@
+plan-digest: 3365ab232346021f28b16a7b60ac24c7331027ba9af916a187918ff6c1765c3c
+
+## sharpens-framing: qualify the highlight promise
+
+The PRD's WI-3 appends a Cite-availability sentence but leaves the existing promise that quoted text “stays highlighted in its row until the citation is sent or removed” (`features/conversations.mdx`, lines 253–255). The proposed `citationsEnabled={false}` makes `MessagesTimeline` pass no `citeConversationName` (`src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx`, lines 657 and 671). Both message row types then omit `CitableText`, which owns `data-cited` and the highlight (`messageRows.tsx`, lines 18–43, 151–165, 284–288). A saved citation therefore loses its visible highlight when the conversation enters a resume, vault, cleared, or forking state, even though the citation remains pending. Amend WI-3 to qualify the highlight sentence to periods when the composer is available, or explicitly describe that the highlight returns with the composer.

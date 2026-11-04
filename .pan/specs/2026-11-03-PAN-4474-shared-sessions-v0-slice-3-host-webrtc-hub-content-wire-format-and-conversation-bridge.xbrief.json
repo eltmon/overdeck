@@ -1,0 +1,959 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-03T06:43:10Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4474: Shared Sessions v0 (slice 3): host WebRTC hub, content wire format and conversation bridge",
+    "updated": "2026-11-03T06:47:54.721Z"
+  },
+  "plan": {
+    "id": "pan-4474",
+    "title": "Shared Sessions v0 (slice 3): host WebRTC hub, content wire format and conversation bridge",
+    "status": "running",
+    "uid": "a43ee4d0-2b4e-4db7-a026-e511422d4523",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-03T06:43:10Z",
+    "updated": "2026-11-03T06:47:54.721Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4474",
+        "label": "PAN-4474",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/658",
+        "label": "PAN-658 (parent, slice 1)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4473",
+        "label": "PAN-4473 (slice 2, merged)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "shared-sessions",
+      "webrtc",
+      "werift",
+      "contracts",
+      "dashboard-server"
+    ],
+    "narratives": {
+      "Problem": "Slice 2 lets a host create a share and admit viewers, but nothing flows after admission: the host ignores the signal and ice-servers frames the share service relays, no peer connection exists, and there is no wire format for content. Slice 4 (viewer surface) cannot start until the host side opens data channels, speaks a defined wire format and streams the shared conversation.",
+      "Proposal": "Add the content wire format types to packages/contracts/src/sharing.ts and its runtime (allow-list mapping, envelope decode, fragmentation, seq gap detection, hello negotiation) to a new sharing-wire.ts. Under src/dashboard/server/sharing/ add ChannelWriter (ordered, fragmenting, backpressured sends), ConversationBridge (full-history backfill via the claude-initial parser, then append/update from watchConversation) and PeerHub (one werift RTCPeerConnection per eligible viewer, five labelled channels, host offers, ICE servers from the share service, content gated on the host's own admitted set, hello then conversation and presence content). Wire the hub into ShareManager (signal/ice-servers routing, admit/kick/revoke notifications, close on drop). Prove it with fake-peer unit tests, a werift loopback test and a Miniflare test through the real share Worker; run the werift spike including Chromium interop and record it in the parent PRD; document it in docs/SHARED-SESSIONS.md and docs/DASHBOARD-ARCHITECTURE.md. Full design: .pan/drafts/PAN-4474.md.",
+      "NonGoals": "- The viewer side: join intent, viewer join socket, browser RTCPeerConnection, /#/shared/<roomId>, rendering (slice 4, PAN-4475)\n- Any content on drafts (slice 5) or terminal (slice 6); inbound handling on any channel other than control\n- Control-channel commands beyond hello (send-prompt, handoff, acks) and controller enforcement (slices 5 and 7)\n- Host socket reconnect, re-park after restart, seeding the host-admitted set from a snapshot, renegotiation after re-park (slice 8, PAN-4479)\n- pan share / pan join (slice 9), the hosted web join (slice 10), forced-TURN verification and the signaling-privacy e2e (slice 11)\n- Sharing the work log, tool calls, thinking, plans, cost or context usage; populating SharedMessage.author\n- Streaming non-Claude harness transcripts or subagent transcripts, or detecting a non-Claude conversation with a transcriptKind/harness comparison\n- Progressive or windowed history; history is one history payload\n- Adding @roamhq/wrtc, reordering TURN URLs for werift, or changing src/lib/anywhere/\n- New src/lib/errors.ts tags, an Effect-native rewrite, or any change to services/share/, routes/shares.ts, ws-rpc.ts, the frontend, or scripts/*-baseline.txt and allowlists\n- Deploying anything"
+    },
+    "autoDecisions": [
+      {
+        "summary": "werift 0.25.1 stays the host WebRTC stack; the spike measures and records rather than chooses (D-1).",
+        "rationale": "werift is already a production dependency running Anywhere's data channels; 5 MB/s is a ~1000x margin over a shared conversation's rate, and @roamhq/wrtc would break bun dev mode (parent NFR-5). Only a Chromium interop failure escalates, via pan tell."
+      },
+      {
+        "summary": "Forced-TURN is not re-verified in this slice (D-2).",
+        "rationale": "Agents hold no TURN credentials; werift's TURN client already runs Anywhere's relay route; slice 11 (PAN-4482) owns forced-TURN verification for sharing."
+      },
+      {
+        "summary": "Runtime wire helpers go in a new packages/contracts/src/sharing-wire.ts; sharing.ts stays type-only (D-3).",
+        "rationale": "Parent D-R3-8 keeps sharing.ts import-free for the Worker; slice 4's browser needs the same decoder, so contracts is the shared home."
+      },
+      {
+        "summary": "The hello is wrapped in a control envelope, the viewer echoes the host's scope, and content waits for the viewer's hello (D-4, D-5, D-6).",
+        "rationale": "One decoder for every message; the viewer cannot know the scope before the host's hello; waiting gives a future host the viewer's version before choosing a format."
+      },
+      {
+        "summary": "Generic fragmentation at 32,768 characters per data-channel message, one history envelope, 32 Mi character cap (D-8).",
+        "rationale": "Browsers advertise a 256 KiB max-message-size; one fragmentation rule also covers a single huge append; the parent PRD defers progressive history."
+      },
+      {
+        "summary": "No transcriptKind/harness check anywhere and no ws-rpc.ts extraction; the bridge mirrors ws-rpc's Claude session resolution without a file-existence check (D-11).",
+        "rationale": "scripts/lint-harness-branches.sh fails any new transcriptKind comparison in a file without a baseline row; a fresh conversation's JSONL appears only after its first prompt and the watcher already polls for it."
+      },
+      {
+        "summary": "The host-admitted set is fed only by the host's own admit/kick/revoke commands; snapshots can only remove absent ids (D-12).",
+        "rationale": "This is the parent PRD's NFR-4 defense in depth; removing on a lobby state would race an in-flight admit."
+      },
+      {
+        "summary": "A dropped host socket keeps established peers; the hub closes only when the host entry is dropped (D-15).",
+        "rationale": "Content is peer-to-peer and slice 2 never reconnects; slice 8 owns reconnect. Viewers tear down on their own 4004."
+      },
+      {
+        "summary": "Presence follows the parent PRD's PresencePayload but with numeric GitHub ids and never sends connected or blocked (D-17).",
+        "rationale": "RoomSnapshot uses numbers; the block list is controller-only information."
+      },
+      {
+        "summary": "Plain async classes with injected seams; no new src/lib/errors.ts tags; new modules under src/dashboard/server/sharing/ (D-19, D-20).",
+        "rationale": "Inherits slice 2's D-8/D-9 (one-variant-per-operation rule); the issue names the sharing/ path."
+      },
+      {
+        "summary": "Work log, tool calls and thinking are not shared; SharedMessage is the whole allow-list (D-21).",
+        "rationale": "The parent PRD's wire format lists SharedMessage only."
+      }
+    ],
+    "items": [
+      {
+        "id": "wire-types",
+        "title": "Append the content wire format types to packages/contracts/src/sharing.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T06:43:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4474",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/sharing.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck (including typecheck:share, which compiles the share Worker against sharing.ts) exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ],
+          "foundationFor": [
+            "wire-runtime",
+            "conversation-bridge",
+            "peer-hub-content",
+            "peer-hub-presence"
+          ]
+        },
+        "narrative": {
+          "Action": "WI-1 of .pan/drafts/PAN-4474.md. Append the 'Wire format types' block from the PRD Design section verbatim to packages/contracts/src/sharing.ts (SharedChannel, SharedEnvelope, SharedChunk, SharedHello, SharedHelloError, ControlPayload, SharedMessage, ConversationPayload, SharedStream, PresenceParticipant, PresencePayload, DraftPayload) and replace the header sentence 'The content wire format (SharedEnvelope and friends) is not here: the share service never carries content. Slice 3 (PAN-4474) adds it.' with the replacement given in the PRD. The file must stay type-only with no import statement (parent PRD D-R3-8): the share Worker imports it by relative path. GitHub ids in PresenceParticipant/PresencePayload are number (D-17). Commit with trailer 'Item: wire-types'."
+        },
+        "items": [
+          {
+            "id": "wire-types.ac1",
+            "title": "packages/contracts/src/sharing.ts exports SharedEnvelope, SharedChunk, SharedHello, ControlPayload, SharedMessage, ConversationPayload, PresencePayload and DraftPayload, and the file contains no import statement",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-types.ac2",
+            "title": "Given the appended types, when npm run typecheck runs (it includes typecheck:share), then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-types.ac3",
+            "title": "Given the appended types, when a reviewer reads sharing.ts, then it contains PresenceParticipant.githubId and PresencePayload.controllerGithubId typed number and a ConversationPayload union with exactly the variants history, append, update and unavailable (reasons transcript_not_found, history_too_large)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-runtime",
+        "title": "Add the wire format runtime in packages/contracts/src/sharing-wire.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T06:43:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4474",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/sharing-wire.ts",
+            "packages/contracts/src/index.ts",
+            "packages/contracts/src/__tests__/sharing-wire.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run packages/contracts/src/__tests__/sharing-wire.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "sharing-wire.test.ts passes (allow-list, envelope decode, fragmentation round trip, seq gaps, hello negotiation)",
+            "typecheck exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3"
+          ],
+          "foundationFor": [
+            "channel-writer",
+            "conversation-bridge",
+            "peer-hub-content",
+            "werift-spike"
+          ]
+        },
+        "narrative": {
+          "Action": "WI-2 of .pan/drafts/PAN-4474.md. Create packages/contracts/src/sharing-wire.ts exactly per the PRD 'Wire format runtime' section: SHARED_WIRE_VERSION, SHARED_SCOPE_KINDS, SHARED_CHANNELS, SHARE_MAX_MESSAGE_CHARS=32768, SHARE_MAX_ENVELOPE_CHARS=32Mi, toSharedMessage (field-by-field copy, never spread, never sets author), decodeEnvelope, encodeSharedMessage (RangeError over the envelope cap), SharedChannelReader, SeqTracker, negotiateHello (shape -> version -> scope kinds -> scope equality, per D-7). Imports are type-only (from './rpc' and './sharing'). Add 'export * from \"./sharing-wire\"' to packages/contracts/src/index.ts right after 'export * from \"./sharing\"'. Write the test file with every case listed under WI-2 in the PRD; the allow-list test must cast an object with extra keys (secret, rawContent, author) to ChatMessage. Commit with trailer 'Item: wire-runtime'."
+        },
+        "items": [
+          {
+            "id": "wire-runtime.ac1",
+            "title": "Given a ChatMessage cast with extra keys secret, rawContent and author, when toSharedMessage maps it, then the result's sorted keys are exactly completedAt, createdAt, id, role, sequence, streaming, text, turnId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-runtime.ac2",
+            "title": "Given an envelope whose encoded text is 100,000 characters, when encodeSharedMessage splits it and SharedChannelReader reads the parts in order, then earlier parts return pending and the last part returns an envelope deep-equal to the original",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-runtime.ac3",
+            "title": "Given seq values 1, 2, 3, 5 on one channel and stream, when SeqTracker observes them, then the fourth call returns ok false with expected 4 and got 5",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-runtime.ac4",
+            "title": "Given a remote hello with scopeKinds [], when negotiateHello compares it with the host hello, then it returns ok false with code scope_kind_unsupported; a remote v of 2 returns ok true with v 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "werift-spike",
+        "title": "Run the werift spike and record the result in the parent PRD",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T06:43:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "spike",
+          "issueLabel": "pan-4474",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/sharing/__tests__/werift-spike.slow.test.ts",
+            ".pan/drafts/pan-658.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "VITEST_INCLUDE_SLOW=1 npx vitest run src/dashboard/server/sharing/__tests__/werift-spike.slow.test.ts"
+          ],
+          "expected_outputs": [
+            "the three spike tests (throughput, 1000-message ordering, Chromium interop) report their results; the throughput assertion message shows the measured MB/s"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "WI-3 of .pan/drafts/PAN-4474.md, decisions D-1 and D-2. Create the .slow.test.ts file (excluded from the default suite) with the three tests described in WI-3: werift<->werift throughput over 32 MiB with a committed floor of >= 1 MB/s and the measured value in the assertion message; 1000 ordered messages; headless Chromium (import { chromium } from 'playwright') as answerer receiving all five labels and a 100,000-character envelope sent as encodeSharedMessage fragments, rebuilt in the page without contracts code. Implementation checkpoint: install Chromium with 'npx playwright install chromium' if missing; if Chromium cannot connect, retry once with --disable-features=WebRtcHideLocalIpsWithMdns to name the cause, then apply D-1's fallback (record, pan tell flywheel-orchestrator, continue on werift). Then append the '**Result (PAN-4474, <date>):**' paragraph to the '### WebRTC dependency' section of .pan/drafts/pan-658.md (fallback location: a '## Spike result' heading in .pan/drafts/PAN-4474.md if a hook refuses the edit). Commit with trailer 'Item: werift-spike'."
+        },
+        "items": [
+          {
+            "id": "werift-spike.ac1",
+            "title": "Given two in-process werift peers, when 32 MiB is sent over one ordered channel, then every byte arrives intact and the assertion message reports the measured MB/s against a committed floor of 1 MB/s",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "werift-spike.ac2",
+            "title": "Given 1000 messages m0..m999 sent in order, when the receiving werift peer collects them, then it records them in exactly that order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "werift-spike.ac3",
+            "title": "Given a headless Chromium page as answerer, when the werift side offers the five labels and sends a 100,000-character envelope as fragments, then the page reports five channels with labels control, conversation, drafts, terminal, presence and a rebuilt text of length 100,000 (or the failure and its cause are recorded per D-1)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "werift-spike.ac4",
+            "title": ".pan/drafts/pan-658.md contains a paragraph starting **Result (PAN-4474 under '### WebRTC dependency' that names the measured MB/s, the ordering result, the Chromium interop result and that forced-TURN is left to Anywhere's relay route and slice 11",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "channel-writer",
+        "title": "Add ChannelWriter: ordered, fragmenting, backpressured channel sends",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T06:43:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4474",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/sharing/channel-writer.ts",
+            "src/dashboard/server/sharing/__tests__/channel-writer.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/sharing/__tests__/channel-writer.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "channel-writer.test.ts passes",
+            "typecheck exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-5",
+            "FR-8",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "WI-4 of .pan/drafts/PAN-4474.md. Create src/dashboard/server/sharing/channel-writer.ts per the 'Channel writer' section: WRITER_HIGH_WATER_BYTES (1 MiB), WRITER_LOW_WATER_BYTES (256 KiB), WRITER_MAX_QUEUED_CHARS (64 Mi), the WritableDataChannel interface, and ChannelWriter (send encodes with encodeSharedMessage and a per-writer chunk id counter, FIFO queue, flush while open and bufferedAmount <= high water, one bufferedAmountLow subscription while waiting, onOverflow once, close). Plain class, no logging, no timers. Tests use a fake channel and cover every case listed under WI-4. Commit with trailer 'Item: channel-writer'."
+        },
+        "items": [
+          {
+            "id": "channel-writer.ac1",
+            "title": "Given a fake channel whose bufferedAmount is above 1 MiB, when two envelopes are sent, then nothing reaches channel.send until bufferedAmountLow fires, after which both are sent in order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "channel-writer.ac2",
+            "title": "Given a 100,000-character envelope, when it is sent, then the channel receives fragments with one chunk.id and index 0, 1, 2, ... in order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "channel-writer.ac3",
+            "title": "Given queued content past 64 Mi characters, when another envelope is sent, then onOverflow is called exactly once and later sends reach the channel no more",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "channel-writer.ac4",
+            "title": "The constructor sets channel.bufferedAmountLowThreshold to 262144, and an envelope over SHARE_MAX_ENVELOPE_CHARS throws RangeError with nothing queued",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-bridge",
+        "title": "Add ConversationBridge: history backfill, then live append and update",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T06:43:10Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4474",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/sharing/conversation-bridge.ts",
+            "src/dashboard/server/sharing/__tests__/conversation-bridge.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/sharing/__tests__/conversation-bridge.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-bridge.test.ts passes",
+            "typecheck exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-2",
+            "NFR-3"
+          ],
+          "parallelSafeReason": "Touches only its own two new files (conversation-bridge.ts and its test); no other item edits them, and it depends only on wire-runtime's exported functions."
+        },
+        "narrative": {
+          "Action": "WI-5 of .pan/drafts/PAN-4474.md, decisions D-9, D-10, D-11. Create src/dashboard/server/sharing/conversation-bridge.ts per the 'Conversation bridge' section: ConversationSink, ConversationBridgeDeps, ConversationBridge (lazy shared start, Map<id, SharedMessage> in transcript order plus sent-JSON map, history sent synchronously on attach, gateSnapshotEmission reset handling, append for new ids, update for changed JSON, detach/refcount with a generation counter, throwing sink dropped), resolveClaudeSessionFile (mirrors ws-rpc.ts lines 803-846 WITHOUT any transcriptKind or harness-name comparison and WITHOUT a file-existence check), productionBridgeDeps (sharedTranscriptParser('claude-initial'), watchConversation and gateSnapshotEmission from ../services/conversation-service.js), conversationLabel. Do not touch ws-rpc.ts. Tests: every case under WI-5, including the vi.mock-based resolveClaudeSessionFile describe. Commit with trailer 'Item: conversation-bridge'."
+        },
+        "items": [
+          {
+            "id": "conversation-bridge.ac1",
+            "title": "Given an initial parse of two messages, when a sink attaches, then it receives exactly one history payload with both messages in order and each message has only allow-listed keys",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-bridge.ac2",
+            "title": "Given an attached sink, when the watch callback delivers a new message id and then the same id with changed text, then the sink receives append and then update; an unchanged known message sends nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-bridge.ac3",
+            "title": "Given two attaches made before the start resolves, when the start completes, then resolveSessionFile and parseInitial were each called once and both sinks received history",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-bridge.ac4",
+            "title": "Given resolveSessionFile returns null, when a sink attaches, then it receives unavailable with reason transcript_not_found and the next attach calls resolveSessionFile again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-bridge.ac5",
+            "title": "Given a mocked conversation with a pinned launcher session id and a different claudeSessionId, when resolveClaudeSessionFile runs, then sessionFilePath receives the pinned id and the returned path is returned even though the file does not exist yet",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "peer-hub-gate",
+        "title": "Add PeerHub admission gate, signaling, ICE servers and the five channels",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T06:43:10Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4474",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/dashboard/server/sharing/peer-hub.ts",
+            "src/dashboard/server/sharing/__tests__/peer-hub.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/sharing/__tests__/peer-hub.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "peer-hub.test.ts passes, including the NFR-4 gate case and the 5 s ICE timeout under fake timers",
+            "typecheck exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-11",
+            "NFR-2",
+            "NFR-3",
+            "NFR-6"
+          ],
+          "foundationFor": [
+            "peer-hub-content",
+            "peer-hub-presence",
+            "share-manager-wiring",
+            "share-worker-e2e"
+          ],
+          "parallelSafeReason": "Creates peer-hub.ts and peer-hub.test.ts, which later items edit only after it completes (blocks edges); no concurrent item touches these files."
+        },
+        "narrative": {
+          "Action": "WI-6 of .pan/drafts/PAN-4474.md, decisions D-12, D-13, D-14, D-16. Create src/dashboard/server/sharing/peer-hub.ts with PeerHubContext, HubPeerConnection, HubDataChannel, HostHub, PeerHubDeps, PeerHub and productionPeerHubDeps per the 'Peer hub' section, implementing admission and reconcile (host-admitted set fed only by admit/remove; snapshots only remove ids absent from participants; eligible = in set + admitted + connected), startPeer (await ICE servers and the label, create the connection, five ordered channels in SHARED_CHANNELS order before the offer, onMessage subscribed only on control, offer and trickled candidates as signal host frames), onSignal (answer once, candidates buffered until remoteSet, offers ignored, unknown ids ignored), iceServers (one in-flight request, 50 min cache, turn_unavailable or 5 s timeout -> [] uncached), closePeer, close. In this item onChannelOpen only records the open label and creates a ChannelWriter (onOverflow -> closePeer). Use vi.useFakeTimers()/vi.advanceTimersByTimeAsync() for the timeout test. Tests: every case under WI-6. Commit with trailer 'Item: peer-hub-gate'."
+        },
+        "items": [
+          {
+            "id": "peer-hub-gate.ac1",
+            "title": "Given a snapshot listing githubId 7 as admitted and connected with no prior admit(7), when the hub processes it, then no peer connection is created and sendFrame is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "peer-hub-gate.ac2",
+            "title": "Given admit(7) and a snapshot with 7 admitted and connected, when ICE servers arrive, then exactly one connection is created with five channels labelled control, conversation, drafts, terminal, presence (ordered true) and one signal frame with githubId 7 and sdp.type offer is sent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "peer-hub-gate.ac3",
+            "title": "Given a live peer for 7, when remove(7) is called or a snapshot shows 7 with connected false, then that connection is closed; a later snapshot after remove(7) creates nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "peer-hub-gate.ac4",
+            "title": "Given no ice-servers answer, when 5000 ms pass under fake timers, then the connection is created with iceServers [] and the result is not cached",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "peer-hub-gate.ac5",
+            "title": "Given an inbound signal carrying an offer, or a signal from a githubId with no peer, when onSignal runs, then setRemoteDescription is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "peer-hub-content",
+        "title": "Add the hello exchange and conversation content to PeerHub, with a werift loopback test",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T06:43:10Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4474",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/sharing/peer-hub.ts",
+            "src/dashboard/server/sharing/__tests__/peer-hub.test.ts",
+            "src/dashboard/server/sharing/__tests__/loopback-viewer.ts",
+            "src/dashboard/server/sharing/__tests__/peer-hub-loopback.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/sharing/__tests__/peer-hub.test.ts src/dashboard/server/sharing/__tests__/peer-hub-loopback.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "peer-hub.test.ts and peer-hub-loopback.test.ts pass",
+            "typecheck exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "NFR-4",
+            "NFR-5"
+          ],
+          "parallelSafeReason": "Edits peer-hub.ts/peer-hub.test.ts only after peer-hub-gate and before peer-hub-presence (blocks edges); its other files (loopback-viewer.ts, peer-hub-loopback.test.ts) are new and owned by it."
+        },
+        "narrative": {
+          "Action": "WI-7 of .pan/drafts/PAN-4474.md, decisions D-4, D-5, D-6, D-8. Add to peer-hub.ts: hostHello, sendEnvelope (per-peer per-channel seq from 1, streamId = conversation name, t = deps.now()), onChannelOpen behavior (control -> host hello; conversation -> maybeAttachConversation), control inbound handling via SharedChannelReader and negotiateHello (ok -> negotiated, failure -> control error payload, second hello ignored, Buffer ignored), maybeAttachConversation (only after negotiation and conversation open, once), sendConversation (RangeError -> unavailable history_too_large). Never send on drafts or terminal. Create the LoopbackViewer helper and the real-UDP loopback test (real timers, 20 s timeouts, event-driven waits, parseEntireConversation(file, { flushPendingToolUse: false }) on a temp JSONL fixture, fake watch) exactly as WI-7 describes. Commit with trailer 'Item: peer-hub-content'."
+        },
+        "items": [
+          {
+            "id": "peer-hub-content.ac1",
+            "title": "Given an open control channel, when the hub sends its first control envelope, then it is seq 1 with payload kind hello carrying v 1, scopeKinds ['conversation'] and the share scope",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "peer-hub-content.ac2",
+            "title": "Given a peer whose viewer has not sent a hello, when the conversation channel opens, then no conversation envelope is sent; after a valid viewer hello the bridge is attached once and history goes out as conversation seq 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "peer-hub-content.ac3",
+            "title": "Given a viewer hello with scopeKinds [], when the hub negotiates it, then the hub sends a control error payload with code scope_kind_unsupported and never attaches the bridge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "peer-hub-content.ac4",
+            "title": "Given a werift loopback viewer, when it is admitted and the fake watch then delivers a third message, then the viewer receives the host hello, a history with the two fixture messages, then an append with the third, and every envelope's streamId equals the conversation name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "peer-hub-content.ac5",
+            "title": "Given a message with 100,000 characters of text, when it is appended, then the loopback viewer reassembles the fragments into that exact text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "peer-hub-presence",
+        "title": "Send presence payloads from PeerHub",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T06:43:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4474",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/sharing/peer-hub.ts",
+            "src/dashboard/server/sharing/__tests__/peer-hub.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/sharing/__tests__/peer-hub.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "peer-hub.test.ts passes including the presence cases",
+            "typecheck exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "WI-8 of .pan/drafts/PAN-4474.md, decisions D-17, D-18. Add presenceOf(snapshot, scope, label) (data owner first with isHost true, state admitted, contributor false; then snapshot participants field by field with isHost false; never connected or blocked; one streams entry { streamId, label, kind: 'conversation' }), maybeSendPresence (negotiated + presence open + snapshot + resolved label), and the onSnapshot change detection (send only when the presence JSON changed). The label comes from deps.streamLabel(), falling back to the conversation name on rejection. Tests: every case under WI-8. Commit with trailer 'Item: peer-hub-presence'."
+        },
+        "items": [
+          {
+            "id": "peer-hub-presence.ac1",
+            "title": "Given a negotiated peer with an open presence channel, when the hub sends presence, then participants[0] is the data owner with isHost true, the rest follow the snapshot order with isHost false, and streams is [{ streamId: <name>, label: <streamLabel()>, kind: 'conversation' }]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "peer-hub-presence.ac2",
+            "title": "Given any sent presence payload, when its JSON is inspected, then it contains neither a connected key nor a blocked key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "peer-hub-presence.ac3",
+            "title": "Given a snapshot that repeats the same roster, when the hub processes it, then no presence envelope is sent; a new lobby joiner produces a new presence envelope with the next seq",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "peer-hub-presence.ac4",
+            "title": "Given streamLabel() rejects, when presence is sent, then the stream label is the conversation name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "share-manager-wiring",
+        "title": "Wire PeerHub into ShareManager",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T06:43:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4474",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/share-host.ts",
+            "src/dashboard/server/services/__tests__/share-host.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/share-host.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "share-host.test.ts passes (existing slice-2 cases unchanged plus the hub cases)",
+            "typecheck and lint exit 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "FR-11",
+            "NFR-3",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "WI-9 of .pan/drafts/PAN-4474.md, decisions D-12, D-15. Apply the 'ShareManager wiring' section to src/dashboard/server/services/share-host.ts: optional createHub dep, ShareHost.hub, hub creation in openHost, sendHostFrame (false unless current, not disconnected and socket OPEN), onFrame routing of room/signal/ice-servers/error turn_unavailable with type checks, hub.admit after a sent admit, hub.remove after a sent kick or revoke, hub.close in dropHost only (not in disconnect), productionDeps createHub with PeerHub + productionPeerHubDeps, module header paragraph. Keep routes/shares.ts unchanged. The file must stay under 1000 lines. Tests: every case under WI-9 with a fake HostHub. Commit with trailer 'Item: share-manager-wiring'."
+        },
+        "items": [
+          {
+            "id": "share-manager-wiring.ac1",
+            "title": "Given a ShareManager with a fake createHub, when the host socket delivers signal, ice-servers and error turn_unavailable frames, then the hub receives onSignal(githubId, data), onIceServers(list) and onIceServersUnavailable(), and a signal frame with a string githubId is ignored",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-manager-wiring.ac2",
+            "title": "Given a connected share, when command admit is sent, then hub.admit(id) is called after the frame was written; kick and revoke call hub.remove(id); unrevoke and set-contributor call neither",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-manager-wiring.ac3",
+            "title": "Given a live share, when the host socket closes with 1006, then hub.close is not called; when it closes with 4004, or end() or stop() runs, then hub.close is called once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-manager-wiring.ac4",
+            "title": "Given no createHub dep, when the slice-2 share-host tests run, then they pass unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "share-worker-e2e",
+        "title": "Add the Miniflare integration test: admitted viewer receives history and a live append through the real share Worker",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T06:43:10Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-4474",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/integration/services/share/peer-hub.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/integration/services/share/peer-hub.test.ts"
+          ],
+          "expected_outputs": [
+            "peer-hub.test.ts integration test passes on real workerd"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-7",
+            "FR-8",
+            "FR-10",
+            "FR-11"
+          ],
+          "parallelSafeReason": "Creates one new integration test file that no other item touches; it only reads modules finished by its blockers."
+        },
+        "narrative": {
+          "Action": "WI-10 of .pan/drafts/PAN-4474.md. Create tests/integration/services/share/peer-hub.test.ts by copying the Miniflare setup from tests/integration/services/share/host-manager.test.ts (do not edit that file). Use the real ShareManager with createHub building a PeerHub on werift and a ConversationBridge over a temp JSONL fixture (real parseEntireConversation(file, { flushPendingToolUse: false }), fake watch), and the LoopbackViewer helper relaying signals over the viewer's join socket. Follow the WI-10 flow exactly; SLOW = 120_000 timeouts; vi.waitFor and socket events only, nothing sleeps. Commit with trailer 'Item: share-worker-e2e'."
+        },
+        "items": [
+          {
+            "id": "share-worker-e2e.ac1",
+            "title": "Given a viewer in the lobby, when the host has not admitted it, then the viewer's join socket receives only status lobby and no signal frame",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-worker-e2e.ac2",
+            "title": "Given the host admits the viewer through manager.command, when signaling runs through the real share Worker, then the viewer receives a host offer, answers, and receives the hello, a history with the fixture messages, and an append after the fake watch fires",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-worker-e2e.ac3",
+            "title": "Given an admitted viewer with an open peer connection, when manager.command kick runs, then the viewer's join socket closes with 4010 and the host hub reports peerCount() 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document the host WebRTC hub and content wire format",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T06:43:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4474",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/SHARED-SESSIONS.md",
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -c 'Host WebRTC hub and content wire format (slice 3, PAN-4474)' docs/SHARED-SESSIONS.md",
+            "grep -c 'src/dashboard/server/sharing/' docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "each grep prints 1 or more"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-5",
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "WI-11 of .pan/drafts/PAN-4474.md. In docs/SHARED-SESSIONS.md replace the slice-2 paragraph starting '**Not done yet.** No content flows:' with the replacement text in WI-11, and add the section '## Host WebRTC hub and content wire format (slice 3, PAN-4474)' before '## Local development' covering every point listed in WI-11 (werift + spike result, peer hub, host-admitted set and eligibility, peer lifetime and the close-then-reopen restart rule after the close event, host-socket loss and the 4004 teardown duty for viewers, five-channel table, envelope/seq/fragmentation/hello rules with SHARE_MAX_MESSAGE_CHARS 32,768 and SHARE_MAX_ENVELOPE_CHARS 32 Mi, SharedMessage allow-list and what is not shared, Claude-only streaming, sharing-wire.ts exports for slice 4). Extend the '- Shared Sessions host side (PAN-4473):' paragraph in docs/DASHBOARD-ARCHITECTURE.md with the sentence from WI-11. Commit with trailer 'Item: docs'."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "Given the edited docs/SHARED-SESSIONS.md, when a reader opens the section 'Host WebRTC hub and content wire format (slice 3, PAN-4474)', then it contains a channel table listing control, conversation, drafts, terminal and presence with what each carries, and states that drafts and terminal carry nothing yet",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "Given that section, when a reader looks for the gating and size rules, then it contains the host-admitted set rule (fed only by the host's own admit, kick and revoke; eligibility needs admitted and connected) and the fragment limit SHARE_MAX_MESSAGE_CHARS of 32,768 characters",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "docs/SHARED-SESSIONS.md no longer contains the text 'No content flows', and docs/DASHBOARD-ARCHITECTURE.md names src/dashboard/server/sharing/ with peer-hub.ts, conversation-bridge.ts and channel-writer.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wire-types",
+        "to": "wire-runtime",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-runtime",
+        "to": "channel-writer",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-runtime",
+        "to": "conversation-bridge",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-runtime",
+        "to": "werift-spike",
+        "type": "blocks"
+      },
+      {
+        "from": "channel-writer",
+        "to": "peer-hub-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-bridge",
+        "to": "peer-hub-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "peer-hub-gate",
+        "to": "peer-hub-content",
+        "type": "blocks"
+      },
+      {
+        "from": "peer-hub-content",
+        "to": "peer-hub-presence",
+        "type": "blocks"
+      },
+      {
+        "from": "peer-hub-gate",
+        "to": "share-manager-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "share-manager-wiring",
+        "to": "share-worker-e2e",
+        "type": "blocks"
+      },
+      {
+        "from": "peer-hub-content",
+        "to": "share-worker-e2e",
+        "type": "blocks"
+      },
+      {
+        "from": "peer-hub-gate",
+        "to": "peer-hub-presence",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-03-PAN-4474-shared-sessions-v0-slice-3-host-webrtc-hub-content-wire-format-and-conversation-bridge.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

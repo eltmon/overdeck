@@ -6,15 +6,18 @@
  * protocol. The body therefore contains no paths, usernames, tokens or secrets
  * (`/api/health` stays separate because it exposes `serverPath`).
  *
- * The identity comes from `environment-id.json`. A corrupt file answers 503
- * naming the file; it is never re-minted (see `lib/environment-identity.ts`).
+ * The identity comes from `environment-id.json` and the machine public key from
+ * `machine-key.json` (PAN-4645). A corrupt file answers 503 naming the file; it
+ * is never re-minted (see `lib/environment-identity.ts`, `lib/anywhere/machine-key.ts`).
  */
 import { arch, platform } from 'node:os';
 
 import { Effect, Schema } from 'effect';
 import { HttpRouter } from 'effect/unstable/http';
-import { ENVIRONMENT_PROTOCOL_VERSION, EnvironmentDescriptor } from '@overdeck/contracts';
+import { ENVIRONMENT_PROTOCOL_VERSION, EnvironmentDescriptor, LINK_PROTOCOL_VERSION } from '@overdeck/contracts';
 
+import { currentAdvertisedEndpoints } from '../../../lib/anywhere/endpoints.js';
+import { ensureMachineKey, publicKeyHex } from '../../../lib/anywhere/machine-key.js';
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
 import { jsonResponse } from '../http-helpers.js';
 import { WS_UPGRADE_REQUIRES_CREDENTIAL } from '../ws-auth.js';
@@ -25,6 +28,7 @@ const decodeDescriptor = Schema.decodeUnknownSync(EnvironmentDescriptor);
 
 export async function buildEnvironmentDescriptor(): Promise<EnvironmentDescriptor> {
   const identity = await ensureEnvironmentIdentity();
+  const machineKey = await ensureMachineKey();
   return decodeDescriptor({
     descriptorVersion: 1,
     environmentId: identity.environmentId,
@@ -32,7 +36,17 @@ export async function buildEnvironmentDescriptor(): Promise<EnvironmentDescripto
     platform: { os: platform(), arch: arch() },
     serverVersion: await getOverdeckVersion(),
     protocolVersion: ENVIRONMENT_PROTOCOL_VERSION,
-    capabilities: { pairing: true, deviceSessions: true, terminalAuth: WS_UPGRADE_REQUIRES_CREDENTIAL },
+    capabilities: {
+      pairing: true,
+      deviceSessions: true,
+      terminalAuth: WS_UPGRADE_REQUIRES_CREDENTIAL,
+      machineLinks: true,
+      phoneApp: true,
+      connector: true,
+    },
+    machineKey: publicKeyHex(machineKey),
+    linkProtocol: LINK_PROTOCOL_VERSION,
+    endpoints: currentAdvertisedEndpoints(),
   });
 }
 

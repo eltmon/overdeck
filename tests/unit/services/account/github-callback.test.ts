@@ -25,7 +25,7 @@ function recordingHandlers(seen: Seen): PurposeHandlers {
       return json({ denied: purpose }, 200);
     },
   });
-  return { pkce: make('pkce'), device: make('device'), admin: make('admin') };
+  return { pkce: make('pkce'), device: make('device'), admin: make('admin'), account: make('account') };
 }
 
 function setup(mock: GitHubMockOptions = {}) {

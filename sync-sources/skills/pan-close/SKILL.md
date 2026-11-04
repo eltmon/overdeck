@@ -51,6 +51,8 @@ Row 8 probes the dashboard's `/api/health` three times (5 s timeout, 2 s apart) 
 reports `dashboard not reachable … after 3 attempts`, so a short server stall is not a miss.
 Row 3 passes a stale `running` or `skipped` verification artifact when the work landed and
 main CI is green.
+Rows 1 and 2 retry a failed PR read once. `pull request read failed on the forge after 2 attempts: …`
+means the forge could not be read — re-run `pan close`; it is not evidence that the PR is missing.
 Use an override only when the missing evidence is understood:
 
 ```bash

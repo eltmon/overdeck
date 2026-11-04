@@ -1,0 +1,260 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-01T05:47:22Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4663: Overdeck workspace stacks burn two Docker subnets each: init-perms has no networks, so Compose adds an empty _default network",
+    "updated": "2026-11-01T11:01:17.663Z"
+  },
+  "plan": {
+    "id": "pan-4663",
+    "title": "Overdeck workspace stacks burn two Docker subnets each: init-perms has no networks, so Compose adds an empty _default network",
+    "status": "running",
+    "uid": "174e93ef-1a10-4ab3-b9d0-19b56ab73721",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-11-01T05:47:22Z",
+    "updated": "2026-11-01T11:01:17.663Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4663",
+        "label": "PAN-4663",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-4663.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "docker",
+      "devcontainer",
+      "infra",
+      "workspace-stack"
+    ],
+    "narratives": {
+      "Problem": "Every Overdeck workspace stack creates two bridge networks: <project>_devnet and an empty <project>_default. The init-perms service in infra/.devcontainer-template/docker-compose.devcontainer.yml.template declares neither networks: nor network_mode:, so Compose puts it on an implicit default network. With ~31 bridge subnets available on the host, only ~13 stacks fit, and on 2026-11-01 four issues could not start because rebuildWorkspaceStack failed with 'all predefined address pools have been fully subnetted'. Verified with docker compose config: the current template yields networks default, devnet, overdeck; with network_mode: none on init-perms it yields devnet, overdeck.",
+      "Proposal": "Add network_mode: none (with a PAN-4663 comment) to the init-perms service in the template. Extend tests/unit/lib/workspace/devcontainer-init-command.test.ts so the init-perms assertion checks network_mode: 'none' and a new test fails when any rendered service has no network_mode and no non-empty, non-default networks declaration. Document the authoring rule and the fact that existing _default networks free up on rebuild or teardown in infra/.devcontainer-template/README.md, docs/MERGE-WORKFLOW.md and sync-sources/skills/pan-docker/SKILL.md. Full detail, before/after snippets and the scratch-project live-check recipe are in .pan/drafts/pan-4663.md.",
+      "NonGoals": "- No migration or sweep that removes existing _default networks from live stacks; they go away on each stack's next rebuild or teardown.\n- No change to src/lib/workspace/traefik-connect.ts, src/lib/workspace/orphan-networks.ts, src/lib/docker-bridge-pool.ts, src/lib/cloister/uat-stack.ts, src/lib/workspace/rebuild-stack.ts or src/lib/workspace-manager/docker.ts.\n- No change to sync-sources/templates/docker/*/docker-compose.yml or docker/pan-workspace/docker-compose.yml.\n- No edit to untracked rendered copies (<workspace>/.devcontainer/, a workspace-root docker-compose.devcontainer.yml).\n- No raise of the bridge-pool limit and no Docker daemon default-address-pools change.\n- No docker compose up/create/down against any real workspace project name (only the scratch project pan4663-netprobe)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Use network_mode: none on init-perms rather than attaching it to devnet.",
+        "rationale": "The issue body names network_mode: none as the fix, and the service only chowns a named volume; giving a root container no network is the smaller privilege. Both options remove the _default network."
+      },
+      {
+        "summary": "Do not sweep existing _default networks from live stacks.",
+        "rationale": "The issue scopes the fix to new renders and rebuilds. rebuildWorkspaceStack runs down against the old compose file (which still declares default) and teardown calls removeComposeProjectNetworks, so the waste frees up without new code."
+      },
+      {
+        "summary": "Live verification renders the branch template into a scratch compose project (pan4663-netprobe), with docker compose config as the accepted fallback when the bridge pool is exhausted.",
+        "rationale": "renderDevcontainer reads the template from the project's primary checkout (devcontainer-renderer.ts line 213), so the workspace's own stack keeps the main template until merge; the host is near the pool limit, so a create can fail for the very reason this issue fixes."
+      },
+      {
+        "summary": "Put the guard test in the existing tests/unit/lib/workspace/devcontainer-init-command.test.ts.",
+        "rationale": "That file already renders the template with readDevcontainerTemplate(); reading a .yml.template does not count against lint:source-introspection, which only counts .ts/.tsx reads."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-01-PAN-4663-overdeck-workspace-stacks-burn-two-docker-subnets-each-init-perms-has-no-networks-so-compose-adds-an-empty-default-network.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "init-perms-network-mode",
+        "title": "Set network_mode: none on the init-perms template service",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T05:47:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-4663",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "infra/.devcontainer-template/docker-compose.devcontainer.yml.template"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "sed -e 's/{{FEATURE_FOLDER}}/feature-pan4663-netprobe/g' -e \"s#{{PROJECT_PATH}}#$PWD#g\" -e \"s#{{PROJECTS_DIR}}#$(dirname \"$PWD\")#g\" infra/.devcontainer-template/docker-compose.devcontainer.yml.template > <scratch>/docker-compose.yml && docker compose -f <scratch>/docker-compose.yml config --format json 2>/dev/null | node -e 'const d=JSON.parse(require(\"fs\").readFileSync(0,\"utf8\"));console.log(JSON.stringify({own:Object.entries(d.networks).filter(([,v])=>!v.external).map(([k])=>k),initPerms:d.services[\"init-perms\"]}))'",
+            "cp infra/.devcontainer-template/Dockerfile <scratch>/ && docker compose -p pan4663-netprobe -f <scratch>/docker-compose.yml create && docker network ls --filter label=com.docker.compose.project=pan4663-netprobe --format '{{.Name}}'; docker compose -p pan4663-netprobe -f <scratch>/docker-compose.yml down -v"
+          ],
+          "expected_outputs": [
+            "config JSON shows own networks exactly [\"devnet\"] and init-perms with network_mode \"none\" and no networks key",
+            "docker network ls prints exactly pan4663-netprobe_devnet (or, under the PRD fallback, create fails with 'fully subnetted' and the config output is recorded in the commit message)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In infra/.devcontainer-template/docker-compose.devcontainer.yml.template, inside the init-perms service, insert directly after the line `    user: root` a three-line YAML comment and the key: `    # PAN-4663: chown needs no network. Without networks: or network_mode:,` / `    # Compose creates an extra <project>_default network for this service alone,` / `    # which uses one of Docker's ~31 bridge subnets per workspace.` / `    network_mode: none`. Change nothing else in the file. Then run the mechanical docker compose config check from PRD WI-1 against a scratch directory outside the repo (write the scratch path literally). Then run the PRD WI-1 implementation checkpoint: copy the Dockerfile into the scratch dir, `docker compose -p pan4663-netprobe -f <scratch>/docker-compose.yml create`, list networks by the compose project label, and ALWAYS finish with `docker compose -p pan4663-netprobe -f <scratch>/docker-compose.yml down -v`. Never use the real overdeck-feature-pan-4663 project name. If create stops before Docker reports networks for a reason unrelated to the fix (bridge pool 'fully subnetted', image build failure such as the Dockerfile's curl of bun.sh/install, registry pull failure, or 'network overdeck declared as external, but could not be found'), the live check is inconclusive: run down -v, do not free, create or delete any network, put the error and the config JSON in the commit message, and continue. Only a successful create that shows a _default network or any network other than pan4663-netprobe_devnet means the fix failed. Do not judge the fix by this workspace's own .devcontainer/ stack: it renders from main's template and still shows _default until merge (PRD D6)."
+        },
+        "items": [
+          {
+            "id": "init-perms-network-mode.ac1",
+            "title": "Given the template rendered with FEATURE_FOLDER=feature-pan4663-netprobe, when `docker compose config --format json` runs, then it returns exactly one non-external network, devnet, and init-perms shows network_mode \"none\" with no networks key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "init-perms-network-mode.ac2",
+            "title": "Given the scratch project pan4663-netprobe, when `docker compose create` succeeds, then Docker creates exactly one network labeled with that project, pan4663-netprobe_devnet; when create instead exits on pool exhaustion, a build or pull failure, or a missing external overdeck network, then the commit message records that error plus the ac1 config output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "init-perms-network-mode.ac3",
+            "title": "The init-perms service in the diff preserves user: root, the `chown node:node /workspaces/overdeck/node_modules` command and the container-node-modules volume, and the diff touches no other service or top-level key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "network-guard-test",
+        "title": "Guard test: every rendered template service declares networks or network_mode",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T05:47:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4663",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/workspace/devcontainer-init-command.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/workspace/devcontainer-init-command.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-source-introspection.sh"
+          ],
+          "expected_outputs": [
+            "devcontainer-init-command.test.ts passes, including the new 'attaches every service to a declared network' test",
+            "typecheck completes without errors",
+            "lint-source-introspection exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In tests/unit/lib/workspace/devcontainer-init-command.test.ts: (1) widen the DevcontainerCompose interface so services is Record<string, DevcontainerService | undefined>, where DevcontainerService has optional user, command, volumes, depends_on, networks?: unknown and network_mode?: string; keep the existing three tests compiling. (2) In the test 'repairs the node_modules volume ownership before installing dependencies', add network_mode: 'none' to the toMatchObject for init-perms and add expect(perms).not.toHaveProperty('networks'). (3) Add the module-level helper declaredNetworkNames(networks: unknown): string[] (array -> entries as strings, object -> Object.keys, else []) and the test 'attaches every service to a declared network so Compose creates no _default network' exactly as shown in PRD WI-2: it reads readDevcontainerTemplate().services, asserts there is at least one service, and collects the names of services that have no non-empty network_mode string AND whose declared network names are empty or include 'default' (an empty networks: [] or {} still lands on default); it expects that list toEqual([]). Add no it.skip, it.skipIf or .only, and add no new readFile call. Run only this test file, never the full npm test."
+        },
+        "items": [
+          {
+            "id": "network-guard-test.ac1",
+            "title": "Given the current template with init-perms network_mode: none, when `npx vitest run tests/unit/lib/workspace/devcontainer-init-command.test.ts` runs, then all tests in the file pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "network-guard-test.ac2",
+            "title": "Given a rendered service with no network_mode and either no networks key, an empty networks list or map, or a networks entry named default, when the guard test runs, then it fails and its diff output names that service",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "network-guard-test.ac3",
+            "title": "Given the init-perms assertion in the existing test, when vitest runs it, then it rejects any init-perms service whose user is not 'root', whose command is not the chown, whose volume is not container-node-modules, or whose network_mode is not 'none', and it rejects an init that no longer depends on init-perms with service_completed_successfully",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "network-rule-docs",
+        "title": "Document the one-network-per-stack rule in the template README, MERGE-WORKFLOW and pan-docker skill",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:47:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4663",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "infra/.devcontainer-template/README.md",
+            "docs/MERGE-WORKFLOW.md",
+            "sync-sources/skills/pan-docker/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "npm run lint:skills"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "lint:skills exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3 items 1-3. (1) infra/.devcontainer-template/README.md: add init-perms and init rows to the '## Services' table, and add a '### Networks' subsection under it stating that the stack creates one network, overdeck-<FEATURE_FOLDER>_devnet, and joins the external overdeck network; every service must list networks: or set network_mode:; a service with neither makes Compose create an extra <project>_default network, each of which uses one of Docker's ~31 bridge subnets (PAN-4663); stacks rendered before the fix keep their empty _default network until their next rebuild or teardown removes it. (2) docs/MERGE-WORKFLOW.md, section 'Post-merge handoff and Docker cleanup': after the paragraph ending 'NEVER remove this cleanup step.', add one paragraph saying an Overdeck workspace stack creates one bridge network (_devnet); before PAN-4663 init-perms also created an empty _default network, which halved how many stacks fit; existing _default networks are removed on the stack's next rebuild (its down runs against the old compose file) or by teardown's removeComposeProjectNetworks, and pan workspace reap leaves them alone while the workspace directory exists. (3) sync-sources/skills/pan-docker/SKILL.md, '### Add a Service': after the example, add one or two sentences scoped to stacks that declare named networks (as every bundled template does with app-network): in such a stack every service must list at least one named network or set network_mode: (network_mode: none for a one-shot job such as a chown or migration); a service with neither, or with an empty networks:, puts Compose on an extra <project>_default network that uses another bridge subnet; a stack that declares no networks and relies only on _default is fine because that is its only network. Do not add pan commands to the skill text. lint:skills runs the built CLI (dist/cli/index.js); run `npm run build` first if dist is missing."
+        },
+        "items": [
+          {
+            "id": "network-rule-docs.ac1",
+            "title": "infra/.devcontainer-template/README.md renders a Services table that lists init-perms with network_mode: none, and a Networks subsection that states the 'networks: or network_mode:' rule and that old _default networks are removed on rebuild or teardown",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "network-rule-docs.ac2",
+            "title": "docs/MERGE-WORKFLOW.md's 'Post-merge handoff and Docker cleanup' section contains a PAN-4663 paragraph stating each stack creates one _devnet network and that pan workspace reap leaves existing _default networks alone while the workspace directory exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "network-rule-docs.ac3",
+            "title": "Given the edited sync-sources/skills/pan-docker/SKILL.md, when the 'Add a Service' section is read, then it states the networks:/network_mode: rule for stacks that declare named networks and allows a default-only stack; and when `npm run lint:docs` and `npm run lint:skills` run, then both exit 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "init-perms-network-mode",
+        "to": "network-guard-test",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

@@ -1,0 +1,390 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T23:42:44.939Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4859: Open in editor on an SSH-host machine targets ssh-remote+127.0.0.1 (the local forward)",
+    "updated": "2026-11-02T23:46:19.131Z"
+  },
+  "plan": {
+    "id": "pan-4859",
+    "title": "Open in editor on an SSH-host machine targets ssh-remote+127.0.0.1 (the local forward)",
+    "status": "running",
+    "uid": "fe21cfbc-6e9d-41bd-ae2b-7c0db8a10a68",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-02T23:42:44.939Z",
+    "updated": "2026-11-02T23:46:19.131Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4859",
+        "label": "PAN-4859",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "anywhere",
+      "ssh-machines",
+      "open-in-editor",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "For a machine added as an SSH host (PAN-4404), the link's only ssh route is the local port forward tcp://127.0.0.1:<localPort>. sshHostFor in src/dashboard/server/services/open-remote.ts takes the first ssh route's hostname, so Open in editor launches `code --remote ssh-remote+127.0.0.1 <cwd>`, which opens the viewing machine's own SSH server instead of the SSH host.",
+      "Proposal": "The route handler looks up the SSH machine record by link id (getSshMachineByLinkId) and passes its destination to resolveRemoteEditorLaunch. A new parseSshDestination in src/lib/anywhere/ssh/target.ts splits the destination into user/host/port; a new sshRemoteAuthority in open-remote.ts renders the Remote-SSH authority: plain [user@]host, or lowercase hex of JSON {hostName,user,port} when a port, an IPv6 host or an uppercase letter is present. Host order: SSH record destination, then the tailnet /ws/link route, then any tailnet route, else 409 no-ssh-host. ssh routes are local forwards and are never used as an editor host. configuration/linked-machines.mdx states the new rule.",
+      "NonGoals": "- No change to how SSH machines are added, forwarded or stored; no new fields in ssh-machines.json.\n- No per-editor authority encodings, and no Cursor/Windsurf remote support.\n- No change to the PanOpenInPicker UI; the long hex commandLine echo is accepted.\n- No destination field added to the open-in-editor response.\n- No change to tailnet-route behavior or to the editor-unsupported / no-cwd responses.\n- No fallback that ever returns an ssh route's hostname (that is the bug).\n- No change to docs/ANYWHERE-ARCHITECTURE.md."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Host order is SSH machine record destination, then tailnet /ws/link route, then any tailnet route, else no-ssh-host; ssh routes are never a host source.",
+        "rationale": "kind 'ssh' is assigned only by ssh-machine-service.ts:301 and always points at tcp://127.0.0.1:<localPort>; the record's destination is the address the dashboard's own ssh client already reaches."
+      },
+      {
+        "summary": "Authority encoding: plain [user@]host unless a port, an IPv6 host or an uppercase letter is present, then hex JSON {hostName,user,port}.",
+        "rationale": "Verified against jeanp413/open-remote-ssh (VSCodium) sshDestination.ts and the installed anysphere.remote-ssh parser: both decode hex JSON with those keys; the plain parser splits the port on the last ':' (breaks IPv6) and vscode.uri lowercases the authority. Plain stays for the common case so existing tailnet output is unchanged."
+      },
+      {
+        "summary": "The destination parser lives in src/lib/anywhere/ssh/target.ts and validates first.",
+        "rationale": "That module's header makes it the single owner of every destination string; reusing validateSshDestination keeps one grammar."
+      },
+      {
+        "summary": "The no-ssh-host 409 message becomes '<label> has no SSH host (not an SSH machine and no tailnet route)'.",
+        "rationale": "The old text mentions an ssh route, which no longer counts."
+      },
+      {
+        "summary": "Microsoft's proprietary Remote-SSH is not installed, so the hex form is unit-tested only; if a later live check shows it rejects hex, file a follow-up rather than adding per-editor encodings.",
+        "rationale": "Two Remote-SSH implementations share the hex shape; the issue itself named the hex-encoded JSON authority as the expected form for ports."
+      }
+    ],
+    "items": [
+      {
+        "id": "parse-destination",
+        "title": "Add parseSshDestination to src/lib/anywhere/ssh/target.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T23:42:44.939Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4859",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/anywhere/ssh/target.ts",
+            "src/lib/anywhere/ssh/__tests__/target.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/anywhere/ssh/__tests__/target.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "target.test.ts passes including the new parseSshDestination describe block",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Export interface ParsedSshDestination { user?: string; host: string; port?: number } and function parseSshDestination(input) right after isValidSshDestination. It calls validateSshDestination first (so it throws SshMachineError 'bad-destination' for rejected input), strips 'ssh://', splits the user on the first '@', strips IPv6 brackets and reads an optional ':port'. Omit absent keys from the result. Add a describe('parseSshDestination') block with every row of the PRD WI-1 table."
+        },
+        "items": [
+          {
+            "id": "parse-destination.ac1",
+            "title": "Given 'ssh://root@build-box:2222', parseSshDestination returns { user: 'root', host: 'build-box', port: 2222 }; given 'build-box' it returns { host: 'build-box' } with no user or port keys",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parse-destination.ac2",
+            "title": "Given 'ssh://me@[fd00::5]:2200', it returns { user: 'me', host: 'fd00::5', port: 2200 }; given '[fd00::5]' it returns { host: 'fd00::5' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parse-destination.ac3",
+            "title": "Given 'build-box:2222', '-oProxyCommand=x' or '', it throws an SshMachineError whose code is 'bad-destination'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "remote-authority",
+        "title": "Add sshRemoteAuthority (plain or hex JSON) to open-remote.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T23:42:44.939Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4859",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "resolver-uses-destination",
+            "route-ssh-lookup"
+          ],
+          "files_scope": [
+            "src/dashboard/server/services/open-remote.ts",
+            "src/dashboard/server/services/__tests__/open-remote.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/open-remote.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "open-remote.test.ts passes including describe('sshRemoteAuthority (PAN-4859)')",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2 / D-2. export function sshRemoteAuthority(destination: string): string using parseSshDestination. Return plain `${user}@${host}` (or host) unless port is set, host contains ':', or the plain string matches /[A-Z]/; then return Buffer.from(JSON.stringify({ hostName: host, user, port }), 'utf8').toString('hex') (key order hostName, user, port; undefined keys omitted by JSON.stringify; port is a number). Add tests for every row of the PRD WI-2 table, with the exact hex strings."
+        },
+        "items": [
+          {
+            "id": "remote-authority.ac1",
+            "title": "sshRemoteAuthority returns 'root@build-box' for 'root@build-box' and for 'ssh://root@build-box', and 'build-box' for 'build-box'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remote-authority.ac2",
+            "title": "sshRemoteAuthority('ssh://root@build-box:2222') returns exactly '7b22686f73744e616d65223a226275696c642d626f78222c2275736572223a22726f6f74222c22706f7274223a323232327d'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remote-authority.ac3",
+            "title": "sshRemoteAuthority('[::1]') returns '7b22686f73744e616d65223a223a3a31227d' and 'Admin@build-box' returns hex that decodes to { hostName: 'build-box', user: 'Admin' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "resolver-uses-destination",
+        "title": "resolveRemoteEditorLaunch uses the SSH destination and never an ssh route's host",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T23:42:44.939Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4859",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/open-remote.ts",
+            "src/dashboard/server/services/__tests__/open-remote.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/open-remote.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "open-remote.test.ts passes, including the issue reproduction case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3 / D-1. Delete the ssh-route branch from sshHostFor (keep the tailnet logic unchanged). Add optional `sshDestination?: string | null` to resolveRemoteEditorLaunch's input; authority = destinationAuthority(sshDestination) ?? sshHostFor(link), where destinationAuthority wraps sshRemoteAuthority in try/catch and returns null on a throw. Rewrite the module header (lines 1-10): record destination first, then tailnet /ws/link, then any tailnet route; ssh routes are local forwards and never used; one sentence on the plain/hex rule. In the tests, replace the assertion that expects 'desk-ssh' from an ssh route with the same routes expecting 'desk.tail1234.ts.net', and add the PRD WI-3 cases (issue repro, destination wins over tailnet, ssh+tailnet without destination, bad destination falls back). Verify the second clause of ac4 by reading the diff, not with a test that reads source files (source-reading tests fail lint)."
+        },
+        "items": [
+          {
+            "id": "resolver-uses-destination.ac1",
+            "title": "Given routes [ssh tcp://127.0.0.1:40123] and no sshDestination, resolveRemoteEditorLaunch returns { error: 'no-ssh-host' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolver-uses-destination.ac2",
+            "title": "Given the same routes and sshDestination 'ssh://root@build-box:2222', it returns args ['--remote', 'ssh-remote+7b22686f73744e616d65223a226275696c642d626f78222c2275736572223a22726f6f74222c22706f7274223a323232327d', '/home/root/project']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolver-uses-destination.ac3",
+            "title": "Given sshDestination 'root@build-box' and a tailnet /ws/link route, it returns 'ssh-remote+root@build-box'; given sshDestination '-bad' and that tailnet route, it falls back to 'ssh-remote+desk.tail1234.ts.net'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolver-uses-destination.ac4",
+            "title": "sshHostFor on routes [tailnet wss://desk.tail1234.ts.net/ws/link, ssh tcp://desk-ssh:22] returns 'desk.tail1234.ts.net', and open-remote.ts contains no code that reads an ssh-kind route's hostname",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "route-ssh-lookup",
+        "title": "Open-in-editor route looks up the SSH machine record by link id",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T23:42:44.939Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4859",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/linked-open.ts",
+            "src/dashboard/server/services/__tests__/open-remote.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/open-remote.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "open-remote.test.ts passes including the SSH-linked handler cases",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 / D-5. Add `getSshMachine: (linkId: string) => Promise<SshMachineRecord | null>` to LinkedOpenDeps with default getSshMachineByLinkId from '../../../lib/anywhere/ssh/machine-store.js'. After the no-cwd check, `const sshMachine = await deps.getSshMachine(link.id)` and pass `sshDestination: sshMachine?.destination ?? null`. Change the no-ssh-host message to `${link.label} has no SSH host (not an SSH machine and no tailnet route)`. Existing handler tests pass `getSshMachine: async () => null`. Add the PRD WI-4 handler tests."
+        },
+        "items": [
+          {
+            "id": "route-ssh-lookup.ac1",
+            "title": "Given an SSH-linked machine (routes [ssh tcp://127.0.0.1:40123], getSshMachine returns destination 'ssh://root@build-box:2222'), handleLinkedOpenInEditor returns 200, launches code with the WI-2 hex authority, and its commandLine contains no '127.0.0.1'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-ssh-lookup.ac2",
+            "title": "When handleLinkedOpenInEditor runs for @desk/conv-x, it calls getSshMachine with the link id \"link-desk\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-ssh-lookup.ac3",
+            "title": "Given getSshMachine returns null and only the ssh route exists, it returns 409 with code 'no-ssh-host' and error 'desk has no SSH host (not an SSH machine and no tailnet route)', and launch is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-open-in-editor",
+        "title": "Document the SSH machine host rule in configuration/linked-machines.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T23:42:44.939Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4859",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/linked-machines.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"destination you added it with\" configuration/linked-machines.mdx",
+            "! grep -q \"route when there is one\" configuration/linked-machines.mdx"
+          ],
+          "expected_outputs": [
+            "the first grep prints a line inside the ## Open in editor section",
+            "the second command exits 0 (the old sentence is gone)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. In configuration/linked-machines.mdx, section '## Open in editor', replace the sentence \"The host is the link's `ssh` route when there is one, else its Tailscale (`tailnet`) route's host name; a link with neither cannot do this (`no-ssh-host`).\" with: for a machine added as an SSH machine the host is the destination you added it with (for example `ssh-remote+root@build-box`), never the local port forward; otherwise the link's Tailscale (`tailnet`) host name; a link with neither cannot do this (`no-ssh-host`); a destination with a port, an IPv6 address or an uppercase letter is passed in Remote-SSH's encoded form (hex of {\"hostName\",\"user\",\"port\"}), so the command line shows a long hex string. Include the literal phrase 'destination you added it with'."
+        },
+        "items": [
+          {
+            "id": "docs-open-in-editor.ac1",
+            "title": "The ## Open in editor section of configuration/linked-machines.mdx contains the text \"destination you added it with\" and says the local port forward is never used as the host",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-open-in-editor.ac2",
+            "title": "The section no longer contains \"route when there is one\" (! grep -q exits 0) and contains a sentence that a port, IPv6 address or uppercase letter produces the hex-encoded authority",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "parse-destination",
+        "to": "remote-authority",
+        "type": "blocks"
+      },
+      {
+        "from": "remote-authority",
+        "to": "resolver-uses-destination",
+        "type": "blocks"
+      },
+      {
+        "from": "resolver-uses-destination",
+        "to": "route-ssh-lookup",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-02-PAN-4859-open-in-editor-on-an-ssh-host-machine-targets-ssh-remote-127-0-0-1-the-local-forward.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

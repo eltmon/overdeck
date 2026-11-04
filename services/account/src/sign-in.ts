@@ -10,7 +10,7 @@ import { authorizeUrl, type GitHubIdentity } from './github.ts';
 import { isAllowed, recordPendingAttempt, type SignInFlow } from './grants.ts';
 import { redirect, setCookie } from './http.ts';
 
-export type Purpose = 'pkce' | 'device' | 'admin';
+export type Purpose = 'pkce' | 'device' | 'admin' | 'account';
 export const STATE_COOKIE = '__Host-od_state';
 export const AUTH_REQUEST_TTL_MS = 600_000;
 
@@ -43,13 +43,14 @@ export type SignInResolution =
 /**
  * D-11: the only path to minting. Not allowlisted → pending attempt, no users row.
  * Allowed → upsert the user (login refreshed) unless the account is mid-deletion.
+ * `flow` null (the account page, PAN-4959 D-7) refuses a non-allowlisted id without recording an attempt.
  */
-export async function resolveSignIn(rc: RequestContext, identity: GitHubIdentity, flow: SignInFlow): Promise<SignInResolution> {
+export async function resolveSignIn(rc: RequestContext, identity: GitHubIdentity, flow: SignInFlow | null): Promise<SignInResolution> {
   // A deleting account has already lost its grant; refuse it as such instead of recording a pending attempt.
   const existing = await rc.env.DB.prepare('SELECT deleted_at FROM users WHERE github_id = ?').bind(identity.githubId).first<{ deleted_at: number | null }>();
   if (existing?.deleted_at != null) return { allowed: false, reason: 'account_deleting' };
   if (!(await isAllowed(rc, identity.githubId))) {
-    await recordPendingAttempt(rc, identity.githubId, identity.login, flow);
+    if (flow !== null) await recordPendingAttempt(rc, identity.githubId, identity.login, flow);
     return { allowed: false, reason: 'invite_only' };
   }
   const row = await rc.env.DB.prepare(

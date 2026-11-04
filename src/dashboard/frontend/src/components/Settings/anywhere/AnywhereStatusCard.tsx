@@ -1,11 +1,16 @@
 /**
  * The Anywhere status card (PAN-4445 FR-11): this machine, the addresses other
- * devices can reach, the paired-device count, the Session Vault state, and
- * each problem with a fix button. Problems come from the server
+ * devices can reach, the paired-device count, the Session Vault state, the
+ * Tailscale state (PAN-1254), and each problem with a fix button. Problems come from the server
  * (`GET /api/anywhere/status`); this card maps each `action.kind` to a button
  * and never tells the operator to run a command.
+ *
+ * PAN-2356: the overdeck.ai directory line (a refusal shows as a problem line), and the relay
+ * add-on: "Using relay" with this month's traffic while a relay channel is open, and the cap
+ * message with an Add 50 GB link once the allowance is used.
  */
 import { useQuery } from '@tanstack/react-query';
+import { RELAY_CAP_MESSAGE } from '@overdeck/contracts';
 
 import {
   ANYWHERE_STATUS_QUERY_KEY,
@@ -34,6 +39,43 @@ function vaultText(vault: AnywhereStatus['vault']): string {
   }
 }
 
+function tailscaleText(tailscale: AnywhereStatus['tailscale']): string {
+  switch (tailscale.nextStep) {
+    case 'not-installed':
+      return 'Not installed';
+    case 'login':
+      return 'Signed out';
+    case 'enable-https':
+      return 'Needs HTTPS';
+    case 'ready':
+      return tailscale.serveUrl ? `Ready (${tailscale.serveUrl})` : 'Ready';
+    default:
+      return 'Set up unfinished';
+  }
+}
+
+export const ADD_RELAY_URL = 'https://overdeck.ai/anywhere';
+
+/** `12.3 of 50 GB relay traffic this month`, in decimal gigabytes with one decimal. */
+export function relayTrafficText(bytesUsed: number, capBytes: number): string {
+  const used = (bytesUsed / 1e9).toFixed(1);
+  const cap = Number.isInteger(capBytes / 1e9) ? String(capBytes / 1e9) : (capBytes / 1e9).toFixed(1);
+  return `${used} of ${cap} GB relay traffic this month`;
+}
+
+function directoryText(directory: NonNullable<AnywhereStatus['directory']>): string {
+  switch (directory.state) {
+    case 'online':
+      return directory.plan === 'free' ? 'Connected (free account)' : 'Connected';
+    case 'connecting':
+      return 'Connecting';
+    case 'refused':
+      return 'Refused';
+    default:
+      return 'Off';
+  }
+}
+
 function ProblemFix({ problem, onAction }: { problem: AnywhereProblem; onAction: (action: AnywhereAction) => void }) {
   const { action } = problem;
   if (action.kind === 'pair-dialog') {
@@ -41,6 +83,9 @@ function ProblemFix({ problem, onAction }: { problem: AnywhereProblem; onAction:
   }
   if (action.kind === 'settings-section') {
     return <button type="button" className={SECONDARY_BUTTON} onClick={() => onAction(action)}>Open Session Vault</button>;
+  }
+  if (action.kind === 'tailscale-setup') {
+    return <button type="button" className={SECONDARY_BUTTON} onClick={() => onAction(action)}>Protect the dashboard</button>;
   }
   if (action.docsUrl) {
     return (
@@ -116,7 +161,38 @@ export function AnywhereStatusCard({ onAction }: AnywhereStatusCardProps) {
                 )}
               </span>
             </Row>
+            {status.tailscale && (
+              <Row label="Tailscale">
+                <span data-testid="anywhere-tailscale" className="break-all">{tailscaleText(status.tailscale)}</span>
+              </Row>
+            )}
+            {status.directory && (
+              <Row label="Directory">
+                <span data-testid="anywhere-directory">{directoryText(status.directory)}</span>
+              </Row>
+            )}
+            {status.relay && (status.relay.using || status.relay.stopped || status.relay.bytesUsed > 0) && (
+              <Row label="Relay">
+                <span data-testid="anywhere-relay" className="inline-flex flex-col items-end gap-1">
+                  {status.relay.using && <span className="font-medium">Using relay</span>}
+                  <span className="tabular-nums">{relayTrafficText(status.relay.bytesUsed, status.relay.capBytes)}</span>
+                </span>
+              </Row>
+            )}
           </dl>
+          {status.directory?.state === 'refused' && status.directory.refusal && (
+            <p data-testid="anywhere-directory-refusal" className="mt-3 rounded-md bg-muted/30 px-3 py-2 text-xs text-foreground">
+              {status.directory.refusal}
+            </p>
+          )}
+          {status.relay?.stopped && (
+            <div data-testid="anywhere-relay-cap" className="mt-3 flex items-start justify-between gap-3 rounded-md bg-muted/30 px-3 py-2">
+              <span className="text-xs text-foreground">{RELAY_CAP_MESSAGE}</span>
+              <a href={ADD_RELAY_URL} target="_blank" rel="noreferrer" className={SECONDARY_BUTTON}>
+                Add 50 GB
+              </a>
+            </div>
+          )}
           {status.problems.length > 0 && (
             <ul className="mt-3 space-y-2" aria-label="Anywhere problems">
               {status.problems.map((problem) => (

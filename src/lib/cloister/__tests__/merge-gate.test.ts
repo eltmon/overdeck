@@ -17,6 +17,10 @@ import {
 } from '../pr-facts.js';
 import type { IssuePullRequestData } from '../../overdeck/pull-requests.js';
 
+// PAN-4852: the SageOx merge guard reads git and projects.yaml; these tests judge
+// forge facts and the Deft guard only (repo-merge-guards.test.ts covers SageOx).
+vi.mock('../../sageox/merge-guard.js', () => ({ sageoxMergeGuardForIssue: vi.fn(async () => ({ ok: true })) }));
+
 const HEAD = 'dddd444400000000000000000000000000000000';
 
 function readyFacts(issueId: string, overrides: Partial<PrFacts> = {}): PrFacts {
@@ -348,5 +352,46 @@ describe('evaluateIssueMergeGate — approval bound to the PR head (#3983)', () 
     const facts = readyFacts('MIN-1', { forge: 'gitlab', approvedAtHead: undefined });
     const result = await evaluateIssueMergeGate('MIN-1', { getFacts: async () => facts, ciTestsRequired: () => false });
     expect(result.ready).toBe(true);
+  });
+});
+
+describe('evaluateIssueMergeGate — operator-started strike merge (PAN-4750)', () => {
+  const noReviews = async (): Promise<GitHubReviewsAtHead> => ({ headRefOid: HEAD, reviews: [] });
+  const unreviewed = (overrides: Partial<PrFacts> = {}) => readyFacts('PAN-9', {
+    headBranch: 'strike/pan-9', reviewDecision: '', approved: false, approvedAtHead: false, ...overrides,
+  });
+  const judge = (facts: PrFacts, options: { requireApprovalAtHead?: boolean } = {}) => evaluateIssueMergeGate('PAN-9', {
+    getFacts: async () => facts, ciTestsRequired: () => false, readReviews: noReviews,
+  }, { preferBranch: 'strike/pan-9', ...options });
+
+  it('requireApprovalAtHead: false lets a green mergeable unreviewed PR through', async () => {
+    await expect(judge(unreviewed(), { requireApprovalAtHead: false })).resolves.toEqual(expect.objectContaining({ ready: true }));
+  });
+
+  it('requireApprovalAtHead: false still refuses changes requested, a draft, red checks and an unmergeable PR', async () => {
+    const cases: Array<[Partial<PrFacts>, string]> = [
+      [{ changesRequested: true }, 'latest review requested changes'],
+      [{ draft: true }, 'PR is a draft'],
+      [{ checks: 'red' }, `CI checks failing on PR HEAD ${HEAD}`],
+      [{ mergeable: false }, 'PR is not mergeable'],
+    ];
+    for (const [overrides, reason] of cases) {
+      const result = await judge(unreviewed(overrides), { requireApprovalAtHead: false });
+      expect(result.ready).toBe(false);
+      expect(result.reason).toBe(reason);
+    }
+  });
+
+  it('defaults to requiring approval at head', async () => {
+    const result = await judge(unreviewed());
+    expect(result.ready).toBe(false);
+    expect(result.reason).toContain('PR is not approved at PR HEAD');
+  });
+
+  it('never passes the approval option to the forge read', async () => {
+    const getFacts = vi.fn(async () => unreviewed());
+    await evaluateIssueMergeGate('PAN-9', { getFacts, ciTestsRequired: () => false, readReviews: noReviews },
+      { preferBranch: 'strike/pan-9', requireApprovalAtHead: false });
+    expect(getFacts).toHaveBeenCalledWith('PAN-9', { preferBranch: 'strike/pan-9' });
   });
 });

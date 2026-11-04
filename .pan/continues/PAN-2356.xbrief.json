@@ -1,0 +1,526 @@
+{
+  "version": "1",
+  "issueId": "PAN-2356",
+  "created": "2026-11-01T13:35:50.720Z",
+  "updated": "2026-11-01T16:13:01.245Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-01T15:41:24.147Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-01T16:01Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-11-01T16:01:05.637Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-01T16:13Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-11-01T16:13:01.244Z"
+    }
+  ],
+  "items": {
+    "wi1-contracts": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2356",
+      "claimedAt": "2026-11-01T13:35:50.720Z",
+      "doneAt": "2026-11-01T13:36:05.722Z"
+    },
+    "wi2-account-free-plan": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2356",
+      "claimedAt": "2026-11-01T13:37:05.035Z",
+      "doneAt": "2026-11-01T13:37:19.324Z"
+    },
+    "wi3-connect-scaffold": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2356",
+      "claimedAt": "2026-11-01T13:39:50.693Z",
+      "doneAt": "2026-11-01T13:40:04.033Z"
+    },
+    "wi1-contracts.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T13:43:57.717Z"
+    },
+    "wi1-contracts.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T13:44:10.599Z"
+    },
+    "wi1-contracts.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T13:44:23.663Z"
+    },
+    "wi2-account-free-plan.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T13:44:49.381Z"
+    },
+    "wi2-account-free-plan.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T13:45:02.791Z"
+    },
+    "wi2-account-free-plan.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T13:45:16.877Z"
+    },
+    "wi3-connect-scaffold.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T13:45:44.961Z"
+    },
+    "wi3-connect-scaffold.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T13:45:58.972Z"
+    },
+    "wi3-connect-scaffold.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T13:46:12.107Z"
+    },
+    "wi5-do-presence": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2356",
+      "claimedAt": "2026-11-01T13:50:09.079Z",
+      "doneAt": "2026-11-01T13:50:54.919Z"
+    },
+    "wi5-do-presence.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T13:51:09.743Z"
+    },
+    "wi5-do-presence.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T13:51:24.997Z"
+    },
+    "wi5-do-presence.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T13:51:37.671Z"
+    },
+    "wi5-do-presence.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T13:51:50.527Z"
+    },
+    "wi6-do-signaling": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2356",
+      "claimedAt": "2026-11-01T13:52:46.459Z",
+      "doneAt": "2026-11-01T13:53:02.662Z"
+    },
+    "wi6-do-signaling.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T13:53:14.990Z"
+    },
+    "wi6-do-signaling.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T13:53:27.987Z"
+    },
+    "wi6-do-signaling.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T13:53:41.348Z"
+    },
+    "wi6-do-signaling.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T13:53:54.899Z"
+    },
+    "wi7-do-relay": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2356",
+      "claimedAt": "2026-11-01T13:55:19.494Z",
+      "doneAt": "2026-11-01T13:55:37.786Z"
+    },
+    "wi7-do-relay.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T13:55:52.561Z"
+    },
+    "wi7-do-relay.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T13:56:08.282Z"
+    },
+    "wi7-do-relay.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T13:56:22.244Z"
+    },
+    "wi7-do-relay.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T13:56:37.805Z"
+    },
+    "wi4-sealed-box": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2356",
+      "claimedAt": "2026-11-01T13:57:08.570Z",
+      "doneAt": "2026-11-01T13:57:27.226Z"
+    },
+    "wi4-sealed-box.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T13:57:40.483Z"
+    },
+    "wi4-sealed-box.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T13:57:55.306Z"
+    },
+    "wi4-sealed-box.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T13:58:09.153Z"
+    },
+    "wi8-do-inbox": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2356",
+      "claimedAt": "2026-11-01T14:03:54.648Z",
+      "doneAt": "2026-11-01T14:04:14.202Z"
+    },
+    "wi8-do-inbox.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:04:27.876Z"
+    },
+    "wi8-do-inbox.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:04:41.532Z"
+    },
+    "wi8-do-inbox.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:04:55.625Z"
+    },
+    "wi8-do-inbox.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:05:11.364Z"
+    },
+    "wi9-directory-client": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2356",
+      "claimedAt": "2026-11-01T14:10:05.651Z",
+      "doneAt": "2026-11-01T14:10:26.001Z"
+    },
+    "wi9-directory-client.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:10:44.594Z"
+    },
+    "wi9-directory-client.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:11:00.655Z"
+    },
+    "wi9-directory-client.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:11:17.976Z"
+    },
+    "wi9-directory-client.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:11:33.447Z"
+    },
+    "wi10-rtc-transport": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2356",
+      "claimedAt": "2026-11-01T14:14:59.002Z",
+      "doneAt": "2026-11-01T14:15:16.352Z"
+    },
+    "wi10-rtc-transport.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:15:30.772Z"
+    },
+    "wi10-rtc-transport.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:15:45.164Z"
+    },
+    "wi10-rtc-transport.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:15:59.668Z"
+    },
+    "wi10-rtc-transport.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:16:14.370Z"
+    },
+    "wi11-rtc-routes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2356",
+      "claimedAt": "2026-11-01T14:20:36.732Z",
+      "doneAt": "2026-11-01T14:20:55.241Z"
+    },
+    "wi11-rtc-routes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:21:09.781Z"
+    },
+    "wi11-rtc-routes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:21:23.180Z"
+    },
+    "wi11-rtc-routes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:21:36.742Z"
+    },
+    "wi11-rtc-routes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:21:51.594Z"
+    },
+    "wi12-supervisor-phases": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2356",
+      "claimedAt": "2026-11-01T14:23:54.854Z",
+      "doneAt": "2026-11-01T14:24:16.332Z"
+    },
+    "wi12-supervisor-phases.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:24:31.388Z"
+    },
+    "wi12-supervisor-phases.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:24:45.371Z"
+    },
+    "wi12-supervisor-phases.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:25:02.458Z"
+    },
+    "wi12-supervisor-phases.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:25:18.504Z"
+    },
+    "wi13-approval-channel": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2356",
+      "claimedAt": "2026-11-01T14:27:19.411Z",
+      "doneAt": "2026-11-01T14:27:37.186Z"
+    },
+    "wi13-approval-channel.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:27:52.498Z"
+    },
+    "wi13-approval-channel.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:28:06.899Z"
+    },
+    "wi13-approval-channel.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:28:20.561Z"
+    },
+    "wi13-approval-channel.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:28:34.082Z"
+    },
+    "wi14-approval-service": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2356",
+      "claimedAt": "2026-11-01T14:34:39.212Z",
+      "doneAt": "2026-11-01T14:34:56.539Z"
+    },
+    "wi14-approval-service.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:35:10.005Z"
+    },
+    "wi14-approval-service.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:35:24.205Z"
+    },
+    "wi14-approval-service.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:35:38.539Z"
+    },
+    "wi14-approval-service.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:35:53.122Z"
+    },
+    "wi17-relay-client": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2356",
+      "claimedAt": "2026-11-01T14:36:59.098Z",
+      "doneAt": "2026-11-01T14:37:15.076Z"
+    },
+    "wi17-relay-client.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:37:27.298Z"
+    },
+    "wi17-relay-client.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:37:41.058Z"
+    },
+    "wi17-relay-client.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:37:54.553Z"
+    },
+    "wi19-inbox-delivery": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2356",
+      "claimedAt": "2026-11-01T14:40:45.085Z",
+      "doneAt": "2026-11-01T14:41:04.394Z"
+    },
+    "wi19-inbox-delivery.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:41:17.490Z"
+    },
+    "wi19-inbox-delivery.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:41:31.247Z"
+    },
+    "wi19-inbox-delivery.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:41:46.098Z"
+    },
+    "wi19-inbox-delivery.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:41:59.425Z"
+    },
+    "wi20-inbox-create": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2356",
+      "claimedAt": "2026-11-01T14:45:17.465Z",
+      "doneAt": "2026-11-01T14:45:39.378Z"
+    },
+    "wi20-inbox-create.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:45:56.202Z"
+    },
+    "wi20-inbox-create.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:46:13.337Z"
+    },
+    "wi20-inbox-create.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:46:26.893Z"
+    },
+    "wi20-inbox-create.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:46:41.652Z"
+    },
+    "wi15-approval-ui": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2356",
+      "claimedAt": "2026-11-01T14:47:57.768Z",
+      "doneAt": "2026-11-01T14:48:17.229Z"
+    },
+    "wi15-approval-ui.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:48:32.320Z"
+    },
+    "wi15-approval-ui.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:48:48.730Z"
+    },
+    "wi15-approval-ui.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:49:03.659Z"
+    },
+    "wi16-approval-cli": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2356",
+      "claimedAt": "2026-11-01T14:50:24.730Z",
+      "doneAt": "2026-11-01T14:50:43.741Z"
+    },
+    "wi16-approval-cli.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:50:58.919Z"
+    },
+    "wi16-approval-cli.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:51:13.705Z"
+    },
+    "wi16-approval-cli.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:51:27.177Z"
+    },
+    "wi18-status-card": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2356",
+      "claimedAt": "2026-11-01T14:53:50.477Z",
+      "doneAt": "2026-11-01T14:54:08.259Z"
+    },
+    "wi18-status-card.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:54:22.519Z"
+    },
+    "wi18-status-card.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:54:36.447Z"
+    },
+    "wi18-status-card.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:54:51.036Z"
+    },
+    "wi18-status-card.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:55:06.376Z"
+    },
+    "wi21-directory-smoke": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2356",
+      "claimedAt": "2026-11-01T15:03:40.482Z",
+      "doneAt": "2026-11-01T15:03:58.710Z"
+    },
+    "wi21-directory-smoke.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T15:04:20.552Z"
+    },
+    "wi21-directory-smoke.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T15:04:39.008Z"
+    },
+    "wi21-directory-smoke.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T15:04:58.627Z"
+    },
+    "wi22-docs-user": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2356",
+      "claimedAt": "2026-11-01T15:05:33.899Z",
+      "doneAt": "2026-11-01T15:05:55.906Z"
+    },
+    "wi22-docs-user.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T15:06:12.396Z"
+    },
+    "wi22-docs-user.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T15:06:27.724Z"
+    },
+    "wi22-docs-user.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T15:06:43.685Z"
+    },
+    "wi23-docs-dev": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2356",
+      "claimedAt": "2026-11-01T15:07:32.360Z",
+      "doneAt": "2026-11-01T15:07:46.892Z"
+    },
+    "wi23-docs-dev.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T15:08:01.086Z"
+    },
+    "wi23-docs-dev.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T15:08:17.009Z"
+    },
+    "wi23-docs-dev.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T15:08:31.118Z"
+    },
+    "wi24-anywhere-page": {
+      "status": "completed",
+      "claimedBy": "agent-pan-2356",
+      "claimedAt": "2026-11-01T15:09:59.313Z",
+      "doneAt": "2026-11-01T15:10:15.764Z"
+    },
+    "wi24-anywhere-page.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T15:10:30.294Z"
+    },
+    "wi24-anywhere-page.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T15:10:45.887Z"
+    }
+  },
+  "agentModel": "claude-opus-5-5",
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-11-01T16:01:05Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2356\n\n# Review — PAN-2356\n## Verdict: CHANGES REQUESTED — the six-digit approval SAS (D-2356-10) has no commitment, so a man in the middle can grind both screens to the same code and mint operator-level links\n\n## Context\n- Run ID: agent-pan-2356-review-65a26309\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2356/.pan/review/agent-pan-2356-review-65a26309/context.json\n- Branch / workspace: feature/pan-2356 · /home/eltmon/Projects/overdeck/workspaces/feature-pan-2356 · PR #4726\n- HEAD reviewed: 65a263097c1aa690916ec27a49cdf53ef14c5f73\n- Base / prior cycle SHA: merge-base fc9e06d3e19 (origin/main); no prior review cycle\n- Acceptance criteria source: the manifest's `acceptanceCriteria` was empty, so ACs were taken from `.pan/specs/2026-11-01-PAN-2356-…xbrief.json` (24 work items, 87 sub-ACs) and `.pan/drafts/pan-2356.md`.\n\n## Blocking Findings\n\n### [security] Approval SAS is grindable: a man in the middle can make both screens show the same code — `src/lib/anywhere/channel/noise.ts:118`\n- Severity: `!` MUST\n- Classification / requirement scope: **specification defect, implemented faithfully**; in_pr_scope (new security boundary introduced by this PR, WI-13/WI-14).\n  - D-2356-10 specifies `sas = uint32BE(SHA-256(\"overdeck-approve-sas/1\" || 0x00 || handshakeHash)[0..4]) mod 1_000_000` with no commitment step. `approvalSas()` implements exactly that.\n  - D-2356-9 §5 claims \"A man in the middle produces two different handshake hashes, so the two screens show different codes.\" The hashes do differ, but the codes only need to collide mod 10^6, and the attacker controls inputs to one handshake after the other handshake's code is fixed.\n- Trigger and changed-code connection:\n  1. The approver A dials the requester R through the directory (`defaultApprovalDeps.openApprovalChannel` → `RtcTransport.dial` with SDP relayed by the directory). A compromised directory (the adversary D-18 and D-2356-9 explicitly name) can substitute the DTLS fingerprints in the relayed SDP, terminate both data channels, and name its own key in the `approval-request` frame it sends A, so `open()`'s key check (`directory-approval.ts`, `remoteKeyHex !== approval.publicKeyHex`) passes.\n  2. Leg 1 (A ↔ MITM) completes; A's screen shows SAS₁.\n  3. Leg 2 (MITM ↔ R): the MITM is the initiator, so it sends message 3. Each candidate message-3 payload (or static key) changes the final handshake hash. `acceptChannel` discards the message-3 payload (`handshake.recv(message3)` return value is unused), so any payload is accepted. The MITM grinds until SAS₂ == SAS₁, then sends that message 3.\n  4. R's operator sees the same code as A's screen and clicks **Accept**; A's operator clicks **Approve**. `handleExchange` mints R's operator token for the MITM key, and `runApprove` mints A's operator token for the MITM key. The MITM now holds operator-level links (`access: 'operator'`) to both machines.\n  - Rejecting non-empty handshake payloads does not close this: the directory knows A's static key in advance (it is in the registry), so it can predict A's message 3 and grind its own ephemeral and static keys in message 2 of leg 1 instead.\n- Expected / observed / impact:\n  - Expected: per D-2356-9/D-18, the directory can never make two machines trust an impostor key.\n  - Observed: a MITM matches a 6-digit SAS after about 10^6 tries.\n  - Impact: a compromised overdeck.ai directory gets operator access, the highest machine-link level, to every machine an operator links through approval. This is the exact failure D-2356-9 says it prevents. The UI (`ApprovalDialog.tsx`) tells operators to compare only the code (\"Approve only if the other machine shows the same code\"); it shows the peer's fingerprint but never the machine's own fingerprint to compare against.\n- Evidence:\n  - Probe: scratch script `sas-grind.cjs` (session scratchpad, uses the workspace's `noise-handshake@4.2.0` and the exact D-2356-10 derivation and approval prologue). An honest XX initiator ↔ MITM responder fixes SAS₁. Then the MITM initiator ↔ honest responder R grinds the message-3 payload. Output: `{\"sasOnApprover\":\"390549\",\"sasOnRequester\":\"390549\",\"tries\":1089885,\"ms\":55406,\"rLearnedKeyIsMitm\":true}`. The honest responder accepted the ground message 3, and both screens show `390 549`.\n  - Evidence limit: this naive probe deep-clones the whole Noise state per try (about 50 µs per try on one core, 55 s total). That is slower than R's default 10 s accept timeout. At that speed one attempt still succeeds about 18 % of the time (about 200 K tries in 10 s), which is already unacceptable for link authentication. A real attacker checkpoints the state after `se` and redoes only the final AEAD encrypt and MixHash per try (a few µs each), and the search parallelises across cores, so 10^6 tries fits inside the window. The end-to-end attack over WebRTC with a malicious Worker was not run; NFR/non-goal #3 keeps the Worker undeployed.\n  - Test gap: `src/lib/anywhere/channel/__tests__/channel.test.ts:368` (\"shows two different codes when a proxy terminates and re-originates the handshake\") passes only because its proxy does not grind. wi13.ac2 and AC-13 are therefore green in tests but false against an adaptive MITM.\n- Fix (spec correction first, then code):\n  - Amend D-2356-9/D-2356-10 to add a commit-then-reveal round inside the established approval channel before either side shows a code (the ZRTP / Bluetooth numeric-comparison pattern). For example: the initiator sends `C = SHA-256(n_i)`; the responder sends `n_r`; the initiator reveals `n_i`; the responder checks `C`; then `SAS = truncate(SHA-256(\"overdeck-approve-sas/2\" ‖ handshakeHash ‖ n_i ‖ n_r))`. Each MITM leg must commit before it learns the other leg's nonce, so grinding stops working. The six-digit two-screen UX survives.\n  - The only alternative is a much longer comparison string, such as both 80-bit fingerprints shown on both screens, which breaks the two-screen-code design.\n  - Update `noise.ts`/`accept.ts`/`open.ts`, the approval preamble flow, `docs/ANYWHERE-ARCHITECTURE.md` \"Approval (D-2356-9/10)\", and add a test whose proxy grinds the code. A grinding proxy should still fail to match.\n\n## Non-blocking Findings\n\n1. `~` **[correctness] The relay traffic line on the status card goes stale.** `relay-status` is broadcast only when a report crosses the cap (`directory-state.ts`, `relay-usage` case). The client therefore updates `bytesUsed` only on `welcome` and on cap. The card's \"12.3 of 50 GB relay traffic this month\" shows the value from the last reconnect, which can be hours or days old, while relay traffic accumulates. Fix: send `relay-status` to the reporting socket after each `relay-usage`, or add the client's locally reported deltas. Implementation defect, in_pr_scope, bounded. wi18.ac1 tests only the rendering of supplied data.\n2. `~` **[requirements] Default directory URL points at an undeployed Worker.** `DEFAULT_DIRECTORY_URL = https://connect.overdeck.ai`, but deploying is non-goal #3 (operator checkpoint D-2356-21). After merge, every signed-in machine shows Directory \"Connecting\" and retries with up to 300 s back-off until the Worker is live. The behaviour is harmless but visible. Flag it for the D-2356-21 checkpoint. A release note, or holding the release until deploy, would avoid confusion.\n3. `≉` **[security, minor] Plan-dependent 403 from the inbox.** `InboxStore.intake` answers 403 \"the inbox needs the Anywhere plan\" for a valid secret on a non-tester plan, and 404 otherwise. This reveals only that the secret was valid for a downgraded account. D-2356-13's \"malformed id, non-DO id and wrong secret all answer the same 404\" still holds.\n4. `~` **[performance/cost] The responder also mints TURN credentials.** `RtcTransport.accept` calls `port.iceServers(relay)` for relay offers, so each relay connection fetches TURN credentials on both ends. D-2356-11 says relay credentials are for \"the initiator only\". This affects cost and quota, not correctness, and the responder may need relay candidates anyway. Clarify the spec or skip the responder's fetch.\n5. `≉` **[correctness] Deleted triggers can leave orphan inbox rows.** Removing a trigger while the directory is offline never sends `inbox-delete`. The DO keeps the inbox row indefinitely; only its events expire after 24 h. The URL keeps answering 202, and the machine acks those events as \"not found 404\". The route comment says \"offline, the inbox expires unused\", but inbox rows have no expiry.\n6. `?` **[correctness] Label edge cases on `hello`.** The label is truncated to 64 characters but not checked for control characters or emptiness. The DO rejects such a label as `bad_frame` and closes with 4010, which the client shows as \"The directory does not support this Overdeck version\" and stops retrying. Labels with control characters are unlikely in practice.\n7. **[spec] wi24.ac1 wording.** The AC says \"contains no 'v0.65.0'\", but WI-24's text says \"listing those features as shipped with their release\", and tag `v0.65.0` exists. `anywhere.mdx` lists them as `v0.65.0`, which is correct. AC-wording defect: met in intent, literally unmet.\n8. **[advisory] Pinned alpha.** `services/connect` dev dependency `miniflare` is pinned at `5.20261001.0-alpha`. Dev/test only.\n9. **[stub-UI flag] False positive.** `DirectoryPanel.tsx:90` `useState(false)` for `busy` is written by `run()` through `setBusy`. Not a stub.\n\n## Coverage\n\n### Four dimensions\n- **Correctness:** reducer, DO glue, inbox store, TURN, relay meter, directory client, RTC transport and duplex, supervisor phases, approval service, routes, CLI and frontend were all traced. No implementation defects block. The main correctness advisory is item 1.\n- **Security:**\n  - Worker auth (`verifyIdentity` regex plus account RPC; a grant-expired account answers 403).\n  - DO trusts only the Worker-set identity header.\n  - Frame decoding rebuilds known keys only and caps sizes.\n  - `signal.from` is stamped by the DO.\n  - Approval signals are gated on a live approval.\n  - Inbox: secret hashed, constant-time compare, identical 404s, body capped while streaming, sealed at intake.\n  - Gate: approval channels are limited to `GET /api/environment` and `POST /api/machines/approval-exchange`, and the exchange is refused on other sockets.\n  - `handleExchange` binds the token to the handshake key.\n  - Directory routes are offered only when the directory key equals the pinned key (link mode remains Noise IK with the pinned key).\n  - rtc routes are never persisted (`mergeAdvertised` and `handleAddRoute` refuse them).\n  - **Blocker:** SAS grinding (above).\n- **Performance:** DO sockets hibernate, with ping auto-response. The inbox per-intake scan of all inbox hashes is bounded per account. RTC duplex backpressure is 16 KiB chunks with a 1 MiB high water mark. The directory client back-off is 1 s → 300 s with jitter. No server-path sync I/O was added: `inbox-delivered.json` uses async fs. Advisory: item 4.\n- **Requirements/UX:** see the AC matrix. Non-goals: `git diff --name-only fc9e06d3e19 HEAD -- src/cli/index.ts src/lib/settings-api.ts src/dashboard/server/main.ts services/share` is empty (#5, #11 met). No rtc URL is persisted (#4 met). There is no Settings field for `directory_url` (#8 met). **Add 50 GB** is only a link to https://overdeck.ai/anywhere (#1 met).\n\n### Changed-file ledger (124 files)\n- **Read fully:**\n  - `services/connect/src/` (all 15 source files).\n  - `packages/contracts/src/connect.ts`, `connect-view.ts` (first 40 lines plus types used), and the `machines.ts`/`index.ts` diffs.\n  - `services/account` `devices.ts`, `entitlement.ts`, plus `grants.ts` and the migration column check.\n  - `services/connect` `wrangler.jsonc`, `package.json` and `tsconfig.json`.\n  - Root `package.json` diff.\n  - `src/lib/anywhere/channel/` `noise.ts`, `accept.ts`, `open.ts`, `wire.ts`, `channel-socket.ts`, `rtc-transport.ts` and `rtc-duplex.ts`.\n  - `src/lib/anywhere/` `routes.ts`, `endpoints.ts`, `directory-config.ts` and `sealed-box.ts`.\n  - `src/lib/triggers/` `inbox.ts`, `deliver.ts`, `store.ts`, and `src/lib/remote-access/anywhere-status.ts`.\n  - `src/dashboard/server/` `channel-listener.ts`, `remote-request-gate.ts`, `server.ts`, and the routes `directory.ts`, `directory-approval.ts`, `machines-peer.ts`, `machines.ts`, `anywhere.ts` and `triggers.ts`.\n  - `src/dashboard/server/services/` `directory-client.ts`, `directory-approval.ts`, `directory-rtc.ts`, `directory-routes.ts`, `directory-inbox.ts`, `inbox-client.ts`, `relay-client.ts`, `link-supervisor.ts` (diff), `machine-link-grant.ts`, `machine-link-service.ts` (diff) and `anywhere-boot.ts`.\n  - `src/cli/commands/` `machines.ts` and `triggers.ts` (diffs).\n  - Frontend: `ApprovalDialog.tsx`, `DirectoryPanel.tsx`, `AnywhereStatusCard.tsx`, `MachinesPanel.tsx` and `AddTriggerDialog.tsx` diffs, plus the `scripts/frontend-test-subset.txt` diff.\n- **Checked by grep or targeted read:**\n  - Docs (`anywhere.mdx` diff read; `configuration/*.mdx`, `cli/*.mdx`, `docs/*.md` and `CLAUDE.md` checked against WI-22..24 strings).\n  - `channel.test.ts` MITM test (line 368).\n  - `vitest.config.ts` include globs (the new `tests/integration/**` and `src/**/__tests__` files are in the default run).\n  - `.github/workflows/ci.yml` and `scripts/run-lint-group.mjs` (effect-diagnostics runs in lint-group effect).\n- **Skimmed or not applicable, with reason:**\n  - `bun.lock`: lockfile, covered by CI clean install.\n  - `composer-commands.generated.ts`: generated, and `lint:slash-commands` passes.\n  - `.pan/continues/*`, `.pan/specs/*xbrief.json`, `.pan/drafts/pan-2356.md`: planning artifacts, read for ACs and decisions only.\n  - `.overdeck/context/codebase/*`: one-line doc additions.\n  - `scripts/anywhere/directory-smoke.mjs`: manual loopback smoke, not run (it needs a built tree and two dashboards), so wi21 is unverified.\n  - Remaining test files (`*.test.ts(x)`): exercised through the focused runs and CI below rather than line-read, except `channel.test.ts:368`.\n  - `services/connect/.gitignore`, `.dev.vars.example`: read, trivial.\n\n### AC-to-evidence matrix (xBRIEF sub-ACs)\n| Item | Status | Evidence |\n| --- | --- | --- |\n| wi1 contracts (ac1–3) | met | `packages/contracts/src/__tests__/connect.test.ts` passed locally; constants verified in source |\n| wi2 free plan (ac1–3) | met | `entitlementFor` and `lookupDevice` diff; `tests/unit/services/account/*` green on CI shards |\n| wi3 scaffold (ac1–3) | met | `typecheck:connect` in `typecheck`, and the `overdeck/test` gate passed; miniflare test passed locally |\n| wi4 sealed box (ac1–3) | met | `seal-interop.test.ts` passed locally |\n| wi5 presence (ac1–4) | met | `directory-state.test.ts` and the Miniflare test (label marker absent from logs) passed locally; `log.ts` logs type/env/outcome only |\n| wi6 signalling (ac1–4) | met | reducer stamps `from`; `approvalBetween` gate; limits; tests passed |\n| wi7 relay (ac1–4) | met | reducer order plan → cap → TURN; `relay-meter.test.ts` passed |\n| wi8 inbox DO (ac1–4) | met | `inbox.test.ts` (connect) and the Miniflare storage-dump test passed locally |\n| wi9 directory client (ac1–4) | met | `directory-client.test.ts` and `directory-config.test.ts` green on CI shards |\n| wi10 RTC transport (ac1–4) | met | `rtc-transport.test.ts` green on CI shards |\n| wi11 rtc routes (ac1–4) | met | `channel-rtc.test.ts` and `routes.test.ts` green on CI shards |\n| wi12 supervisor phases (ac1–4) | met | `link-supervisor-phases.test.ts` passed locally; no persistence of rtc routes |\n| wi13 approval channel (ac1, ac3, ac4) | met | `channel.test.ts` passed locally; gate allowlist verified in source |\n| wi13.ac2 (MITM gives different SAS) | **unmet in substance** | test passes only for a non-grinding proxy; the grinding probe produced equal codes (blocking finding) |\n| wi14 approval service (ac1–4) | met as specified | `directory-approval.test.ts` passed locally; it inherits the SAS weakness |\n| wi15 approval UI (ac1–3) | met | `DirectoryPanel.test.tsx` is in the frontend subset; CI green |\n| wi16 CLI (ac1–3) | met | `tests/unit/cli/machines.test.ts` green on CI |\n| wi17 relay client (ac1–3) | met | `relay-client.test.ts` passed locally |\n| wi18 status card (ac1–4) | met | `AnywhereStatusCard.test.tsx` and `MachinesPanel.test.tsx` green on CI (staleness advisory, item 1) |\n| wi19 inbox delivery (ac1–4) | met | `tests/unit/lib/triggers/inbox.test.ts` passed locally |\n| wi20 inbox create (ac1–4) | met | `triggers-inbox.test.ts`, `store.test.ts` and `cli/triggers.test.ts` green on CI |\n| wi21 directory smoke (ac1–3) | unverified | manual script, not run in this review |\n| wi22 user docs (ac1–3) | met | grep: \"What the inbox can see\" present, \"planned separately\" absent; remote-access and cli strings present |\n| wi23 dev docs (ac1–3) | met | grep: both ANYWHERE-ARCHITECTURE headings present, \"#2356: D-3, D-20.\" absent; CONNECT-SERVICE strings and CLAUDE.md topic row present |\n| wi24 anywhere page (ac1) | met in intent; AC wording defect | \"PAN-4446\" absent; \"v0.65.0\" present as the shipped release, as the WI-24 text requires (item 7) |\n| wi24 anywhere page (ac2) | met | \"up to 3 machines\" and \"50 GB\" present; \"until the relay ships\" absent |\n\n## Verification\n- `gh pr checks 4726` on HEAD 65a263097c1: all checks pass. This covers the build, the four test shards, test-e2e, lint, lint-group (core, effect, skills, state), clean install with server smoke, the non-blocking flake lane, the prompt trailer gate and `overdeck/test` (typecheck + lint). Mintlify is skipped and CodeRabbit is rate limited (advisory).\n- `lint:effect-diagnostics`: runs in lint-group (effect) (`scripts/run-lint-group.mjs:16`), which passed on this HEAD. No NEW diagnostics.\n- Focused local runs:\n  - `npx vitest run tests/unit/services/connect src/lib/anywhere/channel/__tests__/channel.test.ts src/dashboard/server/services/__tests__/{directory-approval,relay-client,link-supervisor-phases}.test.ts tests/unit/lib/triggers/inbox.test.ts`: 10 files, 99 tests passed.\n  - `npx vitest run tests/integration/services/connect/miniflare.test.ts packages/contracts/src/__tests__/connect.test.ts`: 2 files, 13 tests passed.\n- SAS grinding probe (isolated scratchpad script, no tracked files touched): reproduced matching codes on both legs after 1,089,885 tries in 55 s, on one core with naive state cloning.\n- Not run: the full suite (CI owns it), `scripts/anywhere/directory-smoke.mjs` (manual), and live Cloudflare checks (non-goal #3).\n\n## Scope Note\nThe blocker is a specification defect in D-2356-9/D-2356-10, not an implementation error. The work agent cannot fix it by matching the spec more closely. The PRD's approval decision needs amending (add a commit-then-reveal round before the SAS is shown), and then `noise.ts`/`accept.ts`/`open.ts`, the docs and a grinding-proxy test need updating. Everything else in this 124-file change reviewed clean or advisory.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2356/.pan/review/agent-pan-2356-review-65a26309/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2356 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 2,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-11-01T16:13:01Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-2356 (attempt 1/3):\n\nFailed check: sync-target-branch\n\nSync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - docs/ANYWHERE-ARCHITECTURE.md\n  - packages/contracts/src/composer-commands.generated.ts\n  - src/cli/commands/machines.ts\n  - src/lib/anywhere/routes.ts\n  - tests/unit/lib/overdeck/no-loss-matrix.ts\n\n## REQUIRED: Resolve merge conflicts BEFORE resubmitting\n\n1. Run: `git fetch origin main && git merge origin/main`\n2. Resolve all conflicts in the listed files\n3. Run the project's build and tests to verify nothing broke\n4. Commit and push ALL changes\n\nAfter fixing:\n1. Run the project's build and tests\n2. Commit and push ALL changes\n3. ONLY THEN resubmit: pan review request PAN-2356 -m \"Fixed sync-target-branch\"\n\nDo NOT resubmit until all repos sync cleanly and tests pass."
+    }
+  ]
+}

@@ -149,7 +149,11 @@ describe('injectMemoryHookSettings', () => {
     expect(settings.hooks.UserPromptSubmit).toHaveLength(1);
     const scriptPath = settings.hooks.UserPromptSubmit[0].hooks[0].command.match(/node "([^"]+)" prompt-inject/)?.[1];
     expect(scriptPath).not.toContain(workspaceDir);
-    expect(readFileSync(scriptPath, 'utf-8')).toContain('x-overdeck-internal-token');
+    const scriptContent = readFileSync(scriptPath, 'utf-8');
+    expect(scriptContent).toContain('x-overdeck-internal-token');
+    expect(scriptContent).toContain("'internal-token'");
+    const internalTokenFn = scriptContent.slice(scriptContent.indexOf('function internalToken()'));
+    expect(internalTokenFn.indexOf('existsSync(path)')).toBeLessThan(internalTokenFn.indexOf('process.env.OVERDECK_INTERNAL_TOKEN'));
   });
 });
 

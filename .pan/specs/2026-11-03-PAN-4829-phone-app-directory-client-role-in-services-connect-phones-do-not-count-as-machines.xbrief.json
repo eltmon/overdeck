@@ -1,0 +1,751 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-03T07:42:47Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4829: Phone app: directory client role in services/connect (phones do not count as machines)",
+    "updated": "2026-11-03T07:48:55.887Z"
+  },
+  "plan": {
+    "id": "pan-4829",
+    "title": "Phone app: directory client role in services/connect (phones do not count as machines)",
+    "status": "running",
+    "uid": "c32e27c6-c0e8-4100-acf7-7bd5f7c0bc18",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-03T07:42:47Z",
+    "updated": "2026-11-03T07:48:55.887Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4829",
+        "label": "PAN-4829",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4823",
+        "label": "PAN-4823 (epic)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4829.md",
+        "label": "PRD PAN-4829",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/pan-4823.md",
+        "label": "Epic PRD, work item W-CON2, AC-2",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "connect-service",
+      "anywhere",
+      "phone-app",
+      "cloudflare-worker",
+      "durable-object",
+      "directory"
+    ],
+    "narratives": {
+      "Problem": "The overdeck.ai directory (services/connect) knows only machines. A phone that sent `hello` would take one of the free account's three machine slots, and the directory decoder refuses every phone frame (`hello-client`, `forget-client`) as bad_frame. A browser WebSocket also cannot send an Authorization header, so the phone app (whose client side, directory-web.ts, already landed in PAN-4833) cannot authenticate at all.",
+      "Proposal": "Serve the client role defined by the W-CON1 contracts (PAN-4828). The Worker accepts the device token from the `overdeck.bearer.<token>` subprotocol when no Authorization header is present and echoes it by re-wrapping the Durable Object's 101. A role-aware decoder routes the first hello to machine or client rules. A new pure reducer module, client-state.ts, owns phone registration (separate `clients` table, cap 5 per account on every plan, close 4013, replacement 4011, forget 4012), phone signalling (phone→machine link only, machine→phone, phone→phone refused) and reuses the machine ICE/relay helpers. Machine broadcasts (`directory`, `relay-status`) gain a `clients` target; approvals and inbox stay machine-only. The DO glue keeps one socket tag ('machine') and stores the role in the attachment so hibernated production sockets keep working. No contract, machine or phone change; CONNECT_PROTOCOL_VERSION stays 1.",
+      "NonGoals": "- Push registration storage and delivery (`push-register`, `push-unregister`, machine `push`, APNs/FCM): PAN-4830; those frames stay bad_frame here\n- Any change to packages/contracts/, packages/anywhere-channel/ or src/ (machine side)\n- Bumping CONNECT_PROTOCOL_VERSION or adding a wrangler migration\n- Deploying overdeck-connect to production\n- Machine-side removal of a directory client row, or automatic eviction of stale client rows\n- Renaming the 'machine' socket tag or adding a 'client' tag\n- Phones receiving approval-request, approval-cancel or inbox frames\n- User-facing Mintlify pages for the phone app (epic W-DOC)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Socket role lives in the WebSocket attachment (clientId), not in a 'client' socket tag; every socket keeps the tag 'machine'.",
+        "rationale": "Cloudflare fixes tags at acceptWebSocket, before the first hello says the role; renaming the tag would orphan hibernated production sockets. Amends epic W-CON2 step 2."
+      },
+      {
+        "summary": "Authorization header wins when present; otherwise the first `overdeck.bearer.` entry of Sec-WebSocket-Protocol supplies the token; a malformed bearer entry is 401.",
+        "rationale": "Keeps machine behavior byte-identical and gives the browser client a single, strict path."
+      },
+      {
+        "summary": "The Worker echoes the subprotocol by re-wrapping the DO's 101, so the token never enters the Durable Object.",
+        "rationale": "A Miniflare probe on 2026-11-03 showed the re-wrapped 101 carries the header and the hibernating socket keeps working; preserves the DO's never-sees-the-token design."
+      },
+      {
+        "summary": "Client reducer logic lives in a new client-state.ts that imports from directory-state.ts; the DO glue picks the reducer by event kind.",
+        "rationale": "Keeps the module graph acyclic (lint:circular does not cover services/) and keeps every file under the epic's 600-line rule."
+      },
+      {
+        "summary": "Target 'others' keeps meaning 'other machine sockets'; new targets 'clients' and { clientId } address phones.",
+        "rationale": "Approvals and inbox delivery use 'others' and must never reach phones; a separate target makes that structural."
+      },
+      {
+        "summary": "signal.to lookup order: online machine, then online client (purpose link only), else peer_offline; a phone signalling any known client id gets bad_frame.",
+        "rationale": "Machine routing stays exactly as today; both ids are UUID v4 so the order makes a collision harmless."
+      },
+      {
+        "summary": "The clients table is created with the nullable push columns PAN-4830 needs, but ClientRow and the upsert ignore them.",
+        "rationale": "CREATE TABLE IF NOT EXISTS cannot add columns to a deployed table; reserving them now avoids an ALTER path in PAN-4830 without implementing push here."
+      },
+      {
+        "summary": "push-register and push-unregister stay bad_frame from clients in this issue.",
+        "rationale": "Mirrors how the machine `push` frame is held back until PAN-4830 (W-CON3) owns push."
+      },
+      {
+        "summary": "ReduceContext.onlineClients is optional (default empty).",
+        "rationale": "Existing reducer tests build ctx literals; the glue always passes it."
+      },
+      {
+        "summary": "The Miniflare phone tests use a new stub account ('u-phones', tokens odd_7…n) with machines envId(41..43).",
+        "rationale": "The shared Miniflare state leaves the 'u-free' account holding envs 1, 2 and 4 after the 4009 test; a dedicated account makes AC-2 order-independent."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Single service (services/connect) plus its tests and one doc; 13 files.",
+      "canonicalFilename": "2026-11-03-PAN-4829-phone-app-directory-client-role-in-services-connect-phones-do-not-count-as-machines.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "subprotocol-auth",
+        "title": "Accept and echo the overdeck.bearer subprotocol on GET /v1/directory",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T07:42:47Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4829",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "miniflare-ac2"
+          ],
+          "files_scope": [
+            "services/connect/src/account.ts",
+            "services/connect/src/routes.ts",
+            "tests/unit/services/connect/routes.test.ts",
+            "tests/integration/services/connect/miniflare.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:connect",
+            "npx vitest run tests/unit/services/connect/routes.test.ts",
+            "npx vitest run tests/integration/services/connect/miniflare.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:connect completes without errors",
+            "routes.test.ts passes including the new subprotocol cases",
+            "miniflare.test.ts passes including 'echoes the bearer subprotocol on the 101'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In account.ts add BEARER_SUBPROTOCOL_PREFIX and directoryToken(headers) exactly as the PRD snippet: Authorization wins when present; otherwise the first comma-separated Sec-WebSocket-Protocol entry starting with 'overdeck.bearer.' whose remainder matches odd_[0-9a-f]{64} becomes 'Bearer <token>' plus the protocol string to echo. In routes.ts directorySocket call verifyIdentity with directoryToken's authorization, and when protocol is non-null and the DO returned status 101 with a webSocket, return new Response(null, { status: 101, webSocket: res.webSocket, headers: { 'Sec-WebSocket-Protocol': protocol } }); otherwise return the DO response unchanged. Add the four routes.test.ts cases and directoryToken unit cases from the PRD, and an openClientSocket helper plus an echo test in miniflare.test.ts (Node cannot construct a 101, so the echo is asserted only there)."
+        },
+        "items": [
+          {
+            "id": "subprotocol-auth.ac1",
+            "title": "Given an upgrade with only Sec-WebSocket-Protocol: overdeck.bearer.<valid token>, when it reaches workerd in miniflare.test.ts, then it returns 101 and the response header Sec-WebSocket-Protocol equals that exact string",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "subprotocol-auth.ac2",
+            "title": "Given both an Authorization header and a bearer subprotocol with different tokens, when routes.ts handles the upgrade, then ACCOUNT.verifyDevice receives the Authorization token (routes.test.ts asserts it)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "subprotocol-auth.ac3",
+            "title": "Given Sec-WebSocket-Protocol 'overdeck.bearer.odd_short' or 'overdeck.bearer.' with no Authorization, when routes.ts handles it, then it returns 401 { error: 'invalid_token' } and the DO stub is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "subprotocol-auth.ac4",
+            "title": "Given a machine upgrade authenticated by the Authorization header on workerd, then the 101 response carries no Sec-WebSocket-Protocol header",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "client-decoder",
+        "title": "Decode client frames by socket role in protocol.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T07:42:47Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4829",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/connect/src/protocol.ts",
+            "tests/unit/services/connect/protocol-client.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:connect",
+            "npx vitest run tests/unit/services/connect/protocol-client.test.ts tests/unit/services/connect/directory-state.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:connect completes without errors",
+            "protocol-client.test.ts passes; directory-state.test.ts passes unchanged"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-7",
+            "FR-9",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2 and decision D-4. Export SocketRole, FrameDecodeResult and decodeFrame(raw, role). Factor the size/JSON/object checks of decodeMachineFrame into a private parse(); keep decodeMachineFrame exported with identical results. Add buildClient(obj) for hello-client (protocol !== 1 => unsupported; clientId UUID v4; label <= 64; publicKeyHex 64 hex; appVersion <= 32; platform 'ios' | 'android'), signal (purpose must be 'link'; to is a UUID), ice-servers and relay-usage (same rules as machines, via shared small builders), and forget-client. Every other type, including push-register and push-unregister, is bad_frame. Role null decodes type 'hello-client' with client rules and everything else with machine rules. Rebuild frames from known keys only. Create protocol-client.test.ts with the PRD's cases."
+        },
+        "items": [
+          {
+            "id": "client-decoder.ac1",
+            "title": "decodeFrame(validHelloClientWithExtraKey, null) returns { ok: true, role: 'client' } and the frame contains no extra key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "client-decoder.ac2",
+            "title": "decodeFrame with role 'client' rejects push-register, push-unregister, hello, and a signal with purpose 'approval' as { ok: false, reason: 'bad_frame' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "client-decoder.ac3",
+            "title": "decodeFrame of a hello-client with protocol 2 returns { ok: false, reason: 'unsupported' }, and a hello-client decoded with role 'machine' returns bad_frame",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "client-decoder.ac4",
+            "title": "decodeMachineFrame of a machine hello with an extra key still returns the frame without that key, and a 65-character label still returns { ok: false, reason: 'bad_frame' }, with directory-state.test.ts unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "client-registry",
+        "title": "Client registry reducer: hello-client, cap 5 with 4013, replace 4011, forget 4012, offline",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T07:42:47Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4829",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "client-signal-routing",
+            "client-broadcasts",
+            "do-glue",
+            "miniflare-ac2"
+          ],
+          "files_scope": [
+            "services/connect/src/directory-state.ts",
+            "services/connect/src/client-state.ts",
+            "services/connect/src/directory.ts",
+            "tests/unit/services/connect/client-state.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:connect",
+            "npx vitest run tests/unit/services/connect/client-state.test.ts tests/unit/services/connect/directory-state.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:connect completes without errors",
+            "client-state.test.ts passes; directory-state.test.ts passes unchanged"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-6",
+            "FR-9",
+            "FR-10",
+            "NFR-3",
+            "NFR-5"
+          ],
+          "acJustification": "Six criteria: five behavioral reducer checks plus one that keeps the tree typechecking between the reducer and the glue item.",
+          "readinessReason": "Parallel-safe against subprotocol-auth and client-decoder: it touches neither account.ts, routes.ts nor protocol.ts. Later reducer and glue items are serialized by blocks edges."
+        },
+        "narrative": {
+          "Action": "PRD WI-3 (decisions D-5, D-6, D-8, D-10, D-11, D-12). In directory-state.ts add ClientRow, DirectoryState.clients (EMPTY_DIRECTORY clients: []), optional ReduceContext.onlineClients with onlineClientsOf(), the Target variants 'clients' and { clientId }, the effects put-client, delete-client, register-client, the widened send frame type (DirectoryToMachineFrame | DirectoryToClientFrame), log.clientId, and export errorFrame and toDirectoryMachines. Create client-state.ts with the ClientEvent union and reduceClient: hello-client (repeat => bad_frame; plan refresh; new clientId with 5 rows => client_limit error + close 4013, no put; else put-client, close { clientId } 4011 if already online, register-client, welcome-client with toDirectoryMachines(state.machines, ctx.online); never touches state.machines), forget-client (delete-client + close self 4012), client-bad-frame, client-gone (lastSeenAt only, no broadcast). The signal/ice-servers/relay-usage branches answer bad_frame here as placeholders replaced by client-signal-routing. Logs carry environmentId null and clientId, never label or key. client-state.ts must not be imported by directory-state.ts. Type plumbing so every commit typechecks (do-glue fills these in): in directory.ts add 'put-client': 0, 'delete-client': 0, 'register-client': 1 to the execute order map with a single no-op `case` for the three kinds, widen safeSend's frame parameter to DirectoryToMachineFrame | DirectoryToClientFrame, and make resolve() return [] for the 'clients' and { clientId } targets. No other directory.ts change in this item."
+        },
+        "items": [
+          {
+            "id": "client-registry.ac1",
+            "title": "Given a free state with 3 machines and maxDevices 3, when reduceClient handles a hello-client, then it emits put-client, register-client and a welcome-client whose machines lists the 3 environment ids, and state.machines still has 3 rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "client-registry.ac2",
+            "title": "Given 5 client rows on either plan, when a hello-client arrives with a new clientId, then it sends { type: 'error', code: 'client_limit', message: CLIENT_LIMIT_MESSAGE }, closes self with 4013, and emits no put-client; a known clientId re-registers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "client-registry.ac3",
+            "title": "Given onlineClients contains the clientId, when that client says hello-client again on a new socket, then the effects include close { clientId } 4011 'replaced'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "client-registry.ac4",
+            "title": "Given a full account, when a client sends forget-client, then the effects include delete-client and close self 4012, and a following hello-client with a new clientId succeeds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "client-registry.ac5",
+            "title": "No log effect produced by reduceClient contains the client's label or publicKeyHex (JSON of all log effects is checked)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "client-registry.ac6",
+            "title": "After this item's commit alone, npm run typecheck:connect exits 0 (directory.ts compiles with no-op handling for the new effect kinds and targets)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "client-signal-routing",
+        "title": "Route signals phone-to-machine and machine-to-phone; share ICE/relay rules with phones",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T07:42:47Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4829",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/connect/src/directory-state.ts",
+            "services/connect/src/client-state.ts",
+            "tests/unit/services/connect/client-state.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:connect",
+            "npx vitest run tests/unit/services/connect/"
+          ],
+          "expected_outputs": [
+            "typecheck:connect completes without errors",
+            "every test file under tests/unit/services/connect/ passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 (decisions D-7, D-9). Move the machine ice-servers and relay-usage case bodies into exported iceServersAnswer and relayUsageAnswer helpers taking a LogSubject { environmentId, clientId? }; relayUsageAnswer also sends the relay-status frame to 'clients'. In the machine signal case: self => bad_frame; approval check unchanged; online machine => forward as today; else online client with purpose 'link' => send { clientId: to } with from = self; else peer_offline. In client-state.ts replace the three placeholders: signal to any known client id => bad_frame 'a phone cannot signal a phone' with session; offline machine => peer_offline with session; else send { environmentId: to } { type: 'signal', from: clientId, purpose: 'link', … }; ice-servers and relay-usage call the shared helpers with { environmentId: null, clientId }."
+        },
+        "items": [
+          {
+            "id": "client-signal-routing.ac1",
+            "title": "Given an online machine, when a client sends signal { to: env, purpose: 'link' }, then exactly one send to { environmentId: env } carries a signal frame with from equal to the clientId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "client-signal-routing.ac2",
+            "title": "Given a client id in onlineClients (and not in online), when a machine sends signal { to: clientId, purpose: 'link' }, then one send to { clientId } carries from equal to the machine's environmentId; with purpose 'approval' it returns approval_unknown and sends nothing to the client",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "client-signal-routing.ac3",
+            "title": "When a client signals another client's id or its own id, then it returns error bad_frame with the session and forwards nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "client-signal-routing.ac4",
+            "title": "A client's ice-servers { relay: true } returns relay_not_allowed on free and fetch-turn on tester with TURN configured; a client's relay-usage emits put-relay-usage and relay-status sends to both 'all' and 'clients'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "client-broadcasts",
+        "title": "Send every directory broadcast to phones; keep phones out of machine views and approvals",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T07:42:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4829",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/connect/src/directory-state.ts",
+            "tests/unit/services/connect/client-state.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:connect",
+            "npx vitest run tests/unit/services/connect/"
+          ],
+          "expected_outputs": [
+            "typecheck:connect completes without errors",
+            "every test file under tests/unit/services/connect/ passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5 (decision D-6). At each reducer site that sends a { type: 'directory' } frame (machine hello, endpoints, forget, socket-gone; search `type: 'directory'`), add a sibling { kind: 'send', to: 'clients', frame: <same frame> } effect; forget needs only one. Do not change the approval-request or approval-cancel sends. Add the PRD WI-5 tests to client-state.test.ts."
+        },
+        "items": [
+          {
+            "id": "client-broadcasts.ac1",
+            "title": "Given 3 machines and a registered client in state, a machine hello, endpoints, forget and socket-gone each emit exactly one send to 'clients' with a directory frame",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "client-broadcasts.ac2",
+            "title": "Given 3 machines and a registered client in state, every welcome or directory frame that reduce emits contains no clientId in its machines list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "client-broadcasts.ac3",
+            "title": "A machine approval-request or approval-cancel emits no send to 'clients' or to any { clientId } target",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "do-glue",
+        "title": "Durable Object glue: clients table, role-aware attachment, client targets and effects",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T07:42:47Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4829",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/connect/src/directory.ts",
+            "services/connect/src/log.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:connect",
+            "npx vitest run tests/unit/services/connect/"
+          ],
+          "expected_outputs": [
+            "typecheck:connect completes without errors (the effect switch handles put-client, delete-client, register-client and the new targets)",
+            "every test file under tests/unit/services/connect/ passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-6",
+            "FR-10",
+            "NFR-2",
+            "NFR-3",
+            "NFR-7"
+          ],
+          "readinessReason": "Runs alone after its blocks edges complete; it is the only item editing directory.ts glue logic and log.ts at that point."
+        },
+        "narrative": {
+          "Action": "PRD WI-6 (decisions D-1, D-11, D-13). Add the clients CREATE TABLE IF NOT EXISTS (with nullable push_platform, push_token, aps_environment) to SCHEMA and load rows in load(). Attachment gains clientId?: string | null; add roleOf(); keep MACHINE_TAG = 'machine' for every socket with a comment explaining why. registered() returns machine sockets only; add registeredClients(). webSocketMessage decodes with decodeFrame(message, roleOf(attachment)) and dispatches client results to reduceClient through a new applyClient, machine results as today. Build the reduce context once with online and onlineClients (both excluding the event's socket). onSocketGone handles clients (skip if another open socket has the same clientId, else client-gone). resolve() handles 'clients' and { clientId }. execute(): put-client upsert that never writes the push columns, delete-client, register-client (serializeAttachment with clientId), log passes clientId. safeSend accepts both frame unions. log.ts logFrame gains an optional clientId emitted as 'client' only when given."
+        },
+        "items": [
+          {
+            "id": "do-glue.ac1",
+            "title": "npm run typecheck:connect exits 0 with directory.ts handling put-client, delete-client, register-client and the 'clients' and { clientId } targets",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "do-glue.ac2",
+            "title": "directory.ts still calls acceptWebSocket(server, [MACHINE_TAG]) with MACHINE_TAG === 'machine', and roleOf returns 'machine' for an attachment { identity, environmentId: <id> } that has no clientId key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "do-glue.ac3",
+            "title": "The put-client upsert preserves the push columns: its SQL contains none of push_platform, push_token, aps_environment, while the clients CREATE TABLE statement contains all three as nullable columns",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "do-glue.ac4",
+            "title": "logFrame('hello-client', null, 'registered', '<id>') emits JSON containing \"client\":\"<id>\", and logFrame without the fourth argument emits no 'client' key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "miniflare-ac2",
+        "title": "Epic AC-2 on workerd: phones register beside 3 free machines, cap 4013, route signals",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T07:42:47Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4829",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/integration/services/connect/miniflare.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/integration/services/connect/miniflare.test.ts"
+          ],
+          "expected_outputs": [
+            "miniflare.test.ts passes, including every case in 'phone clients on real workerd (PAN-4829)'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-9",
+            "NFR-3",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Add a 'u-phones' free account to ACCOUNT_STUB (tokens /^odd_7+[0-9a-f]$/, maxDevices 3) and phoneToken(n). In a new describe 'phone clients on real workerd (PAN-4829)', register machines envId(41..43), then cover: a phone on phoneToken(4) gets welcome-client listing the 3 machines online and a 4th machine is still refused 4009; five phones register and a 6th new clientId gets client_limit + 4013, a re-registering phone replaces its old socket with 4011; an endpoints change reaches every phone as a directory frame and no machine frame lists a clientId; phone->machine and machine->phone signals arrive with stamped from, phone->phone gets bad_frame; forget-client closes 4012 and frees a slot; a phone label marker never appears in logs. Wait on events only; never sleep. Close every peer."
+        },
+        "items": [
+          {
+            "id": "miniflare-ac2.ac1",
+            "title": "Given a free account with 3 online machines on workerd, when a phone sends hello-client over a bearer-subprotocol socket, then it receives welcome-client listing those 3 machines with online: true, and a 4th machine hello is then refused with close 4009",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "miniflare-ac2.ac2",
+            "title": "Given 5 registered phones, when a 6th new clientId says hello-client, then it receives error client_limit with CLIENT_LIMIT_MESSAGE and its socket closes with 4013",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "miniflare-ac2.ac3",
+            "title": "Every welcome and directory frame recorded by the machine peers contains no phone clientId, while each phone receives the directory frame produced by a machine endpoints change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "miniflare-ac2.ac4",
+            "title": "When a phone sends a signal to envId(41), then that machine receives it with from equal to the phone's clientId, and the phone receives the machine's reply signal with from equal to envId(41)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "miniflare-ac2.ac5",
+            "title": "The marker 'PHONE-LABEL-MARKER-4829' used as a phone label never appears in the captured workerd logs, and a hello-client log line contains the clientId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "connect-docs",
+        "title": "Document the client role in docs/CONNECT-SERVICE.md and the codebase map",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T07:42:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4829",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/CONNECT-SERVICE.md",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n 4013 docs/CONNECT-SERVICE.md",
+            "grep -c 'does not serve them yet' docs/CONNECT-SERVICE.md"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "grep prints the Limits line for the 5-phone cap with close 4013",
+            "grep -c prints 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. In docs/CONNECT-SERVICE.md: rewrite line 26 (the directory serves the client role from PAN-4829; push, push-register and push-unregister stay bad_frame until PAN-4830); the 'What it is' Worker bullet names both token forms and the 101 echo; the file table adds src/client-state.ts and says protocol.ts decodes machine and client frames by role; the /v1/directory Auth cell adds the overdeck.bearer subprotocol; Limits adds the Phones bullet (5 per account on every plan, client_limit + 4013, not machines, 4011, forget-client 4012); add a 'Phone clients (PAN-4829)' section of at most 15 lines covering role by first hello, welcome-client, broadcasts phones get and never get, signal rules, ICE/relay metering, the clients table with reserved push columns, and why all sockets keep the 'machine' tag. In .overdeck/context/codebase/architecture.md extend the services/connect/ row with phone clients and update the single trailing last-verified line."
+        },
+        "items": [
+          {
+            "id": "connect-docs.ac1",
+            "title": "docs/CONNECT-SERVICE.md Limits section contains the rule that an account holds at most 5 phones on every plan, that a sixth is refused with error client_limit and close 4013, and that phones never count against the machine limit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connect-docs.ac2",
+            "title": "The /v1/directory Auth cell names the overdeck.bearer.odd_… subprotocol and says it is echoed on the 101, and grep -c 'does not serve them yet' docs/CONNECT-SERVICE.md prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connect-docs.ac3",
+            "title": "docs/CONNECT-SERVICE.md contains a 'Phone clients (PAN-4829)' section stating that phones may signal machines with purpose link only, machines may signal phones, phones may not signal phones, and phones never receive approval or inbox frames",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "subprotocol-auth",
+        "to": "miniflare-ac2",
+        "type": "blocks"
+      },
+      {
+        "from": "client-decoder",
+        "to": "do-glue",
+        "type": "blocks"
+      },
+      {
+        "from": "client-registry",
+        "to": "client-signal-routing",
+        "type": "blocks"
+      },
+      {
+        "from": "client-signal-routing",
+        "to": "client-broadcasts",
+        "type": "blocks"
+      },
+      {
+        "from": "client-broadcasts",
+        "to": "do-glue",
+        "type": "blocks"
+      },
+      {
+        "from": "do-glue",
+        "to": "miniflare-ac2",
+        "type": "blocks"
+      },
+      {
+        "from": "do-glue",
+        "to": "connect-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "client-registry",
+        "to": "client-broadcasts",
+        "type": "blocks"
+      },
+      {
+        "from": "client-registry",
+        "to": "do-glue",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

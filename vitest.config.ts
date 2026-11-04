@@ -66,7 +66,7 @@ export default defineConfig({
       ],
     },
     globalSetup: ['tests/vitest-cpu-admission.ts', 'tests/global-setup.ts'],
-    setupFiles: ['tests/setup/overdeck-home.ts', 'tests/setup/no-real-home-writes.ts', 'tests/setup.ts'],
+    setupFiles: ['tests/setup/overdeck-home.ts', 'tests/setup/no-real-home-writes.ts', 'tests/setup/no-worker-signals.ts', 'tests/setup.ts'],
     // 5s is enough for unit/integration tests; tests that legitimately need
     // more time should opt in via `test('...', { timeout: 20_000 }, ...)`.
     // Pre-PAN-1062: 10s blanket timeout masked slow tests.

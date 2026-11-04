@@ -146,6 +146,13 @@ export default defineConfig(async () => {
         '@lydell/node-pty',
         '@parcel/watcher',
         'ssh2',
+        // PAN-4645 (D-4645-2): the Noise stack resolves `sodium-native` prebuilds via
+        // `require-addon`; bundling any of the four breaks that lookup. The pattern
+        // also keeps subpaths such as `noise-handshake/dh` (PAN-4837) external.
+        /^noise-handshake(\/.*)?$/,
+        '@hyperswarm/secret-stream',
+        'sodium-universal',
+        'sodium-native',
         // PAN-1645: playwright is loaded only via a runtime `await import('playwright')`
         // (artifact thumbnails). Bundling it pulls in playwright-core's prebundled
         // coreBundle.js, which has an internal `require("chromium-bidi/...")` for a
@@ -161,6 +168,15 @@ export default defineConfig(async () => {
         'web-push',
         /^bun:/,
         /^@effect\/platform-bun/,
+        // PAN-4644: jsonc-parser's package.json has no "exports" map, so Node
+        // resolves it via "main" (the UMD/CJS build) at runtime. That build
+        // does internal `require('./impl/format')` calls relative to its own
+        // file. Bundling inlines that UMD source into a shared
+        // rolldown-runtime chunk, so the relative require resolves against
+        // dist/dashboard/ instead of node_modules/jsonc-parser/lib/umd/ and
+        // fails with MODULE_NOT_FOUND. Externalizing keeps it resolved from
+        // node_modules at runtime, where its sibling files are intact.
+        'jsonc-parser',
       ],
     },
   };

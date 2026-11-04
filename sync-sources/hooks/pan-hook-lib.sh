@@ -265,13 +265,15 @@ pan_llm_rate_check() {
 # /api/agents/:id/heartbeat route is token-gated — without this header every
 # hook POST gets 403 and is dropped on 4xx, so hook-emitted runtime activity
 # (thinking/working/idle/waiting) never reaches the AgentStateService mirror.
-# No launcher exports OVERDECK_INTERNAL_TOKEN, so source it from the on-disk
-# token as the primary path. Empty token => same 403/drop as before (no
-# regression).
-PAN_INTERNAL_TOKEN="${OVERDECK_INTERNAL_TOKEN:-}"
+# The token file is read first because a pane can inherit a stale
+# OVERDECK_INTERNAL_TOKEN from a long-lived terminal-backend server
+# (PAN-4628); the env value is the fallback for a home with no file. Empty
+# token => same 403/drop as before (no regression).
+PAN_INTERNAL_TOKEN=""
+_pan_token_path="${OVERDECK_HOME:-$HOME/.overdeck}/internal-token"
+[ -f "$_pan_token_path" ] && PAN_INTERNAL_TOKEN=$(cat "$_pan_token_path" 2>/dev/null || true)
 if [ -z "$PAN_INTERNAL_TOKEN" ]; then
-  _pan_token_path="${OVERDECK_HOME:-$HOME/.overdeck}/internal-token"
-  [ -f "$_pan_token_path" ] && PAN_INTERNAL_TOKEN=$(cat "$_pan_token_path" 2>/dev/null || true)
+  PAN_INTERNAL_TOKEN="${OVERDECK_INTERNAL_TOKEN:-}"
 fi
 
 # Resolve the current agent ID without a "main-cli" fallback (PAN-69).

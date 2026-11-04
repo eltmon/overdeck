@@ -1,0 +1,58 @@
+{
+  "schemaVersion": "0.8",
+  "plan": {
+    "id": "scope-ui",
+    "title": "UI scope",
+    "status": "running",
+    "items": [
+      {
+        "id": "u1",
+        "title": "Render the panel",
+        "status": "completed",
+        "x-directive/evidence": {
+          "kind": "commit",
+          "pointer": "abc1234",
+          "recorded_at": "2026-11-02T13:00:00Z",
+          "recorded_by": "agent:impl-1"
+        }
+      },
+      {
+        "id": "u2",
+        "title": "Write the e2e test",
+        "status": "completed",
+        "x-directive/disposition": {
+          "disposition": "waived",
+          "reason": "Covered by unit tests",
+          "provenance": {
+            "kind": "agent",
+            "actor": "agent:impl-1"
+          },
+          "recorded_at": "2026-11-02T13:30:00Z"
+        }
+      }
+    ],
+    "metadata": {
+      "swarm": {
+        "readiness": "ready",
+        "parallel_safe": true,
+        "depends_on": [
+          "scope-base"
+        ],
+        "conflict_group": "ui",
+        "file_scope": [
+          "src/a.ts",
+          "docs/"
+        ],
+        "verify_commands": [
+          "npm test"
+        ],
+        "size": "S"
+      },
+      "handoffState": "pr_open",
+      "productPullRequest": {
+        "number": 12,
+        "url": "https://github.com/example/repo/pull/12"
+      }
+    }
+  }
+}

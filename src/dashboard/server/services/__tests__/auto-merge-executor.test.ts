@@ -122,6 +122,29 @@ describe('auto-merge executor', () => {
     expect(mergeIssue).not.toHaveBeenCalled();
   });
 
+  it('blocks a held Deft issue and never merges it (PAN-4820)', async () => {
+    const transition = vi.fn();
+    const mergeIssue = vi.fn();
+    const markBlocked = vi.fn(() => true);
+
+    await tickAutoMergeExecutor({
+      now: () => NOW,
+      listEntries: () => [pendingEntry()],
+      isPaused: () => false,
+      isEligible: async () => ({ eligible: true as const }),
+      deftHold: async (issueId) => `${issueId} runs on Deft and requires a human merge`,
+      mergeGate: async () => gate(),
+      hasPendingDeploy: async () => false,
+      transition,
+      mergeIssue,
+      markBlocked,
+    });
+
+    expect(markBlocked).toHaveBeenCalledWith(1, 'PAN-1486 runs on Deft and requires a human merge');
+    expect(transition).not.toHaveBeenCalled();
+    expect(mergeIssue).not.toHaveBeenCalled();
+  });
+
   it('skips the whole tick while the merge train is disabled', async () => {
     const transition = vi.fn();
     const log = vi.fn();

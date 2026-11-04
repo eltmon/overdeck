@@ -191,3 +191,48 @@ describe('postReviewVerdict — self-review refusal fallback', () => {
     expect((result as { reason: string }).reason).toContain('fallback comment failed');
   });
 });
+
+describe('postReviewVerdict — pinned head (PAN-4801)', () => {
+  const head = 'b'.repeat(40);
+
+  it('approves exactly the pinned commit through the reviews API', async () => {
+    const runGh = vi.fn(async () => {});
+    const result = await postReviewVerdict(
+      { issueId: 'PAN-1', verdict: 'approve', body: 'carried', facts: ghFacts({ headSha: head }), reviewedHead: head, pinHead: head },
+      baseDeps({ runGh }),
+    );
+
+    expect(result).toMatchObject({ posted: true, via: 'review' });
+    expect(runGh).toHaveBeenCalledWith([
+      'api', '--method', 'POST', 'repos/eltmon/overdeck/pulls/3933/reviews',
+      '-f', 'event=APPROVE', '-f', `commit_id=${head}`, '-f', 'body=carried',
+    ], {});
+  });
+
+  it('refuses without posting when the PR head is not the pinned commit', async () => {
+    const runGh = vi.fn(async () => {});
+    const result = await postReviewVerdict(
+      { issueId: 'PAN-1', verdict: 'approve', body: 'carried', facts: ghFacts({ headSha: 'c'.repeat(40) }), pinHead: head },
+      baseDeps({ runGh }),
+    );
+
+    expect(result).toEqual({ posted: false, reason: `PR head is ${'c'.repeat(12)}, not the pinned head ${head.slice(0, 12)}` });
+    expect(runGh).not.toHaveBeenCalled();
+  });
+
+  it('falls back to a marker naming the pinned commit on a self-review refusal', async () => {
+    const err = new Error('Command failed: gh api');
+    (err as Error & { stderr?: string }).stderr = 'Unprocessable Entity: Can not approve your own pull request';
+    const runGh = vi.fn(async (args: string[]) => { if (args[0] === 'api') throw err; });
+    const result = await postReviewVerdict(
+      { issueId: 'PAN-1', verdict: 'approve', body: 'carried', facts: ghFacts({ headSha: head }), reviewedHead: head, pinHead: head },
+      baseDeps({ runGh }),
+    );
+
+    expect(result).toMatchObject({ posted: true, via: 'comment' });
+    expect(runGh).toHaveBeenLastCalledWith(
+      ['pr', 'comment', '3933', '--repo', 'eltmon/overdeck', '--body', `<!-- overdeck-verdict: APPROVED sha=${head} -->\n\ncarried`],
+      {},
+    );
+  });
+});

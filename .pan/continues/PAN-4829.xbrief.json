@@ -1,0 +1,193 @@
+{
+  "version": "1",
+  "issueId": "PAN-4829",
+  "created": "2026-11-03T07:49:13.339Z",
+  "updated": "2026-11-03T08:26:51.117Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "subprotocol-auth": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4829",
+      "claimedAt": "2026-11-03T07:49:13.339Z",
+      "doneAt": "2026-11-03T07:54:34.147Z"
+    },
+    "client-decoder": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4829",
+      "claimedAt": "2026-11-03T07:54:42.038Z",
+      "doneAt": "2026-11-03T07:55:03.474Z"
+    },
+    "client-registry": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4829",
+      "claimedAt": "2026-11-03T07:55:10.879Z",
+      "doneAt": "2026-11-03T07:57:20.588Z"
+    },
+    "client-signal-routing": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4829",
+      "claimedAt": "2026-11-03T07:57:50.581Z",
+      "doneAt": "2026-11-03T08:00:43.540Z"
+    },
+    "client-broadcasts": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4829",
+      "claimedAt": "2026-11-03T08:00:53.286Z",
+      "doneAt": "2026-11-03T08:02:38.365Z"
+    },
+    "do-glue": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4829",
+      "claimedAt": "2026-11-03T08:02:48.113Z",
+      "doneAt": "2026-11-03T08:04:55.304Z"
+    },
+    "miniflare-ac2": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4829",
+      "claimedAt": "2026-11-03T08:05:25.348Z",
+      "doneAt": "2026-11-03T08:08:33.318Z"
+    },
+    "connect-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4829",
+      "claimedAt": "2026-11-03T08:08:42.306Z",
+      "doneAt": "2026-11-03T08:09:37.191Z"
+    },
+    "subprotocol-auth.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:13:27.788Z"
+    },
+    "subprotocol-auth.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:13:50.909Z"
+    },
+    "subprotocol-auth.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:14:15.474Z"
+    },
+    "subprotocol-auth.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:14:39.047Z"
+    },
+    "client-decoder.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:15:00.362Z"
+    },
+    "client-decoder.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:15:28.028Z"
+    },
+    "client-decoder.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:16:07.378Z"
+    },
+    "client-decoder.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:16:38.826Z"
+    },
+    "client-registry.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:17:07.929Z"
+    },
+    "client-registry.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:17:30.938Z"
+    },
+    "client-registry.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:17:53.513Z"
+    },
+    "client-registry.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:18:15.522Z"
+    },
+    "client-registry.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:18:36.628Z"
+    },
+    "client-registry.ac6": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:19:03.565Z"
+    },
+    "client-signal-routing.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:19:27.004Z"
+    },
+    "client-signal-routing.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:19:53.458Z"
+    },
+    "client-signal-routing.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:20:21.242Z"
+    },
+    "client-signal-routing.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:20:51.784Z"
+    },
+    "client-broadcasts.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:21:20.085Z"
+    },
+    "client-broadcasts.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:21:48.749Z"
+    },
+    "client-broadcasts.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:22:10.702Z"
+    },
+    "do-glue.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:22:30.359Z"
+    },
+    "do-glue.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:22:50.937Z"
+    },
+    "do-glue.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:23:11.281Z"
+    },
+    "do-glue.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:23:33.260Z"
+    },
+    "miniflare-ac2.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:23:59.779Z"
+    },
+    "miniflare-ac2.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:24:22.242Z"
+    },
+    "miniflare-ac2.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:24:42.794Z"
+    },
+    "miniflare-ac2.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:25:05.547Z"
+    },
+    "miniflare-ac2.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:25:30.975Z"
+    },
+    "connect-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:25:56.731Z"
+    },
+    "connect-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:26:23.688Z"
+    },
+    "connect-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:26:51.117Z"
+    }
+  }
+}

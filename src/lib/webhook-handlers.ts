@@ -9,7 +9,8 @@
  * agent, start the review pipeline for a PR opened or readied outside
  * `pan done`, and fire the post-merge lifecycle for merges that bypassed
  * Overdeck.
- * Shared advisory-check classification keeps CodeRabbit out of merge gates.
+ * Shared advisory-check classification keeps CodeRabbit out of merge gates; a
+ * CodeRabbit review's inline findings are routed to the work agent (PAN-4773).
  */
 
 import { getGitHubConfig } from '../dashboard/server/services/tracker-config.js';
@@ -66,7 +67,7 @@ export interface WebhookPayload {
     number?: number;
     pull_request?: unknown;
   };
-  review?: { state: string };
+  review?: { id?: number; state: string; user?: { login?: string } | null };
   thread?: { id?: number; resolved?: boolean };
   // status event payload
   sha?: string;
@@ -426,7 +427,9 @@ export async function handlePullRequestReview(payload: WebhookPayload): Promise<
   const issueId = issueIdFromBranch(pr.head.ref);
   if (!issueId) return;
   bumpIssuePrTabCacheGeneration(issueId);
-
+  // PAN-4773: a CodeRabbit review's inline findings go to the work agent. Never awaited, never gating.
+  const { maybeRelayCodeRabbitReview } = await import('./cloister/coderabbit-feedback.js');
+  void maybeRelayCodeRabbitReview(payload, issueId)?.catch(() => {});
 }
 
 /** Handle a `pull_request_review_comment` GitHub webhook payload. */

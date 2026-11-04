@@ -79,6 +79,9 @@ export class RoomHost {
     private readonly env: Env,
     private readonly deps: Deps,
   ) {
+    // A browser cannot send WebSocket protocol pings; `ping` text frames are answered by the runtime
+    // without waking the object and never reach the frame decoder (PAN-4481 FR-10).
+    ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair('ping', 'pong'));
     void ctx.blockConcurrencyWhile(async () => {
       this.record = (await ctx.storage.get<RoomRecord>(STORAGE_KEY)) ?? null;
     });

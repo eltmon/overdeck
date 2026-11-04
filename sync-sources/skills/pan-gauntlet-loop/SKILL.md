@@ -115,8 +115,8 @@ REFERENCE is the load-bearing slot. Before accepting it, verify it is:
       "defects": [],
       "note": "<one-line current state>",
       "updated": "<ISO>",
-      "lane": "<optional: builder lane conversation id>",
-      "critic": "<optional: critic lane conversation id, or Agent id>"
+      "lane": "<optional: builder lane conversation name>",
+      "critic": "<optional: critic lane conversation name, or Agent id>"
     }
   }
 }
@@ -247,7 +247,10 @@ pan lane start --run hotel --key 663 --role builder --brief briefs/663-i2.md --m
 # a builder died mid-run: continue in the same directory and iteration
 pan lane start --run hotel --key 663 --role builder --reuse --brief briefs/663-resume.md --model <builder model>
 pan tell conv-<name> "<steer>"                               # never to a critic that reported
-pan lane list --run hotel
+# heavy critics on an idle linked machine (a laptop or a linked Fly machine)
+pan lane start --run hotel --role critic --for 663 --brief briefs/663-critic.md --machine auto --needs docker
+pan tell @<machine>/<name> "<steer>"                         # a lane on another machine
+pan lane list --run hotel                                    # MACHINE column; remote lanes show their name in ID
 pan lane reap <lane> [--park]                                # archives the conversation; --keep leaves it listed
 ```
 
@@ -257,6 +260,10 @@ builder row and checks out the builder's reported head, but tells it only
 the commit. Only a root conversation may launch critics; an orchestrator
 lane launches builders, verifiers and play lanes in its run. Launch rules,
 report grammar and the V3 rule table are in `references/lanes.md`.
+
+`status.json` `lane` and `critic` hold the lane's conversation **name**: a lane on
+another machine has no local id. A critic on another machine judges the builder's
+pushed head, so builders push before they report done (the door already requires it).
 
 - **Model ladder — cheapest that clears the bar, escalate on evidence.**
   Set it per role with `--model` / `--effort`, or once in

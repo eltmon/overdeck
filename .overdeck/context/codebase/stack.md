@@ -3,9 +3,10 @@
 - **Language:** TypeScript (strict), ESM throughout.
 - **Runtime:** Node.js 22 for everything that ships (CLI, dashboard server,
   PTY supervisor). Bun is the *package manager / dev scratchpad* only
-  (`bun install`; root plus 9 bun workspaces: `packages/{contracts,effect-acp,
-  moonshine-linux-x64,qwen-tts-linux-x64,pi-extension,ohmypi-extension}`,
-  `src/dashboard/server`, `src/dashboard/frontend`, `apps/desktop`).
+  (`bun install`; root plus 14 bun workspaces: `packages/{contracts,effect-acp,
+  anywhere-channel,moonshine-linux-x64,qwen-tts-linux-x64,pi-extension,ohmypi-extension}`,
+  `src/dashboard/server`, `src/dashboard/frontend`, `apps/desktop`, `apps/mobile`,
+  `services/{account,share,connect}`).
 - **Build:** tsdown (rolldown) for CLI / server / contracts (`tsdown.config.ts`
   at root, `src/dashboard/server/`, `packages/contracts/`, `scripts/`); Vite for
   the frontend. `npm run build` builds all.
@@ -23,6 +24,9 @@
   `prepare-server-resources.mjs` stages the embedded server and rebuilds
   node-pty for Electron's ABI; macOS notarization runs in the `afterSign`
   hook `scripts/notarize.cjs` with `mac.notarize: false`. See `docs/BUILD.md`.
+- **Phone app:** `apps/mobile` — Capacitor 8 (iOS SPM project, Android
+  Gradle 8.14 / JDK 21), a Vite build of the frontend's `/m` screens. See
+  `apps/mobile/README.md`.
 - **CLI:** commander (`src/cli/index.ts`), self-documenting `--help`.
 - **Dependency bundling:** the root tsdown build keeps root `dependencies`
   external (`lint:dist-externals` fails a bare import that is not declared);
@@ -68,6 +72,12 @@
   only, no `node:` imports; `cloudflare:workers` imported only in its `index.ts`).
   wrangler and Miniflare are dev-only devDependencies of that workspace (local
   `wrangler dev --local`, `--dry-run` bundles, real-workerd tests); deploying is
-  operator-only. See `docs/ACCOUNT-SERVICE.md`.
+  operator-only. See `docs/ACCOUNT-SERVICE.md`. `services/connect/` (PAN-2356, the
+  overdeck.ai directory, relay credentials and webhook inbox) follows the same rules
+  with one SQLite Durable Object per account and pure-JS `@noble/*` sealing; see
+  `docs/CONNECT-SERVICE.md`. `services/share/` (PAN-658 Shared Sessions) follows them
+  too: one SQLite `ShareRoom` Durable Object per room for the lobby, SDP/ICE relay and
+  Realtime TURN credentials; see `docs/SHARED-SESSIONS.md`. The machine side adds `werift` (WebRTC, bundled) and
+  `sodium-native` (sealed-box open) as root dependencies.
 
-<!-- last-verified: 2026-11-01 -->
+<!-- last-verified: 2026-11-03 -->

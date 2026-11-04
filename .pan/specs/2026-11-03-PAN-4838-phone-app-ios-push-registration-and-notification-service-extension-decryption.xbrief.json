@@ -1,0 +1,924 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-03T20:52:44Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4838: Phone app (iOS): push registration and Notification Service Extension decryption",
+    "updated": "2026-11-03T20:59:53.063Z"
+  },
+  "plan": {
+    "id": "pan-4838",
+    "title": "Phone app (iOS): push registration and Notification Service Extension decryption",
+    "status": "running",
+    "uid": "c20bc3bb-4dfc-496b-aa6d-991c675f3592",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-03T20:52:44Z",
+    "updated": "2026-11-03T20:59:53.063Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4838",
+        "label": "PAN-4838",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4838.md",
+        "label": "PRD",
+        "type": "document"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4823",
+        "label": "PAN-4823 epic",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "phone-app",
+      "ios",
+      "push",
+      "anywhere",
+      "notification-service-extension"
+    ],
+    "metadata": {
+      "sizeJustification": "One platform capability (iOS notifications) whose Swift package, NSE target, shared Keychain, JS registration and tap routing must ship together for epic AC-11; the epic already split Android (PAN-4840), Live Activity (PAN-4839), release (PAN-4841) and docs (PAN-4842) into siblings. The file count is inflated by Xcode artifacts (two entitlements, two Info.plists, pbxproj) and Capacitor-regenerated files (CapApp-SPM/Package.swift, capacitor.settings.gradle, bun.lock).",
+      "canonicalFilename": "2026-11-03-PAN-4838-phone-app-ios-push-registration-and-notification-service-extension-decryption.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The machine already seals needs-you notifications to each phone's push key and the directory forwards them to APNs with placeholder text, but the iOS app neither registers its APNs token with the directory nor decrypts the payload, so an iPhone shows nothing (no registration) or only 'Overdeck · Something needs you'.",
+      "Proposal": "Add a local Swift package (OverdeckPush, swift-sodium 0.9.1) holding crypto_box_seal_open, the content rewrite and the Keychain store; move the push key pair into the shared Keychain group $(AppIdentifierPrefix)ai.overdeck.shared; add a Notification Service Extension target that opens s and rewrites title, body and userInfo, falling back to the placeholder; add @capacitor/push-notifications with AppDelegate forwarding; register the token from apps/mobile/src/native/push.ts (iOS only) on token change and each directory online transition with apsEnvironment from a native #if DEBUG method; route taps to the payload's machine and a validated /m path; add a Notifications switch in Settings; verify on the Mac rig with a sodium-native fixture, swift test and simctl push, and run the real-APNs check when /healthz reports apns:true (else hand epic AC-11 to PAN-4841).",
+      "NonGoals": "- Android registration or the FCM service (PAN-4840); pushSupported() stays iOS-only\n- The Live Activity, its push token, or App Groups (PAN-4839)\n- Apple App ID, APNs key, directory secrets, signing team in the project, TestFlight (PAN-4841)\n- User docs beyond one paragraph in configuration/push-notifications.mdx (PAN-4842)\n- Any change to services/connect, packages/contracts or src/lib/push/native-provider.ts\n- Calling PUT /api/phones/self/push-key, or migrating existing Keychain items\n- Calling PushNotifications.unregister()\n- Lock-screen actions (reply, approve), badges or custom sounds"
+    },
+    "autoDecisions": [
+      {
+        "summary": "libsodium for the NSE comes from swift-sodium 0.9.1 inside a new local Swift package apps/mobile/ios/OverdeckPush that both targets link.",
+        "rationale": "The epic names swift-sodium; a local package mirrors the existing CapApp-SPM reference, keeps pbxproj edits small, and makes the decrypt testable with swift test on the rig."
+      },
+      {
+        "summary": "The shared Keychain group is $(AppIdentifierPrefix)ai.overdeck.shared (no App Group in this issue).",
+        "rationale": "The epic W-IOS1 and PAN-4837 C-5 name this group; only the push key needs sharing, and an App Group has no consumer until PAN-4839."
+      },
+      {
+        "summary": "No Keychain migration and no PUT /api/phones/self/push-key call.",
+        "rationale": "No iOS install exists yet (ACCEPTANCE.md: iOS not testable), and the push key changes only on reset(), which also unpairs every machine."
+      },
+      {
+        "summary": "apsEnvironment comes from a native OverdeckKeys.pushEnvironment() using #if DEBUG.",
+        "rationale": "The web bundle is identical across Xcode configurations; the epic says sandbox for Debug and production for Release, and the directory defaults a missing value to production."
+      },
+      {
+        "summary": "Registration is iOS-only via pushSupported(); PAN-4840 widens it.",
+        "rationale": "@capacitor/push-notifications register() throws on Android without Firebase, which is PAN-4840's scope."
+      },
+      {
+        "summary": "The Settings notifications switch ships here.",
+        "rationale": "Epic W-APP1 lists it and PAN-4837 C-8 deferred it to PAN-4838/4839/4840; epic hazard H-4 needs a place to explain denied permission."
+      },
+      {
+        "summary": "Epic AC-11's real-iPhone run happens here only if healthz reports apns:true; otherwise rig evidence is recorded and AC-11 is handed to PAN-4841's TestFlight run with a comment and a flywheel tell.",
+        "rationale": "healthz reported apns:false on 2026-11-03, the APNs secrets are an operator action in PAN-4841, and no pipeline role can drive a physical iPhone."
+      }
+    ],
+    "items": [
+      {
+        "id": "phone-push-fixture",
+        "title": "Sealed-push fixture and Simulator payload tool (WI-1)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T20:52:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4838",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/fixtures/phone-push/*",
+            "tests/unit/lib/push/phone-push-fixture.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node tests/fixtures/phone-push/generate.mjs",
+            "npx vitest run tests/unit/lib/push/phone-push-fixture.test.ts"
+          ],
+          "expected_outputs": [
+            "generate.mjs writes tests/fixtures/phone-push/sealed-push.json",
+            "phone-push-fixture.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4838.md WI-1. Write tests/fixtures/phone-push/generate.mjs (sodium-native via createRequire; phone pair from crypto_box_seed_keypair seed Buffer.alloc(32,0x2a), wrong pair seed 0x17; cases 'question' and 'unicode' exactly as listed in the PRD; wrongKey = question payload sealed to the wrong pair) and commit its output sealed-push.json. Write seal-apns.mjs exporting apnsFixture({publicKeyHex,title,body,machine,url,kind,tag}) with a CLI guard, producing the 'Simulator Target Bundle' + placeholder aps block + s. Write tests/unit/lib/push/phone-push-fixture.test.ts that opens every case with openSealed from src/lib/anywhere/sealed-box.ts."
+        },
+        "items": [
+          {
+            "id": "phone-push-fixture.ac1",
+            "title": "Given the committed sealed-push.json, when the test opens each case with openSealed and the fixture key pair, then it returns the case payload byte-for-byte as JSON, including the non-ASCII title.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phone-push-fixture.ac2",
+            "title": "Given wrongKey.sealed, when openSealed runs with the fixture key pair, then it returns null.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phone-push-fixture.ac3",
+            "title": "Given apnsFixture({ publicKeyHex: fixture key, title, body }), when the test opens its s, then the payload title equals the given title and aps.alert equals { title: 'Overdeck', body: 'Something needs you' } with mutable-content 1.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "overdeck-push-package",
+        "title": "OverdeckPush Swift package: open, rewrite, Keychain (WI-2)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T20:52:44Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4838",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "apps/mobile/ios/OverdeckPush/Package.swift",
+            "apps/mobile/ios/OverdeckPush/Sources/OverdeckPush/SealedPush.swift",
+            "apps/mobile/ios/OverdeckPush/Sources/OverdeckPush/PushContent.swift",
+            "apps/mobile/ios/OverdeckPush/Sources/OverdeckPush/KeychainStore.swift",
+            "apps/mobile/ios/OverdeckPush/Sources/OverdeckPush/PushKeys.swift",
+            "apps/mobile/ios/OverdeckPush/Sources/OverdeckPush/Hex.swift",
+            "apps/mobile/ios/OverdeckPush/Tests/OverdeckPushTests/SealedPushTests.swift",
+            "apps/mobile/ios/OverdeckPush/Tests/OverdeckPushTests/PushContentTests.swift"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "rig (ssh -i ~/.ssh/gauntlet_air eltmon@<rig-ip>, apps/mobile/README.md 'Run in the iOS Simulator'): rsync apps/mobile/ios/OverdeckPush and tests/fixtures/phone-push, then cd ~/overdeck-mobile/apps/mobile/ios/OverdeckPush && swift test"
+          ],
+          "expected_outputs": [
+            "swift test exits 0 and runs SealedPushTests and PushContentTests"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "shared-keychain",
+            "nse-target"
+          ],
+          "parallelSafeReason": "swift test runs in its own package subtree on the rig and touches no other item's files; it is edge-ordered before every item that builds the Xcode project."
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Create apps/mobile/ios/OverdeckPush/ (Package.swift with swift-sodium exact 0.9.1, platforms iOS 15 / macOS 12) with Sources/OverdeckPush/{SealedPush,PushContent,KeychainStore,PushKeys,Hex}.swift and Tests/OverdeckPushTests/{SealedPushTests,PushContentTests}.swift, using the exact signatures in the PRD. KeychainStore is the App target's file made public with an optional group parameter and removeAll(sharedGroup:). Tests read tests/fixtures/phone-push/sealed-push.json via #filePath (seven deletingLastPathComponent() calls reach the repo root). Checkpoint CP-1: if swift-sodium 0.9.1 does not build, pin its newest default-branch revision; if that fails, pan tell flywheel-orchestrator and stop."
+        },
+        "items": [
+          {
+            "id": "overdeck-push-package.ac1",
+            "title": "Given the sodium-native fixture, when SealedPush.open runs with the fixture key pair, then it returns each case's PhonePushPayload, and returns nil for wrongKey, for one flipped base64 character, for 'not base64' and for a 31-byte key.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "overdeck-push-package.ac2",
+            "title": "Given a CryptoKit Curve25519.KeyAgreement.PrivateKey and a v1 payload sealed with Sodium().box.seal to its raw public key, when SealedPush.open runs with the raw key pair, then it returns the payload.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "overdeck-push-package.ac3",
+            "title": "Given a UNMutableNotificationContent holding the alert text 'Overdeck' / 'Something needs you' and userInfo with s, when PushContent.apply runs, then title, body and threadIdentifier equal the payload's title, body and tag, userInfo has url, machine, kind and tag, and s is removed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "overdeck-push-package.ac4",
+            "title": "Given a payload with an empty title, when PushContent.apply runs, then the content keeps the title 'Overdeck'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "shared-keychain",
+        "title": "OverdeckKeys stores the push key in the shared Keychain group (WI-3)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T20:52:44Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4838",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/ios/App/App/App.entitlements",
+            "apps/mobile/ios/App/App/Info.plist",
+            "apps/mobile/ios/App/App/OverdeckKeysPlugin.swift",
+            "apps/mobile/ios/App/App/KeychainStore.swift",
+            "apps/mobile/ios/App/App.xcodeproj/project.pbxproj",
+            "apps/mobile/src/__tests__/native-config.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix apps/mobile test",
+            "rig (ssh -i ~/.ssh/gauntlet_air eltmon@<rig-ip>, apps/mobile/README.md 'Run in the iOS Simulator'): xcodebuild ... CODE_SIGN_IDENTITY=- build, then again with DEVELOPMENT_TEAM=<team> -allowProvisioningUpdates; xcrun simctl spawn $U log show --last 2m --predicate 'eventMessage CONTAINS \"OverdeckKeys\"'"
+          ],
+          "expected_outputs": [
+            "native-config.test.ts passes",
+            "both rig builds exit 0",
+            "the team-signed build logs '[OverdeckKeys] push public key' and no 'shared keychain group unavailable' line"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "push-environment",
+            "nse-target"
+          ],
+          "readinessReason": "All Mac-rig verification shares one ~/overdeck-mobile checkout, one DerivedData and the rig's Simulators, so items that build on the rig must never run in parallel with each other."
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Add apps/mobile/ios/App/App/App.entitlements (aps-environment development; keychain-access-groups $(AppIdentifierPrefix)ai.overdeck.app then $(AppIdentifierPrefix)ai.overdeck.shared), OverdeckSharedKeychainGroup in App Info.plist, CODE_SIGN_ENTITLEMENTS in both App configs, the XCLocalSwiftPackageReference ../OverdeckPush and its App product dependency with the fixed ids 48380000000000000000A004/A008/A00F/A011, and remove KeychainStore.swift from the App target (delete the file and both pbxproj entries). Rewrite ensureKeys per the PRD snippet: push keys in the shared group, errSecMissingEntitlement falls back to the private group with one log line, DEBUG logs the push public key; reset and the reinstall wipe call KeychainStore.removeAll(sharedGroup:). Extend native-config.test.ts."
+        },
+        "items": [
+          {
+            "id": "shared-keychain.ac1",
+            "title": "Given the repo, when native-config.test.ts runs, then it finds App.entitlements with aps-environment and the two keychain groups in the order ai.overdeck.app then ai.overdeck.shared, OverdeckSharedKeychainGroup in Info.plist, CODE_SIGN_ENTITLEMENTS = App/App.entitlements twice, relativePath = ../OverdeckPush, and no 'KeychainStore.swift in Sources'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shared-keychain.ac2",
+            "title": "Given a team-signed Simulator build on the rig, when the app launches, then the Simulator log shows the push public key line and no fallback line.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shared-keychain.ac3",
+            "title": "Given an ad-hoc (CODE_SIGN_IDENTITY=-) Simulator build, when the app launches, then it reaches the sign-in screen instead of failing with 'secure storage failed'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "push-environment",
+        "title": "OverdeckKeys.pushEnvironment() reports sandbox or production (WI-4)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T20:52:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4838",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/ios/App/App/OverdeckKeysPlugin.swift",
+            "apps/mobile/src/native/keys.ts",
+            "apps/mobile/src/native/keys-web.ts",
+            "apps/mobile/src/native/__tests__/keys.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix apps/mobile test",
+            "npm run typecheck:mobile"
+          ],
+          "expected_outputs": [
+            "keys.test.ts passes",
+            "typecheck:mobile completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Add the pushEnvironment plugin method to OverdeckKeysPlugin.swift (#if DEBUG sandbox, else production), add pushEnvironment(): Promise<{ apsEnvironment: ApsEnvironment }> to the OverdeckKeysPlugin interface in apps/mobile/src/native/keys.ts, return { apsEnvironment: 'sandbox' } from OverdeckKeysWeb, and test it in keys.test.ts. Do not change the Android Java plugin."
+        },
+        "items": [
+          {
+            "id": "push-environment.ac1",
+            "title": "Given OverdeckKeysWeb, when pushEnvironment() is called, then it resolves { apsEnvironment: 'sandbox' }.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-environment.ac2",
+            "title": "Given OverdeckKeysPlugin.swift, when the Debug configuration compiles, then pushEnvironment resolves apsEnvironment 'sandbox', and the Release configuration resolves 'production' (the method body is a single #if DEBUG / #else branch).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "nse-target",
+        "title": "Notification Service Extension target that decrypts the payload (WI-5)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T20:52:44Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4838",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/ios/App/NotificationService/*",
+            "apps/mobile/ios/App/App.xcodeproj/project.pbxproj",
+            "apps/mobile/src/__tests__/native-config.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix apps/mobile test",
+            "rig (ssh -i ~/.ssh/gauntlet_air eltmon@<rig-ip>, apps/mobile/README.md 'Run in the iOS Simulator'): xcodebuild -list -project ios/App/App.xcodeproj; xcodebuild ... build; ls ~/overdeck-mobile/DerivedData/Build/Products/Debug-iphonesimulator/App.app/PlugIns/NotificationService.appex/NotificationService"
+          ],
+          "expected_outputs": [
+            "native-config.test.ts passes",
+            "xcodebuild -list shows App and NotificationService",
+            "the build exits 0 and the .appex binary exists"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5",
+            "FR-6"
+          ],
+          "readinessReason": "All Mac-rig verification shares one ~/overdeck-mobile checkout, one DerivedData and the rig's Simulators, so items that build on the rig must never run in parallel with each other."
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Create apps/mobile/ios/App/NotificationService/{NotificationService.swift,Info.plist,NotificationService.entitlements} exactly as specified, and add the NotificationService app-extension target to project.pbxproj with the fixed ids in the PRD table (Embed Foundation Extensions phase dstSubfolderSpec 13 on App, target dependency, OverdeckPush product, matching MARKETING_VERSION 1.0 and CURRENT_PROJECT_VERSION 1). Extend native-config.test.ts. Checkpoint CP-2: xcodebuild -list must list both targets; plutil -lint names a bad line."
+        },
+        "items": [
+          {
+            "id": "nse-target.ac1",
+            "title": "Given the repo, when native-config.test.ts runs, then it finds com.apple.usernotifications.service and $(PRODUCT_MODULE_NAME).NotificationService in the extension Info.plist, only the ai.overdeck.shared group in its entitlements, PRODUCT_BUNDLE_IDENTIFIER = ai.overdeck.app.NotificationService, the app-extension product type, dstSubfolderSpec = 13, and one distinct value each for MARKETING_VERSION and CURRENT_PROJECT_VERSION.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "nse-target.ac2",
+            "title": "Given the rig, when xcodebuild -list runs on ios/App/App.xcodeproj, then it lists the targets App and NotificationService.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "nse-target.ac3",
+            "title": "Given a rig Simulator build, when it finishes, then App.app/PlugIns/NotificationService.appex/NotificationService exists.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "nse-target.ac4",
+            "title": "Given a payload whose s is missing or does not open, when NotificationService.didReceive runs, then it calls the content handler with the unchanged directory alert text ('Overdeck', 'Something needs you') (code path: the if-let chain falls through to contentHandler(content)).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "push-plugin-dependency",
+        "title": "Add @capacitor/push-notifications and forward the APNs callbacks (WI-6)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T20:52:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-4838",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/package.json",
+            "bun.lock",
+            "apps/mobile/capacitor.config.ts",
+            "apps/mobile/ios/App/App/AppDelegate.swift",
+            "apps/mobile/ios/App/CapApp-SPM/Package.swift",
+            "apps/mobile/android/capacitor.settings.gradle",
+            "apps/mobile/src/__tests__/push-config.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm --prefix apps/mobile test",
+            "npm run typecheck:mobile",
+            "cd apps/mobile/android && JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew assembleDebug",
+            "rig (ssh -i ~/.ssh/gauntlet_air eltmon@<rig-ip>, apps/mobile/README.md 'Run in the iOS Simulator'): xcodebuild ... build"
+          ],
+          "expected_outputs": [
+            "push-config.test.ts passes",
+            "assembleDebug exits 0",
+            "the rig build exits 0"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "NFR-4"
+          ],
+          "readinessReason": "All Mac-rig verification shares one ~/overdeck-mobile checkout, one DerivedData and the rig's Simulators, so items that build on the rig must never run in parallel with each other."
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Add @capacitor/push-notifications ^8.1.3 to apps/mobile/package.json, bun install, set plugins.PushNotifications.presentationOptions ['alert','sound'] in capacitor.config.ts, add the two didRegister/didFailToRegister forwarding methods to AppDelegate.swift, run the web build and cap sync for ios and android, commit the regenerated CapApp-SPM/Package.swift and any changed Android Capacitor file, and add apps/mobile/src/__tests__/push-config.test.ts."
+        },
+        "items": [
+          {
+            "id": "push-plugin-dependency.ac1",
+            "title": "Given the repo, when push-config.test.ts runs, then capacitorConfig.plugins.PushNotifications deep-equals { presentationOptions: ['alert', 'sound'] } and CapApp-SPM/Package.swift names CapacitorPushNotifications.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-plugin-dependency.ac2",
+            "title": "Given the new dependency, when ./gradlew assembleDebug runs in apps/mobile/android with JDK 21, then it exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-plugin-dependency.ac3",
+            "title": "Given AppDelegate.swift, when the app registers for remote notifications, then it posts .capacitorDidRegisterForRemoteNotifications with the device token and .capacitorDidFailToRegisterForRemoteNotifications with the error.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "push-registration",
+        "title": "Push registration in the shell sends push-register to the directory (WI-7)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T20:52:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4838",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/src/native/push.ts",
+            "apps/mobile/src/native/__tests__/push.test.ts",
+            "apps/mobile/src/shell/ShellApp.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix apps/mobile test",
+            "npm run typecheck:mobile"
+          ],
+          "expected_outputs": [
+            "push.test.ts passes with one test per rule R1-R8",
+            "ShellApp.test.tsx passes unchanged"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "NFR-4",
+            "NFR-5",
+            "NFR-6"
+          ],
+          "foundationFor": [
+            "settings-notifications-switch",
+            "notification-tap"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Create apps/mobile/src/native/push.ts with pushSupported (iOS only), notificationsEnabled, startPush and the PushController interface, implementing rules R1-R8 exactly; tests in apps/mobile/src/native/__tests__/push.test.ts, one it block per rule. In ShellApp.tsx add push to Services, start it next to createDirectory only when pushSupported(), stop it in the cleanup. Never call PushNotifications.unregister(); never log the token. R4 starts from directory.state at startPush time; if already online it acts once at start."
+        },
+        "items": [
+          {
+            "id": "push-registration.ac1",
+            "title": "Given a stored token and notifications on, when the fake directory changes from connecting to online, then startPush sends exactly one { type: 'push-register', platform: 'ios', token, apsEnvironment: 'sandbox' } frame, and a later machine-list notification with the state still online sends nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-registration.ac2",
+            "title": "Given iOS reports permission 'prompt', when startPush starts, then it calls requestPermissions and, on 'granted', register; on 'denied' it never calls register and permission reads 'denied'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-registration.ac3",
+            "title": "Given a registration event whose value fails /^[0-9A-Za-z:_.-]{1,4096}$/, when it arrives, then nothing is sent and localStorage overdeck.pushToken keeps its old value.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-registration.ac4",
+            "title": "Given notifications turned off with disable(), when the directory is online or next becomes online, then startPush sends { type: 'push-unregister' } and no push-register.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-registration.ac5",
+            "title": "Given platform 'android' or 'web', when pushSupported runs, then it returns false, and ShellApp never calls startPush.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "notification-tap",
+        "title": "Tapping a notification opens the machine and screen (WI-8)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T20:52:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4838",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/src/shell/notificationTap.ts",
+            "apps/mobile/src/shell/__tests__/notificationTap.test.ts",
+            "apps/mobile/src/shell/ShellApp.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix apps/mobile test",
+            "npm run typecheck:mobile"
+          ],
+          "expected_outputs": [
+            "notificationTap.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-3",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. Create apps/mobile/src/shell/notificationTap.ts with safeMobilePath, tapTarget and installNotificationTap (sessionStorage overdeck.notificationHandled dedupe by notification id; ignore when signed out), tests in apps/mobile/src/shell/__tests__/notificationTap.test.ts, and in ShellApp.tsx install it in an effect after boot is ready when pushSupported(); open sets the current machine then navigates, or goes to '/' for an unknown machine. Checkpoint CP-3 (cold launch) is checked in WI-10."
+        },
+        "items": [
+          {
+            "id": "notification-tap.ac1",
+            "title": "Given the URLs https://evil.example/m, //evil.example/m, javascript:alert(1), /settings, /mx, '', undefined and 42, when safeMobilePath runs, then each returns '/m', and '/m?subject=a' and '/m/x?y=1' are returned unchanged.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "notification-tap.ac2",
+            "title": "Given notification data { machine: <paired environmentId>, url: '/m?subject=a' }, when tapTarget runs, then it returns { kind: 'machine', environmentId, path: '/m?subject=a' }; an unknown machine returns { kind: 'machines' }; data without machine returns null.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "notification-tap.ac3",
+            "title": "Given two pushNotificationActionPerformed deliveries with the same notification id, when installNotificationTap handles them, then open is called once, and it is not called at all while signed out.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-notifications-switch",
+        "title": "Notifications switch in Settings (WI-9)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T20:52:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4838",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/src/shell/SettingsScreen.tsx",
+            "apps/mobile/src/shell/__tests__/SettingsScreen.test.tsx",
+            "apps/mobile/src/shell/ShellApp.tsx",
+            "apps/mobile/src/native/push.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix apps/mobile test",
+            "npm run typecheck:mobile"
+          ],
+          "expected_outputs": [
+            "SettingsScreen.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. Add the optional notifications prop to SettingsScreen.tsx with the role=switch button and the two hint texts exactly as written in the PRD, add usePushState(controller) to push.ts, pass notifications from ShellApp.tsx only when services.push is set (onChange calls enable or disable), and add apps/mobile/src/shell/__tests__/SettingsScreen.test.tsx."
+        },
+        "items": [
+          {
+            "id": "settings-notifications-switch.ac1",
+            "title": "Given SettingsScreen without the notifications prop, when it renders, then no element with role switch is present.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-notifications-switch.ac2",
+            "title": "Given notifications { enabled: true, permission: 'granted' }, when the switch renders and is clicked, then it has aria-checked='true' and onChange is called with false.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-notifications-switch.ac3",
+            "title": "Given permission 'denied', when SettingsScreen renders, then it shows the text 'Notifications are off for Overdeck in iOS Settings.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ios-acceptance",
+        "title": "iOS acceptance on the rig and the real-APNs run when configured (WI-10)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T20:52:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4838",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/ACCEPTANCE.md",
+            "apps/mobile/acceptance/pan-4838-*.png"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "grep -n 'PAN-4838 iOS notifications' apps/mobile/ACCEPTANCE.md",
+            "ls apps/mobile/acceptance/pan-4838-*.png",
+            "curl -s https://connect.overdeck.ai/healthz"
+          ],
+          "expected_outputs": [
+            "ACCEPTANCE.md has the PAN-4838 section",
+            "at least the simctl screenshots exist"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-8"
+          ],
+          "acJustification": "Four ACs map to the four evidence lines epic AC-11 needs; the last one is conditional on PAN-4841's APNs secrets (D-16).",
+          "readinessReason": "All Mac-rig verification shares one ~/overdeck-mobile checkout, one DerivedData and the rig's Simulators, so items that build on the rig must never run in parallel with each other."
+        },
+        "narrative": {
+          "Action": "PRD WI-10. On the rig with a team-signed Simulator build: read the push public key from the log, seal with tests/fixtures/phone-push/seal-apns.mjs, terminate the app, simctl push the real and the wrong-key payloads, screenshot both, check the cold-launch tap (CP-3), and record CP-4 if simctl does not run the NSE. Then check https://connect.overdeck.ai/healthz: with apns:true and a device, run the real AskUserQuestion push (title within 10 s, tap opens the card, wrangler tail shows no title); with apns:false or no device, record the healthz output, comment on PAN-4841 that its first TestFlight install must run epic AC-11, and pan tell flywheel-orchestrator. Write everything to the new ACCEPTANCE.md section; delete the Simulator."
+        },
+        "items": [
+          {
+            "id": "ios-acceptance.ac1",
+            "title": "Given the app terminated on the rig Simulator, when simctl push delivers a payload sealed to its push key, then ACCEPTANCE.md records a screenshot showing the payload's real title, or the CP-4 finding with the Xcode version when the extension did not run.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ios-acceptance.ac2",
+            "title": "Given a payload sealed to the wrong key, when simctl push delivers it, then the recorded screenshot shows 'Overdeck' and 'Something needs you'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ios-acceptance.ac3",
+            "title": "Given a notification tapped while the app is terminated, when the app opens, then ACCEPTANCE.md records whether it opened the payload's machine at its /m path and which CP-3 path was used.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ios-acceptance.ac4",
+            "title": "Given healthz reports apns:true and a device is available, when a desktop AskUserQuestion fires, then ACCEPTANCE.md records the real title shown within 10 s and no title text in wrangler tail; otherwise it records the healthz output and links the PAN-4841 comment that carries epic AC-11.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document iOS notifications in the README, the push page and the codebase map (WI-11)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T20:52:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4838",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/README.md",
+            "configuration/push-notifications.mdx",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint",
+            "grep -n 'NotificationService' apps/mobile/README.md .overdeck/context/codebase/architecture.md",
+            "grep -n 'Something needs you' configuration/push-notifications.mdx"
+          ],
+          "expected_outputs": [
+            "lint passes",
+            "both greps find matches"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-5",
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11. Update apps/mobile/README.md (layout rows for ios/OverdeckPush and ios/App/NotificationService, rig rsync of OverdeckPush and tests/fixtures/phone-push, the team-signed build, swift test, the seal-apns + simctl push recipe, the Keys section for the shared group and D-5 fallback and pushEnvironment, a new 'Notifications (iOS)' section, and the 'What it cannot do yet' list), add the placeholder paragraph to configuration/push-notifications.mdx 'The Overdeck app', and update the apps/mobile row of .overdeck/context/codebase/architecture.md."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "Given apps/mobile/README.md, when a reader opens it, then it has a 'Notifications (iOS)' section describing registration, the Settings switch, the fixed 'Overdeck · Something needs you' text on failure and tap routing, and its Keys section names the $(AppIdentifierPrefix)ai.overdeck.shared group the extension reads.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "Given configuration/push-notifications.mdx, when a reader opens 'The Overdeck app', then it says the iPhone decrypts on the phone and otherwise shows 'Overdeck · Something needs you', and that the switch is in the app's Settings.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "Given .overdeck/context/codebase/architecture.md, when a reader opens the apps/mobile/ row, then it names the NotificationService extension and the OverdeckPush Swift package, and the file ends with exactly one last-verified line.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "phone-push-fixture",
+        "to": "overdeck-push-package",
+        "type": "blocks"
+      },
+      {
+        "from": "overdeck-push-package",
+        "to": "shared-keychain",
+        "type": "blocks"
+      },
+      {
+        "from": "shared-keychain",
+        "to": "push-environment",
+        "type": "blocks"
+      },
+      {
+        "from": "shared-keychain",
+        "to": "nse-target",
+        "type": "blocks"
+      },
+      {
+        "from": "overdeck-push-package",
+        "to": "nse-target",
+        "type": "blocks"
+      },
+      {
+        "from": "push-plugin-dependency",
+        "to": "push-registration",
+        "type": "blocks"
+      },
+      {
+        "from": "push-environment",
+        "to": "push-registration",
+        "type": "blocks"
+      },
+      {
+        "from": "push-plugin-dependency",
+        "to": "notification-tap",
+        "type": "blocks"
+      },
+      {
+        "from": "push-registration",
+        "to": "notification-tap",
+        "type": "blocks"
+      },
+      {
+        "from": "push-registration",
+        "to": "settings-notifications-switch",
+        "type": "blocks"
+      },
+      {
+        "from": "notification-tap",
+        "to": "settings-notifications-switch",
+        "type": "blocks"
+      },
+      {
+        "from": "nse-target",
+        "to": "ios-acceptance",
+        "type": "blocks"
+      },
+      {
+        "from": "settings-notifications-switch",
+        "to": "ios-acceptance",
+        "type": "blocks"
+      },
+      {
+        "from": "phone-push-fixture",
+        "to": "ios-acceptance",
+        "type": "blocks"
+      },
+      {
+        "from": "nse-target",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "settings-notifications-switch",
+        "to": "docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

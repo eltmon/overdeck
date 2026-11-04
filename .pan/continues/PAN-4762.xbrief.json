@@ -1,0 +1,143 @@
+{
+  "version": "1",
+  "issueId": "PAN-4762",
+  "created": "2026-11-02T01:21:42.220Z",
+  "updated": "2026-11-02T01:51:01.318Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "browsers-contract": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4762",
+      "claimedAt": "2026-11-02T01:21:42.220Z",
+      "doneAt": "2026-11-02T01:23:25.315Z"
+    },
+    "server-detect-browsers": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4762",
+      "claimedAt": "2026-11-02T01:23:35.574Z",
+      "doneAt": "2026-11-02T01:31:08.217Z"
+    },
+    "server-launch-browser": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4762",
+      "claimedAt": "2026-11-02T01:31:13.140Z",
+      "doneAt": "2026-11-02T01:33:53.746Z"
+    },
+    "rpc-browser-methods": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4762",
+      "claimedAt": "2026-11-02T01:33:59.443Z",
+      "doneAt": "2026-11-02T01:36:58.231Z"
+    },
+    "frontend-generic-menu-browsers": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4762",
+      "claimedAt": "2026-11-02T01:37:03.048Z",
+      "doneAt": "2026-11-02T01:40:23.638Z"
+    },
+    "frontend-markdown-menu-browsers": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4762",
+      "claimedAt": "2026-11-02T01:40:28.717Z",
+      "doneAt": "2026-11-02T01:43:10.110Z"
+    },
+    "docs-browser-menu": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4762",
+      "claimedAt": "2026-11-02T01:43:15.127Z",
+      "doneAt": "2026-11-02T01:44:00.481Z"
+    },
+    "browsers-contract.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:45:55.977Z"
+    },
+    "browsers-contract.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:46:10.434Z"
+    },
+    "browsers-contract.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:46:24.386Z"
+    },
+    "server-detect-browsers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:46:38.959Z"
+    },
+    "server-detect-browsers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:46:53.051Z"
+    },
+    "server-detect-browsers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:47:07.564Z"
+    },
+    "server-detect-browsers.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:47:21.625Z"
+    },
+    "server-launch-browser.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:47:35.657Z"
+    },
+    "server-launch-browser.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:47:49.605Z"
+    },
+    "server-launch-browser.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:48:04.210Z"
+    },
+    "rpc-browser-methods.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:48:18.031Z"
+    },
+    "rpc-browser-methods.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:48:31.996Z"
+    },
+    "rpc-browser-methods.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:48:46.211Z"
+    },
+    "frontend-generic-menu-browsers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:49:00.892Z"
+    },
+    "frontend-generic-menu-browsers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:49:15.497Z"
+    },
+    "frontend-generic-menu-browsers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:49:29.564Z"
+    },
+    "frontend-generic-menu-browsers.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:49:44.420Z"
+    },
+    "frontend-markdown-menu-browsers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:50:00.059Z"
+    },
+    "frontend-markdown-menu-browsers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:50:15.842Z"
+    },
+    "frontend-markdown-menu-browsers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:50:30.999Z"
+    },
+    "docs-browser-menu.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:50:45.831Z"
+    },
+    "docs-browser-menu.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:51:01.318Z"
+    }
+  }
+}

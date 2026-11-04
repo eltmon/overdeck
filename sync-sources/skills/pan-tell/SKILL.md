@@ -65,6 +65,31 @@ pan tell --steer ISSUE-123 "Stop the refactor. Fix the failing login test first.
 - **Refused (exit 1, nothing sent or mailed):** other harnesses (Codex, Kimi, ACP, OpenCode, Muse, Prime Agent), remote (Fly) agents, and paused, suspended or stopped agents, which have no running turn to interrupt. Drop `--steer` to send a normal message. Steer Pi from the dashboard composer.
 - **Old PTY supervisor:** an agent launched before steer support presses Enter instead; `pan tell` prints that the message was delivered as a normal submit.
 
+## Queue until limits reset
+
+When a conversation hit its usage limit, queue the message on the server instead of waiting:
+
+```bash
+pan tell --when-limit-resets conv/2972 "Pick up where you left off."
+```
+
+The message is stored in the dashboard database and sent by the scheduled-message patrol about a minute after the limit resets (or within a minute when no limit is active). When the reset time is unknown it tries again every 15 minutes.
+
+- **Supported:** Claude Code conversations only. Agents, other harnesses and vault browse copies are refused (exit 1, nothing queued).
+- **Refused:** `--steer` with `--when-limit-resets` — a queued message has no running turn to interrupt. `/pan` commands cannot be queued.
+- **Check the queue:** `pan conv pending <conv>` lists undelivered queued messages. Edit or cancel them from the conversation timeline in the dashboard.
+
+## A conversation on another machine
+
+To reach a conversation that a linked machine runs, name it `@<machine>/<conv>` (the machine's label or environment id):
+
+```bash
+pan tell @desk/conv-20261101-1234 "Rebase on main before you push."
+pan tell @desk/conv-20261101-1234 "Rebase on main before you push." --message-id rebase-1
+```
+
+The message goes through this machine's dashboard and the machine link (PAN-4650). It prints `Delivered to <conv> on <machine>`, or the owner's error and exits 1. `--message-id <id>` makes a repeat land once (default: a fresh id); on a local target it is the delivery idempotency key. `--steer` works; `--when-limit-resets` and `--force` exit 1 for a remote target. Only conversations are accepted after `@<machine>/` — an agent name exits 1 with "pan tell @<label>/… targets conversations only".
+
 ## Workflow
 
 ### 1. Find the Agent Session

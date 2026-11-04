@@ -1,0 +1,197 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T23:39:44Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4860: pan project add proposes an issue prefix with digits, which parseIssueId rejects",
+    "updated": "2026-11-02T23:43:50.154Z"
+  },
+  "plan": {
+    "id": "pan-4860",
+    "title": "pan project add proposes an issue prefix with digits, which parseIssueId rejects",
+    "status": "running",
+    "uid": "22afe30e-da78-4d08-9771-32e2bee668b3",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-02T23:39:44Z",
+    "updated": "2026-11-02T23:43:50.154Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4860",
+        "label": "PAN-4860",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "projects",
+      "issue-id",
+      "cli",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "The project-create resolver (src/lib/projects/create.ts step 5) proposes key.toUpperCase().replace(/-/g,'').slice(0,10) and validates ^[A-Z][A-Z0-9]{0,9}$, so a key with digits (pan4774-anywhere-smoke) gets prefix PAN4774ANY. parseIssueId (src/lib/issue-id.ts:42) accepts letters-only prefixes (^([A-Za-z]+)-(\\d+)$), so no issue ID for that project parses and resolveProjectFromIssue returns null.",
+      "Proposal": "Make creation letters-only: the proposal keeps only A-Z (key.toUpperCase().replace(/[^A-Z]/g,'').slice(0,10)), validation becomes ^[A-Z]{1,10}$, and the issue-prefix-invalid message states the letters-only rule. parseIssueId is not widened. Add create-intent tests including a parseIssueId round-trip, and document the rule in configuration/projects.mdx, sync-sources/skills/pan-new-project/SKILL.md, and docs/WORKSPACES-AND-PROJECTS.md.",
+      "NonGoals": "- Widening parseIssueId, parseIssueIdFromText (src/lib/resource-utils.ts), or any of the ~67 LETTERS-NUMBER regexes to accept digits\n- Migrating or repairing existing projects.yaml entries with digit prefixes (e.g. T2OOSDP on the operator machine)\n- A pan doctor check for existing invalid prefixes\n- Any frontend change in the Add-project dialog (ProjectCreateForm.tsx renders the server finding message)\n- Auto-uppercasing an explicit lowercase --issue-prefix\n- Changing src/cli/commands/project.ts (its linearTeam prefix already flows through the resolver at line 170)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix the create resolver to letters-only instead of widening parseIssueId to [A-Za-z][A-Za-z0-9]*",
+        "rationale": "About 67 non-test regex sites (compose project names, specialist session names, feature-<id> dirs, branch refs, reapers, parseIssueIdFromText) hard-code the letters-only LETTERS-NUMBER shape; widening only the parser leaves digit-prefixed projects silently missed everywhere else. Projects that genuinely need digits already have issue_pattern."
+      },
+      {
+        "summary": "A key with no letters (e.g. 2048) yields issue-prefix-invalid with empty detail and no proposal",
+        "rationale": "Matches today's behavior for digit-leading keys and avoids a synthetic fallback prefix that could collide with another project; the operator supplies --issue-prefix or the Options field."
+      },
+      {
+        "summary": "Existing digit prefixes (T2OOSDP) are not migrated",
+        "rationale": "The issue is about create-time agreement; editing operator config is outside the change and the operator can rename or add issue_pattern."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Two small items; well under the files/subsystem limits.",
+      "canonicalFilename": "2026-11-02-PAN-4860-pan-project-add-proposes-an-issue-prefix-with-digits-which-parseissueid-rejects.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "letters-only-prefix",
+        "title": "Create resolver proposes and accepts letters-only issue prefixes",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T23:39:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4860",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/projects/create.ts",
+            "tests/unit/lib/projects/create-intent.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/projects/create-intent.test.ts tests/lib/issue-id.test.ts",
+            "npm run typecheck",
+            "git diff --stat $(git merge-base origin/main HEAD) HEAD -- src/lib/issue-id.ts src/lib/resource-utils.ts"
+          ],
+          "expected_outputs": [
+            "create-intent.test.ts and issue-id.test.ts pass, including the new letters-only prefix tests",
+            "typecheck completes without errors",
+            "the branch's own diff stat for issue-id.ts and resource-utils.ts is empty"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/projects/create.ts step 5 (anchor '// 5. Issue prefix.', ~line 810): change the proposal to (input.issuePrefix ?? key.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 10)).trim(); change the validation regex from /^[A-Z][A-Z0-9]{0,9}$/ to /^[A-Z]{1,10}$/; change the issue-prefix-invalid message to 'Issue prefix must be 1 to 10 uppercase letters (A-Z), with no digits.' and add a short comment citing parseIssueId's letters-only standard format and PAN-4860. Leave the issue-prefix-taken branch, parseIssueId, and project.ts unchanged. Do not grow create.ts past its origin/main line count. In tests/unit/lib/projects/create-intent.test.ts, import parseIssueId from '../../../../src/lib/issue-id.js' and add (mode 'new', homeBoundary true, homeDir TEST_HOME): name 'abc123-x' => proposedIssuePrefix 'ABCX', no issue-prefix-invalid finding, parseIssueId('ABCX-1') matches { prefix: 'ABCX', format: 'standard' }; name 'pan4774-anywhere-smoke' => 'PANANYWHER'; explicit issuePrefix 'BAD1' => issue-prefix-invalid with detail 'BAD1', null proposedIssuePrefix, message contains 'uppercase letters' and not 'letters and digits'; name '2048' => issue-prefix-invalid with detail '' and null proposedIssuePrefix. Existing MYNEWPROJE/THISISAVER tests stay unchanged and green. See PRD WI-1."
+        },
+        "items": [
+          {
+            "id": "letters-only-prefix.ac1",
+            "title": "Given name 'abc123-x', when resolveProjectCreateIntent runs, then it returns proposedIssuePrefix 'ABCX' and parseIssueId('ABCX-1') returns prefix 'ABCX' with format 'standard'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "letters-only-prefix.ac2",
+            "title": "Given explicit issuePrefix 'BAD1', when the resolver runs, then it emits an issue-prefix-invalid finding with detail 'BAD1' whose message contains 'uppercase letters' and does not contain 'letters and digits'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "letters-only-prefix.ac3",
+            "title": "Given name '2048', when the resolver runs, then it emits issue-prefix-invalid with detail '' and returns a null proposedIssuePrefix",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "letters-only-prefix.ac4",
+            "title": "The branch's changes leave src/lib/issue-id.ts and src/lib/resource-utils.ts untouched (git diff $(git merge-base origin/main HEAD) HEAD on them produces no output) and the existing MYNEWPROJE and THISISAVER tests still pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-letters-only-prefix",
+        "title": "Document the letters-only issue prefix rule",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T23:39:44Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4860",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/projects.mdx",
+            "sync-sources/skills/pan-new-project/SKILL.md",
+            "docs/WORKSPACES-AND-PROJECTS.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"uppercase letters\" configuration/projects.mdx sync-sources/skills/pan-new-project/SKILL.md",
+            "grep -n \"letters only\" docs/WORKSPACES-AND-PROJECTS.md"
+          ],
+          "expected_outputs": [
+            "grep prints the new issue_prefix lines in projects.mdx (table row) and SKILL.md (Issue prefix row)",
+            "grep prints the updated detected-configuration sentence in WORKSPACES-AND-PROJECTS.md"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply PRD WI-2 edits verbatim: configuration/projects.mdx line ~95 (issue_prefix bullet: proposed from the letters of the project key, digits and dashes dropped, up to ten characters; a key with no letters gets no proposal, pass --issue-prefix) and line ~244 (issue_prefix table row: append that it is 1 to 10 uppercase letters, digits rejected because IDs must match LETTERS-NUMBER, use issue_pattern otherwise); sync-sources/skills/pan-new-project/SKILL.md line ~110 (Issue prefix row Notes: 1–10 uppercase letters, no digits); docs/WORKSPACES-AND-PROJECTS.md line ~209 (a proposed issue_prefix (the key's letters only, max 10)). Do not edit ProjectCreateForm.tsx help text."
+        },
+        "items": [
+          {
+            "id": "docs-letters-only-prefix.ac1",
+            "title": "configuration/projects.mdx issue_prefix table row states the prefix is 1 to 10 uppercase letters, rejects digits, and names issue_pattern as the alternative",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-letters-only-prefix.ac2",
+            "title": "configuration/projects.mdx issue_prefix registration bullet contains the text that the proposal drops digits and dashes from the key and that a key with no letters needs --issue-prefix",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-letters-only-prefix.ac3",
+            "title": "sync-sources/skills/pan-new-project/SKILL.md Issue prefix row and docs/WORKSPACES-AND-PROJECTS.md detected-configuration sentence both state the letters-only, max-10 rule (grep for 'uppercase letters' / 'letters only' returns those lines)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  },
+  "status": "active"
+}

@@ -4,7 +4,13 @@
 # - Node.js 22 + pnpm
 # - git, tmux, build tools
 # - Claude Code CLI
+# - Codex CLI (@openai/codex), re-pinned to home's version at provisioning
+# - Overdeck CLI (`pan`, npm package @overdeck/core), pinned by OVERDECK_VERSION
+# - Docker (docker.io + iptables) for gauntlet critics that run Compose stacks
 # - Fly CLI (flyctl)
+#
+# CMD stays `sleep infinity`: a Fly machine starts `pan serve` by exec at
+# provisioning (PAN-4652 D-5), and provisioning also starts dockerd.
 #
 # No sshd: Fly's hallpass provides `fly ssh console`/sftp and Machines exec.
 
@@ -50,6 +56,20 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg -o 
 
 # Install Claude Code CLI
 RUN npm install -g @anthropic-ai/claude-code
+
+# Codex CLI for Codex conversations on Fly machines (PAN-4296). Provisioning
+# re-pins it to home's version (npm install -g @openai/codex@<v>).
+RUN npm install -g @openai/codex
+
+# Overdeck: a Fly machine runs `pan serve` (PAN-4652). The version is
+# re-pinned to home's at provisioning (npm install -g @overdeck/core@<v>).
+ARG OVERDECK_VERSION=latest
+RUN npm install -g @overdeck/core@${OVERDECK_VERSION}
+
+# Docker for gauntlet critics that run Compose stacks (PAN-4652 OD-4).
+# dockerd is started by provisioning, not by CMD.
+RUN apt-get update && apt-get install -y docker.io iptables \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install Fly CLI (flyctl)
 RUN curl -L https://fly.io/install.sh | sh

@@ -45,7 +45,9 @@ export default defineConfig({
     // must not itself need node_modules, so its lexer is bundled too.
     alwaysBundle: (id) => id.startsWith('@overdeck/') || id === 'effect-acp' || id.startsWith('effect-acp/')
       || id === 'es-module-lexer',
-    neverBundle: ['@lydell/node-pty'],
+    // PAN-4645 (D-4645-2): the Noise stack resolves `sodium-native` prebuilds via
+    // `require-addon`; bundling any of the four breaks that lookup.
+    neverBundle: ['@lydell/node-pty', /^noise-handshake(\/.*)?$/, '@hyperswarm/secret-stream', 'sodium-universal', 'sodium-native'],
   },
   outDir: 'dist',
 });

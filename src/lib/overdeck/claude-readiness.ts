@@ -14,6 +14,17 @@ import { paneTreeHasHarnessProcess, readProcessTable } from '../tmux-process-tre
 const SESSION_ENDED_PREFIX = CONVERSATION_SESSION_ENDED_MARKER.slice(0, CONVERSATION_SESSION_ENDED_MARKER.indexOf('.') + 1);
 
 /**
+ * Claude Code startup dialogs that take focus before the composer can (PAN-4738).
+ * Their option rows start with the same ❯ the composer prompt does, so a ❯ alone
+ * does not prove the composer is ready. Matched by exact title from the binary.
+ */
+const BLOCKING_STARTUP_DIALOG_TITLES = ['Make auto mode your default permission mode?'] as const;
+
+function blockingStartupDialogTitle(paneText: string): string | null {
+  return BLOCKING_STARTUP_DIALOG_TITLES.find((title) => paneText.includes(title)) ?? null;
+}
+
+/**
  * The error for a harness that exited before its conversation started, with
  * the last pane lines the harness printed (its exit reason, when it gave one).
  * The launcher's own "session ended" line, wrapped or not, is not part of the
@@ -98,7 +109,10 @@ async function probeHarnessExitOnTmux(tmuxSession: string): Promise<HarnessExitP
 /**
  * Wait for Claude Code's prompt. A harness that exits first leaves only the
  * launcher's keep-alive loop holding the pane, which reads as a live, empty
- * conversation (PAN-3827), so that exit is thrown as a spawn error.
+ * conversation (PAN-3827), so that exit is thrown as a spawn error. A known
+ * blocking startup dialog (PAN-4738) is not readiness either, even though its
+ * focused option row also starts with ❯: it becomes a spawn error naming the
+ * dialog once the deadline passes with it still on screen.
  */
 export async function waitForClaudeReady(tmuxSession: string): Promise<void> {
   const deadline = Date.now() + 30_000;
@@ -111,7 +125,7 @@ export async function waitForClaudeReady(tmuxSession: string): Promise<void> {
     const capture = await readAgentPaneText(tmuxSession, 200, undefined, 'visible').catch(() => '');
     if (capture.trim()) output = capture;
     if (capture.includes(SESSION_ENDED_PREFIX)) throw harnessEarlyExitError(capture);
-    if (capture.includes('❯')) {
+    if (capture.includes('❯') && !blockingStartupDialogTitle(capture)) {
       console.log(`[conversations] Claude Code ready in ${tmuxSession}`);
       return;
     }
@@ -119,5 +133,12 @@ export async function waitForClaudeReady(tmuxSession: string): Promise<void> {
   }
   const probe = await probeHarnessExit(tmuxSession);
   if (probe === 'session-gone' || probe === 'harness-gone') throw harnessEarlyExitError(output, probe === 'session-gone');
+  const dialog = blockingStartupDialogTitle(output);
+  if (dialog) {
+    throw new Error(
+      `Claude Code is waiting on its "${dialog}" startup dialog, so the first message was not sent. ` +
+      'Answer the dialog in the conversation\'s terminal, then send the message again.',
+    );
+  }
   console.warn(`[conversations] Timed out waiting for Claude Code prompt in ${tmuxSession} (harness probe: ${probe})`);
 }

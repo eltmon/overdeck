@@ -1,0 +1,889 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-03T23:39:13Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4961: Workspace disk floor is checked once per creation, so concurrent starts run the disk out (6 starts took 15 GB to 4.9 GB)",
+    "updated": "2026-11-03T23:57:29.068Z"
+  },
+  "plan": {
+    "id": "pan-4961",
+    "title": "Workspace disk floor is checked once per creation, so concurrent starts run the disk out (6 starts took 15 GB to 4.9 GB)",
+    "status": "running",
+    "uid": "ec8b0346-396b-4234-97dc-9ee432ed50c8",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-03T23:39:13Z",
+    "updated": "2026-11-03T23:57:29.068Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4961",
+        "label": "PAN-4961",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "disk",
+      "workspace",
+      "docker",
+      "flywheel",
+      "resource-governor"
+    ],
+    "metadata": {
+      "sizeJustification": "The code change spans four lint subsystems (src/lib, src/dashboard, tests/unit, tests/lib); the plan totals 28 files, the extra ones added by the round-1 critique (the real containerize route and its test). The remaining subsystems are documentation paths, which the projected-surface lint counts one subsystem per top-level doc path (docs/X.md, reference/X.mdx, sync-sources/skills, .overdeck/context). Splitting the docs into a sibling issue would ship the disk hold without its docs, which the PRD rule forbids, and splitting the code would ship a ledger nothing calls or a hold that one of the start paths (dashboard route, CLI in-process spawn, containerize route) never applies.",
+      "canonicalFilename": "2026-11-03-PAN-4961-workspace-disk-floor-is-checked-once-per-creation-so-concurrent-starts-run-the-disk-out-6-starts-took-15-gb-to-4-9-gb.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "createWorkspace checks the 10 GiB disk floor once (src/lib/workspace-manager/create.ts line 203) and then writes the worktree and package install; the ~1.94 GB per-workspace Docker volume is written later by rebuildWorkspaceStack when the work agent starts. On 2026-11-03 six Flywheel starts each passed the check at 15-17 GB free and together took the disk to 4.9 GB, near the point where SQLite and git writes fail for every agent (PAN-1674).",
+      "Proposal": "Add a cross-process reservation ledger to src/lib/disk-floor.ts: a disk-heavy phase is admitted only when available − in-flight reserved bytes − its own measured cost ≥ the floor, holds a reservation file while it runs, and releases it when it returns. Measure the per-project host and stack cost (git ls-tree blob sizes, unshared node_modules blocks, docker volume and unique image sizes) in src/lib/workspace/disk-cost.ts. Admit the host phase in createWorkspace and the stack phase in rebuildWorkspaceStack; re-check the plain floor before the package install and before every docker compose up. A work start whose stack needs a rebuild the disk cannot take answers HTTP 507 diskLow, which pan start prints and the finalize auto-handoff defers and retries. Planning already builds no stack; a test pins it and the docs explain where the observed stacks came from.",
+      "NonGoals": "- No disk check in evaluateSpawnGuardrails and no hold on a work start whose stack is already healthy\n- No change to container-ops.ts start/restart/stop actions (they act on existing stacks)\n- No change to the 10 GiB floor value, the disk-pressure patrol, or BuildKit pruning\n- No refactor of src/lib/vault/file-lock.ts (imported as-is)\n- No new HTTP route and no new UI; the PlanDialog Start Docker checkbox stays\n- No attempt to subtract the part of an in-flight reservation already written to disk (over-counting is accepted)\n- No support for Docker's data root on a different filesystem beyond documenting the assumption\n- No raise of any scripts/file-size-allowlist.txt cap\n- No change to blockWork/escalation bookkeeping in spawn-prep.ts beyond the cli-start-disk-hold check; a rebuild refused by the ledger after the hold preview passed (a race) still surfaces as the generic stack-unhealthy error"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Use a cross-process file ledger (~/.overdeck/disk-reservations/) serialized by withFileLock from src/lib/vault/file-lock.ts, not an in-process counter",
+        "rationale": "Workspace creation runs in the dashboard, the Deacon child process and CLI processes; serializing admission under one O_EXCL lock makes every admitted reservation visible to later admissions without ranking logic."
+      },
+      {
+        "summary": "Two phases with separate measured costs (host: worktree + unshared node_modules; stack: compose volumes + unique image bytes), each released when its phase returns",
+        "rationale": "The phases run minutes apart in different code paths; after a phase returns its bytes are real and statfs sees them."
+      },
+      {
+        "summary": "Measure directly and memoize 6 h; seed constants (0.5 GiB host, 2 GiB stack, rounded up from 2026-11-03 measurements) only for an unmeasurable component",
+        "rationale": "The issue requires a measured estimate; a statfs-delta measurement is contaminated by exactly the concurrent phases this issue is about, and du overstates hardlinked bun node_modules by ~2 GB."
+      },
+      {
+        "summary": "Re-checks before install and compose are plain floor checks, not reservation-aware",
+        "rationale": "Subtracting reservations again would double-count the phase's own reservation and refuse already-admitted work."
+      },
+      {
+        "summary": "Hold work starts only at the stack-health gate when a rebuild is needed (HTTP 507 diskLow), mapped to the retryable 'guardrails' skip reason",
+        "rationale": "A start whose stack is healthy adds no disk cost; mapping to guardrails reuses the existing deferred-handoff retry instead of failing the handoff."
+      },
+      {
+        "summary": "Planning keeps building no Docker stack; add a pinning test and document the cause instead of changing planning",
+        "rationale": "Verified: PlanDialog defaults startDocker false, pan start sends none, the plan role skips stack health, and PAN-4840's stack was built by the finalize auto-handoff's work spawn (containers 15:56:31, agent 15:56:58, handoff spent 15:57:00)."
+      },
+      {
+        "summary": "Cover three Docker bring-up doors (createWorkspace startDocker, rebuildWorkspaceStack, WorkspaceService.containerize) and leave container-ops start/restart/stop out",
+        "rationale": "Only 'up -d --build' on a new or torn-down stack writes a new volume; start/restart reuse existing containers."
+      },
+      {
+        "summary": "Set plan.metadata.sizeJustification instead of splitting into sibling issues",
+        "rationale": "The over-limit subsystem count comes from doc files counted one subsystem each; the code spans four subsystems and the slices are not independently useful."
+      }
+    ],
+    "items": [
+      {
+        "id": "floor-ledger",
+        "title": "Add the cross-process disk reservation ledger to disk-floor.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T23:39:13Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4961",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "foundationFor": [
+            "create-admission",
+            "stack-admission",
+            "spawn-disk-hold",
+            "containerize-admission"
+          ],
+          "files_scope": [
+            "src/lib/disk-floor.ts",
+            "src/lib/__tests__/disk-floor.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/disk-floor.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "disk-floor.test.ts passes including the 6-concurrent/3-admitted case",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-2",
+            "NFR-4"
+          ],
+          "acJustification": "Five ACs cover the five distinct ledger behaviors the critique required (N/k admission, release, reclaim, heartbeat, fail-closed); checkDiskFloor prefix and constant equality are covered by the retained existing tests."
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-1 as revised after the round-1 critique: in src/lib/disk-floor.ts add DISK_LOW_HELD_PREFIX, DISK_RESERVATION_HEARTBEAT_MS (60 s), DISK_RESERVATION_STALE_MS (10 min), reserveDiskFloor and previewDiskFloor with DiskFloorLedgerDeps (read, ledgerDir default join(getOverdeckHome(),'disk-reservations'), withLock default withFileLock from ./vault/file-lock.js, isPidAlive via process.kill(pid,0) with EPERM=alive, now, setInterval). Admission runs under the lock: list *.json, delete entries whose pid is dead or whose file mtime is older than 10 min, refuse when available - reservedBytes - bytes < DISK_SAFETY_FLOOR_BYTES, else write <uuid>.json {pid,bytes,label,path,createdAt}, start an unref'd 60 s utimes heartbeat, and return an idempotent release that clears the heartbeat and deletes the file. statfs failure admits with a no-op release; ANY ledger failure (mkdir, listing, write, lock) refuses with the D-7 ledger-unavailable text (fail closed). Refusal text and the new checkDiskFloor text start with DISK_LOW_HELD_PREFIX; floor refusals contain '10.0 GiB'. Keep DISK_SAFETY_FLOOR_BYTES === DISK_PRUNE_TRIGGER_BYTES. Tests: mkdtemp ledger, injected read, in-process promise-chain mutex for withLock, injected isPidAlive/now, vi.useFakeTimers() for the heartbeat test; no real statfs."
+        },
+        "items": [
+          {
+            "id": "floor-ledger.ac1",
+            "title": "Given read() returns 16 GiB and each call asks for 2 GiB, when 6 reserveDiskFloor calls run concurrently without releasing, then exactly 3 return ok: true and 3 return ok: false with an error that starts with 'Disk low — new workspace starts are held' and contains '10.0 GiB'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "floor-ledger.ac2",
+            "title": "Given one admitted reservation is released, when a 7th reserveDiskFloor call runs at the same free space, then it returns ok: true and the released reservation file no longer exists in the ledger directory",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "floor-ledger.ac3",
+            "title": "Given a reservation file whose pid isPidAlive reports dead, or whose mtime is older than DISK_RESERVATION_STALE_MS while its pid is alive, when reserveDiskFloor runs, then that file is deleted and its bytes are not subtracted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "floor-ledger.ac4",
+            "title": "Given fake timers and an admitted reservation whose holder stays alive, when 30 minutes are advanced, then a new reserveDiskFloor call still subtracts its bytes because the heartbeat renewed the file mtime",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "floor-ledger.ac5",
+            "title": "Given withLock throws, when 6 reserveDiskFloor calls run concurrently, then all 6 return ok: false with an error that starts with DISK_LOW_HELD_PREFIX and names the unavailable ledger; given read() throws instead, reserveDiskFloor returns ok: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "disk-cost-estimate",
+        "title": "Measure the per-workspace host and stack disk cost in workspace/disk-cost.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T23:39:13Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4961",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "foundationFor": [
+            "create-admission",
+            "stack-admission",
+            "spawn-disk-hold",
+            "containerize-admission"
+          ],
+          "files_scope": [
+            "src/lib/workspace/disk-cost.ts",
+            "src/lib/workspace/__tests__/disk-cost.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/workspace/__tests__/disk-cost.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "disk-cost.test.ts passes",
+            "typecheck and lint complete without errors (no new circular import)"
+          ],
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-2 as revised after the round-1 critique: new src/lib/workspace/disk-cost.ts exporting DiskCostProject, WorkspaceDiskCost (stackSource 'measured'|'machine'|'seed'|'none'), estimateWorkspaceDiskCost, parseDockerSize, resetWorkspaceDiskCostMemo, invalidateWorkspaceDiskCostMemo, SEED_HOST_DISK_COST_BYTES (0.5 GiB), SEED_STACK_DISK_COST_BYTES (2 GiB), DISK_COST_MEMO_TTL_MS (6 h). NO shell anywhere: git and docker run through execFile argument vectors; unshared node_modules bytes come from an async Node readdir/lstat walk summing blocks*512 for files with nlink === 1, never following symlinks, at most 64 lstat calls in flight. hostBytes = ls-tree blob-size sum + unshared bytes of the newest finished sibling feature-* workspace's node_modules (else the primary checkout's). stackBytes (only with compose_template) = max over finished siblings of '<composeProject>_*' volume Size + '<composeProject>-*' image UniqueSize; with no sibling stack, max(largest compose-project volume group on the host, SEED_STACK) as 'machine'; docker failure -> seed. Any non-finite or negative parsed component counts as unmeasurable. Memoize the promise per project path; do not memoize rejections."
+        },
+        "items": [
+          {
+            "id": "disk-cost-estimate.ac1",
+            "title": "parseDockerSize returns 1938000000 for '1.938GB', 287300000 for '287.3MB', 512000 for '512kB' and 0 for '0B'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "disk-cost-estimate.ac2",
+            "title": "Given an injected docker df fixture with two sibling stacks of different volume sizes, estimateWorkspaceDiskCost returns stackBytes equal to the larger stack's volume Size plus image UniqueSize and stackSource 'measured'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "disk-cost-estimate.ac3",
+            "title": "Given no finished sibling stack but another compose project on the host with a 5 GB volume group, estimateWorkspaceDiskCost returns stackBytes 5000000000 with stackSource 'machine'; given the docker command rejects, it returns SEED_STACK_DISK_COST_BYTES with stackSource 'seed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "disk-cost-estimate.ac4",
+            "title": "Given a temp dir holding one single-link file and one hardlinked pair, the default unshared-bytes walk returns only the single-link file's blocks; and a project path containing '\"$(touch pwned)\"' reaches exec as one argument-vector element with no 'pwned' file created",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "disk-cost-estimate.ac5",
+            "title": "Given a memoized estimate younger than DISK_COST_MEMO_TTL_MS, when estimateWorkspaceDiskCost is called again for the same project path, then it returns the memoized value without invoking the injected exec; after invalidateWorkspaceDiskCostMemo(path) the next call invokes exec again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "create-admission",
+        "title": "createWorkspace reserves its host phase and re-checks the floor before install and compose",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T23:39:13Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4961",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/lib/workspace-manager/create.ts",
+            "tests/unit/lib/workspace-manager/create-disk-floor.test.ts",
+            "tests/unit/lib/workspace-manager/create-workspace-row.test.ts",
+            "tests/unit/lib/workspace-manager/create-resume-setup.test.ts",
+            "tests/lib/workspace-manager.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/workspace-manager/ tests/lib/workspace-manager.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "all workspace-manager test files pass",
+            "typecheck completes without errors",
+            "file-size guard passes"
+          ],
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "NFR-3"
+          ],
+          "parallelSafeReason": "Touches only create.ts and createWorkspace test files, which no other item edits; it consumes floor-ledger and disk-cost-estimate through their exported APIs after those land."
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-3 in src/lib/workspace-manager/create.ts: wrap the existing body as non-exported createWorkspaceHoldingReservation(options, hold) and make exported createWorkspace release hold in a finally. Replace the single checkDiskFloor call (line ~203, 'const diskError = await checkDiskFloor(projectConfig.path);') with estimateWorkspaceDiskCost + reserveDiskFloor({ path: projectConfig.path, bytes: hostBytes + (startDocker ? stackBytes : 0), label: `workspace:${featureName}` }); hold.release releases the reservation then calls invalidateWorkspaceDiskCostMemo(projectConfig.path); validation and dryRun stay before it. Add checkDiskFloor re-checks immediately before the root package install and immediately before EACH per-repo execAsync inside the polyrepo install loop (return success:false, keep the setup-incomplete marker), and before the startDocker `docker compose ... up -d --build` (soft error, skip compose). Update the disk-floor.js mocks in create-workspace-row.test.ts, create-resume-setup.test.ts and tests/lib/workspace-manager.test.ts to also mock reserveDiskFloor and mock workspace/disk-cost.js estimateWorkspaceDiskCost; add create-disk-floor.test.ts. create.ts must stay <= 1000 lines."
+        },
+        "items": [
+          {
+            "id": "create-admission.ac1",
+            "title": "Given reserveDiskFloor returns ok: false, createWorkspace returns success: false with an error starting 'Disk low — new workspace starts are held' and no 'git worktree add' command is executed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-admission.ac2",
+            "title": "Given reserveDiskFloor admits, the reservation's release is called exactly once after createWorkspace resolves, both when setup succeeds and when the dependency install fails",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-admission.ac3",
+            "title": "Given checkDiskFloor refuses at the root install re-check, createWorkspace returns success: false, the install command is never executed, and <workspace>/.overdeck/setup-incomplete exists; given a polyrepo with two installing repos where the second re-check refuses, the first repo's install ran and the second's never ran",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-admission.ac4",
+            "title": "Given startDocker: true, reserveDiskFloor is called with bytes equal to hostBytes + stackBytes; given startDocker unset, with hostBytes only",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-admission.ac5",
+            "title": "When create-workspace-row.test.ts, create-resume-setup.test.ts and tests/lib/workspace-manager.test.ts execute the real createWorkspace, reserveDiskFloor and estimateWorkspaceDiskCost are mocked, so readAvailableBytes and the docker/git estimator commands are never invoked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stack-admission",
+        "title": "rebuildWorkspaceStack reserves the stack phase before docker compose up",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T23:39:13Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4961",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/lib/workspace/rebuild-stack.ts",
+            "src/lib/workspace/__tests__/rebuild-stack.test.ts",
+            "tests/unit/lib/workspace/rebuild-stack.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/workspace/__tests__/rebuild-stack.test.ts tests/unit/lib/workspace/rebuild-stack.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both rebuild-stack test files pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-4 in src/lib/workspace/rebuild-stack.ts: add `diskLow?: boolean` to RebuildWorkspaceStackResult; after ensureExternalNetwork() and before the `up -d --build` dockerCompose call, estimate stackBytes and reserveDiskFloor({ path: workspacePath, bytes: stackBytes, label: `stack:${normalizedIssueId}` }); on refusal return { success: false, diskLow: true, error, workspacePath } without running up; on admission pipe the up call through Effect.ensuring(release). Teardown (down -v) stays before admission. Mock disk-floor.js and workspace/disk-cost.js in both rebuild test files. After release, call invalidateWorkspaceDiskCostMemo(projectConfig.path) so the next estimate measures the stack just built."
+        },
+        "items": [
+          {
+            "id": "stack-admission.ac1",
+            "title": "Given reserveDiskFloor refuses, rebuildWorkspaceStack returns success: false and diskLow: true with an error starting 'Disk low — new workspace starts are held', and no 'up -d --build' docker compose invocation is recorded",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stack-admission.ac2",
+            "title": "Given admission and a succeeding 'up', the reservation release is called exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stack-admission.ac3",
+            "title": "Given admission and a failing 'up', rebuildWorkspaceStack returns success: false and the reservation release is still called exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stack-admission.ac4",
+            "title": "When the stack is rebuilt, reserveDiskFloor is called after the 'down -v' teardown invocation and with bytes equal to the mocked stackBytes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "containerize-admission",
+        "title": "Both containerize doors reserve host and stack cost before they build",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T23:39:13Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4961",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/dashboard/server/routes/workspaces/container-ops.ts",
+            "src/dashboard/server/routes/workspaces/__tests__/container-ops-disk.test.ts",
+            "src/dashboard/server/services/workspace-service.ts",
+            "src/dashboard/server/services/__tests__/workspace-service.unit.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/workspaces/__tests__/container-ops-disk.test.ts src/dashboard/server/services/__tests__/workspace-service.unit.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "container-ops-disk.test.ts and workspace-service.unit.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-5 as revised after the round-1 critique. Route POST /api/workspaces/:issueId/containerize in src/dashboard/server/routes/workspaces/container-ops.ts (lines 61-186, spawns infra/new-feature then ./dev all): after the docker-info and workspace-exists checks and before logActivity, resolve the project (resolveProjectFromIssueSync + getProjectSync, else { path: projectPath }), estimate, and reserveDiskFloor({ path: projectPath, bytes: hostBytes + Math.max(stackBytes, SEED_STACK_DISK_COST_BYTES), label: `containerize:${issueLower}` }); on refusal answer 507 { success:false, blocked:true, diskLow:true, error } and spawn nothing; on admission release exactly once (guarded flag) on every terminal path (new-feature close non-zero, new-feature error, ./dev all close, ./dev all error) and then invalidateWorkspaceDiskCostMemo(projectPath). Service WorkspaceService.containerize in src/dashboard/server/services/workspace-service.ts: reserve stackBytes (or SEED_STACK when 0) before `up -d --build`, throw WorkspaceCreateError with the refusal text, release in finally. New test file container-ops-disk.test.ts; extend workspace-service.unit.test.ts."
+        },
+        "items": [
+          {
+            "id": "containerize-admission.ac1",
+            "title": "Given reserveDiskFloor refuses, POST /api/workspaces/:issueId/containerize returns status 507 with diskLow: true and the mocked child_process spawn is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "containerize-admission.ac2",
+            "title": "Given admission, the reservation release is called exactly once after the mocked './dev all' child emits close, and exactly once when the mocked 'new-feature' child emits close with code 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "containerize-admission.ac3",
+            "title": "Given reserveDiskFloor refuses, WorkspaceService.containerize fails with WorkspaceCreateError whose message starts with 'Disk low — new workspace starts are held' and the mocked exec records no 'up -d --build' command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "containerize-admission.ac4",
+            "title": "Given admission, WorkspaceService.containerize runs 'docker compose ... up -d --build' and then calls the reservation release exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "spawn-disk-hold",
+        "title": "Work start answers HTTP 507 diskLow when a needed stack rebuild would breach the floor",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T23:39:13Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4961",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/lib/workspace/disk-cost.ts",
+            "src/lib/workspace/__tests__/disk-cost.test.ts",
+            "src/dashboard/server/routes/agents/spawn-issue.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/workspace/__tests__/disk-cost.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "disk-cost.test.ts passes including resolveStackDiskHold cases",
+            "typecheck completes without errors",
+            "file-size guard passes"
+          ],
+          "traces": [
+            "FR-9",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-6 as revised after the round-1 critique: add resolveStackDiskHold(projectConfig, workspacePath, deps?) and resolveIssueStackDiskHold(issueId) to src/lib/workspace/disk-cost.ts. resolveIssueStackDiskHold resolves the project with resolveProjectFromIssueSync + getProjectSync from ../projects.js and the workspace path exactly as rebuild-stack.ts does (join(resolved.projectPath, projectConfig.workspace?.workspaces_dir ?? 'workspaces', `feature-${issue}`)), returning null when either is missing. In src/dashboard/server/routes/agents/spawn-issue.ts inside `if (!stackHealth.healthy && !allowHost) {` (after line ~491) and before the rebuild attempt, call resolveIssueStackDiskHold(issueId) — never the route's own hardcoded workspacePath from line 330 — and when it returns text: emitStartAgentPhase(issueId,'stackHealthGate','failure',text), emitActivityEntry warn 'agent-spawn-held-disk-low: <ISSUE>', and return jsonResponse({ success:false, blocked:true, skipped:true, diskLow:true, error:text, hint:'Workspace starts are held until free space recovers. Free disk space (see /resources), then retry pan start <id>.' }, { status: 507 }). spawn-issue.ts must stay <= 1000 lines."
+        },
+        "items": [
+          {
+            "id": "spawn-disk-hold.ac1",
+            "title": "resolveStackDiskHold returns null and never calls the injected preview when the injected estimate reports stackBytes 0, and otherwise returns the preview's refusal text after passing bytes equal to stackBytes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-disk-hold.ac2",
+            "title": "Given a project with workspace.workspaces_dir 'wt', resolveIssueStackDiskHold previews the path <projectPath>/wt/feature-<issue>; given an issue that resolves to no project, it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-disk-hold.ac3",
+            "title": "spawn-issue.ts returns status 507 with body fields diskLow: true, blocked: true and error equal to the hold text inside the unhealthy-stack branch, before any assertWorkspaceStackHealthyForSpawn rebuild call (verified by diff review)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-disk-hold.ac4",
+            "title": "When the stack is healthy, spawn-issue.ts never calls resolveIssueStackDiskHold (the call sits only inside the `!stackHealth.healthy && !allowHost` branch)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-start-disk-hold",
+        "title": "CLI pan start holds a work spawn with the disk-low message before rebuilding a stack",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T23:39:13Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4961",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/spawn-prep.ts",
+            "src/lib/agents/__tests__/spawn-prep-disk-hold.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/spawn-prep-disk-hold.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "spawn-prep-disk-hold.test.ts passes",
+            "typecheck completes without errors",
+            "file-size guard passes (spawn-prep.ts <= 1128 lines)"
+          ],
+          "traces": [
+            "FR-12",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-10. `pan start <planned-id>` spawns in-process (src/cli/commands/start.ts line 977 spawnAgent → src/lib/agents/spawn.ts prepareWorkspaceForAgentSpawn → assertWorkspaceStackHealthyForSpawn in src/lib/agents/spawn-prep.ts), not through POST /api/agents, so the spawn-issue hold never runs and a refused rebuild surfaces as the generic 'Workspace docker stack ... not healthy' error. Reuse resolveIssueStackDiskHold(issueId) from spawn-disk-hold (src/lib/workspace/disk-cost.ts); do not add a second resolver. In assertWorkspaceStackHealthyForSpawn, immediately before `record.lastAttempt = now;` add: `const diskHold = await resolveIssueStackDiskHold(issueId); // PAN-4961` then `if (diskHold) { if (hostFallbackEligible) { fallbackToHost(diskHold); return; } throw new Error(diskHold); }`. The hold does not count a rebuild attempt and does not set the escalation latch. spawn-prep.ts is 1120 lines with allowlist cap 1128: add at most 8 lines; never raise the cap."
+        },
+        "items": [
+          {
+            "id": "cli-start-disk-hold.ac1",
+            "title": "Given an unhealthy stack and resolveIssueStackDiskHold returning the hold text, assertWorkspaceStackHealthyForSpawn(issue, 'work') rejects with an Error whose message starts with 'Disk low — new workspace starts are held' and the mocked rebuildWorkspaceStack is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-start-disk-hold.ac2",
+            "title": "Given the same hold for role 'review', assertWorkspaceStackHealthyForSpawn resolves (host fallback) without calling rebuildWorkspaceStack",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-start-disk-hold.ac3",
+            "title": "Given the hold clears on a later call, the next assertWorkspaceStackHealthyForSpawn('work') call runs the rebuild immediately (the held call recorded no attempt and no cooldown)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "handoff-defers-disk-hold",
+        "title": "A diskLow spawn refusal defers the finalize auto-handoff and keeps deacon-lite retrying",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T23:39:13Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4961",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/lib/overdeck/planning-promotion.ts",
+            "src/lib/cloister/work-agent-start.ts",
+            "tests/unit/lib/disk-low-handoff.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/disk-low-handoff.test.ts tests/unit/cli/plan-finalize-promote-deferred.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "disk-low-handoff.test.ts and plan-finalize-promote-deferred.test.ts pass",
+            "typecheck completes without errors",
+            "file-size guard passes"
+          ],
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-7: in src/lib/overdeck/planning-promotion.ts classifyAutoSpawnSkip add `if (body['diskLow'] === true) return 'guardrails';` before the stack-unhealthy test, and extend the workAgentDeferred condition at line ~533 to `(skipReason === 'guardrails' && (body['guardrails'] || body['diskLow'] === true))`. planning-promotion.ts must stay <= 997 lines (its allowlist cap). In src/lib/cloister/work-agent-start.ts classifySpawnSkip add the same diskLow line before the stack-unhealthy test. New test tests/unit/lib/disk-low-handoff.test.ts using completePlanningAutoSpawn's fetchImpl and a stubbed global fetch for spawnWorkAgentThroughAgentsEndpoint."
+        },
+        "items": [
+          {
+            "id": "handoff-defers-disk-hold.ac1",
+            "title": "Given the agents endpoint answers 507 { success: false, diskLow: true, error: 'Disk low — new workspace starts are held: …' }, completePlanningAutoSpawn returns workAgentSkipReason 'guardrails' and workAgentDeferred true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-defers-disk-hold.ac2",
+            "title": "Given the same 507 diskLow response, spawnWorkAgentThroughAgentsEndpoint returns skippedReason 'guardrails' (a retryable reason, not in the stand-down or give-up sets)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-defers-disk-hold.ac3",
+            "title": "Given a 422 response with stackHealth and no diskLow, both classifiers still return 'stack-unhealthy'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "planning-no-stack-test",
+        "title": "Pin that a planning session builds no Docker stack",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T23:39:13Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4961",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/lib/planning/__tests__/spawn-planning-session-no-stack.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/planning/__tests__/spawn-planning-session-no-stack.test.ts"
+          ],
+          "expected_outputs": [
+            "spawn-planning-session-no-stack.test.ts passes"
+          ],
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-8: new src/lib/planning/__tests__/spawn-planning-session-no-stack.test.ts, copying the mock scaffolding of spawn-planning-session-backend.test.ts. No production code changes: the behavior already holds (PlanDialog defaults startDocker false, pan start sends none, assertWorkspaceStackHealthyForSpawn returns early for role plan)."
+        },
+        "items": [
+          {
+            "id": "planning-no-stack-test.ac1",
+            "title": "Given spawnPlanningSession is called without startDocker for a project with a workspace config, the mocked createWorkspace receives startDocker falsy",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "planning-no-stack-test.ac2",
+            "title": "assertWorkspaceStackHealthyForSpawn('PAN-1', 'plan') resolves without calling the mocked getWorkspaceStackHealth or rebuildWorkspaceStack",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document the disk floor reservations, the disk-low hold and the Flywheel response",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T23:39:13Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4961",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "docs/WORKSPACES-AND-PROJECTS.md",
+            "docs/PIPELINE-GATES.md",
+            "reference/troubleshooting.mdx",
+            "sync-sources/skills/pan-flywheel/SKILL.md",
+            ".overdeck/context/codebase/conventions.md"
+          ],
+          "verify_commands": [
+            "grep -c 'Disk low — new workspace starts are held' docs/WORKSPACES-AND-PROJECTS.md docs/PIPELINE-GATES.md reference/troubleshooting.mdx sync-sources/skills/pan-flywheel/SKILL.md",
+            "grep -n 'reserveDiskFloor' .overdeck/context/codebase/conventions.md"
+          ],
+          "expected_outputs": [
+            "each of the four files reports a count >= 1",
+            "conventions.md names reserveDiskFloor and estimateWorkspaceDiskCost"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "FR-7",
+            "FR-9",
+            "FR-10",
+            "FR-11",
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-9: docs/WORKSPACES-AND-PROJECTS.md new section '## Disk floor and in-flight reservations (PAN-4961)' after the PAN-4171 section (floor, two phases and where each is admitted, admission formula, ledger path ~/.overdeck/disk-reservations/ with the 60 s heartbeat, dead-pid / 10 min stale reclaim, and fail-closed refusal when the ledger is unavailable, re-checks before the root install, each per-repo install and compose, the containerize route, measured estimate with 6 h memo, machine-wide fallback and seeds, one-filesystem assumption, planning builds no stack — the stack is built when the work agent starts). docs/PIPELINE-GATES.md '### Disk-low hold (PAN-4961)' under '## Agent Auto-Resume Gates' (507 diskLow, deferred handoff retries). reference/troubleshooting.mdx '## Disk low — new workspace starts are held' (message, what is held, how to free space, starts resume on retry) and the prevention bullet points to it. sync-sources/skills/pan-flywheel/SKILL.md Phase 3 paragraph (on that message launch nothing more this tick, report needs-you=disk low with free GiB, do not retry that issue this tick). .overdeck/context/codebase/conventions.md lines ~55-57: tests running the real createWorkspace or rebuildWorkspaceStack mock checkDiskFloor and reserveDiskFloor in disk-floor.js and estimateWorkspaceDiskCost in workspace/disk-cost.js; refresh last-verified."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "docs/WORKSPACES-AND-PROJECTS.md contains the heading '## Disk floor and in-flight reservations (PAN-4961)' and states the admission formula available − reserved − own cost ≥ 10 GiB, the ledger path ~/.overdeck/disk-reservations/ and the 60 s heartbeat / 10 min stale rule",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "docs/PIPELINE-GATES.md contains '### Disk-low hold (PAN-4961)' and states that a work start needing a stack rebuild is refused with the disk-low message on both start paths (HTTP 507 diskLow from POST /api/agents; a thrown error from CLI pan start) and that the finalize auto-handoff defers and retries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "reference/troubleshooting.mdx contains the section '## Disk low — new workspace starts are held' with at least one concrete command for freeing space",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac4",
+            "title": "sync-sources/skills/pan-flywheel/SKILL.md Phase 3 tells the loop to launch nothing more in that tick when pan start prints 'Disk low — new workspace starts are held'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac5",
+            "title": ".overdeck/context/codebase/conventions.md contains reserveDiskFloor and estimateWorkspaceDiskCost as mocks required by tests that run the real createWorkspace or rebuildWorkspaceStack",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "floor-ledger",
+        "to": "create-admission",
+        "type": "blocks"
+      },
+      {
+        "from": "disk-cost-estimate",
+        "to": "create-admission",
+        "type": "blocks"
+      },
+      {
+        "from": "floor-ledger",
+        "to": "stack-admission",
+        "type": "blocks"
+      },
+      {
+        "from": "disk-cost-estimate",
+        "to": "stack-admission",
+        "type": "blocks"
+      },
+      {
+        "from": "floor-ledger",
+        "to": "containerize-admission",
+        "type": "blocks"
+      },
+      {
+        "from": "floor-ledger",
+        "to": "spawn-disk-hold",
+        "type": "blocks"
+      },
+      {
+        "from": "disk-cost-estimate",
+        "to": "spawn-disk-hold",
+        "type": "blocks"
+      },
+      {
+        "from": "create-admission",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "stack-admission",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "spawn-disk-hold",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "handoff-defers-disk-hold",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "containerize-admission",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "spawn-disk-hold",
+        "to": "cli-start-disk-hold",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-start-disk-hold",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "disk-cost-estimate",
+        "to": "cli-start-disk-hold",
+        "type": "blocks"
+      },
+      {
+        "from": "disk-cost-estimate",
+        "to": "containerize-admission",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

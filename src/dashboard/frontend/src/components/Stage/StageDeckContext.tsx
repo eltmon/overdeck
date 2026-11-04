@@ -13,8 +13,11 @@ import { createContext, useContext } from 'react'
 export interface StageDeckContextValue {
   /** The deck's pane-store key (the project key). */
   deckKey: string
-  /** Open (or focus, if already open) an internal markdown editor tab for `filePath`. */
-  openOrFocusEditorPane: (filePath: string, label: string) => void
+  /** Open (or focus) an internal markdown editor tab for `filePath`. A non-null
+   *  `citeConversationName` becomes (or replaces) the tab's cite target (PAN-4658 D4). */
+  openOrFocusEditorPane: (filePath: string, label: string, citeConversationName?: string | null) => void
+  /** Open (or focus) the agent tab for a conversation (PAN-4658 D10). */
+  openOrFocusAgentPane: (conversationId: string, label: string) => void
 }
 
 const StageDeckContext = createContext<StageDeckContextValue | null>(null)

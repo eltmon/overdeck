@@ -152,22 +152,29 @@ Overdeck supports multiple AI model providers through direct Anthropic-compatibl
 
 **Anthropic** (via Claude Code / Claude API)
 - `claude-opus-4-6` - Most capable, best for planning and complex tasks
-- `claude-sonnet-4-5` - Balanced performance and cost
+- `claude-sonnet-4-6` - Balanced performance and cost
 - `claude-haiku-4-5` - Fast and cost-effective for simple tasks
 
 **OpenAI**
-- `gpt-5.2-codex` - Agentic coding and research
-- `o3-deep-research` - Deep research capabilities
-- `gpt-4o` - General-purpose model
-- `gpt-4o-mini` - Faster, more cost-effective variant
+- `gpt-5.6-sol` - Default OpenAI model
+- `gpt-6-astra` - Most capable OpenAI model (opt-in)
+- `gpt-5.6-luna` - Fast and cost-effective
 
 **Google (Gemini)**
-- `gemini-3-pro-preview` - Supports `thinking_level: high|low`
-- `gemini-3-flash-preview` - Supports `thinking_level: minimal|low|medium|high`
+- `gemini-4-argon` - Flagship model
+- `gemini-3.8-flash` - Fast tier
+- `gemini-3.6-flash` - Fast tier
+- `gemini-3.5-flash-lite` - Budget tier
+- `gemini-3.1-pro-preview` - Flagship tier
+- `gemini-3-flash-preview` - Fast tier; supports `thinking_level: minimal|low|medium|high`
+- `gemini-3.1-flash-lite` - Budget tier
 
 **Z.AI**
-- `glm-4.7` - General-purpose model
-- `glm-4.7-flash` - Faster variant
+- `glm-5.3` - Flagship model
+- `glm-5.3-flash` - Fast tier
+- `glm-5.3-flashx` - Fast tier, higher speed
+- `glm-5.2` - Previous flagship
+- `glm-5.1` - Previous flagship
 
 #### Configuration via Dashboard
 
@@ -372,6 +379,8 @@ The singular `pan project` form is a compatibility alias.
 
 ### Skills Commands
 
+Skill pack internals: [docs/SKILL-PACKS.md](SKILL-PACKS.md). User guide: [features/skill-packs.mdx](../features/skill-packs.mdx).
+
 ```bash
 # Sync layered context and bundled skills to Claude Code
 pan sync
@@ -388,7 +397,10 @@ pan skills set --pack <id> on|off|inherit [--project <key> | --issue <id>]
 pan skills set <pack>/<skill> on|off|inherit [--project <key> | --issue <id>]
 
 # Register, update, inspect, and cache skill packs pinned to a commit
-pan skills pack add <id> <url> --ref <ref> [--adapter plain|claude-plugin|deft-readonly] [--yes]
+pan skills pack add <id> <url> --ref <ref> [--adapter plain|claude-plugin|deft-readonly|gstack-runtime] [--browser] [--yes]
+pan skills pack add gstack https://github.com/eltmon/gstack --ref main   # gstack runtime pack (needs bun)
+pan skills pack add gstack https://github.com/eltmon/gstack --ref main --browser   # plus the browser runtime (asks twice)
+pan skills pack browser <id> [on|off] [--yes]   # build or remove gstack's browser, design and PDF runtime
 pan skills pack update <id> [--ref <ref>] [--yes]
 pan skills pack list [--json] [--offline]
 pan skills pack remove <id>

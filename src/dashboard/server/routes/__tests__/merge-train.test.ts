@@ -6,9 +6,12 @@
  * run's activePipeline would fail here.
  */
 
+import { rmSync } from 'node:fs';
+import { join } from 'node:path';
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { getOverdeckHome } from '../../../../lib/paths.js';
 
 const projectsMocks = vi.hoisted(() => ({
   listProjectsSync: vi.fn(),
@@ -21,6 +24,12 @@ const projectsMocks = vi.hoisted(() => ({
 const mergeOrderMocks = vi.hoisted(() => ({
   listReadyIssuesForProject: vi.fn(() => [] as Array<{ issueId: string; title: string; pr?: number }>),
   computeMergeQueueFromCandidates: vi.fn(),
+}));
+
+// PAN-4970: mergePathOwner decides mergesPerPr for each queue item; mocked so
+// the queue route tests never reach its real deps (env, forge, the db).
+const mergePathOwnerMocks = vi.hoisted(() => ({
+  mergePathOwner: vi.fn(async () => 'batch' as 'batch' | 'per-pr'),
 }));
 
 const mergeSyncMocks = vi.hoisted(() => ({
@@ -120,6 +129,7 @@ vi.mock('../../services/derived-issue-state.js', async (importOriginal) => {
   };
 });
 vi.mock('../../../../lib/flywheel-merge-order.js', () => mergeOrderMocks);
+vi.mock('../../services/merge-path-owner.js', () => mergePathOwnerMocks);
 vi.mock('../../../../lib/overdeck/merge-sync.js', () => mergeSyncMocks);
 vi.mock('../../services/uat-train.js', () => uatTrainMocks);
 vi.mock('../../../../lib/cloister/merge-batch.js', () => mergeBatchMocks);
@@ -190,6 +200,7 @@ beforeEach(() => {
   process.env.OVERDECK_INTERNAL_TOKEN = 'test-token';
   process.env.OVERDECK_DASHBOARD_SESSION_TOKEN = 'test-session-token';
   process.env.OVERDECK_DASHBOARD_CSRF_TOKEN = 'test-csrf-token';
+  rmSync(join(getOverdeckHome(), 'internal-token'), { force: true });
   _resetInternalTokenCacheForTests();
   _resetDashboardSessionTokenForTests();
   projectsMocks.listProjectsSync.mockReturnValue([
@@ -283,6 +294,42 @@ describe('PAN-1696 merge-train-routes', () => {
       const entries = await getMergeTrainQueuesPayload();
       expect(entries.map((e) => e.projectKey)).toEqual(['overdeck', 'myn']);
       expect(entries.find((e) => e.projectKey === 'overdeck')?.queue).toEqual([]);
+    });
+
+    // queue-owner-flag.ac1
+    it('marks each queue item with mergePathOwner\'s answer (PAN-4970)', async () => {
+      mergeOrderMocks.listReadyIssuesForProject.mockImplementation(() => [
+        { issueId: 'PAN-1', title: 'PAN-1' },
+        { issueId: 'PAN-2', title: 'PAN-2' },
+      ]);
+      mergeOrderMocks.computeMergeQueueFromCandidates.mockImplementation((candidates: readonly { issueId: string }[]) =>
+        Effect.succeed(candidates.map((c, i) => ({ issueId: c.issueId, title: c.issueId, mergeOrder: i }))),
+      );
+      mergePathOwnerMocks.mergePathOwner.mockImplementation(async (issueId: string) =>
+        issueId === 'PAN-1' ? 'per-pr' : 'batch');
+
+      const entries = await getMergeTrainQueuesPayload();
+
+      const queue = entries.find((e) => e.projectKey === 'overdeck')?.queue;
+      expect(queue?.find((item) => item.issueId === 'PAN-1')?.mergesPerPr).toBe(true);
+      expect(queue?.find((item) => item.issueId === 'PAN-2')?.mergesPerPr).toBe(false);
+    });
+
+    // queue-owner-flag.ac2
+    it('reports queue: [] with no mergePathOwner calls for a disabled or failed project', async () => {
+      mergeSyncMocks.isMergeTrainEnabledForProject.mockImplementation(
+        (config: { path: string }) => config.path !== '/repos/myn',
+      );
+      mergeOrderMocks.listReadyIssuesForProject.mockImplementation((path: string) => {
+        if (path === '/repos/overdeck') throw new Error('git fetch failed');
+        return [];
+      });
+
+      const entries = await getMergeTrainQueuesPayload();
+
+      expect(entries.find((e) => e.projectKey === 'myn')).toMatchObject({ enabled: false, queue: [] });
+      expect(entries.find((e) => e.projectKey === 'overdeck')).toMatchObject({ queue: [] });
+      expect(mergePathOwnerMocks.mergePathOwner).not.toHaveBeenCalled();
     });
   });
 

@@ -1,0 +1,93 @@
+{
+  "version": "1",
+  "issueId": "PAN-4871",
+  "created": "2026-11-03T03:36:23.944Z",
+  "updated": "2026-11-03T04:01:54.268Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "open-linked-rows": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4871",
+      "claimedAt": "2026-11-03T03:36:23.944Z",
+      "doneAt": "2026-11-03T03:38:54.778Z"
+    },
+    "linked-row-lookup": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4871",
+      "claimedAt": "2026-11-03T03:39:10.836Z",
+      "doneAt": "2026-11-03T03:41:53.477Z"
+    },
+    "mobile-view-linked": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4871",
+      "claimedAt": "2026-11-03T03:41:59.703Z",
+      "doneAt": "2026-11-03T03:44:39.813Z"
+    },
+    "docs-phone-linked": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4871",
+      "claimedAt": "2026-11-03T03:44:44.815Z",
+      "doneAt": "2026-11-03T03:45:38.982Z"
+    },
+    "open-linked-rows.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T03:56:53.370Z"
+    },
+    "open-linked-rows.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T03:57:33.763Z"
+    },
+    "open-linked-rows.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T03:57:53.208Z"
+    },
+    "linked-row-lookup.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T03:58:12.836Z"
+    },
+    "linked-row-lookup.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T03:58:33.188Z"
+    },
+    "linked-row-lookup.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T03:58:53.222Z"
+    },
+    "mobile-view-linked.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T03:59:13.941Z"
+    },
+    "mobile-view-linked.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T03:59:35.710Z"
+    },
+    "mobile-view-linked.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T03:59:54.080Z"
+    },
+    "mobile-view-linked.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:00:15.382Z"
+    },
+    "mobile-view-linked.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:00:41.340Z"
+    },
+    "docs-phone-linked.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:01:05.069Z"
+    },
+    "docs-phone-linked.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:01:27.846Z"
+    },
+    "docs-phone-linked.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:01:54.268Z"
+    }
+  }
+}

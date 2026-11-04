@@ -26,6 +26,7 @@ import {
   useState,
 } from 'react'
 import { cn } from '../lib/utils'
+import { isNativeShell } from '../lib/nativeShell'
 import { useTheme } from '../hooks/useTheme'
 import { useDiffPreferences } from '../hooks/useDiffPreferences'
 import { buildDiffFetchUrl, parseDiffRouteSearch, type DiffCompareMode } from '../lib/diffRouteSearch'
@@ -672,7 +673,7 @@ export function DiffPanel({
               <div className="text-[10px] leading-tight font-medium">vs main</div>
             </div>
           </button>
-          {repoPath && (
+          {repoPath && !isNativeShell() && (
             <button
               type="button"
               className="shrink-0 rounded-md"

@@ -4,8 +4,11 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../../helpers/overdeck-test-db.js';
 
-const { mockExecAsync } = vi.hoisted(() => ({
+const { mockExecAsync, mockCheckDiskFloor, mockReserveDiskFloor, mockEstimateWorkspaceDiskCost } = vi.hoisted(() => ({
   mockExecAsync: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
+  mockCheckDiskFloor: vi.fn(),
+  mockReserveDiskFloor: vi.fn(),
+  mockEstimateWorkspaceDiskCost: vi.fn(),
 }));
 
 vi.mock('child_process', async () => {
@@ -17,6 +20,21 @@ vi.mock('util', async () => {
   const actual = await vi.importActual<typeof import('util')>('util');
   return { ...actual, promisify: () => mockExecAsync };
 });
+
+// checkDiskFloor and reserveDiskFloor read real free space via statfs
+// (PAN-4723, PAN-4961): mock both so tests don't fail on CI runners whose /tmp
+// has less than the 10 GiB floor. The disk-cost estimator runs real git and
+// docker, so it is mocked too.
+vi.mock('../../../../src/lib/disk-floor.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../src/lib/disk-floor.js')>()),
+  checkDiskFloor: mockCheckDiskFloor,
+  reserveDiskFloor: mockReserveDiskFloor,
+}));
+
+vi.mock('../../../../src/lib/workspace/disk-cost.js', () => ({
+  estimateWorkspaceDiskCost: mockEstimateWorkspaceDiskCost,
+  invalidateWorkspaceDiskCostMemo: vi.fn(),
+}));
 
 
 /** Matches both exec shell strings and execFile argv vectors for `git worktree add`. */
@@ -37,6 +55,12 @@ beforeEach(() => {
   tempDir = mkdtempSync(join(tmpdir(), 'pan-1990-create-row-'));
   mockExecAsync.mockReset();
   mockExecAsync.mockResolvedValue({ stdout: '', stderr: '' });
+  mockCheckDiskFloor.mockReset();
+  mockCheckDiskFloor.mockResolvedValue(null);
+  mockReserveDiskFloor.mockReset();
+  mockReserveDiskFloor.mockResolvedValue({ ok: true, reservation: { release: vi.fn(async () => {}) } });
+  mockEstimateWorkspaceDiskCost.mockReset();
+  mockEstimateWorkspaceDiskCost.mockResolvedValue({ hostBytes: 1, stackBytes: 1, hostSource: 'measured', stackSource: 'measured' });
 });
 
 afterEach(() => {
@@ -63,11 +87,27 @@ describe('createWorkspace: workspace row creation (PAN-1990)', () => {
 
     expect(result.success).toBe(true);
     expect(rowExistedDuringWorktreeAdd).toBe(true);
+    expect(mockReserveDiskFloor).toHaveBeenCalledWith(expect.objectContaining({ path: tempDir, label: 'workspace:pan-2050' }));
 
     const row = getWorkspaceForIssue('PAN-2050');
     expect(row?.kind).toBe('issue');
     expect(row?.branchName).toBe('feature/pan-2050');
     expect(row?.path).toBe(join(tempDir, 'workspaces', 'feature-pan-2050'));
+  });
+
+  it('refuses before creating the row or running git when disk admission refuses (PAN-4723, PAN-4961)', async () => {
+    upsertProjectFromConfig('test-project', { name: 'Test', path: tempDir });
+    mockReserveDiskFloor.mockResolvedValue({ ok: false, error: 'Disk low — new workspace starts are held: only 1.0 GiB free on the filesystem holding ' + tempDir + '; the safety floor is 10.0 GiB. Free disk space (see /resources) and retry.' });
+
+    const result = await createWorkspace({
+      projectConfig: { name: 'Test', path: tempDir },
+      featureName: 'pan-4723',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.errors.join(' ')).toContain('only 1.0 GiB free');
+    expect(getWorkspaceForIssue('PAN-4723')).toBeNull();
+    expect(mockExecAsync).not.toHaveBeenCalled();
   });
 
   it('reuses an existing row for the same issue and creates no duplicates', async () => {
@@ -253,8 +293,11 @@ describe('createWorkspace: aborted setup steps report failure (PAN-3905)', () =>
       let installed = false;
       mockExecAsync.mockImplementation(async (command: string, args?: string[]) => {
         if (isWorktreeAddCall(command, args)) {
-          const { mkdirSync } = await import('node:fs');
+          const { mkdirSync, writeFileSync } = await import('node:fs');
           mkdirSync(workspacePath, { recursive: true });
+          // A real monorepo checkout has a root package.json (PAN-4929: createWorkspace
+          // now skips the install entirely when it's missing).
+          writeFileSync(join(workspacePath, 'package.json'), JSON.stringify({ name: 'test', private: true }), 'utf8');
         }
         if (failsOn(String(command), installed)) throw new Error(`${step} exploded`);
         if (command === 'npm install') installed = true;

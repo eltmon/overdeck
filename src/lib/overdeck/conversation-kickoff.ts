@@ -5,13 +5,15 @@ import {
   registerInFlightForkPipeline,
 } from './conversation-forks.js';
 import { claimHeldKickoff, restoreHeldKickoff } from './conversation-kickoff-store.js';
+import { conversationWriteRefusalBody, type WriteRefusal } from './conversation-release.js';
 import { getConversationByName, updateForkStatus, type LegacyConversation as Conversation } from './conversations.js';
 
 export type StartKickoffResult =
   | { status: 'started'; conversation: Conversation }
   | { status: 'not-found' }
   | { status: 'not-held' }
-  | { status: 'invalid'; error: string };
+  | { status: 'invalid'; error: string }
+  | ({ status: 'refused' } & WriteRefusal);
 
 const MAX_KICKOFF_TEXT_LENGTH = 100000;
 
@@ -36,6 +38,8 @@ async function deliverClaimedKickoff(conv: Conversation, seed: string, claimed: 
 export async function startHeldKickoff(name: string, text?: unknown): Promise<StartKickoffResult> {
   const conv = getConversationByName(name);
   if (!conv) return { status: 'not-found' };
+  const refusal = conversationWriteRefusalBody(conv);
+  if (refusal) return { status: 'refused', ...refusal };
   let editedText: string | undefined;
   if (text !== undefined) {
     const trimmed = typeof text === 'string' ? text.trim() : '';

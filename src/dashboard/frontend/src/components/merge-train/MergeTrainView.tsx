@@ -22,9 +22,19 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
 import { useConfirm } from '../DialogProvider';
-import { ASSEMBLING_LINE, NO_BATCH_YET_LINE, assemblyFailedLine, canRetryAssembly, formatFailedAt, mergeRowConfirmCopy, retryAssemblyConfirmCopy } from './mergeTrainCopy';
+import {
+  SINGLE_FEATURE_READY_LINE,
+  canRetryAssembly,
+  mergeRowConfirmCopy,
+  promoteFailureCopy,
+  retryAssemblyConfirmCopy,
+  shortName,
+} from './mergeTrainCopy';
+import { MergeTrainRequestError, fetchJson, generationParam, postJson } from './mergeTrainApi';
+import { SectionIntroLine } from './SectionIntroLine';
+
+export { SINGLE_FEATURE_READY_LINE, shortName };
 
 /** localStorage key holding the operator's project-filter selection. */
 export const MERGE_TRAIN_PROJECT_FILTER_KEY = 'merge-train.projectFilter';
@@ -38,6 +48,8 @@ export interface MergeTrainQueueItem {
   mergeOrder: number;
   conflictsWith: string[];
   batchGroup?: 'batch' | 'serialize';
+  /** PAN-4970: the per-PR auto-merge scheduler owns this item, not a batch. Undefined = batch-owned (an older server). */
+  mergesPerPr?: boolean;
 }
 
 export interface UatGenerationMember {
@@ -108,13 +120,6 @@ interface MergeBackendStatus {
   detail: string;
 }
 
-/**
- * PAN-3965: the reconciler assembles no batch for a single ready feature — a
- * one-member batch is the PR branch itself and its CI run a duplicate — unless
- * the project holds merges for UAT, where that batch is the UAT stack.
- */
-export const SINGLE_FEATURE_READY_LINE = '1 feature ready — merges directly; batches assemble when 2+ are ready.';
-
 /** One project's merged view: its queue, its generations, and its flag. */
 export interface MergeTrainProjectSection {
   projectKey: string;
@@ -124,32 +129,6 @@ export interface MergeTrainProjectSection {
   holdsForUat?: boolean;
   queue: MergeTrainQueueItem[];
   generations: UatGenerationPayload[];
-}
-
-async function fetchJson<T>(url: string): Promise<T> {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`${url} → ${res.status}`);
-  return res.json() as Promise<T>;
-}
-
-async function postJson<T>(url: string, body?: unknown): Promise<T> {
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: await dashboardMutationJsonHeaders(),
-    body: body === undefined ? '{}' : JSON.stringify(body),
-  });
-  const payload = (await res.json().catch(() => ({}))) as T & { error?: string; message?: string };
-  if (!res.ok) throw new Error(payload.error ?? payload.message ?? `${url} → ${res.status}`);
-  return payload;
-}
-
-function generationParam(name: string): string {
-  return encodeURIComponent(name.replace(/^uat\//, ''));
-}
-
-/** Short display name: uat/pan-otter-0610 → pan-otter-0610. */
-export function shortName(name: string): string {
-  return name.replace(/^uat\//, '');
 }
 
 /**
@@ -357,12 +336,21 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
       toast.success(`Merged ${data.members.length} feature${data.members.length === 1 ? '' : 's'} to main (${data.members.join(', ')})`);
       invalidate();
     },
-    onError: (err) => {
-      toast.error(err instanceof Error ? err.message : 'Batch merge failed');
+    onError: (err, variables) => {
+      const copy = promoteFailureCopy(shortName(variables.name), {
+        message: err instanceof Error ? err.message : undefined,
+        reason: err instanceof MergeTrainRequestError ? err.reason : undefined,
+      });
+      toast.error(copy.message, { duration: 10_000 });
       // The most common rejection is a stale card (batch already promoted or
       // invalidated under us — e.g. the post-merge deploy restarted the server
-      // before the refetch landed). Refetch so the stale button disappears
-      // instead of inviting another doomed click.
+      // before the refetch landed). Drop it from the cache immediately so a
+      // second click can't fire before the refetch resolves, then refetch so
+      // every other view of this data (and any other project) catches up.
+      if (copy.dropCard) {
+        queryClient.setQueryData<GenerationsEntry[]>(['merge-train-generations'], (old) =>
+          old?.map((entry) => ({ ...entry, generations: entry.generations.filter((g) => g.name !== variables.name) })));
+      }
       invalidate();
     },
   });
@@ -638,6 +626,8 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
               visibleGenerations.find((g) => g.status === 'ready') ??
               visibleGenerations.find((g) => g.status === 'superseded');
             const featureCount = section.queue.length;
+            // PAN-4970: how many ready features merge through the per-PR auto-merge train.
+            const perPrCount = section.queue.filter((q) => q.mergesPerPr === true).length;
             const batchCount = visibleGenerations.filter((g) => g.status !== 'assembling').length;
             const promotedPendingCount = visibleGenerations.filter((g) => g.status === 'promoted').length;
             const uatOpen = expandedUat[section.projectKey] ?? true;
@@ -671,27 +661,15 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
                   </p>
                 ) : (
                   <div className="space-y-1">
-                    <p className="px-1 pb-1 text-[11px] leading-snug text-muted-foreground">
-                      {featureCount === 0 && promotedPendingCount > 0 ? (
-                        <><span className="font-semibold text-foreground">{promotedPendingCount} promoted batch{promotedPendingCount === 1 ? '' : 'es'}</span> await{promotedPendingCount === 1 ? 's' : ''} version ship. Supply the version below to satisfy each member&apos;s ship row.</>
-                      ) : featureCount === 1 && !currentBatch && !assemblingNow && section.holdsForUat === false ? (
-                        <span data-testid={`merge-train-single-feature-${section.projectKey}`}>{SINGLE_FEATURE_READY_LINE}</span>
-                      ) : (
-                        <><span className="font-semibold text-foreground">{featureCount} feature{featureCount === 1 ? '' : 's'}</span> passed review &amp; tests.
-                          {currentBatch
-                            ? ' They’re assembled into the test batches below — open a batch’s frontend, run its checklist, then merge that batch to main.'
-                            : assemblingNow
-                              ? ASSEMBLING_LINE
-                              : lastAssemblyFailed
-                                ? (
-                                  <span data-testid={`merge-train-assembly-failed-${section.projectKey}`}>
-                                    {assemblyFailedLine(shortName(lastAssemblyFailed.name), formatFailedAt(lastAssemblyFailed))}
-                                  </span>
-                                )
-                                : NO_BATCH_YET_LINE}</>
-                      )}
-                    </p>
-                    {lastAssemblyFailed && canRetryAssembly({ featureCount, holdsForUat: section.holdsForUat }) && (
+                    <SectionIntroLine
+                      section={section}
+                      featureCount={featureCount}
+                      promotedPendingCount={promotedPendingCount}
+                      currentBatch={currentBatch}
+                      assemblingNow={assemblingNow}
+                      lastAssemblyFailed={lastAssemblyFailed}
+                    />
+                    {lastAssemblyFailed && canRetryAssembly({ featureCount, holdsForUat: section.holdsForUat, perPrCount }) && (
                       <div className="px-1 pb-1">
                         <button
                           type="button"

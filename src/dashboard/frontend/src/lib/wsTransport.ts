@@ -14,6 +14,7 @@ import * as Socket from 'effect/unstable/socket/Socket'
 import { PanRpcGroup } from '@overdeck/contracts'
 import { useConnectionState } from './connectionState'
 import { DashboardSessionUnauthorizedError } from './dashboardSessionError'
+import { isNativeShell } from './nativeShell'
 
 // ─── Protocol setup ───────────────────────────────────────────────────────────
 
@@ -35,6 +36,13 @@ function resolveRpcUrl(url?: string): string {
     return `${proto}://${apiHost}/ws/rpc`
   }
   return `${proto}://${window.location.host}/ws/rpc`
+}
+
+/** The RPC URL of the dashboard with another WebSocket path (PAN-4650: `/ws/linked/<env>/rpc`). */
+export function rpcUrlWithPath(path: string): string {
+  const url = new URL(resolveRpcUrl())
+  url.pathname = path
+  return url.toString()
 }
 
 function dashboardSessionUrl(url?: string): string {
@@ -123,7 +131,8 @@ async function exchangePairingCredential(url: string | undefined, credential: st
 }
 
 export function ensureDashboardSession(url?: string): Promise<void> {
-  if (typeof window === 'undefined') return Promise.resolve()
+  // The phone app authenticates every request with its phone token inside the channel (PAN-4837).
+  if (typeof window === 'undefined' || isNativeShell()) return Promise.resolve()
   const token = consumeDashboardBootstrapToken()
   const pairingCredential = consumePairingCredential()
   dashboardSessionPromise ??= (pairingCredential
@@ -153,6 +162,8 @@ export function ensureDashboardSession(url?: string): Promise<void> {
 }
 
 export async function dashboardMutationJsonHeaders(url?: string): Promise<Record<string, string>> {
+  // A phone credential needs no CSRF token (PAN-4837 FR-9).
+  if (isNativeShell()) return { 'Content-Type': 'application/json' }
   await ensureDashboardSession(url)
   if (!dashboardCsrfToken) throw new Error('Dashboard CSRF token unavailable')
   return {
@@ -207,13 +218,23 @@ function formatError(error: unknown): string {
   return String(error)
 }
 
+/**
+ * Where a subscription finds the live transport and replaces a failed one.
+ * The default is the dashboard singleton; a linked machine's transports
+ * (PAN-4650) keep their own pool so a reconnect never lands on `/ws/rpc`.
+ */
+export interface TransportPool {
+  current(): WsTransport
+  reset(failed: WsTransport): void
+}
+
 export class WsTransport {
   private readonly runtime: ManagedRuntime.ManagedRuntime<RpcClient.Protocol, never>
   private readonly clientScope: Scope.Closeable
   private readonly clientPromise: Promise<PanRpcProtocolClient>
   private disposed = false
 
-  constructor(url?: string) {
+  constructor(url?: string, private readonly pool: TransportPool = defaultPool) {
     this.runtime = ManagedRuntime.make(createPanRpcProtocolLayer(url))
     this.clientScope = this.runtime.runSync(Scope.make())
     this.clientPromise = ensureDashboardSession(url).then(() =>
@@ -270,7 +291,7 @@ export class WsTransport {
 
     const run = () => {
       if (!active) return
-      const transport = getTransport()
+      const transport = this.pool.current()
 
       currentCancel = transport.runtime.runCallback(
         Effect.promise(() => transport.clientPromise).pipe(
@@ -319,7 +340,7 @@ export class WsTransport {
               reconnectAttempts += 1
               try { onRetry?.(reconnectAttempts) } catch { /* non-fatal */ }
               console.warn('[WsTransport] subscription exited, reconnecting with fresh transport')
-              resetTransport(transport)
+              this.pool.reset(transport)
               setTimeout(run, reconnectBackoffDelayMs(reconnectAttempts))
             }
           },
@@ -355,6 +376,8 @@ export function getTransport(): WsTransport {
   }
   return _transport
 }
+
+const defaultPool: TransportPool = { current: getTransport, reset: resetTransport }
 
 export function resetTransport(failed?: WsTransport): void {
   if (!_transport) return

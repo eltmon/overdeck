@@ -267,6 +267,36 @@ describe('resolveDeftLaunch and applyDeftLaunch', () => {
     expect(existsSync(join(root, FLAG))).toBe(false);
   });
 
+  it('runs a Deft-pipeline issue on its deposit even when the deft pack is explicitly off (PAN-4820)', async () => {
+    setToggles({ issue: false });
+    const issueFile = join(projectDir, '.pan', 'skill-overrides', 'TST-1.yaml');
+    writeFileSync(issueFile, 'issue: TST-1\npipeline: deft\npacks:\n  deft: false\n');
+    const root = repo('feature-tst-1', DIRECTIVE_FILES);
+    writeFileSync(join(root, FLAG), `${DEFT_FLAG_MARKER}\n`);
+
+    const { plan, warnings } = await launch(root);
+
+    expect(warnings).toEqual([]);
+    expect(plan).toEqual({
+      directive: true,
+      killSwitch: false,
+      writeFlag: false,
+      orchestrator: false,
+      denyCli: false,
+      hideSkills: [],
+      runSummary: true,
+      provenance: '[launcher] deft: pack master (eeeeeeeeeeee); project directive engine ^0.119.10; deft pipeline',
+    });
+    expect(envText()).toBe('DEFT_RUN_SUMMARY_PATH=overdeck\n');
+    expect(existsSync(join(root, FLAG))).toBe(false);
+  });
+
+  it('takes the pipeline from the context when given', async () => {
+    const root = repo('plain-app', {});
+    const plan = await resolveDeftLaunch({ cwd: root, projectKey: 'tst', deftSkillsMounted: true, pipeline: 'deft' });
+    expect(plan).toMatchObject({ denyCli: false, runSummary: true });
+  });
+
   it('keeps the exact Claude deny list', () => {
     expect(DEFT_CLI_DENY).toEqual([
       'Bash(directive:*)',

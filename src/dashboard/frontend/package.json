@@ -13,7 +13,7 @@
     "test": "vitest run --configLoader runner",
     "test:ui": "vitest --configLoader runner --ui",
     "test:watch": "vitest --configLoader runner",
-    "test:playwright": "playwright test tests/command-deck-resource-strip.spec.ts tests/pan-4523-river-bands.spec.ts"
+    "test:playwright": "playwright test tests/command-deck-resource-strip.spec.ts tests/pan-4523-river-bands.spec.ts tests/pan-2355-mobile.spec.ts tests/pan-4661-mobile-pipeline.spec.ts"
   },
   "dependencies": {
     "@dagrejs/dagre": "^3.1.1",
@@ -41,6 +41,7 @@
     "cmdk": "^1.1.1",
     "effect": "catalog:",
     "framer-motion": "^11.18.2",
+    "jsqr": "1.4.0",
     "lexical": "^0.41.0",
     "lucide-react": "^0.400.0",
     "monaco-editor": "^0.55.1",

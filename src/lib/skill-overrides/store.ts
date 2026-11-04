@@ -11,24 +11,34 @@
  * project `skill_pack_overrides`, and the issue file's `packs:` map. Pack
  * skills use the same per-skill maps with `pack/skill` keys.
  *
+ * The issue file also carries `pipeline: deft` (PAN-4820) when the issue runs
+ * on Deft Directive's pipeline; absent means Overdeck's pipeline.
+ *
  * Server-reachable: every config read here is async. Writes validate against
  * the skill catalog and reject core skills.
  */
 import { execFile } from 'node:child_process';
-import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
+import { mkdir, readdir, rm, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
-import { isMap, parse as parseYaml, parseDocument, stringify as stringifyYaml, type Document } from 'yaml';
+import { isMap, parseDocument, stringify as stringifyYaml, type Document } from 'yaml';
 import { getGlobalConfigPath } from '../config-yaml/load.js';
 import { commitPlanArtifacts, pushPlanArtifacts } from '../overdeck/plan-artifact-commit.js';
-import { PAN_DIRNAME } from '../pan-dir/types.js';
 import {
-  listProjectsAsync,
-  resolveInfraRepo,
-  resolveProjectFromIssueSync,
-  updateProjectsConfigAsync,
-  type ProjectConfig,
-} from '../projects.js';
+  booleanEntries,
+  findProject,
+  type IssueOverrides,
+  issueSkillOverridesPath,
+  parseYamlOrNull,
+  planHomeFor,
+  type ProjectWithSkillOverrides,
+  projectForIssue,
+  readIssueFile,
+  readIssueOverrides,
+  readTextOrEmpty,
+} from './issue-file.js';
+import { PAN_DIRNAME } from '../pan-dir/types.js';
+import { listProjectsAsync, updateProjectsConfigAsync, type ProjectConfig } from '../projects.js';
 import { runSettingsWriteSerialized } from '../settings-api.js';
 import { KNOWN_PACKS, notAppliedLabels, type PackAdapterId } from '../skill-packs/adapters.js';
 import { listPacks, packUpdateAvailable } from '../skill-packs/sources.js';
@@ -81,45 +91,9 @@ export interface SkillOverrideWriteResult {
   reason?: string;
 }
 
-type ProjectWithSkillOverrides = ProjectConfig & {
-  skill_overrides?: Record<string, boolean>;
-  skill_pack_overrides?: Record<string, boolean>;
-};
-
-interface IssueOverrides {
-  skills: Record<string, boolean>;
-  packs: Record<string, boolean>;
-}
-
 const execFileAsync = promisify(execFile);
 
 const ISSUE_FILE_HEADER = '# Overdeck per-issue skill overrides (PAN-3942). true = on, false = off; absent = inherit.\n';
-
-function booleanEntries(value: unknown): Record<string, boolean> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
-  const out: Record<string, boolean> = {};
-  for (const [name, enabled] of Object.entries(value as Record<string, unknown>)) {
-    if (typeof enabled === 'boolean') out[name] = enabled;
-  }
-  return out;
-}
-
-async function readTextOrEmpty(path: string): Promise<string> {
-  try {
-    return await readFile(path, 'utf8');
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return '';
-    throw error;
-  }
-}
-
-function parseYamlOrNull(text: string): unknown {
-  try {
-    return parseYaml(text);
-  } catch {
-    return null;
-  }
-}
 
 // ── reads ────────────────────────────────────────────────────────────────
 
@@ -135,11 +109,6 @@ export async function readGlobalPackOverrides(): Promise<Record<string, boolean>
   return booleanEntries(config?.skills?.pack_overrides);
 }
 
-async function findProject(projectKey: string): Promise<ProjectWithSkillOverrides | null> {
-  const match = (await listProjectsAsync()).find(project => project.key === projectKey);
-  return (match?.config as ProjectWithSkillOverrides | undefined) ?? null;
-}
-
 export async function readProjectSkillOverrides(projectKey: string): Promise<Record<string, boolean>> {
   return booleanEntries((await findProject(projectKey))?.skill_overrides);
 }
@@ -148,42 +117,7 @@ export async function readProjectPackOverrides(projectKey: string): Promise<Reco
   return booleanEntries((await findProject(projectKey))?.skill_pack_overrides);
 }
 
-/** `<planHome>/.pan/skill-overrides/<ISSUE>.yaml` */
-export function issueSkillOverridesPath(planHome: string, issueId: string): string {
-  return join(planHome, PAN_DIRNAME, 'skill-overrides', `${issueId.toUpperCase()}.yaml`);
-}
-
-/**
- * The checkout holding a registered project's `.pan/` — what `resolvePlanHome`
- * returns for the project root, computed from the config without re-reading
- * projects.yaml.
- */
-function planHomeFor(project: ProjectConfig): string {
-  try {
-    return resolveInfraRepo(project, resolve(project.path)).repoPath;
-  } catch {
-    return resolve(project.path);
-  }
-}
-
-/** The registered project that owns an issue, with its key. */
-async function projectForIssue(issueId: string): Promise<{ projectKey: string; project: ProjectConfig } | null> {
-  const resolved = resolveProjectFromIssueSync(issueId);
-  if (!resolved) return null;
-  const project = await findProject(resolved.projectKey);
-  return project ? { projectKey: resolved.projectKey, project } : null;
-}
-
-async function readIssueFile(path: string): Promise<IssueOverrides> {
-  const parsed = parseYamlOrNull(await readTextOrEmpty(path)) as { skills?: unknown; packs?: unknown } | null;
-  return { skills: booleanEntries(parsed?.skills), packs: booleanEntries(parsed?.packs) };
-}
-
-async function readIssueOverrides(issueId: string): Promise<IssueOverrides> {
-  const owner = await projectForIssue(issueId);
-  if (!owner) return { skills: {}, packs: {} };
-  return readIssueFile(issueSkillOverridesPath(planHomeFor(owner.project), issueId));
-}
+export { issueSkillOverridesPath };
 
 export async function readIssueSkillOverrides(issueId: string): Promise<Record<string, boolean>> {
   return (await readIssueOverrides(issueId)).skills;
@@ -539,36 +473,46 @@ function sortedEntries(map: Record<string, boolean>): Record<string, boolean> {
   return Object.fromEntries(Object.entries(map).sort(([a], [b]) => a.localeCompare(b)));
 }
 
-function renderIssueFile(issueId: string, skills: Record<string, boolean>, packs: Record<string, boolean>): string {
+function renderIssueFile(
+  issueId: string,
+  skills: Record<string, boolean>,
+  packs: Record<string, boolean>,
+  pipeline?: 'deft',
+): string {
   const body = {
     issue: issueId,
+    ...(pipeline ? { pipeline } : {}),
     ...(Object.keys(skills).length > 0 ? { skills: sortedEntries(skills) } : {}),
     ...(Object.keys(packs).length > 0 ? { packs: sortedEntries(packs) } : {}),
   };
   return ISSUE_FILE_HEADER + stringifyYaml(body, { indent: 2 });
 }
 
-/** Write (or delete, when both maps are empty) the issue file and commit it through the plan-artifact door. */
+/**
+ * Write (or delete, when both maps are empty and no pipeline is set) the issue
+ * file and commit it through the plan-artifact door.
+ */
 async function persistIssueFile(
   planHome: string,
   path: string,
   issue: string,
   overrides: IssueOverrides,
+  message = `chore(workspace): skill overrides for ${issue}`,
 ): Promise<SkillOverrideWriteResult> {
-  if (Object.keys(overrides.skills).length === 0 && Object.keys(overrides.packs).length === 0) {
+  if (
+    Object.keys(overrides.skills).length === 0 &&
+    Object.keys(overrides.packs).length === 0 &&
+    overrides.pipeline === undefined
+  ) {
     await rm(path, { force: true });
     // A file that was never committed leaves nothing to record.
     if (!(await isTracked(planHome, path))) return { committed: false, reason: 'nothing to commit' };
   } else {
     await mkdir(dirname(path), { recursive: true });
-    await writeFile(path, renderIssueFile(issue, overrides.skills, overrides.packs), 'utf8');
+    await writeFile(path, renderIssueFile(issue, overrides.skills, overrides.packs, overrides.pipeline), 'utf8');
   }
 
-  const commit = await commitPlanArtifacts({
-    cwd: planHome,
-    paths: [path],
-    message: `chore(workspace): skill overrides for ${issue}`,
-  });
+  const commit = await commitPlanArtifacts({ cwd: planHome, paths: [path], message });
   if (!commit.committed) {
     // A clean tree means the same content was already committed.
     if (commit.reason === 'nothing to commit') return { committed: false, reason: commit.reason };
@@ -599,6 +543,28 @@ async function setIssue(issueId: string, skill: string, enabled: boolean | null)
     skills[skill] = enabled;
   }
   return persistIssueFile(planHome, path, issue, overrides);
+}
+
+/**
+ * Choose the pipeline an issue runs on (PAN-4820). `deft` writes
+ * `pipeline: deft` into the issue file; `overdeck` removes the key, and the
+ * file too when nothing else remains.
+ */
+export async function setIssuePipeline(issueId: string, pipeline: 'deft' | 'overdeck'): Promise<SkillOverrideWriteResult> {
+  const issue = issueId.toUpperCase();
+  const owner = await projectForIssue(issue);
+  if (!owner) throw new SkillOverrideError('unknown-issue', `no registered project owns issue ${issue}`);
+  const planHome = planHomeFor(owner.project);
+  const path = issueSkillOverridesPath(planHome, issue);
+  const overrides = await readIssueFile(path);
+  if (pipeline === 'deft') {
+    if (overrides.pipeline === 'deft') return {};
+    overrides.pipeline = 'deft';
+  } else {
+    if (overrides.pipeline === undefined) return {};
+    delete overrides.pipeline;
+  }
+  return persistIssueFile(planHome, path, issue, overrides, `chore(workspace): pipeline for ${issue}`);
 }
 
 async function setPackOverride(update: PackOverrideUpdate): Promise<SkillOverrideWriteResult> {

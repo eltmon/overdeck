@@ -116,9 +116,9 @@ describe('Permission-mode leak prevention — DSP must NEVER appear under Auto',
   })
 
   it('Mimo direct + Auto: no DSP, --permission-mode default', async () => {
-    const cmd = await getAgentRuntimeBaseCommand('mimo-v2.5')
+    const cmd = await getAgentRuntimeBaseCommand('mimo-v2.6-flash')
     expect(cmd).toMatch(/^claude /)
-    expect(cmd).toMatch(/--model 'mimo-v2\.5'/)
+    expect(cmd).toMatch(/--model 'mimo-v2\.6-flash'/)
     expect(cmd).toMatch(/--permission-mode default/)
     expect(cmd).not.toMatch(/--dangerously-skip-permissions/)
     expect(cmd).not.toMatch(/bypassPermissions/)

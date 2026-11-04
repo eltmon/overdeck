@@ -1,0 +1,485 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T00:08:19Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4752: Flywheel board shows strike workspaces as bogus PAN-<n>-STRIKE issues with 'tracker unknown'",
+    "updated": "2026-11-02T00:18:38.849Z"
+  },
+  "plan": {
+    "id": "pan-4752",
+    "title": "Flywheel board shows strike workspaces as bogus PAN-<n>-STRIKE issues with 'tracker unknown'",
+    "status": "running",
+    "uid": "0fe67da0-085f-4912-9fa8-84ca1cd492fd",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-02T00:08:19Z",
+    "updated": "2026-11-02T00:18:38.849Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4752",
+        "label": "PAN-4752",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "flywheel",
+      "strike",
+      "dashboard",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "listFeatureWorkspaces derives PAN-4669-STRIKE from workspaces/feature-pan-4669-strike, and deriveFlywheelStatus puts that id on the Flywheel board unchanged. The tracker has no such issue, so five live rows show 'tracker unknown', backlog, and no PR, while their strike agents count toward no row.",
+      "Proposal": "Fold strike census entries and strike tick ids onto their base issue id inside deriveFlywheelStatus (deacon census untouched), mark the row with a new optional contract field strike: true, overlay the open strike/<id> PR from the cached forge listing when the issue has no feature PR (in-review/changes-requested; merged or closed strike PRs ignored because the branch is reused), and render a neutral strike badge on the page and a ' · strike' suffix in the CLI. Document it in docs/FLYWHEEL.md.",
+      "NonGoals": "- Changing src/lib/cloister/deacon-workspaces.ts or any deacon consumer\n- Showing strike folding on Command Deck, the Pipeline page, or God View\n- Teaching loadIssueStatesForProject or issueIdFromBranch about strike/ heads\n- Deriving 'ready' for strike PRs or routing strikes through the merge gate\n- Showing a separate row for a strike when the base workspace also exists\n- Raising the file-size allowlist for derived-issue-state.ts\n- Rewriting lastTick.pick or other tick-marker text (the no -STRIKE guarantee covers in-flight row ids only)\n- Treating a merged strike/<id> PR as completing the current strike"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fold happens in deriveFlywheelStatus after listWorkspaces returns, not in defaultListWorkspaces or the deacon census",
+        "rationale": "The issue forbids changing deacon-workspaces.ts, and injected listWorkspaces (tests, future server deps) must get the same fold."
+      },
+      {
+        "summary": "One row per base id when both base and strike workspaces exist; base workspace journal wins; strike: true",
+        "rationale": "The page keys rows by issueId, so two rows would collide; the base workspace holds the pipeline journal."
+      },
+      {
+        "summary": "Feature-branch PR wins over the strike PR; strike PR used only when derived.pr is absent",
+        "rationale": "The base pipeline is the authority when it has a PR; the strike PR fills the gap the issue describes."
+      },
+      {
+        "summary": "Only an open strike PR is used: it derives in-review (changes-requested when requested); merged/closed strike PRs are ignored; tracker closed always wins; never ready from a strike PR",
+        "rationale": "pan strike reuses strike/<id> across runs, so a merged PR on that head may belong to an earlier strike (plan critique); open-only is safe and matches the issue's 'open strike/<id> PR'."
+      },
+      {
+        "summary": "Strike PR read via the cached forge listings (listRepoPullRequests/prFromGhRow, listRepoMergeRequests/mrFromGlabRow) and a pure selectOpenStrikePr, injected as readStrikePr",
+        "rationale": "Reuses cached listings (no extra forge calls), covers GitHub and GitLab, and adds zero lines to derived-issue-state.ts (981/1000) — only two export keywords."
+      },
+      {
+        "summary": "Neutral 'strike' StatusBadge on the page and ' · strike' suffix in the CLI",
+        "rationale": "Identity marker, not a status signal; follows the existing trackerUnknown marker pattern and pan-style-guide color restraint."
+      },
+      {
+        "summary": "Tick-marker ids ending in -STRIKE are folded too",
+        "rationale": "The acceptance criterion says no -STRIKE id may appear on the board from any source; the cost is one regex."
+      },
+      {
+        "summary": "When the strike PR overlay applies, drop 'work-not-started' attention and keep other attention values",
+        "rationale": "work-not-started means no PR and no live pane; an open strike PR contradicts it."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "One optional contract field threaded through its single deriver, its two renderers (page and CLI), and one doc; 11 files, each change a few lines.",
+      "canonicalFilename": "2026-11-02-PAN-4752-flywheel-board-shows-strike-workspaces-as-bogus-pan-n-strike-issues-with-tracker-unknown.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "contract-strike-field",
+        "title": "Add optional strike marker to FlywheelInFlightRow contract",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T00:08:19Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4752",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/flywheel-derived.ts",
+            "packages/contracts/src/flywheel-derived.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run packages/contracts/src/flywheel-derived.test.ts",
+            "npm run build:contracts"
+          ],
+          "expected_outputs": [
+            "flywheel-derived.test.ts passes including the strike round-trip and rejection cases",
+            "contracts build completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W1. In packages/contracts/src/flywheel-derived.ts add `strike: Schema.optional(Schema.Literal(true))` to the FlywheelInFlightRow struct directly after the trackerUnknown field, with the doc comment `/** The row folds a feature-<id>-strike workspace onto its base issue (PAN-4752). */`. In flywheel-derived.test.ts add strike: true to one in-flight fixture row so the round-trip test covers it, and add one case asserting that decoding a row with strike: \"yes\" fails."
+        },
+        "items": [
+          {
+            "id": "contract-strike-field.ac1",
+            "title": "Given a FlywheelDerivedStatus fixture whose in-flight row has strike: true, when the test decodes and JSON round-trips it, then the decoded row preserves strike: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contract-strike-field.ac2",
+            "title": "Given an in-flight row with strike: \"yes\", when the schema decodes it, then the decoder rejects the row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contract-strike-field.ac3",
+            "title": "Given a row without a strike key, when the schema decodes it, then the decoded row has no strike key (existing fixtures still decode)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fold-strike-workspaces",
+        "title": "Fold -STRIKE workspace and tick ids onto their base issue row in deriveFlywheelStatus",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T00:08:19Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4752",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/flywheel/derive-status.ts",
+            "tests/unit/lib/flywheel/derive-status.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/flywheel/derive-status.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "derive-status.test.ts passes including the 'strike workspaces (PAN-4752)' fold cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-5",
+            "NFR-1"
+          ],
+          "foundationFor": [
+            "strike-pr-overlay"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W2 (decisions D1-D4). In src/lib/flywheel/derive-status.ts add exported `strikeBaseId(issueId)` returning the upper-cased base id for /^(.+)-STRIKE$/i and null otherwise. Rewrite the candidates loop (currently lines ~267-281, after `listWorkspaces` returns — NOT inside defaultListWorkspaces) so a strike census entry or strike tick id folds onto its base id: one candidate per base id, `strike: true` when any strike shape folded in, base workspace path wins for the journal regardless of order. Add `...(candidate.strike ? { strike: true as const } : {})` to the row. Do not modify src/lib/cloister/deacon-workspaces.ts. Add tests 1-5 from the PRD in a `describe('strike workspaces (PAN-4752)')` block in tests/unit/lib/flywheel/derive-status.test.ts."
+        },
+        "items": [
+          {
+            "id": "fold-strike-workspaces.ac1",
+            "title": "Given listWorkspaces returns { issueId: 'PAN-4669-STRIKE' }, when deriveFlywheelStatus runs, then inFlight contains one row with issueId 'PAN-4669' and strike: true, and no row id matches /-STRIKE$/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fold-strike-workspaces.ac2",
+            "title": "Given a PAN-4669-STRIKE census entry, when deriveFlywheelStatus runs, then readTrackerIssues and loadStates receive ['PAN-4669'] (the base id, never the -STRIKE id)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fold-strike-workspaces.ac3",
+            "title": "Given both PAN-7-STRIKE (listed first) and PAN-7 workspaces, when deriveFlywheelStatus runs, then it produces exactly one PAN-7 row with strike: true and lastJournal is called with the base workspace path only",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fold-strike-workspaces.ac4",
+            "title": "Given a tick marker naming PAN-8-STRIKE with no workspace, when deriveFlywheelStatus runs, then it emits one PAN-8 row with strike: true and inTick: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fold-strike-workspaces.ac5",
+            "title": "Given a live pane whose issue token is PAN-4669 and a PAN-4669-STRIKE workspace, when deriveFlywheelStatus runs, then the folded row reports liveAgents 1 and status.agents lists issueId 'PAN-4669'; a plain workspace row has no strike key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "strike-pr-overlay",
+        "title": "Show the open strike/<id> PR and its derived state on folded strike rows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T00:08:19Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4752",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/flywheel/derive-status.ts",
+            "src/lib/overdeck/derived-issue-state.ts",
+            "tests/unit/lib/flywheel/derive-status.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/flywheel/derive-status.test.ts",
+            "npm run typecheck",
+            "wc -l src/lib/overdeck/derived-issue-state.ts",
+            "git diff origin/main -- src/lib/cloister/deacon-workspaces.ts"
+          ],
+          "expected_outputs": [
+            "derive-status.test.ts passes including strike PR overlay tests 6-11",
+            "typecheck completes without errors",
+            "derived-issue-state.ts line count equals its origin/main count (981)",
+            "deacon-workspaces.ts diff is empty"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W3 (decisions D5-D7, D9; Critique response). In src/lib/overdeck/derived-issue-state.ts add only the `export` keyword to `interface GlabMrRow` and `async function listRepoMergeRequests` (zero added lines; never raise the allowlist). In derive-status.ts: add dep `readStrikePr?: (projectPath, issueId) => DerivedPrState | null | Promise<…>`; add pure exported `selectOpenStrikePr(prs: readonly (LoadedPr | null)[])` that ignores null and merged PRs and returns the highest-numbered open PR as DerivedPrState (no merged key); add lazy default `defaultReadStrikePr` that reads the cached listing by forge (gitlab: listRepoMergeRequests + mrFromGlabRow filtered by source_branch; else listRepoPullRequests + prFromGhRow filtered by headRefName) for branch `strike/<lower-case id>` and passes the mapped rows to selectOpenStrikePr. Merged/closed strike PRs never count because pan strike reuses the branch across runs. In the row map call readStrikePr only when candidate.strike && !derived?.pr. State: derived 'closed' stays closed; else open strike PR with reviewState 'changes-requested' -> 'changes-requested', otherwise 'in-review'; never 'ready' from a strike PR. Row pr = derived.pr if present else the strike PR. When the overlay applies drop attention 'work-not-started', keep other attention values. Add forgeForProject, listRepoPullRequests, listRepoMergeRequests, prFromGhRow, mrFromGlabRow vi.fn stubs to the vi.mock factory of derived-issue-state.js at the top of tests/unit/lib/flywheel/derive-status.test.ts (it currently exports exactly three names). Add PRD tests 6-11."
+        },
+        "items": [
+          {
+            "id": "strike-pr-overlay.ac1",
+            "title": "Given a strike row with no feature PR and readStrikePr returning open PR #4698 (review-requested) while loadStates returns attention 'work-not-started', when deriveFlywheelStatus runs, then the row carries pr.number 4698, state 'in-review', no attention key, and readStrikePr receives (projectRoot, 'PAN-4669')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "strike-pr-overlay.ac2",
+            "title": "Given the open strike PR reports reviewState 'changes-requested', when deriveFlywheelStatus runs, then the row state is 'changes-requested'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "strike-pr-overlay.ac3",
+            "title": "Given readStrikePr returns null (no open strike PR, only an older merged one) and loadStates derives 'working', when deriveFlywheelStatus runs, then the row stays in inFlight with state 'working' and no pr key; given loadStates derives 'closed' with an open strike PR, then the row is absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "strike-pr-overlay.ac4",
+            "title": "Given PRs on one strike head [merged #10], [merged #10, open #12], [null, open #12], [open #11, open #12], when selectOpenStrikePr runs, then it returns null, #12, #12, #12 respectively and the result contains no merged key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "strike-pr-overlay.ac5",
+            "title": "Given loadStates returns a row with its own feature PR #7, when deriveFlywheelStatus runs, then row.pr.number is 7 and readStrikePr is never called, a non-strike row never calls readStrikePr, and `wc -l src/lib/overdeck/derived-issue-state.ts` reports its origin/main count",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pane-strike-badge",
+        "title": "Render a neutral strike badge on strike rows in FlywheelStatusPane",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T00:08:19Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4752",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/flywheel/FlywheelStatusPane.tsx",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelStatusPane.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelStatusPane.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "FlywheelStatusPane.test.tsx passes including the strike badge cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W4 (decision D8). In FlywheelStatusPane.tsx issue cell, after the `row.trackerUnknown &&` block, render `{row.strike && (<span className=\"mt-0.5 block\"><StatusBadge tone=\"neutral\" testId={`flywheel-strike-${row.issueId}`}>strike</StatusBadge></span>)}`. Neutral tone only (identity marker, pan-style-guide color restraint). Add two cases to FlywheelStatusPane.test.tsx using the existing rowStatus helper."
+        },
+        "items": [
+          {
+            "id": "pane-strike-badge.ac1",
+            "title": "Given an in-flight row with strike: true, when FlywheelStatusPane renders, then the element with testId flywheel-strike-PAN-1 renders with text 'strike'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pane-strike-badge.ac2",
+            "title": "Given an in-flight row without a strike key, when FlywheelStatusPane renders, then no element with testId flywheel-strike-PAN-1 exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-strike-marker",
+        "title": "Append a strike marker to strike rows in pan flywheel status",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T00:08:19Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4752",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/flywheel.ts",
+            "tests/unit/cli/commands/flywheel.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/commands/flywheel.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "flywheel.test.ts passes including the strike marker cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W5 (decision D8). In formatFlywheelStatus (src/cli/commands/flywheel.ts, in-flight loop line ~181) compute the existing state text as `base`, then `const state = row.strike ? `${base} · strike` : base;`. Add two cases to tests/unit/cli/commands/flywheel.test.ts next to the '(tracker unknown)' case: a strike row's line (starting '    PAN-1') contains 'strike'; a plain row's line does not."
+        },
+        "items": [
+          {
+            "id": "cli-strike-marker.ac1",
+            "title": "Given a status whose in-flight row has strike: true, when `pan flywheel status` prints, then the row line starting with '    PAN-1' contains 'strike'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-strike-marker.ac2",
+            "title": "Given a row without a strike key, when `pan flywheel status` prints, then its line does not contain 'strike'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-flywheel-strike",
+        "title": "Document strike folding and the strike marker in docs/FLYWHEEL.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T00:08:19Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4752",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/FLYWHEEL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'feature-<id>-strike' docs/FLYWHEEL.md",
+            "grep -n '^| Strike |' docs/FLYWHEEL.md"
+          ],
+          "expected_outputs": [
+            "the In-flight issues row names the feature-<id>-strike fold",
+            "the Sources table contains a Strike row"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W6. In docs/FLYWHEEL.md Sources table: extend the 'In-flight issues' row (line 18) after '(slot workspaces excluded)' with the sentence from the PRD about strike workspaces folding onto the base id, one row when both exist, base journal wins. Add a new '| Strike |' row after 'Tracker unknown' describing strike: true, the neutral page badge, the ' · strike' CLI suffix, the open strike/<id> PR used when no feature/<id> PR exists, deriving in-review or changes-requested and never ready, and that merged or closed PRs on the strike head are ignored because pan strike reuses the branch. No Mintlify page documents the board."
+        },
+        "items": [
+          {
+            "id": "docs-flywheel-strike.ac1",
+            "title": "Given the docs change, when a reader opens docs/FLYWHEEL.md, then the 'In-flight issues' row states that feature-<id>-strike workspaces fold onto their base issue id and that one row is shown when both shapes exist",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-flywheel-strike.ac2",
+            "title": "Given the docs change, when a reader opens docs/FLYWHEEL.md, then a '| Strike |' row contains the page badge, the CLI ' · strike' suffix, and states that only an open strike/<id> PR is shown, deriving in-review or changes-requested and never ready",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "contract-strike-field",
+        "to": "fold-strike-workspaces",
+        "type": "blocks"
+      },
+      {
+        "from": "contract-strike-field",
+        "to": "pane-strike-badge",
+        "type": "blocks"
+      },
+      {
+        "from": "contract-strike-field",
+        "to": "cli-strike-marker",
+        "type": "blocks"
+      },
+      {
+        "from": "fold-strike-workspaces",
+        "to": "strike-pr-overlay",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

@@ -21,7 +21,7 @@ pan token create <name> --scopes <list> [--json]
 
 | Flag | Effect |
 | --- | --- |
-| `--scopes <list>` | Required. Comma-separated, from `read:events, read:state, read:conversations, tell, operate, admin`. |
+| `--scopes <list>` | Required. Comma-separated, from `read:events, read:state, read:conversations, tell, operate, approve, admin`. |
 | `--json` | Print `{ id, name, scopes, token }` as JSON. |
 
 Prints the id, name, scopes, and the token (`odk_…`) once, followed by:
@@ -46,6 +46,10 @@ running dashboard.
 | `--json` | Print the tokens as JSON. |
 
 With no access tokens: `` `No access tokens. Create one with `pan token create`.` ``
+
+Agent tokens appear in the list too, named `agent:<role>:<agentId>`. Once launch injection
+(PAN-4927 W-INJ1) lands, Overdeck mints one for each managed agent or conversation. A token is
+revoked automatically when its agent stops, and removed from the list 7 days after it was revoked.
 
 ## revoke
 

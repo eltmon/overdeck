@@ -2,24 +2,31 @@
  * Lane views: the derived read model behind `GET /api/lanes` and `pan lane list`
  * (.pan/drafts/pan-4223.md WI-5 step 1, D10, NFR-1, NFR-3).
  *
- * Rows come from `listLaneConversations`, which includes archived lanes: reap
+ * Rows come from `listAllLaneRows`, which includes archived lanes: reap
  * archives by default (D14, FR-24), and the enriched conversation list drops
  * archived rows, so it cannot be the row source. Liveness fields are joined
  * from the enriched list by name. Nothing here is stored: activity (D10),
  * the newest report, the iteration (D7) and git facts are computed per read,
  * then memoized per filter for 3 s.
+ *
+ * PAN-4638 WI-6: a lane on another machine comes from its stand-in. Its
+ * activity, git facts, cost and last activity come from the follower's
+ * mirror; nothing runs git or reads liveness here for it. Pairing keys on
+ * names, so a remote critic pairs with a local builder and the reverse.
  */
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
-import { laneActivityOf, type LaneActivity } from '@overdeck/contracts';
+import { LANE_STARTING_GRACE_MS, laneActivityOf, type LaneActivity } from '@overdeck/contracts';
 
 import { latestWorkerReport, type WorkerReport, type WorkerReportStatus } from '../agents/worker/report.js';
 import { withConcurrencyLimit } from '../concurrency.js';
 import { getEnrichedConversationList } from '../overdeck/conversation-list.js';
-import { listLaneConversations, type LaneRole, type LegacyConversation } from '../overdeck/conversations.js';
+import type { LaneRole } from '../overdeck/conversations.js';
 import { laneIterations } from './iteration.js';
+import { listAllLaneRows, type LaneRow } from './lane-rows.js';
 import { judgedIteration, pairBuilder, type CriticSummary, type PairingRow, type VerdictState } from './pairing.js';
+import type { LaneGitFacts } from './types.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -30,15 +37,11 @@ const GIT_BACKED_ROLES: ReadonlySet<LaneRole> = new Set(['builder', 'critic', 'v
 
 export type { LaneActivity };
 
-export interface LaneGitFacts {
-  branch: string | null;
-  head: string | null;
-  ahead: number | null;
-  dirty: boolean;
-}
+export type { LaneGitFacts };
 
 export interface LaneView {
-  id: number;
+  /** The local conversation id; null for a lane on another machine. */
+  id: number | null;
   name: string;
   title: string | null;
   run: string;
@@ -60,13 +63,15 @@ export interface LaneView {
   lastActivityAt: string | null;
   archived: boolean;
   /** Critic and verifier lanes with a link: the builder row judged (WI-20). */
-  criticOf: { id: number; name: string; key: string; iteration: number } | null;
+  criticOf: { id: number | null; name: string; key: string; iteration: number } | null;
   /** Critic and verifier lanes only. */
   verdict: { value: VerdictState; defects: number | null; file: string | null } | null;
   /** Builder lanes only; [] otherwise. */
   critics: CriticSummary[];
   latestVerdict: CriticSummary | null;
   answering: CriticSummary | null;
+  /** PAN-4638 FR-5: the machine a remote lane runs on; null for a lane on this machine. */
+  machine: { environmentId: string; label: string; reachable: boolean; lastSeenAt: string | null } | null;
 }
 
 export interface LaneViewFilter {
@@ -118,17 +123,15 @@ export async function readLaneGitFacts(cwd: string): Promise<LaneGitFacts | null
  * counts over the whole group, and a critic pairs with a builder another
  * conversation may have launched (WI-20).
  */
-function laneGroupsOf(rows: readonly LegacyConversation[]): LegacyConversation[] {
+async function laneGroupsOf(rows: readonly LaneRow[]): Promise<LaneRow[]> {
   const groups = new Map<string, { run: string; key: string }>();
-  for (const row of rows) {
-    if (row.gauntletRun && row.laneKey) groups.set(`${row.gauntletRun}\u0000${row.laneKey}`, { run: row.gauntletRun, key: row.laneKey });
-  }
-  const seen = new Set<number>();
-  const context: LegacyConversation[] = [];
+  for (const row of rows) groups.set(`${row.run}\u0000${row.key}`, { run: row.run, key: row.key });
+  const seen = new Set<string>();
+  const context: LaneRow[] = [];
   for (const group of groups.values()) {
-    for (const row of listLaneConversations(group)) {
-      if (!seen.has(row.id)) {
-        seen.add(row.id);
+    for (const row of await listAllLaneRows(group)) {
+      if (!seen.has(row.name)) {
+        seen.add(row.name);
         context.push(row);
       }
     }
@@ -136,13 +139,21 @@ function laneGroupsOf(rows: readonly LegacyConversation[]): LegacyConversation[]
   return context;
 }
 
+/** WI-6 step 2: a remote lane's activity from its stand-in, never from this machine. */
+function remoteActivity(row: LaneRow, now: number): LaneActivity {
+  const mirror = row.remote?.mirror ?? null;
+  if (row.archivedAt !== null) return 'stopped';
+  if (mirror === null) return now - Date.parse(row.createdAt) < LANE_STARTING_GRACE_MS ? 'starting' : 'failed-to-start';
+  return mirror.state === 'gone' ? 'stopped' : mirror.activity;
+}
+
 async function buildLaneViews(filter: LaneViewFilter, deps: LaneViewDeps, now: number): Promise<LaneView[]> {
-  const rows = listLaneConversations(filter);
+  const rows = await listAllLaneRows(filter);
   if (rows.length === 0) return [];
   const enriched = await (deps.enrichedList ?? (() => getEnrichedConversationList(500, 0)))();
   const liveness = new Map<string, EnrichedLiveness>();
   for (const entry of enriched as EnrichedLiveness[]) liveness.set(entry.name, entry);
-  const context = laneGroupsOf(rows);
+  const context = await laneGroupsOf(rows);
   const iterations = laneIterations(context);
   const latestReport = deps.latestReport ?? latestWorkerReport;
   const gitFacts = deps.gitFacts ?? readLaneGitFacts;
@@ -150,64 +161,77 @@ async function buildLaneViews(filter: LaneViewFilter, deps: LaneViewDeps, now: n
   await withConcurrencyLimit(context.map((row) => async () => {
     reports.set(row.name, await latestReport(`conv-${row.name}`));
   }), GIT_CONCURRENCY);
+  const activityOf = (row: LaneRow): LaneActivity => {
+    if (!row.local) return remoteActivity(row, now);
+    return laneActivityOf({ ...row.local, ...(row.archivedAt === null ? liveness.get(row.name) : undefined) }, now);
+  };
   const pairingRows = context.map((row): PairingRow => {
     const report = reports.get(row.name) ?? null;
     return {
       id: row.id,
       name: row.name,
-      run: row.gauntletRun ?? '',
-      key: row.laneKey ?? '',
-      role: row.laneRole ?? 'builder',
+      run: row.run,
+      key: row.key,
+      role: row.role,
       iteration: iterations.get(row.name) ?? 1,
       createdAt: row.createdAt,
-      criticOfId: row.criticOfConversationId,
-      activity: laneActivityOf({ ...row, ...(row.archivedAt === null ? liveness.get(row.name) : undefined) }, now),
+      criticOfName: row.criticOfName,
+      activity: activityOf(row),
       report: report ? { status: report.status, ...(report.verdict ? { verdict: report.verdict } : {}) } : null,
     };
   });
-  const pairingById = new Map(pairingRows.map((row) => [row.id, row]));
+  const pairingByName = new Map(pairingRows.map((row) => [row.name, row]));
 
   return withConcurrencyLimit(rows.map((row) => async (): Promise<LaneView> => {
     const archived = row.archivedAt !== null;
-    const live = archived ? undefined : liveness.get(row.name);
-    const role = row.laneRole as LaneRole;
+    const { role, local, remote } = row;
+    const live = archived || !local ? undefined : liveness.get(row.name);
+    const mirror = remote?.mirror ?? null;
     const report = reports.get(row.name) ?? null;
-    const git = !archived && GIT_BACKED_ROLES.has(role) ? await gitFacts(row.cwd) : null;
-    const pairing = pairingById.get(row.id);
+    const git = remote ? (mirror?.git ?? null) : !archived && GIT_BACKED_ROLES.has(role) ? await gitFacts(row.cwd) : null;
+    const pairing = pairingByName.get(row.name);
     const judge = role === 'critic' || role === 'verifier';
-    const judged = judge && pairing ? pairingById.get(pairing.criticOfId ?? -1) : undefined;
-    const judgedAt = judge && pairing ? judgedIteration(pairing, pairingById) : null;
+    const judged = judge && pairing?.criticOfName ? pairingByName.get(pairing.criticOfName) : undefined;
+    const judgedAt = judge && pairing ? judgedIteration(pairing, pairingByName) : null;
     const verdict = report?.status === 'done' ? report.verdict : undefined;
     const builderPairing = role === 'builder' && pairing ? pairBuilder(pairing, pairingRows) : null;
     return {
       id: row.id,
       name: row.name,
       title: row.title,
-      run: row.gauntletRun ?? '',
-      key: row.laneKey ?? '',
+      run: row.run,
+      key: row.key,
       role,
       iteration: iterations.get(row.name) ?? 1,
-      parentId: row.parentConversationId,
-      parentName: row.parentConversationName,
+      parentId: row.parentId,
+      parentName: row.parentName,
       harness: row.harness,
       model: row.model,
       effort: row.effort,
       projectKey: row.projectKey,
       cwd: row.cwd,
-      activity: laneActivityOf({ ...row, ...live }, now),
+      activity: activityOf(row),
       report: report
         ? { seq: report.seq, at: report.at, status: report.status, head: report.git?.head ?? null, branch: report.git?.branch ?? null }
         : null,
       git,
-      costUsd: live?.totalCost ?? row.totalCost ?? null,
+      costUsd: remote ? (mirror?.costUsd ?? null) : (live?.totalCost ?? local?.totalCost ?? null),
       createdAt: row.createdAt,
-      lastActivityAt: live?.lastActivityAt ?? null,
+      lastActivityAt: remote ? (mirror?.lastActivityAt ?? null) : (live?.lastActivityAt ?? null),
       archived,
       criticOf: judged && judgedAt !== null ? { id: judged.id, name: judged.name, key: judged.key, iteration: judgedAt } : null,
       verdict: judge ? { value: verdict?.value ?? 'pending', defects: verdict?.defects ?? null, file: verdict?.file ?? null } : null,
       critics: builderPairing?.critics ?? [],
       latestVerdict: builderPairing?.latestVerdict ?? null,
       answering: builderPairing?.answering ?? null,
+      machine: remote
+        ? {
+          environmentId: remote.facts.environmentId,
+          label: remote.facts.label,
+          reachable: mirror?.unreachableSince == null,
+          lastSeenAt: mirror?.lastSeenAt ?? null,
+        }
+        : null,
     };
   }), GIT_CONCURRENCY);
 }

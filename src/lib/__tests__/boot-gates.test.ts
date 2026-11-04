@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   applyBootGateEnv,
   DEACON_GATE_SOURCE_ENV,
+  hostsMachineLinks,
   isPeerDashboardProcess,
   parseBootGateState,
   RESUME_GATE_SOURCE_ENV,
@@ -95,6 +96,22 @@ describe('isPeerDashboardProcess', () => {
   it('is false for a falsy value', () => {
     expect(isPeerDashboardProcess({ OVERDECK_DISABLE_DEACON: '0' })).toBe(false);
     expect(isPeerDashboardProcess({ OVERDECK_DISABLE_DEACON: '' })).toBe(false);
+  });
+});
+
+// PAN-4645 D-4645-21: the channel listener and the link supervisor run on the
+// primary dashboard; a peer-mode dashboard opts in for the two-machine smoke.
+describe('hostsMachineLinks', () => {
+  it('is true for the primary dashboard', () => {
+    expect(hostsMachineLinks({})).toBe(true);
+    expect(hostsMachineLinks({ OVERDECK_DISABLE_DEACON: '0' })).toBe(true);
+  });
+
+  it('is false for a peer-mode dashboard unless OVERDECK_ANYWHERE_SUPERVISOR opts in', () => {
+    expect(hostsMachineLinks({ OVERDECK_DISABLE_DEACON: '1' })).toBe(false);
+    expect(hostsMachineLinks({ OVERDECK_DISABLE_DEACON: '1', OVERDECK_ANYWHERE_SUPERVISOR: '0' })).toBe(false);
+    expect(hostsMachineLinks({ OVERDECK_DISABLE_DEACON: '1', OVERDECK_ANYWHERE_SUPERVISOR: '1' })).toBe(true);
+    expect(hostsMachineLinks({ OVERDECK_DISABLE_DEACON: 'true', OVERDECK_ANYWHERE_SUPERVISOR: 'yes' })).toBe(true);
   });
 });
 

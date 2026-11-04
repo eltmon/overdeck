@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
+import { BUILTIN_COLOR_THEMES } from '@overdeck/contracts';
 import { getUiTheme, getUiThemeSync, setUiTheme, colorFgBgForTheme, TERMINAL_BG } from '../../../src/lib/ui-theme.js';
 
 describe('ui-theme', () => {
@@ -49,8 +50,8 @@ describe('ui-theme', () => {
     expect(colorFgBgForTheme('dark')).toBe('15;0');
   });
 
-  it('exposes pane backgrounds matching the frontend XTERM_BG values', () => {
-    expect(TERMINAL_BG.dark).toBe('#1a1a2e');
-    expect(TERMINAL_BG.light).toBe('#ffffff');
+  it('exposes pane backgrounds matching the built-in color theme terminal backgrounds', () => {
+    expect(TERMINAL_BG.dark).toBe(BUILTIN_COLOR_THEMES['overdeck-dark'].terminal?.background);
+    expect(TERMINAL_BG.light).toBe(BUILTIN_COLOR_THEMES['overdeck-light'].terminal?.background);
   });
 });

@@ -13,6 +13,10 @@
  * epoch *claims* the restart; every other member is *satisfied* by it once the
  * fresh server boots.
  *
+ * A waiting `pan reload` replaced by a newer one leaves through
+ * `POST /api/restart-gate/withdraw`, which drops its request only while it is
+ * outside an epoch, so an approval is never discarded (PAN-4888).
+ *
  * ── Doors ──────────────────────────────────────────────────────────────────
  * This module is the ONE read door and the ONE write door for gate state. No
  * route handler, CLI, or script reads or writes it.
@@ -102,6 +106,11 @@ export interface RestartGatePollResult {
 export interface RestartGateClaimResult {
   granted: boolean;
   status: RestartGateStatus;
+}
+
+export interface RestartGateWithdrawResult {
+  withdrawn: boolean;
+  status: RestartGateStatus | 'satisfied';
 }
 
 export interface RestartGateRequestInput {
@@ -303,6 +312,27 @@ export function claimRestartGate(
 }
 
 /**
+ * PAN-4888: a waiting `pan reload` replaced by a newer one leaves the gate.
+ * Synchronous like approve, so the two are serialized: a request already in
+ * the open epoch is never withdrawn, and an approval is never discarded.
+ */
+export function withdrawRestartRequest(
+  state: RestartGateState,
+  requesterId: string,
+  nowMs: number,
+): { state: RestartGateState; result: RestartGateWithdrawResult } {
+  const pruned = pruneRestartGateState(state, nowMs);
+  if (pruned.satisfied.some((entry) => entry.requesterId === requesterId)) {
+    return { state: pruned, result: { withdrawn: false, status: 'satisfied' } };
+  }
+  if (pruned.epoch?.requesterIds.includes(requesterId)) {
+    return { state: pruned, result: { withdrawn: false, status: deriveRestartGateStatus(pruned, nowMs) } };
+  }
+  const next = { ...pruned, pending: pruned.pending.filter((request) => request.requesterId !== requesterId) };
+  return { state: next, result: { withdrawn: true, status: deriveRestartGateStatus(next, nowMs) } };
+}
+
+/**
  * The dashboard's own restart button is implicit approval (PAN-3729 §2.4).
  *
  * Every live request is folded into an epoch claimed by the UI, so the boot
@@ -337,6 +367,8 @@ export interface RestartGateDeps {
 export interface RestartGate {
   request(input: RestartGateRequestInput): Promise<RestartGatePollResult>;
   claim(requesterId: string): Promise<RestartGateClaimResult>;
+  /** Drop a request that is outside an epoch (PAN-4888). */
+  withdraw(requesterId: string): Promise<RestartGateWithdrawResult>;
   approve(): Promise<{ approved: true; pendingCount: number }>;
   read(): Promise<RestartGateSnapshot>;
   /** Implicit approval taken by the dashboard's own restart button. */
@@ -391,6 +423,7 @@ export function createRestartGate(deps: RestartGateDeps = {}): RestartGate {
   return {
     request: async (input) => mutate((current, nowMs) => upsertRestartRequest(current, input, nowMs)),
     claim: async (requesterId) => mutate((current, nowMs) => claimRestartGate(current, requesterId, nowMs)),
+    withdraw: async (requesterId) => mutate((current, nowMs) => withdrawRestartRequest(current, requesterId, nowMs)),
     approve: async () => mutate((current, nowMs) => approveRestartGate(current, nowMs)),
     read: async () => {
       state = pruneRestartGateState(state, now());

@@ -14,6 +14,7 @@ import { runServer } from './server.js';
 import { startSharedIssueService, getSharedIssueService } from './services/issue-service-singleton.js';
 import { startAgentEnrichmentService, stopAgentEnrichmentService } from './services/agent-enrichment-service.js';
 import { startNeedsYouPushService, stopNeedsYouPushService } from './services/needs-you-push-service.js';
+import { startLiveActivityService, stopLiveActivityService } from './services/live-activity-service.js';
 import { conversationReadDependencies } from './routes/conversations.js';
 import { getConversationsPendingInputFeed } from '../../lib/overdeck/conversation-reads.js';
 import { startResourceRefreshTriggers } from './services/resource-refresh-triggers.js';
@@ -44,6 +45,7 @@ import { initDeployProgress } from './services/deploy-progress.js';
 import { setPipelineHandler } from '../../lib/pipeline-notifier.js';
 import { ensureInternalToken } from '../../lib/internal-token.js';
 import { refreshAccessTokens, startAccessTokenRefresh } from '../../lib/access-tokens.js';
+import { registerRevocationClosers } from './ws-rpc-auth.js';
 import { recoverStuckForks, waitForInFlightForkPipelines } from '../../lib/overdeck/conversation-forks.js';
 import { getEventStore, initEventStore } from './event-store.js';
 import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js';
@@ -68,12 +70,12 @@ import { cleanupClosedIssueAgentDirectories } from '../../lib/agent-directory-cl
 import { startAutoMergeExecutor, stopAutoMergeExecutor } from './services/auto-merge-executor.js';
 import { startConflictRepairPatrol, stopConflictRepairPatrol } from './services/conflict-repair-patrol.js';
 import { startBlockerWakePatrol, stopBlockerWakePatrol } from './services/blocker-wake-patrol.js';
+import { startScheduledMessagePatrol, stopScheduledMessagePatrol } from './services/scheduled-message-patrol.js';
 import { warnIfAutonomousMergeBackendUnavailable } from './services/merge-backend-health.js';
 import { warnIfAppCannotMerge } from './services/merge-app-scopes-health.js';
 import { startConversationSearchWatcher, stopConversationSearchWatcher } from './services/conversation-search-watcher.js';
 import { startConversationRescanScheduler, stopConversationRescanScheduler } from './services/conversation-rescan-scheduler.js';
-import { startPullRequestSyncService, stopPullRequestSyncService } from './services/pull-request-sync-service.js';
-import { startConversationScheduleService, stopConversationScheduleService } from './services/conversation-schedule-service.js';
+import { startConversationSweeps, stopConversationSweeps } from './services/conversation-sweeps.js';
 import { startVaultService, stopVaultService } from './services/vault-service.js';
 import { startVaultBrowseService } from './services/vault-browse-service.js';
 import { startGitHubQuotaSampler } from '../../lib/github-quota/sampler.js';
@@ -97,8 +99,12 @@ import { getOverdeckDatabasePath } from '../../lib/overdeck/paths.js';
 import { startProjectCiRefillAfterProjectionReady } from './services/project-ci-refill-startup.js';
 import { ProjectsLive } from '../../lib/overdeck/config.js';
 import { RecordsLive, TmuxLive, dropPipelineStateMirrorTables, dropDeadIssuesForeignKeys } from '../../lib/overdeck/infra.js';
+import { bootConversationEnvironmentOrWarn } from '../../lib/overdeck/conversation-environment.js';
+import { startAnywhere } from './services/anywhere-boot.js';
+import { getShareManager } from './services/share-host.js';
+import { fleetUpdateService } from './services/fleet-update-service.js';
 import { startServerBootTelemetry } from './telemetry.js';
-import { isPeerDashboardProcess } from '../../lib/boot-gates.js';
+import { hostsMachineLinks, isPeerDashboardProcess } from '../../lib/boot-gates.js';
 import { isSmeeConfigured, startSmeeProcess } from '../../lib/smee.js';
 import { listProjectsSync } from '../../lib/projects.js';
 import { backfillIssueWorkspaces, migrateMemoryHomesToWorkspacesOnce, seedProjectsFromYaml } from '../../lib/workspaces/rebuild.js';
@@ -147,6 +153,7 @@ ensureInternalToken();
 // corrupt registry is already logged loudly and accepts no token.
 await refreshAccessTokens().catch(() => undefined);
 startAccessTokenRefresh();
+registerRevocationClosers(); // PAN-4645 D-4645-16: revokes (any process) close live sockets and channels.
 
 // PAN-785 prepared the managed tmux context here, before any code path could spawn
 // tmux. Since PAN-1379 made that boot hook an Effect, the `await` here returned
@@ -201,6 +208,9 @@ try {
   console.warn('[overdeck] Dead-issues-FK rebuild failed (non-fatal):', err);
 }
 
+// PAN-4645 D-4645-19: this machine's environment id on local conversation rows (non-fatal).
+await bootConversationEnvironmentOrWarn();
+
 // Bind the HTTP socket before starting any background service or the Deacon.
 // A bind failure is retried by server.ts and then terminates this process through
 // Effect's Node runtime; no headless orchestrator is allowed to survive it.
@@ -213,6 +223,9 @@ if (typeof Bun !== 'undefined') {
   runMain(main as never);
 }
 await whenDashboardListening();
+void startAnywhere({ primary: hostsMachineLinks() }).catch((err) => console.warn('[anywhere] boot failed (non-fatal):', err)); // PAN-4645 D-4645-21
+if (hostsMachineLinks()) void getShareManager().resume().catch((err) => console.warn('[share] re-park failed (non-fatal):', err)); // PAN-4479 D-3
+if (hostsMachineLinks()) void fleetUpdateService().boot().catch((err) => console.warn('[fleet-update] boot failed (non-fatal):', err)); // PAN-4654 D-4
 startServerBootTelemetry();
 
 startEventLoopMonitor();
@@ -265,6 +278,7 @@ console.log(`[overdeck] AgentEnrichmentService started${isPeerDashboard ? ' (pee
 // a peer dashboard would send every notification twice.
 if (!isPeerDashboard) {
   startNeedsYouPushService({ readConversationFeed: () => getConversationsPendingInputFeed(conversationReadDependencies) });
+  startLiveActivityService();
 }
 
 // Enable demand-driven agent output capture. The poller starts only while an
@@ -584,18 +598,9 @@ console.log(conversationSearchWatcher
 startConversationRescanScheduler();
 console.log('[overdeck] Conversation rescan scheduler started (boot pass + 6h interval)');
 
-// PAN-3822: link PRs to conversations by branch and refresh their snapshots.
-// Writes overdeck.db, so a peer dashboard never runs it.
-if (!isPeerDashboard) {
-  startPullRequestSyncService();
-  console.log('[pr-sync] started (boot +30s, 60s sweep)');
-}
-// PAN-4640: fire due conversation schedules. Writes overdeck.db and resumes
-// sessions, so a peer dashboard never runs it.
-if (!isPeerDashboard) {
-  startConversationScheduleService();
-  console.log('[schedules] started (boot +30s, 60s sweep)');
-}
+// PAN-3822 PR sync, PAN-4640 schedules, PAN-4655 idle-settle: they write
+// overdeck.db, so a peer dashboard never runs them.
+if (!isPeerDashboard) startConversationSweeps();
 // PAN-4436 D-12: OVERDECK_VAULT_IN_PEER=1 is for isolated UAT fixtures that own a throwaway home.
 if (!isPeerDashboard || process.env.OVERDECK_VAULT_IN_PEER === '1') {
   startVaultBrowseService();
@@ -770,6 +775,7 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   stopResourceRefreshServices();
   stopAgentEnrichmentService();
   stopNeedsYouPushService();
+  stopLiveActivityService();
   stopAgentOutputService();
   stopConversationLifecycleService();
   stopCodexPluginImporter();
@@ -779,6 +785,7 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   stopAutoMergeExecutor();
   stopConflictRepairPatrol();
   stopBlockerWakePatrol();
+  stopScheduledMessagePatrol();
   stopEventLoopMonitor();
   stopTranscriptPoller();
   stopCostReconcileService();
@@ -800,8 +807,7 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   await stopConversationSearchWatcher().catch((err) => console.warn('[conversation-search] watcher shutdown failed:', err));
   await stopConversationRescanScheduler();
   await stopVaultService().catch((err) => console.warn('[vault] shutdown failed:', err));
-  stopPullRequestSyncService();
-  stopConversationScheduleService();
+  stopConversationSweeps();
   stopGitHubQuotaSampler();
   stopGitHubQuotaPublisher();
   stopGitHubQuotaTelemetry();
@@ -937,6 +943,15 @@ if (startBlockerWakePatrol()) {
   console.log('[overdeck] Blocker-wake patrol SKIPPED — peer dashboard spawns nothing');
 } else {
   console.log('[overdeck] Blocker-wake patrol SKIPPED (OVERDECK_DISABLE_BLOCKER_WAKE=1)');
+}
+
+// PAN-4641: delivers operator messages queued until a usage limit resets.
+if (startScheduledMessagePatrol()) {
+  console.log('[overdeck] Scheduled-message patrol started');
+} else if (isPeerDashboard) {
+  console.log('[overdeck] Scheduled-message patrol SKIPPED — peer dashboard spawns nothing');
+} else {
+  console.log('[overdeck] Scheduled-message patrol SKIPPED (OVERDECK_DISABLE_SCHEDULED_MESSAGES=1)');
 }
 
 // PAN-3917: boot used to reset verification runs left `running` by a worker

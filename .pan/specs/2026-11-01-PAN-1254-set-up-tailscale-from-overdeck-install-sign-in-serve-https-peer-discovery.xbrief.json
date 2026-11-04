@@ -1,0 +1,1727 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-01T05:00:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-1254: Set up Tailscale from Overdeck: install, sign in, Serve HTTPS, peer discovery",
+    "updated": "2026-11-01T05:45:19.013Z"
+  },
+  "plan": {
+    "id": "pan-1254",
+    "title": "Set up Tailscale from Overdeck: install, sign in, Serve HTTPS, peer discovery",
+    "status": "running",
+    "uid": "d12cacd6-d815-4db7-b4e5-b861d60a1ca5",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-01T05:00:00Z",
+    "updated": "2026-11-01T05:45:19.013Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1254",
+        "label": "PAN-1254",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-1254.md",
+        "label": "PRD draft (.pan/drafts/PAN-1254.md)",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/pan-2350.md",
+        "label": "Parent PRD PAN-2350 rev 5 (W-TS1, FR-19, D-17)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "anywhere",
+      "tailscale",
+      "remote-access",
+      "cli",
+      "dashboard",
+      "security"
+    ],
+    "narratives": {
+      "Problem": "Overdeck Anywhere encourages Tailscale as the route between machines (parent PRD D-17), but Overdeck has no Tailscale code: the operator must install, sign in, configure Serve HTTPS and protect the dashboard by hand, and nothing shows which tailnet machines run Overdeck. Turning on Tailscale Serve by hand today also opens a root-session hole while dashboard.require_token_mint is off.",
+      "Proposal": "Add src/lib/tailscale/ (CLI runner and state reader with a derived next step, per-platform install plan, userspace tailscaled under a systemd user unit, sign-in URL capture, protected Serve HTTPS that first turns on require_token_mint and trusts the Serve origin, and descriptor-probe peer discovery). Expose it through GET/POST /api/tailscale/* routes (root session or internal token for mutations), a Settings → Anywhere 'Set up Tailscale' dialog that runs elevated steps in a visible terminal pane via POST /api/terminals, an Overdeck-peers panel, a phone-app QR, an Anywhere status row plus a serve-unprotected problem, and `pan tailscale status|setup`. Document it in configuration/tailscale.mdx, cli/tailscale.mdx and a Tailscale-first remote-access.mdx. Full detail: .pan/drafts/PAN-1254.md.",
+      "NonGoals": "- Advertising tailnet or Serve endpoints in the descriptor, learned routes, machine links, or any Link action (W-LINK1/W-LINK2, #4645)\n- Tailscale Funnel or webhook delivery (#4648)\n- The old body's /endpoints panel, AdvertisedEndpoint registry, per-workspace Serve, or pan up/pan down Serve lifecycle hooks\n- Turning Serve off, or replacing another program's Serve handler on 443\n- Asking for, storing, logging or passing an administrator password\n- Driving the Windows Tailscale client from WSL2, or a native-Windows flow beyond showing the winget command\n- Automating loginctl enable-linger for the userspace unit\n- Tailscale OAuth clients or auth keys for unattended join (W-FLY2)\n- A pan-tailscale wrapper skill\n- An Effect port of t3code's tailscale module\n- Raising any scripts/file-size-allowlist.txt row"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Write new code as plain async functions in src/lib/tailscale/, not an Effect port of t3code's module",
+        "rationale": "The repo's one-variant rule (docs/EFFECT-BRIDGING.md) forbids an Effect wrapper over Promise code; the issue body's Effect design is marked as history."
+      },
+      {
+        "summary": "Turning on Serve first sets dashboard.require_token_mint true and trusts the Serve URL origin",
+        "rationale": "Parent PRD 'Known blockers': Serve with require_token_mint false lets every tailnet visitor mint the root session; W-SEC4 (#4645) that automates this has not shipped, so the flow must not open the hole."
+      },
+      {
+        "summary": "pan tailscale setup turns on Serve through the running dashboard, never by writing config files itself",
+        "rationale": "The token-mint and trusted-origin caches live in the server process; a direct file write would leave the running server unprotected until restart."
+      },
+      {
+        "summary": "POST /api/tailscale/* accept only the root session and the internal token",
+        "rationale": "Same precedent as POST /api/pairing/credentials (pairing.ts:74-77); a paired device must not change this machine's network exposure."
+      },
+      {
+        "summary": "Panes reuse the existing POST /api/terminals route; the status response supplies the commands",
+        "rationale": "No new tmux code, and the route already attaches on Herdr hosts via the tmux fallback in resolveTerminalAttachTarget."
+      },
+      {
+        "summary": "Discovery lists Overdeck peers without a Link action",
+        "rationale": "The issue says linking needs #4645 (W-LINK1); until then discovery lists peers only."
+      },
+      {
+        "summary": "Userspace mode is an operator choice on Linux and automatic when sudo is not on PATH, run as the systemd user unit overdeck-tailscaled.service",
+        "rationale": "D-17 implementation checkpoint names userspace mode for Linux without sudo; Overdeck already manages systemd user units (src/lib/systemd.ts)."
+      },
+      {
+        "summary": "No pan up/pan down Serve lifecycle and never `tailscale serve off`",
+        "rationale": "--bg persists Serve inside tailscaled; Overdeck must not clobber other programs' Serve config."
+      },
+      {
+        "summary": "Set plan.metadata.sizeJustification instead of creating sibling issues",
+        "rationale": "This issue is already the W-TS1 leaf of the operator's #2350 decomposition; the lint counts each doc file as its own subsystem, and a CLI/UI split would be horizontal layering."
+      },
+      {
+        "summary": "Extract QrImage once into Settings/anywhere/QrImage.tsx and leave OpenOnScreenTab's copy alone",
+        "rationale": "The phone QR would be the third copy; surgical-change rule keeps the unrelated conversation copy untouched."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "PAN-1254 is already the decomposed W-TS1 leaf of epic #2350 (operator's revision-5 issue disposition assigns all of W-TS1 here). The projected surface counts ~45 files and 8 two-segment subsystems mainly because every top-level doc file (configuration/tailscale.mdx, configuration/remote-access.mdx, cli/tailscale.mdx, docs.json) and package.json count as separate subsystems, and each lib module carries its own test file. Splitting CLI from UI would be the horizontal layering the swarm contract rejects; the 20 items are each small, vertical and independently reviewable.",
+      "canonicalFilename": "2026-11-01-PAN-1254-set-up-tailscale-from-overdeck-install-sign-in-serve-https-peer-discovery.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "ts-cli-state",
+        "title": "Tailscale CLI runner and state reader in src/lib/tailscale",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1254",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/tailscale/cli.ts",
+            "src/lib/tailscale/state.ts",
+            "tests/unit/lib/tailscale/cli.test.ts",
+            "tests/unit/lib/tailscale/state.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/tailscale/cli.test.ts tests/unit/lib/tailscale/state.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "cli.test.ts and state.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-2",
+            "NFR-3",
+            "NFR-6"
+          ],
+          "foundationFor": [
+            "ts-install-plan",
+            "ts-userspace",
+            "ts-login",
+            "ts-serve",
+            "ts-peers",
+            "pan-tailscale-status",
+            "route-tailscale-status",
+            "anywhere-status-tailscale"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-1. Create src/lib/tailscale/cli.ts (resolveTailscaleCli per D-7, runTailscale with AbortController+setTimeout timeouts per NFR-3, path helpers tailscaleHome/userspaceSocketPath/userspaceBinDir) and src/lib/tailscale/state.ts (TailscaleState, pure parseTailscaleStatus, parseServeStatus, computeNextStep implementing the D-8 table (including the protect row and three-state operator per D-6), and readTailscaleState running version/status --json/serve status --json/debug prefs in parallel, memoized for 3 s so the 30 s Anywhere status refetch and concurrent routes do not spawn a process per request). Plain async functions modeled on src/lib/sageox/probe.ts; no Effect wrapper (D-1); no sync child processes (NFR-2). Tests in tests/unit/lib/tailscale/{cli,state}.test.ts with fake timers."
+        },
+        "items": [
+          {
+            "id": "ts-cli-state.ac1",
+            "title": "Given fixtures for each row of PRD D-8, computeNextStep returns install, start-daemon, operator, login, enable-https, serve, protect and ready respectively, and returns login (not operator) when operator is unknown because debug prefs failed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ts-cli-state.ac2",
+            "title": "Given ${OVERDECK_HOME}/tailscale/bin/tailscale exists, resolveTailscaleCli returns mode 'userspace' with baseArgs ['--socket=<home>/tailscale/tailscaled.sock'] even when tailscale is also on PATH",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ts-cli-state.ac3",
+            "title": "Given a child that never exits, runTailscale returns { ok: false, timedOut: true } after 1500 ms advanced with vi.advanceTimersByTimeAsync",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ts-cli-state.ac4",
+            "title": "Given no tailscale binary anywhere, readTailscaleState resolves (never rejects) with installed false and nextStep 'install'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ts-cli-state.ac5",
+            "title": "parseServeStatus returns proxiesDashboard true for Web['<name>:443'].Handlers['/'].Proxy 'http://127.0.0.1:3011', and returns otherHandlerOn443 true for a proxy to another port, a TCP['443'] TCPForward entry, and an extra web mount besides '/'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ts-install-plan",
+        "title": "Per-platform Tailscale install plan",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-1254",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/tailscale/installer.ts",
+            "tests/unit/lib/tailscale/installer.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/tailscale/installer.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "installer.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-2 and D-9. Create src/lib/tailscale/installer.ts exporting the InstallPlan union, pure installPlan(input) implementing every D-9 row, operatorCommand(username) (null for a name failing /^[a-z_][a-z0-9_.-]*\\$?$/i), and resolveInstallPlan({ userspace }) gathering detectPlatform() (src/lib/platform.ts), uid, os.userInfo().username and an async PATH scan for sudo/brew with fs.promises.access(X_OK). No elevation happens here; commands are strings only (NFR-1)."
+        },
+        "items": [
+          {
+            "id": "ts-install-plan.ac1",
+            "title": "Given platform linux, sudo on PATH and userspace false, installPlan returns { kind: 'pane', command: 'curl -fsSL https://tailscale.com/install.sh | sh && sudo tailscale set --operator=<user>' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ts-install-plan.ac2",
+            "title": "Given platform linux with no sudo on PATH, or userspace true, installPlan returns { kind: 'userspace' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ts-install-plan.ac3",
+            "title": "Given platform darwin with brew on PATH, installPlan returns a pane command 'brew install --cask tailscale-app && open -a Tailscale'; without brew it returns a manual plan with url https://pkgs.tailscale.com/stable/#macos",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ts-install-plan.ac4",
+            "title": "Given platform wsl or win32, installPlan returns kind 'manual' and win32 includes command 'winget install tailscale.tailscale'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ts-install-plan.ac5",
+            "title": "Given username 'bad name;rm', operatorCommand returns null and installPlan on linux falls back to the manual plan",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ts-userspace",
+        "title": "Userspace tailscaled install under a systemd user unit (D-17 checkpoint)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-1254",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/tailscale/userspace.ts",
+            "tests/unit/lib/tailscale/userspace.test.ts",
+            "src/lib/tailscale/installer.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/tailscale/userspace.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "userspace.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "parallelSafeReason": "Owns userspace.ts and its test; installer.ts is touched only in the C-1 fallback and ts-install-plan precedes it by edge."
+        },
+        "narrative": {
+          "Action": "PRD W-3, D-10, C-1, C-2. Create src/lib/tailscale/userspace.ts: renderTailscaledUnit(home) (exact D-10 unit text), tarballArch(nodeArch), installUserspaceTailscale(deps) (pkgs.tailscale.com/stable/?mode=json -> Tarballs[arch] -> download -> sha256 check -> async tar extract -> copy tailscale+tailscaled into ${OVERDECK_HOME}/tailscale/bin 0755 -> installUserUnit + enableUserUnitNow from src/lib/systemd.ts -> wait up to 10 s for the socket), and restartUserspaceDaemon(). Every failure returns { ok: false, reason, message, fallbackCommand } where fallbackCommand is the install.sh line. Then perform checkpoint C-1 live: on a Linux host, install in userspace mode, sign in, and from another tailnet device curl http://<tailnet-ip>:<api_port>/api/environment and https://<MagicDNS>/api/environment; paste commands and output into the PR body. If inbound fails, OR the live check cannot be run because no tailnet sign-in, auth key or second tailnet device is available, apply the C-1 fallback: installPlan stops returning 'userspace' (Linux without sudo gets the manual plan with the install.sh command), and the PR body records why. Never fabricate evidence. Also pan tell flywheel-orchestrator so the operator can run the live check later and re-enable userspace."
+        },
+        "items": [
+          {
+            "id": "ts-userspace.ac1",
+            "title": "renderTailscaledUnit('/h') produces ExecStart=/h/tailscale/bin/tailscaled --tun=userspace-networking --statedir=/h/tailscale/state --socket=/h/tailscale/tailscaled.sock --outbound-http-proxy-listen=127.0.0.1:1055 and WantedBy=default.target",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ts-userspace.ac2",
+            "title": "Given systemdUserAvailable() false, installUserspaceTailscale returns { ok: false, reason: 'no-systemd' } with fallbackCommand 'curl -fsSL https://tailscale.com/install.sh | sh' and downloads nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ts-userspace.ac3",
+            "title": "Given a downloaded tarball whose sha256 differs from the published .sha256, installUserspaceTailscale returns reason 'checksum-mismatch' and writes no binary to bin/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ts-userspace.ac4",
+            "title": "Given the socket never appears, installUserspaceTailscale returns reason 'daemon-timeout' after 10 s advanced with fake timers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ts-userspace.ac5",
+            "title": "Live checkpoint C-1: the PR body shows curl output from a second tailnet device returning this machine's environmentId at http://<tailnet-ip>:<api_port>/api/environment, or, when inbound fails or the check cannot be run, the C-1 fallback applies and installPlan returns the manual plan for Linux without sudo, with the reason recorded in the PR body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ts-login",
+        "title": "Tailscale sign-in URL capture",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1254",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/tailscale/login.ts",
+            "tests/unit/lib/tailscale/login.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/tailscale/login.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "login.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-4, D-11. Create src/lib/tailscale/login.ts exporting startTailscaleLogin(state, deps): spawn `login` (or `up` when backend is Stopped) with piped output via node:child_process spawn, resolve with the first /https:\\/\\/\\S+/ within 15 s, keep the child alive for the sign-in, kill it after 10 minutes, share one pending child per process, and map access-denied stderr (D-6) to { error: 'access-denied' } (this is how an unknown operator is resolved)."
+        },
+        "items": [
+          {
+            "id": "ts-login.ac1",
+            "title": "Given a fake child that writes 'To authenticate, visit:\\n\\thttps://login.tailscale.com/a/abc' to stderr, startTailscaleLogin resolves { authUrl: 'https://login.tailscale.com/a/abc' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ts-login.ac2",
+            "title": "Given no URL within 15 s (fake timers), startTailscaleLogin resolves { error: 'timeout' } and kills the child",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ts-login.ac3",
+            "title": "Given stderr 'Access denied: prefs write access denied', startTailscaleLogin resolves { error: 'access-denied' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ts-login.ac4",
+            "title": "Given two concurrent calls, spawn is called once and both callers receive the same authUrl",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ts-login.ac5",
+            "title": "Given backend state 'Stopped', the spawned args are ['up'] and an exit 0 with no URL resolves { authUrl: null }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ts-serve",
+        "title": "Protected Tailscale Serve HTTPS: token mint, trusted origin, serve, self-check",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-1254",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/tailscale/serve.ts",
+            "src/lib/settings-api.ts",
+            "tests/unit/lib/tailscale/serve.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/tailscale/serve.test.ts",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "serve.test.ts passes",
+            "lint:file-size reports no file over its allowed count"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-4",
+            "NFR-5"
+          ],
+          "foundationFor": [
+            "route-tailscale-actions",
+            "pan-tailscale-setup",
+            "tailscale-setup-dialog",
+            "ts-token-mint-guard"
+          ],
+          "parallelSafeReason": "Owns serve.ts, its test, and one new function in settings-api.ts that no other item touches."
+        },
+        "narrative": {
+          "Action": "PRD W-5, D-2, D-12, NFR-5, C-4. Add exported saveRequireTokenMint() beside saveDesignLanguage in src/lib/settings-api.ts (one runSettingsWriteSerialized turn using saveSettingsApiPromiseUnlocked; stay under the 1508-line allowlist cap, else use the PRD's require-token-mint.ts fallback; never raise the allowlist). Create src/lib/tailscale/serve.ts exporting enableTailscaleServe(deps) returning the PRD ServeResult union, in the exact order: read state, refuse not-running / https-disabled (adminUrl https://login.tailscale.com/admin/dns) / foreign-handler / old-version (<1.52), saveRequireTokenMint(), addSavedTrustedOrigin('https://<MagicDNS>', alreadyTrusted), run `serve --bg --https=443 http://127.0.0.1:<port>` unless already proxying (changed:false), then 15 s self-check of https://<MagicDNS>/api/environment against ensureEnvironmentIdentity() (skipped in userspace mode). Never run `serve ... off`."
+        },
+        "items": [
+          {
+            "id": "ts-serve.ac1",
+            "title": "Given a Running tailnet with HTTPS certs, enableTailscaleServe calls saveRequireTokenMint and addSavedTrustedOrigin('https://desk.tailnet.ts.net') before the serve command, asserted by injected-dep call order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ts-serve.ac2",
+            "title": "Given the serve command exits non-zero, enableTailscaleServe returns { ok: false, reason: 'serve-failed' } and require_token_mint remains written as true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ts-serve.ac3",
+            "title": "Given serve status already proxies 443 to another local port, enableTailscaleServe returns reason 'foreign-handler' and never runs a serve command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ts-serve.ac4",
+            "title": "Given Serve already proxies to the dashboard port, a second call returns { ok: true, changed: false } without running the serve command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ts-serve.ac5",
+            "title": "Given CertDomains is empty, enableTailscaleServe returns reason 'https-disabled' with adminUrl 'https://login.tailscale.com/admin/dns' and writes no config",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ts-peers",
+        "title": "Tailnet peer discovery by descriptor probe",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1254",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/tailscale/peers.ts",
+            "tests/unit/lib/tailscale/peers.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/tailscale/peers.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "peers.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-6, D-13. Create src/lib/tailscale/peers.ts exporting discoverTailnetPeers(state, { port, selfEnvironmentId }, deps): for each online peer probe https://<dnsName>/api/environment and http://<ipv4>:<port>/api/environment in parallel with 2.5 s AbortController timeouts (max 16 concurrent), decode with Schema.decodeUnknownSync(EnvironmentDescriptor) from @overdeck/contracts, drop self, return TailnetPeer[]. In userspace mode send only the http candidate through 127.0.0.1:1055 as an absolute-form node:http request."
+        },
+        "items": [
+          {
+            "id": "ts-peers.ac1",
+            "title": "Given an online peer whose http candidate returns a valid descriptor, discoverTailnetPeers returns that peer with overdeck.environmentId, label, serverVersion and url set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ts-peers.ac2",
+            "title": "Given a peer that never answers, the result for that peer has overdeck null after 2500 ms advanced with fake timers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ts-peers.ac3",
+            "title": "Given a descriptor whose environmentId equals selfEnvironmentId, that peer is omitted from the result",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ts-peers.ac4",
+            "title": "Given an offline peer, no probe is sent and the peer is returned with overdeck null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ts-peers.ac5",
+            "title": "Given mode 'userspace', no https probe is sent and the http probe goes through the injected proxy request dep",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-tailscale-status",
+        "title": "pan tailscale status [--json]",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-1254",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/tailscale.ts",
+            "src/cli/index.ts",
+            "tests/unit/cli/tailscale.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/cli/tailscale.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tailscale.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-7. Create src/cli/commands/tailscale.ts with registerTailscaleCommands(program) adding `tailscale status [--json]`; static imports limited to Commander types and chalk like src/cli/commands/pair.ts, lib modules imported inside the handler. Register it in src/cli/index.ts right after registerPairCommands(program). Human output lists mode, version, backend, MagicDNS name, login, HTTPS certs, Serve URL or off, next step with remedy, and Overdeck peers; --json prints { state, peers }."
+        },
+        "items": [
+          {
+            "id": "pan-tailscale-status.ac1",
+            "title": "Given readTailscaleState reports not installed, `pan tailscale status` prints 'Tailscale is not installed. Run `pan tailscale setup`.' and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-tailscale-status.ac2",
+            "title": "Given a ready state with one Overdeck peer, `pan tailscale status --json` prints JSON with state.nextStep 'ready' and a peers array of length 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-tailscale-status.ac3",
+            "title": "`pan tailscale --help` lists the status subcommand after a build (node dist/cli/index.js tailscale --help exits 0)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "route-tailscale-status",
+        "title": "GET /api/tailscale/status route",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1254",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/tailscale.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/tailscale-routes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/__tests__/tailscale-routes.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tailscale-routes.test.ts and no-loss-matrix.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-8. Create src/dashboard/server/routes/tailscale.ts exporting tailscaleRouteLayer with GET /api/tailscale/status returning { state, install, operatorCommand, port } (no-store, rejectUnauthorizedDashboardRequest; ?userspace=1 requests the userspace plan). Register tailscaleRouteLayer after anywhereRouteLayer in src/dashboard/server/server.ts. Add the AGGREGATE row to tests/unit/lib/overdeck/no-loss-matrix.ts. Route tests in src/dashboard/server/__tests__/tailscale-routes.test.ts following anywhere-status-route.test.ts."
+        },
+        "items": [
+          {
+            "id": "route-tailscale-status.ac1",
+            "title": "GET /api/tailscale/status with a root session returns 200 with state.nextStep, install.kind, operatorCommand and port fields and Cache-Control no-store",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-tailscale-status.ac2",
+            "title": "GET /api/tailscale/status with no credential from a non-loopback peer returns 401",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-tailscale-status.ac3",
+            "title": "GET /api/tailscale/status?userspace=1 on a mocked linux platform returns install.kind 'userspace'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-tailscale-status.ac4",
+            "title": "npx vitest run tests/unit/lib/overdeck/no-loss-matrix.test.ts passes with the new route present",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "route-tailscale-actions",
+        "title": "POST userspace, login and serve routes with root-only auth",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1254",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/tailscale.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/tailscale-routes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/__tests__/tailscale-routes.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tailscale-routes.test.ts and no-loss-matrix.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-9, D-4. In src/dashboard/server/routes/tailscale.ts add POST /api/tailscale/userspace, POST /api/tailscale/login and POST /api/tailscale/serve. Each runs rejectUnsafeDashboardMutationRequest, then refuses any credential kind other than root-session or internal-token with 403 { error: 'Only this machine can change Tailscale settings.' }. Serve passes getTrustedOrigins() as alreadyTrusted and calls invalidateTrustedOriginsCache() after every call whatever the result (critique finding 3); emits an activity entry when changed. Status codes per PRD W-9. Add three WRITE rows to no-loss-matrix.ts."
+        },
+        "items": [
+          {
+            "id": "route-tailscale-actions.ac1",
+            "title": "POST /api/tailscale/serve with a paired-device credential returns 403 and the serve lib is never called; the same holds for /login and /userspace",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-tailscale-actions.ac2",
+            "title": "POST /api/tailscale/serve with the internal token and a mocked ok result returns 200 and invalidateTrustedOriginsCache is called once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-tailscale-actions.ac3",
+            "title": "POST /api/tailscale/serve with a mocked { ok: false, reason: 'self-check-failed' } returns 409 with the reason in the body and still calls invalidateTrustedOriginsCache once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-tailscale-actions.ac4",
+            "title": "POST /api/tailscale/login with a mocked access-denied result returns 409 { nextStep: 'operator' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "route-tailscale-peers",
+        "title": "GET /api/tailscale/peers route",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-1254",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/tailscale.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/tailscale-routes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/__tests__/tailscale-routes.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tailscale-routes.test.ts and no-loss-matrix.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-11"
+          ],
+          "acJustification": "A read-only route over an already-tested lib; two ACs cover the success path and the not-running short-circuit."
+        },
+        "narrative": {
+          "Action": "PRD W-10. In src/dashboard/server/routes/tailscale.ts add GET /api/tailscale/peers returning { peers: TailnetPeer[] } from discoverTailnetPeers (empty when backend is not Running), guarded by rejectUnauthorizedDashboardRequest, no-store. Add the AGGREGATE row to no-loss-matrix.ts."
+        },
+        "items": [
+          {
+            "id": "route-tailscale-peers.ac1",
+            "title": "GET /api/tailscale/peers with a root session and a mocked Running state returns 200 { peers } with the mocked peer list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-tailscale-peers.ac2",
+            "title": "GET /api/tailscale/peers when backend state is NeedsLogin returns 200 { peers: [] } without calling discoverTailnetPeers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-tailscale-setup",
+        "title": "pan tailscale setup [--userspace]",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1254",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/tailscale.ts",
+            "tests/unit/cli/tailscale.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/cli/tailscale.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tailscale.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "NFR-1"
+          ],
+          "acJustification": "The setup command walks every next step; six ACs check one step transition each."
+        },
+        "narrative": {
+          "Action": "PRD W-11, D-3. Add `tailscale setup [--userspace]` to src/cli/commands/tailscale.ts: loop at most 8 times over readTailscaleState().nextStep, running pane commands with spawn('sh', ['-c', cmd], { stdio: 'inherit' }) so the operator types sudo passwords in their own terminal, installUserspaceTailscale for userspace, startTailscaleLogin then 2 s polling up to 10 minutes for login, a login access-denied result runs the operator command then retries login once, and callDashboard('/api/tailscale/serve', { method: 'POST', body: {} }) for both serve and protect (dashboard unreachable => 'Overdeck dashboard is not running; start it with `pan up`.' exit 1). A step that does not change nextStep prints its remedy and exits 1."
+        },
+        "items": [
+          {
+            "id": "pan-tailscale-setup.ac1",
+            "title": "Given state sequence install(pane) -> operator -> login -> serve -> ready, setup runs the pane command and operator command with stdio 'inherit', prints the sign-in URL, POSTs /api/tailscale/serve, prints the Serve URL and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-tailscale-setup.ac2",
+            "title": "Given the serve step and an unreachable dashboard, setup prints 'Overdeck dashboard is not running; start it with `pan up`.' and exits 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-tailscale-setup.ac3",
+            "title": "Given nextStep 'enable-https', setup prints the https://login.tailscale.com/admin/dns instruction and exits 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-tailscale-setup.ac4",
+            "title": "Given a step whose action leaves nextStep unchanged, setup exits 1 after one retry instead of looping",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-tailscale-setup.ac5",
+            "title": "Given --userspace on linux, setup calls installUserspaceTailscale and never spawns sudo",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-tailscale-setup.ac6",
+            "title": "Given nextStep 'protect' then 'ready', setup POSTs /api/tailscale/serve once and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "anywhere-status-tailscale",
+        "title": "Anywhere status: Tailscale row and serve-unprotected problem",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-1254",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/remote-access/anywhere-status.ts",
+            "src/dashboard/server/routes/anywhere.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/anywhereApi.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/AnywhereStatusCard.tsx",
+            "tests/unit/lib/remote-access/anywhere-status.test.ts",
+            "src/dashboard/server/__tests__/anywhere-status-route.test.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/AnywhereStatusCard.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/remote-access/anywhere-status.test.ts src/dashboard/server/__tests__/anywhere-status-route.test.ts",
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/anywhere/__tests__/AnywhereStatusCard.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "anywhere-status.test.ts and anywhere-status-route.test.ts pass",
+            "AnywhereStatusCard.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-12. Add AnywhereStatus.tailscale { nextStep | 'not-installed', serveUrl, magicDnsName } read in buildAnywhereStatus (src/dashboard/server/routes/anywhere.ts) via readTailscaleState; add action { kind: 'tailscale-setup' } and problem 'tailscale-serve-unprotected' to src/lib/remote-access/anywhere-status.ts (computeAnywhereProblems gains tailscaleServeOn and requireTokenMint inputs); mirror the unions in anywhereApi.ts; AnywhereStatusCard renders a Tailscale row and a 'Protect the dashboard' fix button for the new action."
+        },
+        "items": [
+          {
+            "id": "anywhere-status-tailscale.ac1",
+            "title": "Given tailscaleServeOn true and requireTokenMint false, computeAnywhereProblems includes code 'tailscale-serve-unprotected' with action { kind: 'tailscale-setup' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anywhere-status-tailscale.ac2",
+            "title": "Given tailscaleServeOn true and requireTokenMint true, computeAnywhereProblems returns no tailscale problem",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anywhere-status-tailscale.ac3",
+            "title": "GET /api/anywhere/status returns a tailscale object with nextStep 'not-installed' when no tailscale binary is resolvable",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anywhere-status-tailscale.ac4",
+            "title": "AnywhereStatusCard renders a 'Tailscale' row reading 'Ready (https://desk.tailnet.ts.net)' for a ready status and a 'Protect the dashboard' button for the new problem",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ts-token-mint-guard",
+        "title": "Keep require_token_mint on while Tailscale Serve forwards to this dashboard",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1254",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/tailscale/token-mint-guard.ts",
+            "src/lib/settings-api.ts",
+            "tests/unit/lib/tailscale/token-mint-guard.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/tailscale/token-mint-guard.test.ts",
+            "npm run lint:circular",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "token-mint-guard.test.ts passes",
+            "lint:circular exits 0",
+            "lint:file-size reports no file over its allowed count"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-18 (critique finding 1). Create src/lib/tailscale/token-mint-guard.ts exporting keepTokenMintWhileServing(settings, deps): unchanged when settings.dashboard?.require_token_mint !== false (no Tailscale call); otherwise read readTailscaleState via dynamic import('./state.js') and, when Serve proxies this dashboard, return a copy with require_token_mint true and console.warn. In src/lib/settings-api.ts change saveSettingsApi to runSettingsWriteSerialized(async () => saveSettingsApiPromiseUnlocked(await keepTokenMintWhileServing(settings))). Type-only import of ApiSettingsConfig; keep settings-api.ts under its 1508-line cap; lint:circular stays green."
+        },
+        "items": [
+          {
+            "id": "ts-token-mint-guard.ac1",
+            "title": "Given Serve proxies this dashboard and a stale settings save with dashboard.require_token_mint false, keepTokenMintWhileServing returns settings with require_token_mint true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ts-token-mint-guard.ac2",
+            "title": "Given Serve is off, a save with require_token_mint false persists false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ts-token-mint-guard.ac3",
+            "title": "Given require_token_mint true or absent in the incoming settings, keepTokenMintWhileServing returns the same object and never calls readTailscaleState",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ts-token-mint-guard.ac4",
+            "title": "npm run lint:circular exits 0 with the new import in settings-api.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "qr-image-extract",
+        "title": "Extract shared QrImage for the anywhere components",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:00:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "refactor",
+          "issueLabel": "pan-1254",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/QrImage.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/PairDeviceDialog.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/anywhere/__tests__/PairDeviceDialog.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "PairDeviceDialog.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ],
+          "acJustification": "A mechanical move of one component; the existing dialog test is the behavior check."
+        },
+        "narrative": {
+          "Action": "PRD W-13, D-15. Move the local QrImage from PairDeviceDialog.tsx into src/dashboard/frontend/src/components/Settings/anywhere/QrImage.tsx as export function QrImage({ link, alt }), same body; PairDeviceDialog imports it with alt 'Pairing QR code'. Leave OpenOnScreenTab.tsx unchanged."
+        },
+        "items": [
+          {
+            "id": "qr-image-extract.ac1",
+            "title": "Given the refactor, PairDeviceDialog.tsx contains no local QrImage function and renders QrImage imported from './QrImage'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "qr-image-extract.ac2",
+            "title": "PairDeviceDialog.test.tsx passes unchanged and the rendered pairing image still has alt 'Pairing QR code'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tailscale-setup-dialog",
+        "title": "Settings → Anywhere 'Set up Tailscale' dialog with pane install, sign-in and Serve",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-1254",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/tailscaleApi.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/TailscaleSetupDialog.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/AnywhereSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/TailscaleSetupDialog.test.tsx",
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/anywhere/__tests__/TailscaleSetupDialog.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "TailscaleSetupDialog.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-4"
+          ],
+          "acJustification": "The dialog is the single UI surface for five setup steps plus the root-only visibility rule; each AC checks one observable step.",
+          "parallelSafeReason": "Owns the dialog, tailscaleApi.ts and the AnywhereSection button; later frontend items that share AnywhereSection.tsx, TailscaleSetupDialog.tsx and package.json are ordered after it by edges."
+        },
+        "narrative": {
+          "Action": "PRD W-14, D-2, D-5. Create tailscaleApi.ts (status/userspace/login/serve/peers fetchers plus createPane via POST /api/terminals and deletePane) and TailscaleSetupDialog.tsx (polls ['tailscale-status'] every 3 s while open, one panel per nextStep exactly as PRD W-14 lists including the protect panel and the operator panel shown after a login 409, embeds <XTerminal sessionName embedded /> for pane commands with the 'Overdeck never sees it' note, shows the D-2 token-mint consequence text before 'Turn on HTTPS access', deletes its panes on close). AnywhereSection.tsx gets a 'Set up Tailscale' header button, rendered only when the Anywhere status viewer.kind is 'root-session' (a paired device cannot run the POST routes), and maps { kind: 'tailscale-setup' } to opening the dialog. Add the new test to root package.json test:frontend-subset. Follow pan-style-guide."
+        },
+        "items": [
+          {
+            "id": "tailscale-setup-dialog.ac1",
+            "title": "Given status nextStep 'install' with a pane plan, clicking 'Install Tailscale' POSTs /api/terminals with that exact command and renders an XTerminal for the returned sessionName",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tailscale-setup-dialog.ac2",
+            "title": "Given nextStep 'login', clicking 'Sign in' POSTs /api/tailscale/login and renders an 'Open sign-in' link whose href is the returned authUrl; a 409 { nextStep: 'operator' } renders the operator panel instead",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tailscale-setup-dialog.ac3",
+            "title": "Given nextStep 'serve' the dialog renders text naming 'Require a token to sign in' before 'Turn on HTTPS access', and given nextStep 'protect' it renders 'Protect the dashboard'; both buttons POST /api/tailscale/serve",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tailscale-setup-dialog.ac4",
+            "title": "Closing the dialog after a pane was created sends DELETE /api/terminals/<sessionName>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tailscale-setup-dialog.ac5",
+            "title": "Given a status card problem with action tailscale-setup, AnywhereSection opens the Set up Tailscale dialog",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tailscale-setup-dialog.ac6",
+            "title": "Given Anywhere status viewer.kind 'device', AnywhereSection renders no 'Set up Tailscale' button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tailscale-peers-panel",
+        "title": "Overdeck-on-your-tailnet peers panel",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-1254",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/TailscalePeersPanel.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/AnywhereSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/TailscalePeersPanel.test.tsx",
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/anywhere/__tests__/TailscalePeersPanel.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "TailscalePeersPanel.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-15. Create TailscalePeersPanel.tsx shown under DevicesPanel when Tailscale is ready: rows for peers with overdeck set (label, host name, server version, URL link), a muted count of non-Overdeck devices, a Refresh button, the note 'Linking machines arrives with machine links (#4645).', and no Link button. Fetch GET /api/tailscale/peers on mount and Refresh only. Mount it in AnywhereSection.tsx; add the test to test:frontend-subset."
+        },
+        "items": [
+          {
+            "id": "tailscale-peers-panel.ac1",
+            "title": "Given peers with one Overdeck peer labelled 'laptop' and two non-Overdeck devices, the panel renders 'laptop' with its URL and the text '2 other tailnet devices do not run Overdeck'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tailscale-peers-panel.ac2",
+            "title": "The panel renders no button or link labelled 'Link'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tailscale-peers-panel.ac3",
+            "title": "Clicking Refresh sends a second GET /api/tailscale/peers, and advancing fake timers by 60 s sends no further request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tailscale-phone-qr",
+        "title": "Phone app QR and Pair a device in the ready step",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-1254",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/TailscalePhoneQr.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/TailscaleSetupDialog.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/TailscalePhoneQr.test.tsx",
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/anywhere/__tests__/TailscalePhoneQr.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "TailscalePhoneQr.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-16. Create TailscalePhoneQr.tsx rendering <QrImage link='https://tailscale.com/download' alt='Tailscale app download QR code' />, 'Scan to install Tailscale on your phone, then sign in as <loginName>.' and a 'Pair a device' button calling onPair. Mount it in TailscaleSetupDialog's ready step; onPair closes the setup dialog and opens PairDeviceDialog. Add the test to test:frontend-subset."
+        },
+        "items": [
+          {
+            "id": "tailscale-phone-qr.ac1",
+            "title": "Given loginName 'me@example.com', the component renders an image with alt 'Tailscale app download QR code' and the text 'sign in as me@example.com'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tailscale-phone-qr.ac2",
+            "title": "When 'Pair a device' is clicked, the component calls onPair exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tailscale-phone-qr.ac3",
+            "title": "In TailscaleSetupDialog with nextStep 'ready', the phone QR is rendered and 'Pair a device' closes the setup dialog and opens the pair dialog",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-tailscale-page",
+        "title": "New configuration/tailscale.mdx page and nav entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-1254",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/tailscale.mdx",
+            "docs.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-6",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-17a. Write configuration/tailscale.mdx with the sections PRD W-17a lists (steps, per-platform table, userspace mode incl. lingering and the C-1 outcome, Serve HTTPS and token sign-in, tailnet settings, phone app, discovering machines) and add 'configuration/tailscale' after 'configuration/remote-access' in docs.json's Overdeck Anywhere group. State behavior exactly as implemented."
+        },
+        "items": [
+          {
+            "id": "docs-tailscale-page.ac1",
+            "title": "docs.json contains 'configuration/tailscale' in the 'Overdeck Anywhere' group directly after 'configuration/remote-access'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-tailscale-page.ac2",
+            "title": "configuration/tailscale.mdx contains a per-platform table naming install.sh, 'brew install --cask tailscale-app', 'winget install tailscale.tailscale' and the WSL2 instruction",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-tailscale-page.ac3",
+            "title": "configuration/tailscale.mdx contains the statement that turning on HTTPS access also turns on 'Require a token to sign in' and that new browsers must pair",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-tailscale-page.ac4",
+            "title": "npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-cli-tailscale",
+        "title": "New cli/tailscale.mdx reference page",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-1254",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/tailscale.mdx",
+            "docs.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "node dist/cli/index.js tailscale --help"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "help lists status and setup"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-17b. Write cli/tailscale.mdx documenting `pan tailscale status [--json]` and `pan tailscale setup [--userspace]` with exit codes and examples matching the implemented output, and add 'cli/tailscale' after 'cli/pair' in docs.json."
+        },
+        "items": [
+          {
+            "id": "docs-cli-tailscale.ac1",
+            "title": "docs.json contains 'cli/tailscale' directly after 'cli/pair'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-cli-tailscale.ac2",
+            "title": "cli/tailscale.mdx contains both subcommands, the --json and --userspace flags, and that setup exits 1 when the dashboard is not running",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-cli-tailscale.ac3",
+            "title": "npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-remote-access",
+        "title": "remote-access.mdx becomes the reach page with Tailscale first",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-1254",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/remote-access.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-17c. In configuration/remote-access.mdx add a first section '## Reach this machine with Tailscale' before '## Pair a device' linking /configuration/tailscale, and update '## Local reverse proxies: `require_token_mint`' to say Set up Tailscale turns the setting on automatically. Do not add #4645 or #2356 sections."
+        },
+        "items": [
+          {
+            "id": "docs-remote-access.ac1",
+            "title": "configuration/remote-access.mdx contains '## Reach this machine with Tailscale' as its first '##' heading, with a link to /configuration/tailscale",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-remote-access.ac2",
+            "title": "The require_token_mint section contains the statement that Set up Tailscale turns it on automatically when it enables Serve",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-remote-access.ac3",
+            "title": "npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "ts-cli-state",
+        "to": "ts-userspace",
+        "type": "blocks"
+      },
+      {
+        "from": "ts-cli-state",
+        "to": "ts-login",
+        "type": "blocks"
+      },
+      {
+        "from": "ts-cli-state",
+        "to": "ts-serve",
+        "type": "blocks"
+      },
+      {
+        "from": "ts-cli-state",
+        "to": "ts-peers",
+        "type": "blocks"
+      },
+      {
+        "from": "ts-cli-state",
+        "to": "pan-tailscale-status",
+        "type": "blocks"
+      },
+      {
+        "from": "ts-cli-state",
+        "to": "route-tailscale-status",
+        "type": "blocks"
+      },
+      {
+        "from": "ts-cli-state",
+        "to": "anywhere-status-tailscale",
+        "type": "blocks"
+      },
+      {
+        "from": "ts-peers",
+        "to": "pan-tailscale-status",
+        "type": "blocks"
+      },
+      {
+        "from": "ts-cli-state",
+        "to": "ts-token-mint-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "ts-serve",
+        "to": "ts-token-mint-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "ts-token-mint-guard",
+        "to": "docs-tailscale-page",
+        "type": "blocks"
+      },
+      {
+        "from": "ts-install-plan",
+        "to": "route-tailscale-status",
+        "type": "blocks"
+      },
+      {
+        "from": "ts-install-plan",
+        "to": "ts-userspace",
+        "type": "blocks"
+      },
+      {
+        "from": "ts-userspace",
+        "to": "route-tailscale-actions",
+        "type": "blocks"
+      },
+      {
+        "from": "ts-login",
+        "to": "route-tailscale-actions",
+        "type": "blocks"
+      },
+      {
+        "from": "ts-serve",
+        "to": "route-tailscale-actions",
+        "type": "blocks"
+      },
+      {
+        "from": "route-tailscale-status",
+        "to": "route-tailscale-actions",
+        "type": "blocks"
+      },
+      {
+        "from": "route-tailscale-actions",
+        "to": "route-tailscale-peers",
+        "type": "blocks"
+      },
+      {
+        "from": "route-tailscale-status",
+        "to": "route-tailscale-peers",
+        "type": "blocks"
+      },
+      {
+        "from": "ts-peers",
+        "to": "route-tailscale-peers",
+        "type": "blocks"
+      },
+      {
+        "from": "pan-tailscale-status",
+        "to": "pan-tailscale-setup",
+        "type": "blocks"
+      },
+      {
+        "from": "ts-install-plan",
+        "to": "pan-tailscale-setup",
+        "type": "blocks"
+      },
+      {
+        "from": "ts-userspace",
+        "to": "pan-tailscale-setup",
+        "type": "blocks"
+      },
+      {
+        "from": "ts-login",
+        "to": "pan-tailscale-setup",
+        "type": "blocks"
+      },
+      {
+        "from": "route-tailscale-actions",
+        "to": "pan-tailscale-setup",
+        "type": "blocks"
+      },
+      {
+        "from": "route-tailscale-actions",
+        "to": "tailscale-setup-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "anywhere-status-tailscale",
+        "to": "tailscale-setup-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "tailscale-setup-dialog",
+        "to": "tailscale-peers-panel",
+        "type": "blocks"
+      },
+      {
+        "from": "route-tailscale-peers",
+        "to": "tailscale-peers-panel",
+        "type": "blocks"
+      },
+      {
+        "from": "tailscale-setup-dialog",
+        "to": "tailscale-phone-qr",
+        "type": "blocks"
+      },
+      {
+        "from": "qr-image-extract",
+        "to": "tailscale-phone-qr",
+        "type": "blocks"
+      },
+      {
+        "from": "tailscale-peers-panel",
+        "to": "tailscale-phone-qr",
+        "type": "blocks"
+      },
+      {
+        "from": "pan-tailscale-setup",
+        "to": "docs-tailscale-page",
+        "type": "blocks"
+      },
+      {
+        "from": "tailscale-setup-dialog",
+        "to": "docs-tailscale-page",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-tailscale-page",
+        "to": "docs-cli-tailscale",
+        "type": "blocks"
+      },
+      {
+        "from": "pan-tailscale-setup",
+        "to": "docs-cli-tailscale",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-tailscale-page",
+        "to": "docs-remote-access",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

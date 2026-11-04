@@ -1,0 +1,149 @@
+{
+  "version": "1",
+  "issueId": "PAN-4936",
+  "created": "2026-11-04T00:57:11.277Z",
+  "updated": "2026-11-04T01:44:48.537Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "self-caller": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4936",
+      "claimedAt": "2026-11-04T00:57:11.277Z",
+      "doneAt": "2026-11-04T01:08:10.269Z"
+    },
+    "self-job-argv": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4936",
+      "claimedAt": "2026-11-04T01:08:17.513Z",
+      "doneAt": "2026-11-04T01:12:02.457Z"
+    },
+    "self-job-store": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4936",
+      "claimedAt": "2026-11-04T01:12:08.167Z",
+      "doneAt": "2026-11-04T01:16:07.803Z"
+    },
+    "self-jobs-routes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4936",
+      "claimedAt": "2026-11-04T01:16:12.583Z",
+      "doneAt": "2026-11-04T01:29:35.746Z"
+    },
+    "wait-job-tool": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4936",
+      "claimedAt": "2026-11-04T01:29:41.834Z",
+      "doneAt": "2026-11-04T01:34:03.467Z"
+    },
+    "self-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4936",
+      "claimedAt": "2026-11-04T01:34:09.276Z",
+      "doneAt": "2026-11-04T01:34:46.227Z"
+    },
+    "self-caller.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:37:55.548Z"
+    },
+    "self-caller.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:38:13.813Z"
+    },
+    "self-caller.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:38:32.606Z"
+    },
+    "self-caller.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:38:50.922Z"
+    },
+    "self-job-argv.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:39:09.925Z"
+    },
+    "self-job-argv.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:39:27.799Z"
+    },
+    "self-job-argv.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:39:45.261Z"
+    },
+    "self-job-argv.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:40:03.070Z"
+    },
+    "self-job-argv.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:40:23.826Z"
+    },
+    "self-job-store.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:40:42.652Z"
+    },
+    "self-job-store.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:41:02.222Z"
+    },
+    "self-job-store.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:41:20.191Z"
+    },
+    "self-job-store.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:41:38.326Z"
+    },
+    "self-job-store.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:41:53.139Z"
+    },
+    "self-jobs-routes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:42:08.284Z"
+    },
+    "self-jobs-routes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:42:23.780Z"
+    },
+    "self-jobs-routes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:42:39.056Z"
+    },
+    "self-jobs-routes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:42:55.182Z"
+    },
+    "wait-job-tool.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:43:10.528Z"
+    },
+    "wait-job-tool.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:43:26.596Z"
+    },
+    "wait-job-tool.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:43:42.708Z"
+    },
+    "wait-job-tool.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:43:58.945Z"
+    },
+    "self-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:44:14.864Z"
+    },
+    "self-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:44:31.302Z"
+    },
+    "self-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:44:48.537Z"
+    }
+  }
+}

@@ -15,7 +15,7 @@ import * as AcpAgent from "effect-acp/agent";
 import * as EffectAcpErrors from "effect-acp/errors";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { AcpSessionRuntime, layer } from "../session-runtime.js";
+import { AcpSessionRuntime, layer, type AcpSessionRequestLogEvent } from "../session-runtime.js";
 
 const fixturePath = NodePath.join(
   NodePath.dirname(NodeURL.fileURLToPath(import.meta.url)),
@@ -232,6 +232,35 @@ describe("AcpSessionRuntime", () => {
       "AssistantItemCompleted",
     ]);
     expect(result.events.some((event) => event._tag === "ToolCallUpdated")).toBe(false);
+  });
+
+  it.each([
+    ["session/new", {}],
+    ["session/load", { resumeSessionId: "mock-session-1" }],
+  ])("sends mcpServers in %s (PAN-4934)", async (method, extra) => {
+    const server = {
+      name: "overdeck",
+      command: "/usr/bin/node",
+      args: ["x"],
+      env: [{ name: "OVERDECK_MCP_TOKEN_FILE", value: "/a/mcp-token" }],
+    };
+    const logged: AcpSessionRequestLogEvent[] = [];
+    const options = {
+      ...runtimeOptions(),
+      ...extra,
+      mcpServers: [server],
+      requestLogger: (event: AcpSessionRequestLogEvent) => Effect.sync(() => void logged.push(event)),
+    };
+
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        const runtime = yield* AcpSessionRuntime;
+        yield* runtime.start();
+      }).pipe(Effect.provide(layer(options)), Effect.scoped, Effect.provide(NodeServices.layer)),
+    );
+
+    const started = logged.find((event) => event.method === method && event.status === "started");
+    expect(started?.payload).toMatchObject({ mcpServers: [server] });
   });
 
   it("returns cancelled when an active prompt is interrupted", async () => {

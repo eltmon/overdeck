@@ -1,0 +1,221 @@
+{
+  "version": "1",
+  "issueId": "PAN-4959",
+  "created": "2026-11-03T21:54:38.804Z",
+  "updated": "2026-11-03T23:28:17.945Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "connect-account-view": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4959",
+      "claimedAt": "2026-11-03T21:54:38.804Z",
+      "doneAt": "2026-11-03T21:58:29.945Z"
+    },
+    "connect-remove-machine": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4959",
+      "claimedAt": "2026-11-03T21:58:46.581Z",
+      "doneAt": "2026-11-03T22:01:20.406Z"
+    },
+    "connect-delete-account": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4959",
+      "claimedAt": "2026-11-03T22:01:36.467Z",
+      "doneAt": "2026-11-03T22:03:28.501Z"
+    },
+    "account-web-session": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4959",
+      "claimedAt": "2026-11-03T22:03:56.790Z",
+      "doneAt": "2026-11-03T22:12:52.618Z"
+    },
+    "account-directory-client": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4959",
+      "claimedAt": "2026-11-03T22:13:01.161Z",
+      "doneAt": "2026-11-03T22:14:28.796Z"
+    },
+    "account-page": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4959",
+      "claimedAt": "2026-11-03T22:14:39.328Z",
+      "doneAt": "2026-11-03T22:16:39.394Z"
+    },
+    "account-remove-machine": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4959",
+      "claimedAt": "2026-11-03T22:16:46.060Z",
+      "doneAt": "2026-11-03T23:05:43.746Z"
+    },
+    "account-delete": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4959",
+      "claimedAt": "2026-11-03T23:05:49.482Z",
+      "doneAt": "2026-11-03T23:08:31.963Z"
+    },
+    "account-directory-holder": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4959",
+      "claimedAt": "2026-11-03T23:08:38.044Z",
+      "doneAt": "2026-11-03T23:09:49.034Z"
+    },
+    "account-page-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4959",
+      "claimedAt": "2026-11-03T23:09:56.798Z",
+      "doneAt": "2026-11-03T23:11:14.192Z"
+    },
+    "connect-account-view.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:17:28.874Z"
+    },
+    "connect-account-view.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:17:48.935Z"
+    },
+    "connect-account-view.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:18:07.812Z"
+    },
+    "connect-remove-machine.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:18:24.643Z"
+    },
+    "connect-remove-machine.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:18:41.352Z"
+    },
+    "connect-remove-machine.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:18:58.659Z"
+    },
+    "connect-remove-machine.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:19:16.383Z"
+    },
+    "connect-delete-account.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:19:33.116Z"
+    },
+    "connect-delete-account.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:19:49.212Z"
+    },
+    "connect-delete-account.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:20:07.515Z"
+    },
+    "account-web-session.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:20:27.860Z"
+    },
+    "account-web-session.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:20:47.197Z"
+    },
+    "account-web-session.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:21:04.472Z"
+    },
+    "account-web-session.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:21:19.798Z"
+    },
+    "account-web-session.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:21:35.034Z"
+    },
+    "account-directory-client.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:21:50.071Z"
+    },
+    "account-directory-client.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:22:06.895Z"
+    },
+    "account-directory-client.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:22:24.094Z"
+    },
+    "account-directory-client.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:22:40.376Z"
+    },
+    "account-page.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:22:56.106Z"
+    },
+    "account-page.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:23:12.353Z"
+    },
+    "account-page.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:23:48.182Z"
+    },
+    "account-page.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:24:04.166Z"
+    },
+    "account-remove-machine.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:24:22.677Z"
+    },
+    "account-remove-machine.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:24:41.904Z"
+    },
+    "account-remove-machine.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:25:01.971Z"
+    },
+    "account-remove-machine.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:25:21.663Z"
+    },
+    "account-delete.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:25:43.989Z"
+    },
+    "account-delete.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:26:03.690Z"
+    },
+    "account-delete.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:26:20.481Z"
+    },
+    "account-directory-holder.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:26:36.768Z"
+    },
+    "account-directory-holder.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:26:51.810Z"
+    },
+    "account-directory-holder.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:27:06.961Z"
+    },
+    "account-page-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:27:22.944Z"
+    },
+    "account-page-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:27:38.754Z"
+    },
+    "account-page-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:27:54.889Z"
+    },
+    "account-page.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:28:17.945Z"
+    }
+  }
+}

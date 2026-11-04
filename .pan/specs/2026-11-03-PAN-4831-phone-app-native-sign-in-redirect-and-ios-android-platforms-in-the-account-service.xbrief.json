@@ -1,0 +1,348 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-03T03:57:01Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4831: Phone app: native sign-in redirect and ios/android platforms in the account service",
+    "updated": "2026-11-03T03:59:53.546Z"
+  },
+  "plan": {
+    "id": "pan-4831",
+    "title": "Phone app: native sign-in redirect and ios/android platforms in the account service",
+    "status": "running",
+    "uid": "80a67985-c3cf-462f-b137-bb8970cbef15",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-03T03:57:01Z",
+    "updated": "2026-11-03T03:59:53.546Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4831",
+        "label": "PAN-4831",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-4831.md",
+        "label": "PRD draft (.pan/drafts/pan-4831.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4823",
+        "label": "PAN-4823 epic (W-ACC1, D-6, AC-4)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "account-service",
+      "oauth",
+      "pkce",
+      "phone-app",
+      "anywhere"
+    ],
+    "narratives": {
+      "Problem": "The overdeck.ai account service (services/account) accepts only loopback redirect_uri values in its PKCE sign-in flow and only desktop platforms (linux|darwin|win32 x x64|arm64). The Overdeck phone app (epic PAN-4823) signs in through the system browser and must be redirected back to its private-use URI scheme ai.overdeck.app:/oauth/callback, and must register itself as an ios-arm64 or android-arm64 device.",
+      "Proposal": "In services/account/src/pkce.ts add NATIVE_APP_REDIRECT = 'ai.overdeck.app:/oauth/callback' and validateClientRedirect (exact raw-string match, else the existing loopback rule), used in parseStart and readPayload only; the token exchange already compares against the stored, validated redirect and stays unchanged. In services/account/src/devices.ts widen PLATFORM_RE to ^((linux|darwin|win32)-(x64|arm64)|(ios|android)-arm64)$ and make defaultLabel return 'iPhone' and 'Android phone'. Unit tests cover the accept/reject set and a full PKCE exchange with the native redirect (epic AC-4). docs/ACCOUNT-SERVICE.md describes the new redirect and platforms.",
+      "NonGoals": "- No CORS or any other new response header on the account service; the phone app must call /oauth/token and /v1/* with native HTTP (CapacitorHttp)\n- No change to src/lib/account/client.ts (machine-side PLATFORM_ARCH_RE stays desktop-only)\n- No change to the device flow (device-flow.ts) or its /activate wording, even though it now accepts the phone platforms through the shared validator\n- No change to exchangeAuthorizationCode or redirectToClient in pkce.ts\n- No prefix, scheme-only or parsed-URL matching of the native redirect; exact string only\n- No D1 migration\n- No universal links / App Links / https redirect for the app\n- No phone app code, no user-facing Mintlify pages, no services/connect change (other epic items)\n- No deploy of the account Worker (operator-only)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "PAN-4774 sequencing gate treated as satisfied",
+        "rationale": "The issue says not to start before the Anywhere release acceptance run (PAN-4774) passes; gh reports PAN-4774 CLOSED on 2026-11-02."
+      },
+      {
+        "summary": "Only parseStart and readPayload switch to validateClientRedirect; the code exchange is unchanged",
+        "rationale": "W-ACC1 says to also use it in the code exchange, but exchangeAuthorizationCode (pkce.ts line 128) never called validateLoopbackRedirect; it compares the posted redirect_uri to the stored, already-validated value, which is the RFC 6749 4.1.3 rule."
+      },
+      {
+        "summary": "The device flow accepts ios-arm64/android-arm64 through the shared isValidPlatform, with no extra gate",
+        "rationale": "The phone app never uses the device flow and no caller sends phone platforms there; a second validator would be code for no caller."
+      },
+      {
+        "summary": "No CORS headers are added",
+        "rationale": "Epic AC-4 does not need it, http.ts documents 'no Access-Control-* header' as an invariant, and CORS changes the auth surface; W-APP1 uses native HTTP instead. Note posted on the epic."
+      },
+      {
+        "summary": "src/lib/account/client.ts PLATFORM_ARCH_RE stays unchanged",
+        "rationale": "It validates the machine's own process.platform/arch; widening it would let a Node process on Android (Termux) register as an 'Android phone'."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-03-PAN-4831-phone-app-native-sign-in-redirect-and-ios-android-platforms-in-the-account-service.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "native-redirect",
+        "title": "Accept exactly ai.overdeck.app:/oauth/callback as a PKCE redirect_uri",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T03:57:01Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4831",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "native-signin-e2e"
+          ],
+          "files_scope": [
+            "services/account/src/pkce.ts",
+            "tests/unit/services/account/pkce.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:account",
+            "npx vitest run tests/unit/services/account/pkce.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:account completes without errors",
+            "tests/unit/services/account/pkce.test.ts passes, including the new native-redirect accept/reject test"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item W-1. In services/account/src/pkce.ts: (1) update the module header on line 2 to name both the loopback redirect (RFC 8252 7.3) and the phone app's private-use scheme redirect (PRD PAN-4823 D-6; RFC 8252 7.1). (2) Directly after validateLoopbackRedirect (ends line 36) add `export const NATIVE_APP_REDIRECT = 'ai.overdeck.app:/oauth/callback';` with the doc comment `/** The phone app's private-use scheme redirect (RFC 8252 §7.1), allowed exactly. */` and `export function validateClientRedirect(raw: string | null): string | null { if (raw === NATIVE_APP_REDIRECT) return raw; return validateLoopbackRedirect(raw); }`. (3) Replace validateLoopbackRedirect( with validateClientRedirect( in parseStart (line 47) and readPayload (line 73) only. Do NOT change exchangeAuthorizationCode or redirectToClient. In tests/unit/services/account/pkce.test.ts import NATIVE_APP_REDIRECT and validateClientRedirect and add the test 'accepts exactly the native redirect ai.overdeck.app:/oauth/callback and refuses near misses with 400' asserting: startQuery({ redirect_uri: NATIVE_APP_REDIRECT }) -> 302; each of 'ai.overdeck.app:/other', 'ai.overdeck.app://oauth/callback', 'evil:/oauth/callback', 'AI.OVERDECK.APP:/oauth/callback', 'ai.overdeck.app:/oauth/callback?x=1', 'ai.overdeck.app:/oauth/callback#' -> 400, Location null, body contains 'redirect_uri'; validateClientRedirect(NATIVE_APP_REDIRECT) === NATIVE_APP_REDIRECT, validateClientRedirect('http://127.0.0.1:4567/callback') returns that string, validateClientRedirect(null) === null."
+        },
+        "items": [
+          {
+            "id": "native-redirect.ac1",
+            "title": "Given redirect_uri=ai.overdeck.app:/oauth/callback, when GET /auth/start is called with otherwise valid params, then it returns 302 to GitHub",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "native-redirect.ac2",
+            "title": "Given redirect_uri is any of ai.overdeck.app:/other, ai.overdeck.app://oauth/callback, evil:/oauth/callback, AI.OVERDECK.APP:/oauth/callback, ai.overdeck.app:/oauth/callback?x=1 or ai.overdeck.app:/oauth/callback#, when GET /auth/start is called, then it returns 400 with no Location header and a body naming redirect_uri",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "native-redirect.ac3",
+            "title": "validateClientRedirect returns NATIVE_APP_REDIRECT for the exact string, returns a loopback URL unchanged, and returns null for null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "native-redirect.ac4",
+            "title": "The diff of exchangeAuthorizationCode and redirectToClient is empty, and every pre-existing test in pkce.test.ts passes with unchanged expectations",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "phone-platforms",
+        "title": "Accept ios-arm64 and android-arm64 platforms with iPhone and Android phone default labels",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T03:57:01Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4831",
+          "requiresInspection": false,
+          "files_scope": [
+            "services/account/src/devices.ts",
+            "tests/unit/services/account/devices.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:account",
+            "npx vitest run tests/unit/services/account/devices.test.ts tests/unit/services/account/device-flow.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:account completes without errors",
+            "devices.test.ts and device-flow.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item W-2. In services/account/src/devices.ts change line 18 from `export const PLATFORM_RE = /^(linux|darwin|win32)-(x64|arm64)$/;` to `export const PLATFORM_RE = /^((linux|darwin|win32)-(x64|arm64)|(ios|android)-arm64)$/;`. In defaultLabel (lines 57-62) add `if (platform.startsWith('ios-')) return 'iPhone';` and `if (platform.startsWith('android-')) return 'Android phone';` after the win32 branch and before `return 'Linux device';`. In tests/unit/services/account/devices.test.ts assert isValidPlatform true for 'ios-arm64' and 'android-arm64', false for 'ios-x64', 'android-x64', 'ios-arm', 'iphone-arm64'; and in the 'default labels follow D-17' test assert defaultLabel('ios-arm64') === 'iPhone' and defaultLabel('android-arm64') === 'Android phone'. Do not touch src/lib/account/client.ts or device-flow.ts."
+        },
+        "items": [
+          {
+            "id": "phone-platforms.ac1",
+            "title": "isValidPlatform returns true for ios-arm64 and android-arm64 and false for ios-x64, android-x64, ios-arm and iphone-arm64, asserted in devices.test.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phone-platforms.ac2",
+            "title": "defaultLabel returns 'iPhone' for ios-arm64 and 'Android phone' for android-arm64, and still returns 'Linux device', 'macOS device', 'Windows device' for the desktop platforms",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phone-platforms.ac3",
+            "title": "src/lib/account/client.ts and services/account/src/device-flow.ts are unchanged in the diff, and device-flow.test.ts passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "native-signin-e2e",
+        "title": "End-to-end PKCE test: native redirect with ios-arm64 mints an iPhone device",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T03:57:01Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4831",
+          "requiresInspection": false,
+          "files_scope": [
+            "tests/unit/services/account/pkce.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/services/account/"
+          ],
+          "expected_outputs": [
+            "every test file under tests/unit/services/account/ passes, including the two new native sign-in tests"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item W-3 (epic AC-4). In tests/unit/services/account/pkce.test.ts add test 'native sign-in: ai.overdeck.app:/oauth/callback with ios-arm64 mints a device labelled iPhone': setup(); back = await signIn(env, deps, { redirect_uri: NATIVE_APP_REDIRECT, platform: 'ios-arm64' }); assert back.protocol + back.pathname === 'ai.overdeck.app:/oauth/callback' (NOT back.origin, which is the string 'null' for a private-use scheme); state is 'client-state-123', code matches /^odc_[0-9a-f]{64}$/, error is null; exchange(env, deps, { code, redirect_uri: NATIVE_APP_REDIRECT }) (the helper defaults redirect_uri to the loopback REDIRECT, so the override is required); status 200, body.label 'iPhone', access_token matches /^odd_[0-9a-f]{64}$/, verifyDeviceToken resolves ok:true, SELECT platform FROM devices is 'ios-arm64'. Add test 'native sign-in with android-arm64 mints a device labelled Android phone' with the same steps and label 'Android phone'. Add an assertion that a fresh native code exchanged with redirect_uri 'http://127.0.0.1:4567/callback' returns { error: 'invalid_grant' }."
+        },
+        "items": [
+          {
+            "id": "native-signin-e2e.ac1",
+            "title": "Given a PKCE sign-in with redirect_uri ai.overdeck.app:/oauth/callback and platform ios-arm64, when the GitHub callback completes, then the 302 Location is ai.overdeck.app:/oauth/callback with code=odc_... and the original state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "native-signin-e2e.ac2",
+            "title": "When that code is exchanged at POST /oauth/token with the native redirect_uri and the matching verifier, then the response is 200 with label 'iPhone' and the devices row persists platform 'ios-arm64'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "native-signin-e2e.ac3",
+            "title": "The same flow with platform android-arm64 returns label 'Android phone'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "native-signin-e2e.ac4",
+            "title": "A native code exchanged with redirect_uri http://127.0.0.1:4567/callback returns 400 { error: 'invalid_grant' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "account-docs",
+        "title": "Document the native redirect and phone platforms in docs/ACCOUNT-SERVICE.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T03:57:01Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4831",
+          "requiresInspection": false,
+          "files_scope": [
+            "docs/ACCOUNT-SERVICE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'ai.overdeck.app:/oauth/callback' docs/ACCOUNT-SERVICE.md",
+            "grep -n 'Android phone' docs/ACCOUNT-SERVICE.md",
+            "grep -cF '^(linux|darwin|win32)-(x64|arm64)$' docs/ACCOUNT-SERVICE.md"
+          ],
+          "expected_outputs": [
+            "the first two greps each print at least one line",
+            "the third grep prints 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item W-4. In docs/ACCOUNT-SERVICE.md: (1) line 21, rename the lead '**PKCE loopback flow** (local dashboard; client in PAN-4330).' to '**PKCE flow** (local dashboard: loopback redirect, client in PAN-4330; phone app: native redirect, PAN-4823).' and after the loopback-rule sentence add: 'The one other accepted `redirect_uri` is the phone app's private-use scheme redirect `ai.overdeck.app:/oauth/callback` (RFC 8252 §7.1), matched as the exact string: `ai.overdeck.app://oauth/callback`, another path, a query string or a different case is a 400.' (2) line 39, change the platform regex to `^((linux|darwin|win32)-(x64|arm64)|(ios|android)-arm64)$` and the default label list to \"Linux device\" / \"macOS device\" / \"Windows device\" / \"iPhone\" / \"Android phone\". (3) Add after the PKCE paragraph: 'The service sends no `Access-Control-*` headers, so the phone app calls `/oauth/token` and `/v1/*` with native HTTP, not WebView `fetch`.' Do not edit configuration/*.mdx pages (epic W-DOC)."
+        },
+        "items": [
+          {
+            "id": "account-docs.ac1",
+            "title": "docs/ACCOUNT-SERVICE.md states that ai.overdeck.app:/oauth/callback is accepted as an exact string and that ai.overdeck.app://oauth/callback, another path, a query or a different case returns 400",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-docs.ac2",
+            "title": "docs/ACCOUNT-SERVICE.md shows the platform regex ^((linux|darwin|win32)-(x64|arm64)|(ios|android)-arm64)$ and lists the default labels iPhone and Android phone; grep -cF for the old six-value regex returns 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-docs.ac3",
+            "title": "docs/ACCOUNT-SERVICE.md states that the service sends no Access-Control-* headers and the phone app uses native HTTP for /oauth/token and /v1/*",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "native-redirect",
+        "to": "native-signin-e2e",
+        "type": "blocks"
+      },
+      {
+        "from": "phone-platforms",
+        "to": "native-signin-e2e",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

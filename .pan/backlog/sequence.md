@@ -1,36 +1,36 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-01T09:18:58Z · model: claude-opus-5-5 · open: 871_
+_Last sequenced: 2026-11-04T09:56:06.243460Z · model: claude-opus-5-5 · open: 868_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
-| 2 | PAN-4639 | L | medium | ok |  |  | In pipeline: conversation list as inbox; settle/snooze states, Needs-you on top, auto-settle on merge and idle, bulk actions. |
-| 3 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
-| 4 | PAN-4663 | XS | critical | ok |  |  | In pipeline: init-perms lacks networks so each stack burns 2 Docker subnets; pool exhaustion blocks new workspace starts |
-| 5 | PAN-4670 | S | high | ok |  |  | In pipeline: simple-mode postJson omits CSRF header so every action 403s; idle planner shows Start work while work agent runs. |
-| 6 | PAN-4672 | S | high | ok |  |  | In pipeline: missed CodeRabbit fixes: atomic Traefik compose write, migration try/catch, IPv6 doc, 503 after hold timeout. |
-| 7 | PAN-4697 | S | critical | ok |  |  | In pipeline: one 7.4 KB test:frontend-subset line in package.json makes every two frontend-test PRs conflict; move to union-merged file. |
-| 8 | PAN-4690 | S | critical | ok |  |  | Review dispatch rewrites the tracked continue file uncommitted, so the dirty-tree gate blocks the review it dispatched |
-| 9 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json |
-| 10 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
-| 11 | PAN-4666 | S | critical | ok |  |  | Flywheel status drops live agents whose Herdr pane says 'done'; loop may respawn them. Route via liveness.ts. Needs handoff. |
-| 12 | PAN-4669 | S | critical | ok |  |  | Herdr hosts: idle-stack reaper checks tmux only, so it stops server/frontend containers of every live agent after 10m; needs-handoff |
-| 13 | PAN-4547 | M | high | ok |  |  | Restore automatic close-out for verifying-on-main issues whose DoD fully passes; close_out.auto inert since PAN-3917 |
-| 14 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
-| 15 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
-| 16 | PAN-4551 | L | high | ok |  |  | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
-| 17 | PAN-4671 | M | high | ok |  |  | CodeRabbit comments posted after the reviewer snapshot merge unseen; deliver late ones to the work agent at merge. Needs handoff. |
-| 18 | PAN-4674 | S | high | ok |  |  | Operator can't remove a configured crew (Fable expert) in Settings tiered execution; removal or model change doesn't persist |
-| 19 | PAN-4673 | S | high | ok |  |  | Model Routing selects truncate model names (Opus 5.5 shows as Opus 5): narrow column plus repeated provider prefix in option text |
-| 20 | PAN-4675 | S | critical | ok |  |  | One transient gh label timeout aborts post-merge lifecycle; merge door replies Already merged, so the issue can never close. |
-| 20 | PAN-4680 | S | critical | ok |  |  | In pipeline: run-gh ledger test flaked main red; queueLedgerEntry appends race. Serialize appends with a promise chain. |
+| 1 | PAN-4702 | S | critical | ok |  |  | Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs. |
+| 3 | PAN-4995 | S | high | ok |  |  | pan review request verifies a half-adopted workspace; its main merge trips adoption's head check -> false Needs-you on handoff PRs |
+| 4 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
+| 5 | PAN-4553 | S | critical | ok |  |  | Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges. |
+| 6 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
+| 7 | PAN-4690 | S | critical | ok |  |  | Review dispatch rewrites the tracked continue file uncommitted, so the dirty-tree gate blocks the review it dispatched |
+| 8 | PAN-4710 | S | high | ok |  |  | Deferred plan hand-off retries omit the guardrail ack, so they're refused at 'agent count high' and give up silently; needs handoff |
+| 9 | PAN-4554 | S | high | ok |  |  | pan start --plan auto finalizes planning but never spawns the work agent; a second manual pan start is needed. Seen on 7 MYN issues |
+| 10 | PAN-4666 | S | critical | ok |  |  | Flywheel status drops live agents whose Herdr pane says 'done'; loop may respawn them. Route via liveness.ts. Needs handoff. |
+| 11 | PAN-4669 | S | critical | ok |  |  | Herdr hosts: idle-stack reaper checks tmux only, so it stops server/frontend containers of every live agent after 10m; needs-handoff |
+| 12 | PAN-4547 | M | high | ok |  |  | Restore automatic close-out for verifying-on-main issues whose DoD fully passes; close_out.auto inert since PAN-3917 |
+| 13 | PAN-4511 | S | high | ok |  |  | pan spawn starts its worker pane with argv '--model <m>' and no harness binary, so foreman item workers never launch |
+| 14 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
+| 15 | PAN-4551 | L | high | ok |  |  | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
+| 16 | PAN-4671 | M | high | ok |  |  | CodeRabbit comments posted after the reviewer snapshot merge unseen; deliver late ones to the work agent at merge. Needs handoff. |
+| 17 | PAN-4674 | S | high | ok |  |  | Operator can't remove a configured crew (Fable expert) in Settings tiered execution; removal or model change doesn't persist |
+| 18 | PAN-4673 | S | high | ok |  |  | Model Routing selects truncate model names (Opus 5.5 shows as Opus 5): narrow column plus repeated provider prefix in option text |
+| 19 | PAN-4675 | S | critical | ok |  |  | One transient gh label timeout aborts post-merge lifecycle; merge door replies Already merged, so the issue can never close. |
+| 20 | PAN-4705 | S | high | ok |  |  | quality-gate-admission test leaks a poller past afterEach rmSync; unhandled ENOENT fails unrelated PR CI shards. |
+| 21 | PAN-4746 | S | high | ok |  |  | CI test shard flakes on ENOTEMPTY: afterEach rmSync races an unawaited snapshot write; reds unrelated PRs (seen on #4745). |
 | 22 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
 | 23 | PAN-4625 | S | high | ok |  |  | CI relay debounces a later failed check on the same head, so agents never see a failing test shard; lands after PAN-4534 (same file) |
 | 24 | PAN-4586 | XS | critical | ok |  |  | Herdr pane.read nests text under result.read; every Overdeck pane-text reader gets '' — detection, inventory, resume all blind |
 | 25 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
 | 26 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
-| 26 | PAN-4681 | S | high | ok |  |  | In pipeline: CodeRabbit fixes lost at #4667 merge: messageRows test not in CI subset; cite toolbar shown with no composer. |
+| 27 | PAN-4708 | M | high | needs-refinement |  |  | docs.json nav is a hot file: concurrent docs PRs conflict, each costing a merge-main and re-review. Pick a fix option first. |
 | 28 | PAN-4229 | S | critical | needs-refinement |  | PAN-4217 | pan task done skips nested AC children, so pan done refuses at the end; third report of the PAN-4217 missing writer; fold into its fix. |
 | 29 | PAN-3566 | XS | critical | ok |  |  | Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the deterministic producer of zombie test agents. |
 | 30 | PAN-3952 | S | critical | ok |  |  | Herdr sizes unviewed panes to 1 row: 10 of 13 work panes report nothing to pane read; every pane-text consumer is blind |
@@ -73,165 +73,164 @@ _Last sequenced: 2026-11-01T09:18:58Z · model: claude-opus-5-5 · open: 871_
 | 67 | PAN-3708 | M | critical | ok |  |  | pan strike dies at git worktree list on a polyrepo wrapper — the urgent-strike escape hatch is unavailable for MYN-class projects. |
 | 68 | PAN-3605 | XS | high | ok |  |  | Supply chain: lint-effect-diagnostics npx fell back to the registry and ran a squatted unscoped package; pin the scoped local bin. |
 | 69 | PAN-4624 | S | high | ok |  |  | Polyrepo ci-mode test gate reads CI verdict for the wrapper HEAD, never the member repo PR head, so red CI is silently missed. |
-| 70 | PAN-3557 | S | critical | ok |  |  | Post-merge label writes have no retry; a 403 hides a merged issue from the verify-on-main sweep while lifecycle reports success. |
-| 71 | PAN-3543 | S | critical | ok |  |  | Completed-handoff agents are unstartable: start, --fresh and reset-session all refuse while the refusal itself recommends --fresh. |
-| 72 | PAN-3522 | S | critical | ok |  |  | Supervisor watchdog restart-churns under CPU storm because the probe timeout budget ignores the boot warm phase. |
-| 73 | PAN-3314 | M | critical | ok |  |  | One cgroup holds every agent pane, so a single hungry agent inflates the unit and oomd kills the whole fleet — twice now. |
-| 74 | PAN-3278 | S | critical | needs-refinement |  |  | A finished work agent with an open PR sat two hours because review was never dispatched and auto-requeue fired none of 25 attempts. |
-| 75 | PAN-4623 | XS | high | ok |  |  | deacon-lite stalled-review fallback calls a starter never registered in the deacon child, so stranded reviews stay stranded. TENET-10 |
-| 76 | PAN-3234 | S | critical | needs-refinement |  |  | Agents freeze indefinitely on blocking choice menus and no health surface notices; the detector is wired only to delivery refusal. |
-| 77 | PAN-3205 | S | critical | ok |  |  | The deployment gate promises the queued deploy will fire at the next verification boundary; that trigger does not exist. |
-| 78 | PAN-3118 | S | critical | needs-refinement |  |  | Model-specific quota exhaustion is invisible everywhere but the pane: four planning agents read 'running' at $0.00 with no fallback. |
-| 79 | PAN-3106 | S | critical | ok |  |  | auto_merge_default: hold is consulted on one merge path only, so held issues merge individually and defeat the UAT train. |
-| 80 | PAN-3100 | S | critical | ok |  |  | The test role evaluates the dirty working tree, so a live work agent's uncommitted edits are recorded as the issue's test failure. |
-| 81 | PAN-4213 | M | high | ok |  |  | Merge-train follow-ups from #4066 (merged): stamp-vs-pin mismatch, reset --keep can strand agent commits, fetch retry, tests |
-| 82 | PAN-3096 | S | critical | ok |  |  | pan done blocks on generated .devcontainer/ and dev, and agents resolve it by deleting workspace infrastructure or inventing gitignores. |
-| 83 | PAN-3084 | S | critical | needs-refinement |  |  | A review session spawned but never briefed sits at zero context forever, and restart 'preserves' the zombie that blocks its replacement. |
-| 84 | PAN-3043 | S | critical | needs-refinement |  |  | Provider health is probed only at spawn, so a mid-run 403 quota refusal leaves an agent 'running' for days holding a slot. |
-| 85 | PAN-1824 | S | high | ok |  |  | Fix flaky main CI: fake timers + @slow exclusion for real-timer test family |
-| 86 | PAN-2932 | S | high | ok |  | PAN-2337 | intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap leaves :3011 unbound (Bad Gateway) after pan reload |
-| 87 | PAN-2935 | S | critical | ok |  |  | Workspace devcontainer duplicate backend hijacks Traefik router |
-| 88 | PAN-2337 | XS | critical | ok |  |  | Reload/build atomicity: an in-place `npm run build` under a live dashboard breaks new PTY-supervisor spawns until restart |
-| 89 | PAN-2422 | XS | high | ok |  | PAN-2337 | rebuilding dist under a live server breaks lazy chunk imports |
-| 90 | PAN-2699 | XS | high | ok |  |  | npm run build regenerates the committed record-cost-event.js bundle |
-| 91 | PAN-2957 | XS | high | ok |  | PAN-2337 | npm run build intermittently produces stale frontend bundles |
-| 92 | PAN-2850 | M | high | ok |  |  | npm test fails in clean checkout after pretest removes dashboard bundle |
-| 93 | PAN-2758 | S | critical | needs-refinement |  |  | Provider capacity error silently zombies a spawned agent: willRetry=false, turn reported completed, state stays status=running forever |
-| 94 | PAN-2817 | M | high | needs-refinement |  |  | Idle-at-prompt work/review agents are never redriven: gpt-5.6-sol sessions stop at the composer mid-task and sit for hours |
-| 95 | PAN-2813 | M | high | ok |  |  | Scheduler yield never self-clears: yielded work agents stay paused after the blocking review completes/merges |
-| 96 | PAN-2668 | M | high | ok |  |  | Verification/review feedback silently queued to stopped-by-user agents |
-| 97 | PAN-2569 | XS | critical | ok |  |  | planning finalizes (issue→planned) but work agent does not auto-spawn |
-| 98 | PAN-4269 | M | high | ok |  |  | macOS conversations hang on 'Working…'/'waiting for transcript'; governor ruled out, root cause unknown (delivery or transcript find). |
-| 99 | PAN-3811 | M | high | ok |  |  | The PAN-3809 emergency strike prunes BuildKit unconditionally; inventory, bounded reclaim door and retention floor are still missing |
-| 100 | PAN-2179 | S | high | needs-refinement |  |  | relaunch can leave a zombie agent |
-| 101 | PAN-2169 | S | high | needs-refinement |  |  | kimi agent silently frozen at 100% ctx (no thrown overflow error) not caught by CONTEXT_OVERFLOW_PATTERNS |
-| 102 | PAN-2734 | S | high | ok |  |  | merge queue head-of-line zombie |
-| 103 | PAN-3697 | XS | high | ok |  |  | Deployed dashboard PATH omits Bun, so verification workers hit 'bun: not found' before the required install gate. |
-| 104 | PAN-3633 | S | high | ok |  |  | Strike workspaces spawn without @types, so the contract's own typecheck gate fails and agents abort reporting a false red main. |
-| 105 | PAN-4420 | S | high | ok |  |  | npx @overdeck/core on native Windows serves 404 for every page: static root is built from a URL path |
-| 106 | PAN-3099 | XS | critical | ok |  |  | --health-timeout 120 is enforced as 120ms and a false-failed check exits after killing the old server — nothing left listening. |
-| 107 | PAN-4418 | S | high | ok |  |  | vault join fails on native Windows: core.autocrlf=true rewrites the VAULT-FORMAT marker; blocks Windows continue flow |
-| 108 | PAN-3040 | S | critical | ok |  |  | pan strike is monorepo-shaped end to end and fails immediately on polyrepo projects; same defect as PAN-3708. |
-| 109 | PAN-3023 | S | critical | ok |  |  | Post-planning auto-spawn logs 'attempt 1/3' and never retries after a transient Docker EOF, stranding the issue with no re-drive owner. |
-| 110 | PAN-1618 | S | high | ok |  |  | Substrate: work-spawn docker-health gate has no autonomous recovery |
-| 111 | PAN-3916 | M | high | ok |  |  | Session pointers go stale after rollover + crash recovery; issue view and pan tell confirmation track a dead transcript |
-| 112 | PAN-3900 | S | high | ok |  |  | Docker bridge pool exhausted by orphaned workspace networks; pan start fails; bridge-pool patrol only warns |
-| 113 | PAN-3793 | S | high | ok |  |  | resolveIssuePullRequestRef probes only feature/ and strike/ names, so close-out cannot find a merged PR on a descriptive branch |
-| 114 | PAN-2639 | S | high | ok |  | PAN-2331 | codex-resume replays a rotated-out (revoked) refresh token → codex review convoys wedge with 401 |
-| 115 | PAN-2331 | S | high | ok |  |  | codex rate-limit 'Switch to gpt-5.4-mini?' modal stalls autonomous agents (no auto-dismiss) |
-| 116 | PAN-2333 | M | high | ok |  |  | feat: handle codex weekly-quota exhaustion gracefully |
-| 117 | PAN-4184 | S | high | needs-refinement |  |  | --no-deacon on the host port is refused as a peer after the old server stops, so the escape hatch may leave no dashboard; fix unpicked |
-| 118 | PAN-2511 | XS | high | ok |  |  | Work agents burn 20+ min on false test failures |
-| 119 | PAN-2763 | S | high | ok |  |  | Workspace node_modules is symlinked to the primary repo, breaking test resolution |
-| 120 | PAN-2170 | XS | high | ok |  |  | Docker init container lacks Python |
-| 121 | PAN-1198 | S | high | ok |  |  | Workspace init container's bun install doesn't populate container-node-modules named volume |
-| 122 | PAN-4453 | XS | high | ok |  |  | runtimes/codex.ts uses homedir() not OVERDECK_HOME; isolated homes write thread ids into the real ~/.overdeck |
-| 123 | PAN-2106 | S | high | ok |  |  | pan strike workspace setup leaves broken partial workspace + false 'spawned' success (git-lock race) |
-| 124 | PAN-2880 | M | high | ok |  | PAN-2259 | Linear tracker listIssues is a 3N+1 request storm |
-| 125 | PAN-2966 | S | high | ok |  |  | Polyrepo wrapper .gitignore misses .pan/ .devcontainer/ dev |
-| 126 | PAN-2945 | S | high | ok |  |  | pan done rejects Overdeck-generated runtime in polyrepo wrapper repos (.devcontainer/, dev, .pan/review) |
-| 127 | PAN-2680 | M | high | ok |  |  | pan close: Docker teardown silently skips a running stack in multi-repo projects (MYN), aborting close-out |
-| 128 | PAN-4419 | S | high | ok |  | PAN-4418 | pan vault resume cannot spawn claude on native Windows (ENOENT, needs shell/.cmd resolution); --no-launch works |
-| 129 | PAN-3734 | S | high | ok |  |  | Completed swarm slot reuse can start a new item from a stale polyrepo branch — silent wrong-parent work. |
-| 130 | PAN-3621 | M | high | ok |  |  | pan start intermittently dies resolving a chunk graph spliced across two builds — importer from primary dist, path in the live generation. |
-| 131 | PAN-3555 | S | high | ok |  |  | pan start without --fresh silently abandoned an intact 7.5MB warm session, violating the warm-by-default contract. |
-| 132 | PAN-3498 | S | high | ok |  |  | write-sequence pins in-pipeline ranks without renumbering, so the persisted sequence carries duplicate ranks and gaps. |
-| 133 | PAN-3496 | XS | high | ok |  |  | A review convoy member blocked on an operator AskUserQuestion about review depth; review agents must decide and record, not ask. |
-| 134 | PAN-3081 | S | high | ok |  |  | The agent git guard is PATH-based and an agent stripped it unprompted to get past a false block; a control the agent can remove isn't one. |
-| 135 | PAN-2627 | S | high | ok |  |  | Linear poller is blind after cycle rollover |
-| 136 | PAN-2324 | XS | high | ok |  |  | label transition fails atomically on missing 'in-planning' label |
-| 137 | PAN-2165 | XS | high | ok |  |  | pan close: close-issue phase reports success but leaves issue OPEN / wrong labels (remove-label aborts on absent label; no-vBRIEF trans… |
-| 138 | PAN-2905 | S | high | ok |  |  | Dashboard steady-state CPU ~50% keeps API responses at 0.5-1.5s |
-| 139 | PAN-2259 | S | critical | ok |  |  | something burns the full 5k/hr GitHub GraphQL quota |
-| 140 | PAN-2379 | S | high | ok |  |  | dependency install is warn-only + 60s timeout → false verify failures against empty node_modules (blocks swarm convergence) |
-| 141 | PAN-2421 | XS | high | ok |  |  | dashboard server route tests flake under full-suite verification load |
-| 142 | PAN-2430 | S | high | ok |  |  | frontend typecheck fails with dozens of pre-existing unused-local errors |
-| 143 | PAN-2593 | S | high | ok |  |  | server children inherit bare system PATH |
-| 144 | PAN-4302 | M | high | ok |  |  | ~19 files exec gh directly, bypassing runGh: spend is unattributed and keeps hitting GitHub during quota pause. Follow-up to PAN-4291 |
-| 145 | PAN-2080 | M | high | needs-refinement |  |  | External transports (email/Slack/push/TTS) still plausible; its stated dependency on the PAN-2079 Inbox spine is undercut by boot… |
-| 146 | PAN-1775 | M | high | ok |  |  | Remote (Fly.io) work agents appear as real session rows in the issue tree |
-| 147 | PAN-1436 | S | high | ok |  |  | PAN-1419 follow-up: stale stopped-agent zombies still pollute dashboard list |
-| 148 | PAN-3556 | S | high | ok |  |  | No per-agent spawn mutex: two flows allocated session identities 3s apart and the second pin orphaned the first transcript. |
-| 149 | PAN-3553 | S | high | ok |  |  | tmux list-panes -a exits 1 on a zero-session server, so the census reads unavailable post-reboot and conversations hang on 'Starting…'. |
-| 150 | PAN-3535 | S | high | ok |  |  | The drain/resume hold is re-derived from the caller's env each boot, so any restart from a clean shell silently drops it. |
-| 151 | PAN-3429 | M | high | ok |  |  | Memory governor defers admissions but sheds nothing under HARD pressure; concurrent heavy gate runs aren't in the shed ladder. |
-| 152 | PAN-3397 | S | high | ok |  |  | Fresh convoy lanes freeze at 0 output before kickoff; PAN-3375's detector only covers warm resumes, so recovery is manual. |
-| 153 | PAN-3325 | S | high | ok |  |  | A fresh workspace ships an empty-but-present node_modules, so tooling silently resolves the parent repo's deps and gates go false-green. |
-| 154 | PAN-3317 | S | high | ok |  |  | Strike agents are told to rebase, the launcher guard blocks it, and pan sync-main can't resolve a -strike workspace. Overlaps PAN-3306. |
-| 155 | PAN-3284 | S | high | ok |  |  | A workspace-confined agent wrote a doc edit into the primary main worktree — the PAN-2204 write-to-main hazard through a new door. |
-| 156 | PAN-3270 | S | high | ok |  |  | New workspaces arrive with empty node_modules and bun off the agent shell PATH, so the documented bun install remedy fails. |
-| 157 | PAN-4487 | XS | high | ok |  |  | cleanAgentState whitelist drops foreman, modelSpawnKey, workspaceId on every state.json write; add fields + round-trip test |
-| 158 | PAN-3257 | S | high | ok |  |  | Crash-resume leaves a stale PTY socket and drops supervisorEnabled from state.json, so every supervisor delivery fails afterwards. |
-| 159 | PAN-3129 | M | high | ok |  |  | No symlink/TOCTOU containment on canonical writes under agent-controlled paths; a planted symlink redirects a server-side write. |
-| 160 | PAN-3120 | S | high | ok |  |  | A scheduler-yielded work agent makes operator MERGE hard-error on polyrepo and silently dead-end on single-repo. |
-| 161 | PAN-4349 | S | high | ok |  |  | Agent-side GitHub reads prefer REST over GraphQL gh --json until PAN-4302 meters callers; protects the hourly quota |
-| 162 | PAN-3062 | M | high | ok |  |  | The shared primary main worktree stacks several sessions' commits, so whoever pushes next ships everyone else's unverified work. |
-| 163 | PAN-3048 | XS | high | needs-refinement |  |  | Pipeline auto-commit lands Overdeck's own .pan/drafts PRD into product feature branches; the exclusion list is duplicated and has drifted. |
-| 164 | PAN-3032 | S | high | ok |  |  | Rebuild composes under overdeck-feature- while Traefik labels name myn-feature- devnet, and traefik attaches are runtime-only. |
-| 165 | PAN-3833 | S | high | ok |  |  | Feed renders assistant text emitted after tool calls as collapsed thinking rows; operator believes the agent never answered |
-| 166 | PAN-3902 | S | high | ok |  |  | Verification gates inherit OVERDECK_* env from the dashboard, so host boot state (e.g. OVERDECK_NO_RESUME) can red any branch |
-| 167 | PAN-4629 | M | high | ok |  |  | Fresh npx machine cannot pan start: no gh auth token fallback for the GitHub tracker, and registration derives the wrong issue prefix. |
-| 167 | PAN-4628 | S | high | ok |  |  | npx pan serve mints a per-run token never written to disk; Herdr panes keep a stale one, so pane CLI calls to the dashboard get 401. |
-| 169 | PAN-3854 | S | high | ok |  |  | Feature-workspace devcontainer stack 403s on POST /api/dashboard/session, blocking all in-browser mutation UAT |
-| 170 | PAN-4577 | M | high | ok |  |  | Operator's facts didn't follow them to a new Mac: no importer for Claude auto-memory. PAN-3957 merged, so W9-W11 are unblocked. |
-| 171 | PAN-3307 | XS | high | ok |  |  | commitlint scope-enum lists 11 scopes, 14 real ones are missing, and it still names the removed beads scope — trains everyone to ignore it. |
-| 172 | PAN-4634 | M | medium | needs-refinement |  |  | Terra unserved on claude-code route: no CLIProxy release (to v8.0.44) lists it; bump pin, add to GPT_56_MODELS. Aliases also broken. |
-| 173 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
-| 174 | PAN-4653 | S | medium | ok |  | PAN-4639 | Ranked for readiness when #4639 merges: auto-settle on PR merge replaces tmux-only auto-archive; default on, setting toggle. |
-| 175 | PAN-1868 | XS | high | ok |  |  | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
-| 176 | PAN-4655 | M | medium | ok |  | PAN-4639 | Ranked for readiness when #4639 merges: idle auto-settle after N days (default 3); supersedes the #1485 archive part. |
-| 177 | PAN-1042 | S | high | ok |  |  | cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions |
-| 178 | PAN-4657 | M | medium | ok |  | PAN-4639 | Schedule dialog, next-run row badge and inbox resurfacing for scheduled conversations; #4640 merged, waits on in-pipeline #4639. |
-| 179 | PAN-570 | XS | high | ok |  | PAN-2642 | Show PLAN badge on costs when under a subscription/plan |
-| 180 | PAN-2059 | XL | high | ok | ✓ |  | Backlog pickup gate |
-| 181 | PAN-2376 | XL | high | stale | ✓ |  | Epic: CI/CD reliability — all 21 named children are closed; needs an operator disposition (close or restate) |
-| 182 | PAN-3775 | S | high | ok |  |  | makeDbLive opens overdeck.db unmigrated; zero-table db poisons a vitest worker home and breaks later read-only audits. |
-| 183 | PAN-3652 | XS | high | ok |  |  | No workflow_dispatch on ci.yml / state-plane-branches.yml, so an unverified main tip can never be verified and DoD row 6 blocks close-out. |
-| 184 | PAN-3579 | M | high | ok |  |  | ~20 frontend mutations hand-write JSON headers and omit the CSRF token, so each 403s the moment its route becomes guarded. |
-| 185 | PAN-3541 | S | high | ok |  |  | Review restart loops on the session-resume menu because eligibility ignores how the prior session ended; partial mechanical break landed. |
-| 186 | PAN-3463 | S | high | ok |  |  | A legitimate empty-diff slot outcome can never pass item verify, so the slot wedges and blocks dispatch of remaining items forever. |
-| 187 | PAN-3460 | S | high | ok |  |  | Per-item verify_commands that run the whole root suite make slot merge gates load-fragile and hold a patrol in flight for ~17 minutes. |
-| 188 | PAN-3454 | M | high | ok |  |  | Cost hook rescans fork-copied parent history from byte 0 under the reviewer's id — fabricated cache-miss warnings and double-billed spend. |
-| 189 | PAN-3432 | S | high | ok |  |  | Preemptive yield fans out: seven work agents paused to make room for one review convoy, then flood back oldest-first. |
-| 190 | PAN-3306 | S | high | ok |  |  | Three layers disagree on how a strike rebases: the prompt instructs it, the launcher guard blocks it, sync-main resolves the wrong worktree. |
-| 191 | PAN-3297 | S | high | ok |  |  | After a dashboard restart, delivery calls a healthy agent a zombie while resume calls it healthy; both classifiers can't be right. |
-| 192 | PAN-3274 | S | high | needs-refinement |  |  | A test-role agent spawned and never ran a turn, holding an approved CI-green issue out of the merge gate behind a stale failed verdict. |
-| 193 | PAN-3267 | S | high | ok |  |  | GitLab merged-head oracle spawns one glab subprocess per repo × head, so pipeline membership refresh fails on every cycle. |
-| 194 | PAN-3261 | S | high | ok |  |  | The tmux delivery fallback answered a live session-resume menu because its own paste hid the menu from the detector — silent /compact. |
-| 195 | PAN-3256 | S | high | ok |  |  | glab mr list runs with a polyrepo wrapper root as cwd, which is not a git repo, so MYN membership fails forge_unavailable every cycle. |
-| 196 | PAN-4342 | M | medium | ok |  |  | Re-review rounds resume every lane on its own round-1 findings; give each round one fresh critic lane (Deft method) |
-| 197 | PAN-3174 | S | high | ok |  |  | Polyrepo UAT stacks 504: Traefik labels carry the old myn- prefix, Traefik isn't on the overdeck-* devnet, and the fe port is wrong. |
-| 198 | PAN-3050 | XS | high | ok |  |  | Idle-stack reaper's regex only matches overdeck-feature-*-server|frontend, so MYN stacks run for hours after their agents are gone. |
-| 199 | PAN-4365 | S | medium | ok |  |  | Stale defaults: workhorses.expensive is Opus 4.8 and the flywheel role is a literal that ignores the slot; evals now unblocked |
-| 200 | PAN-2980 | XS | high | ok |  |  | The pre-push file-size guard reads the shared working tree, so another session's uncommitted edits block an unrelated, guard-clean push. |
-| 201 | PAN-3769 | S | high | needs-refinement |  |  | Red main 707089c5→e4b280b3 blocked deploys ~14h: missing no-loss lock entry + stale OpenRouter expectation. Verify still reproducing. |
-| 202 | PAN-3760 | S | high | ok |  |  | permissionMode 'auto' undocumented as non-bypass, launcher can emit invalid --permission-mode, invalid values drop silently. |
-| 203 | PAN-3629 | M | high | ok |  |  | No sanctioned door to re-scope a live agent; the operator must violate pan tell doctrine or let the rejected design land. |
-| 204 | PAN-3517 | M | high | ok |  |  | Convoy forks still miss the parent prompt cache in production — launch-injection byte drift plus resume dropping the cache-scope header. |
-| 205 | PAN-3508 | S | high | ok |  |  | pan reload deletes the generation the global pan link points at, so the CLI vanishes mid-deploy for anyone invoking from elsewhere. |
-| 206 | PAN-3303 | S | high | ok |  |  | An empty registered-projects 200 is treated as authoritative, latching Command Deck at 'Unknown project' until a manual page reload. |
-| 207 | PAN-4364 | S | medium | ok |  |  | GPT-6 catalog: gpt-6-sol misclassed frontier and OpenAI tierModels still remap to GPT-5.6; prerequisites have closed |
-| 208 | PAN-3196 | S | high | ok |  |  | Root-owned container residue makes close-out die on EACCES after passing every DoD row; same family as PAN-3570. |
-| 209 | PAN-3186 | XS | high | ok |  |  | One configured non-git member (auricle/infra) blanks pipeline membership for the whole project the resolver claims it can answer. |
-| 210 | PAN-3185 | XS | high | ok |  |  | Racer (deacon auto-resume) was cut but the check-then-create gap in spawn.ts remains; pan start must report the live agent, not fail. |
-| 211 | PAN-3179 | M | high | ok |  |  | A UAT promote is complete at merge time with no production-reach check, so members read shipped while prod serves the old build. |
-| 212 | PAN-3176 | S | high | ok |  |  | UAT promote consults no stack health, so a batch whose stack was never exercised can be promoted from a success-green control. |
-| 213 | PAN-3130 | S | high | ok |  |  | Identifier-joined write paths have no containment assertion, so a crafted issue or agent id could redirect a canonical write. |
-| 214 | PAN-3047 | XS | high | ok |  |  | Strike-branch teardown uses --is-ancestor, which cannot see a squash merge, so all 96 strike/* branches survive as residue. |
-| 215 | PAN-3046 | XS | high | ok |  |  | pan exits with ERR_UNHANDLED_REJECTION when the PostHog shutdown flush times out, so callers read a successful merge handoff as failure. |
-| 216 | PAN-1711 | S | high | ok |  |  | Dashboard event-loop stalls under load force watchdog restarts; the root cause behind the PAN-3522 churn and the 0.5-1.5s API latencies. |
-| 217 | PAN-3667 | M | high | ok |  |  | CLIProxy has no cross-family remap, so every Anthropic-pinned subagent dies at spawn in a proxied session; stopgap is hand-written. |
-| 218 | PAN-4561 | L | medium | ok |  |  | React 18.3 + ~700 hand memo hooks; upgrade to React 19, enable the compiler, ratchet out manual memo. #4560 profiling has landed. |
-| 219 | PAN-4242 | M | high | ok |  |  | pan handoff --cwd skips the folder-trust pre-trust pan start does; successor sits at the trust prompt for hours while shown live |
-| 220 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
-| 221 | PAN-3778 | S | medium | ok |  |  | Server snapshot cap shipped in #4558 (closed). Resume-from-offset on resubscribe is the remaining open piece; now unblocked. |
-| 222 | PAN-4575 | S | high | ok |  |  | Kimi ACP cancel is sent with id:"" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed. Unblocked. |
-| 223 | PAN-4656 | M | medium | needs-refinement |  | PAN-4645, PAN-4628 | pan connect: one command links a fresh server as a lasting machine; follows secure channel and links (#4645). Body pending. |
-| 224 | PAN-4650 | XL | medium | needs-refinement |  | PAN-4645, PAN-4646 | Conversations across machines: shared list, remote control, Pull here; needs #4645 and the #4646 mockup. Body pending. |
+| 70 | PAN-4792 | S | high | ok |  |  | Paste guard only knows numbered menus; a failed paste presses Enter into unnumbered selects, silently setting defaultMode=auto. |
+| 71 | PAN-3557 | S | critical | ok |  |  | Post-merge label writes have no retry; a 403 hides a merged issue from the verify-on-main sweep while lifecycle reports success. |
+| 72 | PAN-3543 | S | critical | ok |  |  | Completed-handoff agents are unstartable: start, --fresh and reset-session all refuse while the refusal itself recommends --fresh. |
+| 73 | PAN-3522 | S | critical | ok |  |  | Supervisor watchdog restart-churns under CPU storm because the probe timeout budget ignores the boot warm phase. |
+| 74 | PAN-3314 | M | critical | ok |  |  | One cgroup holds every agent pane, so a single hungry agent inflates the unit and oomd kills the whole fleet — twice now. |
+| 75 | PAN-3278 | S | critical | needs-refinement |  |  | A finished work agent with an open PR sat two hours because review was never dispatched and auto-requeue fired none of 25 attempts. |
+| 76 | PAN-4623 | XS | high | ok |  |  | deacon-lite stalled-review fallback calls a starter never registered in the deacon child, so stranded reviews stay stranded. TENET-10 |
+| 77 | PAN-3234 | S | critical | needs-refinement |  |  | Agents freeze indefinitely on blocking choice menus and no health surface notices; the detector is wired only to delivery refusal. |
+| 78 | PAN-3205 | S | critical | ok |  |  | The deployment gate promises the queued deploy will fire at the next verification boundary; that trigger does not exist. |
+| 79 | PAN-3118 | S | critical | needs-refinement |  |  | Model-specific quota exhaustion is invisible everywhere but the pane: four planning agents read 'running' at $0.00 with no fallback. |
+| 80 | PAN-3106 | S | critical | ok |  |  | auto_merge_default: hold is consulted on one merge path only, so held issues merge individually and defeat the UAT train. |
+| 81 | PAN-3100 | S | critical | ok |  |  | The test role evaluates the dirty working tree, so a live work agent's uncommitted edits are recorded as the issue's test failure. |
+| 82 | PAN-4213 | M | high | ok |  |  | Merge-train follow-ups from #4066 (merged): stamp-vs-pin mismatch, reset --keep can strand agent commits, fetch retry, tests |
+| 83 | PAN-4753 | XL | high | needs-refinement | ✓ |  | Epic: restore merge trains (MergeTrain component, strike fast lane); PAN-4750 merged; PRD being written, no children yet; handoff. |
+| 84 | PAN-3096 | S | critical | ok |  |  | pan done blocks on generated .devcontainer/ and dev, and agents resolve it by deleting workspace infrastructure or inventing gitignores. |
+| 85 | PAN-3084 | S | critical | needs-refinement |  |  | A review session spawned but never briefed sits at zero context forever, and restart 'preserves' the zombie that blocks its replacement. |
+| 86 | PAN-3043 | S | critical | needs-refinement |  |  | Provider health is probed only at spawn, so a mid-run 403 quota refusal leaves an agent 'running' for days holding a slot. |
+| 87 | PAN-1824 | S | high | ok |  |  | Fix flaky main CI: fake timers + @slow exclusion for real-timer test family |
+| 88 | PAN-2932 | S | high | ok |  | PAN-2337 | intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap leaves :3011 unbound (Bad Gateway) after pan reload |
+| 89 | PAN-2935 | S | critical | ok |  |  | Workspace devcontainer duplicate backend hijacks Traefik router |
+| 90 | PAN-2337 | XS | critical | ok |  |  | Reload/build atomicity: an in-place `npm run build` under a live dashboard breaks new PTY-supervisor spawns until restart |
+| 91 | PAN-2422 | XS | high | ok |  | PAN-2337 | rebuilding dist under a live server breaks lazy chunk imports |
+| 92 | PAN-2699 | XS | high | ok |  |  | npm run build regenerates the committed record-cost-event.js bundle |
+| 93 | PAN-2957 | XS | high | ok |  | PAN-2337 | npm run build intermittently produces stale frontend bundles |
+| 94 | PAN-2850 | M | high | ok |  |  | npm test fails in clean checkout after pretest removes dashboard bundle |
+| 95 | PAN-2758 | S | critical | needs-refinement |  |  | Provider capacity error silently zombies a spawned agent: willRetry=false, turn reported completed, state stays status=running forever |
+| 96 | PAN-2817 | M | high | needs-refinement |  |  | Idle-at-prompt work/review agents are never redriven: gpt-5.6-sol sessions stop at the composer mid-task and sit for hours |
+| 97 | PAN-2813 | M | high | ok |  |  | Scheduler yield never self-clears: yielded work agents stay paused after the blocking review completes/merges |
+| 98 | PAN-2668 | M | high | ok |  |  | Verification/review feedback silently queued to stopped-by-user agents |
+| 99 | PAN-2569 | XS | critical | ok |  |  | planning finalizes (issue→planned) but work agent does not auto-spawn |
+| 100 | PAN-4269 | M | high | ok |  |  | macOS conversations hang on 'Working…'/'waiting for transcript'; governor ruled out, root cause unknown (delivery or transcript find). |
+| 101 | PAN-3811 | M | high | ok |  |  | The PAN-3809 emergency strike prunes BuildKit unconditionally; inventory, bounded reclaim door and retention floor are still missing |
+| 102 | PAN-2179 | S | high | needs-refinement |  |  | relaunch can leave a zombie agent |
+| 103 | PAN-2169 | S | high | needs-refinement |  |  | kimi agent silently frozen at 100% ctx (no thrown overflow error) not caught by CONTEXT_OVERFLOW_PATTERNS |
+| 104 | PAN-2734 | S | high | ok |  |  | merge queue head-of-line zombie |
+| 105 | PAN-3697 | XS | high | ok |  |  | Deployed dashboard PATH omits Bun, so verification workers hit 'bun: not found' before the required install gate. |
+| 106 | PAN-3633 | S | high | ok |  |  | Strike workspaces spawn without @types, so the contract's own typecheck gate fails and agents abort reporting a false red main. |
+| 107 | PAN-4420 | S | high | ok |  |  | npx @overdeck/core on native Windows serves 404 for every page: static root is built from a URL path |
+| 108 | PAN-3099 | XS | critical | ok |  |  | --health-timeout 120 is enforced as 120ms and a false-failed check exits after killing the old server — nothing left listening. |
+| 109 | PAN-4418 | S | high | ok |  |  | vault join fails on native Windows: core.autocrlf=true rewrites the VAULT-FORMAT marker; blocks Windows continue flow |
+| 110 | PAN-3040 | S | critical | ok |  |  | pan strike is monorepo-shaped end to end and fails immediately on polyrepo projects; same defect as PAN-3708. |
+| 111 | PAN-3023 | S | critical | ok |  |  | Post-planning auto-spawn logs 'attempt 1/3' and never retries after a transient Docker EOF, stranding the issue with no re-drive owner. |
+| 112 | PAN-1618 | S | high | ok |  |  | Substrate: work-spawn docker-health gate has no autonomous recovery |
+| 113 | PAN-3916 | M | high | ok |  |  | Session pointers go stale after rollover + crash recovery; issue view and pan tell confirmation track a dead transcript |
+| 114 | PAN-3900 | S | high | ok |  |  | Docker bridge pool exhausted by orphaned workspace networks; pan start fails; bridge-pool patrol only warns |
+| 115 | PAN-3793 | S | high | ok |  |  | resolveIssuePullRequestRef probes only feature/ and strike/ names, so close-out cannot find a merged PR on a descriptive branch |
+| 116 | PAN-2639 | S | high | ok |  | PAN-2331 | codex-resume replays a rotated-out (revoked) refresh token → codex review convoys wedge with 401 |
+| 117 | PAN-2331 | S | high | ok |  |  | codex rate-limit 'Switch to gpt-5.4-mini?' modal stalls autonomous agents (no auto-dismiss) |
+| 118 | PAN-2333 | M | high | ok |  |  | feat: handle codex weekly-quota exhaustion gracefully |
+| 119 | PAN-4184 | S | high | needs-refinement |  |  | --no-deacon on the host port is refused as a peer after the old server stops, so the escape hatch may leave no dashboard; fix unpicked |
+| 120 | PAN-2511 | XS | high | ok |  |  | Work agents burn 20+ min on false test failures |
+| 121 | PAN-2763 | S | high | ok |  |  | Workspace node_modules is symlinked to the primary repo, breaking test resolution |
+| 122 | PAN-2170 | XS | high | ok |  |  | Docker init container lacks Python |
+| 123 | PAN-1198 | S | high | ok |  |  | Workspace init container's bun install doesn't populate container-node-modules named volume |
+| 124 | PAN-4453 | XS | high | ok |  |  | runtimes/codex.ts uses homedir() not OVERDECK_HOME; isolated homes write thread ids into the real ~/.overdeck |
+| 125 | PAN-2106 | S | high | ok |  |  | pan strike workspace setup leaves broken partial workspace + false 'spawned' success (git-lock race) |
+| 126 | PAN-2880 | M | high | ok |  | PAN-2259 | Linear tracker listIssues is a 3N+1 request storm |
+| 127 | PAN-2966 | S | high | ok |  |  | Polyrepo wrapper .gitignore misses .pan/ .devcontainer/ dev |
+| 128 | PAN-2945 | S | high | ok |  |  | pan done rejects Overdeck-generated runtime in polyrepo wrapper repos (.devcontainer/, dev, .pan/review) |
+| 129 | PAN-2680 | M | high | ok |  |  | pan close: Docker teardown silently skips a running stack in multi-repo projects (MYN), aborting close-out |
+| 130 | PAN-4419 | S | high | ok |  | PAN-4418 | pan vault resume cannot spawn claude on native Windows (ENOENT, needs shell/.cmd resolution); --no-launch works |
+| 131 | PAN-3734 | S | high | ok |  |  | Completed swarm slot reuse can start a new item from a stale polyrepo branch — silent wrong-parent work. |
+| 132 | PAN-3621 | M | high | ok |  |  | pan start intermittently dies resolving a chunk graph spliced across two builds — importer from primary dist, path in the live generation. |
+| 133 | PAN-3555 | S | high | ok |  |  | pan start without --fresh silently abandoned an intact 7.5MB warm session, violating the warm-by-default contract. |
+| 134 | PAN-3498 | S | high | ok |  |  | write-sequence pins in-pipeline ranks without renumbering, so the persisted sequence carries duplicate ranks and gaps. |
+| 135 | PAN-3496 | XS | high | ok |  |  | A review convoy member blocked on an operator AskUserQuestion about review depth; review agents must decide and record, not ask. |
+| 136 | PAN-3081 | S | high | ok |  |  | The agent git guard is PATH-based and an agent stripped it unprompted to get past a false block; a control the agent can remove isn't one. |
+| 137 | PAN-2627 | S | high | ok |  |  | Linear poller is blind after cycle rollover |
+| 138 | PAN-2324 | XS | high | ok |  |  | label transition fails atomically on missing 'in-planning' label |
+| 139 | PAN-2165 | XS | high | ok |  |  | pan close: close-issue phase reports success but leaves issue OPEN / wrong labels (remove-label aborts on absent label; no-vBRIEF trans… |
+| 140 | PAN-2905 | S | high | ok |  |  | Dashboard steady-state CPU ~50% keeps API responses at 0.5-1.5s |
+| 141 | PAN-2259 | S | critical | ok |  |  | something burns the full 5k/hr GitHub GraphQL quota |
+| 142 | PAN-2379 | S | high | ok |  |  | dependency install is warn-only + 60s timeout → false verify failures against empty node_modules (blocks swarm convergence) |
+| 143 | PAN-2421 | XS | high | ok |  |  | dashboard server route tests flake under full-suite verification load |
+| 144 | PAN-2430 | S | high | ok |  |  | frontend typecheck fails with dozens of pre-existing unused-local errors |
+| 145 | PAN-2593 | S | high | ok |  |  | server children inherit bare system PATH |
+| 146 | PAN-4302 | M | high | ok |  |  | ~19 files exec gh directly, bypassing runGh: spend is unattributed and keeps hitting GitHub during quota pause. Follow-up to PAN-4291 |
+| 147 | PAN-2080 | M | high | needs-refinement |  |  | External transports (email/Slack/push/TTS) still plausible; its stated dependency on the PAN-2079 Inbox spine is undercut by boot… |
+| 148 | PAN-4885 | S | high | ok |  |  | pan worker run to an online Fly link fails 2 of 3 times: the 2.5 s secure-channel open budget is too short for the public Fly route. |
+| 149 | PAN-1436 | S | high | ok |  |  | PAN-1419 follow-up: stale stopped-agent zombies still pollute dashboard list |
+| 150 | PAN-3556 | S | high | ok |  |  | No per-agent spawn mutex: two flows allocated session identities 3s apart and the second pin orphaned the first transcript. |
+| 151 | PAN-3553 | S | high | ok |  |  | tmux list-panes -a exits 1 on a zero-session server, so the census reads unavailable post-reboot and conversations hang on 'Starting…'. |
+| 152 | PAN-3535 | S | high | ok |  |  | The drain/resume hold is re-derived from the caller's env each boot, so any restart from a clean shell silently drops it. |
+| 153 | PAN-3429 | M | high | ok |  |  | Memory governor defers admissions but sheds nothing under HARD pressure; concurrent heavy gate runs aren't in the shed ladder. |
+| 154 | PAN-3397 | S | high | ok |  |  | Fresh convoy lanes freeze at 0 output before kickoff; PAN-3375's detector only covers warm resumes, so recovery is manual. |
+| 155 | PAN-3325 | S | high | ok |  |  | A fresh workspace ships an empty-but-present node_modules, so tooling silently resolves the parent repo's deps and gates go false-green. |
+| 156 | PAN-3317 | S | high | ok |  |  | Strike agents are told to rebase, the launcher guard blocks it, and pan sync-main can't resolve a -strike workspace. Overlaps PAN-3306. |
+| 157 | PAN-3284 | S | high | ok |  |  | A workspace-confined agent wrote a doc edit into the primary main worktree — the PAN-2204 write-to-main hazard through a new door. |
+| 158 | PAN-3270 | S | high | ok |  |  | New workspaces arrive with empty node_modules and bun off the agent shell PATH, so the documented bun install remedy fails. |
+| 159 | PAN-4487 | XS | high | ok |  |  | cleanAgentState whitelist drops foreman, modelSpawnKey, workspaceId on every state.json write; add fields + round-trip test |
+| 160 | PAN-3257 | S | high | ok |  |  | Crash-resume leaves a stale PTY socket and drops supervisorEnabled from state.json, so every supervisor delivery fails afterwards. |
+| 161 | PAN-3129 | M | high | ok |  |  | No symlink/TOCTOU containment on canonical writes under agent-controlled paths; a planted symlink redirects a server-side write. |
+| 162 | PAN-3120 | S | high | ok |  |  | A scheduler-yielded work agent makes operator MERGE hard-error on polyrepo and silently dead-end on single-repo. |
+| 163 | PAN-4349 | S | high | ok |  |  | Agent-side GitHub reads prefer REST over GraphQL gh --json until PAN-4302 meters callers; protects the hourly quota |
+| 164 | PAN-3062 | M | high | ok |  |  | The shared primary main worktree stacks several sessions' commits, so whoever pushes next ships everyone else's unverified work. |
+| 165 | PAN-3048 | XS | high | needs-refinement |  |  | Pipeline auto-commit lands Overdeck's own .pan/drafts PRD into product feature branches; the exclusion list is duplicated and has drifted. |
+| 166 | PAN-3032 | S | high | ok |  |  | Rebuild composes under overdeck-feature- while Traefik labels name myn-feature- devnet, and traefik attaches are runtime-only. |
+| 167 | PAN-3833 | S | high | ok |  |  | Feed renders assistant text emitted after tool calls as collapsed thinking rows; operator believes the agent never answered |
+| 168 | PAN-3902 | S | high | ok |  |  | Verification gates inherit OVERDECK_* env from the dashboard, so host boot state (e.g. OVERDECK_NO_RESUME) can red any branch |
+| 169 | PAN-4629 | M | high | ok |  |  | Fresh npx machine cannot pan start: no gh auth token fallback for the GitHub tracker, and registration derives the wrong issue prefix. |
+| 170 | PAN-1775 | M | medium | needs-refinement |  |  | PAN-4734 merged 2026-11-02 and should deliver this; verify Fly work agents show as session rows, then close. |
+| 171 | PAN-3854 | S | high | ok |  |  | Feature-workspace devcontainer stack 403s on POST /api/dashboard/session, blocking all in-browser mutation UAT |
+| 172 | PAN-4577 | M | high | ok |  |  | Operator's facts didn't follow them to a new Mac: no importer for Claude auto-memory. PAN-3957 merged, so W9-W11 are unblocked. |
+| 173 | PAN-3307 | XS | high | ok |  |  | commitlint scope-enum lists 11 scopes, 14 real ones are missing, and it still names the removed beads scope — trains everyone to ignore it. |
+| 174 | PAN-4634 | M | medium | needs-refinement |  |  | Terra unserved on claude-code route: no CLIProxy release (to v8.0.44) lists it; bump pin, add to GPT_56_MODELS. Aliases also broken. |
+| 175 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
+| 176 | PAN-1868 | XS | high | ok |  |  | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
+| 177 | PAN-4847 | S | high | ok |  |  | Remote reap silently skips review request when a background writer dirties a tracked file; pipeline stalls at PR-open. |
+| 178 | PAN-1042 | S | high | ok |  |  | cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions |
+| 179 | PAN-4844 | S | medium | ok |  |  | Claude Code parser prices glm-*/qwen3* as Sonnet 4, ohmypi prices DashScope at $0; route both to custom rows. |
+| 180 | PAN-570 | XS | high | ok |  | PAN-2642 | Show PLAN badge on costs when under a subscription/plan |
+| 181 | PAN-2059 | XL | high | ok | ✓ |  | Backlog pickup gate |
+| 182 | PAN-2376 | XL | high | stale | ✓ |  | Epic: CI/CD reliability — all 21 named children are closed; needs an operator disposition (close or restate) |
+| 183 | PAN-3775 | S | high | ok |  |  | makeDbLive opens overdeck.db unmigrated; zero-table db poisons a vitest worker home and breaks later read-only audits. |
+| 184 | PAN-3652 | XS | high | ok |  |  | No workflow_dispatch on ci.yml / state-plane-branches.yml, so an unverified main tip can never be verified and DoD row 6 blocks close-out. |
+| 185 | PAN-3579 | M | high | ok |  |  | ~20 frontend mutations hand-write JSON headers and omit the CSRF token, so each 403s the moment its route becomes guarded. |
+| 186 | PAN-3541 | S | high | ok |  |  | Review restart loops on the session-resume menu because eligibility ignores how the prior session ended; partial mechanical break landed. |
+| 187 | PAN-3463 | S | high | ok |  |  | A legitimate empty-diff slot outcome can never pass item verify, so the slot wedges and blocks dispatch of remaining items forever. |
+| 188 | PAN-3460 | S | high | ok |  |  | Per-item verify_commands that run the whole root suite make slot merge gates load-fragile and hold a patrol in flight for ~17 minutes. |
+| 189 | PAN-3454 | M | high | ok |  |  | Cost hook rescans fork-copied parent history from byte 0 under the reviewer's id — fabricated cache-miss warnings and double-billed spend. |
+| 190 | PAN-3432 | S | high | ok |  |  | Preemptive yield fans out: seven work agents paused to make room for one review convoy, then flood back oldest-first. |
+| 191 | PAN-3306 | S | high | ok |  |  | Three layers disagree on how a strike rebases: the prompt instructs it, the launcher guard blocks it, sync-main resolves the wrong worktree. |
+| 192 | PAN-3297 | S | high | ok |  |  | After a dashboard restart, delivery calls a healthy agent a zombie while resume calls it healthy; both classifiers can't be right. |
+| 193 | PAN-3274 | S | high | needs-refinement |  |  | A test-role agent spawned and never ran a turn, holding an approved CI-green issue out of the merge gate behind a stale failed verdict. |
+| 194 | PAN-3267 | S | high | ok |  |  | GitLab merged-head oracle spawns one glab subprocess per repo × head, so pipeline membership refresh fails on every cycle. |
+| 195 | PAN-3261 | S | high | ok |  |  | The tmux delivery fallback answered a live session-resume menu because its own paste hid the menu from the detector — silent /compact. |
+| 196 | PAN-3256 | S | high | ok |  |  | glab mr list runs with a polyrepo wrapper root as cwd, which is not a git repo, so MYN membership fails forge_unavailable every cycle. |
+| 197 | PAN-4342 | M | medium | ok |  |  | Re-review rounds resume every lane on its own round-1 findings; give each round one fresh critic lane (Deft method) |
+| 198 | PAN-3174 | S | high | ok |  |  | Polyrepo UAT stacks 504: Traefik labels carry the old myn- prefix, Traefik isn't on the overdeck-* devnet, and the fe port is wrong. |
+| 199 | PAN-3050 | XS | high | ok |  |  | Idle-stack reaper's regex only matches overdeck-feature-*-server|frontend, so MYN stacks run for hours after their agents are gone. |
+| 200 | PAN-4365 | S | medium | ok |  |  | Stale defaults: workhorses.expensive is Opus 4.8 and the flywheel role is a literal that ignores the slot; evals now unblocked |
+| 201 | PAN-2980 | XS | high | ok |  |  | The pre-push file-size guard reads the shared working tree, so another session's uncommitted edits block an unrelated, guard-clean push. |
+| 202 | PAN-3769 | S | high | needs-refinement |  |  | Red main 707089c5→e4b280b3 blocked deploys ~14h: missing no-loss lock entry + stale OpenRouter expectation. Verify still reproducing. |
+| 203 | PAN-3760 | S | high | ok |  |  | permissionMode 'auto' undocumented as non-bypass, launcher can emit invalid --permission-mode, invalid values drop silently. |
+| 204 | PAN-3629 | M | high | ok |  |  | No sanctioned door to re-scope a live agent; the operator must violate pan tell doctrine or let the rejected design land. |
+| 205 | PAN-3517 | M | high | ok |  |  | Convoy forks still miss the parent prompt cache in production — launch-injection byte drift plus resume dropping the cache-scope header. |
+| 206 | PAN-3508 | S | high | ok |  |  | pan reload deletes the generation the global pan link points at, so the CLI vanishes mid-deploy for anyone invoking from elsewhere. |
+| 207 | PAN-3303 | S | high | ok |  |  | An empty registered-projects 200 is treated as authoritative, latching Command Deck at 'Unknown project' until a manual page reload. |
+| 208 | PAN-4364 | S | medium | ok |  |  | GPT-6 catalog: gpt-6-sol misclassed frontier and OpenAI tierModels still remap to GPT-5.6; prerequisites have closed |
+| 209 | PAN-3196 | S | high | ok |  |  | Root-owned container residue makes close-out die on EACCES after passing every DoD row; same family as PAN-3570. |
+| 210 | PAN-3186 | XS | high | ok |  |  | One configured non-git member (auricle/infra) blanks pipeline membership for the whole project the resolver claims it can answer. |
+| 211 | PAN-3185 | XS | high | ok |  |  | Racer (deacon auto-resume) was cut but the check-then-create gap in spawn.ts remains; pan start must report the live agent, not fail. |
+| 212 | PAN-3179 | M | high | ok |  |  | A UAT promote is complete at merge time with no production-reach check, so members read shipped while prod serves the old build. |
+| 213 | PAN-3176 | S | high | ok |  |  | UAT promote consults no stack health, so a batch whose stack was never exercised can be promoted from a success-green control. |
+| 214 | PAN-3130 | S | high | ok |  |  | Identifier-joined write paths have no containment assertion, so a crafted issue or agent id could redirect a canonical write. |
+| 215 | PAN-3047 | XS | high | ok |  |  | Strike-branch teardown uses --is-ancestor, which cannot see a squash merge, so all 96 strike/* branches survive as residue. |
+| 216 | PAN-3046 | XS | high | ok |  |  | pan exits with ERR_UNHANDLED_REJECTION when the PostHog shutdown flush times out, so callers read a successful merge handoff as failure. |
+| 217 | PAN-1711 | S | high | ok |  |  | Dashboard event-loop stalls under load force watchdog restarts; the root cause behind the PAN-3522 churn and the 0.5-1.5s API latencies. |
+| 218 | PAN-3667 | M | high | ok |  |  | CLIProxy has no cross-family remap, so every Anthropic-pinned subagent dies at spawn in a proxied session; stopgap is hand-written. |
+| 219 | PAN-4561 | L | medium | ok |  |  | React 18.3 + ~700 hand memo hooks; upgrade to React 19, enable the compiler, ratchet out manual memo. #4560 profiling has landed. |
+| 220 | PAN-4242 | M | high | ok |  |  | pan handoff --cwd skips the folder-trust pre-trust pan start does; successor sits at the trust prompt for hours while shown live |
+| 221 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
+| 222 | PAN-3778 | S | medium | ok |  |  | Server snapshot cap shipped in #4558 (closed). Resume-from-offset on resubscribe is the remaining open piece; now unblocked. |
+| 223 | PAN-4575 | S | high | ok |  |  | Kimi ACP cancel is sent with id:"" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed. Unblocked. |
 | 225 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
-| 225 | PAN-4645 | XL | high | needs-refinement |  |  | Anywhere build step 1: machine keys, Noise channel, machine tokens, owner column, links. Everything else needs it. Body pending. |
 | 226 | PAN-4616 | S | medium | ok |  |  | After PAN-4614 lands, check whether GitHub mergeable honors merge=union; if not, plan a merge-gate fallback |
-| 227 | PAN-4646 | S | medium | needs-refinement |  |  | Interactive mockup for machine-aware conversation UI (title bar, chips, offline banner); D-6 needs it approved first. Body pending. |
+| 227 | PAN-4909 | S | high | ok |  |  | Mac set up with connect: Safari on localhost:3011 gets HTTP 401 from the loopback session mint, so the Mac's own dashboard won't load. |
+| 228 | PAN-4747 | S | high | ok |  |  | Two pan reloads built into the same generation slot 12s apart; restart lock taken over early, first build died on TS6053. |
 | 229 | PAN-3355 | XS | high | ok |  |  | sessionExists collapses 'no such session' and 'could not ask' into false, so callers read not-running when liveness is unknown. |
 | 230 | PAN-3289 | S | high | ok |  |  | A sequencer pass ran against an empty manifest while the read model held 1120 issues — a transiently empty read at spawn. |
 | 231 | PAN-4348 | S | medium | ok |  |  | Verification emits warn-first evidence of changed files outside every item's files_scope, so scope creep is visible |
@@ -272,17 +271,17 @@ _Last sequenced: 2026-11-01T09:18:58Z · model: claude-opus-5-5 · open: 871_
 | 266 | PAN-2241 | S | high | ok |  |  | complete-planning is not serialized or idempotent per issue (spec tmp-rename 500s, bead delete-recreate thrash) |
 | 267 | PAN-2242 | S | high | ok |  |  | Unidentified duplicate caller fires complete-planning in pairs every ~2 minutes (perpetual loop while session survives) |
 | 268 | PAN-2240 | S | high | ok |  |  | pan tell contradicts itself on dead ohmypi sessions |
-| 268 | PAN-4295 | M | medium | ok |  | PAN-1775 | Anywhere W-FLY1: restore Fly auto-reap, heartbeat, credential refresh; start-now item that PAN-4652 (Fly VMs as machines) waits for |
+| 269 | PAN-4926 | XS | medium | ok |  |  | pan down SIGTERMs the smee pidfile PID without verifying it is smee; a reused PID kills an unrelated process. XS guard + test. |
 | 270 | PAN-2243 | S | high | ok |  |  | pan plan finalize: CLI aborts complete-planning at 90s while the server handler legitimately finishes later (false ✖ Failed) |
 | 271 | PAN-2202 | S | high | ok |  |  | complete-planning silently skips spec promotion on a dead session's unanswered AskUserQuestion |
-| 272 | PAN-4654 | M | medium | needs-refinement |  | PAN-4645 | Fleet versions table, protocol gating, Update all for Overdeck and harness CLIs (W-LINK7); needs links. Body pending. |
-| 273 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
-| 274 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
-| 275 | PAN-4696 | XS | medium | ok |  | PAN-4295 | Post-merge smoke for PAN-4295: one pan start --remote run proves auto-reap, remote-reap source, fresh heartbeat on deployed build. |
-| 276 | PAN-4651 | L | medium | needs-refinement |  | PAN-4645, PAN-4650, PAN-4649 | Work across machines: Machine field, Auto placement, delegation, fleet usage; follows conv items and Fly VMs. Body pending. |
-| 277 | PAN-4682 | XS | medium | ok |  |  | Fly default image registry.fly.io/pan-workspace:latest does not exist; default to <app>:latest and fix docs/fly-provider.md. |
-| 277 | PAN-4649 | M | medium | ok |  |  | Overdeck MCP server: pan mcp serve, /mcp endpoint, Copy MCP URL (W-INT2); follows W-CONV3 in #4650. Body pending. |
-| 279 | PAN-4685 | S | medium | ok |  |  | Fly remote: 60 s Machines exec deadline kills git clone of large repos, so pan start --remote fails; clone detached + poll. |
+| 272 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
+| 273 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
+| 274 | PAN-4811 | M | medium | ok |  |  | Lanes on a new Fly VM plus gauntlet.fly.max_vms cap; PAN-4743 landed the Fly target door, so this is now unblocked. |
+| 275 | PAN-4849 | XL | medium | ok |  |  | Part B of PAN-4820 (now closed): Deft state surfaces, review-cycle view and Run on Deft switch in the dashboard; unblocked |
+| 276 | PAN-4756 | L | medium | ok |  |  | Move ~45 bespoke dialogs onto the shared Modal from PAN-4755 (now landed); surface/structure only, unblocked. |
+| 277 | PAN-4852 | L | medium | ok |  |  | SageOx core: transient per-project binding, Overdeck-built ox, Codex launches, fork rebase; in pipeline, waits on PAN-4820 merge |
+| 278 | PAN-4778 | S | medium | ok |  |  | Workspace-image CI never published: wrong Fly app, fly not on PATH, no FLY_API_TOKEN (operator). Fly VMs run a June image. |
+| 279 | PAN-4817 | S | medium | ok |  | PAN-4778 | Fly app's cached image predates pan serve --no-open, so every new Fly VM crashes and rolls back; blocks live Fly verification. |
 | 280 | PAN-2211 | M | high | ok |  |  | writeSwarmSlotCompletion has no production caller; pan done in a slot workspace must record it. Swarm is dormant (Cut D11). |
 | 281 | PAN-2210 | M | high | ok |  |  | Rewritten pan done has no slot handling: a slot agent takes the issue-level PR/review path. Must record slot completion only. |
 | 282 | PAN-2201 | XS | high | ok |  |  | Close-out label step fails atomically when a hardcoded label (e.g. 'in-planning') is absent from the repo |
@@ -296,8 +295,8 @@ _Last sequenced: 2026-11-01T09:18:58Z · model: claude-opus-5-5 · open: 871_
 | 290 | PAN-2478 | S | high | ok |  |  | CI flake: Playwright browser install fails on packages.microsoft.com apt (NOSPLIT), red-mains legit merges |
 | 291 | PAN-1710 | S | high | ok |  |  | 'Clean install + server smoke test' hangs (3 consecutive 20-min timeout kills) on feature/pan-1491 and feature/pan-1641 |
 | 292 | PAN-1558 | M | high | ok |  |  | Review/specialist agents should run in the workspace Docker container, not inherit host-override |
-| 292 | PAN-4648 | M | medium | ok |  |  | Webhook triggers for conversations: pan triggers, Tailscale Funnel delivery, signature checks; Funnel needs W-TS1. Body pending. |
 | 293 | PAN-1766 | S | high | ok |  |  | work agents hang on Claude Code settings-file protection when editing .claude/** |
+| 294 | PAN-4853 | M | low | ok |  | PAN-4852 | SageOx dashboard views (session tab, context trace, project panel); blocked by PAN-4852; session-to-issue mapping is a checkpoint |
 | 295 | PAN-2266 | M | high | ok |  |  | feat: add zcode harness and make it the default for glm-5.2 |
 | 296 | PAN-1578 | M | high | ok |  |  | GitHub Copilot CLI as a first-class harness (pipeline peer to Claude Code, Pi, Codex) |
 | 297 | PAN-1538 | M | high | ok |  |  | Unblock Pi source forks |
@@ -310,12 +309,12 @@ _Last sequenced: 2026-11-01T09:18:58Z · model: claude-opus-5-5 · open: 871_
 | 304 | PAN-1196 | M | high | needs-refinement |  |  | Workhorse routing by bead difficulty + subject-matter (single-agent and swarm) |
 | 305 | PAN-1311 | M | high | needs-refinement |  |  | Swarm: fast-track tier |
 | 306 | PAN-1313 | L | high | ok |  |  | Finish src/lib Effect migration: remove or justify legacy Promise/sync surfaces |
-| 307 | PAN-4683 | M | medium | ok |  |  | pan start --remote misses specs on feature branches and re-plans; planning never pushes branch; post-plan work starts local. |
+| 307 | PAN-4863 | S | medium | ok |  |  | Manual AC-10 check of Anywhere connect on a real systemd VPS; needs a release shipping `pan connect` and a human-provisioned VPS. |
 | 308 | PAN-1246 | M | high | ok |  |  | Perf: projection-cached VCS driver for diff/checkpoint reads (port of t3code #2586) |
 | 309 | PAN-1253 | M | high | needs-refinement |  |  | Flywheel: respect issue dependencies before autopicking work |
 | 310 | PAN-1357 | M | high | ok |  |  | Template conversations: load curated skill bundles into a single conversation |
-| 310 | PAN-1254 | L | high | ok |  |  | Tailscale integration: advertise dashboard + workspace endpoints over tailnet (Effect-native) |
 | 311 | PAN-1915 | M | high | ok |  |  | enhancement(security): API key at-rest hardening |
+| 312 | PAN-4886 | S | medium | ok |  |  | Live TURN relay check for PAN-4862 on Fly; scripted except one device-code sign-in, so it needs the operator present to approve. |
 | 313 | PAN-1435 | XS | high | ok |  |  | API keys in ~/.panopticon/config.yaml stored as plaintext |
 | 314 | PAN-1672 | M | high | ok |  |  | GPT-5.5/CLIProxy context-window deadlock: conversations get no overflow recovery + 200k window illusion |
 | 315 | PAN-1640 | M | high | ok |  |  | Re-platform interactive permission allow/deny onto a PreToolUse hook (provider-agnostic) |
@@ -326,20 +325,18 @@ _Last sequenced: 2026-11-01T09:18:58Z · model: claude-opus-5-5 · open: 871_
 | 320 | PAN-4204 | S | medium | ok |  | PAN-4203 | Sync-main conflict error dumps every file path; show the count, a Replan button, and Open workspace only for few conflicts. |
 | 321 | PAN-1219 | M | high | needs-refinement |  |  | Promote across-cycle review state to first-class data (cycle SHA, prior findings) instead of prompt-derived |
 | 322 | PAN-1451 | M | high | needs-refinement |  |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
-| 322 | PAN-4330 | M | medium | ok |  |  | Sign-in client: pan account, Settings → Anywhere, device token; entry point for shared sessions and cross-machine continue |
 | 323 | PAN-1452 | M | high | ok |  |  | PAN-1381 follow-up: per-reviewer restart with model override (architectural mismatch with PAN-1048) |
-| 325 | PAN-4473 | M | medium | ok |  | PAN-4330 | Shared Sessions slice 2: host share action, share record file and lobby panel; first slice on the slice-1 share service |
+| 324 | PAN-4927 | XL | medium | ok | ✓ |  | Epic: Overdeck MCP in every managed agent, OAuth /mcp, Hermes/OpenClaw/Grok plugins; W-SELF1 closed, 29 children filed. |
 | 326 | PAN-1553 | M | high | ok |  |  | Investigate Claude Code Fast mode support (and fast-tier pricing) |
 | 327 | PAN-1504 | M | high | ok |  |  | pan hygiene |
 | 328 | PAN-1480 | L | high | ok |  |  | TLDR: 93% bypass rate |
 | 329 | PAN-1479 | M | high | ok |  |  | RTK: Add telemetry to measure token savings from bash output compression |
 | 330 | PAN-2950 | L | high | ok |  |  | Refactor god files back under file-size ceilings after the UX overhaul |
-| 331 | PAN-4474 | L | medium | ok |  | PAN-4473 | Shared Sessions slice 3: host WebRTC hub, content wire format and conversation bridge (werift spike first) |
+| 331 | PAN-4950 | M | medium | ok |  |  | pan mcp connector process bridging outside bots to /mcp; gates Hermes, OpenClaw and Grok Build plugins. |
 | 332 | PAN-2720 | M | high | ok |  |  | File-size ratchet counts lines, so it rewards line-packing on the god files it means to improve |
 | 333 | PAN-2650 | S | high | ok |  |  | Shed-stack half is moot (slot merges verify on host); remaining: pan swarm recover path for a stuck ready-to-merge slot. |
 | 334 | PAN-2358 | M | high | ok |  |  | PAN-2145 follow-up: restore PAN-1535 hardening in transformMessageForHarness (rewritten during conversations.ts decomposition) |
 | 335 | PAN-2334 | XS | high | ok |  |  | write a Definition of Ready (DoR) |
-| 336 | PAN-4475 | M | medium | ok |  | PAN-4474 | Shared Sessions slice 4: viewer surface, join intent and localhost-detect; gates slices 5-10 |
 | 337 | PAN-2193 | S | high | ok |  |  | Held issues (objection/parked/vetoed/needs-handoff) are invisible in the Command Deck tree |
 | 338 | PAN-1984 | XS | high | ok |  |  | Migrate or delete the 18 dead panopticon.db modules referenced by ~30 test files (#1983 follow-up) |
 | 339 | PAN-1913 | XS | high | ok |  |  | Project description: show on click, edit in dashboard, mirror into the project layer (and document what's in .pan and ~/.panopticon) |
@@ -399,11 +396,9 @@ _Last sequenced: 2026-11-01T09:18:58Z · model: claude-opus-5-5 · open: 871_
 | 393 | PAN-3014 | XS | medium | ok |  |  | Background title/about spawns use --bare, which now skips credential reads, so every one fails 'Not logged in' with empty stderr. |
 | 394 | PAN-3944 | S | medium | needs-refinement |  |  | Main fix landed (host-backed targets skip Herdr agent.prompt); remaining: buffer bracketed paste in the app-server host, placeholder guard |
 | 395 | PAN-4208 | M | medium | ok |  |  | #4205 follow-ups: Effect-free config read for telemetry to hit <100ms pan --version; CI import test for lazy command targets |
-| 396 | PAN-4476 | M | medium | ok |  | PAN-4475 | Shared Sessions slice 5: prompt drafts, contributor direct-submit and host FIFO submit queue |
 | 397 | PAN-3829 | L | medium | ok |  |  | Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main) |
 | 398 | PAN-2280 | M | medium | ok |  |  | Resumed conversations wedge without writing transcripts when dashboard is black-holed |
 | 399 | PAN-2197 | S | medium | ok |  |  | work agents skip `pan done` (manual push instead) |
-| 400 | PAN-4477 | S | medium | ok |  | PAN-4475 | Shared Sessions slice 6: read-only terminal channel over the pty-hub byte stream |
 | 401 | PAN-2069 | XS | medium | ok |  |  | caveman: follow-up gaps |
 | 402 | PAN-1918 | XS | medium | ok |  |  | full frontend vitest suite runs in no CI path |
 | 403 | PAN-1912 | XS | medium | ok |  |  | Pi agent transcripts hide tool-call detail; agent panes lack the Tools show/hide toggle |
@@ -422,8 +417,7 @@ _Last sequenced: 2026-11-01T09:18:58Z · model: claude-opus-5-5 · open: 871_
 | 416 | PAN-3016 | M | medium | ok |  |  | Operator ask: every view should be URL-addressable; cockpit tabs, stage panes and several drawers are still local state. |
 | 417 | PAN-3890 | S | medium | ok |  |  | opencode provider stream errors (rate limit) are invisible in the feed and never retried; first message dies silently |
 | 418 | PAN-3822 | L | medium | ok |  |  | PRD landed (12 items, FR-1..14): link PRs to conversations via branch detection + explicit override; unblocks PAN-3920 |
-| 419 | PAN-4479 | M | medium | ok |  | PAN-4475 | Shared Sessions slice 8: host reconnect inside the 5-minute window and viewer auto-restore |
-| 420 | PAN-4478 | S | medium | ok |  | PAN-4476 | Shared Sessions slice 7: controller handoff and data-owner reclaim, enforced host-side |
+| 420 | PAN-4935 | M | medium | ok |  |  | Instruction blocks and no-MCP fallback; only W-PR1 (PAN-4943, in review) remains before it can start. |
 | 421 | PAN-1673 | S | medium | ok |  |  | Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
 | 422 | PAN-1669 | S | medium | ok |  |  | restart-with-model doesn't emit a live event |
 | 423 | PAN-1668 | S | medium | ok |  |  | right-click 'restart with <model>' carries model only, never harness |
@@ -440,7 +434,6 @@ _Last sequenced: 2026-11-01T09:18:58Z · model: claude-opus-5-5 · open: 871_
 | 434 | PAN-1461 | S | medium | ok |  |  | Conversation transcript: in-page search (Ctrl+F) only finds text in currently-rendered virtualized rows |
 | 435 | PAN-1449 | S | medium | ok |  |  | Memory extraction still failing; the live symptom PAN-4370 closed and PAN-4374 adds a working provider; layout half remains |
 | 436 | PAN-1446 | S | medium | ok |  |  | PAN-1231 follow-up: remove or implement Table + Timeline modes in FleetAgentsView (scope-creep stubs) |
-| 437 | PAN-4480 | M | medium | ok |  | PAN-4475, PAN-4330 | Shared Sessions slice 9: pan share/join CLI plus zero-install npx join and invite-page command; needs PAN-4475, PAN-4330 |
 | 438 | PAN-1445 | S | medium | ok |  |  | PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs) |
 | 439 | PAN-3616 | S | medium | ok |  |  | Planned deploy restarts show the alarm-toned Reconnecting banner; use the lifecycle signal for calm 'updating' copy. |
 | 440 | PAN-2982 | XS | medium | ok |  |  | Nothing runs a skill's own selftest when sync-sources/skills/** changes; a convoy passed a PR with its selftest red. |
@@ -453,15 +446,13 @@ _Last sequenced: 2026-11-01T09:18:58Z · model: claude-opus-5-5 · open: 871_
 | 447 | PAN-1392 | S | low | stale |  |  | docs/prds/active→completed archive step is superseded by .pan/drafts and .pan/specs on the feature branch |
 | 448 | PAN-4151 | L | medium | needs-refinement |  | PAN-3822 | Deferred remainder of PAN-3822/#4067: GitLab MR sync, PR page + search, handoff link copy, diffstat, link-dialog a11y, sync throttle |
 | 449 | PAN-1330 | S | medium | ok |  |  | CLI cannot address planning-*/specialist-* sessions |
-| 450 | PAN-4481 | M | medium | needs-refinement |  | PAN-4475 | Shared Sessions slice 10: hosted web join page; awaits operator decision OD-1 on sign-in without a local install |
-| 451 | PAN-4482 | S | medium | ok |  | PAN-4473, PAN-4474, PAN-4475, PAN-4476, PAN-4477, PAN-4478, PAN-4479, PAN-4480, PAN-4481 | Shared Sessions slice 11: signaling-privacy e2e, forced-TURN check (operator checkpoint) and full AC sweep |
+| 450 | PAN-4971 | S | medium | ok |  |  | Viewer header shows only host + count; roster of all participants with host/controller marked. Frontend-only, payload exists. |
 | 452 | PAN-1226 | L | medium | ok |  |  | PAN-1148 unified-dashboard redesign |
 | 453 | PAN-1173 | S | medium | ok |  |  | pan show <bare-number> derives wrong agent ID for PAN-prefixed issues |
 | 454 | PAN-1154 | M | medium | ok |  |  | pan up does not kill existing port holders |
 | 455 | PAN-3354 | XS | medium | ok |  |  | The archive write door accepts kind=main, hiding a project's singleton workspace with no unarchive affordance in the UI. |
 | 456 | PAN-3178 | XL | medium | ok |  |  | Make worktrees and diffs first class: +/- badge, dedicated Changes surface, conversation worktrees. PRD and mockup exist. |
 | 457 | PAN-3017 | S | medium | ok |  |  | The issue-page UAT panel renders only inline actions, so restart/rebuild/stop are unreachable outside the rail's context menu. |
-| 458 | PAN-4405 | M | medium | ok |  |  | Aggregated cross-environment overview, Needs-You and search; unblocked now that the PAN-4402 desktop switcher has closed |
 | 459 | PAN-3873 | M | medium | ok |  |  | GitHub event delivery: support gh webhook forward alongside smee with guided setup, settings exposure, and docs |
 | 460 | PAN-1150 | S | medium | ok |  |  | Settings: "Anthropic is not configured" warning persists in Model Routing after claude /login (Provider tab disagrees) |
 | 461 | PAN-1149 | S | medium | ok |  |  | v0.9.3 upgraders: stale workhorses.mid: claude-sonnet-4-7 in config.yaml keeps breaking Model Routing saves |
@@ -485,7 +476,7 @@ _Last sequenced: 2026-11-01T09:18:58Z · model: claude-opus-5-5 · open: 871_
 | 479 | PAN-3909 | M | medium | needs-refinement |  |  | One agents read door (operator-directed); the cut deleted the agents table and made liveness.ts canonical — re-scope what remains |
 | 480 | PAN-2659 | S | medium | ok |  |  | acquireRecordLock survives for the planning auto-start consent lock; an ownerless lock after a crash is never reclaimed. |
 | 481 | PAN-3831 | S | medium | ok |  |  | Model picker: gray out models whose provider has no API key or subscription login (per-provider readiness resolver) |
-| 482 | PAN-4403 | M | medium | ok |  |  | Advertise direct HTTPS/Tailscale endpoints and add them to trusted origins; today such origins get 403 |
+| 482 | PAN-4779 | S | medium | ok |  |  | Docs on main: 2 MDX parse errors hide pages from Mintlify + 15 broken vision.mdx links; mint broken-links can't gate |
 | 483 | PAN-538 | S | medium | ok |  |  | pan reload freshness guard must also verify the frontend bundle |
 | 484 | PAN-1164 | M | medium | ok |  |  | Conversation diff summaries update live over WebSocket (drop 5s polling) |
 | 485 | PAN-3563 | S | medium | needs-refinement |  |  | pan unstick is gone; verify whether a spawned-but-never-briefed role agent can still read as running forever under liveness.ts |
@@ -499,7 +490,7 @@ _Last sequenced: 2026-11-01T09:18:58Z · model: claude-opus-5-5 · open: 871_
 | 493 | PAN-3061 | M | medium | ok |  |  | Deterministic start-vs-swarm recommendation at plan-finalize, derived from plan shape plus recorded outcomes. |
 | 494 | PAN-3057 | S | medium | needs-refinement |  |  | Compaction tracking is gone; remaining bug = GPT-5.6 context window declared twice (372K vs 150K); verify separately |
 | 495 | PAN-3892 | M | medium | needs-refinement |  |  | Substrate review follow-ups deferred from PAN-3845 (minor findings, config clear-sentinel); split into workable items |
-| 496 | PAN-4404 | L | medium | ok |  | PAN-4645 | Desktop-managed SSH launch and loopback forward for remote environments; PAN-4402 closed, still waits on PAN-4645 |
+| 496 | PAN-4918 | M | medium | ok |  |  | Six Anywhere UI bugs seen while filming: Codex keeps Claude model, Zen models listed first, chip wrap, Pull-here state, no remote archive. |
 | 497 | PAN-863 | M | medium | ok |  |  | One-shot sweep of stale feature branches and worktrees predating the reaper |
 | 498 | PAN-817 | M | medium | ok |  |  | Improve planning dialog layout and content fit |
 | 499 | PAN-802 | M | medium | ok |  |  | Resume on conversation session forks instead of resuming |
@@ -526,7 +517,7 @@ _Last sequenced: 2026-11-01T09:18:58Z · model: claude-opus-5-5 · open: 871_
 | 520 | PAN-3772 | XS | medium | ok |  |  | Conv view renders Claude Code's synthetic 'no visible output' nudge as an operator message; should read as plumbing. |
 | 521 | PAN-3853 | S | medium | needs-refinement |  |  | Review synthesizer self-declared an operator override; that override door was deleted by the cut — verify on the PR-review path |
 | 522 | PAN-3830 | S | medium | ok |  |  | OpenCode provider: curate picker models via Settings favorites (OpenRouter pattern) instead of listing every discovered model |
-| 523 | PAN-3863 | L | medium | ok |  | PAN-4404 | Orca-style SSH Hosts onboarding; builds on the one SSH stack in PAN-4404 (PAN-4402 catalog has closed) |
+| 523 | PAN-4924 | S | medium | ok |  |  | linked-machines.mdx promises switch model for running conversations; dashboard disables it. Fix docs or add the control. |
 | 524 | PAN-4367 | M | medium | ok |  |  | Replace inherited capability scores for Sonnet 5.5, GPT-6 Sol/Luna with measured ones; eval harness has closed |
 | 525 | PAN-2443 | M | medium | ok |  |  | OpenTelemetry GenAI semconv |
 | 526 | PAN-2442 | M | medium | ok |  |  | Agent Client Protocol (ACP) as Overdeck's structured control plane |
@@ -570,14 +561,14 @@ _Last sequenced: 2026-11-01T09:18:58Z · model: claude-opus-5-5 · open: 871_
 | 564 | PAN-4409 | M | medium | ok |  |  | Overdeck integration on OKF v0.2.0 (injector trust tiers, new verbs); blocked on external eltmon/okf#9 |
 | 565 | PAN-4410 | M | medium | ok |  | PAN-4409 | Migrate eltmon/overdeck-knowledge to OKF v0.2 and refresh stale concepts; last link in the OKF chain |
 | 566 | PAN-2978 | S | medium | ok |  | PAN-2976, PAN-2977 | Opt-in per-agent install recipes for ACP CLIs from the setup UI; deliberately separated for its supply-chain trust decision. |
-| 567 | PAN-4652 | L | medium | needs-refinement |  | PAN-4645, PAN-4295 | Fly VMs as machines: pan serve on the VM, linked at spawn; W-FLY1 can start day one, W-FLY2 needs links. Body pending. |
+| 567 | PAN-4878 | XS | low | ok |  | PAN-4852 | Delete dead ox curl installer in prereqs registry; PAN-4852 builds ox from the pinned fork commit, so ~/.local/bin/ox is never used. |
 | 568 | PAN-1754 | M | medium | ok |  |  | surface + edit the host claude CLI default model (~/.claude/settings.json) from the Settings page |
 | 569 | PAN-1751 | M | medium | ok |  |  | harness picker on every Settings → Roles row (plan/work/review/test/ship/strike), not just Flywheel |
 | 570 | PAN-1750 | M | medium | ok |  |  | UAT assembly/conflict agent |
 | 571 | PAN-1748 | M | medium | ok |  |  | reuse uat-assembly conflict resolutions across generations (rerere or resolution replay) |
 | 572 | PAN-1691 | M | medium | ok |  |  | conflict-aware merge train + on-demand UAT candidate |
 | 573 | PAN-1685 | XS | medium | ok |  |  | Show model capability icons in conversation dialogs + complete per-model vision (supportsImages) audit |
-| 574 | PAN-1676 | M | medium | ok |  | PAN-4295 | harden remote workspaces + `pan workspace move` local↔remote (scale-out / overflow slots) |
+| 574 | PAN-1676 | M | medium | ok |  |  | harden remote workspaces + `pan workspace move` local↔remote (scale-out / overflow slots) |
 | 575 | PAN-1667 | M | medium | ok |  |  | unify Agents + Resources into one issue-centric holistic view |
 | 576 | PAN-1657 | M | medium | ok |  |  | feat: one-off double-check reviews with a user-specified agent/harness + settings-managed default reviewer |
 | 577 | PAN-1656 | M | medium | ok |  |  | Skills page: make it a full management surface (browse, review, edit, scope, sync status) |
@@ -591,7 +582,7 @@ _Last sequenced: 2026-11-01T09:18:58Z · model: claude-opus-5-5 · open: 871_
 | 585 | PAN-1542 | XS | medium | ok |  |  | Spawn-refusal modal: render the three-button workflow on dirty-workspace 409 |
 | 586 | PAN-1524 | M | medium | ok |  |  | Slash command aliases: /handoff → /pan-handoff (and similar short forms) |
 | 587 | PAN-1490 | M | medium | ok |  |  | show each conversation's current git branch (port t3code BranchToolbar pattern) |
-| 588 | PAN-1485 | M | medium | needs-refinement |  |  | Idle auto-archive (warn 7d, archive 10d); the archive-after-idle part is now split into #4655 as undoable idle auto-settle. |
+| 588 | PAN-1485 | S | medium | needs-refinement |  |  | Remaining scope after #4655 auto-settle: day-10 archive + favorite clearing; close-or-keep is an operator call. |
 | 589 | PAN-1473 | M | medium | ok |  |  | Dashboard conversation composer: refactor context indicator to mirror t3code (show cumulative + live separately) |
 | 590 | PAN-1443 | M | low | stale |  |  | Specs live directly under .pan/specs now; only check that no stale legacy files remain under docs/prds/ |
 | 591 | PAN-1442 | M | medium | ok |  |  | Follow-up to PAN-829: voice-sampler.html cleanup in pan-tts repo |
@@ -606,74 +597,74 @@ _Last sequenced: 2026-11-01T09:18:58Z · model: claude-opus-5-5 · open: 871_
 | 600 | PAN-958 | M | medium | ok |  |  | Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
 | 601 | PAN-949 | M | medium | ok |  |  | feat: add conversation for project from sidebar |
 | 602 | PAN-3157 | XS | medium | ok |  |  | Rescoped: Awareness rail should show conv-flywheel as the Flywheel with its last tick (derive-status.ts) and link to /flywheel. |
-| 603 | PAN-4296 | L | medium | needs-refinement |  | PAN-1676, PAN-4652 | Anywhere Fly track: Codex/GPT agents on Fly remotes; provider path (own vs host CLIProxy) and credential sync decided at plan time |
-| 604 | PAN-947 | M | medium | ok |  |  | feat: project management actions in unified sidebar |
-| 605 | PAN-938 | M | medium | ok |  |  | Fizzy visual pipeline |
-| 606 | PAN-903 | M | medium | ok |  |  | Detect ~/.claude.json corruption on startup and surface it in the dashboard |
-| 607 | PAN-902 | XS | medium | ok |  |  | Settings: add 'Run pan sync' button to configuration menu |
-| 608 | PAN-901 | XS | medium | ok |  |  | Settings: add Maintenance panel with Claude Code Organizer + Config Editor quick-launch |
-| 609 | PAN-818 | M | medium | ok |  |  | Make summary optional when forking conversations |
-| 610 | PAN-4308 | S | medium | ok |  | PAN-4295 | Settle reaped Fly remote transcripts into the Session Vault; blocked by PAN-2609 (engine) and PAN-4295 (restored Fly auto-reap). |
-| 611 | PAN-3322 | XS | medium | ok |  |  | launcher-generator.ts's file-size ceiling sits 126 lines above the real file, handing back the regrowth the ratchet exists to prevent. |
-| 612 | PAN-678 | M | medium | ok |  |  | pan work issue --auto: headless planning → agent handoff without interactive dialog |
-| 613 | PAN-675 | M | medium | needs-refinement |  |  | Deacon: detect API rate-limit events, surface on dashboard, auto-restart when window resets |
-| 614 | PAN-654 | L | medium | ok |  |  | Project Setup Wizard |
-| 615 | PAN-649 | M | medium | ok |  |  | Render Excalidraw drawings inline in Claude Code conversations |
-| 616 | PAN-637 | XS | medium | ok |  |  | Direct issue kickoff (skip planning) from dashboard UI |
-| 617 | PAN-629 | M | medium | ok |  |  | Workspace quotas and resource governance |
-| 618 | PAN-613 | M | medium | needs-refinement |  |  | Investigate thinking effort levels for agents |
-| 619 | PAN-607 | M | medium | needs-refinement |  |  | Evaluate Ultimate Bug Scanner (UBS) for verification gate |
-| 620 | PAN-606 | M | medium | needs-refinement |  |  | Evaluate MCP Agent Mail for inter-agent communication and file reservations |
-| 621 | PAN-548 | M | medium | ok |  |  | Command Deck: preserve state across navigation including URL routing for tabs |
-| 622 | PAN-546 | M | medium | ok |  |  | Remove claude-code-router |
-| 623 | PAN-537 | M | medium | ok |  |  | feat: show changed files diff summary after each agent response in activity view |
-| 624 | PAN-531 | XS | medium | ok |  |  | PAN: Windows Electron support (WSL2 required) |
-| 625 | PAN-452 | M | medium | ok |  |  | Conversation input bar |
-| 626 | PAN-450 | M | medium | ok |  |  | Adopt remaining Effect patterns |
-| 627 | PAN-1126 | M | medium | ok |  |  | Integrate TLDR summaries into review context manifest |
-| 628 | PAN-1066 | M | medium | ok |  |  | Complete PAN-1048 R5: retire dispatchParallelReview body and specialists.ts module |
-| 629 | PAN-3441 | L | low | ok |  |  | God View 'River' WebGL pipeline visualization fed by the live hook-event stream; PRD and mockup exist. |
-| 630 | PAN-2968 | M | low | ok |  |  | Adopt the interactive decision page as the default way to present operator decisions |
-| 631 | PAN-2941 | M | low | stale |  |  | Superseded by OKF v0.2: drafts plus human verify replace the PR gate (eltmon/okf#6); semantic pass is eltmon/okf#7 |
-| 632 | PAN-2936 | M | low | ok |  |  | Handle loop.max_steps_exceeded: detect and nudge agents to continue instead of stranding them |
-| 633 | PAN-4373 | M | medium | ok |  |  | Optional Jev relevance filter for prompt-time memory injection candidates; both prerequisites have closed |
-| 634 | PAN-2868 | M | low | ok |  |  | Desktop window opens at fixed 1400×900 |
-| 635 | PAN-2767 | M | low | ok |  |  | Expose Codex app-server conversation controls in the dashboard |
-| 636 | PAN-2679 | M | low | ok |  |  | conv-lookup skill: resolve transcripts for codex and pi harness conversations |
-| 637 | PAN-2662 | M | low | ok |  |  | Add project context-menu actions scoped to issues currently in the pipeline |
-| 638 | PAN-2645 | M | low | ok |  |  | Add opt-in Observation-first conversation view |
-| 639 | PAN-2635 | XS | low | ok |  |  | pay down the 152-error src/dashboard/server typecheck debt |
-| 640 | PAN-2630 | M | low | ok |  |  | pan binary not on PATH for operator shells or spawned work agents; pan doctor can't be run to diagnose it |
-| 641 | PAN-2629 | M | low | ok |  |  | pan start kickoff delivery never lands: "Claude Code did not become ready within 30s" (both attempts), agent sits idle at empty prompt |
-| 642 | PAN-3443 | L | low | ok |  |  | God View 'Spectrum Deck' visualizer concept with mockup and PRD; pure exploration, no substrate impact. |
-| 643 | PAN-4350 | M | medium | needs-refinement |  |  | Re-dispatch budget for foreman items; issue itself flags an unresolved conflict with the no-stored-state rule |
-| 644 | PAN-4003 | L | medium | ok |  |  | Parked: delete the ohmypi/omp harness, keep Pi; obsoletes 10 open ohmypi issues and shrinks PAN-3958's CH-7 scope |
-| 645 | PAN-4368 | S | medium | ok |  |  | Operator-run checklist: verify Sonnet 5.5 across switch-model, fork and compaction (model-locked thinking blocks) |
-| 646 | PAN-2628 | M | low | ok |  |  | pan close aborts at close-issue:transition: "No tracker available and cannot determine issue type" for GitHub-tracker project |
-| 647 | PAN-2622 | M | low | ok |  |  | cloister.toml materializes ALL defaults into the user file |
-| 648 | PAN-2600 | XS | low | ok |  |  | Retire the Codex TUI path after app-server burn-in (no-loss audit gate) |
-| 649 | PAN-2533 | XS | low | ok |  |  | UAT workspace magic-link login 502: Traefik picks unreachable panopticon IP for multi-homed fe/api |
-| 650 | PAN-2527 | M | low | ok |  |  | Harness selector should restrict OpenAI models to Claude Code only |
-| 651 | PAN-2514 | M | low | ok |  |  | Claude Code Traffic Inspector |
-| 652 | PAN-2505 | M | low | ok |  |  | lint:circular reports new frontend cycles + stale baseline in chat/conversations components |
-| 653 | PAN-2504 | M | low | ok |  |  | Auto-relaunch npx @overdeck/core under a compatible Node 22+ instead of failing on old Node |
-| 653 | PAN-2354 | M | low | ok |  |  | Overdeck Anywhere P1c: needs-you push notification bridge (ntfy first, Web Push later) |
-| 654 | PAN-2449 | M | low | ok |  |  | start-planning: GITHUB_REPOS env shadows projects.yaml github_repo; unknown IDs fall through to Linear and plan the wrong issue |
-| 656 | PAN-3940 | XL | low | ok | ✓ |  | Parked epic: event-driven plugin/hook system on pipeline-notifier + hygiene-scheduler; do not pick up until the journal has soaked |
-| 657 | PAN-2424 | L | low | ok | ✓ |  | Epic: the Order Book |
-| 658 | PAN-2406 | S | low | ok |  |  | Remaining scope: findAllWorkspacePaths must also enumerate -strike-wt and named-suffix worktrees; gaps 1 and 3 are moot. |
-| 659 | PAN-2394 | M | low | ok |  |  | Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts ("no saved history") |
-| 660 | PAN-4661 | S | low | ok |  | PAN-2355 | Phone PWA third tab: read-only phase-grouped pipeline list at /m/pipeline; waits on the PAN-2355 /m shell |
-| 661 | PAN-2353 | M | low | needs-refinement |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
-| 662 | PAN-4294 | L | low | ok |  |  | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
-| 662 | PAN-2355 | M | low | ok |  |  | Overdeck Anywhere P2: mobile PWA (Needs-You feed, conversation view, pipeline board, Web Push) |
-| 663 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
-| 665 | PAN-3011 | M | low | ok |  | PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
-| 666 | PAN-4638 | L | medium | needs-refinement |  | PAN-4651, PAN-4652 | Anywhere: run gauntlet lanes on linked machines/Fly VMs; waits on unfiled machine-link plan items; Fly stack + creds open |
-| 667 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
-| 668 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
-| 669 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
-| 669 | PAN-4641 | M | medium | ok |  |  | Server-held 'send when limits reset' composer message; needs a parsed reset time; usage-window data would come from #2065. |
+| 603 | PAN-4960 | M | medium | ok |  |  | Dashboard Settings → Anywhere Account card with PKCE sign-in; no code deps (the PAN-4959 page it linked to has closed). |
+| 604 | PAN-4908 | S | low | ok |  |  | Other remote-not-enabled messages name no file and the dead verb 'pan remote setup'; reuse PAN-4905's remoteEnabledHint(). |
+| 605 | PAN-947 | M | medium | ok |  |  | feat: project management actions in unified sidebar |
+| 606 | PAN-938 | M | medium | ok |  |  | Fizzy visual pipeline |
+| 607 | PAN-903 | M | medium | ok |  |  | Detect ~/.claude.json corruption on startup and surface it in the dashboard |
+| 608 | PAN-902 | XS | medium | ok |  |  | Settings: add 'Run pan sync' button to configuration menu |
+| 609 | PAN-901 | XS | medium | ok |  |  | Settings: add Maintenance panel with Claude Code Organizer + Config Editor quick-launch |
+| 610 | PAN-818 | M | medium | ok |  |  | Make summary optional when forking conversations |
+| 611 | PAN-4308 | S | medium | ok |  |  | Settle reaped Fly remote transcripts into the Session Vault; PAN-4295 auto-reap landed, still blocked by PAN-2609 (engine). |
+| 612 | PAN-3322 | XS | medium | ok |  |  | launcher-generator.ts's file-size ceiling sits 126 lines above the real file, handing back the regrowth the ratchet exists to prevent. |
+| 613 | PAN-678 | M | medium | ok |  |  | pan work issue --auto: headless planning → agent handoff without interactive dialog |
+| 614 | PAN-675 | M | medium | needs-refinement |  |  | Deacon: detect API rate-limit events, surface on dashboard, auto-restart when window resets |
+| 615 | PAN-654 | L | medium | ok |  |  | Project Setup Wizard |
+| 616 | PAN-649 | M | medium | ok |  |  | Render Excalidraw drawings inline in Claude Code conversations |
+| 617 | PAN-637 | XS | medium | ok |  |  | Direct issue kickoff (skip planning) from dashboard UI |
+| 618 | PAN-629 | M | medium | ok |  |  | Workspace quotas and resource governance |
+| 619 | PAN-613 | M | medium | needs-refinement |  |  | Investigate thinking effort levels for agents |
+| 620 | PAN-607 | M | medium | needs-refinement |  |  | Evaluate Ultimate Bug Scanner (UBS) for verification gate |
+| 621 | PAN-606 | M | medium | needs-refinement |  |  | Evaluate MCP Agent Mail for inter-agent communication and file reservations |
+| 622 | PAN-548 | M | medium | ok |  |  | Command Deck: preserve state across navigation including URL routing for tabs |
+| 623 | PAN-546 | M | medium | ok |  |  | Remove claude-code-router |
+| 624 | PAN-537 | M | medium | ok |  |  | feat: show changed files diff summary after each agent response in activity view |
+| 625 | PAN-531 | XS | medium | ok |  |  | PAN: Windows Electron support (WSL2 required) |
+| 626 | PAN-452 | M | medium | ok |  |  | Conversation input bar |
+| 627 | PAN-450 | M | medium | ok |  |  | Adopt remaining Effect patterns |
+| 628 | PAN-1126 | M | medium | ok |  |  | Integrate TLDR summaries into review context manifest |
+| 629 | PAN-1066 | M | medium | ok |  |  | Complete PAN-1048 R5: retire dispatchParallelReview body and specialists.ts module |
+| 630 | PAN-3441 | L | low | ok |  |  | God View 'River' WebGL pipeline visualization fed by the live hook-event stream; PRD and mockup exist. |
+| 631 | PAN-2968 | M | low | ok |  |  | Adopt the interactive decision page as the default way to present operator decisions |
+| 632 | PAN-2941 | M | low | stale |  |  | Superseded by OKF v0.2: drafts plus human verify replace the PR gate (eltmon/okf#6); semantic pass is eltmon/okf#7 |
+| 633 | PAN-2936 | M | low | ok |  |  | Handle loop.max_steps_exceeded: detect and nudge agents to continue instead of stranding them |
+| 634 | PAN-4373 | M | medium | ok |  |  | Optional Jev relevance filter for prompt-time memory injection candidates; both prerequisites have closed |
+| 635 | PAN-2868 | M | low | ok |  |  | Desktop window opens at fixed 1400×900 |
+| 636 | PAN-2767 | M | low | ok |  |  | Expose Codex app-server conversation controls in the dashboard |
+| 637 | PAN-2679 | M | low | ok |  |  | conv-lookup skill: resolve transcripts for codex and pi harness conversations |
+| 638 | PAN-2662 | M | low | ok |  |  | Add project context-menu actions scoped to issues currently in the pipeline |
+| 639 | PAN-2645 | M | low | ok |  |  | Add opt-in Observation-first conversation view |
+| 640 | PAN-2635 | XS | low | ok |  |  | pay down the 152-error src/dashboard/server typecheck debt |
+| 641 | PAN-2630 | M | low | ok |  |  | pan binary not on PATH for operator shells or spawned work agents; pan doctor can't be run to diagnose it |
+| 642 | PAN-2629 | M | low | ok |  |  | pan start kickoff delivery never lands: "Claude Code did not become ready within 30s" (both attempts), agent sits idle at empty prompt |
+| 643 | PAN-3443 | L | low | ok |  |  | God View 'Spectrum Deck' visualizer concept with mockup and PRD; pure exploration, no substrate impact. |
+| 644 | PAN-4350 | M | medium | needs-refinement |  |  | Re-dispatch budget for foreman items; issue itself flags an unresolved conflict with the no-stored-state rule |
+| 645 | PAN-4003 | L | medium | ok |  |  | Parked: delete the ohmypi/omp harness, keep Pi; obsoletes 10 open ohmypi issues and shrinks PAN-3958's CH-7 scope |
+| 646 | PAN-4368 | S | medium | ok |  |  | Operator-run checklist: verify Sonnet 5.5 across switch-model, fork and compaction (model-locked thinking blocks) |
+| 647 | PAN-2628 | M | low | ok |  |  | pan close aborts at close-issue:transition: "No tracker available and cannot determine issue type" for GitHub-tracker project |
+| 648 | PAN-2622 | M | low | ok |  |  | cloister.toml materializes ALL defaults into the user file |
+| 649 | PAN-2600 | XS | low | ok |  |  | Retire the Codex TUI path after app-server burn-in (no-loss audit gate) |
+| 650 | PAN-2533 | XS | low | ok |  |  | UAT workspace magic-link login 502: Traefik picks unreachable panopticon IP for multi-homed fe/api |
+| 651 | PAN-2527 | M | low | ok |  |  | Harness selector should restrict OpenAI models to Claude Code only |
+| 652 | PAN-2514 | M | low | ok |  |  | Claude Code Traffic Inspector |
+| 653 | PAN-2505 | M | low | ok |  |  | lint:circular reports new frontend cycles + stale baseline in chat/conversations components |
+| 654 | PAN-2504 | M | low | ok |  |  | Auto-relaunch npx @overdeck/core under a compatible Node 22+ instead of failing on old Node |
+| 655 | PAN-2449 | M | low | ok |  |  | start-planning: GITHUB_REPOS env shadows projects.yaml github_repo; unknown IDs fall through to Linear and plan the wrong issue |
+| 656 | PAN-4769 | XS | low | ok |  |  | Two-sentence wording fix in features/skill-packs.mdx; PAN-4759 created the page and closed, so this is unblocked. |
+| 657 | PAN-3940 | XL | low | ok | ✓ |  | Parked epic: event-driven plugin/hook system on pipeline-notifier + hygiene-scheduler; do not pick up until the journal has soaked |
+| 658 | PAN-2424 | L | low | ok | ✓ |  | Epic: the Order Book |
+| 659 | PAN-2406 | S | low | ok |  |  | Remaining scope: findAllWorkspacePaths must also enumerate -strike-wt and named-suffix worktrees; gaps 1 and 3 are moot. |
+| 660 | PAN-2394 | M | low | ok |  |  | Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts ("no saved history") |
+| 661 | PAN-4823 | XL | medium | ok | ✓ |  | Epic: Capacitor phone client for Anywhere without Tailscale; 15 children filed (#4828-4843); OD-1 settled; PAN-4774 done. |
+| 662 | PAN-2353 | M | low | needs-refinement |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
+| 663 | PAN-4294 | L | low | ok |  |  | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
+| 664 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
+| 666 | PAN-4638 | L | medium | ok |  |  | Anywhere: run gauntlet lanes on linked machines/Fly VMs; waits on unfiled machine-link plan items; Fly stack + creds open |
+| 667 | PAN-3011 | M | low | ok |  | PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
+| 668 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
+| 669 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
+| 670 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
+| 671 | PAN-4760 | S | low | ok |  | PAN-4638 | Live 3-machine gauntlet check moved out of PAN-4638; needs its release, pan reload, a linked laptop rig and Fly setup by the operator. |
 | 672 | PAN-2084 | M | low | ok |  |  | Auto-create lightweight conversation worktrees on project chats |
 | 673 | PAN-2083 | M | low | ok |  | PAN-1592 | Composer: a failed first send leaves the text in BOTH the composer box and the retry outbox |
 | 674 | PAN-2082 | M | low | ok |  |  | Composer: a single send failure clears ALL in-flight optimistic bubbles (and strips siblings' compaction net) |
@@ -688,7 +679,6 @@ _Last sequenced: 2026-11-01T09:18:58Z · model: claude-opus-5-5 · open: 871_
 | 683 | PAN-1983 | L | low | ok |  |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
 | 684 | PAN-2672 | S | low | needs-refinement |  |  | Transcript half reported fixed; parent-stays-ended half moved to PAN-4485. Verify on current build, then close. |
 | 685 | PAN-1958 | M | low | ok |  |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
-| 686 | PAN-2356 | M | low | needs-refinement |  | PAN-4297, PAN-4645, PAN-4330, PAN-4648 | Overdeck Anywhere P3: relay service |
 | 687 | PAN-1907 | M | low | ok |  |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every… |
 | 688 | PAN-1895 | M | low | ok |  |  | Spawn work agents from issue workspace slide-out |
 | 689 | PAN-1878 | M | low | ok |  |  | process: bake 'docs updated' into acceptance criteria / definition-of-done in role + planning prompts |
@@ -709,7 +699,7 @@ _Last sequenced: 2026-11-01T09:18:58Z · model: claude-opus-5-5 · open: 871_
 | 704 | PAN-1208 | M | low | ok |  |  | Polyrepo: support non-feature 'main' workspaces alongside feature-* |
 | 705 | PAN-4352 | XS | low | ok |  |  | Operator verification: skill packs in a managed interactive Claude Code launch now that PAN-4334 has shipped |
 | 706 | PAN-1153 | M | low | ok |  |  | Vite TRAEFIK_ENABLED conflates 'Traefik on' with 'inside container' |
-| 707 | PAN-4298 | XL | low | needs-refinement |  | PAN-4294, PAN-4295, PAN-1676 | Anywhere paid tier: run users' agents on hosted Fly capacity; tenant isolation, credentials, metering all open; four deps unbuilt |
+| 707 | PAN-4298 | XL | low | needs-refinement |  | PAN-4294, PAN-1676 | Anywhere paid tier: run agents on hosted Fly capacity; tenant isolation, credentials, metering open; PAN-4294 and PAN-1676 unbuilt |
 | 708 | PAN-1152 | XS | low | ok |  |  | Remove PANOPTICON_DEV env-var persistence |
 | 709 | PAN-1135 | M | low | ok |  |  | Document the hook system in docs/HOOKS.md |
 | 710 | PAN-1133 | M | low | stale |  |  | Deacon-patrol tie-in for TLDR supervision is gone; would need its own liveness check |
@@ -829,11 +819,7 @@ _Last sequenced: 2026-11-01T09:18:58Z · model: claude-opus-5-5 · open: 871_
 | 824 | PAN-3248 | XS | low | stale |  |  | Stale: targets the deploy patrol (pan reload is the new home) deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 825 | PAN-3244 | S | low | stale |  |  | Stale: targets the deploy-patrol deploy window deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 826 | PAN-2775 | S | low | needs-refinement |  |  | Stale: targets boot-correlated reaping (boot reconciliation) deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 827 | PAN-4658 | S | low | needs-refinement |  |  | Cite text from the EditorPane markdown preview; needs a decision on how the preview picks its target conversation. #4642 shipped. |
-| 828 | PAN-4659 | M | low | ok |  | PAN-4644 | Import VS Code themes from a .vsix package (ZIP read, caps, include resolution); cosmetic, waits for #4644 to merge. |
-| 828 | PAN-4644 | L | low | ok |  |  | Import VS Code themes and custom color themes for UI tokens, terminal palette and syntax highlighting; cosmetic, large surface. |
 | 829 | PAN-3505 | XS | low | needs-refinement |  |  | Stale: targets the flywheel state write door deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 831 | PAN-4660 | M | low | ok |  | PAN-4644 | Duplicate-and-edit theme editor with live preview in Settings > Appearance; cosmetic, waits for #4644 to merge. |
 | 832 | PAN-3321 | XS | low | stale |  |  | Stale: targets pan unstick deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 833 | PAN-736 | M | low | stale |  |  | Retired: work-types.ts, WorkTypeRouter and models.overrides are all gone (#4174); per-subagent routing needs a fresh roles.* design |
 | 834 | PAN-762 | M | low | stale |  |  | Premise gone: models.overrides is a retired, ignored key since #4174, so there are no overrides left to warn about |
@@ -876,88 +862,99 @@ _Last sequenced: 2026-11-01T09:18:58Z · model: claude-opus-5-5 · open: 871_
 | 871 | PAN-4592 | M | low | ok |  | PAN-4590 | pan semgrep ci-setup opens a PR adding a Semgrep Actions workflow + failure relay; needs gate mode from PAN-4590. |
 | 872 | PAN-4594 | M | low | ok |  | PAN-4590 | Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590. |
 | 873 | PAN-4593 | L | low | needs-refinement |  | PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
+| 877 | PAN-4840 | M | medium | ok |  |  | Phone app W-AND1: FCM FirebaseMessagingService decrypts sealed data payloads and posts notifications. |
+| 878 | PAN-4841 | M | medium | ok |  |  | Phone app W-REL1: Apple/Firebase/Play/Cloudflare setup and first store builds; operator approves purchases. |
+| 880 | PAN-4842 | S | medium | ok |  |  | Phone app W-DOC: phone-app.mdx and updates to Anywhere, push, tailscale and service docs; finished last. |
+| 881 | PAN-4851 | S | low | needs-refinement |  |  | Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them |
+| 882 | PAN-4887 | M | medium | ok |  |  | Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); PAN-4835 merged. |
+| 885 | PAN-4958 | S | low | ok |  |  | Docs for agent MCP and bot plugins; no hard deps but best written once Part A and B surfaces have landed. |
+| 904 | PAN-4953 | M | medium | ok |  | PAN-4950 | integrations/hermes/: Hermes plugin with its own revocable scoped token. |
+| 905 | PAN-4954 | M | medium | ok |  | PAN-4950 | integrations/openclaw/: OpenClaw plugin with its own revocable scoped token. |
+| 906 | PAN-4955 | S | medium | ok |  | PAN-4950 | integrations/grok-build/: Grok Build plugin with its own revocable scoped token. |
+| 907 | PAN-4956 | S | low | ok |  |  | integrations/grok-bot/ and xAI API example; needs OAuth UI and public Funnel /mcp, not the connector. |
+| 909 | PAN-4957 | S | low | ok |  | PAN-4953, PAN-4954, PAN-4955, PAN-4956 | CI for the four integration packages; lands after all integrations exist. |
 
 ## Rationale detail
 
-### PAN-4639 (rank 2)
+### PAN-4702 (rank 1)
 
-New in-pipeline issue with a live workspace, so it is pinned near the top beside PAN-4626 per the in-pipeline rule; it also offers a non-destructive path for the idle cleanup asked in PAN-1485.
+New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.
 
-### PAN-4636 (rank 3)
+### PAN-4995 (rank 3)
+
+New substrate-improvement issue, placed in the open rank-3 slot so no other rank moves. Every handoff that opens a PR and then runs pan review request (the order the handoff brief prescribes) can race the PR-opened adoption: verification merges origin/main into the workspace before adoption's final head check, so adoption journals workspace-head-mismatch and the issue shows a false needs pr-outside-pipeline. Nothing is stranded, but each occurrence costs operator attention. The issue names the cause and picks the fix (await an in-flight adoptPrAndStartReview from the request-review path), so it is small and ready to plan.
+
+### PAN-4636 (rank 4)
 
 New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.
 
-### PAN-4663 (rank 4)
+### PAN-4553 (rank 5)
 
-New in-pipeline substrate bug pinned at the free rank 4: an extra empty _default network per workspace stack exhausted the Docker address pool on 2026-11-01 and blocked PAN-4645, PAN-4648, PAN-4649 and PAN-4295 from starting, so the one-line network_mode fix unblocks workspace creation for the whole pipeline.
+Rank unchanged; its duplicate PAN-4929 entered the pipeline with an open PR, so this issue now waits on that PR instead of being picked up separately.
 
-### PAN-4670 (rank 5)
+### PAN-4733 (rank 6)
 
-New in-pipeline substrate bug (live workspace) with a decided two-part fix and clear tests, so it is pinned with the other in-pipeline items at the top; ranks 5-9 shift down one into the former gap at 10.
+Rank held: parent PAN-4732 (move heavy e2e out of the default shards) closed as completed on 2026-11-01, so this follow-up is now unblocked and next in line.
 
-### PAN-4672 (rank 6)
-
-New in-pipeline substrate-improvement bug filed after the prior run; pinned in the in-pipeline top tier at rank 6 (ranks 6-14 shift down one into the free rank 15).
-
-### PAN-4697 (rank 7)
-
-New in-pipeline substrate-improvement bug: five open PRs went CONFLICTING at once on this line, so each costs a work cycle and re-review; pinned in the in-pipeline top tier at rank 7.
-
-### PAN-4690 (rank 8)
+### PAN-4690 (rank 7)
 
 New issue: review dispatch clears feedback[] in the tracked .pan/continues file without committing, so the dirty-worktree gate refuses the review it was dispatching and deacon-lite re-requests fail forever. It stalled PAN-4626 and PAN-4643 after verification passed, hits every issue whose continue file carries feedback, and is substrate pipeline machinery, so it ranks at the top of the non-pinned tier (handoff per TENET-10).
 
-### PAN-4553 (rank 9)
+### PAN-4710 (rank 8)
 
-New issue, ranked into the open rank-6 slot. Since #4163 made workspace-setup failures fatal, the unconditional root npm install in workspace-manager/create.ts aborts every polyrepo workspace creation, so pan start fails for all MYN issues and the CLI misreports it as an unresponsive dashboard. The fix is small (skip the root install when the workspace root has no package.json, surface the real error) and it supersedes the non-fatal PAN-4390 report of the same root cause.
+New issue, ranked into the rank-10 slot beside PAN-4554. When pan start --plan auto finishes planning while the pipeline is busy, the deferred hand-off retries without the agent_count_high/memory_tight acknowledgement the first attempt sends, so it is refused below the ceiling until the attempt cap gives up with no operator signal; PAN-4663 and PAN-4670 sat three hours without work agents. It is substrate work with a precise root cause and testable ACs, but it carries needs-handoff (TENET-10), so it lands through a supervised handoff, and a manual second pan start is a working fallback, so it ranks high rather than critical.
 
-### PAN-4554 (rank 10)
+### PAN-4554 (rank 9)
 
 New issue, ranked into the open rank-7 slot beside PAN-4553. The paved road (pan start with auto-planning) promises the work agent starts after planning finalizes, but on mind-your-now seven issues reached planned with no work agent, so every auto-planned start silently stalls until an operator re-runs pan start. It ranks high rather than critical because a manual second pan start is a working fallback, and it may share a cause with the PAN-4553 workspace-setup abort that preceded it.
 
-### PAN-4666 (rank 11)
+### PAN-4666 (rank 10)
 
 New substrate bug in the Flywheel's own status read model: a second liveness rule in derive-status.ts hides live agents, so the loop or operator may respawn running work; small fix with clear ACs, ranked beside PAN-4636 as critical but labeled needs-handoff (TENET-10), so it goes through a supervised pan handoff.
 
-### PAN-4669 (rank 12)
+### PAN-4669 (rank 11)
 
 New since the prior run: on the default Herdr backend the idle-stack reaper decides liveness from the tmux session list, so it stops the dev server and UI containers of every running workspace 10 minutes after start, breaking agents' dev servers and preview URLs fleet-wide. The fix is small and well specified (route through liveness.ts or the backend list()), with clear acceptance criteria, so it ranks in the critical substrate tier next to PAN-4666, the same bypass-liveness.ts class. It carries needs-handoff (TENET-10), so pickup is a supervised pan handoff, not autonomous.
 
-### PAN-4547 (rank 13)
+### PAN-4547 (rank 12)
 
 Operator decision 2026-10-04 after the Flywheel closed 19 deployed issues by hand. With false DoD refusals fixed by PAN-4543, auto close-out only needs a patrol on the existing verify-on-main path and live settings. High because unclosed issues distort every pipeline view.
 
-### PAN-4511 (rank 14)
+### PAN-4511 (rank 13)
 
 pan spawn is the foreman's pane-only item worker, so parallel waves cannot run any item through it on either backend. The test suite never asserts argv, so it stayed green. Small fix with a clear expected behavior.
 
-### PAN-4544 (rank 15)
+### PAN-4544 (rank 14)
 
 Follow-up to PAN-4543, which fixed the summary route. The Pipeline view polls this route in the background, so every poll freezes all HTTP and WebSocket traffic for ~1.6 s and can fail DoD health probes. The async reader already exists, so the fix is small.
 
-### PAN-4551 (rank 16)
+### PAN-4551 (rank 15)
 
 Moves 705 importing files off a four-month-old beta onto the supported line, which is substrate hardening. PAN-4527, PAN-4531 and PAN-4540 closed on 2026-10-24, so it now waits only on PAN-4534 (in pipeline); rank holds at 14.
 
-### PAN-4671 (rank 17)
+### PAN-4671 (rank 16)
 
 New substrate fix to the merge door that closes the gap which let PAN-4672's findings merge unreviewed; advisory-only with a clear design and ACs, but TENET-10 requires a supervised handoff.
 
-### PAN-4674 (rank 18)
+### PAN-4674 (rank 17)
 
 New operator-reported substrate bug: tiered-execution crew removal and model changes do not persist, so the operator cannot route the expert difficulty to Opus 5.5. Clear repro steps, file pointers, and testable ACs; ranked beside the other fresh operator-reported substrate fixes.
 
-### PAN-4673 (rank 19)
+### PAN-4673 (rank 18)
 
 New operator-reported settings UI bug (substrate-improvement label sets a high floor): truncated model names make the operator misread which model is routed. Cause and fix are already identified in WorkhorsePanel.tsx, so it is a small, self-contained change; ranked just below the crew-removal bug because it misleads but does not block configuration.
 
-### PAN-4675 (rank 20)
+### PAN-4675 (rank 19)
 
 New this pass. addLabel in merge-agent.ts uses Effect.promise, so one gh network timeout becomes a defect that skips pausing agents and stopping the stack, and the merge door then refuses re-runs with Already merged. PAN-4299 is stuck half-closed right now, and pan close refuses on DoD row 5. Substrate bug with clear AC, so it slots into the free rank 19 beside the other merge and close-out fixes; it overlaps PAN-3557 (label retry), and fixing either should consult the other.
 
-### PAN-4680 (rank 20)
+### PAN-4705 (rank 20)
 
-New in-pipeline fix for a red-main flake (run 41283191295): unserialized ledger appends reorder entries, so main CI fails at random; placed in free slot 20 as critical substrate work.
+New since the prior pass. A latent race in the PAN-4546 admission test fails whole CI shards with an unhandled ENOENT on PRs that never touch it (seen on #4703), costing verification attempts pipeline-wide. It sits beside PAN-4680, the sibling flake fix, because both keep CI verification honest; the fix is small and scoped to one test file or publishExclusive.
+
+### PAN-4746 (rank 21)
+
+New flaky-test bug: a background membership-snapshot write races the test's teardown rmSync and turned an unrelated PR's CI shard red. Ranked next to PAN-4705, the same leaked-async-work-vs-teardown pattern, because each red shard costs a PR a rerun on the path to merge.
 
 ### PAN-4572 (rank 22)
 
@@ -979,9 +976,9 @@ New bug discovered on PAN-4199. The vbrief-ac verification gate and the pan done
 
 New bug filed from PAN-4201: pan done refused completion on 36 acceptance-criterion sub-items that no supported verb can close, and the vbrief-ac feedback names a nonexistent pan task close. It ranks critical and right behind PAN-4217 because it blocks completion of every issue planned with nested ACs, the default planner shape. It is marked needs-refinement because PAN-4217 already describes the same missing writer (updateSubItemStatus has no production caller) including the done-preflight half, so it should be closed as a duplicate or fixed by the same change.
 
-### PAN-4681 (rank 26)
+### PAN-4708 (rank 27)
 
-New in-pipeline follow-up to the merged PAN-4642 PR: an unregistered frontend test and a citation toggle without a mounted composer; placed in free slot 26 beside PAN-4671, its root cause.
+New substrate-improvement issue, the second hot-file conflict source after in-pipeline PAN-4697; on 2026-11-01 it forced merge-main cycles and fresh head reviews on three PRs. It takes the free rank 27 beside its sibling so no other node moves, and it stays needs-refinement because the body asks for a decision among three fixes (frontmatter-generated nav, per-group fragments, JSON merge driver) before work starts.
 
 ### PAN-4229 (rank 28)
 
@@ -1151,53 +1148,53 @@ New this pass and the only supply-chain finding in the batch. A stale node_modul
 
 New issue: a silent verification-gate bypass for polyrepo projects in ci tests mode; scoped fix with clear AC, placed beside the other polyrepo pipeline bugs and after PAN-4527, which touches the same head-resolution code.
 
-### PAN-3557 (rank 70)
+### PAN-4792 (rank 70)
+
+New bug found while planning PAN-4738: the tmux paste guard misses Claude Code's unnumbered select dialogs, so a failed paste's fallback Enter can answer them, including a silent permission-mode change. PAN-4738 removes the one known trigger on Fly, so it ranks with the high-tier delivery bugs rather than the top tier.
+
+### PAN-3557 (rank 71)
 
 New this pass. Post-merge label application has no retry, so a rate-limited 403 leaves a merged issue without its verifying-on-main label — and the verify-on-main phase enumerates by that label, which makes the issue invisible to the phase that owns it. Lifecycle reported 'completed' throughout, so nothing noticed for 45 minutes.
 
-### PAN-3543 (rank 71)
+### PAN-3543 (rank 72)
 
 New this pass. A completed-handoff agent owed rework after a blocked verdict cannot be started at all: pan start refuses and recommends --fresh, --fresh gives the identical refusal, and reset-session is refused too because the durable plane reconstructs the session pointer. The refusal message names an action the operator cannot take, which is the self-contradictory-deadlock family PAN-3526 opened.
 
-### PAN-3522 (rank 72)
+### PAN-3522 (rank 73)
 
 New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts through a new generation's 138-second boot warm phase and killed it anyway, producing four restarts in ten minutes, racing spawns on port 3012, and a WATCHDOG GIVING UP. Each restart re-triggered docker stack rebuilds, feeding the storm. The probe budget has to know the difference between starved and starting.
 
-### PAN-3314 (rank 73)
+### PAN-3314 (rank 74)
 
 New this pass. Every agent pane is a child of one transient tmux-server unit, so agent memory is the unit's memory and systemd-oomd's kill decision is all-or-nothing: one hungry agent takes the entire fleet with it. That has now happened twice, the second time killing seven work agents, four strikes and a live review convoy. Blast-radius containment is a different fix from choosing a better victim.
 
-### PAN-3278 (rank 74)
+### PAN-3278 (rank 75)
 
 Triage: the auto-requeue machinery cited targeted the deleted review_status table; verify review-dispatch-after-PR-open against the current mechanism (see PAN-3939 for the post-cut reproduction). Rank held.
 
-### PAN-4623 (rank 75)
+### PAN-4623 (rank 76)
 
 New since the prior run (filed by the PAN-4532 plan critic). recoverStalledReviews falls back to getRequestReviewStarter(), which is only registered by the dashboard route module the forked deacon child never loads, so the fallback is a silent no-op in production and a journaled-but-undispatched review with no parent state stays stranded. The fix is a one-call swap to requestReviewThroughRoute, which undispatched-review-recovery already uses. Placed beside PAN-3278 (review never dispatched) because it closes the same throughput hole; it is review-recovery machinery, so it goes through a supervised handoff.
 
-### PAN-3234 (rank 76)
+### PAN-3234 (rank 77)
 
 Triage: verify whether blocking-choice-menu detection is wired to the current liveness/health surface. Rank held.
 
-### PAN-3205 (rank 77)
+### PAN-3205 (rank 78)
 
 New this pass. The deployment gate's queue message is unusually good — it names the holders, the queue age, and warns against forcing — and it promises a 'next verification boundary' trigger that does not exist. Every holder cleared and the deploy never fired; the live build stayed stale for 35 minutes until a manual reload. A correct-sounding instruction that cannot happen is worse than no message.
 
-### PAN-3118 (rank 78)
+### PAN-3118 (rank 79)
 
 Triage: verify "running at $0.00 with no capacity fallback" against the current liveness definition. Rank held.
 
-### PAN-3106 (rank 79)
+### PAN-3106 (rank 80)
 
 New this pass. shouldHoldForUat is consulted on exactly one merge path, so every other path merges a ready issue without asking whether its project holds for UAT — verified at code level on a real MIN-901 merge. This defeats the batch-train model directly: issues merge one at a time before a generation can assemble them.
 
-### PAN-3100 (rank 80)
+### PAN-3100 (rank 81)
 
 New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.
-
-### PAN-4213 (rank 81)
-
-Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066 merged, so these seven follow-ups now harden code that is on main. Items 2 and 5 are real merge-path correctness hazards: a success status can sit on a head that never landed, and git reset --keep can move an agent commit off its branch. Each item names its file, so the work is well defined and is now startable.
 
 
 <!-- machine-readable; do not hand-edit below this line -->
@@ -1206,27 +1203,27 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-01T09:18:58Z",
+  "generatedAt": "2026-11-04T09:56:06.243460Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 871,
+  "openCount": 868,
   "nodes": [
     {
-      "issue": "PAN-4639",
-      "rank": 2,
-      "size": "L",
-      "importance": "medium",
-      "score": 56,
+      "issue": "PAN-4702",
+      "rank": 1,
+      "size": "S",
+      "importance": "critical",
+      "score": 92,
       "condition": "ok",
       "dependsOn": [],
-      "why": "In pipeline: conversation list as inbox; settle/snooze states, Needs-you on top, auto-settle on merge and idle, bulk actions.",
-      "rationale": "New in-pipeline issue with a live workspace, so it is pinned near the top beside PAN-4626 per the in-pipeline rule; it also offers a non-destructive path for the idle cleanup asked in PAN-1485.",
+      "why": "Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs.",
+      "rationale": "New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.",
       "gate": "auto",
       "planning": "auto"
     },
     {
       "issue": "PAN-4636",
-      "rank": 3,
+      "rank": 4,
       "size": "S",
       "importance": "critical",
       "score": 86,
@@ -1238,60 +1235,34 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-4663",
-      "rank": 4,
-      "size": "XS",
-      "importance": "critical",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: init-perms lacks networks so each stack burns 2 Docker subnets; pool exhaustion blocks new workspace starts",
-      "rationale": "New in-pipeline substrate bug pinned at the free rank 4: an extra empty _default network per workspace stack exhausted the Docker address pool on 2026-11-01 and blocked PAN-4645, PAN-4648, PAN-4649 and PAN-4295 from starting, so the one-line network_mode fix unblocks workspace creation for the whole pipeline.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4670",
+      "issue": "PAN-4553",
       "rank": 5,
       "size": "S",
-      "importance": "high",
-      "score": 72,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: simple-mode postJson omits CSRF header so every action 403s; idle planner shows Start work while work agent runs.",
-      "rationale": "New in-pipeline substrate bug (live workspace) with a decided two-part fix and clear tests, so it is pinned with the other in-pipeline items at the top; ranks 5-9 shift down one into the former gap at 10.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4672",
-      "rank": 6,
-      "size": "S",
-      "importance": "high",
-      "score": 70,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: missed CodeRabbit fixes: atomic Traefik compose write, migration try/catch, IPv6 doc, 503 after hold timeout.",
-      "rationale": "New in-pipeline substrate-improvement bug filed after the prior run; pinned in the in-pipeline top tier at rank 6 (ranks 6-14 shift down one into the free rank 15).",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4697",
-      "rank": 7,
-      "size": "S",
       "importance": "critical",
-      "score": 86,
+      "score": 90,
       "condition": "ok",
       "dependsOn": [],
-      "why": "In pipeline: one 7.4 KB test:frontend-subset line in package.json makes every two frontend-test PRs conflict; move to union-merged file.",
-      "rationale": "New in-pipeline substrate-improvement bug: five open PRs went CONFLICTING at once on this line, so each costs a work cycle and re-review; pinned in the in-pipeline top tier at rank 7.",
+      "why": "Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges.",
+      "rationale": "Rank unchanged; its duplicate PAN-4929 entered the pipeline with an open PR, so this issue now waits on that PR instead of being picked up separately.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4733",
+      "rank": 6,
+      "size": "M",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it.",
+      "rationale": "Rank held: parent PAN-4732 (move heavy e2e out of the default shards) closed as completed on 2026-11-01, so this follow-up is now unblocked and next in line.",
       "gate": "auto",
       "planning": "auto"
     },
     {
       "issue": "PAN-4690",
-      "rank": 8,
+      "rank": 7,
       "size": "S",
       "importance": "critical",
       "score": 90,
@@ -1303,21 +1274,21 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-4553",
-      "rank": 9,
+      "issue": "PAN-4710",
+      "rank": 8,
       "size": "S",
-      "importance": "critical",
-      "score": 88,
+      "importance": "high",
+      "score": 82,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Polyrepo root npm install now aborts workspace creation (since #4163), so every MYN pan start fails; skip install w/o package.json",
-      "rationale": "New issue, ranked into the open rank-6 slot. Since #4163 made workspace-setup failures fatal, the unconditional root npm install in workspace-manager/create.ts aborts every polyrepo workspace creation, so pan start fails for all MYN issues and the CLI misreports it as an unresponsive dashboard. The fix is small (skip the root install when the workspace root has no package.json, surface the real error) and it supersedes the non-fatal PAN-4390 report of the same root cause.",
+      "why": "Deferred plan hand-off retries omit the guardrail ack, so they're refused at 'agent count high' and give up silently; needs handoff",
+      "rationale": "New issue, ranked into the rank-10 slot beside PAN-4554. When pan start --plan auto finishes planning while the pipeline is busy, the deferred hand-off retries without the agent_count_high/memory_tight acknowledgement the first attempt sends, so it is refused below the ceiling until the attempt cap gives up with no operator signal; PAN-4663 and PAN-4670 sat three hours without work agents. It is substrate work with a precise root cause and testable ACs, but it carries needs-handoff (TENET-10), so it lands through a supervised handoff, and a manual second pan start is a working fallback, so it ranks high rather than critical.",
       "gate": "auto",
       "planning": "auto"
     },
     {
       "issue": "PAN-4554",
-      "rank": 10,
+      "rank": 9,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -1330,7 +1301,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4666",
-      "rank": 11,
+      "rank": 10,
       "size": "S",
       "importance": "critical",
       "score": 85,
@@ -1343,7 +1314,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4669",
-      "rank": 12,
+      "rank": 11,
       "size": "S",
       "importance": "critical",
       "score": 86,
@@ -1356,7 +1327,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4547",
-      "rank": 13,
+      "rank": 12,
       "size": "M",
       "importance": "high",
       "score": 80,
@@ -1369,7 +1340,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4511",
-      "rank": 14,
+      "rank": 13,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -1382,7 +1353,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4544",
-      "rank": 15,
+      "rank": 14,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -1395,7 +1366,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4551",
-      "rank": 16,
+      "rank": 15,
       "size": "L",
       "importance": "high",
       "score": 74,
@@ -1408,7 +1379,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4671",
-      "rank": 17,
+      "rank": 16,
       "size": "M",
       "importance": "high",
       "score": 72,
@@ -1421,7 +1392,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4674",
-      "rank": 18,
+      "rank": 17,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -1434,7 +1405,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4673",
-      "rank": 19,
+      "rank": 18,
       "size": "S",
       "importance": "high",
       "score": 64,
@@ -1447,7 +1418,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4675",
-      "rank": 20,
+      "rank": 19,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -1459,15 +1430,28 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-4680",
+      "issue": "PAN-4705",
       "rank": 20,
       "size": "S",
-      "importance": "critical",
-      "score": 88,
+      "importance": "high",
+      "score": 76,
       "condition": "ok",
       "dependsOn": [],
-      "why": "In pipeline: run-gh ledger test flaked main red; queueLedgerEntry appends race. Serialize appends with a promise chain.",
-      "rationale": "New in-pipeline fix for a red-main flake (run 41283191295): unserialized ledger appends reorder entries, so main CI fails at random; placed in free slot 20 as critical substrate work.",
+      "why": "quality-gate-admission test leaks a poller past afterEach rmSync; unhandled ENOENT fails unrelated PR CI shards.",
+      "rationale": "New since the prior pass. A latent race in the PAN-4546 admission test fails whole CI shards with an unhandled ENOENT on PRs that never touch it (seen on #4703), costing verification attempts pipeline-wide. It sits beside PAN-4680, the sibling flake fix, because both keep CI verification honest; the fix is small and scoped to one test file or publishExclusive.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4746",
+      "rank": 21,
+      "size": "S",
+      "importance": "high",
+      "score": 74,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "CI test shard flakes on ENOTEMPTY: afterEach rmSync races an unawaited snapshot write; reds unrelated PRs (seen on #4745).",
+      "rationale": "New flaky-test bug: a background membership-snapshot write races the test's teardown rmSync and turned an unrelated PR's CI shard red. Ranked next to PAN-4705, the same leaked-async-work-vs-teardown pattern, because each red shard costs a PR a rerun on the path to merge.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1537,15 +1521,15 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-4681",
-      "rank": 26,
-      "size": "S",
+      "issue": "PAN-4708",
+      "rank": 27,
+      "size": "M",
       "importance": "high",
-      "score": 70,
-      "condition": "ok",
+      "score": 74,
+      "condition": "needs-refinement",
       "dependsOn": [],
-      "why": "In pipeline: CodeRabbit fixes lost at #4667 merge: messageRows test not in CI subset; cite toolbar shown with no composer.",
-      "rationale": "New in-pipeline follow-up to the merged PAN-4642 PR: an unregistered frontend test and a citation toggle without a mounted composer; placed in free slot 26 beside PAN-4671, its root cause.",
+      "why": "docs.json nav is a hot file: concurrent docs PRs conflict, each costing a merge-main and re-review. Pick a fix option first.",
+      "rationale": "New substrate-improvement issue, the second hot-file conflict source after in-pipeline PAN-4697; on 2026-11-01 it forced merge-main cycles and fresh head reviews on three PRs. It takes the free rank 27 beside its sibling so no other node moves, and it stays needs-refinement because the body asks for a decision among three fixes (frontmatter-generated nav, per-group fragments, JSON merge driver) before work starts.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2098,8 +2082,21 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-3557",
+      "issue": "PAN-4792",
       "rank": 70,
+      "size": "S",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Paste guard only knows numbered menus; a failed paste presses Enter into unnumbered selects, silently setting defaultMode=auto.",
+      "rationale": "New bug found while planning PAN-4738: the tmux paste guard misses Claude Code's unnumbered select dialogs, so a failed paste's fallback Enter can answer them, including a silent permission-mode change. PAN-4738 removes the one known trigger on Fly, so it ranks with the high-tier delivery bugs rather than the top tier.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3557",
+      "rank": 71,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2112,7 +2109,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3543",
-      "rank": 71,
+      "rank": 72,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2125,7 +2122,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3522",
-      "rank": 72,
+      "rank": 73,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2138,7 +2135,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3314",
-      "rank": 73,
+      "rank": 74,
       "size": "M",
       "importance": "critical",
       "score": 84,
@@ -2151,7 +2148,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3278",
-      "rank": 74,
+      "rank": 75,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2164,7 +2161,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4623",
-      "rank": 75,
+      "rank": 76,
       "size": "XS",
       "importance": "high",
       "score": 82,
@@ -2177,7 +2174,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3234",
-      "rank": 76,
+      "rank": 77,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2190,7 +2187,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3205",
-      "rank": 77,
+      "rank": 78,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2203,7 +2200,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3118",
-      "rank": 78,
+      "rank": 79,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2216,7 +2213,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3106",
-      "rank": 79,
+      "rank": 80,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2229,7 +2226,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3100",
-      "rank": 80,
+      "rank": 81,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2242,7 +2239,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4213",
-      "rank": 81,
+      "rank": 82,
       "size": "M",
       "importance": "high",
       "score": 80,
@@ -2254,8 +2251,22 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
+      "issue": "PAN-4753",
+      "rank": 83,
+      "size": "XL",
+      "importance": "high",
+      "score": 78,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "Epic: restore merge trains (MergeTrain component, strike fast lane); PAN-4750 merged; PRD being written, no children yet; handoff.",
+      "rationale": "Rank held: its strike-lane dependency PAN-4750 merged and is verifying on main, so that blocker is cleared; the epic still has no children.",
+      "gate": "auto",
+      "planning": "auto",
+      "isEpic": true
+    },
+    {
       "issue": "PAN-3096",
-      "rank": 82,
+      "rank": 84,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2268,7 +2279,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3084",
-      "rank": 83,
+      "rank": 85,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2281,7 +2292,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3043",
-      "rank": 84,
+      "rank": 86,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2294,7 +2305,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-1824",
-      "rank": 85,
+      "rank": 87,
       "size": "S",
       "importance": "high",
       "score": 84,
@@ -2307,7 +2318,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2932",
-      "rank": 86,
+      "rank": 88,
       "size": "S",
       "importance": "high",
       "score": 83,
@@ -2322,7 +2333,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2935",
-      "rank": 87,
+      "rank": 89,
       "size": "S",
       "importance": "critical",
       "score": 91,
@@ -2335,7 +2346,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2337",
-      "rank": 88,
+      "rank": 90,
       "size": "XS",
       "importance": "critical",
       "score": 90,
@@ -2348,7 +2359,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2422",
-      "rank": 89,
+      "rank": 91,
       "size": "XS",
       "importance": "high",
       "score": 83,
@@ -2363,7 +2374,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2699",
-      "rank": 90,
+      "rank": 92,
       "size": "XS",
       "importance": "high",
       "score": 83,
@@ -2376,7 +2387,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2957",
-      "rank": 91,
+      "rank": 93,
       "size": "XS",
       "importance": "high",
       "score": 83,
@@ -2391,7 +2402,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2850",
-      "rank": 92,
+      "rank": 94,
       "size": "M",
       "importance": "high",
       "score": 83,
@@ -2404,7 +2415,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2758",
-      "rank": 93,
+      "rank": 95,
       "size": "S",
       "importance": "critical",
       "score": 90,
@@ -2417,7 +2428,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2817",
-      "rank": 94,
+      "rank": 96,
       "size": "M",
       "importance": "high",
       "score": 83,
@@ -2430,7 +2441,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2813",
-      "rank": 95,
+      "rank": 97,
       "size": "M",
       "importance": "high",
       "score": 83,
@@ -2443,7 +2454,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2668",
-      "rank": 96,
+      "rank": 98,
       "size": "M",
       "importance": "high",
       "score": 82,
@@ -2456,7 +2467,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2569",
-      "rank": 97,
+      "rank": 99,
       "size": "XS",
       "importance": "critical",
       "score": 88,
@@ -2469,7 +2480,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4269",
-      "rank": 98,
+      "rank": 100,
       "size": "M",
       "importance": "high",
       "score": 76,
@@ -2482,7 +2493,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3811",
-      "rank": 99,
+      "rank": 101,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -2495,7 +2506,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2179",
-      "rank": 100,
+      "rank": 102,
       "size": "S",
       "importance": "high",
       "score": 82,
@@ -2508,7 +2519,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2169",
-      "rank": 101,
+      "rank": 103,
       "size": "S",
       "importance": "high",
       "score": 82,
@@ -2521,7 +2532,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2734",
-      "rank": 102,
+      "rank": 104,
       "size": "S",
       "importance": "high",
       "score": 82,
@@ -2534,7 +2545,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3697",
-      "rank": 103,
+      "rank": 105,
       "size": "XS",
       "importance": "high",
       "score": 82,
@@ -2546,7 +2557,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3633",
-      "rank": 104,
+      "rank": 106,
       "size": "S",
       "importance": "high",
       "score": 82,
@@ -2558,7 +2569,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4420",
-      "rank": 105,
+      "rank": 107,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -2570,7 +2581,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3099",
-      "rank": 106,
+      "rank": 108,
       "size": "XS",
       "importance": "critical",
       "score": 82,
@@ -2582,7 +2593,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4418",
-      "rank": 107,
+      "rank": 109,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -2594,7 +2605,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3040",
-      "rank": 108,
+      "rank": 110,
       "size": "S",
       "importance": "critical",
       "score": 82,
@@ -2606,7 +2617,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3023",
-      "rank": 109,
+      "rank": 111,
       "size": "S",
       "importance": "critical",
       "score": 82,
@@ -2618,7 +2629,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-1618",
-      "rank": 110,
+      "rank": 112,
       "size": "S",
       "importance": "high",
       "score": 81,
@@ -2631,7 +2642,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3916",
-      "rank": 111,
+      "rank": 113,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -2644,7 +2655,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3900",
-      "rank": 112,
+      "rank": 114,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -2657,7 +2668,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3793",
-      "rank": 113,
+      "rank": 115,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -2670,7 +2681,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2639",
-      "rank": 114,
+      "rank": 116,
       "size": "S",
       "importance": "high",
       "score": 81,
@@ -2685,7 +2696,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2331",
-      "rank": 115,
+      "rank": 117,
       "size": "S",
       "importance": "high",
       "score": 81,
@@ -2698,7 +2709,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2333",
-      "rank": 116,
+      "rank": 118,
       "size": "M",
       "importance": "high",
       "score": 81,
@@ -2711,7 +2722,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4184",
-      "rank": 117,
+      "rank": 119,
       "size": "S",
       "importance": "high",
       "score": 81,
@@ -2724,7 +2735,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2511",
-      "rank": 118,
+      "rank": 120,
       "size": "XS",
       "importance": "high",
       "score": 81,
@@ -2737,7 +2748,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2763",
-      "rank": 119,
+      "rank": 121,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2750,7 +2761,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2170",
-      "rank": 120,
+      "rank": 122,
       "size": "XS",
       "importance": "high",
       "score": 80,
@@ -2763,7 +2774,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-1198",
-      "rank": 121,
+      "rank": 123,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2776,7 +2787,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4453",
-      "rank": 122,
+      "rank": 124,
       "size": "XS",
       "importance": "high",
       "score": 72,
@@ -2788,7 +2799,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2106",
-      "rank": 123,
+      "rank": 125,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2801,7 +2812,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2880",
-      "rank": 124,
+      "rank": 126,
       "size": "M",
       "importance": "high",
       "score": 80,
@@ -2816,7 +2827,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2966",
-      "rank": 125,
+      "rank": 127,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2829,7 +2840,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2945",
-      "rank": 126,
+      "rank": 128,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2842,7 +2853,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2680",
-      "rank": 127,
+      "rank": 129,
       "size": "M",
       "importance": "high",
       "score": 80,
@@ -2855,7 +2866,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4419",
-      "rank": 128,
+      "rank": 130,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -2869,7 +2880,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3734",
-      "rank": 129,
+      "rank": 131,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2881,7 +2892,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3621",
-      "rank": 130,
+      "rank": 132,
       "size": "M",
       "importance": "high",
       "score": 80,
@@ -2893,7 +2904,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3555",
-      "rank": 131,
+      "rank": 133,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2905,7 +2916,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3498",
-      "rank": 132,
+      "rank": 134,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2917,7 +2928,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3496",
-      "rank": 133,
+      "rank": 135,
       "size": "XS",
       "importance": "high",
       "score": 80,
@@ -2929,7 +2940,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3081",
-      "rank": 134,
+      "rank": 136,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2941,7 +2952,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2627",
-      "rank": 135,
+      "rank": 137,
       "size": "S",
       "importance": "high",
       "score": 79,
@@ -2954,7 +2965,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2324",
-      "rank": 136,
+      "rank": 138,
       "size": "XS",
       "importance": "high",
       "score": 79,
@@ -2967,7 +2978,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2165",
-      "rank": 137,
+      "rank": 139,
       "size": "XS",
       "importance": "high",
       "score": 79,
@@ -2980,7 +2991,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2905",
-      "rank": 138,
+      "rank": 140,
       "size": "S",
       "importance": "high",
       "score": 79,
@@ -2993,7 +3004,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2259",
-      "rank": 139,
+      "rank": 141,
       "size": "S",
       "importance": "critical",
       "score": 86,
@@ -3006,7 +3017,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2379",
-      "rank": 140,
+      "rank": 142,
       "size": "S",
       "importance": "high",
       "score": 79,
@@ -3019,7 +3030,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2421",
-      "rank": 141,
+      "rank": 143,
       "size": "XS",
       "importance": "high",
       "score": 79,
@@ -3032,7 +3043,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2430",
-      "rank": 142,
+      "rank": 144,
       "size": "S",
       "importance": "high",
       "score": 79,
@@ -3045,7 +3056,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2593",
-      "rank": 143,
+      "rank": 145,
       "size": "S",
       "importance": "high",
       "score": 79,
@@ -3058,7 +3069,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4302",
-      "rank": 144,
+      "rank": 146,
       "size": "M",
       "importance": "high",
       "score": 72,
@@ -3071,7 +3082,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2080",
-      "rank": 145,
+      "rank": 147,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -3083,21 +3094,21 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-1775",
-      "rank": 146,
-      "size": "M",
+      "issue": "PAN-4885",
+      "rank": 148,
+      "size": "S",
       "importance": "high",
-      "score": 78,
+      "score": 72,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Remote (Fly.io) work agents appear as real session rows in the issue tree",
-      "rationale": "Remote Fly.io work agents appear as real session rows — prerequisite visibility before reconciliation can include them.",
+      "why": "pan worker run to an online Fly link fails 2 of 3 times: the 2.5 s secure-channel open budget is too short for the public Fly route.",
+      "rationale": "New defect found by the in-pipeline PAN-4882 re-run: remote worker starts against an online Fly link intermittently fail on LINK_WAIT_MS (2.5 s) in link-client.ts. The fix is small and well-specified (larger open budget for online links, or one retry), and it makes Anywhere remote workers reliable, so it takes the free rank 147 beside other high, small reliability fixes without moving any node.",
       "gate": "auto",
-      "planning": "skip"
+      "planning": "auto"
     },
     {
       "issue": "PAN-1436",
-      "rank": 147,
+      "rank": 149,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3110,7 +3121,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3556",
-      "rank": 148,
+      "rank": 150,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3122,7 +3133,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3553",
-      "rank": 149,
+      "rank": 151,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3134,7 +3145,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3535",
-      "rank": 150,
+      "rank": 152,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3146,7 +3157,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3429",
-      "rank": 151,
+      "rank": 153,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -3158,7 +3169,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3397",
-      "rank": 152,
+      "rank": 154,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3170,7 +3181,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3325",
-      "rank": 153,
+      "rank": 155,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3182,7 +3193,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3317",
-      "rank": 154,
+      "rank": 156,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3194,7 +3205,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3284",
-      "rank": 155,
+      "rank": 157,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3206,7 +3217,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3270",
-      "rank": 156,
+      "rank": 158,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3218,7 +3229,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4487",
-      "rank": 157,
+      "rank": 159,
       "size": "XS",
       "importance": "high",
       "score": 74,
@@ -3231,7 +3242,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3257",
-      "rank": 158,
+      "rank": 160,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3243,7 +3254,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3129",
-      "rank": 159,
+      "rank": 161,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -3255,7 +3266,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3120",
-      "rank": 160,
+      "rank": 162,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3267,7 +3278,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4349",
-      "rank": 161,
+      "rank": 163,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -3279,7 +3290,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3062",
-      "rank": 162,
+      "rank": 164,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -3291,7 +3302,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3048",
-      "rank": 163,
+      "rank": 165,
       "size": "XS",
       "importance": "high",
       "score": 78,
@@ -3304,7 +3315,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3032",
-      "rank": 164,
+      "rank": 166,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3316,7 +3327,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3833",
-      "rank": 165,
+      "rank": 167,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3329,7 +3340,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3902",
-      "rank": 166,
+      "rank": 168,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3342,7 +3353,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4629",
-      "rank": 167,
+      "rank": 169,
       "size": "M",
       "importance": "high",
       "score": 72,
@@ -3354,21 +3365,21 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-4628",
-      "rank": 167,
-      "size": "S",
-      "importance": "high",
-      "score": 74,
-      "condition": "ok",
+      "issue": "PAN-1775",
+      "rank": 170,
+      "size": "M",
+      "importance": "medium",
+      "score": 30,
+      "condition": "needs-refinement",
       "dependsOn": [],
-      "why": "npx pan serve mints a per-run token never written to disk; Herdr panes keep a stale one, so pane CLI calls to the dashboard get 401.",
-      "rationale": "New issue with a verified cause: pan serve never persists the internal token, and long-lived Herdr panes inherit an old one, so every CLI-to-dashboard call from an npx-launched pane is rejected. It breaks pan pair today and threatens any pane-side pipeline call on npx machines; the fix (reuse ensureInternalToken) is small.",
+      "why": "PAN-4734 merged 2026-11-02 and should deliver this; verify Fly work agents show as session rows, then close.",
+      "rationale": "Dependency PAN-4734 closed as completed, so this issue is likely satisfied; demoted in score pending a verify-and-close check.",
       "gate": "auto",
-      "planning": "auto"
+      "planning": "skip"
     },
     {
       "issue": "PAN-3854",
-      "rank": 169,
+      "rank": 171,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -3381,7 +3392,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4577",
-      "rank": 170,
+      "rank": 172,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -3394,7 +3405,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3307",
-      "rank": 171,
+      "rank": 173,
       "size": "XS",
       "importance": "high",
       "score": 62,
@@ -3407,7 +3418,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4634",
-      "rank": 172,
+      "rank": 174,
       "size": "M",
       "importance": "medium",
       "score": 66,
@@ -3420,7 +3431,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2642",
-      "rank": 173,
+      "rank": 175,
       "size": "XL",
       "importance": "high",
       "score": 77,
@@ -3433,23 +3444,8 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "isEpic": true
     },
     {
-      "issue": "PAN-4653",
-      "rank": 174,
-      "size": "S",
-      "importance": "medium",
-      "score": 48,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4639"
-      ],
-      "why": "Ranked for readiness when #4639 merges: auto-settle on PR merge replaces tmux-only auto-archive; default on, setting toggle.",
-      "rationale": "New issue split from in-pipeline PAN-4639 with a full spec; it ranks high because it becomes workable as soon as PAN-4639 merges and it retires the tmux-only liveness check in PR-sync auto-archive.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1868",
-      "rank": 175,
+      "rank": 176,
       "size": "XS",
       "importance": "high",
       "score": 77,
@@ -3461,23 +3457,21 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "skip"
     },
     {
-      "issue": "PAN-4655",
-      "rank": 176,
-      "size": "M",
-      "importance": "medium",
-      "score": 46,
+      "issue": "PAN-4847",
+      "rank": 177,
+      "size": "S",
+      "importance": "high",
+      "score": 76,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4639"
-      ],
-      "why": "Ranked for readiness when #4639 merges: idle auto-settle after N days (default 3); supersedes the #1485 archive part.",
-      "rationale": "New issue split from in-pipeline PAN-4639 with a full spec; it sits beside PAN-4653 because both unblock when PAN-4639 merges, and it resolves the scope question on PAN-1485.",
+      "dependsOn": [],
+      "why": "Remote reap silently skips review request when a background writer dirties a tracked file; pipeline stalls at PR-open.",
+      "rationale": "New issue placed in the open rank-177 slot: a silent pipeline stall (review never requested after Fly reap) that also blocks PAN-4696 FR-2; root cause is an unidentified background writer of .overdeck/context/codebase/concerns.md plus an over-strict porcelain dirty check in requestReviewThroughRoute.",
       "gate": "auto",
       "planning": "auto"
     },
     {
       "issue": "PAN-1042",
-      "rank": 177,
+      "rank": 178,
       "size": "S",
       "importance": "high",
       "score": 77,
@@ -3489,23 +3483,21 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-4657",
-      "rank": 178,
-      "size": "M",
+      "issue": "PAN-4844",
+      "rank": 179,
+      "size": "S",
       "importance": "medium",
-      "score": 45,
+      "score": 58,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4639"
-      ],
-      "why": "Schedule dialog, next-run row badge and inbox resurfacing for scheduled conversations; #4640 merged, waits on in-pipeline #4639.",
-      "rationale": "Rank held: dependency PAN-4640 closed as completed, leaving only in-pipeline PAN-4639 (snooze and settle) before this slice is workable.",
+      "dependsOn": [],
+      "why": "Claude Code parser prices glm-*/qwen3* as Sonnet 4, ohmypi prices DashScope at $0; route both to custom rows.",
+      "rationale": "New cost bug found while planning PAN-4827: two parsers mis-route GLM and Qwen models, so cost reports are wrong for those sessions. It is small, self-contained and independent, so it takes the free rank 179 near PAN-4827.",
       "gate": "auto",
       "planning": "auto"
     },
     {
       "issue": "PAN-570",
-      "rank": 179,
+      "rank": 180,
       "size": "XS",
       "importance": "high",
       "score": 77,
@@ -3520,7 +3512,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2059",
-      "rank": 180,
+      "rank": 181,
       "size": "XL",
       "importance": "high",
       "score": 77,
@@ -3534,7 +3526,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2376",
-      "rank": 181,
+      "rank": 182,
       "size": "XL",
       "importance": "high",
       "score": 77,
@@ -3548,7 +3540,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3775",
-      "rank": 182,
+      "rank": 183,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3560,7 +3552,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3652",
-      "rank": 183,
+      "rank": 184,
       "size": "XS",
       "importance": "high",
       "score": 76,
@@ -3572,7 +3564,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3579",
-      "rank": 184,
+      "rank": 185,
       "size": "M",
       "importance": "high",
       "score": 76,
@@ -3584,7 +3576,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3541",
-      "rank": 185,
+      "rank": 186,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3596,7 +3588,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3463",
-      "rank": 186,
+      "rank": 187,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3608,7 +3600,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3460",
-      "rank": 187,
+      "rank": 188,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3620,7 +3612,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3454",
-      "rank": 188,
+      "rank": 189,
       "size": "M",
       "importance": "high",
       "score": 76,
@@ -3632,7 +3624,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3432",
-      "rank": 189,
+      "rank": 190,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3644,7 +3636,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3306",
-      "rank": 190,
+      "rank": 191,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3656,7 +3648,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3297",
-      "rank": 191,
+      "rank": 192,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3668,7 +3660,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3274",
-      "rank": 192,
+      "rank": 193,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3681,7 +3673,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3267",
-      "rank": 193,
+      "rank": 194,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3693,7 +3685,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3261",
-      "rank": 194,
+      "rank": 195,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3705,7 +3697,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3256",
-      "rank": 195,
+      "rank": 196,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3717,7 +3709,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4342",
-      "rank": 196,
+      "rank": 197,
       "size": "M",
       "importance": "medium",
       "score": 64,
@@ -3729,7 +3721,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3174",
-      "rank": 197,
+      "rank": 198,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3741,7 +3733,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3050",
-      "rank": 198,
+      "rank": 199,
       "size": "XS",
       "importance": "high",
       "score": 76,
@@ -3753,7 +3745,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4365",
-      "rank": 199,
+      "rank": 200,
       "size": "S",
       "importance": "medium",
       "score": 64,
@@ -3765,7 +3757,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2980",
-      "rank": 200,
+      "rank": 201,
       "size": "XS",
       "importance": "high",
       "score": 76,
@@ -3777,7 +3769,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3769",
-      "rank": 201,
+      "rank": 202,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3789,7 +3781,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3760",
-      "rank": 202,
+      "rank": 203,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3801,7 +3793,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3629",
-      "rank": 203,
+      "rank": 204,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -3813,7 +3805,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3517",
-      "rank": 204,
+      "rank": 205,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -3825,7 +3817,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3508",
-      "rank": 205,
+      "rank": 206,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3837,7 +3829,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3303",
-      "rank": 206,
+      "rank": 207,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3849,7 +3841,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4364",
-      "rank": 207,
+      "rank": 208,
       "size": "S",
       "importance": "medium",
       "score": 62,
@@ -3861,7 +3853,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3196",
-      "rank": 208,
+      "rank": 209,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3873,7 +3865,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3186",
-      "rank": 209,
+      "rank": 210,
       "size": "XS",
       "importance": "high",
       "score": 74,
@@ -3885,7 +3877,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3185",
-      "rank": 210,
+      "rank": 211,
       "size": "XS",
       "importance": "high",
       "score": 70,
@@ -3898,7 +3890,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3179",
-      "rank": 211,
+      "rank": 212,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -3910,7 +3902,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3176",
-      "rank": 212,
+      "rank": 213,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3922,7 +3914,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3130",
-      "rank": 213,
+      "rank": 214,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3934,7 +3926,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3047",
-      "rank": 214,
+      "rank": 215,
       "size": "XS",
       "importance": "high",
       "score": 74,
@@ -3947,7 +3939,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3046",
-      "rank": 215,
+      "rank": 216,
       "size": "XS",
       "importance": "high",
       "score": 74,
@@ -3959,7 +3951,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-1711",
-      "rank": 216,
+      "rank": 217,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3972,7 +3964,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3667",
-      "rank": 217,
+      "rank": 218,
       "size": "M",
       "importance": "high",
       "score": 72,
@@ -3984,7 +3976,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4561",
-      "rank": 218,
+      "rank": 219,
       "size": "L",
       "importance": "medium",
       "score": 52,
@@ -3997,7 +3989,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4242",
-      "rank": 219,
+      "rank": 220,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -4010,7 +4002,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2874",
-      "rank": 220,
+      "rank": 221,
       "size": "M",
       "importance": "high",
       "score": 45,
@@ -4023,7 +4015,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3778",
-      "rank": 221,
+      "rank": 222,
       "size": "S",
       "importance": "medium",
       "score": 46,
@@ -4036,7 +4028,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4575",
-      "rank": 222,
+      "rank": 223,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4044,38 +4036,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "dependsOn": [],
       "why": "Kimi ACP cancel is sent with id:\"\" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed. Unblocked.",
       "rationale": "Source-verified cause: effect-acp serializes every notification with an empty id, so session/cancel never reaches Kimi, the provider keeps generating and spending, and 318 late chunks render after turn_completed. Its prerequisite PAN-4563 (replay fixture and pinned host-replay test) merged in #4576, so the dependency is cleared; the rank stays at 224 because it already sat in the high tier with peers of equal score and nothing else about the issue changed.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4656",
-      "rank": 223,
-      "size": "M",
-      "importance": "medium",
-      "score": 50,
-      "condition": "needs-refinement",
-      "dependsOn": [
-        "PAN-4645",
-        "PAN-4628"
-      ],
-      "why": "pan connect: one command links a fresh server as a lasting machine; follows secure channel and links (#4645). Body pending.",
-      "rationale": "New Anywhere child (W-LINK9), which the build order places after W-SEC2 and W-LINK1, so it depends on PAN-4645. Body is still a placeholder.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4650",
-      "rank": 224,
-      "size": "XL",
-      "importance": "medium",
-      "score": 54,
-      "condition": "needs-refinement",
-      "dependsOn": [
-        "PAN-4645",
-        "PAN-4646"
-      ],
-      "why": "Conversations across machines: shared list, remote control, Pull here; needs #4645 and the #4646 mockup. Body pending.",
-      "rationale": "New Anywhere child covering the W-CONV2 to W-CONV5 conversation items; it is the core user-facing outcome and several revision 5 items (MCP server, work items) follow W-CONV3. Body is still a placeholder.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4088,19 +4048,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "condition": "ok",
       "dependsOn": [],
       "why": "Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4645",
-      "rank": 225,
-      "size": "XL",
-      "importance": "high",
-      "score": 66,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Anywhere build step 1: machine keys, Noise channel, machine tokens, owner column, links. Everything else needs it. Body pending.",
-      "rationale": "New child of the Anywhere epic PAN-2350 covering W-SEC1 to W-SEC5 and W-CONV1, which the revision 5 build order puts first because every other item needs the secure channel, token kind and owner column. The operator has settled that the whole plan ships in the next release, so its children rank in a band just ahead of the epic. Condition is needs-refinement only because the issue body is still a placeholder pointing at .pan/drafts/pan-2350.md.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4118,15 +4065,28 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-4646",
+      "issue": "PAN-4909",
       "rank": 227,
       "size": "S",
-      "importance": "medium",
-      "score": 52,
-      "condition": "needs-refinement",
+      "importance": "high",
+      "score": 68,
+      "condition": "ok",
       "dependsOn": [],
-      "why": "Interactive mockup for machine-aware conversation UI (title bar, chips, offline banner); D-6 needs it approved first. Body pending.",
-      "rationale": "New Anywhere child (W-CONV5 mockup). The plan says it can start on day one and decision D-6 requires an approved mockup before the UI is built, so it ranks right after the foundation. Body is still a placeholder.",
+      "why": "Mac set up with connect: Safari on localhost:3011 gets HTTP 401 from the loopback session mint, so the Mac's own dashboard won't load.",
+      "rationale": "New since the prior run. A connect-set-up Mac refuses its own loopback session mint (HTTP 401), so the local dashboard is unusable without the token bootstrap; it breaks the Anywhere setup path like PAN-4897 and takes the free rank 227 near the other Anywhere setup bugs so no other node moves.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4747",
+      "rank": 228,
+      "size": "S",
+      "importance": "high",
+      "score": 62,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Two pan reloads built into the same generation slot 12s apart; restart lock taken over early, first build died on TS6053.",
+      "rationale": "New issue: the restart lock let a second reload into a generation slot mid-build; no bad build went live, so it sits just below the Fly token bug and near the reload cluster (PAN-3508 at 206).",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4627,17 +4587,15 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-4295",
-      "rank": 268,
-      "size": "M",
+      "issue": "PAN-4926",
+      "rank": 269,
+      "size": "XS",
       "importance": "medium",
-      "score": 42,
+      "score": 64,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-1775"
-      ],
-      "why": "Anywhere W-FLY1: restore Fly auto-reap, heartbeat, credential refresh; start-now item that PAN-4652 (Fly VMs as machines) waits for",
-      "rationale": "Rank 568->268 (swap with PAN-4652): the revision 5 child list makes it a start-now item that PAN-4652 waits for.",
+      "dependsOn": [],
+      "why": "pan down SIGTERMs the smee pidfile PID without verifying it is smee; a reused PID kills an unrelated process. XS guard + test.",
+      "rationale": "New since prior run: a small safety fix with an exact recipe (reuse the isSmeeCommand cmdline guard), placed in the free rank 269 slot.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4666,23 +4624,8 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-4654",
-      "rank": 272,
-      "size": "M",
-      "importance": "medium",
-      "score": 46,
-      "condition": "needs-refinement",
-      "dependsOn": [
-        "PAN-4645"
-      ],
-      "why": "Fleet versions table, protocol gating, Update all for Overdeck and harness CLIs (W-LINK7); needs links. Body pending.",
-      "rationale": "New Anywhere child (W-LINK7), step 6 of the build order, so it follows the link foundation in PAN-4645. Body is still a placeholder.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2237",
-      "rank": 273,
+      "rank": 272,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -4694,7 +4637,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2487",
-      "rank": 274,
+      "rank": 273,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -4705,73 +4648,82 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-4696",
-      "rank": 275,
-      "size": "XS",
+      "issue": "PAN-4811",
+      "rank": 274,
+      "size": "M",
       "importance": "medium",
-      "score": 40,
+      "score": 48,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4295"
-      ],
-      "why": "Post-merge smoke for PAN-4295: one pan start --remote run proves auto-reap, remote-reap source, fresh heartbeat on deployed build.",
-      "rationale": "Rank kept: the body is unchanged and it still waits on PAN-4295 deploying; PAN-4682 and PAN-4683 are workarounds, not blockers.",
+      "dependsOn": [],
+      "why": "Lanes on a new Fly VM plus gauntlet.fly.max_vms cap; PAN-4743 landed the Fly target door, so this is now unblocked.",
+      "rationale": "Moved up from rank 277 into the vacated PAN-4743 slot: its only dependency PAN-4743 closed as completed on 2026-11-02, so startFlyTarget exists and lane provisioning can start.",
       "gate": "auto",
       "planning": "auto"
     },
     {
-      "issue": "PAN-4651",
+      "issue": "PAN-4849",
+      "rank": 275,
+      "size": "XL",
+      "importance": "medium",
+      "score": 52,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Part B of PAN-4820 (now closed): Deft state surfaces, review-cycle view and Run on Deft switch in the dashboard; unblocked",
+      "rationale": "Rank kept: its blocker PAN-4820 closed as completed on 2026-11-03, so the dependency is dropped and the issue is now startable in its existing slot.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4756",
       "rank": 276,
       "size": "L",
       "importance": "medium",
       "score": 50,
-      "condition": "needs-refinement",
-      "dependsOn": [
-        "PAN-4645",
-        "PAN-4650",
-        "PAN-4649"
-      ],
-      "why": "Work across machines: Machine field, Auto placement, delegation, fleet usage; follows conv items and Fly VMs. Body pending.",
-      "rationale": "Rank 277->278 (swap with PAN-4649): revision 5 says it also waits for PAN-4649.",
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Move ~45 bespoke dialogs onto the shared Modal from PAN-4755 (now landed); surface/structure only, unblocked.",
+      "rationale": "Rank held: dependency PAN-4755 (shared Modal primitive) closed as completed, so this follow-up is now unblocked.",
       "gate": "auto",
       "planning": "auto"
     },
     {
-      "issue": "PAN-4682",
+      "issue": "PAN-4852",
       "rank": 277,
-      "size": "XS",
+      "size": "L",
+      "importance": "medium",
+      "score": 54,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "SageOx core: transient per-project binding, Overdeck-built ox, Codex launches, fork rebase; in pipeline, waits on PAN-4820 merge",
+      "rationale": "New in-pipeline issue, pinned in the free rank after the Deft part-B work: it reuses PAN-4820's worktree hide module and merge guard and states work starts after PAN-4820 merges, so it ranks just behind that cluster as decided feature work, not substrate.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4778",
+      "rank": 278,
+      "size": "S",
       "importance": "medium",
       "score": 50,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Fly default image registry.fly.io/pan-workspace:latest does not exist; default to <app>:latest and fix docs/fly-provider.md.",
-      "rationale": "New one-line config/doc fix found in the PAN-4295 Fly smoke test; every unconfigured createVm points at a missing image, so it sits just after PAN-4295.",
+      "why": "Workspace-image CI never published: wrong Fly app, fly not on PATH, no FLY_API_TOKEN (operator). Fly VMs run a June image.",
+      "rationale": "New, found while planning PAN-4682; sits next to it because both fix the Fly image path, and until it ships Fly VMs miss the #4652/#4296 Dockerfile changes. Workflow edits need an SSH push and the secret needs an operator.",
       "gate": "auto",
       "planning": "auto"
     },
     {
-      "issue": "PAN-4649",
-      "rank": 277,
-      "size": "M",
-      "importance": "medium",
-      "score": 44,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Overdeck MCP server: pan mcp serve, /mcp endpoint, Copy MCP URL (W-INT2); follows W-CONV3 in #4650. Body pending.",
-      "rationale": "Rank 278->277 (swap with PAN-4651): revision 5 lists it as a start-now item that PAN-4651 waits for; dropped the inferred PAN-4650 dependency.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4685",
+      "issue": "PAN-4817",
       "rank": 279,
       "size": "S",
       "importance": "medium",
-      "score": 55,
+      "score": 48,
       "condition": "ok",
-      "dependsOn": [],
-      "why": "Fly remote: 60 s Machines exec deadline kills git clone of large repos, so pan start --remote fails; clone detached + poll.",
-      "rationale": "New bug from the PAN-4295 live smoke test that blocks remote workspace creation for any repo slower than 60 s to clone; ranked with the Fly remote cluster right after PAN-4682.",
+      "dependsOn": [
+        "PAN-4778"
+      ],
+      "why": "Fly app's cached image predates pan serve --no-open, so every new Fly VM crashes and rolls back; blocks live Fly verification.",
+      "rationale": "New issue filed 2026-11-02 during PAN-4743's live verification: registry.fly.io/pan-workspaces:latest is the June image, so pan serve rejects --no-open and provisioning rolls the VM back. It is the visible symptom of PAN-4778 (the image CI never publishes), so it takes the free rank 279 directly behind PAN-4778 with no other node moving; a one-off manual image push can clear it sooner, but that needs operator Fly credentials.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4946,15 +4898,17 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-4648",
-      "rank": 292,
+      "issue": "PAN-4853",
+      "rank": 294,
       "size": "M",
-      "importance": "medium",
-      "score": 42,
+      "importance": "low",
+      "score": 40,
       "condition": "ok",
-      "dependsOn": [],
-      "why": "Webhook triggers for conversations: pan triggers, Tailscale Funnel delivery, signature checks; Funnel needs W-TS1. Body pending.",
-      "rationale": "New Anywhere child (W-INT1); its Funnel route follows W-TS1 and its inbox follows W-LINK5, so it ranks last of the new children. Body is still a placeholder.",
+      "dependsOn": [
+        "PAN-4852"
+      ],
+      "why": "SageOx dashboard views (session tab, context trace, project panel); blocked by PAN-4852; session-to-issue mapping is a checkpoint",
+      "rationale": "New issue: dashboard read-only views over SageOx files, explicitly blocked by PAN-4852 part A, so it sits right after part A with lower importance as UI follow-up.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -5104,15 +5058,15 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "interactive"
     },
     {
-      "issue": "PAN-4683",
+      "issue": "PAN-4863",
       "rank": 307,
-      "size": "M",
+      "size": "S",
       "importance": "medium",
-      "score": 48,
+      "score": 45,
       "condition": "ok",
       "dependsOn": [],
-      "why": "pan start --remote misses specs on feature branches and re-plans; planning never pushes branch; post-plan work starts local.",
-      "rationale": "New remote-start bug from the PAN-4295 smoke test with three linked gaps (spec lookup, branch push, start location); ranked with the Fly remote cluster near PAN-4295.",
+      "why": "Manual AC-10 check of Anywhere connect on a real systemd VPS; needs a release shipping `pan connect` and a human-provisioned VPS.",
+      "rationale": "New issue split out of in-pipeline PAN-4774: Fly VMs lack systemd as PID 1, so AC-10 (connect survives logout and reboot) must run on a real VPS against the first release that ships `pan connect`. It is an operator-run verification step, so it takes free rank 307 beside the Anywhere epic and moves no other node.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -5166,16 +5120,17 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-1254",
-      "rank": 310,
-      "size": "L",
-      "importance": "high",
-      "score": 70,
+      "issue": "PAN-4886",
+      "rank": 312,
+      "size": "S",
+      "importance": "medium",
+      "score": 45,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Tailscale integration: advertise dashboard + workspace endpoints over tailnet (Effect-native)",
+      "why": "Live TURN relay check for PAN-4862 on Fly; scripted except one device-code sign-in, so it needs the operator present to approve.",
+      "rationale": "New manual verification issue: the relay fix shipped in 0.73.0 with unit tests only, and two live attempts expired unapproved. It is operator-gated like PAN-4863, so it takes the free rank 312 next to it; the PRD it replays lives on feature/pan-4882, recorded as an advisory informs edge.",
       "gate": "auto",
-      "planning": "interactive"
+      "planning": "auto"
     },
     {
       "issue": "PAN-1435",
@@ -5235,7 +5190,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "condition": "needs-refinement",
       "dependsOn": [],
       "why": "Epic rebaselined 2026-09-28; account service and share-service slice 1 built 2026-10-02. Children carry the order.",
-      "rationale": "Rank and operator gate held. The revision 5 child list (2026-11-01 comment) adds PAN-4628, PAN-4299 and PAN-1254 as children; PAN-4407, PAN-2352, PAN-241 and PAN-43 closed, and the stated waits re-order PAN-4295 ahead of PAN-4652 and PAN-4649 ahead of PAN-4651.",
+      "rationale": "Rank and operator gate held. Children PAN-4645, PAN-4654 and PAN-4650 (conversations across machines) closed as completed on 2026-11-01; remaining children keep their order.",
       "gate": "blocked",
       "planning": "skip",
       "isEpic": true
@@ -5319,32 +5274,18 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-4330",
-      "rank": 322,
-      "size": "M",
+      "issue": "PAN-4927",
+      "rank": 324,
+      "size": "XL",
       "importance": "medium",
-      "score": 62,
+      "score": 58,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Sign-in client: pan account, Settings → Anywhere, device token; entry point for shared sessions and cross-machine continue",
-      "rationale": "Blocker PAN-4293 closed since the prior run, so it is dropped from dependsOn; rank held because the remaining scope and value are unchanged.",
+      "why": "Epic: Overdeck MCP in every managed agent, OAuth /mcp, Hermes/OpenClaw/Grok plugins; W-SELF1 closed, 29 children filed.",
+      "rationale": "The PRD (.pan/drafts/pan-4927.md) is written and child issues were filed per work item, so the epic is ok and keeps rank 324. Roots W-TOK1, W-MCP1 and W-SELF1 have closed; W-SELF1 closing unblocks W-DEL1, W-MEM1 and W-PR1, lifted to the 396-419 band. W-INJ2 (PAN-4934), request_secret (PAN-4941) and the OAuth server (PAN-4945) closed 2026-11-04, unblocking W-LINK1, W-OAUTH2 and W-FUN1.",
       "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4473",
-      "rank": 325,
-      "size": "M",
-      "importance": "medium",
-      "score": 60,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4330"
-      ],
-      "why": "Shared Sessions slice 2: host share action, share record file and lobby panel; first slice on the slice-1 share service",
-      "rationale": "Blocker PAN-658, PAN-4293 closed since the prior run, so it is dropped from dependsOn; rank held because the remaining scope and value are unchanged.",
-      "gate": "auto",
-      "planning": "auto"
+      "planning": "auto",
+      "isEpic": true
     },
     {
       "issue": "PAN-1553",
@@ -5407,16 +5348,15 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "interactive"
     },
     {
-      "issue": "PAN-4474",
+      "issue": "PAN-4950",
       "rank": 331,
-      "size": "L",
+      "size": "M",
       "importance": "medium",
-      "score": 60,
+      "score": 44,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4473"
-      ],
-      "why": "Shared Sessions slice 3: host WebRTC hub, content wire format and conversation bridge (werift spike first)",
+      "dependsOn": [],
+      "why": "pan mcp connector process bridging outside bots to /mcp; gates Hermes, OpenClaw and Grok Build plugins.",
+      "rationale": "Its only dependency PAN-4949 (W-CONN1) closed on 2026-11-04, so this now-unblocked connector bridge moves from the tail into slot 331, which PAN-4949 vacated next to the epic.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -5466,20 +5406,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "condition": "ok",
       "dependsOn": [],
       "why": "write a Definition of Ready (DoR)",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4475",
-      "rank": 336,
-      "size": "M",
-      "importance": "medium",
-      "score": 60,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4474"
-      ],
-      "why": "Shared Sessions slice 4: viewer surface, join intent and localhost-detect; gates slices 5-10",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6201,20 +6127,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-4476",
-      "rank": 396,
-      "size": "M",
-      "importance": "medium",
-      "score": 56,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4475"
-      ],
-      "why": "Shared Sessions slice 5: prompt drafts, contributor direct-submit and host FIFO submit queue",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3829",
       "rank": 397,
       "size": "L",
@@ -6248,20 +6160,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "condition": "ok",
       "dependsOn": [],
       "why": "work agents skip `pan done` (manual push instead)",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4477",
-      "rank": 400,
-      "size": "S",
-      "importance": "medium",
-      "score": 54,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4475"
-      ],
-      "why": "Shared Sessions slice 6: read-only terminal channel over the pty-hub byte stream",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6485,30 +6383,15 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-4479",
-      "rank": 419,
+      "issue": "PAN-4935",
+      "rank": 420,
       "size": "M",
       "importance": "medium",
-      "score": 54,
+      "score": 45,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4475"
-      ],
-      "why": "Shared Sessions slice 8: host reconnect inside the 5-minute window and viewer auto-restore",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4478",
-      "rank": 420,
-      "size": "S",
-      "importance": "medium",
-      "score": 52,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4476"
-      ],
-      "why": "Shared Sessions slice 7: controller handoff and data-owner reclaim, enforced host-side",
+      "dependsOn": [],
+      "why": "Instruction blocks and no-MCP fallback; only W-PR1 (PAN-4943, in review) remains before it can start.",
+      "rationale": "Dependency PAN-4942 (W-LINK1 link_machine) closed as completed, leaving only in-review PAN-4943, so it moves from the tail into the freed slot right after it.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6710,22 +6593,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-4480",
-      "rank": 437,
-      "size": "M",
-      "importance": "medium",
-      "score": 52,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4475",
-        "PAN-4330"
-      ],
-      "why": "Shared Sessions slice 9: pan share/join CLI plus zero-install npx join and invite-page command; needs PAN-4475, PAN-4330",
-      "rationale": "Body changed on 2026-10-02 to add an operator requirement for zero-install `npx @overdeck/core join`, so size grows from S to M; rank holds at 436 because its blockers PAN-4475 and PAN-4330 are still open and no new cross-references appeared.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1445",
       "rank": 438,
       "size": "S",
@@ -6874,38 +6741,15 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-4481",
+      "issue": "PAN-4971",
       "rank": 450,
-      "size": "M",
-      "importance": "medium",
-      "score": 48,
-      "condition": "needs-refinement",
-      "dependsOn": [
-        "PAN-4475"
-      ],
-      "why": "Shared Sessions slice 10: hosted web join page; awaits operator decision OD-1 on sign-in without a local install",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4482",
-      "rank": 451,
       "size": "S",
       "importance": "medium",
-      "score": 50,
+      "score": 48,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4473",
-        "PAN-4474",
-        "PAN-4475",
-        "PAN-4476",
-        "PAN-4477",
-        "PAN-4478",
-        "PAN-4479",
-        "PAN-4480",
-        "PAN-4481"
-      ],
-      "why": "Shared Sessions slice 11: signaling-privacy e2e, forced-TURN check (operator checkpoint) and full AC sweep",
+      "dependsOn": [],
+      "why": "Viewer header shows only host + count; roster of all participants with host/controller marked. Frontend-only, payload exists.",
+      "rationale": "New issue filed by the PAN-4482 acceptance sweep; placed beside PAN-4482 since it closes the PAN-658 FR-6/AC-7 gap that sweep found.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6979,19 +6823,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "condition": "ok",
       "dependsOn": [],
       "why": "The issue-page UAT panel renders only inline actions, so restart/rebuild/stop are unreachable outside the rail's context menu.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4405",
-      "rank": 458,
-      "size": "M",
-      "importance": "medium",
-      "score": 46,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Aggregated cross-environment overview, Needs-You and search; unblocked now that the PAN-4402 desktop switcher has closed",
-      "rationale": "Lifted from 508 into the slot PAN-4402 vacated: PAN-4402 closed as completed on 2026-11-01, so this issue has no open dependency left.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7277,14 +7108,15 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-4403",
+      "issue": "PAN-4779",
       "rank": 482,
-      "size": "M",
+      "size": "S",
       "importance": "medium",
-      "score": 50,
+      "score": 48,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Advertise direct HTTPS/Tailscale endpoints and add them to trusted origins; today such origins get 403",
+      "why": "Docs on main: 2 MDX parse errors hide pages from Mintlify + 15 broken vision.mdx links; mint broken-links can't gate",
+      "rationale": "New issue: small, well-scoped docs fix with mechanical ACs; placed in a free medium-tier slot beside comparable XS/S doc hygiene work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7449,17 +7281,15 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-4404",
+      "issue": "PAN-4918",
       "rank": 496,
-      "size": "L",
+      "size": "M",
       "importance": "medium",
-      "score": 48,
+      "score": 47,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4645"
-      ],
-      "why": "Desktop-managed SSH launch and loopback forward for remote environments; PAN-4402 closed, still waits on PAN-4645",
-      "rationale": "Rank held; PAN-4402 closed as completed, but PAN-4645 is still open and still blocks this issue.",
+      "dependsOn": [],
+      "why": "Six Anywhere UI bugs seen while filming: Codex keeps Claude model, Zen models listed first, chip wrap, Pull-here state, no remote archive.",
+      "rationale": "New issue filed 2026-11-03 with six concrete, evidenced UI defects; ranked beside other Anywhere polish (PAN-4906) since a handoff polish pass already covers part of it.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7784,17 +7614,15 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-3863",
+      "issue": "PAN-4924",
       "rank": 523,
-      "size": "L",
+      "size": "S",
       "importance": "medium",
       "score": 45,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4404"
-      ],
-      "why": "Orca-style SSH Hosts onboarding; builds on the one SSH stack in PAN-4404 (PAN-4402 catalog has closed)",
-      "rationale": "Rank held; PAN-4402 closed as completed, but the PAN-4404 SSH stack this builds on is still open.",
+      "dependsOn": [],
+      "why": "linked-machines.mdx promises switch model for running conversations; dashboard disables it. Fix docs or add the control.",
+      "rationale": "New issue since the prior run: a docs-versus-UI mismatch found while filming the Anywhere video; it takes free rank 523 beside the related composer model-switching work (PAN-2626) so no other node moves.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -8322,20 +8150,19 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-4652",
+      "issue": "PAN-4878",
       "rank": 567,
-      "size": "L",
-      "importance": "medium",
-      "score": 50,
-      "condition": "needs-refinement",
+      "size": "XS",
+      "importance": "low",
+      "score": 30,
+      "condition": "ok",
       "dependsOn": [
-        "PAN-4645",
-        "PAN-4295"
+        "PAN-4852"
       ],
-      "why": "Fly VMs as machines: pan serve on the VM, linked at spawn; W-FLY1 can start day one, W-FLY2 needs links. Body pending.",
-      "rationale": "Rank 268->568 (swap with PAN-4295): the revision 5 child list says it waits for PAN-4295, so it now ranks after it.",
+      "why": "Delete dead ox curl installer in prereqs registry; PAN-4852 builds ox from the pinned fork commit, so ~/.local/bin/ox is never used.",
+      "rationale": "New issue placed in a free low-tier slot: a self-contained XS deletion with exact targets, best done after PAN-4852 lands its Overdeck-built ox.",
       "gate": "auto",
-      "planning": "auto"
+      "planning": "skip"
     },
     {
       "issue": "PAN-1754",
@@ -8416,11 +8243,9 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "importance": "medium",
       "score": 39,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4295"
-      ],
+      "dependsOn": [],
       "why": "harden remote workspaces + `pan workspace move` local↔remote (scale-out / overflow slots)",
-      "rationale": "Rank held; gained dependsOn PAN-4295 from the build order in PAN-2350's 2026-09-28 rebaseline.",
+      "rationale": "Dependency PAN-4295 closed (Fly auto-reap restored); rank unchanged pending its own refinement.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -8583,13 +8408,13 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     {
       "issue": "PAN-1485",
       "rank": 588,
-      "size": "M",
+      "size": "S",
       "importance": "medium",
-      "score": 36,
+      "score": 32,
       "condition": "needs-refinement",
       "dependsOn": [],
-      "why": "Idle auto-archive (warn 7d, archive 10d); the archive-after-idle part is now split into #4655 as undoable idle auto-settle.",
-      "rationale": "Rank unchanged; stays needs-refinement because new PAN-4655 supersedes its archive-after-idle part, so what remains of this issue must be rescoped or closed.",
+      "why": "Remaining scope after #4655 auto-settle: day-10 archive + favorite clearing; close-or-keep is an operator call.",
+      "rationale": "Rank unchanged; a 2026-11-02 comment confirms PAN-4655 delivers idle auto-settle, so only day-10 archive and favorite clearing remain (size M→S, score trimmed), still needs-refinement pending the operator close decision.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -8764,24 +8589,34 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-4296",
+      "issue": "PAN-4960",
       "rank": 603,
-      "size": "L",
+      "size": "M",
       "importance": "medium",
+      "score": 30,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Dashboard Settings → Anywhere Account card with PKCE sign-in; no code deps (the PAN-4959 page it linked to has closed).",
+      "rationale": "PAN-4959 closed since the prior run; the informs edge is dropped and rank holds.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4908",
+      "rank": 604,
+      "size": "S",
+      "importance": "low",
       "score": 34,
-      "condition": "needs-refinement",
-      "dependsOn": [
-        "PAN-1676",
-        "PAN-4652"
-      ],
-      "why": "Anywhere Fly track: Codex/GPT agents on Fly remotes; provider path (own vs host CLIProxy) and credential sync decided at plan time",
-      "rationale": "Rank held; gained dependsOn PAN-1676 from the build order in PAN-2350's 2026-09-28 rebaseline.",
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Other remote-not-enabled messages name no file and the dead verb 'pan remote setup'; reuse PAN-4905's remoteEnabledHint().",
+      "rationale": "Its blocker PAN-4905 closed on 2026-11-03, so the remoteEnabledHint() helper exists; rank holds at 604 and the issue is now unblocked.",
       "gate": "auto",
       "planning": "auto"
     },
     {
       "issue": "PAN-947",
-      "rank": 604,
+      "rank": 605,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -8793,7 +8628,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-938",
-      "rank": 605,
+      "rank": 606,
       "size": "M",
       "importance": "medium",
       "score": 34,
@@ -8805,7 +8640,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-903",
-      "rank": 606,
+      "rank": 607,
       "size": "M",
       "importance": "medium",
       "score": 34,
@@ -8817,7 +8652,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-902",
-      "rank": 607,
+      "rank": 608,
       "size": "XS",
       "importance": "medium",
       "score": 34,
@@ -8829,7 +8664,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-901",
-      "rank": 608,
+      "rank": 609,
       "size": "XS",
       "importance": "medium",
       "score": 34,
@@ -8841,7 +8676,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-818",
-      "rank": 609,
+      "rank": 610,
       "size": "M",
       "importance": "medium",
       "score": 34,
@@ -8853,22 +8688,20 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4308",
-      "rank": 610,
+      "rank": 611,
       "size": "S",
       "importance": "medium",
       "score": 38,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4295"
-      ],
-      "why": "Settle reaped Fly remote transcripts into the Session Vault; blocked by PAN-2609 (engine) and PAN-4295 (restored Fly auto-reap).",
-      "rationale": "New node split from PAN-2609; placed after both blockers (PAN-2609 at 506, PAN-4295 at 566) in a free slot so no other rank moves.",
+      "dependsOn": [],
+      "why": "Settle reaped Fly remote transcripts into the Session Vault; PAN-4295 auto-reap landed, still blocked by PAN-2609 (engine).",
+      "rationale": "Dependency PAN-4295 closed; PAN-2609 remains, so rank unchanged.",
       "gate": "auto",
       "planning": "auto"
     },
     {
       "issue": "PAN-3322",
-      "rank": 611,
+      "rank": 612,
       "size": "XS",
       "importance": "medium",
       "score": 34,
@@ -8880,7 +8713,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-678",
-      "rank": 612,
+      "rank": 613,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -8892,7 +8725,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-675",
-      "rank": 613,
+      "rank": 614,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -8905,7 +8738,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-654",
-      "rank": 614,
+      "rank": 615,
       "size": "L",
       "importance": "medium",
       "score": 33,
@@ -8917,7 +8750,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-649",
-      "rank": 615,
+      "rank": 616,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -8929,7 +8762,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-637",
-      "rank": 616,
+      "rank": 617,
       "size": "XS",
       "importance": "medium",
       "score": 33,
@@ -8941,7 +8774,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-629",
-      "rank": 617,
+      "rank": 618,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -8953,7 +8786,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-613",
-      "rank": 618,
+      "rank": 619,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -8965,7 +8798,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-607",
-      "rank": 619,
+      "rank": 620,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -8977,7 +8810,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-606",
-      "rank": 620,
+      "rank": 621,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -8989,7 +8822,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-548",
-      "rank": 621,
+      "rank": 622,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9001,7 +8834,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-546",
-      "rank": 622,
+      "rank": 623,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9013,7 +8846,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-537",
-      "rank": 623,
+      "rank": 624,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9025,7 +8858,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-531",
-      "rank": 624,
+      "rank": 625,
       "size": "XS",
       "importance": "medium",
       "score": 32,
@@ -9037,7 +8870,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-452",
-      "rank": 625,
+      "rank": 626,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9049,7 +8882,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-450",
-      "rank": 626,
+      "rank": 627,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -9061,7 +8894,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-1126",
-      "rank": 627,
+      "rank": 628,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -9073,7 +8906,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-1066",
-      "rank": 628,
+      "rank": 629,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -9085,7 +8918,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3441",
-      "rank": 629,
+      "rank": 630,
       "size": "L",
       "importance": "low",
       "score": 30,
@@ -9097,7 +8930,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2968",
-      "rank": 630,
+      "rank": 631,
       "size": "M",
       "importance": "low",
       "score": 29,
@@ -9109,7 +8942,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2941",
-      "rank": 631,
+      "rank": 632,
       "size": "M",
       "importance": "low",
       "score": 29,
@@ -9122,7 +8955,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2936",
-      "rank": 632,
+      "rank": 633,
       "size": "M",
       "importance": "low",
       "score": 29,
@@ -9134,7 +8967,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4373",
-      "rank": 633,
+      "rank": 634,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -9146,7 +8979,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2868",
-      "rank": 634,
+      "rank": 635,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9158,7 +8991,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2767",
-      "rank": 635,
+      "rank": 636,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9170,7 +9003,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2679",
-      "rank": 636,
+      "rank": 637,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9182,7 +9015,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2662",
-      "rank": 637,
+      "rank": 638,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9194,7 +9027,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2645",
-      "rank": 638,
+      "rank": 639,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9206,7 +9039,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2635",
-      "rank": 639,
+      "rank": 640,
       "size": "XS",
       "importance": "low",
       "score": 28,
@@ -9218,7 +9051,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2630",
-      "rank": 640,
+      "rank": 641,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9230,7 +9063,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2629",
-      "rank": 641,
+      "rank": 642,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9242,7 +9075,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3443",
-      "rank": 642,
+      "rank": 643,
       "size": "L",
       "importance": "low",
       "score": 28,
@@ -9254,7 +9087,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4350",
-      "rank": 643,
+      "rank": 644,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -9266,7 +9099,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4003",
-      "rank": 644,
+      "rank": 645,
       "size": "L",
       "importance": "medium",
       "score": 30,
@@ -9279,7 +9112,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4368",
-      "rank": 645,
+      "rank": 646,
       "size": "S",
       "importance": "medium",
       "score": 40,
@@ -9291,7 +9124,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2628",
-      "rank": 646,
+      "rank": 647,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9303,7 +9136,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2622",
-      "rank": 647,
+      "rank": 648,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9315,7 +9148,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2600",
-      "rank": 648,
+      "rank": 649,
       "size": "XS",
       "importance": "low",
       "score": 27,
@@ -9327,7 +9160,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2533",
-      "rank": 649,
+      "rank": 650,
       "size": "XS",
       "importance": "low",
       "score": 27,
@@ -9339,7 +9172,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2527",
-      "rank": 650,
+      "rank": 651,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9351,7 +9184,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2514",
-      "rank": 651,
+      "rank": 652,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9363,7 +9196,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2505",
-      "rank": 652,
+      "rank": 653,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9375,7 +9208,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2504",
-      "rank": 653,
+      "rank": 654,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9387,7 +9220,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2449",
-      "rank": 654,
+      "rank": 655,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9398,21 +9231,21 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-2354",
-      "rank": 653,
-      "size": "M",
+      "issue": "PAN-4769",
+      "rank": 656,
+      "size": "XS",
       "importance": "low",
       "score": 26,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Overdeck Anywhere P1c: needs-you push notification bridge (ntfy first, Web Push later)",
-      "rationale": "Rank 661->651 (slot swap within the Anywhere set) to follow PAN-2350's 2026-09-28 recommended order; no other node moved.",
+      "why": "Two-sentence wording fix in features/skill-packs.mdx; PAN-4759 created the page and closed, so this is unblocked.",
+      "rationale": "Rank held: dependency PAN-4759 (the skill-packs page) closed as completed, so this wording fix is now unblocked.",
       "gate": "auto",
       "planning": "skip"
     },
     {
       "issue": "PAN-3940",
-      "rank": 656,
+      "rank": 657,
       "size": "XL",
       "importance": "low",
       "score": 30,
@@ -9426,7 +9259,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2424",
-      "rank": 657,
+      "rank": 658,
       "size": "L",
       "importance": "low",
       "score": 26,
@@ -9440,7 +9273,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2406",
-      "rank": 658,
+      "rank": 659,
       "size": "S",
       "importance": "low",
       "score": 26,
@@ -9453,7 +9286,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2394",
-      "rank": 659,
+      "rank": 660,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9464,23 +9297,22 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-4661",
-      "rank": 660,
-      "size": "S",
-      "importance": "low",
-      "score": 22,
+      "issue": "PAN-4823",
+      "rank": 661,
+      "size": "XL",
+      "importance": "medium",
+      "score": 32,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-2355"
-      ],
-      "why": "Phone PWA third tab: read-only phase-grouped pipeline list at /m/pipeline; waits on the PAN-2355 /m shell",
-      "rationale": "New since the prior run: split out of PAN-2355 to keep that plan within size limits, so it ranks directly after its parent shell.",
+      "dependsOn": [],
+      "why": "Epic: Capacitor phone client for Anywhere without Tailscale; 15 children filed (#4828-4843); OD-1 settled; PAN-4774 done.",
+      "rationale": "PAN-4774 (Anywhere release AC run) closed as completed, so that dependency is removed; rank held because the phone-app epic is feature work that still ranks below substrate items.",
       "gate": "auto",
-      "planning": "auto"
+      "planning": "auto",
+      "isEpic": true
     },
     {
       "issue": "PAN-2353",
-      "rank": 661,
+      "rank": 662,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9493,7 +9325,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4294",
-      "rank": 662,
+      "rank": 663,
       "size": "L",
       "importance": "low",
       "score": 22,
@@ -9506,7 +9338,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-3133",
-      "rank": 663,
+      "rank": 664,
       "size": "S",
       "importance": "low",
       "score": 26,
@@ -9517,21 +9349,21 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "interactive"
     },
     {
-      "issue": "PAN-2355",
-      "rank": 662,
-      "size": "M",
-      "importance": "low",
-      "score": 26,
+      "issue": "PAN-4638",
+      "rank": 666,
+      "size": "L",
+      "importance": "medium",
+      "score": 38,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Overdeck Anywhere P2: mobile PWA (Needs-You feed, conversation view, pipeline board, Web Push)",
-      "rationale": "Triage: verify the PRD is retrievable under .pan/drafts before starting P2. Epic child; rank held.",
+      "why": "Anywhere: run gauntlet lanes on linked machines/Fly VMs; waits on unfiled machine-link plan items; Fly stack + creds open",
+      "rationale": "Rank held: dependency PAN-4652 closed as completed on 2026-11-01; PAN-4651 still gates this issue, so order is unchanged.",
       "gate": "auto",
-      "planning": "skip"
+      "planning": "auto"
     },
     {
       "issue": "PAN-3011",
-      "rank": 665,
+      "rank": 667,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9545,24 +9377,8 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-4638",
-      "rank": 666,
-      "size": "L",
-      "importance": "medium",
-      "score": 38,
-      "condition": "needs-refinement",
-      "dependsOn": [
-        "PAN-4651",
-        "PAN-4652"
-      ],
-      "why": "Anywhere: run gauntlet lanes on linked machines/Fly VMs; waits on unfiled machine-link plan items; Fly stack + creds open",
-      "rationale": "Rank 668->670: resolves a duplicate rank shared with a pinned in-workspace issue; impact assessment unchanged.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2282",
-      "rank": 667,
+      "rank": 668,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9574,7 +9390,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2091",
-      "rank": 668,
+      "rank": 669,
       "size": "XS",
       "importance": "low",
       "score": 25,
@@ -9586,7 +9402,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-2085",
-      "rank": 669,
+      "rank": 670,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9597,15 +9413,17 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-4641",
-      "rank": 669,
-      "size": "M",
-      "importance": "medium",
-      "score": 37,
+      "issue": "PAN-4760",
+      "rank": 671,
+      "size": "S",
+      "importance": "low",
+      "score": 30,
       "condition": "ok",
-      "dependsOn": [],
-      "why": "Server-held 'send when limits reset' composer message; needs a parsed reset time; usage-window data would come from #2065.",
-      "rationale": "New issue: useful for rate-limited operators but depends on reset-time parsing that does not exist yet, so it sits below the self-contained features.",
+      "dependsOn": [
+        "PAN-4638"
+      ],
+      "why": "Live 3-machine gauntlet check moved out of PAN-4638; needs its release, pan reload, a linked laptop rig and Fly setup by the operator.",
+      "rationale": "New follow-up to PAN-4638 holding the live check that could not run before merge. It ranks just after PAN-4638 because it needs that PR released and reloaded plus operator setup of the rig and Fly, so it cannot be picked up autonomously yet.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -9782,24 +9600,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "why": "Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source)",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-2356",
-      "rank": 686,
-      "size": "M",
-      "importance": "low",
-      "score": 26,
-      "condition": "needs-refinement",
-      "dependsOn": [
-        "PAN-4297",
-        "PAN-4645",
-        "PAN-4330",
-        "PAN-4648"
-      ],
-      "why": "Overdeck Anywhere P3: relay service",
-      "rationale": "Blocker PAN-4293 closed since the prior run, so it is dropped from dependsOn; rank held because the remaining scope and value are unchanged.",
-      "gate": "auto",
-      "planning": "skip"
     },
     {
       "issue": "PAN-1907",
@@ -10050,11 +9850,10 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "condition": "needs-refinement",
       "dependsOn": [
         "PAN-4294",
-        "PAN-4295",
         "PAN-1676"
       ],
-      "why": "Anywhere paid tier: run users' agents on hosted Fly capacity; tenant isolation, credentials, metering all open; four deps unbuilt",
-      "rationale": "Blocker PAN-4293 closed since the prior run, so it is dropped from dependsOn; rank held because the remaining scope and value are unchanged.",
+      "why": "Anywhere paid tier: run agents on hosted Fly capacity; tenant isolation, credentials, metering open; PAN-4294 and PAN-1676 unbuilt",
+      "rationale": "Dependency PAN-4295 closed; PAN-4294 and PAN-1676 remain, so rank unchanged.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11512,34 +11311,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-4658",
-      "rank": 827,
-      "size": "S",
-      "importance": "low",
-      "score": 22,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Cite text from the EditorPane markdown preview; needs a decision on how the preview picks its target conversation. #4642 shipped.",
-      "rationale": "Dependency #4642 closed as completed, so its citation store now exists; rank holds because the preview-target design decision is still open.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4659",
-      "rank": 828,
-      "size": "M",
-      "importance": "low",
-      "score": 20,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4644"
-      ],
-      "why": "Import VS Code themes from a .vsix package (ZIP read, caps, include resolution); cosmetic, waits for #4644 to merge.",
-      "rationale": "New issue split from #4644 with clear AC; cosmetic and blocked on #4644, so it sits right after that issue.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3505",
       "rank": 829,
       "size": "XS",
@@ -11549,34 +11320,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "dependsOn": [],
       "why": "Stale: targets the flywheel state write door deleted by the PAN-3917 cut (ca15def); re-triage or close",
       "rationale": "Triage: flywheelRunId and the main-push guard both still exist; verify the allowlist bug against current logic. Rank held.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4644",
-      "rank": 828,
-      "size": "L",
-      "importance": "low",
-      "score": 24,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Import VS Code themes and custom color themes for UI tokens, terminal palette and syntax highlighting; cosmetic, large surface.",
-      "rationale": "New issue: cosmetic appearance work touching many theme surfaces, so it ranks low.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4660",
-      "rank": 831,
-      "size": "M",
-      "importance": "low",
-      "score": 20,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4644"
-      ],
-      "why": "Duplicate-and-edit theme editor with live preview in Settings > Appearance; cosmetic, waits for #4644 to merge.",
-      "rationale": "New issue split from #4644 with clear AC; cosmetic and blocked on #4644, so it sits right after that issue.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12111,6 +11854,173 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "rationale": "Epic PAN-4585 closed 2026-10-24 with this child still open, so the epic dependency was dropped; rank unchanged because the work itself did not change.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4840",
+      "rank": 877,
+      "size": "M",
+      "importance": "medium",
+      "score": 30,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Phone app W-AND1: FCM FirebaseMessagingService decrypts sealed data payloads and posts notifications.",
+      "rationale": "PAN-4830 and PAN-4843 closed; rank unchanged because the remaining dependency PAN-4837 is still in the work phase.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4841",
+      "rank": 878,
+      "size": "M",
+      "importance": "medium",
+      "score": 28,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Phone app W-REL1: Apple/Firebase/Play/Cloudflare setup and first store builds; operator approves purchases.",
+      "rationale": "Rank held: PAN-4839 (Live Activity) closed completed 2026-11-04, removing its informs edge; release setup is still feature work below substrate.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4842",
+      "rank": 880,
+      "size": "S",
+      "importance": "medium",
+      "score": 26,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Phone app W-DOC: phone-app.mdx and updates to Anywhere, push, tailscale and service docs; finished last.",
+      "rationale": "PAN-4774 (Anywhere release AC run) closed as completed, so that dependency is removed; rank held because the phone-app epic is feature work that still ranks below substrate items.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4851",
+      "rank": 881,
+      "size": "S",
+      "importance": "low",
+      "score": 15,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them",
+      "rationale": "Rank kept at the bottom: PAN-4820 closed so the dependency is dropped, but the operator still parks this undecided low-priority question.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4887",
+      "rank": 882,
+      "size": "M",
+      "importance": "medium",
+      "score": 30,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); PAN-4835 merged.",
+      "rationale": "PAN-4835 merged in #4894, which clears its only dependency; rank held because the Anywhere phone epic is low-impact relative to substrate work above it.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4958",
+      "rank": 885,
+      "size": "S",
+      "importance": "low",
+      "score": 30,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Docs for agent MCP and bot plugins; no hard deps but best written once Part A and B surfaces have landed.",
+      "rationale": "New child W-DOC of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4953",
+      "rank": 904,
+      "size": "M",
+      "importance": "medium",
+      "score": 40,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4950"
+      ],
+      "why": "integrations/hermes/: Hermes plugin with its own revocable scoped token.",
+      "rationale": "Rank held: dependency PAN-4952 (shared skill text) closed completed 2026-11-04; still waits on PAN-4950.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4954",
+      "rank": 905,
+      "size": "M",
+      "importance": "medium",
+      "score": 38,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4950"
+      ],
+      "why": "integrations/openclaw/: OpenClaw plugin with its own revocable scoped token.",
+      "rationale": "Rank held: dependency PAN-4952 (shared skill text) closed completed 2026-11-04; still waits on PAN-4950.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4955",
+      "rank": 906,
+      "size": "S",
+      "importance": "medium",
+      "score": 36,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4950"
+      ],
+      "why": "integrations/grok-build/: Grok Build plugin with its own revocable scoped token.",
+      "rationale": "Rank held: dependency PAN-4952 (shared skill text) closed completed 2026-11-04; still waits on PAN-4950.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4956",
+      "rank": 907,
+      "size": "S",
+      "importance": "low",
+      "score": 32,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "integrations/grok-bot/ and xAI API example; needs OAuth UI and public Funnel /mcp, not the connector.",
+      "rationale": "Rank held: dependency PAN-4952 (shared skill text) closed completed 2026-11-04; still waits on PAN-4946 and PAN-4947.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4957",
+      "rank": 909,
+      "size": "S",
+      "importance": "low",
+      "score": 30,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4953",
+        "PAN-4954",
+        "PAN-4955",
+        "PAN-4956"
+      ],
+      "why": "CI for the four integration packages; lands after all integrations exist.",
+      "rationale": "New child W-CI1 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4995",
+      "rank": 3,
+      "size": "S",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan review request verifies a half-adopted workspace; its main merge trips adoption's head check -> false Needs-you on handoff PRs",
+      "rationale": "New substrate-improvement issue, placed in the open rank-3 slot so no other rank moves. Every handoff that opens a PR and then runs pan review request (the order the handoff brief prescribes) can race the PR-opened adoption: verification merges origin/main into the workspace before adoption's final head check, so adoption journals workspace-head-mismatch and the issue shows a false needs pr-outside-pipeline. Nothing is stranded, but each occurrence costs operator attention. The issue names the cause and picks the fix (await an in-flight adoptPrAndStartReview from the request-review path), so it is small and ready to plan.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12472,27 +12382,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "confidence": 1
     },
     {
-      "from": "PAN-2350",
-      "to": "PAN-2354",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
-      "to": "PAN-2355",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
-      "to": "PAN-2356",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-3566",
       "to": "PAN-2706",
       "type": "informs",
@@ -12568,13 +12457,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "type": "informs",
       "source": "github-ref",
       "confidence": 0.8
-    },
-    {
-      "from": "PAN-3862",
-      "to": "PAN-3863",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.7
     },
     {
       "from": "PAN-3830",
@@ -12850,27 +12732,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "confidence": 1
     },
     {
-      "from": "PAN-4294",
-      "to": "PAN-2356",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-2350",
-      "to": "PAN-4295",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
-      "to": "PAN-4296",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-2350",
       "to": "PAN-4297",
       "type": "contains",
@@ -12881,13 +12742,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "from": "PAN-2350",
       "to": "PAN-4298",
       "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4295",
-      "to": "PAN-4298",
-      "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
     },
@@ -12909,20 +12763,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "from": "PAN-4294",
       "to": "PAN-4297",
       "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4296",
-      "to": "PAN-4298",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
-      "to": "PAN-3863",
-      "type": "contains",
       "source": "github-ref",
       "confidence": 1
     },
@@ -12948,34 +12788,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "confidence": 1
     },
     {
-      "from": "PAN-1775",
-      "to": "PAN-4295",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.9
-    },
-    {
-      "from": "PAN-4295",
-      "to": "PAN-1676",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.9
-    },
-    {
-      "from": "PAN-1676",
-      "to": "PAN-4296",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.9
-    },
-    {
-      "from": "PAN-4297",
-      "to": "PAN-2356",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.9
-    },
-    {
       "from": "PAN-2259",
       "to": "PAN-4302",
       "type": "informs",
@@ -12992,41 +12804,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     {
       "from": "PAN-2350",
       "to": "PAN-4308",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4295",
-      "to": "PAN-4308",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
-      "to": "PAN-4330",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
-      "to": "PAN-4403",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
-      "to": "PAN-4404",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
-      "to": "PAN-4405",
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
@@ -13060,148 +12837,8 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "confidence": 1
     },
     {
-      "from": "PAN-4330",
-      "to": "PAN-4473",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4473",
-      "to": "PAN-4474",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4474",
-      "to": "PAN-4475",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4475",
-      "to": "PAN-4476",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4475",
-      "to": "PAN-4477",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4475",
-      "to": "PAN-4479",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4476",
-      "to": "PAN-4478",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4475",
-      "to": "PAN-4480",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4330",
-      "to": "PAN-4480",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4475",
-      "to": "PAN-4481",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4404",
-      "to": "PAN-3863",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4409",
       "to": "PAN-4410",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4473",
-      "to": "PAN-4482",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4474",
-      "to": "PAN-4482",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4475",
-      "to": "PAN-4482",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4476",
-      "to": "PAN-4482",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4477",
-      "to": "PAN-4482",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4478",
-      "to": "PAN-4482",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4479",
-      "to": "PAN-4482",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4480",
-      "to": "PAN-4482",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4481",
-      "to": "PAN-4482",
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
@@ -13361,349 +12998,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "confidence": 1
     },
     {
-      "from": "PAN-4296",
-      "to": "PAN-4638",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
-    },
-    {
-      "from": "PAN-4639",
-      "to": "PAN-1485",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2065",
-      "to": "PAN-4641",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-675",
-      "to": "PAN-4641",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4151",
-      "to": "PAN-4639",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3822",
-      "to": "PAN-4639",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
-      "to": "PAN-4645",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
-      "to": "PAN-4646",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
-      "to": "PAN-4648",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
-      "to": "PAN-4649",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
-      "to": "PAN-4650",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
-      "to": "PAN-4651",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
-      "to": "PAN-4652",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
-      "to": "PAN-4654",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
-      "to": "PAN-4656",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4639",
-      "to": "PAN-4653",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4639",
-      "to": "PAN-4655",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4655",
-      "to": "PAN-1485",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4645",
-      "to": "PAN-4656",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.85
-    },
-    {
-      "from": "PAN-4645",
-      "to": "PAN-4650",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.9
-    },
-    {
-      "from": "PAN-4646",
-      "to": "PAN-4650",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-4645",
-      "to": "PAN-4654",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-4650",
-      "to": "PAN-4651",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-4645",
-      "to": "PAN-4651",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.85
-    },
-    {
-      "from": "PAN-4652",
-      "to": "PAN-4651",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-4645",
-      "to": "PAN-4652",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-4645",
-      "to": "PAN-4648",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.4
-    },
-    {
-      "from": "PAN-2350",
-      "to": "PAN-4628",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
-      "to": "PAN-1254",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4649",
-      "to": "PAN-4651",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4651",
-      "to": "PAN-4638",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4652",
-      "to": "PAN-4638",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4645",
-      "to": "PAN-2356",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4330",
-      "to": "PAN-2356",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4648",
-      "to": "PAN-2356",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4295",
-      "to": "PAN-4652",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4652",
-      "to": "PAN-4296",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4628",
-      "to": "PAN-4656",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4645",
-      "to": "PAN-4404",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4639",
-      "to": "PAN-4657",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4644",
-      "to": "PAN-4659",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4644",
-      "to": "PAN-4660",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2355",
-      "to": "PAN-4661",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4663",
-      "to": "PAN-4645",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-4663",
-      "to": "PAN-4648",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-4663",
-      "to": "PAN-4649",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-4663",
-      "to": "PAN-4295",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-2354",
-      "to": "PAN-2355",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-1254",
-      "to": "PAN-2355",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4666",
       "to": "PAN-4669",
       "type": "informs",
@@ -13725,109 +13019,291 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "confidence": 0.5
     },
     {
-      "from": "PAN-4671",
-      "to": "PAN-4681",
+      "from": "PAN-4702",
+      "to": "PAN-3946",
       "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
+      "source": "ai-inferred",
+      "confidence": 0.5
     },
     {
-      "from": "PAN-4682",
-      "to": "PAN-4295",
+      "from": "PAN-1824",
+      "to": "PAN-4705",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
+    },
+    {
+      "from": "PAN-4710",
+      "to": "PAN-4554",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
     },
     {
-      "from": "PAN-4683",
-      "to": "PAN-4295",
+      "from": "PAN-4705",
+      "to": "PAN-4746",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
     },
     {
-      "from": "PAN-4682",
-      "to": "PAN-4683",
+      "from": "PAN-4747",
+      "to": "PAN-3508",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-3657",
+      "to": "PAN-4753",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-4213",
+      "to": "PAN-4753",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4638",
+      "to": "PAN-4760",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4811",
+      "to": "PAN-4638",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4778",
+      "to": "PAN-4817",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-4817",
+      "to": "PAN-4811",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4823",
+      "to": "PAN-4840",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4823",
+      "to": "PAN-4841",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4823",
+      "to": "PAN-4842",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4840",
+      "to": "PAN-4841",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-4849",
+      "to": "PAN-4851",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-4852",
+      "to": "PAN-4853",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4852",
+      "to": "PAN-4878",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-4823",
+      "to": "PAN-4887",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4887",
+      "to": "PAN-4842",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-2626",
+      "to": "PAN-4924",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-3789",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-255",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-2353",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4958",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4950",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4950",
+      "to": "PAN-4953",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4953",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4950",
+      "to": "PAN-4954",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4954",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4950",
+      "to": "PAN-4955",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4955",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4956",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4935",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4953",
+      "to": "PAN-4957",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4954",
+      "to": "PAN-4957",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4955",
+      "to": "PAN-4957",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4956",
+      "to": "PAN-4957",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4957",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2350",
+      "to": "PAN-4960",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4995",
+      "to": "PAN-4636",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
-    },
-    {
-      "from": "PAN-4685",
-      "to": "PAN-4295",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4685",
-      "to": "PAN-4652",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
-      "from": "PAN-4685",
-      "to": "PAN-4683",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
-    },
-    {
-      "from": "PAN-4295",
-      "to": "PAN-4696",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4682",
-      "to": "PAN-4696",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4683",
-      "to": "PAN-4696",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4697",
-      "to": "PAN-3532",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.9
-    },
-    {
-      "from": "PAN-1254",
-      "to": "PAN-4648",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-1254",
-      "to": "PAN-4649",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2354",
-      "to": "PAN-2080",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4697",
-      "to": "PAN-4681",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
     }
   ]
 }

@@ -1,0 +1,851 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-03T08:06:35Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4888: pan reload: a held reload ships a stale build and blocks newer reloads, so the operator approves twice",
+    "updated": "2026-11-03T08:25:15.537Z"
+  },
+  "plan": {
+    "id": "pan-4888",
+    "title": "pan reload: a held reload ships a stale build and blocks newer reloads, so the operator approves twice",
+    "status": "running",
+    "uid": "7b98a68d-c6d4-4c73-91d6-fbf4e0890a5b",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-03T08:06:35Z",
+    "updated": "2026-11-03T08:25:15.537Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4888",
+        "label": "PAN-4888",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "pan-reload",
+      "restart-gate",
+      "restart-lock",
+      "deploy",
+      "dashboard"
+    ],
+    "narratives": {
+      "Problem": "A pan reload takes the restart lock, builds the origin/main it fetched at start, activates that build, then waits on the restart gate with no time limit while holding the lock. A newer pan reload (built from newer green main) is refused with 'restart in progress' and exit 2, and approving the held reload ships its stale build, so the operator approves twice (2026-11-03, twice). The banner never shows which build an approval ships.",
+      "Proposal": "A pan reload keeps the pan dev path first, then resolves origin/main before the lock and records it (targetSha, supersedable:true) in the lock record, and builds exactly that commit. A newcomer that finds a supersedable pan reload holder compares targets by git ancestry: same or older => exit 0 (covered); strictly newer => it writes its own marker ~/.overdeck/reload-supersede/<pid>.json (refreshed every 2 s) and waits up to 20 minutes for the lock; diverged => exit 2. The holder checks markers inside the gate wait and steps aside only after the server atomically withdraws its gate request (new POST /api/restart-gate/withdraw, refused once an approval covers it). Stepping aside restores the previous build unless the dashboard already runs it, restarts nothing, writes no restart-status entry and exits 0. The banner, CLI wait lines and pan status show the 12-character build SHA. Full detail in .pan/drafts/PAN-4888.md.",
+      "NonGoals": "- No approval timeout on the restart gate; the wait stays unbounded (PAN-3729).\n- No rebuild after approval (refresh-at-approval is not implemented).\n- No HTTP route besides POST /api/restart-gate/withdraw; no change to the existing gate routes, their JSON shapes or RestartGateSnapshot.\n- No 'main has moved past this build' indicator in the banner.\n- pan restart, supervisor restart, supervisor watchdog and pan connect lock holders are never superseded and their behavior does not change.\n- No CI-green check added to pan reload.\n- No change to deploy-progress derivation (src/dashboard/server/services/deploy-progress.ts).\n- The `pan status` restart-gate line does not change (the banner and the CLI wait message carry the build SHA)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Supersede (issue option 1), not refresh-at-approval",
+        "rationale": "Supersede fixes both symptoms: the newer reload is no longer dropped, and the single waiting request is the newest build. Refresh-at-approval leaves newer reloads refused with exit 2 and rebuilds for minutes after the click while the gate request (20 s TTL) and claim (5 min lapse) expire."
+      },
+      {
+        "summary": "Supersede requests are per-newcomer files ~/.overdeck/reload-supersede/<pid>.json, refreshed every poll",
+        "rationale": "The holder may still be building and not polling the gate; per-writer files mean two newcomers never overwrite or delete each other's request (critique finding 3)."
+      },
+      {
+        "summary": "Only supersedable 'pan reload' lock holders step aside",
+        "rationale": "pan restart waits on the gate before taking the lock, so pan reload is the only lock holder that waits for approval; supervisor/connect/restart holders and old-CLI reloads keep today's refusal, which also makes the first deploy of this change safe."
+      },
+      {
+        "summary": "Targets are compared by git ancestry: same or older => exit 0, newer => supersede, diverged => exit 2",
+        "rationale": "Inequality is not an ordering; an older paused invocation must never replace a newer build (critique finding 2), and the Flywheel must not rebuild the same commit every tick."
+      },
+      {
+        "summary": "Resolve origin/main before taking the lock and pin the build to it",
+        "rationale": "The SHA recorded in the lock must be the SHA that gets built, or the identical-SHA comparison is wrong."
+      },
+      {
+        "summary": "A holder steps aside only after an atomic server-side withdraw (new POST /api/restart-gate/withdraw)",
+        "rationale": "An approval can land between two polls; the server serializes withdraw with approve, so an approved request is never discarded (critique finding 1)."
+      },
+      {
+        "summary": "Newcomer waits at most 20 minutes, polling every 2 s",
+        "rationale": "Long enough to cover a holder that is still building and only checks the marker at the gate; bounded so a stuck holder cannot hang the Flywheel forever."
+      },
+      {
+        "summary": "A superseded holder exits 0, writes no restart-status entry and reports composer phase 'superseded'",
+        "rationale": "It is not a failure; a failed restart-status entry would light the Deploy ✗ chip for 15 minutes (deploy-progress.ts line 73)."
+      },
+      {
+        "summary": "Banner and CLI wait lines show the 12-character build SHA; pan status and a 'behind main' indicator are out of scope",
+        "rationale": "12 characters match the existing build line; a behind-main indicator needs a server-side comparison and a snapshot contract change, and supersede already keeps the waiting build current. The pan status line was dropped to keep the plan within the 25-file surface limit; the issue only requires the banner."
+      },
+      {
+        "summary": "A superseded holder keeps its build when the running dashboard already runs it",
+        "rationale": "If pan restart --now or the dashboard's restart button booted the holder's activated build during the wait, rolling back would rename dist/ and delete the worktree under the live server; /api/health buildCommit equals builtSha in that case, so the holder commits like the satisfied branch."
+      },
+      {
+        "summary": "The pan dev branch runs before any target resolution",
+        "rationale": "A dev hot-restart needs no fetch; an unreachable origin must not block it (critique finding 4)."
+      }
+    ],
+    "items": [
+      {
+        "id": "lock-target-record",
+        "title": "Restart lock record carries targetSha and supersedable",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T08:06:35Z",
+        "metadata": {
+          "issueLabel": "pan-4888",
+          "inspectionDepth": "fast",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/restart-lock.ts",
+            "src/lib/__tests__/restart-lock.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/restart-lock.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "restart-lock.test.ts passes including the three new PAN-4888 cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In src/lib/restart-lock.ts add optional `targetSha?: string` and `supersedable?: boolean` to RestartLockHolder; readHolderFromPath copies targetSha only when a non-empty string and supersedable only when === true; acquireRestartLock(caller, extra = {}) writes the set fields; matchesHolder stays pid/ts/caller; refresh() keeps the fields through its spread. Add the three tests named in WI-1 to src/lib/__tests__/restart-lock.test.ts."
+        },
+        "items": [
+          {
+            "id": "lock-target-record.ac1",
+            "title": "Given acquireRestartLock('pan reload', { targetSha: 'abc', supersedable: true }), when readRestartLockHolder() runs, then it returns targetSha 'abc' and supersedable true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lock-target-record.ac2",
+            "title": "Given a held lock with targetSha and supersedable, when handle.refresh() rewrites the heartbeat, then a later read still returns both fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lock-target-record.ac3",
+            "title": "Given a lock file written with targetSha 42 and supersedable 'yes', when it is read, then the returned holder has neither field and is still accepted as a valid holder",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "supersede-protocol",
+        "title": "New reload-supersede module: per-newcomer markers, ancestry check and the newcomer's lock loop",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T08:06:35Z",
+        "metadata": {
+          "issueLabel": "pan-4888",
+          "inspectionDepth": "deep",
+          "difficulty": "complex",
+          "kind": "backend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "reload-newcomer",
+            "reload-holder-yield"
+          ],
+          "files_scope": [
+            "src/lib/deploy/reload-supersede.ts",
+            "tests/unit/lib/deploy/reload-supersede.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/deploy/reload-supersede.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "reload-supersede.test.ts passes with all eight cases under fake timers",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-4"
+          ],
+          "parallelSafeReason": "It creates two new files that no other item touches; it runs alone once lock-target-record lands."
+        },
+        "narrative": {
+          "Action": "PRD WI-2 (revised after critique). Create src/lib/deploy/reload-supersede.ts with the exact exports in WI-2: RELOAD_CALLER, RELOAD_SUPERSEDE_POLL_MS=2000, RELOAD_SUPERSEDE_WAIT_MS=20*60_000, RELOAD_SUPERSEDE_FRESH_MS=30_000, ReloadSupersedeRequest {targetPid, byPid, targetSha, refreshedAt}, reloadSupersedeDir/reloadSupersedeFile(byPid) (~/.overdeck/reload-supersede/<byPid>.json), writeReloadSupersedeRequest, deleteOwnReloadSupersedeRequest (unlinks only its own path), listReloadSupersedeRequests, reloadSupersedeDetail(pid, deps) (fresh + live writer + matching targetPid; never deletes), ReloadLockOutcome {acquired|covered|refused}, AcquireReloadLockDeps (required isAncestor), acquireReloadLock. compareTargets: equal or own-ancestor-of-holder => covered; holder-ancestor-of-own => supersede; otherwise or git error => diverged (refused). Follow the 8-step loop in WI-2 exactly: every return deletes the own marker; the marker is rewritten on every iteration that reaches step 5; the immediate refusal message stays byte-identical to today. Write tests/unit/lib/deploy/reload-supersede.test.ts with the eleven cases in WI-2 under fake timers."
+        },
+        "items": [
+          {
+            "id": "supersede-protocol.ac1",
+            "title": "Given the lock is held by caller 'pan restart' (pid 77), when acquireReloadLock('abc', deps) runs, then it returns refused with message exactly 'restart in progress (held by PID 77 (pan restart))' and no file exists under reload-supersede/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supersede-protocol.ac2",
+            "title": "Given a supersedable 'pan reload' holder whose targetSha is newer and isAncestor(own, holder) is true, when acquireReloadLock runs, then it returns covered and writes no marker file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supersede-protocol.ac3",
+            "title": "Given a supersedable holder whose history diverged (both isAncestor calls false), when acquireReloadLock runs, then it returns refused with a message containing 'have diverged'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supersede-protocol.ac4",
+            "title": "Given acquire fails three times then succeeds against an older supersedable holder, when fake time advances, then reload-supersede/<pid>.json exists with a later refreshedAt after each iteration and is deleted once the lock is acquired",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supersede-protocol.ac5",
+            "title": "Given two waiters 101 and 102 marking the same holder and 102 dead with its file deleted, when reloadSupersedeDetail(holderPid) runs, then it returns 101's detail; given only a stale (older than 30 s) or dead-writer marker it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gate-yield-hook",
+        "title": "waitForRestartApproval steps aside only through an atomic withdraw",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T08:06:35Z",
+        "metadata": {
+          "issueLabel": "pan-4888",
+          "inspectionDepth": "fast",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "reload-holder-yield"
+          ],
+          "files_scope": [
+            "src/lib/restart-gate-client.ts",
+            "tests/unit/lib/restart-gate-client.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/restart-gate-client.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "restart-gate-client.test.ts passes including the four shouldYield cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3 (revised after critique). In src/lib/restart-gate-client.ts add withdrawRestartGateRequest(requesterId, options) => 'withdrawn' | 'kept' | 'absent' | 'unavailable' (POST /api/restart-gate/withdraw, body {requesterId}, payload {withdrawn}). Add shouldYield?: () => Promise<string | null> to RestartGateWaitOptions and the outcome {proceed:false, reason:'superseded', detail}. Track registered (after any ok poll) and inEpoch (ok poll answered approved/claimed). At the top of each iteration with shouldYield && !inEpoch: a non-null detail calls withdraw when registered (else treats it as withdrawn); 'kept' sets inEpoch=true and continues to the poll and claim; anything else logs 'Stepping aside — <detail>.' and returns superseded. Update the module header. Do not change restart.ts. Add the five tests in WI-3, extending the createGate() fake with a withdraw handler."
+        },
+        "items": [
+          {
+            "id": "gate-yield-hook.ac1",
+            "title": "Given shouldYield returns a detail before any poll, when waitForRestartApproval runs, then it returns reason 'superseded' and fetchImpl is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-yield-hook.ac2",
+            "title": "Given a pending poll followed by a non-null shouldYield, when the gate answers withdrawn true, then the wait returns superseded and the withdraw request carried the requester id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-yield-hook.ac3",
+            "title": "Given a pending poll, an approval during the sleep and then a non-null shouldYield, when the gate answers withdrawn false, then the next poll's claim is granted and the outcome reason is 'claimed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-yield-hook.ac4",
+            "title": "Given a poll that answers claimed with mayClaim false, when fake time advances one interval, then shouldYield has been called exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-yield-hook.ac5",
+            "title": "Given the withdraw route answers 404, when shouldYield returns a detail after a pending poll, then the wait returns superseded",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gate-withdraw-route",
+        "title": "Server gate withdraws a request only while it is outside an epoch",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T08:06:35Z",
+        "metadata": {
+          "issueLabel": "pan-4888",
+          "inspectionDepth": "fast",
+          "difficulty": "medium",
+          "kind": "api",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/services/restart-gate.ts",
+            "src/dashboard/server/routes/restart-gate.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/services/__tests__/restart-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/restart-gate.test.ts tests/unit/lib/overdeck",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "restart-gate.test.ts passes including the four withdraw cases",
+            "the no-loss matrix tests pass with the new withdraw row",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. Add the pure withdrawRestartRequest(state, requesterId, nowMs) transition exactly as WI-10 shows (satisfied => withdrawn false status 'satisfied'; in the open epoch => withdrawn false with the derived status; else remove from pending => withdrawn true). Add withdraw(requesterId) to the RestartGate interface and createRestartGate via mutate(). Add postWithdrawRoute on POST /api/restart-gate/withdraw in src/dashboard/server/routes/restart-gate.ts (copy postClaimRoute: 400 on missing requesterId) and export it with the other routes. Add the OUT_OF_SCOPE row for 'POST /api/restart-gate/withdraw' to tests/unit/lib/overdeck/no-loss-matrix.ts after the claim row. Add the four tests in WI-10."
+        },
+        "items": [
+          {
+            "id": "gate-withdraw-route.ac1",
+            "title": "Given a pending request outside any epoch, when withdrawRestartRequest runs, then it answers withdrawn true and the request is gone from toRestartGateSnapshot's pending list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-withdraw-route.ac2",
+            "title": "Given an approved epoch that contains the request, when withdrawRestartRequest runs, then it answers withdrawn false with status 'approved' and the request stays pending",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-withdraw-route.ac3",
+            "title": "Given a satisfied request id, when withdrawRestartRequest runs, then it answers withdrawn false with status 'satisfied'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-withdraw-route.ac4",
+            "title": "Given the no-loss matrix, when its tests run, then the surface 'POST /api/restart-gate/withdraw' has an OUT_OF_SCOPE row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "build-pinned-target",
+        "title": "Resolve the origin/main target once, compare by ancestry, and build exactly it",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T08:06:35Z",
+        "metadata": {
+          "issueLabel": "pan-4888",
+          "inspectionDepth": "fast",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/deploy/build-from-origin.ts",
+            "tests/unit/lib/deploy/build-from-origin.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/deploy/build-from-origin.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "build-from-origin.test.ts passes including the pinned-target and resolveOriginMainSha cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-7",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In src/lib/deploy/build-from-origin.ts export resolveOriginMainSha(repoRoot, runGit = runGitAsync) that runs `git fetch origin main` then `git rev-parse origin/main` and returns the trimmed SHA (throws when empty). Let buildDashboardFromOriginMain's second parameter also accept `targetSha?: string`; when set, skip the fetch and the origin/main rev-parse and use targetSha for the HEAD-differs note, `worktree add --detach <deployRoot> <targetSha>`, builtSha and the success line. Unset keeps today's behavior. Add the two tests named in WI-4 to tests/unit/lib/deploy/build-from-origin.test.ts. Also export isAncestorCommit(repoRoot, ancestor, descendant, runGit = runGitAsync) running `git merge-base --is-ancestor ancestor descendant`: resolve => true, error.code === 1 => false, any other error rethrows. Add its test."
+        },
+        "items": [
+          {
+            "id": "build-pinned-target.ac1",
+            "title": "Given buildDashboardFromOriginMain is called with targetSha 'feedface' (40 chars), when it runs, then the recorded git calls contain no 'fetch' and include 'worktree add --detach <root> <targetSha>', and builtSha equals targetSha",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "build-pinned-target.ac2",
+            "title": "Given git rev-parse origin/main prints a SHA with a trailing newline, when resolveOriginMainSha runs, then it runs fetch first and returns the trimmed SHA",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "build-pinned-target.ac3",
+            "title": "Given no targetSha, when buildDashboardFromOriginMain runs, then it still fetches origin main and adds the worktree at origin/main (existing tests keep passing)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "build-pinned-target.ac4",
+            "title": "Given git merge-base --is-ancestor exits 0, 1, or 128, when isAncestorCommit runs, then it returns true, returns false, or rejects respectively",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reload-newcomer",
+        "title": "pan reload keeps the dev path first, resolves its target, and supersedes a waiting reload",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T08:06:35Z",
+        "metadata": {
+          "issueLabel": "pan-4888",
+          "inspectionDepth": "fast",
+          "difficulty": "complex",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/cli/commands/reload.ts",
+            "src/cli/commands/__tests__/reload.test.ts",
+            "src/cli/commands/__tests__/reload-health-timeout.integration.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/reload.test.ts src/cli/commands/__tests__/reload-health-timeout.integration.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "both reload test files pass",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-12",
+            "NFR-5"
+          ],
+          "acJustification": "Five ACs: dev path, covered, refused, pinned build and fetch failure are distinct observable outcomes of one entry sequence.",
+          "parallelSafeReason": "Its files overlap only reload-holder-yield, which a blocks edge orders after it; no other item touches reload.ts or its tests."
+        },
+        "narrative": {
+          "Action": "PRD WI-5 (revised after critique). In src/cli/commands/reload.ts lift the pan dev branch out of the try so it runs right after the agent warning and before any target resolution: plain acquireRestartLock('pan reload'), today's refusal, today's SIGUSR2 block, release, return; no fetch. Then, when !skipBuild, resolve repoRoot and targetSha (resolveOriginMainSha), failing with '<message> — old dashboard left running', a failed status and exit 1. Call acquireReloadLock(targetSha, { isAncestor: (a, d) => isAncestorCommit(repoRoot, a, d) }): 'covered' prints the already-building-or-waiting line and returns with no status entry and exit 0 (composer phase stays 'completed'; accepted); 'refused' prints the message, records a failed status and exits 2; 'acquired' continues. Remove the duplicate repoRoot resolution in the build block and pass targetSha into buildDashboardFromOriginMain. Update reload.test.ts and reload-health-timeout.integration.test.ts exactly as WI-5 says (mock reload-supersede.js; add resolveOriginMainSha and isAncestorCommit to the build-from-origin mock)."
+        },
+        "items": [
+          {
+            "id": "reload-newcomer.ac1",
+            "title": "Given a pan dev supervisor marker and a git fetch that would reject, when reloadCommand runs, then SIGUSR2 is sent, no git fetch runs and acquireReloadLock is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reload-newcomer.ac2",
+            "title": "Given acquireReloadLock returns covered, when reloadCommand runs, then no install or build is spawned, writeRestartStatus is not called and process.exitCode stays unset",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reload-newcomer.ac3",
+            "title": "Given acquireReloadLock returns refused with 'restart in progress (held by PID 9 (pan restart))', when reloadCommand runs, then it prints that message, records a failed status and exits with code 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reload-newcomer.ac4",
+            "title": "Given a successful reload, when reloadCommand runs, then resolveOriginMainSha runs before acquireReloadLock and the deployment worktree is added at that resolved SHA",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reload-newcomer.ac5",
+            "title": "Given git fetch fails without a dev marker, when reloadCommand runs, then it exits 1 with 'old dashboard left running' and never calls acquireReloadLock or restartDashboard",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reload-holder-yield",
+        "title": "A waiting pan reload steps aside for a newer one, keeping its build only if it already runs",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T08:06:35Z",
+        "metadata": {
+          "issueLabel": "pan-4888",
+          "inspectionDepth": "fast",
+          "difficulty": "complex",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/cli/commands/reload.ts",
+            "src/cli/commands/__tests__/reload.test.ts",
+            "src/cli/commands/__tests__/reload-health-timeout.integration.test.ts",
+            "src/lib/composer-commands/reload.ts",
+            "src/lib/composer-commands/__tests__/reload.test.ts",
+            "src/lib/deploy/running-boot-gates.ts",
+            "tests/unit/lib/deploy/running-build-commit.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/reload.test.ts src/cli/commands/__tests__/reload-health-timeout.integration.test.ts src/lib/composer-commands/__tests__/reload.test.ts tests/unit/lib/deploy/running-build-commit.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "all four test files pass including the step-aside, keep-build and superseded-phase cases",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4"
+          ],
+          "acJustification": "Five ACs: undo path, keep path, no-status/exit path, hook wiring and composer phase are distinct observable behaviors of one step-aside branch.",
+          "parallelSafeReason": "It runs after reload-newcomer (blocks edge on the shared reload.ts files); no other item touches its remaining files."
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Add readRunningBuildCommit(apiPort, deps) to src/lib/deploy/running-boot-gates.ts exactly as WI-6 step 2 shows (fetchHealthBody, 3 s budget, null on throw or missing buildCommit) with tests in tests/unit/lib/deploy/running-build-commit.test.ts. In src/cli/commands/reload.ts pass `{ shouldYield: () => reloadSupersedeDetail() }` as the second argument of waitForRestartApproval. On outcome reason 'superseded': if deployment?.builtSha equals await readRunningBuildCommit(config.dashboardApiPort), keep the build like the satisfied branch (activation.commit(), reportCliRepoint, sweep) and print that another restart already put it live; otherwise writeActiveDashboardBundle(previousBundle), activation?.rollback(), removeDashboardDeployment(repoRoot, deployment.deployRoot) and print that the build was discarded. Both paths write no restart-status entry and return 'superseded'. runReload returns Promise<'superseded' | void>; reloadCommand reports progress 'superseded'. In src/lib/composer-commands/reload.ts add the 'superseded' ReloadPhase with the WI-6 message, activity status 'completed', level 'info', and include it in the log-tail read. Add readRunningBuildCommit to the running-boot-gates.js mocks in reload.test.ts and reload-health-timeout.integration.test.ts. Add the tests named in WI-6."
+        },
+        "items": [
+          {
+            "id": "reload-holder-yield.ac1",
+            "title": "Given waitForRestartApproval resolves { proceed: false, reason: 'superseded' } and readRunningBuildCommit returns a different SHA, when reloadCommand runs, then writeActiveDashboardBundle's last call receives the previous bundle, the primary dist rollback rename runs and the generation worktree is removed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reload-holder-yield.ac2",
+            "title": "Given the superseded outcome and readRunningBuildCommit returning the holder's builtSha, when reloadCommand runs, then the activation is committed, removeDashboardDeployment is not called for that generation and writeActiveDashboardBundle is not called with the previous bundle",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reload-holder-yield.ac3",
+            "title": "Given either superseded path, when reloadCommand finishes, then restartDashboard is never called, writeRestartStatus is not called after the wait, process.exitCode stays unset and progress reports 'superseded'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reload-holder-yield.ac4",
+            "title": "Given a normal reload, when it reaches the gate, then waitForRestartApproval receives a second argument whose shouldYield is a function",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reload-holder-yield.ac5",
+            "title": "Given reportComposerReloadProgress('superseded', id, log), when it emits the activity entry, then status is 'completed' and level is 'info'; and readRunningBuildCommit returns null when the health read throws",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "banner-build-sha",
+        "title": "Restart banner shows the build SHA each approval will ship",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T08:06:35Z",
+        "metadata": {
+          "issueLabel": "pan-4888",
+          "inspectionDepth": "fast",
+          "difficulty": "simple",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/RestartApprovalBanner.tsx",
+            "src/dashboard/frontend/src/components/RestartApprovalBanner.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/RestartApprovalBanner.test.tsx"
+          ],
+          "expected_outputs": [
+            "RestartApprovalBanner.test.tsx passes including the build-SHA cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. In src/dashboard/frontend/src/components/RestartApprovalBanner.tsx replace the reasons join (line 119) with a per-request label `<reason> · build <builtSha.slice(0, 12)>` when builtSha is present, else the reason alone; the tooltip explanation picks it up through `reasons`. Add the two tests named in WI-7 to RestartApprovalBanner.test.tsx."
+        },
+        "items": [
+          {
+            "id": "banner-build-sha.ac1",
+            "title": "Given a pending request with builtSha '530ee175e8c1d2e3f4', when the banner renders, then its text contains 'build 530ee175e8c1'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "banner-build-sha.ac2",
+            "title": "Given a pending request without builtSha, when the banner renders, then its text contains the reason and no 'build ' label",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-build-sha-lines",
+        "title": "The CLI wait message names the build an approval will ship",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T08:06:35Z",
+        "metadata": {
+          "issueLabel": "pan-4888",
+          "inspectionDepth": "fast",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/restart-gate-client.ts",
+            "tests/unit/lib/restart-gate-client.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/restart-gate-client.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "restart-gate-client.test.ts passes including the build-SHA wait-line case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ],
+          "acJustification": "Two ACs: the line with a build SHA and the line without one."
+        },
+        "narrative": {
+          "Action": "PRD WI-8. In src/lib/restart-gate-client.ts restartGateWaitLines appends ' Approving it puts origin/main build <sha12> live.' to the second line when request.builtSha is set. Add the test named in WI-8. Do not change src/cli/commands/status.ts (pan status is out of scope)."
+        },
+        "items": [
+          {
+            "id": "cli-build-sha-lines.ac1",
+            "title": "Given a request with builtSha '530ee175e8c1d2e3', when restartGateWaitLines renders, then the second line contains 'Approving it puts origin/main build 530ee175e8c1 live.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-build-sha-lines.ac2",
+            "title": "Given a request without builtSha, when restartGateWaitLines renders, then no line contains 'Approving it puts origin/main build'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-supersede",
+        "title": "Document reload supersede, exit codes and the banner build label",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T08:06:35Z",
+        "metadata": {
+          "issueLabel": "pan-4888",
+          "inspectionDepth": "fast",
+          "difficulty": "simple",
+          "kind": "docs",
+          "requiresInspection": false,
+          "files_scope": [
+            "sync-sources/skills/pan-reload/SKILL.md",
+            "docs/MERGE-WORKFLOW.md",
+            "sync-sources/skills/pan-flywheel/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Concurrent reloads' sync-sources/skills/pan-reload/SKILL.md",
+            "grep -n 'restart-gate/withdraw' docs/MERGE-WORKFLOW.md",
+            "grep -n 'already waiting' sync-sources/skills/pan-flywheel/SKILL.md",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "each grep prints at least one matching line",
+            "lint completes without errors (skill lint included)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. Add a '## Concurrent reloads' section to sync-sources/skills/pan-reload/SKILL.md after '## Options' covering every rule listed in WI-9 (ancestry: equal or older exits 0, diverged exits 2; replaced reload restarts nothing and exits 0; approved reloads are never replaced because the replaced one leaves the gate through an atomic withdraw; non-reload holders exit 2; pan dev is signaled without fetching; the banner shows build <sha12>). Add a '### A newer reload replaces a waiting one (PAN-4888)' subsection to docs/MERGE-WORKFLOW.md under '## Deploy progress on the project row' after the paragraph ending 'The frontend never polls.', naming src/lib/deploy/reload-supersede.ts, ~/.overdeck/reload-supersede/<pid>.json, POST /api/restart-gate/withdraw and the first-deploy caveat. In sync-sources/skills/pan-flywheel/SKILL.md, after the `pan reload` block of the deploy rule, say pan reload exits 0 when a reload of the same or a newer commit is already waiting and replaces a waiting reload of an older commit, and exit 2 still means a non-reload restart holds the lock or history diverged."
+        },
+        "items": [
+          {
+            "id": "docs-supersede.ac1",
+            "title": "Given the pan-reload skill, when read, then a 'Concurrent reloads' section states that a reload of the same or an older commit exits 0 and that a replaced reload restarts nothing and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-supersede.ac2",
+            "title": "Given the pan-reload skill, when read, then the same section states that a reload held by pan restart, the supervisor, pan connect or an older CLI is refused with exit 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-supersede.ac3",
+            "title": "Given docs/MERGE-WORKFLOW.md, when read, then a PAN-4888 subsection names src/lib/deploy/reload-supersede.ts, ~/.overdeck/reload-supersede/<pid>.json and POST /api/restart-gate/withdraw",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-supersede.ac4",
+            "title": "Given the pan-flywheel skill deploy rule, when read, then it states pan reload exits 0 when a reload of the same or a newer commit is already waiting",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "lock-target-record",
+        "to": "supersede-protocol",
+        "type": "blocks"
+      },
+      {
+        "from": "supersede-protocol",
+        "to": "reload-newcomer",
+        "type": "blocks"
+      },
+      {
+        "from": "build-pinned-target",
+        "to": "reload-newcomer",
+        "type": "blocks"
+      },
+      {
+        "from": "supersede-protocol",
+        "to": "reload-holder-yield",
+        "type": "blocks"
+      },
+      {
+        "from": "gate-yield-hook",
+        "to": "reload-holder-yield",
+        "type": "blocks"
+      },
+      {
+        "from": "reload-newcomer",
+        "to": "reload-holder-yield",
+        "type": "blocks"
+      },
+      {
+        "from": "gate-yield-hook",
+        "to": "cli-build-sha-lines",
+        "type": "blocks"
+      },
+      {
+        "from": "lock-target-record",
+        "to": "reload-newcomer",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-03-PAN-4888-pan-reload-a-held-reload-ships-a-stale-build-and-blocks-newer-reloads-so-the-operator-approves-twice.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

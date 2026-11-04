@@ -1,0 +1,61 @@
+{
+  "version": "1",
+  "issueId": "PAN-4757",
+  "created": "2026-11-02T00:54:16.802Z",
+  "updated": "2026-11-02T01:06:59.822Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "spec-exact-yes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4757",
+      "claimedAt": "2026-11-02T00:54:16.802Z",
+      "doneAt": "2026-11-02T00:59:42.125Z"
+    },
+    "docs-playwright-name-match": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4757",
+      "claimedAt": "2026-11-02T00:59:50.109Z",
+      "doneAt": "2026-11-02T01:01:06.464Z"
+    },
+    "spec-exact-yes.ac1": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4757",
+      "claimedAt": "2026-11-02T01:02:23.531Z",
+      "doneAt": "2026-11-02T01:03:54.326Z"
+    },
+    "spec-exact-yes.ac2": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4757",
+      "claimedAt": "2026-11-02T01:02:26.090Z",
+      "doneAt": "2026-11-02T01:04:23.964Z"
+    },
+    "spec-exact-yes.ac3": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4757",
+      "claimedAt": "2026-11-02T01:02:28.156Z",
+      "doneAt": "2026-11-02T01:05:00.732Z"
+    },
+    "docs-playwright-name-match.ac1": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4757",
+      "claimedAt": "2026-11-02T01:02:30.613Z",
+      "doneAt": "2026-11-02T01:05:42.367Z"
+    },
+    "docs-playwright-name-match.ac2": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4757",
+      "claimedAt": "2026-11-02T01:02:32.414Z",
+      "doneAt": "2026-11-02T01:06:20.964Z"
+    },
+    "docs-playwright-name-match.ac3": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4757",
+      "claimedAt": "2026-11-02T01:02:34.320Z",
+      "doneAt": "2026-11-02T01:06:59.822Z"
+    }
+  }
+}

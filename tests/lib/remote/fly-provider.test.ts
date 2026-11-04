@@ -40,6 +40,12 @@ vi.mock('../../../src/lib/remote/fly-api.js', () => ({
   createFlyApiClient: vi.fn(() => mockApi),
 }));
 
+const { listFlyMachinesMock } = vi.hoisted(() => ({ listFlyMachinesMock: vi.fn().mockResolvedValue([]) }));
+
+vi.mock('../../../src/lib/anywhere/fly/machine-store.js', () => ({
+  listFlyMachines: listFlyMachinesMock,
+}));
+
 // Mock fs so resolveVm can't find workspace metadata
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
@@ -51,7 +57,7 @@ vi.mock('fs', async (importOriginal) => {
   };
 });
 
-import { FlyProvider, createFlyProvider } from '../../../src/lib/remote/fly-provider.js';
+import { FlyProvider, createFlyProvider, defaultFlyImage } from '../../../src/lib/remote/fly-provider.js';
 
 describe('FlyProvider', () => {
   let provider: FlyProvider;
@@ -83,7 +89,7 @@ describe('FlyProvider', () => {
 
       expect(mockApi.ensureApp).toHaveBeenCalledWith('test-app', 'test-org');
       expect(mockApi.createMachine).toHaveBeenCalledWith('test-app', 'ws-123', expect.objectContaining({
-        image: expect.any(String),
+        image: 'registry.fly.io/test-app:latest',
       }));
       expect(result.machineId).toBe('new-machine');
       expect(result.name).toBe('ws-123');
@@ -173,6 +179,41 @@ describe('FlyProvider', () => {
       expect(mockApi.createMachine).toHaveBeenCalledWith('test-app', 'ws-123', expect.objectContaining({
         mounts: [{ volume: 'vol-1', path: '/workspace' }],
       }));
+    });
+
+    it('defaults the image to registry.fly.io/pan-workspaces:latest when app and image are unset', async () => {
+      const defaulted = createFlyProvider({});
+      mockApi.ensureApp.mockResolvedValue(undefined);
+      mockApi.listMachines.mockResolvedValue([]);
+      mockApi.createMachine.mockResolvedValue({ id: 'new-machine', name: 'ws-123', state: 'started', region: 'iad' });
+      mockApi.waitForState.mockResolvedValue(undefined);
+
+      await run(defaulted.createVm('ws-123'));
+
+      expect(mockApi.ensureApp).toHaveBeenCalledWith('pan-workspaces', 'personal');
+      expect(mockApi.createMachine).toHaveBeenCalledWith('pan-workspaces', 'ws-123', expect.objectContaining({
+        image: 'registry.fly.io/pan-workspaces:latest',
+      }));
+    });
+
+    it('uses an explicit image over the app-derived default', async () => {
+      const explicit = createFlyProvider({ app: 'test-app', image: 'registry.fly.io/custom:v1' });
+      mockApi.ensureApp.mockResolvedValue(undefined);
+      mockApi.listMachines.mockResolvedValue([]);
+      mockApi.createMachine.mockResolvedValue({ id: 'new-machine', name: 'ws-123', state: 'started', region: 'iad' });
+      mockApi.waitForState.mockResolvedValue(undefined);
+
+      await run(explicit.createVm('ws-123'));
+
+      expect(mockApi.createMachine).toHaveBeenCalledWith('test-app', 'ws-123', expect.objectContaining({
+        image: 'registry.fly.io/custom:v1',
+      }));
+    });
+  });
+
+  describe('defaultFlyImage', () => {
+    it("returns 'registry.fly.io/my-app:latest' for 'my-app'", () => {
+      expect(defaultFlyImage('my-app')).toBe('registry.fly.io/my-app:latest');
     });
   });
 
@@ -374,8 +415,47 @@ describe('resolveVm — public method', () => {
     expect(result.machineId).toBe('machine-1');
   });
 
+  it('resolves a Fly machine record by name, in its own app, without listing (PAN-4734)', async () => {
+    listFlyMachinesMock.mockResolvedValueOnce([
+      { id: 'rec-1', machineName: 'overdeck-machine-1a2b3c4d', machineId: 'm-42', appName: 'custom-app' },
+    ]);
+    const result = await provider.resolveVm('overdeck-machine-1a2b3c4d');
+    expect(result).toEqual({ appName: 'custom-app', machineId: 'm-42' });
+    expect(mockApi.listMachines).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the API listing when the Fly machine store is unreadable', async () => {
+    listFlyMachinesMock.mockRejectedValueOnce(new Error('unexpected shape'));
+    mockApi.listMachines.mockResolvedValue([{ id: 'machine-1', name: 'test-vm', state: 'started', region: 'iad' }]);
+    expect(await provider.resolveVm('test-vm')).toEqual({ appName: 'test-app', machineId: 'machine-1' });
+  });
+
   it('throws when vm not found', async () => {
     mockApi.listMachines.mockResolvedValue([]);
     await expect(provider.resolveVm('nonexistent')).rejects.toThrow('No Fly machine found');
+  });
+});
+
+describe('configureClaudeCode', () => {
+  it('pre-accepts onboarding, the /workspace trust dialog and the bypass disclaimer', async () => {
+    process.env.FLY_API_TOKEN = 'test-token';
+    const provider = createFlyProvider({ app: 'test-app', org: 'test-org', region: 'iad' });
+    const commands: string[] = [];
+    (provider as unknown as { sshImpl: (vm: string, command: string) => Promise<unknown> }).sshImpl =
+      async (_vm: string, command: string) => {
+        commands.push(command);
+        return { stdout: '', stderr: '', exitCode: 0 };
+      };
+
+    await provider.configureClaudeCode('vm-1');
+
+    const scripts = commands
+      .map((command) => command.match(/^echo '([A-Za-z0-9+/=]+)' \| base64 -d \| python3$/)?.[1])
+      .filter((b64): b64 is string => !!b64)
+      .map((b64) => Buffer.from(b64, 'base64').toString('utf8'));
+    expect(scripts).toHaveLength(1);
+    expect(scripts[0]).toContain('data["hasCompletedOnboarding"] = True');
+    expect(scripts[0]).toContain('ws["hasTrustDialogAccepted"] = True');
+    expect(scripts[0]).toContain('data["bypassPermissionsModeAccepted"] = True');
   });
 });

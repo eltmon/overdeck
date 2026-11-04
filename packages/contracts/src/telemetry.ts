@@ -108,7 +108,7 @@ const TELEMETRY_GITHUB_CALLERS = [
 
 export const TELEMETRY_PROPERTY_DOMAINS = {
   agent_spawn_mode: ["spawn-and-send", "spawn-work-and-send"],
-  answer_type: ["custom", "selection"],
+  answer_type: ["custom", "selection", "note", "selection+note"],
   auto_merge_variant: ["segmented", "badge"],
   boolean: [false, true],
   cli_verb: TELEMETRY_CLI_VERBS,

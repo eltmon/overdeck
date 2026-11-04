@@ -1,0 +1,912 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-01T13:21:23Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4656: pan connect: one command turns a fresh server into a lasting linked machine",
+    "updated": "2026-11-01T13:30:18.355Z"
+  },
+  "plan": {
+    "id": "pan-4656",
+    "title": "pan connect: one command turns a fresh server into a lasting linked machine",
+    "status": "running",
+    "uid": "b7141893-681f-4be9-b106-cf0b5ec7a91c",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-01T13:21:23Z",
+    "updated": "2026-11-01T13:30:18.355Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4656",
+        "label": "PAN-4656",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4656.md",
+        "label": "PRD",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/pan-2350.md",
+        "label": "Parent PRD (W-LINK9, FR-25)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "anywhere",
+      "cli",
+      "systemd",
+      "launchd",
+      "machine-links"
+    ],
+    "narratives": {
+      "Problem": "FR-25 of the Overdeck Anywhere PRD asks for one command that turns a fresh server reached over SSH into a lasting linked machine. Today the supervisor unit has no [Install] section (deliberately, PAN-2253), nothing enables lingering, there is no launchd code, `npx @overdeck/core` runs the dashboard in the foreground from the prunable npx cache, and `pan pair` on a VPS prints a localhost link the other machine refuses.",
+      "Proposal": "Add `pan connect` (registered lazily from pair.ts so index.ts does not grow). Under npx it installs the exact version into ${OVERDECK_HOME}/runtime and re-execs from there. It makes sure the primary dashboard is running (restartDashboard + spawnDashboardDetached under the restart lock), then installs the service: on Linux the existing supervisor unit, now rendered with [Install] WantedBy=default.target, is enabled and started, the operator PATH is persisted for the user manager, and lingering is turned on (or the exact sudo line is printed and awaited); on macOS a launch agent ai.overdeck.supervisor runs the supervisor; with no service manager it falls back to a plain process and says it stops at logout. After a reboot the enabled supervisor's watchdog restarts the dashboard after its 5-minute boot grace. It prints one pairing link whose base the other machine can reach (--url, tailnet, SSH_CONNECTION server address, interface, loopback) as a ready `pan machines link` line.",
+      "NonGoals": "- Directory registration or 'waiting for approval' in the directory (FR-25.2 second half) — #2356 (W-LINK5).\n- Installing harness CLIs, Herdr, tmux or Traefik on the connected machine.\n- A dedicated dashboard unit, a Restart=always dashboard, or any change to the watchdog boot grace.\n- `pan up` enabling the supervisor unit (only pan connect enables).\n- An uninstall verb, a --dry-run flag, or `pan connect status`.\n- Making pan down, pan restart or pan reload launchd-aware beyond the pan up skip.\n- npm install --global, or any sudo during the runtime install.\n- Fleet updates (#4654), SSH-run machines (#4404), Tailscale setup changes (#1254).\n- Setting the machine label.\n- Looking up a public address through an outside service (cloud NAT users pass --url).\n- Growing src/cli/index.ts."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Reuse the supervisor unit (enabled) rather than a dedicated dashboard unit",
+        "rationale": "The parent PRD names installSupervisorUnit(); a second Restart=always dashboard unit would fight pan restart, pan reload and the watchdog over the port. The watchdog restart path needs no tmux or Herdr and is exempt from the approval gate."
+      },
+      {
+        "summary": "Render [Install] WantedBy=default.target in the default supervisor unit; only pan connect enables it",
+        "rationale": "pan up re-renders the unit idempotently, so the text must stay stable; a unit that is never enabled keeps PAN-2253's no-boot-start guarantee on every other machine."
+      },
+      {
+        "summary": "Accept the watchdog's 5-minute boot grace; online within 15 minutes of reboot",
+        "rationale": "Shortening it only for connected machines needs unit text that pan up would erase; the bound is stated in NFR-5 and the release check."
+      },
+      {
+        "summary": "Durable runtime via npm install --prefix ${OVERDECK_HOME}/runtime and a re-exec",
+        "rationale": "No sudo on system Node; re-exec makes every baked path agree so the watchdog does not evict the dashboard as foreign."
+      },
+      {
+        "summary": "Directory approval deferred to #2356",
+        "rationale": "The directory does not exist yet; the issue body says showing the machine as waiting for approval needs #2356."
+      },
+      {
+        "summary": "Lingering failure is not an error; wait only on a TTY",
+        "rationale": "FR-25.3 says to state plainly that the server stops at logout, not to fail; non-interactive runs must not hang."
+      },
+      {
+        "summary": "Persist PATH through ~/.config/environment.d plus set-environment, not in the unit",
+        "rationale": "The user manager's default PATH lacks ~/.local/bin and nvm; baking PATH into the supervisor unit would let pan up from an agent shell bake a git-guard shim PATH."
+      },
+      {
+        "summary": "No uninstall verb or dry-run; removal documented",
+        "rationale": "FR-25 asks for one command; systemctl/launchctl removal commands are documented in cli/machines.mdx."
+      }
+    ],
+    "items": [
+      {
+        "id": "supervisor-unit-install-section",
+        "title": "Supervisor unit render emits [Install] WantedBy=default.target; systemd.ts reports why the user manager is unavailable",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:21:23Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4656",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/systemd.ts",
+            "src/lib/__tests__/systemd.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/systemd.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "src/lib/__tests__/systemd.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1 (.pan/drafts/PAN-4656.md). In src/lib/systemd.ts renderSupervisorUnit (line 72), append '[Install]', 'WantedBy=default.target', '' after the RestartSec line, with the two-line comment from the PRD (pan connect enables it; pan up never does, PAN-2253). Update the inline snapshot in src/lib/__tests__/systemd.test.ts and replace the two not.toContain('[Install]') / not.toContain('WantedBy=') assertions with toContain('[Install]\\nWantedBy=default.target\\n'). Add a test that the pan up path (installSupervisorUnit + startSupervisorUnitIfAvailable) never issues a `systemctl --user enable` command. Also export `explainSystemdUserUnavailable(): Promise<'not-linux'|'ci'|'container'|'no-runtime-dir'|'systemctl-unusable'|'manager-not-running'|null>` built from the same private checks (runningInContainer, userDbusSessionExists, userManagerState) in the same order, and make systemdUserAvailable() return `(await explainSystemdUserUnavailable()) === null`. Do not add any enable call anywhere in this item."
+        },
+        "items": [
+          {
+            "id": "supervisor-unit-install-section.ac1",
+            "title": "Given default options, when renderSupervisorUnit() renders, then the returned text ends with '[Install]\\nWantedBy=default.target\\n' and the inline snapshot in systemd.test.ts shows it.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-unit-install-section.ac2",
+            "title": "Given systemd is available, when startSupervisorUnitIfAvailable() runs (the pan up path), then no execAsync call contains 'enable' — the test asserts this on the mocked exec calls.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-unit-install-section.ac3",
+            "title": "Given an existing unit file identical to the new render, when installSupervisorUnit() runs, then it returns written: false and issues no daemon-reload (existing idempotence preserved).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-unit-install-section.ac4",
+            "title": "Given /.dockerenv exists, when explainSystemdUserUnavailable() runs on linux, then it returns 'container' and systemdUserAvailable() returns false; given XDG_RUNTIME_DIR is unset outside a container, then it returns 'no-runtime-dir'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "systemd-user-session",
+        "title": "Add src/lib/systemd-user-session.ts: lingering check, enable, wait, and user-manager PATH",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:21:23Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4656",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/systemd-user-session.ts",
+            "src/lib/__tests__/systemd-user-session.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/systemd-user-session.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "systemd-user-session.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. New module with injectable deps { execFile, fileExists, writeFile, mkdir, homedir } and async execFile only. Exports LINGER_DIR='/var/lib/systemd/linger', ENVIRONMENT_D_FILE='60-overdeck.conf', lingerSudoCommand(user) => `sudo loginctl enable-linger ${user}`, isLingerEnabled(user) (loginctl show-user <user> --property=Linger --value === 'yes'; on loginctl error, existence of /var/lib/systemd/linger/<user>), tryEnableLinger(user) (execFile loginctl ['enable-linger','--no-ask-password',user], 10 s timeout, never throws, returns isLingerEnabled), waitForLinger(user, skip) (poll every 2000 ms until enabled => 'on', or skip resolves => 'off'), persistUserManagerPath(path) (write ~/.config/environment.d/60-overdeck.conf = `PATH=<path>\\n` only when different, then execFile systemctl ['--user','set-environment',`PATH=${path}`]); it first drops every ':'-separated PATH segment ending in '/git-guard' (agent shim dirs, src/lib/launcher-git-guard.ts:372). User names must match /^[a-z_][a-z0-9_.-]*\\$?$/i or isLingerEnabled/tryEnableLinger/waitForLinger reject (and lingerSudoCommand throws) `Invalid user name: <user>`. Tests use vi.useFakeTimers() + vi.advanceTimersByTimeAsync()."
+        },
+        "items": [
+          {
+            "id": "systemd-user-session.ac1",
+            "title": "Given loginctl fails to enable lingering, when tryEnableLinger('alice') runs, then the execFile argv is exactly ['enable-linger','--no-ask-password','alice'] and it resolves false without throwing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "systemd-user-session.ac2",
+            "title": "Given lingering turns on at the third poll, when waitForLinger runs under fake timers and time advances 4000 ms, then it resolves 'on'; given skip resolves first, then it resolves 'off'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "systemd-user-session.ac3",
+            "title": "Given ~/.config/environment.d/60-overdeck.conf already holds the same PATH, when persistUserManagerPath runs, then it returns written: false yet still runs systemctl --user set-environment PATH=<path>.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "systemd-user-session.ac4",
+            "title": "Given the user name 'a;rm', when isLingerEnabled, tryEnableLinger or waitForLinger runs, then it rejects with 'Invalid user name: a;rm' and runs no command; given a PATH containing '/home/a/.overdeck/agents/x/git-guard', when persistUserManagerPath runs, then the written file omits that segment.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "launchd-agent",
+        "title": "Add src/lib/launchd.ts: render, detect and load the ai.overdeck.supervisor launch agent",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:21:23Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4656",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/launchd.ts",
+            "src/lib/__tests__/launchd.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/launchd.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "launchd.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3 and D-10. Exports SUPERVISOR_AGENT_LABEL='ai.overdeck.supervisor', supervisorAgentPath(home) (~/Library/LaunchAgents/ai.overdeck.supervisor.plist), pure renderSupervisorPlist({nodePath, supervisorBundle, workingDirectory, overdeckHome, supervisorPort, path, logPath}) with keys in order Label, ProgramArguments [nodePath, supervisorBundle], WorkingDirectory, EnvironmentVariables {OVERDECK_HOME, OVERDECK_SUPERVISOR_PORT, PATH}, RunAtLoad true, KeepAlive true, ThrottleInterval 5, StandardOutPath/StandardErrorPath = logPath, all strings XML-escaped. isSupervisorAgentLoaded() = `launchctl print <domain>/ai.overdeck.supervisor` exit 0 for gui/<uid> then user/<uid>. installSupervisorAgent(opts) writes the plist when it differs, then: unchanged+loaded => no launchctl write; changed+loaded => bootout <domain>/<label> then bootstrap; not loaded => bootstrap gui/<uid> <plist>, on failure bootstrap user/<uid> <plist>. Async execFile with injectable deps (execFile, readFile, writeFile, mkdir, uid, homedir)."
+        },
+        "items": [
+          {
+            "id": "launchd-agent.ac1",
+            "title": "Given fixed options, when renderSupervisorPlist renders, then the output matches an inline snapshot containing <key>RunAtLoad</key><true/> and <key>KeepAlive</key><true/>.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launchd-agent.ac2",
+            "title": "Given a bundle path containing '&' and '<', when the plist renders, then the output contains '&amp;' and '&lt;' and no raw '<' inside a <string>.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launchd-agent.ac3",
+            "title": "Given no agent is loaded and bootstrap gui/501 fails, when installSupervisorAgent runs with uid 501, then launchctl is called with ['bootstrap','gui/501',<path>] and then ['bootstrap','user/501',<path>].",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launchd-agent.ac4",
+            "title": "Given the agent is loaded and the plist text changed, when installSupervisorAgent runs, then a bootout call precedes the bootstrap call; given it is loaded and unchanged, then no bootstrap call is made.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "up-sidecars-launchd",
+        "title": "pan up skips starting a second supervisor when the launch agent is loaded on macOS",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:21:23Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4656",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/up-sidecars.ts",
+            "tests/unit/cli/up-sidecars.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/up-sidecars.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "up-sidecars.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In src/cli/up-sidecars.ts supervisor block (search `startSupervisorUnitIfAvailable({ onWarning })`), add an `else if (process.platform === 'darwin' && (await isSupervisorAgentLoaded()).loaded)` branch that prints `✓ Supervisor managed by launchd agent ai.overdeck.supervisor` and does not call startSupervisorProcess(). Import launchd.js lazily inside the try like the other imports. Add tests with mocked lib/supervisor.js, lib/systemd.js and lib/launchd.js."
+        },
+        "items": [
+          {
+            "id": "up-sidecars-launchd.ac1",
+            "title": "Given platform darwin, no systemd unit, and the agent loaded, when the post-launch sidecar step runs, then startSupervisorProcess is not called and the output contains 'Supervisor managed by launchd agent ai.overdeck.supervisor'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "up-sidecars-launchd.ac2",
+            "title": "Given platform darwin and no agent loaded, when the sidecar step runs, then startSupervisorProcess is called once.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "connect-runtime",
+        "title": "Add src/lib/anywhere/connect-runtime.ts: detect the npx cache and install a durable runtime",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:21:23Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4656",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/anywhere/connect-runtime.ts",
+            "src/lib/anywhere/__tests__/connect-runtime.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/anywhere/__tests__/connect-runtime.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "connect-runtime.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5, D-4, D-5. Exports CONNECT_REEXEC_ENV='OVERDECK_CONNECT_REEXEC', isNpxCacheRoot(root) (true when a path segment equals '_npx'), runtimePackageRoot(home) = <home>/runtime/node_modules/@overdeck/core, readRuntimeVersion(home) (version from that package.json or null), ensureDurableRuntime(home, version) — no-op when versions match, else async execFile npm ['install','--prefix',`${home}/runtime`,'--no-audit','--no-fund','--omit=dev',`@overdeck/core@${version}`] with 600000 ms timeout, then verify dist/cli/index.js and dist/supervisor/server.js exist under the root. On failure throw Error(`Could not install @overdeck/core@<v> into <home>/runtime: <last 20 lines of npm stderr>. Run that npm command yourself, then run pan connect again.`). Never npm install --global."
+        },
+        "items": [
+          {
+            "id": "connect-runtime.ac1",
+            "title": "Given '/home/a/.npm/_npx/3f2a/node_modules/@overdeck/core', when isNpxCacheRoot runs, then it returns true; given '/usr/lib/node_modules/@overdeck/core' or a git checkout path, then it returns false.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connect-runtime.ac2",
+            "title": "Given the runtime already holds the requested version, when ensureDurableRuntime runs, then it makes no npm call and returns installed: false.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connect-runtime.ac3",
+            "title": "Given no runtime, when ensureDurableRuntime(home,'0.73.0') runs, then npm is called with exactly ['install','--prefix','<home>/runtime','--no-audit','--no-fund','--omit=dev','@overdeck/core@0.73.0'] and it returns installed: true.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connect-runtime.ac4",
+            "title": "Given npm exits non-zero, when ensureDurableRuntime runs, then it rejects with a message starting 'Could not install @overdeck/core@0.73.0 into' that includes the npm stderr tail.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "connect-address",
+        "title": "Add src/lib/anywhere/connect-address.ts: pick the pairing base the other machine can reach",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:21:23Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4656",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/anywhere/connect-address.ts",
+            "src/lib/anywhere/__tests__/connect-address.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/anywhere/__tests__/connect-address.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "connect-address.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6 and D-6. Pure pickPairingBase({url, port, sshConnection, interfaces}) returning {base, host, kind: 'tailnet'|'public'|'lan'|'loopback', source: 'flag'|'tailnet'|'ssh'|'interface'|'loopback'}. Order: --url (http/https only, trailing slash stripped; other schemes throw '--url must be an http:// or https:// address'); first tailnet IPv4 (isTailnetIPv4); SSH_CONNECTION third field when not loopback (IPv6 bracketed); first non-internal non-tailnet IPv4 on an interface not in IGNORED_INTERFACE_PREFIXES, public before RFC 1918; else http://localhost:<port>. Kind via classifyHost from src/lib/anywhere/routes.ts, 'loopback' for the last rule. Reuse endpoints.ts helpers."
+        },
+        "items": [
+          {
+            "id": "connect-address.ac1",
+            "title": "Given --url 'http://vps.example.com:3011/', when pickPairingBase runs, then base is 'http://vps.example.com:3011' and source is 'flag'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connect-address.ac2",
+            "title": "Given a 100.101.1.2 interface and SSH_CONNECTION '198.51.100.4 51000 203.0.113.7 22', when pickPairingBase runs, then base is 'http://100.101.1.2:3011' with kind 'tailnet'; without the tailnet interface it returns 'http://203.0.113.7:3011' with kind 'public' and source 'ssh'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connect-address.ac3",
+            "title": "Given SSH_CONNECTION with server address '2001:db8::5', when pickPairingBase runs, then base is 'http://[2001:db8::5]:3011'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connect-address.ac4",
+            "title": "Given only a docker0 172.17.0.1 interface and no SSH_CONNECTION, when pickPairingBase runs, then base is 'http://localhost:3011' with kind 'loopback'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pair-link-helper",
+        "title": "Extract requestPairingLink from runPair in pair.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:21:23Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-4656",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/pair.ts",
+            "tests/unit/cli/pair.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/pair.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "pair.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Export `requestPairingLink({ label?, base? }): Promise<PairingLinkResult>` where PairingLinkResult = { ok: true, url, credential, expiresAt, base } | { ok: false, message }. It posts /api/pairing/credentials via callDashboard, maps unreachable => NOT_RUNNING, 401 => TOKEN_REJECTED, other non-ok => `pan pair failed: <errorText>`; base defaults to getDashboardApiUrl(); url = pairingUrl(base, credential). runPair calls it and keeps every output string byte-identical. Existing pair tests must pass unchanged."
+        },
+        "items": [
+          {
+            "id": "pair-link-helper.ac1",
+            "title": "Given the success, loopback-warning and 401 fixtures, when runPair runs after the extraction, then it prints the same 'Open this URL on the device to pair:' block, the same loopback warning and the same TOKEN_REJECTED message as before, byte for byte.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pair-link-helper.ac2",
+            "title": "Given a dashboard returning credential 'odp_x', when requestPairingLink({ base: 'http://203.0.113.7:3011' }) runs, then it resolves ok with url 'http://203.0.113.7:3011/#pair=odp_x'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pair-link-helper.ac3",
+            "title": "Given the dashboard answers 401, when requestPairingLink runs, then it resolves { ok: false } with the TOKEN_REJECTED message.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "connect-core",
+        "title": "pan connect core: command, npx re-exec, primary dashboard, process fallback, one link",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:21:23Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4656",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/connect.ts",
+            "src/cli/commands/pair.ts",
+            "src/cli/commands/__tests__/connect.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/connect.test.ts tests/unit/cli/startup-lazy-load.test.ts",
+            "npm run typecheck",
+            "git diff --quiet origin/main -- src/cli/index.ts"
+          ],
+          "expected_outputs": [
+            "connect.test.ts and startup-lazy-load.test.ts pass",
+            "typecheck completes without errors",
+            "git diff exits 0 (index.ts unchanged)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "FR-10",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "connect-systemd",
+            "connect-launchd",
+            "connect-docs"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8, D-5, D-6, D-7, D-11. New src/cli/commands/connect.ts exporting connectCommand(options) and runConnect(options, deps) with every side effect injected. Define `pan connect` with --url <base>, --label <name>, --json inside registerPairCommands in pair.ts using lazyAction(() => import('./connect.js'), 'connectCommand'); never import connect.ts statically. Steps exactly as PRD WI-8 1-7: win32 refusal; npx re-exec through ensureDurableRuntime with OVERDECK_CONNECT_REEXEC=1 and async spawn of `process.execPath <root>/dist/cli/index.js connect ...process.argv.slice(3)`, passing the child's exit code; dashboard kept when waitForDashboardHealth(port,{timeoutMs:2000, expectedIdentity: resolvePrimaryDashboardIdentity()}) passes, else under acquireRestartLock('pan connect') run restartDashboard(readPlatformConfig(), () => spawnDashboardDetached(config,{resume:true}), {healthTimeoutMs:120000, expectedIdentity}); service dispatch with only the process fallback in this item (startSupervisorProcess + the FR-7 sentence; the reason text maps explainSystemdUserUnavailable()/supervisorUnitAllowed() exactly as PRD WI-8 step 4); update pair.ts's header comment to mention lazyAction; pickPairingBase + requestPairingLink; text output with the exact lines from the PRD; --json prints one object with the PRD's fields. Define the ServiceOutcome type and the dispatch seam that connect-systemd and connect-launchd plug into."
+        },
+        "items": [
+          {
+            "id": "connect-core.ac1",
+            "title": "Given platform win32, when runConnect runs, then it prints 'pan connect supports Linux and macOS; on Windows, run it inside WSL.' and exits 1.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connect-core.ac2",
+            "title": "Given packageRoot under ~/.npm/_npx and no OVERDECK_CONNECT_REEXEC, when runConnect runs, then it spawns process.execPath with '<runtime>/dist/cli/index.js connect --url …' and env OVERDECK_CONNECT_REEXEC=1, and exits with the child's code; with OVERDECK_CONNECT_REEXEC=1 it never spawns.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connect-core.ac3",
+            "title": "Given a healthy dashboard with the primary identity, when runConnect runs twice, then restartDashboard is never called and each run prints a fresh 'pan machines link' line (FR-9); given a foreign dashboard, then output starts with 'Replaced the dashboard that was running from <repoRoot>.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connect-core.ac4",
+            "title": "Given systemd is unavailable because of a container, when runConnect runs, then startSupervisorProcess is called and the output contains 'it stops when you log out and does not start after a reboot' with reason 'container'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connect-core.ac5",
+            "title": "Given --json, when runConnect succeeds, then stdout holds exactly one JSON object whose service.manager is 'process' and whose url starts with the chosen base.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "connect-systemd",
+        "title": "pan connect on Linux: install, enable and start the supervisor unit, persist PATH, turn on lingering",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:21:23Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4656",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/connect-systemd.ts",
+            "src/cli/commands/connect.ts",
+            "src/cli/commands/__tests__/connect.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/connect.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "connect.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. New connect-systemd.ts exporting installLinuxService(ctx): ServiceOutcome. connect.ts dispatch calls it on linux when systemdUserAvailable() && supervisorUnitAllowed(); otherwise the WI-8 fallback with the matching reason (XDG_RUNTIME_DIR unset, non-default OVERDECK_HOME without OVERDECK_SUPERVISOR_UNIT=1, systemctl unusable). Order: installSupervisorUnit(); enableUserUnit(SUPERVISOR_UNIT_NAME); persistUserManagerPath(env.PATH); startSupervisorUnit() (PATH before start, D-8); isLingerEnabled -> tryEnableLinger -> print the sudo line and, only when stdin is a TTY and --json is off, 'Waiting for lingering to turn on… (press Enter to continue without it)' and waitForLinger(user, enterPressed). enterPressed is built here in the CLI layer (process.stdin.once('data') or readline); in a finally remove the listener and call process.stdin.pause() so the command exits. Service and linger lines exactly as in the PRD. Linger off is exit 0."
+        },
+        "items": [
+          {
+            "id": "connect-systemd.ac1",
+            "title": "Given systemd is usable, when runConnect runs on linux, then the recorded calls occur in the order installSupervisorUnit, enableUserUnit('overdeck-supervisor.service'), persistUserManagerPath, startSupervisorUnit, isLingerEnabled.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connect-systemd.ac2",
+            "title": "Given lingering is already on, when runConnect runs, then tryEnableLinger is not called and output contains 'Lingering is on for alice, so the server keeps running after you log out and starts at boot.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connect-systemd.ac3",
+            "title": "Given enable-linger fails and stdin is not a TTY, when runConnect runs, then output contains 'sudo loginctl enable-linger alice' and the stops-at-logout sentence, no wait happens, and the exit code is 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connect-systemd.ac4",
+            "title": "Given a TTY and lingering that turns on at the second poll, when fake timers advance 4000 ms, then the output reports lingering on; given Enter is pressed first, then it reports lingering off, and in both cases the fake stdin has no 'data' listener left and was paused.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "connect-launchd",
+        "title": "pan connect on macOS: install the supervisor launch agent and state the login caveat",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:21:23Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4656",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/connect-launchd.ts",
+            "src/cli/commands/connect.ts",
+            "src/cli/commands/__tests__/connect.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/connect.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "connect.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. New connect-launchd.ts exporting installMacService(ctx); connect.ts dispatch calls it on darwin. Render options: nodePath process.execPath, supervisorBundle resolveSupervisorBundle(), workingDirectory resolveSupervisorPrimaryRepoRoot(), supervisorPort getSupervisorPort(), overdeckHome, path env.PATH, logPath <home>/logs/supervisor.log; then installSupervisorAgent. Service line exactly as in the PRD; linger 'not-applicable'. Implementation checkpoint: if the Mac rig is reachable, run pan connect there and confirm `launchctl print gui/$(id -u)/ai.overdeck.supervisor` shows the job, then bootout; otherwise note in the PR body that live macOS verification is pending."
+        },
+        "items": [
+          {
+            "id": "connect-launchd.ac1",
+            "title": "Given platform darwin, when runConnect runs, then installSupervisorAgent is called with nodePath process.execPath, the supervisor bundle and logPath '<home>/logs/supervisor.log'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connect-launchd.ac2",
+            "title": "Given platform darwin, when runConnect runs in text mode, then output contains 'It starts when alice logs in' and 'turn on automatic login'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connect-launchd.ac3",
+            "title": "Given platform darwin and --json, when runConnect runs, then service.manager is 'launchd', service.name is 'ai.overdeck.supervisor' and linger is 'not-applicable'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "connect-docs",
+        "title": "Document pan connect in cli/machines.mdx, linked-machines.mdx and ANYWHERE-ARCHITECTURE.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:21:23Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4656",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/machines.mdx",
+            "configuration/linked-machines.mdx",
+            "docs/ANYWHERE-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '^## connect' cli/machines.mdx",
+            "grep -c '^## Link a fresh server' configuration/linked-machines.mdx",
+            "grep -c '^## pan connect (W-LINK9, FR-25)' docs/ANYWHERE-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "each grep prints 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11. cli/machines.mdx: new '## connect' section with synopsis (pan connect and npx @overdeck/core connect), flag table, the D-7 steps, the Linux sample output copied from the implemented strings, lingering (sudo line, wait, Enter), macOS login caveat, no-systemd sentence, D-6 address order and firewall hint, reboot timing (about 6 minutes, NFR-5), updating (npx @overdeck/core@latest connect), removal commands, and the pan install note for agents. configuration/linked-machines.mdx: '## Link a fresh server' after '## Link a machine' with the two-command flow linking /cli/machines#connect. docs/ANYWHERE-ARCHITECTURE.md: '## pan connect (W-LINK9, FR-25)' before '## Decisions added by sibling issues' covering D-1, D-2, D-3 boot path, D-4/D-5, D-8, D-10. No destructive delete-and-observe instructions."
+        },
+        "items": [
+          {
+            "id": "connect-docs.ac1",
+            "title": "Given the docs change, when a reader opens cli/machines.mdx, then a '## connect' section shows 'npx @overdeck/core connect', 'sudo loginctl enable-linger', 'overdeck-supervisor.service' and 'ai.overdeck.supervisor'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connect-docs.ac2",
+            "title": "Given the docs change, when a reader opens configuration/linked-machines.mdx, then '## Link a fresh server' shows the server command and the 'pan machines link' command and links /cli/machines#connect.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connect-docs.ac3",
+            "title": "Given the docs change, when a reader opens docs/ANYWHERE-ARCHITECTURE.md, then '## pan connect (W-LINK9, FR-25)' describes the boot path lingering → user manager → enabled supervisor unit → watchdog boot grace → pan restart --dashboard.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connect-docs.ac4",
+            "title": "Given the sample output in cli/machines.mdx, when compared with the strings in src/cli/commands/connect.ts and connect-systemd.ts, then every quoted output line matches the code verbatim.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "supervisor-unit-install-section",
+        "to": "connect-core",
+        "type": "blocks"
+      },
+      {
+        "from": "launchd-agent",
+        "to": "up-sidecars-launchd",
+        "type": "blocks"
+      },
+      {
+        "from": "launchd-agent",
+        "to": "connect-launchd",
+        "type": "blocks"
+      },
+      {
+        "from": "supervisor-unit-install-section",
+        "to": "connect-systemd",
+        "type": "blocks"
+      },
+      {
+        "from": "systemd-user-session",
+        "to": "connect-systemd",
+        "type": "blocks"
+      },
+      {
+        "from": "connect-runtime",
+        "to": "connect-core",
+        "type": "blocks"
+      },
+      {
+        "from": "connect-address",
+        "to": "connect-core",
+        "type": "blocks"
+      },
+      {
+        "from": "pair-link-helper",
+        "to": "connect-core",
+        "type": "blocks"
+      },
+      {
+        "from": "connect-core",
+        "to": "connect-systemd",
+        "type": "blocks"
+      },
+      {
+        "from": "connect-core",
+        "to": "connect-launchd",
+        "type": "blocks"
+      },
+      {
+        "from": "connect-systemd",
+        "to": "connect-launchd",
+        "type": "blocks"
+      },
+      {
+        "from": "connect-systemd",
+        "to": "connect-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "connect-launchd",
+        "to": "connect-docs",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-01-PAN-4656-pan-connect-one-command-turns-a-fresh-server-into-a-lasting-linked-machine.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

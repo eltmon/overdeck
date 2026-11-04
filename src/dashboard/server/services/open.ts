@@ -1,10 +1,11 @@
 import { spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import { exec, execFile } from 'node:child_process';
-import { dirname } from 'node:path';
+import { access } from 'node:fs/promises';
+import { dirname, isAbsolute } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { Effect, Layer, Context } from 'effect';
-import { EDITORS, type EditorId, type OpenInEditorInput } from '@overdeck/contracts';
+import { BROWSERS, EDITORS, type BrowserEntry, type BrowserId, type EditorId, type OpenInBrowserInput, type OpenInEditorInput } from '@overdeck/contracts';
 import { PanRpcError } from '@overdeck/contracts';
 import { getDefaultCwd } from '../../../lib/default-cwd.js';
 
@@ -118,11 +119,55 @@ async function resolveAvailableEditors(): Promise<EditorId[]> {
   return results.filter((id): id is EditorId => id !== null);
 }
 
+// ─── Available browsers detection (async, cached, PAN-4762) ─────────────────
+
+// The binary to spawn for a detected browser and the args before the URL.
+interface BrowserLauncher {
+  readonly command: string;
+  readonly args: ReadonlyArray<string>;
+}
+
+async function detectBrowserLauncher(browser: BrowserEntry): Promise<BrowserLauncher | null> {
+  if (browser.id === 'default-browser') {
+    const cmd = getFileManagerCommand();
+    return cmd && (await isCommandAvailable(cmd)) ? { command: cmd, args: [] } : null;
+  }
+  switch (process.platform) {
+    case 'linux':
+      for (const command of browser.linuxCommands) {
+        if (await isCommandAvailable(command)) return { command, args: [] };
+      }
+      return null;
+    case 'darwin':
+      if (!browser.macApp) return null;
+      try {
+        await access(`/Applications/${browser.macApp}.app`);
+        return { command: 'open', args: ['-a', browser.macApp] };
+      } catch {
+        return null;
+      }
+    default:
+      return null;
+  }
+}
+
+async function resolveAvailableBrowsers(): Promise<Map<BrowserId, BrowserLauncher>> {
+  const launchers = await Promise.all(BROWSERS.map((browser) => detectBrowserLauncher(browser)));
+  const available = new Map<BrowserId, BrowserLauncher>();
+  BROWSERS.forEach((browser, index) => {
+    const launcher = launchers[index];
+    if (launcher) available.set(browser.id, launcher);
+  });
+  return available;
+}
+
 // ─── Service interface ──────────────────────────────────────────────────────
 
 export interface PanOpenShape {
   readonly openInEditor: (input: OpenInEditorInput) => Effect.Effect<void, PanRpcError>;
   readonly getAvailableEditors: () => Effect.Effect<EditorId[], PanRpcError>;
+  readonly getAvailableBrowsers: () => Effect.Effect<BrowserId[], PanRpcError>;
+  readonly openInBrowser: (input: OpenInBrowserInput) => Effect.Effect<void, PanRpcError>;
   readonly getDefaultCwd: () => Effect.Effect<string, PanRpcError>;
 }
 
@@ -139,6 +184,8 @@ export const PanOpenLive = Layer.effect(
   Effect.promise(async () => {
     const cachedEditors = await resolveAvailableEditors();
     console.log(`[pan/open] Detected editors: ${cachedEditors.join(', ') || 'none'}`);
+    const cachedBrowsers = await resolveAvailableBrowsers();
+    console.log(`[pan/open] Detected browsers: ${[...cachedBrowsers.keys()].join(', ') || 'none'}`);
 
     return PanOpen.of({
       openInEditor: (input) =>
@@ -167,6 +214,32 @@ export const PanOpenLive = Layer.effect(
         }),
 
       getAvailableEditors: () => Effect.succeed(cachedEditors),
+
+      getAvailableBrowsers: () => Effect.succeed([...cachedBrowsers.keys()]),
+
+      openInBrowser: (input) =>
+        Effect.tryPromise({
+          try: async () => {
+            if (!isAbsolute(input.path)) {
+              throw new Error(`Path must be absolute: ${input.path}`);
+            }
+            // Only spawn a launcher detection found: a spawn of a missing
+            // binary throws uncaught.
+            const launcher = cachedBrowsers.get(input.browser);
+            if (!launcher) {
+              throw new Error(`Browser "${input.browser}" is not available on this machine`);
+            }
+            launchDetached({
+              command: launcher.command,
+              args: [...launcher.args, pathToFileURL(input.path).href],
+            });
+          },
+          catch: (err) =>
+            new PanRpcError({
+              message: `Failed to open browser: ${err instanceof Error ? err.message : String(err)}`,
+              code: 'BROWSER_LAUNCH_FAILED',
+            }),
+        }),
 
       getDefaultCwd: () => Effect.sync(getDefaultCwd),
     });

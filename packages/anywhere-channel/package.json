@@ -1,0 +1,33 @@
+{
+  "name": "@overdeck/anywhere-channel",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    },
+    "./node": {
+      "types": "./src/node.ts",
+      "import": "./src/node.ts"
+    },
+    "./web": {
+      "types": "./src/web.ts",
+      "import": "./src/web.ts"
+    }
+  },
+  "dependencies": {
+    "@hyperswarm/secret-stream": "6.9.2",
+    "@noble/hashes": "2.4.0",
+    "@overdeck/contracts": "workspace:*",
+    "b4a": "1.9.0",
+    "bare-events": "2.9.2",
+    "noise-handshake": "4.2.0",
+    "sodium-javascript": "0.8.0",
+    "streamx": "2.28.1"
+  },
+  "devDependencies": {
+    "vite": "^8.3.1"
+  }
+}

@@ -6,6 +6,8 @@ import type { ReactElement } from 'react';
 import { DecisionsPanel, DecisionsCount } from '../DecisionsPanel';
 import * as useDecisionsModule from '../../lib/useDecisions';
 import { useAskUserQuestionUiStore } from '../../lib/askUserQuestionUiStore';
+import { useDashboardStore } from '../../lib/store';
+import { isAwaitingInput } from '../../lib/pendingInput';
 
 function renderWithQuery(ui: ReactElement) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -90,10 +92,81 @@ describe('DecisionsPanel', () => {
     expect(container.querySelector('[data-decision-id="agent-pan-2748"][data-blocking="true"]')).toBeNull();
   });
 
+  it('shows SLA and dangerous chips for a Deft escalation only (PAN-4849)', () => {
+    const deftDecision = {
+      ...agentDecision,
+      id: 'agent-pan-1',
+      label: 'PAN-1',
+      pendingAskUserQuestion: {
+        toolUseId: 'deft-escalation:esc-20261102120000-aaaaaa',
+        askedAt: '2026-11-02T12:00:00Z',
+        questions: [{
+          question: 'Run the database migration',
+          header: 'cmd_approval',
+          context: 'npm run migrate drops the old table.\n\nSLA 1h (due 2026-11-02T13:00:00.000Z)\nDANGEROUS',
+          options: [{ label: 'Approve' }],
+        }],
+      },
+    };
+    vi.spyOn(useDecisionsModule, 'useDecisions').mockReturnValue([deftDecision, conversationDecision]);
+    const { container } = renderWithQuery(<DecisionsPanel />);
+    const deftRow = container.querySelector('[data-decision-id="agent-pan-1"]') as HTMLElement;
+    expect(deftRow.textContent).toContain('SLA 1h');
+    expect(deftRow.textContent).toContain('dangerous');
+    const otherRow = container.querySelector('[data-decision-id="conv-20260716-6155"]') as HTMLElement;
+    expect(otherRow.textContent).not.toContain('SLA');
+    expect(otherRow.textContent).not.toContain('dangerous');
+  });
+
+  it('shows an external-only Deft escalation as a quiet note, not a decision or a waiting agent (PAN-4849 review)', () => {
+    const agent = { id: 'agent-pan-1', issueId: 'PAN-1', status: 'running', pendingInputCount: 0, pendingInputKinds: [], deftExternalEscalations: 1 };
+    const previous = useDashboardStore.getState().agentsById;
+    useDashboardStore.setState({ agentsById: { 'agent-pan-1': agent } } as unknown as Parameters<typeof useDashboardStore.setState>[0]);
+    try {
+      vi.spyOn(useDecisionsModule, 'useDecisions').mockReturnValue([]);
+      renderWithQuery(<DecisionsPanel />);
+      expect(screen.getByTestId('decisions-empty')).toBeTruthy();
+      expect(screen.getByTestId('deft-external-notes').textContent).toBe('PAN-1 · Deft: waiting on external (1)');
+      const { container } = renderWithQuery(<DecisionsCount />);
+      expect(container.innerHTML).toBe('');
+      expect(isAwaitingInput(agent)).toBe(false);
+    } finally {
+      useDashboardStore.setState({ agentsById: previous } as Parameters<typeof useDashboardStore.setState>[0]);
+    }
+  });
+
   it('shows the actual question text, not just the kind', () => {
     vi.spyOn(useDecisionsModule, 'useDecisions').mockReturnValue([agentDecision]);
     renderWithQuery(<DecisionsPanel />);
     expect(screen.getByText('Which approach for crew create?')).toBeTruthy();
+  });
+
+  it('PAN-4946: renders mcp-sign-in-card for an mcpSignIn decision, with no Answer button', () => {
+    const mcpSignInDecision = {
+      id: 'appr-1',
+      source: 'agent' as const,
+      label: 'Claude Desktop',
+      kinds: ['mcpSignIn'],
+      since: '2026-11-04T00:00:00.000Z',
+      blocking: true,
+      mcpSignIn: {
+        id: 'appr-1',
+        clientId: 'odc_123',
+        clientName: 'Claude Desktop',
+        redirectHost: 'claude.ai',
+        requestedLevel: 'admin',
+        approvalCode: 'KQZT-MWRB',
+        createdAt: '2026-11-04T00:00:00.000Z',
+        expiresAt: '2026-11-04T00:10:00.000Z',
+      },
+    };
+    vi.spyOn(useDecisionsModule, 'useDecisions').mockReturnValue([mcpSignInDecision]);
+    renderWithQuery(<DecisionsPanel />);
+
+    expect(screen.getByTestId('mcp-sign-in-card')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Answer' })).toBeNull();
+    // An unrecognized requestedLevel ('admin') defaults the select to 'Read only'.
+    expect(screen.getByRole('combobox', { name: 'Access level' })).toHaveValue('read');
   });
 
   it('Answer re-opens the dialog for that subject', async () => {

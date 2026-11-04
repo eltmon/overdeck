@@ -73,7 +73,7 @@ export interface ContinueResumePoint {
 export interface ContinueFeedbackEntry {
   /** Sequence number — matches the NNN prefix of the legacy .planning/feedback/ filename. */
   seq: number;
-  specialist: 'verification-gate' | 'review-agent' | 'test-agent' | 'inspect-agent' | 'uat-agent' | 'merge-agent' | 'ci-monitor';
+  specialist: 'verification-gate' | 'review-agent' | 'test-agent' | 'inspect-agent' | 'uat-agent' | 'merge-agent' | 'ci-monitor' | 'coderabbit';
   /** Outcome label (e.g. "changes-requested", "approved"). */
   outcome: string;
   /** ISO 8601 timestamp when feedback was written. */

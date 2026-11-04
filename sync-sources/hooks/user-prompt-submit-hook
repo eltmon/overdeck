@@ -30,12 +30,13 @@ pan_emit_event "$AGENT_ID" "{\"kind\":\"waiting_clear\",\"clearedBy\":\"user_res
 pan_emit_event "$AGENT_ID" "{\"kind\":\"message_received\",\"direction\":\"to_agent\",\"source\":\"user\",\"timestamp\":\"$TS\"}"
 pan_emit_event "$AGENT_ID" "{\"kind\":\"thinking_start\",\"lastToolAt\":\"$TS\",\"timestamp\":\"$TS\"}"
 
-INTERNAL_TOKEN="${OVERDECK_INTERNAL_TOKEN:-}"
+INTERNAL_TOKEN=""
+TOKEN_PATH="${OVERDECK_HOME:-$HOME/.overdeck}/internal-token"
+if [ -f "$TOKEN_PATH" ]; then
+  INTERNAL_TOKEN=$(cat "$TOKEN_PATH" 2>/dev/null || true)
+fi
 if [ -z "$INTERNAL_TOKEN" ]; then
-  TOKEN_PATH="${OVERDECK_HOME:-$HOME/.overdeck}/internal-token"
-  if [ -f "$TOKEN_PATH" ]; then
-    INTERNAL_TOKEN=$(cat "$TOKEN_PATH" 2>/dev/null || true)
-  fi
+  INTERNAL_TOKEN="${OVERDECK_INTERNAL_TOKEN:-}"
 fi
 
 if command -v jq >/dev/null 2>&1; then

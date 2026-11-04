@@ -1,0 +1,2 @@
+{"schema_version":1,"session_id":"s1","framework_version":"0.127.0","seq":1,"ts":"2026-11-02T14:30:00Z","event":"session_start","payload":{}}
+{"schema_version":1,"session_id":"s1","framework_version":"0.127.0","seq":2,"ts":"2026-11-02T14:35:00Z","event":"check_invocation","payload":{"target":"pre-pr","exit_code":1,"gates":[{"id":"lint","status":"run","exit_code":0},{"id":"e2e","status":"skipped","cause":"no browser available"},{"id":"typecheck","status":"failed","exit_code":2,"cause":"TS2322 in src/a.ts","remedy":"Fix the type error"}]}}

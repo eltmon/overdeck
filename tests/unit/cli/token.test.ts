@@ -76,7 +76,7 @@ describe('pan token (PAN-2351)', () => {
   it('create --scopes write:all exits non-zero, names the valid set, and writes nothing', async () => {
     await expect(runTokenCreate('bad', { scopes: 'write:all' })).rejects.toThrow('exit 1');
     expect(stderr.join('\n')).toContain('write:all');
-    expect(stderr.join('\n')).toContain('read:events, read:state, read:conversations, tell, operate, admin');
+    expect(stderr.join('\n')).toContain('read:events, read:state, read:conversations, read:costs, read:settings, tell, operate, approve, forward, admin');
     expect(await fileRecords()).toEqual([]);
   });
 

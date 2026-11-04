@@ -55,6 +55,7 @@ function makeDeps(projectRoot: string, options: {
   assembleStatus?: UatGenerationStatus;
   containedNames?: string[];
   holdsForUat?: boolean;
+  mergesPerPr?: (feature: ReadyFeature) => boolean | Promise<boolean>;
 } = {}): UatReconcilerDeps & {
   rows: Map<string, UatGeneration>;
   assembled: ReadyFeature[][];
@@ -99,6 +100,7 @@ function makeDeps(projectRoot: string, options: {
     teardownStack: async (g) => { teardowns.push(g.name); },
     cleanup: async () => { cleanups.push(1); },
     ...(options.holdsForUat !== undefined ? { holdsForUat: () => options.holdsForUat! } : {}),
+    ...(options.mergesPerPr ? { mergesPerPr: options.mergesPerPr } : {}),
     now: () => T0,
     log: (message) => { logs.push(message); },
   };
@@ -598,5 +600,100 @@ describe('PAN-3965 no batch for a single ready feature', () => {
 
     expect(result.action).toBe('single-feature');
     expect(deps.assembled).toEqual([]);
+  });
+});
+
+describe('PAN-4970 per-PR partition', () => {
+  // owner-rule.ac1 is covered in merge-path-owner.test.ts; these cover
+  // reconciler-partition.ac1-ac6.
+
+  it('drops a per-PR-owned feature from the ready set: single-feature action, reported in perPr', async () => {
+    const proj = freshProject();
+    const deps = makeDeps(proj, {
+      readySet: READY, // PAN-1, PAN-2
+      mergesPerPr: (f) => f.issueId === 'PAN-1',
+    });
+
+    const result = await reconcileUatGenerations(proj, deps);
+
+    expect(result.action).toBe('single-feature');
+    expect(deps.assembled).toEqual([]);
+    expect(result.perPr).toEqual(['PAN-1']);
+  });
+
+  it('is idle, not blocked, when every ready feature is per-PR-owned — with and without force', async () => {
+    for (const force of [false, true]) {
+      const proj = freshProject();
+      const deps = makeDeps(proj, { readySet: READY, mergesPerPr: () => true });
+
+      const result = await reconcileUatGenerations(proj, deps, { force });
+
+      expect(result.action).toBe('idle');
+      expect(deps.assembled).toEqual([]);
+      expect(result.perPr).toEqual(['PAN-1', 'PAN-2']);
+    }
+  });
+
+  it('invalidates a live generation whose member is now per-PR-owned, with the per-PR reason', async () => {
+    const proj = freshProject();
+    const current = gen(proj, 'uat/pan-owned-0610', 'ready');
+    const deps = makeDeps(proj, {
+      rows: [current],
+      readySet: READY,
+      mergesPerPr: (f) => f.issueId === 'PAN-1',
+    });
+    const log = vi.fn();
+    deps.log = log;
+
+    const result = await reconcileUatGenerations(proj, deps);
+
+    expect(deps.rows.get(current.name)?.status).toBe('invalidated');
+    expect(result.invalidated).toEqual([current.name]);
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('PAN-1 merges through the per-PR auto-merge train'));
+  });
+
+  it('assembles only the batch-owned subset when one of three ready features is per-PR-owned', async () => {
+    const proj = freshProject();
+    const three = [...READY, { issueId: 'PAN-3', title: 'Third', branch: 'feature/pan-3' }];
+    const deps = makeDeps(proj, {
+      readySet: three,
+      headShas: { 'feature/pan-3': 'h3' },
+      mergesPerPr: (f) => f.issueId === 'PAN-3',
+    });
+
+    const result = await reconcileUatGenerations(proj, deps);
+
+    expect(result.action).toBe('assembled');
+    expect(deps.assembled).toHaveLength(1);
+    expect(deps.assembled[0]!.map((f) => f.issueId)).toEqual(['PAN-1', 'PAN-2']);
+    expect(result.perPr).toEqual(['PAN-3']);
+  });
+
+  it('treats a synchronous throw, and separately a rejected promise, from mergesPerPr as false', async () => {
+    for (const mergesPerPr of [
+      (f: ReadyFeature) => { if (f.issueId === 'PAN-1') throw new Error('boom'); return false; },
+      async (f: ReadyFeature) => { if (f.issueId === 'PAN-1') throw new Error('boom'); return false; },
+    ]) {
+      const proj = freshProject();
+      const deps = makeDeps(proj, { readySet: READY, mergesPerPr });
+
+      const result = await reconcileUatGenerations(proj, deps);
+
+      expect(result.action).toBe('assembled');
+      expect(deps.assembled).toHaveLength(1);
+      expect(deps.assembled[0]!.map((f) => f.issueId)).toEqual(['PAN-1', 'PAN-2']);
+      expect(result.perPr).toEqual([]);
+    }
+  });
+
+  it('with mergesPerPr omitted, behaves exactly as before (perPr always empty)', async () => {
+    const proj = freshProject();
+    const deps = makeDeps(proj, { readySet: READY });
+
+    const result = await reconcileUatGenerations(proj, deps);
+
+    expect(result.action).toBe('assembled');
+    expect(deps.assembled[0]!.map((f) => f.issueId)).toEqual(['PAN-1', 'PAN-2']);
+    expect(result.perPr).toEqual([]);
   });
 });

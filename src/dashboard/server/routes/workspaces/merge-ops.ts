@@ -23,6 +23,8 @@ import { MainDivergedError, gitPush } from '../../../../lib/git/operations.js';
 import { listGitOperations } from '../../../../lib/git-activity.js';
 import { extractPrefix, parseIssueId } from '../../../../lib/issue-id.js';
 import { enqueueMerge, getCurrentMerge, markMergeProcessing, dequeueMerge, getAllActiveQueues } from '../../../../lib/overdeck/merge.js';
+import { getPrFacts } from '../../../../lib/cloister/pr-facts.js';
+import { evaluateRepoMergeGuards } from '../../../../lib/cloister/repo-merge-guards.js';
 import { findProjectByTeam } from '../../../../lib/projects.js';
 import { isOverdeckOwnedOnlyStatus } from '../../../../lib/state-plane.js';
 import { isIntegrationPermissionError, verifyAppCanMerge, type GitHubPullRequestState } from '../../../../lib/github-app.js';
@@ -42,7 +44,7 @@ import { ensurePRExists } from './ensure-pr.js';
 import { buildLocalMainRecoveryError } from './git-recovery-advice.js';
 import { freshMergeArtifact } from './merge-artifact.js';
 import { postInternalPipelineNotifyRoute } from './internal-pipeline-notify.js';
-import { activeStrikeMerge, advanceMergeQueue, automaticMergeHead, automaticMergeStartRefusal, forgeMergeGate, manualMergeHeadMoved, mergeHeadPin, mergeTargetRefusal, mergeVerificationOptions, normalMergeEligibility, prepareWorkAgentForRebase, rebaseWithAgentFallback, validateStrikeMergeRequest, type TriggerMergeRequest, type TriggerMergeResult } from './merge-strike.js';
+import { activeStrikeMerge, advanceMergeQueue, automaticMergeHead, automaticMergeStartRefusal, busyMergeRefusal, forgeMergeGate, manualMergeHeadMoved, mergeHeadPin, mergeTargetRefusal, mergeVerificationOptions, normalMergeEligibility, prepareWorkAgentForRebase, rebaseWithAgentFallback, validateStrikeMergeRequest, type TriggerMergeRequest, type TriggerMergeResult } from './merge-strike.js';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
@@ -305,11 +307,8 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
   const normalizedId = issueId.toUpperCase();
   const currentlyMerging = getCurrentMerge(projectKey);
   if (request.kind === 'strike' && currentlyMerging === normalizedId) return { success: true, statusCode: 200, message: 'Strike merge already in progress', outcome: 'merging' };
-  // #4066 review: an automatic merge never waits on the queue, which would start it
-  // with none of its pin or policy checks; the executor retries with every check.
-  if (currentlyMerging && currentlyMerging !== normalizedId && approvedHead) {
-    return { success: false, statusCode: 409, error: `Another merge (${currentlyMerging}) is in progress; the automatic merge retries on the executor's next tick`, deferred: true, outcome: 'queued' };
-  }
+  const busy = busyMergeRefusal(request, currentlyMerging, normalizedId);
+  if (busy) return busy;
   if (currentlyMerging && currentlyMerging !== normalizedId) {
     // Another merge is in progress — queue this one
     const position = enqueueMerge(projectKey, normalizedId);
@@ -1350,6 +1349,12 @@ const postForgeMergeRoute = HttpRouter.add(
       if (!mergeSet) {
         return jsonResponse({ error: `No merge set found for ${issueId}` }, { status: 404 });
       }
+
+      // PAN-4820, PAN-4852 (AD-21): this door bypasses the merge gate, so the PR
+      // must pass the repository merge guards (Deft, SageOx) here.
+      const prFacts = await getPrFacts(issueId);
+      const guard = await evaluateRepoMergeGuards(issueId, { headSha: prFacts.headSha, headBranch: prFacts.headBranch });
+      if (!guard.ok) return jsonResponse({ error: `Cannot merge: ${guard.reason}`, refused: true }, { status: 409 });
 
       const results: Array<{ repoKey: string; merged: boolean; error?: string }> = [];
       for (const repo of mergeSet.repos) {

@@ -1,0 +1,1100 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-03T20:53:31Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4839: Phone app (iOS): counts-only Live Activity",
+    "updated": "2026-11-03T21:00:56.439Z"
+  },
+  "plan": {
+    "id": "pan-4839",
+    "title": "Phone app (iOS): counts-only Live Activity",
+    "status": "running",
+    "uid": "7073e889-ba77-4a0f-8ee2-782e089e61ce",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-03T20:53:31Z",
+    "updated": "2026-11-03T21:00:56.439Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4839",
+        "label": "PAN-4839",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4823",
+        "label": "PAN-4823 epic (W-IOS2, OD-1, AC-12)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4839.md",
+        "label": "PRD",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "phone-app",
+      "ios",
+      "live-activity",
+      "connect-service",
+      "push",
+      "anywhere"
+    ],
+    "metadata": {
+      "sizeJustification": "W-IOS2 is one epic work item (pan-4823.md lines 378-388). The counts-only privacy rule (OD-1) must be proven across the contract, the directory's APNs request, the machine sender and the iOS widget in one review: a field added at any layer breaks it. No layer ships user value alone (the frames have no other consumer and the widget has no data source without them), so splitting into sibling issues would land dead code. The plan touches about 50 files across contracts, services/connect, src/lib, src/dashboard, apps/mobile and four doc paths.",
+      "canonicalFilename": "2026-11-03-PAN-4839-phone-app-ios-counts-only-live-activity.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The Overdeck phone app has no Live Activity. An operator with an iPhone cannot see at a glance, on the lock screen or in the Dynamic Island, how many items need them and how many agents are running. A Live Activity is updated by APNs push and drawn by iOS with no app code in between, so its content cannot be end-to-end encrypted (OD-1): it may carry only the two counts.",
+      "Proposal": "Add three directory frames (machine push-activity, phone activity-register and activity-unregister). Each primary dashboard polls its own counts every 5 s (needsYou from buildNeedsYou, running from the read model's agent statuses) and reports them to every paired phone at most once per 15 s, with a 5-minute keepalive. The directory stores the last report per phone and machine, sums the reports of the last 10 minutes, and sends an APNs liveactivity push whose body holds only the two counts plus APNs timing fields, on a 60-per-minute window separate from alerts. The iOS app gets a WidgetKit extension target with an ActivityKit Live Activity, a Swift plugin that starts or adopts the activity in the foreground and streams its push token, a TS controller that registers the token with the directory, and a Settings switch (on by default). A Debug launch argument lets the Mac rig screenshot the widget; the live APNs device run is a gated checkpoint until PAN-4841 sets the APNs secrets.",
+      "NonGoals": "- Push-to-start Live Activities (iOS 17.2+) or restarting an ended card while the app is closed.\n- Any text, title, machine label, issue id, conversation name or other field beyond the two counts in push-activity, activity-register, the APNs body or the card.\n- Counting linked (fleet) machines' rows on the card (PAN-4887).\n- A machine-side switch for the card, or tying it to the machine's push.enabled config.\n- Android ongoing notifications, Android widgets or any Android native change.\n- Push registration, the Notification Service Extension, Keychain Sharing, App Groups and @capacitor/push-notifications (PAN-4838).\n- Apple developer portal actions, production APNs secrets and store builds (PAN-4841).\n- configuration/phone-app.mdx (PAN-4842).\n- A machine HTTP route that serves the counts to the phone.\n- Raising CONNECT_PROTOCOL_VERSION."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Use new frames activity-register / activity-unregister (phone) and push-activity { to, needsYou, running } (machine) instead of adding liveActivityToken to push-register.",
+        "rationale": "Alert push and the card have independent lifecycles: turning the card off must not drop alert registration, and push-register requires an alert token the card does not have."
+      },
+      {
+        "summary": "push-activity is fire-and-forget: no requestId and no answer frame.",
+        "rationale": "The machine takes no action on the result; the directory logs the outcome and clears dead tokens itself."
+      },
+      {
+        "summary": "The directory sums the fresh reports (last 10 minutes) of every machine paired with the phone.",
+        "rationale": "The card has no app code to merge machines; without summing in the per-account Durable Object, a phone paired with two machines would flip between their numbers."
+      },
+      {
+        "summary": "activity-register pushes the current sum at once; the app starts the card with -1/-1 drawn as a dash.",
+        "rationale": "Removes the need for a machine counts route and makes the card correct within seconds of opening the app."
+      },
+      {
+        "summary": "APNs priority 10 when the sum changed (or first push after register), 5 for refreshes; NSSupportsLiveActivitiesFrequentUpdates on.",
+        "rationale": "AC-12 asks for updates within 30 s and iOS may delay priority 5; refreshes only move the stale date."
+      },
+      {
+        "summary": "Timing: stale 10 min, directory refresh 4 min, machine keepalive 5 min, machine poll 5 s, machine min interval 15 s, 60 activity pushes per account per minute, counts capped at 9999.",
+        "rationale": "Epic W-IOS2 gives 15 s and 10 min; refresh shorter than keepalive guarantees each keepalive moves the stale date; a separate window keeps alerts from starving."
+      },
+      {
+        "summary": "running counts read-model agents with status in {running, active, starting, thinking, working}, the dashboard pill's set, with no role filter.",
+        "rationale": "The phone and the desktop show the same number."
+      },
+      {
+        "summary": "needsYou counts only the local machine (buildNeedsYou conversations + agents), not linked machines.",
+        "rationale": "The phone's own Needs-you screen shows only local rows today (/api/fleet/needs-you is 403 for phones until PAN-4887)."
+      },
+      {
+        "summary": "The machine sender runs whenever a phone record exists and the directory is online, independent of push.enabled; primary dashboard only.",
+        "rationale": "OD-1 defines only the app's switch; a peer dashboard would double every report."
+      },
+      {
+        "summary": "If App.entitlements does not exist when work starts (PAN-4838 not merged), create it with aps-environment = development and set CODE_SIGN_ENTITLEMENTS on the App target, then comment on PAN-4838.",
+        "rationale": "ActivityKit push tokens need the Push Notifications capability; waiting on an unplanned issue would stall this one, and the change is exactly what PAN-4838 would add."
+      },
+      {
+        "summary": "The Swift plugin reports apsEnvironment sandbox in DEBUG builds and production otherwise.",
+        "rationale": "Matches the epic's rule for alert tokens without depending on PAN-4838 code."
+      },
+      {
+        "summary": "Generate the widget target with an idempotent xcodeproj-gem Ruby script on the Mac rig; hand-edit pbxproj as fallback.",
+        "rationale": "This host has no Ruby or Xcode; a scripted edit is reproducible and reviewable."
+      },
+      {
+        "summary": "No push-to-start; the card returns the next time the app is opened after iOS ends it (8 h).",
+        "rationale": "Push-to-start needs iOS 17.2 and a second token type; the epic step 2 says the app starts the activity in the foreground."
+      },
+      {
+        "summary": "Stale cards draw their numbers at 50% opacity with no extra text.",
+        "rationale": "OD-1 says the card shows the two counts and nothing else."
+      },
+      {
+        "summary": "A #if DEBUG launch argument -overdeckLiveActivityDemo N,M starts a local card for the rig screenshot.",
+        "rationale": "The Simulator cannot receive production liveactivity pushes and sign-in needs the operator; release builds ignore it."
+      },
+      {
+        "summary": "The live APNs device run of AC-12 is a gated checkpoint: run it if connect healthz reports apns:true, else record 'not run' and hand it to PAN-4841 by issue comment.",
+        "rationale": "Production APNs secrets do not exist until PAN-4841; the code path is proven by unit tests and the Simulator run."
+      },
+      {
+        "summary": "Ship as one issue with plan.metadata.sizeJustification rather than sibling issues.",
+        "rationale": "W-IOS2 is one epic work item and the OD-1 rule must be reviewed across all layers together."
+      }
+    ],
+    "items": [
+      {
+        "id": "contracts",
+        "title": "Contracts: push-activity, activity-register, activity-unregister frames and Live Activity constants",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T20:53:31Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4839",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "decoder",
+            "directory-activity",
+            "machine-sender",
+            "app-bridge"
+          ],
+          "files_scope": [
+            "packages/contracts/src/connect.ts",
+            "packages/contracts/src/__tests__/connect.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:contracts",
+            "npx vitest run packages/contracts/src/__tests__/connect.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:contracts completes without errors",
+            "connect.test.ts passes including the new Live Activity cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-6",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1: in packages/contracts/src/connect.ts add ACTIVITY_COUNT_MAX = 9_999, ACTIVITY_STALE_MS = 600_000, ACTIVITY_REFRESH_MS = 240_000, ACTIVITY_PUSH_RATE_PER_MINUTE = 60 and the LiveActivityCounts interface; add the machine frame { type: 'push-activity'; to; needsYou; running } to MachineToDirectoryFrame and the client frames { type: 'activity-register'; token; apsEnvironment? } and { type: 'activity-unregister' } to ClientToDirectoryFrame; keep the file runtime-import-free and CONNECT_PROTOCOL_VERSION = 1; add test cases to connect.test.ts."
+        },
+        "items": [
+          {
+            "id": "contracts.ac1",
+            "title": "Given connect.ts, when imported, then it exports ACTIVITY_STALE_MS = 600000, ACTIVITY_REFRESH_MS = 240000, ACTIVITY_PUSH_RATE_PER_MINUTE = 60 and ACTIVITY_COUNT_MAX = 9999, and CONNECT_PROTOCOL_VERSION still returns 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts.ac2",
+            "title": "The push-activity frame type contains exactly the keys type, to, needsYou and running, and activity-register contains exactly type, token and optional apsEnvironment",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts.ac3",
+            "title": "npx vitest run packages/contracts/src/__tests__/connect.test.ts passes with test cases that name all three new frames",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "decoder",
+        "title": "Directory decoder: decode push-activity on machine sockets and activity-register / activity-unregister on phone sockets",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T20:53:31Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4839",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/connect/src/protocol.ts",
+            "tests/unit/services/connect/protocol-push.test.ts",
+            "tests/unit/services/connect/protocol-client.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:connect",
+            "npx vitest run tests/unit/services/connect/protocol-push.test.ts tests/unit/services/connect/protocol-client.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:connect completes without errors",
+            "both protocol test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2: in services/connect/src/protocol.ts add a countOf helper (safe integer 0..ACTIVITY_COUNT_MAX), a buildMachine case 'push-activity' returning { type, to: environmentIdOf(obj, 'to'), needsYou, running }, and buildClient cases 'activity-register' (token via str(obj, 'token', MAX_PUSH_TOKEN_CHARS, PUSH_TOKEN_RE), optional apsEnvironment production|sandbox) and 'activity-unregister'; frames are rebuilt from known keys only."
+        },
+        "items": [
+          {
+            "id": "decoder.ac1",
+            "title": "decodeFrame accepts push-activity with needsYou 0 and running 9999 on a machine socket and rejects -1, 1.5, the string \"3\" and 10000 as bad_frame",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "decoder.ac2",
+            "title": "A push-activity frame with an extra title key decodes to a frame that contains no title key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "decoder.ac3",
+            "title": "decodeFrame rejects push-activity on a client socket and activity-register on a machine socket as bad_frame",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "decoder.ac4",
+            "title": "activity-register rejects a token containing '/' and an apsEnvironment of \"dev\", and accepts a 160-hex token with apsEnvironment sandbox",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "apns-liveactivity",
+        "title": "Directory APNs: liveactivity request with a counts-only body and deliverActivity with one retry",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T20:53:31Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4839",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/connect/src/push/apns.ts",
+            "services/connect/src/push/config.ts",
+            "services/connect/src/push/deliver.ts",
+            "tests/unit/services/connect/push/apns.test.ts",
+            "tests/unit/services/connect/push/deliver.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:connect",
+            "npx vitest run tests/unit/services/connect/push/"
+          ],
+          "expected_outputs": [
+            "typecheck:connect completes without errors",
+            "every test file under tests/unit/services/connect/push/ passes, including the unchanged alert tests"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3: add ActivityPushRequest to push/config.ts; in push/apns.ts extract the shared POST-and-classify logic of sendApns into a private postApns helper without changing the alert request, then add APNS_LIVE_ACTIVITY_TOPIC, apnsActivityBody(needsYou, running, nowMs) and sendApnsActivity with headers apns-push-type liveactivity, the liveactivity topic, apns-priority 10 or 5, apns-expiration = stale-date, and no collapse id; add deliverActivity to push/deliver.ts with not_configured and one retry after PUSH_RETRY_DELAY_MS via the injected sleep."
+        },
+        "items": [
+          {
+            "id": "apns-liveactivity.ac1",
+            "title": "Given needsYou 3 and running 2, the sent body parses to exactly { aps: { timestamp, event: 'update', 'content-state': { needsYou: 3, running: 2 }, 'stale-date': timestamp + 600 } } and contains no other key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "apns-liveactivity.ac2",
+            "title": "The request sends apns-push-type liveactivity, apns-topic ai.overdeck.app.push-type.liveactivity, apns-priority 10 for high and 5 for normal, no apns-collapse-id, and routes sandbox tokens to api.sandbox.push.apple.com",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "apns-liveactivity.ac3",
+            "title": "deliverActivity returns gone for a 410, returns delivered after a 503 then 200 with exactly one injected sleep(2000), and returns not_configured when APNs config is null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "apns-liveactivity.ac4",
+            "title": "After the postApns extraction the existing sendApns alert test suite passes unchanged and sendApns still sends the same alert headers and body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "directory-activity",
+        "title": "Directory: Live Activity reducer, SQLite storage and Durable Object glue",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T20:53:31Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4839",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "docs",
+            "acceptance"
+          ],
+          "files_scope": [
+            "services/connect/src/activity-state.ts",
+            "services/connect/src/directory-state.ts",
+            "services/connect/src/client-state.ts",
+            "services/connect/src/directory-store.ts",
+            "services/connect/src/directory.ts",
+            "tests/unit/services/connect/activity-state.test.ts",
+            "tests/unit/services/connect/directory-glue.test.ts",
+            "tests/unit/services/connect/client-state.test.ts",
+            "tests/unit/services/connect/push-state.test.ts",
+            "tests/unit/services/connect/directory-state.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck:connect",
+            "npx vitest run tests/unit/services/connect/"
+          ],
+          "expected_outputs": [
+            "typecheck:connect completes without errors",
+            "every test file under tests/unit/services/connect/ passes, including the new activity-state.test.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-6",
+            "FR-7",
+            "FR-9",
+            "NFR-1",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4: create the pure module services/connect/src/activity-state.ts (types ActivityRegistration, ActivityPushed, ActivityReport, ActivityOutcomeEvent; activityRegistrationAnswer, pushActivityAnswer, reduceActivityOutcome with the pushIfDue summing, refresh and separate rate-window rules); add ClientRow.activity, DirectoryState.activityReports and activityWindow, EMPTY_DIRECTORY fields, the effects put-client-activity, put-activity-report, put-activity-window and deliver-activity, and the push-activity case in directory-state.ts; route activity-register/unregister in client-state.ts and keep activity on re-hello; add the client_activities and activity_reports tables, SQL constants and loadDirectory reads in directory-store.ts; execute the effects in directory.ts, feed deliverActivity outcomes back through reduceActivityOutcome, and delete activity rows on delete-client and delete-machine. Update ClientRow / DirectoryState fixtures in existing connect tests where they build those objects."
+        },
+        "items": [
+          {
+            "id": "directory-activity.ac1",
+            "title": "Given one registered iOS phone and reports (2,1) from machine A and (1,0) from machine B, the reducer emits one deliver-activity with needsYou 3 and running 1, and a report older than 600000 ms drops out of the sum",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "directory-activity.ac2",
+            "title": "An identical report 239999 ms after a push emits no deliver-activity, one at 240000 ms emits deliver-activity with priority normal, and a changed sum emits priority high",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "directory-activity.ac3",
+            "title": "The 61st Live Activity push in one UTC minute logs rate_limited while an alert push in the same minute is still accepted, and activity-register from an Android row returns error bad_frame",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "directory-activity.ac4",
+            "title": "A gone outcome clears the registration only when the row still holds the failed token, and a failed outcome resets lastPushed so the next report pushes again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "directory-activity.ac5",
+            "title": "Through the glue, activity-register plus two push-activity frames persist rows that loadDirectory restores to the same registration, reports and window, and forget-client deletes the client_activities and activity_reports rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "machine-sender",
+        "title": "Machine: throttled Live Activity sender module with keepalive",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T20:53:31Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4839",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/push/live-activity-sender.ts",
+            "src/lib/push/__tests__/live-activity-sender.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/push/__tests__/live-activity-sender.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "live-activity-sender.test.ts passes using vi.useFakeTimers"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "NFR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5: create src/lib/push/live-activity-sender.ts exporting LIVE_ACTIVITY_POLL_MS = 5000, LIVE_ACTIVITY_MIN_INTERVAL_MS = 15000, LIVE_ACTIVITY_KEEPALIVE_MS = 300000 and createLiveActivitySender({ counts, phones, directory, now }) with tick/start/stop; tick resets lastSent while offline or without phones, clamps counts to 0..ACTIVITY_COUNT_MAX, sends { type: 'push-activity', to, needsYou, running } to each phone when changed and 15 s have passed or 5 minutes have passed unchanged, and records lastSent only when at least one send returned true; write fake-timer tests. A phone id absent from the previous send's set is sent the current counts at the next tick even inside the 15 s window, without re-sending the other phones."
+        },
+        "items": [
+          {
+            "id": "machine-sender.ac1",
+            "title": "Given two phones and an online directory, the first tick sends one push-activity frame per phone, and each sent frame contains exactly the keys type, to, needsYou and running",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "machine-sender.ac2",
+            "title": "With fake timers, a change 1 s after a send produces no frame until the first tick at or after 15 s, and that frame carries the latest counts when they changed twice",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "machine-sender.ac3",
+            "title": "For unchanged counts the sender sends a keepalive at 300000 ms and no frame at 295000 ms, and it sends a count of 12345 as 9999",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "machine-sender.ac4",
+            "title": "When the directory goes offline and returns, the next online tick sends at once; when every send returns false the next tick sends again; with no phones counts() is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "machine-sender.ac5",
+            "title": "Given a send to two phones, when a third phone is added 2 s later, then the next tick sends the counts to the third phone only",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "machine-service",
+        "title": "Machine: Live Activity counts and start-up in the primary dashboard",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T20:53:31Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4839",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/live-activity-service.ts",
+            "src/dashboard/server/services/__tests__/live-activity-service.test.ts",
+            "src/dashboard/server/main.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/services/__tests__/live-activity-service.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "live-activity-service.test.ts passes",
+            "file-size guard passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-6: create src/dashboard/server/services/live-activity-service.ts with RUNNING_AGENT_STATUSES (running, active, starting, thinking, working), readLiveActivityCounts (needsYou = buildNeedsYou conversations.length + agents.length; running = readAgentSnapshots rows whose status is in the set), activityPhoneIds (active phone records' clientId), and idempotent startLiveActivityService / stopLiveActivityService wrapping createLiveActivitySender with currentDirectoryClient; call start inside main.ts's existing if (!isPeerDashboard) block after startNeedsYouPushService and stop after stopNeedsYouPushService, or from needs-you-push-service.ts if main.ts would pass 1000 lines."
+        },
+        "items": [
+          {
+            "id": "machine-service.ac1",
+            "title": "Given a feed with 2 conversations and 1 agent and agent statuses running, starting, stopped, error and thinking, readLiveActivityCounts returns { needsYou: 3, running: 3 }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "machine-service.ac2",
+            "title": "activityPhoneIds skips an active phone record without a clientId, and calling startLiveActivityService twice creates one interval under fake timers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "machine-service.ac3",
+            "title": "main.ts calls startLiveActivityService only inside the if (!isPeerDashboard) block, and bash scripts/lint-file-size.sh prints file-size guard passed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ios-widget-target",
+        "title": "iOS: OverdeckWidgets extension target with the counts-only Live Activity widget",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T20:53:31Z",
+        "metadata": {
+          "difficulty": "expert",
+          "kind": "frontend",
+          "issueLabel": "pan-4839",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "ios-plugin",
+            "acceptance"
+          ],
+          "files_scope": [
+            "apps/mobile/ios/App/Shared/OverdeckActivityAttributes.swift",
+            "apps/mobile/ios/App/OverdeckWidgets/OverdeckWidgetsBundle.swift",
+            "apps/mobile/ios/App/OverdeckWidgets/OverdeckLiveActivityWidget.swift",
+            "apps/mobile/ios/App/OverdeckWidgets/Info.plist",
+            "apps/mobile/ios/scripts/add-widgets-target.rb",
+            "apps/mobile/ios/App/App.xcodeproj/project.pbxproj",
+            "apps/mobile/ios/App/App/Info.plist",
+            "apps/mobile/ios/App/App/App.entitlements"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "ssh -i ~/.ssh/gauntlet_air eltmon@<rig-ip> 'cd ~/overdeck-mobile/apps/mobile && xcodebuild -project ios/App/App.xcodeproj -scheme App -sdk iphonesimulator -destination \"id=$U\" -derivedDataPath ~/overdeck-mobile/DerivedData CODE_SIGN_IDENTITY=- build'",
+            "ssh -i ~/.ssh/gauntlet_air eltmon@<rig-ip> 'ls ~/overdeck-mobile/DerivedData/Build/Products/Debug-iphonesimulator/App.app/PlugIns/OverdeckWidgets.appex'",
+            "grep -c 'var needsYou: Int' apps/mobile/ios/App/Shared/OverdeckActivityAttributes.swift"
+          ],
+          "expected_outputs": [
+            "xcodebuild prints ** BUILD SUCCEEDED **",
+            "ls lists OverdeckWidgets.appex",
+            "grep prints 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-7: write apps/mobile/ios/App/Shared/OverdeckActivityAttributes.swift (ContentState with exactly needsYou: Int and running: Int, no static attributes, OverdeckActivityText helpers), the OverdeckWidgets bundle, widget and Info.plist (widgetkit-extension point), add NSSupportsLiveActivities and NSSupportsLiveActivitiesFrequentUpdates to the App Info.plist, write the idempotent add-widgets-target.rb (xcodeproj gem: target ai.overdeck.app.widgets at iOS 16.2, shared file in both targets, Embed Foundation Extensions phase, D-10 entitlements rule), run it on the Mac rig, copy project.pbxproj and App.entitlements back and commit; use Fallback A (hand edit) or Fallback B (pan tell flywheel-orchestrator and leave open) from the PRD if needed."
+        },
+        "items": [
+          {
+            "id": "ios-widget-target.ac1",
+            "title": "When the App scheme is built for the Simulator on the Mac rig, xcodebuild prints ** BUILD SUCCEEDED ** and App.app/PlugIns contains OverdeckWidgets.appex",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ios-widget-target.ac2",
+            "title": "OverdeckActivityAttributes.ContentState contains exactly two stored properties, needsYou: Int and running: Int, and the attributes struct has no stored property",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ios-widget-target.ac3",
+            "title": "OverdeckActivityText returns \"–\" for -1, \"1 needs you\" for 1, \"3 need you\" for 3 and \"2 running\" for 2, and the widget renders numbers at 0.5 opacity when context.isStale",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ios-widget-target.ac4",
+            "title": "The App Info.plist contains NSSupportsLiveActivities true and NSSupportsLiveActivitiesFrequentUpdates true, and App.entitlements contains aps-environment referenced by CODE_SIGN_ENTITLEMENTS in both App configurations",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ios-plugin",
+        "title": "iOS: OverdeckLiveActivity Capacitor plugin (status, start, end, token events, Debug demo)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T20:53:31Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-4839",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/ios/App/App/OverdeckLiveActivityPlugin.swift",
+            "apps/mobile/ios/App/App/MainViewController.swift",
+            "apps/mobile/ios/App/App.xcodeproj/project.pbxproj"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "ssh -i ~/.ssh/gauntlet_air eltmon@<rig-ip> 'cd ~/overdeck-mobile/apps/mobile && xcodebuild -project ios/App/App.xcodeproj -scheme App -sdk iphonesimulator -destination \"id=$U\" -derivedDataPath ~/overdeck-mobile/DerivedData CODE_SIGN_IDENTITY=- build'",
+            "grep -n 'registerPluginInstance(OverdeckLiveActivityPlugin())' apps/mobile/ios/App/App/MainViewController.swift",
+            "grep -n 'print(' apps/mobile/ios/App/App/OverdeckLiveActivityPlugin.swift"
+          ],
+          "expected_outputs": [
+            "xcodebuild prints ** BUILD SUCCEEDED **",
+            "grep finds one registration line",
+            "every print line prints a .count or fixed text, never the hex token"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-8",
+            "NFR-6",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-8: write apps/mobile/ios/App/App/OverdeckLiveActivityPlugin.swift, a CAPPlugin with jsName OverdeckLiveActivity and methods status (supported = iOS 16.2+, enabled = areActivitiesEnabled), start (adopt one active activity and end extras, else request with content -1/-1 and pushType .token; emit the current pushToken and one pushTokenUpdates task per activity as notifyListeners('token', { token: lowercase hex, apsEnvironment: sandbox in DEBUG else production }, retainUntilConsumed: true)), and end (immediate dismissal, cancel tasks); in DEBUG load() honour -overdeckLiveActivityDemo N,M; log only token length; register it in MainViewController.capacitorDidLoad and add the file to the App target."
+        },
+        "items": [
+          {
+            "id": "ios-plugin.ac1",
+            "title": "The rig Simulator build compiles OverdeckLiveActivityPlugin.swift in the App target and prints ** BUILD SUCCEEDED **",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ios-plugin.ac2",
+            "title": "MainViewController.capacitorDidLoad contains bridge?.registerPluginInstance(OverdeckLiveActivityPlugin()) next to the OverdeckKeysPlugin registration",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ios-plugin.ac3",
+            "title": "start requests a new activity only when none is active, ends extra active activities, and emits token events carrying token and apsEnvironment (sandbox under #if DEBUG)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ios-plugin.ac4",
+            "title": "No print statement in the plugin logs the token value; the token log line prints only its character count",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "app-bridge",
+        "title": "App: OverdeckLiveActivity JS bridge and the Live Activity controller",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T20:53:31Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4839",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/src/native/liveActivity.ts",
+            "apps/mobile/src/shell/liveActivity.ts",
+            "apps/mobile/src/shell/__tests__/liveActivity.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:mobile",
+            "npx vitest run --config apps/mobile/vitest.config.ts apps/mobile/src/shell/__tests__/liveActivity.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:mobile completes without errors",
+            "liveActivity.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-9: create apps/mobile/src/native/liveActivity.ts (LiveActivityStatus, LiveActivityToken, OverdeckLiveActivityPlugin with status/start/end/addListener('token'), registerPlugin with a web fallback that answers unsupported) and apps/mobile/src/shell/liveActivity.ts (LIVE_ACTIVITY_SETTING_KEY = 'overdeck.liveActivity' where 'off' disables, liveActivityEnabled, setLiveActivityEnabled, createLiveActivityController({ plugin, directory, platform, enabled }) with refresh/disable/dispose: iOS only, validate tokens against /^[0-9a-f]{1,4096}$/, send activity-register when the directory is online and keep it pending otherwise, re-send on refresh, send activity-unregister on disable); write tests with a mocked plugin and directory."
+        },
+        "items": [
+          {
+            "id": "app-bridge.ac1",
+            "title": "On Android the controller makes no plugin call and sends no frame on refresh or disable",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "app-bridge.ac2",
+            "title": "On iOS with the setting on, refresh calls start, and a token event sends one activity-register frame containing that token and apsEnvironment",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "app-bridge.ac3",
+            "title": "When the directory is offline the registration is not sent, then onStateChange to online sends it, and a second refresh sends the same token again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "app-bridge.ac4",
+            "title": "With localStorage overdeck.liveActivity = 'off' refresh does not call start, disable calls end and sends activity-unregister, and a token \"AB/CD\" is ignored",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "app-wiring",
+        "title": "App: Settings switch, start-up and resume refresh, and sign-out ending the card",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T20:53:31Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4839",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/src/shell/ShellApp.tsx",
+            "apps/mobile/src/shell/SettingsScreen.tsx",
+            "apps/mobile/src/shell/lifecycle.ts",
+            "apps/mobile/src/shell/signOut.ts",
+            "apps/mobile/src/shell/__tests__/ShellApp.test.tsx",
+            "apps/mobile/src/shell/__tests__/lifecycle.test.tsx",
+            "apps/mobile/src/shell/__tests__/signOut.test.ts",
+            "apps/mobile/src/shell/__tests__/SettingsScreen.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:mobile",
+            "npx vitest run --config apps/mobile/vitest.config.ts apps/mobile/src/shell/__tests__/"
+          ],
+          "expected_outputs": [
+            "typecheck:mobile completes without errors",
+            "every shell test file passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-10: in ShellApp.tsx create the controller in the services effect, call refresh after directory.client.start(), pass liveActivity into installResumeHandler targets, dispose on cleanup, read status once for Settings and pass endLiveActivity to signOut; add an optional liveActivity target to ResumeTargets and call its refresh in resume(); add the Live Activity switch row to SettingsScreen.tsx (role switch, the FR-8 texts, hidden when unavailable) wired to setLiveActivityEnabled plus disable/refresh; add the end live activity step to signOut.ts after forget-client and before revoke device."
+        },
+        "items": [
+          {
+            "id": "app-wiring.ac1",
+            "title": "SettingsScreen renders a role=switch Live Activity row with the counts disclosure text when available and allowed, renders the 'Turn on Live Activities for Overdeck in iOS Settings.' text when not allowed, and renders nothing for Android",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "app-wiring.ac2",
+            "title": "Toggling the switch off stores 'off' under overdeck.liveActivity and calls controller.disable; toggling it on removes 'off' and calls controller.refresh",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "app-wiring.ac3",
+            "title": "resume() calls liveActivity.refresh when the target is present and still restarts the directory and transport when it is null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "app-wiring.ac4",
+            "title": "signOut sends forget-client, then calls endLiveActivity, then deleteDevice, and logs a rejected endLiveActivity without stopping the next step",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "acceptance",
+        "title": "Acceptance: Simulator screenshot of the card and the gated live APNs device checkpoint",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T20:53:31Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4839",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/ACCEPTANCE.md",
+            "apps/mobile/acceptance/11-live-activity-island.png",
+            "apps/mobile/acceptance/12-live-activity-lock.png"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "test -s apps/mobile/acceptance/11-live-activity-island.png",
+            "grep -n 'Live Activity (PAN-4839)' apps/mobile/ACCEPTANCE.md",
+            "curl -s https://connect.overdeck.ai/healthz"
+          ],
+          "expected_outputs": [
+            "the island screenshot exists and is non-empty",
+            "ACCEPTANCE.md has the Live Activity (PAN-4839) section",
+            "healthz JSON shows whether apns is true"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-11: on the Mac rig build Debug, create an iPhone 17 Pro Simulator, install, launch with xcrun simctl launch $U ai.overdeck.app -overdeckLiveActivityDemo 3,2, open com.apple.Preferences, save the Dynamic Island screenshot as apps/mobile/acceptance/11-live-activity-island.png, try the lock screen via osascript, delete the Simulator; then check connect healthz: if apns is true and a signed device build is possible, time a real update after an AskUserQuestion on the desktop, else record 'not run: APNs secrets unset (PAN-4841)' and comment on PAN-4841 (include the AC-12 check, the ai.overdeck.app.widgets App ID, and that the existing APNs key is reused); write the results and the comment URL into apps/mobile/ACCEPTANCE.md."
+        },
+        "items": [
+          {
+            "id": "acceptance.ac1",
+            "title": "apps/mobile/acceptance/11-live-activity-island.png exists and shows the Dynamic Island with 3 and 2 from the -overdeckLiveActivityDemo 3,2 launch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acceptance.ac2",
+            "title": "ACCEPTANCE.md contains a Live Activity (PAN-4839) section that records the Simulator result, the lock-screen result or 'lock screen not scriptable', and the healthz apns value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acceptance.ac3",
+            "title": "ACCEPTANCE.md records either a measured device update time in seconds or 'not run: APNs secrets unset (PAN-4841)' with the URL of the comment posted on PAN-4841",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Docs: Live Activity in CONNECT-SERVICE, push-notifications, ANYWHERE-ARCHITECTURE and the mobile README",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T20:53:31Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4839",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/CONNECT-SERVICE.md",
+            "configuration/push-notifications.mdx",
+            "docs/ANYWHERE-ARCHITECTURE.md",
+            "apps/mobile/README.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Live Activity (PAN-4839)' docs/CONNECT-SERVICE.md",
+            "grep -n 'Live Activity' configuration/push-notifications.mdx docs/ANYWHERE-ARCHITECTURE.md",
+            "! grep -n 'The Live Activity: PAN-4839' apps/mobile/README.md",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "CONNECT-SERVICE.md has the section",
+            "both files mention the Live Activity",
+            "the README no longer lists the Live Activity as missing",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-12: in docs/CONNECT-SERVICE.md add the activity-state.ts module row, a 'Live Activity (PAN-4839)' section (frames, tables, summing rule, refresh and priorities, exact APNs headers and body, dead tokens, logs), the 60-per-minute limit and the deploy-order note; in configuration/push-notifications.mdx add a 'Live Activity (iPhone)' subsection under The Overdeck app stating what the card shows and that Apple and overdeck.ai see only the two numbers; in docs/ANYWHERE-ARCHITECTURE.md add the phone Live Activity data-flow paragraph; in apps/mobile/README.md add the Layout rows, the demo launch argument and script note, delete the 'The Live Activity: PAN-4839.' line and note the ai.overdeck.app.widgets App ID for PAN-4841."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "docs/CONNECT-SERVICE.md contains a Live Activity (PAN-4839) section that shows the exact APNs body with only needsYou and running in content-state, and the Limits section shows the 60 per minute activity window",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "configuration/push-notifications.mdx contains a Live Activity (iPhone) subsection stating that Apple and overdeck.ai see the two counts and nothing else, that it is on by default, and that the app's Settings switch turns it off",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "apps/mobile/README.md no longer contains 'The Live Activity: PAN-4839.', and it shows the -overdeckLiveActivityDemo launch argument and the ai.overdeck.app.widgets App ID",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac4",
+            "title": "docs/ANYWHERE-ARCHITECTURE.md states that the two counts are the only phone data that leaves the secure channel in plain text and shows the machine to directory to APNs flow",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "contracts",
+        "to": "decoder",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts",
+        "to": "directory-activity",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts",
+        "to": "machine-sender",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts",
+        "to": "app-bridge",
+        "type": "blocks"
+      },
+      {
+        "from": "decoder",
+        "to": "directory-activity",
+        "type": "blocks"
+      },
+      {
+        "from": "apns-liveactivity",
+        "to": "directory-activity",
+        "type": "blocks"
+      },
+      {
+        "from": "machine-sender",
+        "to": "machine-service",
+        "type": "blocks"
+      },
+      {
+        "from": "ios-widget-target",
+        "to": "ios-plugin",
+        "type": "blocks"
+      },
+      {
+        "from": "app-bridge",
+        "to": "app-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "ios-widget-target",
+        "to": "acceptance",
+        "type": "blocks"
+      },
+      {
+        "from": "ios-plugin",
+        "to": "acceptance",
+        "type": "blocks"
+      },
+      {
+        "from": "app-wiring",
+        "to": "acceptance",
+        "type": "blocks"
+      },
+      {
+        "from": "directory-activity",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "machine-service",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "app-wiring",
+        "to": "docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

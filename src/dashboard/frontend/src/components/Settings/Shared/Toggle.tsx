@@ -17,7 +17,7 @@ export function Toggle({ checked, onChange, disabled = false, locked = false }: 
   return (
     <div
       className={cn(
-        'relative inline-flex h-6 w-11 items-center rounded-full transition-colors',
+        'relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors',
         checked ? 'bg-[#a078f7]' : 'bg-card',
         locked ? 'bg-[#a078f7]/40 cursor-not-allowed' : 'cursor-pointer',
         disabled && !locked && 'opacity-50 cursor-not-allowed'
@@ -25,6 +25,7 @@ export function Toggle({ checked, onChange, disabled = false, locked = false }: 
       onClick={handleClick}
       role="switch"
       aria-checked={checked}
+      aria-disabled={disabled || locked}
     >
       <span
         className={cn(

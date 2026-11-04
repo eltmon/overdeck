@@ -5,6 +5,35 @@
 
 import type { ComposerCommandResult } from '@overdeck/contracts';
 
+/** PAN-4641: a server-held message and the limit state it waits on (client hook: scheduledMessages.ts). */
+export type ScheduledMessageStatus = 'pending' | 'sending' | 'sent' | 'delivered' | 'failed' | 'unknown';
+
+/** Mirrors `ScheduledMessage` in src/lib/overdeck/conversation-scheduled-messages.ts. */
+export interface ScheduledMessage {
+  id: number;
+  conversationName: string;
+  text: string;
+  status: ScheduledMessageStatus;
+  notBefore: string;
+  resetSource: 'quota-limits' | 'message-text' | 'fallback' | null;
+  limitWindow: string | null;
+  attempts: number;
+  lastError: string | null;
+  createdAt: string;
+  updatedAt: string;
+  sentAt: string | null;
+  deliveredAt: string | null;
+}
+
+/** Mirrors `ConversationLimitState` in src/lib/overdeck/conversation-usage-limit.ts. */
+export interface ConversationLimitState {
+  limited: boolean;
+  resetsAt: string | null;
+  window: string | null;
+  source: 'quota-limits' | 'message-text' | null;
+  errorAt: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant' | 'system';
@@ -18,17 +47,21 @@ export interface ChatMessage {
   /** Local send identity and transcript reconciliation metadata. */
   clientMessageId?: string;
   echoBaselineIds?: string[];
-  deliveryState?: 'pending' | 'accepted' | 'unknown' | 'subagent' | 'held';
+  deliveryState?: 'pending' | 'accepted' | 'unknown' | 'subagent' | 'held' | 'scheduled';
   /** When deliveryState is 'held': epoch ms the server refused the paste because a
    * permission prompt was up (PAN-4278). Release waits for a newer feed read. */
   heldAt?: number;
   /** Set when deliveryState is 'subagent': the message routed into this running
    * subagent instead of the main conversation (PAN-4247). */
   deliveredToSubagent?: { agentId: string; description: string };
+  /** Set when deliveryState is 'scheduled': the server-held message (PAN-4641). */
+  scheduled?: ScheduledMessage;
   /** Local-only structured result for a dashboard-intercepted `/pan` command. */
   commandResult?: ComposerCommandResult;
   /** Exact command text that produced commandResult, used for confirmations. */
   commandText?: string;
+  /** Which human sent a shared prompt (Shared Sessions viewer timeline, PAN-4476). */
+  author?: { login: string; avatarUrl: string };
 }
 
 /** A user message or portable command whose send POST failed — held in the retry outbox. */

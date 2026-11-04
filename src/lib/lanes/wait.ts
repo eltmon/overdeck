@@ -12,11 +12,17 @@
  *
  * These run in the CLI, so lane views and transcripts come from the dashboard
  * API, never from the server modules.
+ *
+ * PAN-4638: a lane on another machine is judged from home's stand-in, which
+ * the dashboard's follower keeps in step with the owner. Its reports are
+ * mirrored into the same `conv-<name>` store. An unreachable owner counts as
+ * alive and never as idle, so a sleeping machine delays a report, never fails it.
  */
 import { conversationHarnessAlive } from '../overdeck/conversation-liveness.js';
 import { getDashboardApiUrl } from '../config.js';
 import { listWorkerReports, type WorkerReport } from '../agents/worker/report.js';
 import { waitForWorkerReport, WAIT_POLL_MS, type WaitDeps, type WaitOptions, type WaitOutcome } from '../agents/worker/wait.js';
+import { readRemoteLane, type RemoteLane } from './remote-lanes.js';
 import type { LaneView } from './views.js';
 
 /** The lane view fields the waits read. */
@@ -27,6 +33,29 @@ export interface LaneWaitDeps extends Pick<WaitDeps, 'now' | 'sleep' | 'listRepo
   fetchLane?: (name: string) => Promise<LaneWaitView | null>;
   fetchLastAssistantMessage?: (name: string) => Promise<string | null>;
   resolveTranscriptPath?: (name: string) => Promise<string | null>;
+  /** PAN-4638: the stand-in of a lane on another machine; null for a local lane. */
+  readStandIn?: (name: string) => Promise<RemoteLane | null>;
+}
+
+/** A stand-in by name; null for a local lane (or a name the stand-in store does not accept). */
+async function readStandInQuietly(name: string): Promise<RemoteLane | null> {
+  return readRemoteLane(name).catch(() => null);
+}
+
+/** WI-9 step 5: a remote lane is alive until archived, gone or stopped; an unreachable owner counts as alive. */
+function remoteLaneAlive(lane: RemoteLane): boolean {
+  if (lane.archivedAt !== null) return false;
+  const { mirror } = lane;
+  if (mirror === null || mirror.unreachableSince !== null) return true;
+  return mirror.state === 'running' && mirror.activity !== 'stopped';
+}
+
+/** Idle age from the mirror: none while unreachable, 0 while working. */
+function remoteIdleAgeMs(lane: RemoteLane, now: number): number | null {
+  const { mirror } = lane;
+  if (!mirror || mirror.unreachableSince !== null) return null;
+  if (mirror.activity === 'working') return 0;
+  return mirror.lastActivityAt ? now - Date.parse(mirror.lastActivityAt) : null;
 }
 
 async function dashboardJson(path: string): Promise<unknown> {
@@ -72,21 +101,30 @@ export function waitForLane(name: string, options: WaitOptions = {}, deps: LaneW
   const tmuxSession = `conv-${name}`;
   const harnessAlive = deps.harnessAlive ?? ((session: string) => conversationHarnessAlive(session));
   const fetchLane = deps.fetchLane ?? fetchLaneFromDashboard;
+  const readStandIn = deps.readStandIn ?? readStandInQuietly;
   return waitForWorkerReport(tmuxSession, options, {
     now: deps.now,
     sleep: deps.sleep,
     listReports: deps.listReports,
-    isAlive: async () => ((await harnessAlive(tmuxSession))
-      ? { alive: true, paneAlive: true }
-      : { alive: false, reason: 'no-session' }),
+    isAlive: async () => {
+      const remote = await readStandIn(name);
+      const alive = remote ? remoteLaneAlive(remote) : await harnessAlive(tmuxSession);
+      return alive ? { alive: true, paneAlive: true } : { alive: false, reason: 'no-session' };
+    },
     idleAgeMs: async (_id, now) => {
+      const remote = await readStandIn(name);
+      if (remote) return remoteIdleAgeMs(remote, now);
       const lane = await fetchLane(name).catch(() => null);
       if (!lane) return null;
       if (lane.activity === 'working') return 0;
       return lane.lastActivityAt ? now - Date.parse(lane.lastActivityAt) : null;
     },
-    fetchLastAssistantMessage: () => (deps.fetchLastAssistantMessage ?? fetchLastAssistantFromDashboard)(name),
-    resolveTranscriptPath: () => (deps.resolveTranscriptPath ?? resolveLaneTranscriptPath)(name),
+    fetchLastAssistantMessage: async () => {
+      const remote = await readStandIn(name);
+      if (remote) return remote.mirror?.lastAssistantMessage ?? null;
+      return (deps.fetchLastAssistantMessage ?? fetchLastAssistantFromDashboard)(name);
+    },
+    resolveTranscriptPath: async () => ((await readStandIn(name)) ? null : (deps.resolveTranscriptPath ?? resolveLaneTranscriptPath)(name)),
   });
 }
 

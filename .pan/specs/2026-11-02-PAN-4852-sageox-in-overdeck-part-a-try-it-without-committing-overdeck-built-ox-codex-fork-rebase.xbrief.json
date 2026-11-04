@@ -1,0 +1,1789 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T18:00:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4852: SageOx in Overdeck, part A: try it without committing, Overdeck-built ox, Codex, fork rebase",
+    "updated": "2026-11-03T02:45:10.834Z"
+  },
+  "plan": {
+    "id": "pan-4852",
+    "title": "SageOx in Overdeck, part A: try it without committing, Overdeck-built ox, Codex, fork rebase",
+    "status": "running",
+    "uid": "600e4d5c-196b-4de1-98f3-b1d64ce45f35",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-11-02T18:00:00.000Z",
+    "updated": "2026-11-03T02:45:10.834Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4852",
+        "label": "PAN-4852",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4820",
+        "label": "PAN-4820 (dependency)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4853",
+        "label": "PAN-4853 (part B)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "sageox",
+      "skill-packs",
+      "codex",
+      "merge-guard",
+      "fork"
+    ],
+    "metadata": {
+      "sizeJustification": "The operator already split SageOx part A (core) from part B (dashboard, PAN-4853); auto mode does not re-scope the issue's acceptance, which binds the fork rebase, the Overdeck-built ox, link/placement/switch-off, the merge guard plus commit, and Codex into this issue. Items are small, independently testable slices with a DAG; PRD section 11 gives the A1/A2/A3 sibling split if the operator wants Flywheel parallelism (precedent: PAN-4820 AD-21).",
+      "canonicalFilename": "2026-11-02-PAN-4852-sageox-in-overdeck-part-a-try-it-without-committing-overdeck-built-ox-codex-fork-rebase.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Using SageOx in an Overdeck project today means committing .sageox/ to the repository, building ox by hand into ~/.local/bin, and giving up on Codex launches; the eltmon/ox fork is 297 commits behind upstream.",
+      "Proposal": "Rebase the fork onto upstream v0.25.0 as new branches and pin the pack to it; build ox (plus the Claude Code and Codex adapters) under ~/.overdeck/packs/sageox at pack add/update/sync with a consent preview and an isolated Go env; store a per-project binding created by `pan skills pack sageox link` (host-managed ox init in a throwaway worktree); at launch place it into the issue worktree or primary checkout, hidden through a generalized worktree-exclude module shared with PAN-4820, and remove it at the next launch when SageOx is off; refuse .sageox/ in PRs unless the project ran `pan skills pack sageox commit`; give Codex launches six pre-trusted ox agent hook entries in the per-agent CODEX_HOME.",
+      "NonGoals": "- Dashboard views for SageOx (part B, PAN-4853)\n- Any upstream sageox/ox contact: no push, PR, issue or comment; no PR on the fork either\n- Force-pushing or moving the existing overdeck-base or overdeck/host-managed fork branches\n- Remote (Fly) launches\n- Harnesses other than Claude Code and Codex\n- Polyrepo workspaces for placement and the merge guard\n- Writing to ~/.local/bin or using an ox found on PATH\n- Running ox login, reading auth.json contents, or running the live link flow as an agent (operator-only)\n- Using --dangerously-bypass-hook-trust for Codex\n- Running git stash\n- Raising any file-size allowlist row"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fork rebase pushes new branches overdeck-base-v<tag> and overdeck/host-managed-v<tag>; no PR anywhere",
+        "rationale": "D7 forbids force pushes to existing branches, and gh pr create in a fork defaults to upstream, which D7 forbids."
+      },
+      {
+        "summary": "Fallback to the next older upstream tag (v0.24.2 … v0.23.0) when the rebased fork fails its tests",
+        "rationale": "Issue checkpoint 3 fallback, made mechanical; never weaken a fork test."
+      },
+      {
+        "summary": "KNOWN_PACKS.sageox.ref pins the 40-hex rebased head",
+        "rationale": "Same as pstack; pan skills pack add sageox then needs no --ref and the pin never moves silently."
+      },
+      {
+        "summary": "Build ox, ox-adapter-claude-code and ox-adapter-codex into <packdir>/<commit>/bin",
+        "rationale": "ox forks ox-adapter-<agent> found next to the ox binary to record sessions; without it Codex recording is silent (upstream issue #519)."
+      },
+      {
+        "summary": "Build env sets GOCACHE, GOMODCACHE, GOPATH and XDG_CONFIG_HOME under the pack dir plus GOFLAGS=-modcacherw",
+        "rationale": "Verified in planning: without XDG_CONFIG_HOME Go writes ~/.config/go/telemetry; -modcacherw keeps the pack dir deletable."
+      },
+      {
+        "summary": "Build readiness comes from a marker file and the directory, not from ox host-contract's commit",
+        "rationale": "An archive build has no VCS stamp, so host-contract reports commit \"\"; doctor would otherwise warn on every machine."
+      },
+      {
+        "summary": "No PATH fallback: launches, hooks, probes and doctor use only the built ox",
+        "rationale": "D5; ox on PATH on this machine is upstream 0.2.0."
+      },
+      {
+        "summary": "pan skills pack remove sageox keeps bindings/",
+        "rationale": "A binding needs ox login and the network to recreate and re-running ox init may register a second repo."
+      },
+      {
+        "summary": "The binding is every untracked, non-ignored file ox init creates under .sageox/ (usually five), max 50, must include config.json",
+        "rationale": "Matches exactly what a commit would contain without hard-coding the .repo_<uuid> name."
+      },
+      {
+        "summary": "link runs ox init in a detached throwaway worktree under the pack dir, with a fresh-clone fallback, and polls ox status up to 120 s for the ledger clone before removing it",
+        "rationale": "Issue D1 and checkpoint 1; recording needs the ledger clone (fork ledger CP-1), and the ledger path is keyed by repo_id, not by the worktree."
+      },
+      {
+        "summary": "Four .sageox/ states at launch: tracked, placed (marker), hand-made (untouched), absent",
+        "rationale": "D2/D3 cover only absent vs placed; an operator's own untracked .sageox/ must never be overwritten or deleted."
+      },
+      {
+        "summary": "Switch-off checks only <cwd>/.sageox/.overdeck-placed and runs no git call when it is absent",
+        "rationale": "Every Overdeck launch cwd is the root where placement happens; keeps the off path cheap for launches that never used SageOx."
+      },
+      {
+        "summary": "New src/lib/git/worktree-exclude.ts with per-owner blocks; Deft is repointed to it if PAN-4820 merged",
+        "rationale": "One core.excludesFile per worktree means Deft and SageOx must share one file; the issue asks to generalize rather than copy."
+      },
+      {
+        "summary": "The SageOx merge guard applies to every issue in every project when the gate is otherwise ready, fails closed, and counts a default branch that already tracks .sageox/ as committed",
+        "rationale": "D4 literal scope with bounded cost; a project that committed .sageox/ before Overdeck must still merge its legitimate updates."
+      },
+      {
+        "summary": "Guards compose in src/lib/cloister/repo-merge-guards.ts with one call per merge door (Deft first, then SageOx)",
+        "rationale": "D4 says extend PAN-4820's guard; one composed call per door avoids divergent wiring."
+      },
+      {
+        "summary": "commit records sageox_binding: committed only after the PR is opened, and uses git add -f",
+        "rationale": "A failed run records nothing; a primary-checkout info/exclude block hides .sageox/ in every worktree."
+      },
+      {
+        "summary": "Codex: Overdeck owns <codexHome>/hooks.json and writes trusted_hash entries computed with Codex's own algorithm, never --dangerously-bypass-hook-trust",
+        "rationale": "Codex 0.159 runs untrusted hooks never; the hash algorithm was reproduced exactly against a real trusted entry; bypass would also run a repo's .codex/hooks.json unreviewed."
+      },
+      {
+        "summary": "pan skills pack sageox status gains a link column (committed | held | none)",
+        "rationale": "The operator needs to see whether link ran; part B reads the same function."
+      },
+      {
+        "summary": "One xBRIEF with sizeJustification",
+        "rationale": "The operator already split part A from part B; auto mode does not re-scope acceptance (PAN-4820 precedent)."
+      }
+    ],
+    "items": [
+      {
+        "id": "fork-rebase",
+        "title": "Rebase the eltmon/ox fork onto the newest upstream release as new -v<tag> branches",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T18:00:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "infra",
+          "issueLabel": "pan-4852",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/SAGEOX-FORK.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git -C ~/Projects/ox-pan-2444 ls-remote origin 'refs/heads/overdeck-base-v*' 'refs/heads/overdeck/host-managed-v*'",
+            "cd ~/Projects/ox-pan-2444 && go test ./... -count=1",
+            "git -C ~/Projects/ox-pan-2444 remote get-url --push upstream"
+          ],
+          "expected_outputs": [
+            "ls-remote prints both new branches",
+            "go test exits 0 at the rebased head",
+            "push URL prints DISABLED"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-5"
+          ],
+          "readinessReason": "Runs in the external fork clone; its only Overdeck file is docs/SAGEOX-FORK.md, serialized before docs."
+        },
+        "narrative": {
+          "Action": "PRD WI-1: in ~/Projects/ox-pan-2444 fetch upstream, create overdeck-base-<tag> at the newest upstream release tag (expected v0.25.0) and rebase overdeck/host-managed onto it as overdeck/host-managed-<tag>; keep every host-managed behavior (F2-F6), gate any new Codex repo write under OX_HOST_MANAGED, run the fork tests, push only the two new branches to origin (never --force, never upstream, no PR anywhere), apply the AD-2 older-tag fallback on failure, re-read codexHookEvents at the new head, and update docs/SAGEOX-FORK.md (branch rows, F7 entry, Building section)."
+        },
+        "items": [
+          {
+            "id": "fork-rebase.ac1",
+            "title": "Given the rebase, when `git ls-remote origin` runs in the fork clone, then it returns `overdeck-base-v<tag>` at the upstream tag commit and `overdeck/host-managed-v<tag>`, and the existing `overdeck-base` and `overdeck/host-managed` refs keep their old commits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-rebase.ac2",
+            "title": "`go test ./... -count=1` exits 0 at the head of `overdeck/host-managed-v<tag>`, and the ledger records the command and result",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-rebase.ac3",
+            "title": "`docs/SAGEOX-FORK.md` shows the new base and head commits in the Branches table and an `F7 fork-rebase` entry naming the tag and the conflicts resolved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-rebase.ac4",
+            "title": "`git remote get-url --push upstream` in the fork clone still prints `DISABLED`, and no ref, PR or issue was created on sageox/ox",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ox-build",
+        "title": "Add the ox build module (go build into <packdir>/<commit>/bin with an isolated Go env)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T18:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4852",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-packs/ox-build.ts",
+            "src/lib/skill-packs/__tests__/ox-build.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/skill-packs/__tests__/ox-build.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "ox-build.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-6"
+          ],
+          "foundationFor": [
+            "pack-builds-ox",
+            "ox-binary",
+            "launch-uses-built-ox",
+            "doctor-built-ox"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2: new src/lib/skill-packs/ox-build.ts (node:* imports only) exporting OX_BUILD_MARKER, OX_BINARIES (ox, ox-adapter-claude-code, ox-adapter-codex), OxBuildError, oxBuildEnv (GOCACHE/GOMODCACHE/GOPATH/XDG_CONFIG_HOME under goDir, GOFLAGS -modcacherw), oxBuildCommands, assertGoAvailable, oxBuildDownloads, isOxBuildReady and buildOx with an injectable runner; failure removes bin/, the marker is written last."
+        },
+        "items": [
+          {
+            "id": "ox-build.ac1",
+            "title": "Given an injected runner, when `buildOx` runs, then it executes `go build -o <extract>/bin/<name> ./cmd/<name>` for ox, ox-adapter-claude-code and ox-adapter-codex with cwd = the extraction and env GOCACHE, GOMODCACHE, GOPATH and XDG_CONFIG_HOME all under goDir and GOFLAGS containing `-modcacherw`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ox-build.ac2",
+            "title": "After a successful build `isOxBuildReady(dir, commit)` returns true, and returns false for a different commit or when `bin/.overdeck-ox-build.json` is missing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ox-build.ac3",
+            "title": "When the second go build fails, `buildOx` throws an OxBuildError whose message ends with the stderr tail and leaves no `bin/` directory",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ox-build.ac4",
+            "title": "When `go version` fails, `assertGoAvailable` rejects with exactly `pack sageox needs go on PATH (https://go.dev/dl/)`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pack-builds-ox",
+        "title": "Build ox at pack add, update and sync, with a consent preview naming commands, paths and downloads",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T18:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4852",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-packs/sources.ts",
+            "src/cli/commands/skills.ts",
+            "src/lib/skill-packs/__tests__/sources-sageox.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/skill-packs/__tests__/sources-sageox.test.ts src/lib/skill-packs/__tests__/sources.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "sources-sageox.test.ts and sources.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3: for id sageox, addPack and updatePack (when the commit moves) set PackPreview.oxBuild {commands, writes, downloads} before confirm and build after consent before the registry write; syncPack builds a not-ready trusted commit without asking; Go missing maps to PackSourceError('render', 'pack sageox needs go on PATH (https://go.dev/dl/)'); printPackPreview prints Builds, Writes and Downloads rows."
+        },
+        "items": [
+          {
+            "id": "pack-builds-ox.ac1",
+            "title": "Given `addPack` for sageox, when confirm is called, then the preview's `oxBuild.commands` names `<packdir>/<commit>/bin/ox` and `oxBuild.writes` names `<packdir>/<commit>/bin/` and `<packdir>/go/`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pack-builds-ox.ac2",
+            "title": "A declined confirm creates no registry entry and runs no build; an accepted add returns with `isOxBuildReady` true before the registry entry is written",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pack-builds-ox.ac3",
+            "title": "`syncPack('sageox')` with a deleted `bin/` creates it again and returns without calling confirm",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pack-builds-ox.ac4",
+            "title": "`pan skills pack add sageox` without --yes on a TTY prints `Builds`, `Writes` and `Downloads` rows before the trust question",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "remove-keeps-bindings",
+        "title": "Keep the SageOx binding store when the sageox pack is removed",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T18:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4852",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-packs/sources.ts",
+            "src/cli/commands/skills.ts",
+            "src/lib/skill-packs/__tests__/sources-sageox.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/skill-packs/__tests__/sources-sageox.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "sources-sageox.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4: removePack('sageox') deletes every child of the pack dir except bindings/ and returns keptBindings; the CLI prints the AD-10 line naming the kept path."
+        },
+        "items": [
+          {
+            "id": "remove-keeps-bindings.ac1",
+            "title": "Given a pack dir with bindings/app/config.json, bin/, go/ and repo.git/, when `removePack('sageox')` runs, then bindings/app/config.json still exists and bin/, go/ and repo.git/ do not",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remove-keeps-bindings.ac2",
+            "title": "`pan skills pack remove sageox` prints `kept SageOx link files in <packdir>/bindings/` when the binding store exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remove-keeps-bindings.ac3",
+            "title": "`removePack` for any other pack id still deletes the whole pack dir",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "repin-pack",
+        "title": "Pin KNOWN_PACKS.sageox.ref to the rebased fork head",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T18:00:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-4852",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-packs/adapters.ts",
+            "src/lib/skill-packs/__tests__/adapters.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/skill-packs/__tests__/adapters.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "adapters.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5: set KNOWN_PACKS.sageox.ref to the 40-hex head of overdeck/host-managed-v<tag> from fork-rebase, with a comment citing PAN-4852 and docs/SAGEOX-FORK.md."
+        },
+        "items": [
+          {
+            "id": "repin-pack.ac1",
+            "title": "`KNOWN_PACKS.sageox.ref` equals the head commit of `overdeck/host-managed-v<tag>` recorded in docs/SAGEOX-FORK.md, and adapters.test.ts passes its /^[0-9a-f]{40}$/ assertion",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "repin-pack.ac2",
+            "title": "`pan skills pack add sageox --yes` with no --ref resolves to that commit (preview Source line shows its short SHA)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ox-binary",
+        "title": "Resolve the built ox binary for the trusted sageox commit",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T18:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4852",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/sageox/binary.ts",
+            "src/lib/sageox/__tests__/binary.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/sageox/__tests__/binary.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "binary.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6: new src/lib/sageox/binary.ts resolveOxBinary() returning {ok:true, bin, binDir, commit} for a registered, ready build, else not-registered or not-built with the PRD messages."
+        },
+        "items": [
+          {
+            "id": "ox-binary.ac1",
+            "title": "Given a registered sageox pack whose build is ready, `resolveOxBinary()` returns ok with bin = `<packdir>/<commit>/bin/ox`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ox-binary.ac2",
+            "title": "Given a registered pack without a ready build, it returns reason `not-built` with a message naming `pan skills pack sync sageox`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ox-binary.ac3",
+            "title": "Given no registry entry, it returns reason `not-registered` with a message naming `pan skills pack add sageox`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "launch-uses-built-ox",
+        "title": "Probe and Claude Code hooks use the built ox by absolute path",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T18:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4852",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/sageox/launch.ts",
+            "src/lib/sageox/__tests__/launch.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/sageox/__tests__/launch.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "launch.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7: SageoxLaunchDeps gains resolveBinary and probe(bin); resolve probes the built ox; sageoxClaudeHooks builds AD-25 commands with the absolute bin through a shared oxHookCommand(bin, env, agentEnv, event); a not-built binary yields one warning and active:false."
+        },
+        "items": [
+          {
+            "id": "launch-uses-built-ox.ac1",
+            "title": "Given an active launch, each Claude hook command contains the absolute built ox path and `[ -x`, and contains no `command -v ox`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-uses-built-ox.ac2",
+            "title": "The probe receives the built ox path, never bare `ox`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-uses-built-ox.ac3",
+            "title": "Given a not-built binary, `resolveSageoxLaunch` returns active:false with exactly one warning naming `pan skills pack sync sageox`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "doctor-built-ox",
+        "title": "pan doctor reports the Overdeck-built ox instead of ox on PATH",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T18:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4852",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/doctor-sageox.ts",
+            "src/cli/commands/__tests__/doctor-sageox.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/cli/commands/__tests__/doctor-sageox.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "doctor-sageox.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8: deps become resolveBinary + probe(bin); rows per AD-7 (no row when not registered; warn with fix `pan skills pack sync sageox` when not built or the probe fails; ok `built ox at <bin>; host contract overdeck-host/1, ox <version>; pack <short>`); delete the ~/.local/bin FIX."
+        },
+        "items": [
+          {
+            "id": "doctor-built-ox.ac1",
+            "title": "Given a ready build whose probe answers overdeck-host/1, `checkSageox` returns status ok with a message starting `built ox at <packdir>/<commit>/bin/ox`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-built-ox.ac2",
+            "title": "Given a not-built pack, it returns warn with fix `pan skills pack sync sageox`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-built-ox.ac3",
+            "title": "No message or fix returned by `checkSageox` contains `~/.local/bin`, and an empty probe commit no longer produces a warning",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "worktree-exclude",
+        "title": "Generalize the hide into src/lib/git/worktree-exclude.ts with per-owner blocks (Deft and SageOx share one file)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T18:00:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "refactor",
+          "issueLabel": "pan-4852",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/git/worktree-exclude.ts",
+            "src/lib/git/__tests__/worktree-exclude.test.ts",
+            "src/lib/deft/install.ts",
+            "src/lib/deft/uninstall.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/git/__tests__/worktree-exclude.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "worktree-exclude.test.ts passes (and PAN-4820's install/uninstall tests when present)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7"
+          ],
+          "foundationFor": [
+            "placement",
+            "switch-off",
+            "launch-placement-wiring"
+          ],
+          "acJustification": "Five criteria: the module plus the conditional PAN-4820 repoint must both be verified.",
+          "readinessReason": "Owns new src/lib/git/worktree-exclude.ts; the only item touching src/lib/deft/."
+        },
+        "narrative": {
+          "Action": "PRD WI-9: excludeTarget (linked worktree -> <gitdir>/info/overdeck-exclude via git config --worktree core.excludesFile with extensions.worktreeConfig, seeded with a copy of the global excludes; primary checkout -> info/exclude), setExcludeBlock/readExcludeBlock/removeExcludeBlock with '# overdeck:<owner> begin/end' blocks; checkpoint: if PAN-4820 merged, repoint src/lib/deft install/uninstall to this module with the legacy overdeck-deft-exclude cleanup."
+        },
+        "items": [
+          {
+            "id": "worktree-exclude.ac1",
+            "title": "Given a linked worktree, when `setExcludeBlock(worktree, 'sageox', ['/.sageox/'])` runs, then a new `.sageox/config.json` there is absent from `git status --porcelain`, while an untracked `.sageox/` in the primary checkout still shows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "worktree-exclude.ac2",
+            "title": "Setting `deft` then `sageox` keeps both blocks; removing `deft` keeps `core.excludesFile`; removing `sageox` too unsets the worktree key and deletes the file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "worktree-exclude.ac3",
+            "title": "In the primary checkout the block is written to `.git/info/exclude`, an unrelated existing line is preserved byte-for-byte, and `removeExcludeBlock` restores the other lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "worktree-exclude.ac4",
+            "title": "A pattern from the global excludes file still applies in the worktree after `setExcludeBlock`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "worktree-exclude.ac5",
+            "title": "When PAN-4820's src/lib/deft/install.ts exists, its hide applies `setExcludeBlock(worktree, 'deft', …)` and `npx vitest run src/lib/deft/__tests__/install.test.ts src/lib/deft/__tests__/uninstall.test.ts` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "binding-store",
+        "title": "Add the SageOx binding store, link state and the sageox_binding committed flag",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T18:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4852",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/sageox/binding.ts",
+            "src/lib/sageox/__tests__/binding.test.ts",
+            "src/lib/sageox/config.ts",
+            "src/lib/sageox/__tests__/config.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/sageox/__tests__/binding.test.ts src/lib/sageox/__tests__/config.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "binding.test.ts and config.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-9",
+            "FR-10",
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10: binding.ts (bindingDir, readBinding, writeBinding atomic with AD-11 limits, defaultBranchTracksSageox, readSageoxLinkState) and config.ts (sageox_binding?: 'committed', readSageoxBindingCommitted, setSageoxBindingCommitted)."
+        },
+        "items": [
+          {
+            "id": "binding-store.ac1",
+            "title": "`writeBinding` then `readBinding` returns the same sorted file list including `.repo_<uuid>` and `.gitignore`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "binding-store.ac2",
+            "title": "`writeBinding` rejects a source without `config.json` and a source with 51 files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "binding-store.ac3",
+            "title": "`defaultBranchTracksSageox` returns true for a scratch repo whose main commits `.sageox/config.json` and false otherwise",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "binding-store.ac4",
+            "title": "`setSageoxBindingCommitted('app')` persists `sageox_binding: committed` in projects.yaml and returns changed:false on a second call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "placement",
+        "title": "Place the binding into a launch root and hide it, respecting tracked and hand-made .sageox/",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T18:00:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4852",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/sageox/placement.ts",
+            "src/lib/sageox/__tests__/placement.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/sageox/__tests__/placement.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "placement.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7"
+          ],
+          "foundationFor": [
+            "switch-off",
+            "launch-placement-wiring",
+            "codex-hooks"
+          ],
+          "readinessReason": "Owns new file placement.ts and its test; reads binding.ts and worktree-exclude.ts APIs only after their items land."
+        },
+        "narrative": {
+          "Action": "PRD WI-11: sageoxDirState (tracked/placed/hand-made/absent) and ensureSageoxPlaced: tracked and hand-made untouched; absent/placed -> hide first via setExcludeBlock(root,'sageox',['/.sageox/']), copy binding files atomically, write the .overdeck-placed marker last; no binding -> warning naming `pan skills pack sageox link --project <key>`."
+        },
+        "items": [
+          {
+            "id": "placement.ac1",
+            "title": "Given SageOx placement for one issue worktree, `<worktree>/.sageox/config.json` exists, `git status --porcelain` in that worktree prints nothing, and neither the primary checkout nor a second worktree has `.sageox/`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "placement.ac2",
+            "title": "Placement in the primary checkout writes a `# overdeck:sageox begin` block in `.git/info/exclude` and `git status --porcelain` prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "placement.ac3",
+            "title": "With `.sageox/config.json` tracked on main, or a hand-made untracked `.sageox/`, placement creates no marker and preserves every byte under `.sageox/`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "placement.ac4",
+            "title": "With no binding stored, `ensureSageoxPlaced` returns ok:false with a warning containing `pan skills pack sageox link --project app`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "switch-off",
+        "title": "Remove a placed binding when SageOx is off, keeping the hide and ox runtime folders",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T18:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4852",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/sageox/placement.ts",
+            "src/lib/sageox/__tests__/placement.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/sageox/__tests__/placement.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "placement.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-12: removeSageoxPlacement(root): no marker -> no-op without any git call; else delete each marker-listed file that git does not track (resolved inside .sageox/), then the marker; keep the exclude block and every other file."
+        },
+        "items": [
+          {
+            "id": "switch-off.ac1",
+            "title": "After placement plus `logs/x.log` and `cache/y`, `removeSageoxPlacement` deletes the marker-listed files and the marker, keeps `logs/x.log` and `cache/y`, and `git status --porcelain` still prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "switch-off.ac2",
+            "title": "With `.sageox/config.json` tracked and a stale marker, the tracked file survives and the marker is deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "switch-off.ac3",
+            "title": "A marker listing `../outside` deletes nothing outside `.sageox/`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "launch-placement-wiring",
+        "title": "Call placement when SageOx is on and switch-off when it is off at every launch",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T18:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4852",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/sageox/launch.ts",
+            "src/lib/sageox/__tests__/launch.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/sageox/__tests__/launch.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "launch.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-13: off path calls removePlacement(ctx.cwd); on path order git root -> built binary -> probe -> project key -> place(root, key); remove the old isDirectory(.sageox) check and its `ox init there once` warning; errors become one warning, never a failed launch."
+        },
+        "items": [
+          {
+            "id": "launch-placement-wiring.ac1",
+            "title": "Given SageOx off and a placed `.sageox/` at cwd, the launch calls removePlacement(cwd) and returns no settings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-placement-wiring.ac2",
+            "title": "Given SageOx on, a binding and a passing probe, the launch places the binding and returns env and hooks",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-placement-wiring.ac3",
+            "title": "Given SageOx on and no binding, the launch returns active:false with the `pan skills pack sageox link` warning",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-placement-wiring.ac4",
+            "title": "A throwing placement prints exactly one `[launcher] WARNING:` line, returns active:false, and the launch itself proceeds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "link-command",
+        "title": "Add pan skills pack sageox link (host-managed ox init in a throwaway worktree into the binding store)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T18:00:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4852",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/sageox/link.ts",
+            "src/lib/sageox/__tests__/link.test.ts",
+            "src/cli/commands/skills-sageox.ts",
+            "src/cli/commands/skills.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/sageox/__tests__/link.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "link.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-4"
+          ],
+          "acJustification": "Five criteria: four library outcomes plus the CLI surface.",
+          "readinessReason": "Owns new link.ts and skills-sageox.ts; its one skills.ts line is serialized by blocks edges."
+        },
+        "narrative": {
+          "Action": "PRD WI-14: linkSageoxProject(projectKey, {team}, deps): resolve project and default branch, built ox, login-file check (AD-14), committed check, already-linked check, detached throwaway worktree under <packdir>/tmp, `ox init --quiet [--team]` with OX_HOST_MANAGED=1 OX_HOST_NETWORK=on, verify only .sageox/ changed (fresh-clone fallback once), store the AD-11 file set, poll `ox status --json` up to 120 s (checkpoint: find the ledger field), remove the worktree in finally. CLI in new skills-sageox.ts registered from skills.ts."
+        },
+        "items": [
+          {
+            "id": "link-command.ac1",
+            "title": "Given an injected ox runner that writes five files, `linkSageoxProject` stores them in `<packdir>/bindings/<key>/`, `git worktree list` afterwards shows only the primary checkout, and the primary checkout's `git status --porcelain` is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "link-command.ac2",
+            "title": "Without `auth.json`, it rejects with a message starting `SageOx login not found. Run:` and creates no worktree",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "link-command.ac3",
+            "title": "When main tracks `.sageox/config.json`, it returns status committed and never runs `ox init`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "link-command.ac4",
+            "title": "With fake timers and an `ox status` that never reports the ledger, advancing 120 s returns ledger `pending`, keeps the binding and removes the worktree",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "link-command.ac5",
+            "title": "`pan skills pack sageox link --help` prints the `--project <key>` and `--team <team>` options",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "merge-guard",
+        "title": "Add the SageOx merge guard rule and its changed-path reader",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T18:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4852",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/sageox/merge-guard.ts",
+            "src/lib/sageox/__tests__/merge-guard.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/sageox/__tests__/merge-guard.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "merge-guard.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-15: evaluateSageoxMergeGuard (pure), readSageoxChangedPaths (git diff --name-only -z <base>...<head> -- .sageox, one fetch retry), sageoxMergeGuardForIssue (committed from flag or tracked default branch; worktree else project root; polyrepo skipped; null head or git failure refuses)."
+        },
+        "items": [
+          {
+            "id": "merge-guard.ac1",
+            "title": "`evaluateSageoxMergeGuard` refuses `.sageox/config.json` with committed:false and the reason names `pan skills pack sageox commit --project <key>`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-guard.ac2",
+            "title": "It passes the same path with committed:true and passes `src/a.ts` with committed:false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-guard.ac3",
+            "title": "In a scratch repo where HEAD adds `.sageox/README.md`, `readSageoxChangedPaths` returns that path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-guard.ac4",
+            "title": "`sageoxMergeGuardForIssue` with a null head returns ok:false with `could not read the PR's changed files` (fail closed)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "merge-gate-wiring",
+        "title": "Run the composed repo merge guards (Deft, then SageOx) in evaluateIssueMergeGate and forge-merge",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T18:00:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4852",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/repo-merge-guards.ts",
+            "src/lib/cloister/__tests__/repo-merge-guards.test.ts",
+            "src/lib/cloister/merge-gate.ts",
+            "src/dashboard/server/routes/workspaces/merge-ops.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/cloister/__tests__/repo-merge-guards.test.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "repo-merge-guards.test.ts passes",
+            "lint passes (file-size and no-execSync guards)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "readinessReason": "Owns repo-merge-guards.ts and is the only item editing merge-gate.ts and merge-ops.ts."
+        },
+        "narrative": {
+          "Action": "PRD WI-16: new repo-merge-guards.ts evaluateRepoMergeGuards(issueId, {headSha, headBranch}, deps) running PAN-4820's Deft guard (null for non-Deft issues or when PAN-4820 is absent) then the SageOx guard; evaluateIssueMergeGate calls it once when readiness is otherwise ready; the forge-merge route calls it before the merge-set loop and returns 409 refused; replace PAN-4820's direct Deft calls in both places. Every refusal reason caused by an unreadable diff names the fix: `fetch the PR head in <path>`."
+        },
+        "items": [
+          {
+            "id": "merge-gate-wiring.ac1",
+            "title": "Given a green, approved, mergeable PR whose diff adds `.sageox/config.json` in a project without a committed binding, `evaluateIssueMergeGate` returns ready:false with the SageOx reason",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-gate-wiring.ac2",
+            "title": "After `sageox_binding: committed` is set for that project, the same gate returns ready:true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-gate-wiring.ac3",
+            "title": "When both Deft and SageOx refuse, the Deft reason and `deftDrift` are returned; a not-ready readiness never calls the guards",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-gate-wiring.ac4",
+            "title": "`POST /api/issues/:issueId/forge-merge` returns 409 with `refused: true` and `Cannot merge:` plus the SageOx reason for that PR",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "codex-hooks",
+        "title": "Give Codex launches SageOx: six pre-trusted ox agent hook entries in the per-agent CODEX_HOME",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T18:00:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4852",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/sageox/codex-hooks.ts",
+            "src/lib/sageox/__tests__/codex-hooks.test.ts",
+            "src/lib/sageox/launch.ts",
+            "src/cli/commands/skills.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/sageox/__tests__/codex-hooks.test.ts src/lib/sageox/__tests__/launch.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "codex-hooks.test.ts and launch.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "NFR-7"
+          ],
+          "acJustification": "Five criteria: hash golden, file shape, TOML coexistence, launch path and the live trust check.",
+          "readinessReason": "Owns new codex-hooks.ts; its launch.ts and skills.ts edits are serialized by blocks edges."
+        },
+        "narrative": {
+          "Action": "PRD WI-17: codex-hooks.ts writes <codexHome>/hooks.json for SessionStart, PreToolUse, PostToolUse, UserPromptSubmit, Stop, SessionEnd (timeout 30, SessionEnd 3; commands via oxHookCommand with AGENT_ENV=codex and the absolute built ox) and a '# overdeck:sageox-hooks' block of [hooks.state.\"<path>:<snake>:0:0\"] trusted_hash tables (sha256 of sorted compact JSON {event_name, hooks:[{type,command,timeout,async:false}]}); remove the Codex refusal in launch.ts; the launch-settings Codex branch writes or removes them fail-open. Live checkpoint: codex app-server hooks/list shows the six trusted."
+        },
+        "items": [
+          {
+            "id": "codex-hooks.ac1",
+            "title": "`codexHookTrustHash('session_start', <the verified command from PRD 3.4>, 10)` returns `sha256:9a9311f083ae0743a51676ae5bae444af736815ebffd02d5c81619ea19db90af`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-hooks.ac2",
+            "title": "`writeSageoxCodexHooks` writes six events to hooks.json with SessionEnd timeout 3, and every command contains the absolute built ox path and `AGENT_ENV=codex`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-hooks.ac3",
+            "title": "After initCodexHome-style content, `writeCodexSkillOverrides` and `writeSageoxCodexHooks`, config.toml parses with @iarna/toml, holds both marked blocks and has no bare `[hooks.state]` line; `removeSageoxCodexHooks` deletes hooks.json and keeps the skill block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-hooks.ac4",
+            "title": "A Codex launch with SageOx on returns active settings instead of the `supports Claude Code launches only` warning",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-hooks.ac5",
+            "title": "Live: `hooks/list` from `codex app-server` with the prepared CODEX_HOME returns the six SageOx hooks as trusted, and a session start runs `ox agent hook SessionStart`; the commands and output are recorded in the PRD Implementation notes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "status-link-column",
+        "title": "Show each project's SageOx link state in pan skills pack sageox status",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T18:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4852",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/skills.ts",
+            "src/cli/commands/__tests__/skills.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/cli/commands/__tests__/skills.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "skills.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-18: add the link column (committed | held | none) from readSageoxLinkState to the table and JSON rows; the not-registered hint becomes `pan skills pack add sageox`."
+        },
+        "items": [
+          {
+            "id": "status-link-column.ac1",
+            "title": "`pan skills pack sageox status --json` returns `link: \"held\"` for a project with a stored binding and `link: \"none\"` for one without",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "status-link-column.ac2",
+            "title": "The text table prints a `link` column for every project row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "status-link-column.ac3",
+            "title": "With the pack unregistered, the command prints the hint `Add it with: pan skills pack add sageox`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "commit-command",
+        "title": "Add pan skills pack sageox commit (one PR with only the binding files, then record sageox_binding: committed)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T18:00:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4852",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/sageox/commit.ts",
+            "src/lib/sageox/__tests__/commit.test.ts",
+            "src/cli/commands/skills-sageox.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/sageox/__tests__/commit.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "commit.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ],
+          "readinessReason": "Owns new commit.ts; its skills-sageox.ts edit is serialized after link-command."
+        },
+        "narrative": {
+          "Action": "PRD WI-19: commitSageoxBinding per AD-22: needs a binding; tracked default branch -> record flag, exit 0; else throwaway worktree on overdeck/sageox-link from origin/<default>, copy binding into .sageox/, git add -f, commit, push, open the PR via getForgeAdapter(forge).createReviewArtifact, then setSageoxBindingCommitted; worktree removed in finally; idempotent re-runs."
+        },
+        "items": [
+          {
+            "id": "commit-command.ac1",
+            "title": "Given a stored binding, the pushed branch `overdeck/sageox-link` differs from main only by the binding files under `.sageox/` (`git diff --name-only origin/main...origin/overdeck/sageox-link`)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "commit-command.ac2",
+            "title": "With `/.sageox/` in `.git/info/exclude`, the pushed commit still contains the binding files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "commit-command.ac3",
+            "title": "`sageox_binding: committed` is written only after createArtifact succeeds, and not when it throws",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "commit-command.ac4",
+            "title": "When main already tracks `.sageox/config.json`, it returns already-committed and pushes nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "build-home-check",
+        "title": "Add scripts/check-sageox-build-home.sh and prove an empty HOME stays clean outside ~/.overdeck",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T18:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4852",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/check-sageox-build-home.sh"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash -n scripts/check-sageox-build-home.sh",
+            "PAN=\"node dist/cli/index.js\" bash scripts/check-sageox-build-home.sh"
+          ],
+          "expected_outputs": [
+            "bash -n exits 0",
+            "the script exits 0 and prints no offending paths"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-20: the script runs `pan skills pack add sageox --yes` with HOME and OVERDECK_HOME in a fresh mktemp dir, fails on any path outside $H/.overdeck or any child of $H/.overdeck/packs other than sageox, never runs the built ox, and removes only its mktemp dir. Run it once and paste the output into the PRD Implementation notes."
+        },
+        "items": [
+          {
+            "id": "build-home-check.ac1",
+            "title": "Given Go and network, the script exits 0 after building, and `<tmp>/.overdeck/packs/sageox/<commit>/bin/ox` existed before cleanup",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "build-home-check.ac2",
+            "title": "Running the script's two `find` checks against a temp HOME that contains `.config/go/telemetry/x` prints that path and exits 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "build-home-check.ac3",
+            "title": "The PRD's Implementation notes section contains the script's output from one real run",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document Overdeck-built ox, link/placement/switch-off, the merge guard, commit, Codex support and the fork rebase",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T18:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-4852",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/skill-packs.mdx",
+            "cli/skills-commands.mdx",
+            "docs/SKILL-PACKS.md",
+            "docs/SAGEOX-FORK.md",
+            "CHANGELOG.md",
+            "src/lib/sageox/disclosure.ts",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "lint passes, including lint:docs",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-8",
+            "FR-9",
+            "FR-10",
+            "FR-11",
+            "FR-12",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-21: update the sageox rows and the SageOx section of features/skill-packs.mdx (setup steps add/login/link/on/commit, the four .sageox/ states, hide, switch-off at next launch, merge guard message, Codex, host-managed differences in SageOx's own words), add `pan skills pack sageox link` and `commit` sections and the status link column to cli/skills-commands.mdx, module and paragraph rows in docs/SKILL-PACKS.md, the Building wording in docs/SAGEOX-FORK.md, a CHANGELOG Unreleased entry ending (PAN-4852), the disclosure sentence, and the architecture.md SageOx sentence with a new last-verified date."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "`features/skill-packs.mdx` no longer contains `supports Claude Code launches only` or `go build -o ~/.local/bin/ox`, and its SageOx section names `pan skills pack sageox link`, `pan skills pack sageox commit` and Codex",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "`cli/skills-commands.mdx` contains the headings `## pan skills pack sageox link` and `## pan skills pack sageox commit`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "`docs/SKILL-PACKS.md` contains rows for ox-build.ts, worktree-exclude.ts, repo-merge-guards.ts and every new src/lib/sageox module, and `CHANGELOG.md` contains a PAN-4852 bullet under `## Unreleased`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac4",
+            "title": "`SAGEOX_DISCLOSURE` ends with `Overdeck builds ox from the eltmon/ox fork; see \\`pan doctor\\`.` and the Skills page row renders that text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "fork-rebase",
+        "to": "repin-pack",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-rebase",
+        "to": "codex-hooks",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-rebase",
+        "to": "build-home-check",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-rebase",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "ox-build",
+        "to": "pack-builds-ox",
+        "type": "blocks"
+      },
+      {
+        "from": "ox-build",
+        "to": "ox-binary",
+        "type": "blocks"
+      },
+      {
+        "from": "pack-builds-ox",
+        "to": "remove-keeps-bindings",
+        "type": "blocks"
+      },
+      {
+        "from": "pack-builds-ox",
+        "to": "build-home-check",
+        "type": "blocks"
+      },
+      {
+        "from": "repin-pack",
+        "to": "build-home-check",
+        "type": "blocks"
+      },
+      {
+        "from": "ox-binary",
+        "to": "launch-uses-built-ox",
+        "type": "blocks"
+      },
+      {
+        "from": "ox-binary",
+        "to": "doctor-built-ox",
+        "type": "blocks"
+      },
+      {
+        "from": "ox-binary",
+        "to": "link-command",
+        "type": "blocks"
+      },
+      {
+        "from": "launch-uses-built-ox",
+        "to": "launch-placement-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "launch-placement-wiring",
+        "to": "codex-hooks",
+        "type": "blocks"
+      },
+      {
+        "from": "worktree-exclude",
+        "to": "placement",
+        "type": "blocks"
+      },
+      {
+        "from": "binding-store",
+        "to": "placement",
+        "type": "blocks"
+      },
+      {
+        "from": "binding-store",
+        "to": "link-command",
+        "type": "blocks"
+      },
+      {
+        "from": "binding-store",
+        "to": "merge-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "binding-store",
+        "to": "status-link-column",
+        "type": "blocks"
+      },
+      {
+        "from": "binding-store",
+        "to": "commit-command",
+        "type": "blocks"
+      },
+      {
+        "from": "placement",
+        "to": "switch-off",
+        "type": "blocks"
+      },
+      {
+        "from": "switch-off",
+        "to": "launch-placement-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "remove-keeps-bindings",
+        "to": "link-command",
+        "type": "blocks"
+      },
+      {
+        "from": "link-command",
+        "to": "status-link-column",
+        "type": "blocks"
+      },
+      {
+        "from": "status-link-column",
+        "to": "codex-hooks",
+        "type": "blocks"
+      },
+      {
+        "from": "link-command",
+        "to": "commit-command",
+        "type": "blocks"
+      },
+      {
+        "from": "merge-guard",
+        "to": "merge-gate-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "link-command",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "merge-gate-wiring",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-hooks",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "commit-command",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "doctor-built-ox",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "pack-builds-ox",
+        "to": "link-command",
+        "type": "blocks"
+      },
+      {
+        "from": "pack-builds-ox",
+        "to": "codex-hooks",
+        "type": "blocks"
+      },
+      {
+        "from": "pack-builds-ox",
+        "to": "status-link-column",
+        "type": "blocks"
+      },
+      {
+        "from": "remove-keeps-bindings",
+        "to": "codex-hooks",
+        "type": "blocks"
+      },
+      {
+        "from": "remove-keeps-bindings",
+        "to": "status-link-column",
+        "type": "blocks"
+      },
+      {
+        "from": "launch-uses-built-ox",
+        "to": "codex-hooks",
+        "type": "blocks"
+      },
+      {
+        "from": "link-command",
+        "to": "codex-hooks",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

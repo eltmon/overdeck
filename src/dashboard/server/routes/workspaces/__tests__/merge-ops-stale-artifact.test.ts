@@ -181,6 +181,7 @@ vi.mock('../merge-strike.js', async (importOriginal) => {
   manualMergeHeadMoved: actual.manualMergeHeadMoved,
   mergeHeadPin: actual.mergeHeadPin,
   automaticMergeStartRefusal: actual.automaticMergeStartRefusal,
+  busyMergeRefusal: actual.busyMergeRefusal,
   activeStrikeMerge: vi.fn(() => false),
   advanceMergeQueue: vi.fn(async () => {}),
   ensureAgentReadyForMerge: mocks.ensureAgentReadyForMerge,

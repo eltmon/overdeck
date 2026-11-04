@@ -19,15 +19,17 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstab
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { NO_LOSS_MATRIX } from '../../../../tests/unit/lib/overdeck/no-loss-matrix.js';
-import { _resetAccessTokensForTests, _settleAccessTokenWritesForTests, createAccessToken } from '../../../lib/access-tokens.js';
+import { _resetAccessTokensForTests, _settleAccessTokenWritesForTests, createAccessToken, MACHINE_TOKEN_SCOPES } from '../../../lib/access-tokens.js';
 import { _resetInternalTokenCacheForTests } from '../../../lib/internal-token.js';
 import { invalidateRemoteAccessConfig } from '../../../lib/remote-access/config.js';
+import type { ChannelMarker } from '../channel-peer.js';
 import { _resetDashboardSessionTokenForTests, rejectUnauthorizedDashboardSessionMintRequest } from '../routes/dashboard-auth.js';
-import { REMOTE_GATE_ALLOWLIST, remoteRequestGateLayer } from '../remote-request-gate.js';
+import { publicLinkOnly, REMOTE_GATE_ALLOWLIST, remoteGateRejection, remoteRequestGateLayer } from '../remote-request-gate.js';
 
 const LAN_PEER = '192.0.2.44';
 const originalHome = process.env.OVERDECK_HOME;
 const originalEventsToken = process.env.OVERDECK_EVENTS_TOKEN;
+const originalPublicLinkOnly = process.env.OVERDECK_PUBLIC_LINK_ONLY;
 let home: string;
 
 const reachedRoute = HttpRouter.add('*', '*', Effect.succeed(HttpServerResponse.text('reached')));
@@ -67,6 +69,7 @@ beforeEach(async () => {
   process.env.OVERDECK_HOME = home;
   process.env.OVERDECK_INTERNAL_TOKEN = 'gate-internal-token';
   delete process.env.OVERDECK_EVENTS_TOKEN;
+  delete process.env.OVERDECK_PUBLIC_LINK_ONLY;
   _resetInternalTokenCacheForTests();
   _resetDashboardSessionTokenForTests();
   _resetAccessTokensForTests();
@@ -82,6 +85,8 @@ afterEach(async () => {
   _resetDashboardSessionTokenForTests();
   if (originalEventsToken === undefined) delete process.env.OVERDECK_EVENTS_TOKEN;
   else process.env.OVERDECK_EVENTS_TOKEN = originalEventsToken;
+  if (originalPublicLinkOnly === undefined) delete process.env.OVERDECK_PUBLIC_LINK_ONLY;
+  else process.env.OVERDECK_PUBLIC_LINK_ONLY = originalPublicLinkOnly;
   if (originalHome === undefined) delete process.env.OVERDECK_HOME;
   else process.env.OVERDECK_HOME = originalHome;
   await rm(home, { recursive: true, force: true });
@@ -223,5 +228,84 @@ describe('remote request gate scopes (PAN-2351)', () => {
     const { token } = await createAccessToken({ name: 'phone', scopes: ['admin'], kind: 'device' });
     expect(await send('GET', '/api/settings', { peer: LAN_PEER, headers: { authorization: `Bearer ${token}` } })).toBe(200);
     expect(await send('GET', '/api/settings', { peer: LAN_PEER, headers: { authorization: 'Bearer odk_unknown' } })).toBe(401);
+  });
+});
+
+describe('remote request gate: Tailscale Funnel isolation (PAN-4648)', () => {
+  const funnel = { 'tailscale-funnel-request': '?1' };
+
+  it('answers 404 to a funneled loopback request on every path except POST /hooks/*', async () => {
+    expect(await sendFull('GET', '/api/health', { peer: '127.0.0.1', headers: funnel })).toEqual({ status: 404, text: '{"error":"not found"}' });
+    expect(await send('POST', '/api/dashboard/session', { peer: '127.0.0.1', headers: funnel })).toBe(404);
+    expect(await send('GET', '/', { peer: '127.0.0.1', headers: funnel })).toBe(404);
+    expect(await send('GET', '/hooks/trg_x/abc', { peer: '127.0.0.1', headers: funnel })).toBe(404);
+    expect(await send('POST', '/api/webhooks/github', { peer: '127.0.0.1', headers: funnel })).toBe(404);
+    expect(await send('POST', '/hooks/trg_x/abc', { peer: '127.0.0.1', headers: funnel })).toBe(200);
+  });
+
+  it('normalizes the path before allowing /hooks, so a dotted path cannot escape', async () => {
+    expect(await send('POST', '/hooks/../api/dashboard/session', { peer: '127.0.0.1', headers: funnel })).toBe(404);
+    expect(await send('POST', '/hooks/%2e%2e/api/dashboard/session', { peer: '127.0.0.1', headers: funnel })).toBe(404);
+  });
+
+  it('ignores a credential on a funneled request', async () => {
+    const { token } = await createAccessToken({ name: 'phone', scopes: ['admin'], kind: 'device' });
+    expect(await send('GET', '/api/conversations', { peer: '127.0.0.1', headers: { ...funnel, authorization: `Bearer ${token}` } })).toBe(404);
+  });
+
+  it('refuses the session mint for the same funneled request the gate 404s', () => {
+    const request = makeRequest('POST', '/api/dashboard/session', { peer: '127.0.0.1', headers: funnel });
+    expect(rejectUnauthorizedDashboardSessionMintRequest(request)?.status).toBe(401);
+  });
+
+  it('keeps today\'s result for a loopback request without the marker', async () => {
+    expect(await send('GET', '/api/health', { peer: '127.0.0.1' })).toBe(200);
+    expect(await send('GET', '/api/conversations', { peer: '127.0.0.1' })).toBe(200);
+  });
+});
+
+describe('remote request gate: public-link-only mode (PAN-4652)', () => {
+  beforeEach(() => {
+    process.env.OVERDECK_PUBLIC_LINK_ONLY = '1';
+  });
+
+  it('reads the flag only when it is exactly 1', () => {
+    expect(publicLinkOnly({ OVERDECK_PUBLIC_LINK_ONLY: '1' })).toBe(true);
+    expect(publicLinkOnly({ OVERDECK_PUBLIC_LINK_ONLY: 'true' })).toBe(false);
+    expect(publicLinkOnly({})).toBe(false);
+  });
+
+  it('answers 404 to a non-loopback, non-channel peer on every path, the SPA included', async () => {
+    expect(await sendFull('GET', '/', { peer: LAN_PEER })).toEqual({ status: 404, text: '{"error":"not found"}' });
+    expect(await send('GET', '/api/environment', { peer: LAN_PEER })).toBe(404);
+    expect(await send('POST', '/api/pairing/exchange', { peer: LAN_PEER })).toBe(404);
+    const { token } = await createAccessToken({ name: 'phone', scopes: ['admin'], kind: 'device' });
+    expect(await send('GET', '/api/conversations', { peer: LAN_PEER, headers: { authorization: `Bearer ${token}` } })).toBe(404);
+  });
+
+  it('answers 404 to a loopback peer behind a forwarding proxy', async () => {
+    expect(await send('GET', '/api/health', { peer: '127.0.0.1', headers: { 'x-forwarded-for': LAN_PEER } })).toBe(404);
+  });
+
+  it('passes a loopback peer as today', async () => {
+    expect(await send('GET', '/api/health', { peer: '127.0.0.1' })).toBe(200);
+    expect(await send('GET', '/api/conversations', { peer: '127.0.0.1' })).toBe(200);
+  });
+
+  it('judges a link-mode channel request by its machine credential as today', async () => {
+    const machineKey = 'a1'.repeat(32);
+    const link: ChannelMarker = { mode: 'link', remoteKeyHex: machineKey, pairingId: null };
+    const { token } = await createAccessToken({
+      name: 'machine:home', kind: 'machine', scopes: MACHINE_TOKEN_SCOPES('operator'),
+      machineKey, environmentId: 'env-home', access: 'operator',
+    });
+    const withToken = makeRequest('GET', '/api/conversations', { peer: LAN_PEER, headers: { authorization: `Bearer ${token}` } });
+    const without = makeRequest('GET', '/api/conversations', { peer: LAN_PEER });
+
+    expect(remoteGateRejection(withToken, link)).toBeNull();
+    expect(remoteGateRejection(without, link)).toEqual({ status: 401 });
+    delete process.env.OVERDECK_PUBLIC_LINK_ONLY;
+    expect(remoteGateRejection(withToken, link)).toBeNull();
+    expect(remoteGateRejection(without, link)).toEqual({ status: 401 });
   });
 });

@@ -198,7 +198,7 @@ describe('commitCompletePlanningWorkspaceGit', () => {
 
     const result = await commitCompletePlanningWorkspaceGit(workspacePath, 'PAN-3901', null, execSpy as never);
 
-    expect(result).toEqual({ pushed: true, taskWarning: null });
+    expect(result).toEqual({ taskWarning: null });
     expect(calls.some((args) => args.length === 1 && args[0] === 'init')).toBe(false);
     expect(calls).toEqual([]);
     expect(existsSync(join(workspacePath, '.git'))).toBe(false);
@@ -219,14 +219,14 @@ describe('commitCompletePlanningWorkspaceGit', () => {
 
     const result = await commitCompletePlanningWorkspaceGit(workspacePath, 'PAN-3902', null, execSpy as never);
 
-    expect(result).toEqual({ pushed: true, taskWarning: null });
+    expect(result).toEqual({ taskWarning: null });
     expect(calls).toEqual([
       ['init'],
       ['add', '.gitignore'],
       ['diff', '--cached', '--quiet'],
       ['commit', '-m', 'chore(plan): complete planning for PAN-3902', '--no-verify'],
-      ['remote'],
     ]);
+    expect(calls.some((args) => args[0] === 'push')).toBe(false);
   });
 
   // PAN-1728: the finalize commit carries the Plan-Finalized trailer in the repo that holds the spec.
@@ -290,8 +290,8 @@ describe('commitCompletePlanningWorkspaceGit', () => {
       ['add', '.pan/'],
       ['diff', '--cached', '--quiet'],
       ['commit', '-m', 'chore(plan): complete planning for PAN-1803', '--no-verify'],
-      ['remote'],
     ]);
+    expect(calls.some((call) => call.args[0] === 'push')).toBe(false);
   });
 });
 

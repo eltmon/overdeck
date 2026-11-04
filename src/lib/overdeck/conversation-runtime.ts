@@ -37,8 +37,10 @@ import { cpuClassForConversation } from '../terminal-backends/cpu-class.js';
 import type { AgentPaneRef, TerminalBackend, TerminalBackendName } from '../terminal-backends/types.js';
 import { normalizeHarnessName, type AgentRole } from '@overdeck/contracts';
 import { conversationStateDir, readConversationPaneRole, writeConversationPaneRole } from './conversation-pane-role.js';
+import { revokeAgentMcpTokens } from '../mcp/agent-token.js';
+import { conversationTokenRole, prepareClaudeOverdeckMcp, prepareCodexOverdeckMcp } from '../mcp/agent-injection.js';
 import { validateCwdContainment } from './cwd-containment.js';
-import { isVaultBrowseConversation, vaultBrowseReadOnlyMessage } from './conversation-vault-rows.js';
+import { conversationWriteRefusal } from './conversation-release.js';
 import { closeConversationPane, conversationHarnessAlive, conversationSessionAlive, waitForConversationSession } from './conversation-liveness.js';
 import { isSupersededConversation, resolveClearChainHead } from './conversation-clear-chain.js';
 import {
@@ -60,7 +62,7 @@ import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { piFifoPaths } from '../runtimes/pi-fifo.js';
 import { generateLauncherScript } from '../launcher-generator.js';
 import { waitForClaudeReady } from './claude-readiness.js';
-import { claudeSystemPromptFiles, getAcpLauncherFields, waitForHostReady, waitForPromptReady } from '../agents/runtime-command.js';
+import { claudeSystemPromptFiles, getAcpLauncherFields, waitForCodexAppServerReady, waitForHostReady, waitForPromptReady } from '../agents/runtime-command.js';
 import { reapPrimeAgentDaemon } from '../prime-agent/daemon.js';
 import { getPrimeAgentLauncherFields } from '../prime-agent/launcher-fields.js';
 import { requirePrimeAgentSessionFile } from '../runtimes/storage/prime-agent.js';
@@ -198,6 +200,7 @@ export async function stopConversationRuntime(conv: Conversation, name: string):
     const msg = error instanceof Error ? error.message : String(error);
     console.warn(`[conversations] failed to cleanup runtime processes for ${name}: ${msg}`);
   }
+  await revokeAgentMcpTokens(name, { agentKind: 'conversation', dir: conversationStateDir(conv.tmuxSession) }); // PAN-4927; never throws
 }
 // Canonical model-id shape lives in model-validation.ts — it permits the
 // square-bracket context suffix (e.g. `k3[1m]`) that a local copy of this
@@ -337,6 +340,14 @@ export async function waitForConversationRuntimeReady(tmuxSession: string, harne
       return;
     case 'codex-tui-prompt':
     case 'codex-app-server-ready':
+      // PAN-4903: an app-server conversation takes its first message only through
+      // the host socket, so wait until the host answers `ready`. Without this the
+      // first delivery raced the socket bind and fell through to a terminal paste
+      // (on Herdr, a tmux "no current target"). A TUI conversation's supervisor
+      // socket is already awaited inside the spawn.
+      if ((loadConfigSync().config.codex?.transport ?? 'app-server') === 'app-server') {
+        await waitForCodexAppServerReady(tmuxSession, 60, { sessionExists: tmuxSessionExists });
+      }
       return;
     case 'claude-session-signal':
       if (mode === 'respawn') await waitForReadySignal(tmuxSession, 30);
@@ -356,9 +367,8 @@ export async function handleConversationSwitchModel(
   body: Record<string, unknown>,
 ): Promise<ReturnType<typeof jsonResponse>> {
   const conv = getConversationByName(name);
-  if (!conv) {
-    return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
-  }
+  if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+  const refusal = conversationWriteRefusal(conv); if (refusal) return refusal;
   const model = typeof body['model'] === 'string' && body['model'].trim()
     ? body['model'].trim()
     : (conv.model ?? undefined);
@@ -575,6 +585,10 @@ export async function spawnConversationSession(
   await mkdir(stateDir, { recursive: true });
   if (launch.role) await writeConversationPaneRole(tmuxSession, launch.role);
   const role: AgentRole = launch.role ?? await readConversationPaneRole(tmuxSession);
+  // PAN-4932: the overdeck MCP server, owned by the conversation row (D-4, D-6, D-7).
+  // Resolved here (ahead of the Codex branch below) so both it and the later
+  // Claude Code overdeckMcp spread share one row read.
+  const tokenRow = bareContext ? null : getConversationByTmuxSession(tmuxSession);
   clearReadySignal(tmuxSession);
   const launcherScript = join(stateDir, 'launcher.sh');
   const permissionFlags = getClaudePermissionFlagsString();
@@ -686,6 +700,7 @@ export async function spawnConversationSession(
         approvalPolicy: codexApprovalPolicy,
         sandboxMode: codexSandboxMode,
         approvalsReviewer: codexApprovalsReviewer,
+        mcpServers: tokenRow ? await prepareCodexOverdeckMcp({ agentId: tokenRow.name, agentKind: 'conversation', role: conversationTokenRole(tokenRow, role, tmuxSession), harness, dir: stateDir }) : undefined,
       });
       const resumeSessionId = resume
         ? await resolveCodexRolloutPath(tmuxSession, { agentsDirOverride: join(getOverdeckHome(), 'agents') })
@@ -758,6 +773,9 @@ export async function spawnConversationSession(
     writeBridgeToken(tmuxSession);
     await writeChannelsBridgeMcpConfig(channelsBridgeMcpConfig, tmuxSession);
   }
+  const overdeckMcp = tokenRow
+    ? await prepareClaudeOverdeckMcp({ agentId: tokenRow.name, agentKind: 'conversation', role: conversationTokenRole(tokenRow, role, tmuxSession), harness, dir: stateDir })
+    : {};
   // PAN-1837 review fix: the tmux-create + session-capture sequence below is
   // wrapped per-bucket (withKimiSessionCaptureLock) for kimi-code conversations
   // and genuinely awaited — not fire-and-forget — so two conversations sharing
@@ -828,6 +846,7 @@ export async function spawnConversationSession(
         execConversationHarness: backend.name !== 'tmux',
         fileMode: 0o700,
         channelsBridgeMcpConfig,
+        ...overdeckMcp,
         useSupervisor,
         supervisorScriptPath,
       }),
@@ -1079,7 +1098,7 @@ export async function handleConversationResume(
   try {
     let conv = getConversationByName(name);
     if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
-    if (isVaultBrowseConversation(conv)) return jsonResponse({ error: vaultBrowseReadOnlyMessage(conv), code: 'vault-browse-copy' }, { status: 409 });
+    const refusal = conversationWriteRefusal(conv); if (refusal) return refusal;
     // PAN-4485: never respawn a superseded /clear row into the shared session — resume its chain head.
     const requestedName = name;
     if (isSupersededConversation(conv)) {

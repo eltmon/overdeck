@@ -216,3 +216,32 @@ describe('PAN-4642 citation highlight (data-cited)', () => {
     expect(document.querySelector('[data-cite-message-id="asst-1"]')).not.toHaveAttribute('data-cited', 'true');
   });
 });
+
+describe('PAN-4476 shared prompt author', () => {
+  const user = (overrides: Partial<ChatMessage> = {}): ChatMessage => ({
+    id: 'user-1',
+    role: 'user',
+    text: 'Run the tests.',
+    createdAt: '2026-11-01T00:00:00Z',
+    ...overrides,
+  });
+  const alice = { login: 'alice', avatarUrl: 'https://avatars.githubusercontent.com/u/1' };
+
+  it('renders @login and the avatar on a user message with an author', () => {
+    render(<UserMessageRow message={user({ author: alice })} />);
+    const line = screen.getByTestId('user-message-author');
+    expect(line.textContent).toContain('@alice');
+    expect(line.querySelector('img')?.getAttribute('src')).toBe(alice.avatarUrl);
+  });
+
+  it('renders no author line without an author', () => {
+    render(<UserMessageRow message={user()} />);
+    expect(screen.queryByTestId('user-message-author')).toBeNull();
+  });
+
+  it('leaves an optimistic message unchanged', () => {
+    render(<UserMessageRow message={user({ id: 'optimistic-1', acknowledged: true })} />);
+    expect(screen.queryByTestId('user-message-author')).toBeNull();
+    expect(screen.getByText('Sent · waiting for transcript')).toBeTruthy();
+  });
+});

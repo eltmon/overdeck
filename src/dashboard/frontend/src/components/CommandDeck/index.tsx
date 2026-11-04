@@ -48,6 +48,7 @@ import { IssuesPaneFilterRow } from './IssuesPaneFilterRow';
 import { usePlannedBacklogVisibility } from '../../hooks/usePlannedBacklogVisibility';
 import { usePriorityConversation } from './usePriorityConversation';
 import { LoadingBoundary } from '../primitives/LoadingBoundary';
+import { conversationRouteKey } from '../../lib/linkedConversation';
 
 async function fetchConversations(): Promise<Conversation[]> {
   const res = await fetchWithTimeout('/api/conversations');
@@ -633,7 +634,7 @@ export function CommandDeck({
     const conv = conversations.find((c) => c.name === selectedConversation);
     if (conv) {
       if (convId === String(conv.id) || convId === conv.name) return;
-      onConvIdChange(String(conv.id));
+      onConvIdChange(conversationRouteKey(conv));
     }
   }, [selectedConversation, conversations, onConvIdChange, convId]);
 
@@ -1093,7 +1094,7 @@ export function CommandDeck({
       // in sync so that effect skips the redundant follow-up call.
       if (conv && onConvIdChange) {
         prevSelectedRef.current = name;
-        onConvIdChange(String(conv.id));
+        onConvIdChange(conversationRouteKey(conv));
       }
     }
   }, [selectSession, selectedFeature, conversations, resolveConversationProjectName, selectedProject, onSelectProject, openConversationTabIn, onConvIdChange]);

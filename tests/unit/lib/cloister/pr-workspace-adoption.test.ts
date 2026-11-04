@@ -11,6 +11,7 @@ import { readPipelineJournal } from '../../../../src/lib/cloister/pipeline-journ
 import {
   adoptionRefusalFix,
   adoptPrWorkspace,
+  preflightPrAdoption,
   type AdoptionDeps,
   type AdoptionRefusal,
 } from '../../../../src/lib/cloister/pr-workspace-adoption.js';
@@ -107,8 +108,17 @@ describe('adoptPrWorkspace (PAN-4605)', () => {
     const outcome = await adoptPrWorkspace(pr(), deps());
 
     expect(outcome).toMatchObject({ adopted: false, reason: 'checked-out-elsewhere', worktreePath: hoff });
-    expect(outcome.adopted === false && outcome.fix).toContain(`git -C ${primary} worktree remove ${hoff}`);
+    expect(outcome.adopted === false && outcome.fix).toContain(`git -C ${hoff} switch --detach`);
     expect(createWorkspace).not.toHaveBeenCalled();
+  });
+
+  // PAN-4785: the worktree refusal needs no network, so it comes before any fetch.
+  it('refuses checked-out-elsewhere before fetching', async () => {
+    const hoff = join(tempDir, 'hoff-prefetch');
+    git(primary, 'worktree', 'add', hoff, BRANCH);
+
+    await expect(adoptPrWorkspace(pr({ headSha: mainSha }), deps())).resolves.toMatchObject({ reason: 'checked-out-elsewhere' });
+    expect(gitCalls.some((args) => args[0] === 'fetch')).toBe(false);
   });
 
   it('refuses when origin is not at the PR head and never creates a workspace', async () => {
@@ -196,5 +206,45 @@ describe('adoptPrWorkspace (PAN-4605)', () => {
       expect(fix, reason).not.toContain('--force');
       expect(fix, reason).not.toContain('reset --hard');
     }
+  });
+});
+
+describe('preflightPrAdoption (PAN-4785)', () => {
+  const HEAD = 'c'.repeat(40);
+  const PR = { issueId: 'PAN-1', number: 7, headRef: 'feature/pan-1', headSha: HEAD, repo: 'acme/demo' };
+  const project = { projectPath: '/repo', projectName: 'demo', polyrepo: false };
+  const porcelain = (extra = '') => `worktree /repo\nHEAD ${'d'.repeat(40)}\nbranch refs/heads/main\n${extra}`;
+
+  function fakeGit(listing: string) {
+    return vi.fn<AdoptionDeps['git']>(async (args) => (args[1] === 'list' ? listing : ''));
+  }
+
+  it('passes a pipeline PR whose branch no other worktree holds, running only worktree prune and list', async () => {
+    const git = fakeGit(porcelain());
+    await expect(preflightPrAdoption(PR, { git, resolveProject: () => project })).resolves.toEqual({
+      ok: true, headSha: HEAD, project, canonical: join('/repo', 'workspaces', 'feature-pan-1'),
+    });
+    expect(git.mock.calls.map(([args]) => args.slice(0, 2))).toEqual([['worktree', 'prune'], ['worktree', 'list']]);
+  });
+
+  it('refuses a branch checked out in another worktree, naming it in the fix', async () => {
+    const git = fakeGit(porcelain(`\nworktree /home/me/hoff\nHEAD ${HEAD}\nbranch refs/heads/feature/pan-1\n`));
+    const answer = await preflightPrAdoption(PR, { git, resolveProject: () => project });
+    expect(answer).toMatchObject({ ok: false, refusal: { reason: 'checked-out-elsewhere', worktreePath: '/home/me/hoff' } });
+    expect(!answer.ok && answer.refusal.fix).toContain('git -C /home/me/hoff switch --detach');
+  });
+
+  it('refuses the other network-free reasons without touching git', async () => {
+    const git = fakeGit(porcelain());
+    const cases: Array<[Parameters<typeof preflightPrAdoption>[0], ReturnType<AdoptionDeps['resolveProject']>, AdoptionRefusal]> = [
+      [{ ...PR, headRef: 'strike/pan-1' }, project, 'not-feature-branch'],
+      [{ ...PR, headSha: undefined }, project, 'head-unknown'],
+      [PR, null, 'no-project'],
+      [PR, { ...project, polyrepo: true }, 'polyrepo'],
+    ];
+    for (const [target, resolved, reason] of cases) {
+      await expect(preflightPrAdoption(target, { git, resolveProject: () => resolved })).resolves.toMatchObject({ ok: false, refusal: { reason } });
+    }
+    expect(git).not.toHaveBeenCalled();
   });
 });

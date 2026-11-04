@@ -8,15 +8,21 @@
 import type { GrantRow } from './grants.ts';
 
 export const DEFAULT_STORAGE_CAP_BYTES = 5 * 1024 ** 3; // 5 GB
+/** Machines a `free` account may register in the connect directory (PAN-2356 D-2356-3). */
+export const FREE_PLAN_MAX_MACHINES = 3;
 
 export interface Entitlement {
-  plan: 'tester';
+  plan: 'free' | 'tester';
   storageBytesCap: number;
   maxDevices: number | null;
 }
 
-export function entitlementFor(grant: Pick<GrantRow, 'storage_cap_bytes'> | null): Entitlement {
-  return { plan: 'tester', storageBytesCap: grant?.storage_cap_bytes ?? DEFAULT_STORAGE_CAP_BYTES, maxDevices: null };
+/** A grant whose `entitlement` column is `'free'` is the free plan; any other value, and the owner, is `tester`. */
+export function entitlementFor(grant: Pick<GrantRow, 'storage_cap_bytes' | 'entitlement'> | null): Entitlement {
+  const storageBytesCap = grant?.storage_cap_bytes ?? DEFAULT_STORAGE_CAP_BYTES;
+  return grant?.entitlement === 'free'
+    ? { plan: 'free', storageBytesCap, maxDevices: FREE_PLAN_MAX_MACHINES }
+    : { plan: 'tester', storageBytesCap, maxDevices: null };
 }
 
 export type QuotaDecision =

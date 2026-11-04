@@ -5,7 +5,7 @@
  * config gate → 503 for everything but /healthz (D-23); /admin* → 503 without OWNER_GITHUB_ID;
  * rate-limit bucket → 429 (D-12); 16 KiB body guard → 413 (D-28); handler.
  *
- * Later work items replace handler bodies in their own modules and never edit this file.
+ * Each work item adds its rows here and its handlers in its own module.
  */
 import type { Deps, Env, Handler, RequestContext } from './env.ts';
 import { parseConfig } from './env.ts';
@@ -21,6 +21,9 @@ import * as deletion from './deletion.ts';
 import * as adminScreen from './admin/screen.ts';
 import * as adminSession from './admin/session.ts';
 import * as adminPending from './admin/pending.ts';
+import * as accountActions from './account-page/actions.ts';
+import * as accountPage from './account-page/page.ts';
+import * as accountSession from './account-page/session.ts';
 
 interface Route {
   method: string;
@@ -54,6 +57,12 @@ const ROUTES: Route[] = [
   { method: 'POST', pattern: '/admin/grants', handler: adminScreen.addGrant },
   { method: 'POST', pattern: '/admin/grants/:githubId/revoke', handler: adminScreen.revokeGrant },
   { method: 'POST', pattern: '/admin/pending/:githubId/allow', handler: adminPending.allow },
+  { method: 'GET', pattern: '/account', handler: accountPage.page },
+  { method: 'POST', pattern: '/account/login', handler: accountSession.login, bucket: 'account-login' },
+  { method: 'POST', pattern: '/account/logout', handler: accountSession.logout, bucket: 'account-action' },
+  { method: 'POST', pattern: '/account/machines/:environmentId/remove', handler: accountActions.removeMachine, bucket: 'account-action' },
+  { method: 'POST', pattern: '/account/delete', handler: accountActions.deleteAccount, bucket: 'account-action' },
+  { method: 'POST', pattern: '/account/delete/confirm', handler: accountActions.confirmDeleteAccount, bucket: 'account-action' },
 ];
 
 function matchPattern(pattern: string, pathname: string): Record<string, string> | null {

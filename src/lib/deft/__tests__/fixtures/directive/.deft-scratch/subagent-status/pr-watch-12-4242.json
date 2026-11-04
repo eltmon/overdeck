@@ -1,0 +1,10 @@
+{
+  "agent_id": "pr-watch-12-4242",
+  "parent_id": "impl-1",
+  "last_heartbeat_at": "2026-11-02T17:58:00Z",
+  "last_message": "Waiting for Greptile",
+  "phase": "polling",
+  "pr_number": 12,
+  "wait_kind": "review",
+  "head_sha": "0123456789abcdef0123456789abcdef01234567"
+}

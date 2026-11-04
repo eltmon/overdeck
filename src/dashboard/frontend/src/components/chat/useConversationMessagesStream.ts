@@ -2,7 +2,8 @@ import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stream } from 'effect';
 import { getHarnessBehavior, isAgentSessionName, WS_METHODS } from '@overdeck/contracts';
-import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
+import type { PanRpcProtocolClient } from '../../lib/wsTransport';
+import { transportForConversation } from '../../lib/linkedConversation';
 import { fetchWithTimeout } from '../../lib/apiFetch';
 import type { Conversation } from '../CommandDeck/ConversationList';
 import type { ChatMessage, CompactBoundary, ContextUsage, ConversationEvent, ConversationWindow, ProposedPlan, SubagentSummary, WorkLogEntry } from './chat-types';
@@ -181,10 +182,11 @@ export function useConversationMessagesStream(
     if (!enabled) return;
 
     const queryKey = conversationMessagesQueryKey(conversation.name);
-    const unsubscribe = getTransport().subscribe(
+    const { transport, subscribeName } = transportForConversation(conversation.name);
+    const unsubscribe = transport.subscribe(
       (client) =>
         (client as PanRpcProtocolClient)[WS_METHODS.subscribeConversationMessages]({
-          conversationName: conversation.name,
+          conversationName: subscribeName,
           // Read at every (re)subscribe so the server sends only rows this cache lacks.
           ...resumeField(queryClient.getQueryData<ConversationMessagesCache>(queryKey)),
         }) as Stream.Stream<ConversationEvent, Error>,
@@ -218,10 +220,11 @@ export function useSubagentTranscript(
     if (!agentId || !streaming) return;
 
     void queryClient.cancelQueries({ queryKey });
-    const unsubscribe = getTransport().subscribe(
+    const { transport, subscribeName } = transportForConversation(conversation.name);
+    const unsubscribe = transport.subscribe(
       (client) =>
         (client as PanRpcProtocolClient)[WS_METHODS.subscribeConversationMessages]({
-          conversationName: conversation.name,
+          conversationName: subscribeName,
           agentId,
           ...resumeField(queryClient.getQueryData<ConversationMessagesCache>(queryKey)),
         }) as Stream.Stream<ConversationEvent, Error>,

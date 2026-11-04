@@ -19,7 +19,6 @@ import React, {
   useContext,
   useState,
   useCallback,
-  useRef,
   useEffect,
   useMemo,
   type ReactNode,
@@ -31,11 +30,15 @@ import { defaultSchema } from 'rehype-sanitize';
 import remarkGfm from 'remark-gfm';
 import { CheckIcon, CopyIcon } from 'lucide-react';
 import type { Components, ExtraProps } from 'react-markdown';
-import type { DiffsThemeNames } from '@pierre/diffs';
 import { resolveMarkdownFileLinkMeta, shouldPreserveMarkdownFileLinkHref, splitMarkdownTextFileLinks, type MarkdownFileLinkMeta } from '../../markdown-links';
 import { MarkdownFileLink } from './MarkdownFileLink';
 import { useFilePathExists } from '../../hooks/useFilePathExists';
+import { useTheme } from '../../hooks/useTheme';
+import { useColorTheme } from '../../hooks/useColorTheme';
 import { LRUCache } from '../../lib/lruCache';
+import { fnv1a32 } from '../../lib/diffRendering';
+import { isNativeShell } from '../../lib/nativeShell';
+import { ensureSyntaxTheme, highlight, syntaxThemeName } from '../../lib/syntaxTheme';
 import { TranscriptLink } from './TranscriptPullRequestLink';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
@@ -52,18 +55,8 @@ function estimateHighlightedSize(html: string, code: string): number {
   return Math.max(html.length * 2, code.length * 3);
 }
 
-/** FNV-1a 32-bit hash — fast cache key for code blocks */
-function fnv1a32(str: string): number {
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < str.length; i++) {
-    hash ^= str.charCodeAt(i);
-    hash = (hash * 0x01000193) >>> 0;
-  }
-  return hash;
-}
-
-function cacheKey(code: string, lang: string): string {
-  return `${fnv1a32(code)}:${code.length}:${lang}`;
+function cacheKey(code: string, lang: string, themeName: string): string {
+  return `${fnv1a32(code)}:${code.length}:${lang}:${themeName}`;
 }
 
 /** Sanitize Shiki HTML output before rendering with dangerouslySetInnerHTML.
@@ -137,38 +130,22 @@ function sanitizeShikiHtml(html: string): string {
   return wrapper.innerHTML;
 }
 
-// ─── Highlighter (lazy-loaded) ────────────────────────────────────────────────
-
-let sharedHighlighterPromise: Promise<unknown> | null = null;
-
-async function getHighlighter() {
-  if (!sharedHighlighterPromise) {
-    sharedHighlighterPromise = import('@pierre/diffs').then((m) =>
-      m.getSharedHighlighter({ themes: ['github-dark' as DiffsThemeNames], langs: [] }),
-    );
-  }
-  return sharedHighlighterPromise;
-}
+// ─── Highlighter (lazy-loaded, active color theme's syntax colors — PAN-4644) ──
 
 async function highlightCode(
   code: string,
   lang: string,
   isStreaming: boolean,
+  themeName: string,
 ): Promise<string> {
-  const key = cacheKey(code, lang);
+  const key = cacheKey(code, lang, themeName);
   if (!isStreaming) {
     const cached = highlightCache.get(key);
     if (cached !== null) return cached;
   }
 
   try {
-    const highlighter = await getHighlighter() as {
-      codeToHtml: (code: string, options: { lang: string; theme: string }) => string;
-    };
-    const html = highlighter.codeToHtml(code, {
-      lang: lang || 'text',
-      theme: 'github-light',
-    });
+    const html = await highlight(code, lang, themeName);
     if (!isStreaming) highlightCache.set(key, html, estimateHighlightedSize(html, code));
     return html;
   } catch {
@@ -205,15 +182,21 @@ interface CodeBlockProps {
 function CodeBlock({ code, lang, isStreaming }: CodeBlockProps) {
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const abortRef = useRef(false);
+  const mode = useTheme((s) => s.resolvedTheme);
+  const activeTheme = useColorTheme((s) => s.activeTheme(mode));
+  const themeName = syntaxThemeName(activeTheme);
 
   useEffect(() => {
-    abortRef.current = false;
-    highlightCode(code, lang, isStreaming).then((html) => {
-      if (!abortRef.current) setHighlighted(html);
-    });
-    return () => { abortRef.current = true; };
-  }, [code, lang, isStreaming]);
+    // A local flag per effect run (not a shared ref) — a shared flag would
+    // get reset to "not cancelled" by a newer run while an older run's
+    // promise chain is still in flight, letting a stale highlight overwrite
+    // a newer one once it resolves out of order (PAN-4644 review).
+    let cancelled = false;
+    void ensureSyntaxTheme(activeTheme).then(() => highlightCode(code, lang, isStreaming, themeName)).then((html) => {
+      if (!cancelled) setHighlighted(html);
+    }).catch(() => { /* registration or highlighting failed; keep the plain-text fallback */ });
+    return () => { cancelled = true; };
+  }, [code, lang, isStreaming, activeTheme, themeName]);
 
   const sanitizedHtml = useMemo(
     () => (highlighted ? sanitizeShikiHtml(highlighted) : null),
@@ -278,6 +261,8 @@ export function ChatMarkdownSettingsProvider({ children }: { children: ReactNode
   const { data: settings } = useQuery({
     queryKey: ['settings'],
     queryFn: fetchChatMarkdownSettings,
+    // The phone app (PAN-4837) cannot read settings; the defaults apply.
+    enabled: !isNativeShell(),
     retry: false,
   });
 
@@ -428,7 +413,7 @@ function makeComponents(isStreaming: boolean, cwd: string | undefined, issueId: 
         !/^(javascript|data|vbscript):/i.test(href.trim())
           ? href
           : undefined;
-      // PAN-3822: a PR/MR URL inside a conversation gets a link/unlink context menu.
+      // PAN-3822 / PAN-4714: inside a conversation, PR/MR URLs get a link/unlink menu and issue URLs open the issue drawer.
       return <TranscriptLink href={safeHref} className={styles.mdLink}>{children}</TranscriptLink>;
     },
   };

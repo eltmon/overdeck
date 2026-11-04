@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { MODELS_BY_PROVIDER, type OpenRouterFavoriteModel } from '../modelCatalog';
 import type { ModelId, SettingsConfig } from '../types';
+import { AutoSettleIdleRow } from './AutoSettleIdleRow';
 
 interface ConversationSettingsSectionProps {
   children: ReactNode;
@@ -188,6 +189,8 @@ export function ConversationSettingsSection({
             }`} />
           </button>
         </div>
+
+        <AutoSettleIdleRow />
 
         {children}
       </div>

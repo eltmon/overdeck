@@ -1,0 +1,542 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-03T03:19:16Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4869: Anywhere is hard to find: add a sidebar entry and command-palette actions",
+    "updated": "2026-11-03T03:24:03.723Z"
+  },
+  "plan": {
+    "id": "pan-4869",
+    "title": "Anywhere is hard to find: add a sidebar entry and command-palette actions",
+    "status": "running",
+    "uid": "fa14a334-285d-4f5c-9667-8558eb8b88eb",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-03T03:19:16Z",
+    "updated": "2026-11-03T03:24:03.723Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4869",
+        "label": "PAN-4869",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4869.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "frontend",
+      "dashboard",
+      "anywhere",
+      "sidebar",
+      "command-palette",
+      "docs"
+    ],
+    "narratives": {
+      "Problem": "Every Overdeck Anywhere action lives only in Settings → Anywhere (and the Health page status card). The sidebar has no entry for it and the command palette has no Anywhere action, so the operator cannot find it.",
+      "Proposal": "Add a Machines row to the sidebar primary rail that opens Settings → Anywhere and shows the number of online linked machines; add seven Anywhere command-palette actions, six of which open the same dialogs as the Settings buttons over the current page through a new zustand store plus a host mounted in main.tsx (the repo's dialog-host convention), and one that navigates to the section; add a 'Reach this machine from anywhere' row to the Home Get set up card when nothing is linked and Tailscale is not ready; make the phone dialog's settings link navigate from any page; document the entry points in anywhere.mdx (new Getting started section), linked-machines.mdx and remote-access.mdx. Full detail: .pan/drafts/PAN-4869.md.",
+      "NonGoals": "- Rewiring the existing Settings → Anywhere buttons to the new dialog store (they keep their local state)\n- Changing HealthDashboard's AnywhereStatusCard action handler\n- A palette action for Copy MCP URL or any Anywhere action beyond the seven listed\n- A new Tab, route or page for machines; the Machines row must not become a Tab\n- Showing the Home Anywhere row in simple UI mode\n- Any server, API route, contract or CLI change\n- Raising a file-size allowlist cap for Sidebar.tsx or CommandPalette.tsx\n- Green color for online state"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Palette actions open the Anywhere dialogs over the current page through a new zustand store and a host mounted in main.tsx",
+        "rationale": "conventions.md documents this as the pattern for dialogs opened from menus; it avoids sessionStorage intents with TTLs, two consumers of one intent and late-mount handling, and leaves the Settings components untouched while still rendering the same dialog components."
+      },
+      {
+        "summary": "The sidebar Machines row is an action button, not a Tab, and never shows the active highlight",
+        "rationale": "Every Tab maps to a URL in App/routes.ts; a fake Tab would break routing. The issue specifies requestSettingsSection('anywhere'), which is a shortcut into Settings."
+      },
+      {
+        "summary": "The badge counts links with state 'online' (hidden links included), polls GET /api/machines every 30 s on the shared MACHINES_QUERY_KEY, and is hidden at 0 and when collapsed",
+        "rationale": "Matches the issue's 'linked machines online', reuses existing invalidations, and matches the sidebar's existing 30 s fleet-projects cadence."
+      },
+      {
+        "summary": "Set up Tailscale is always listed in the palette; the host shows a toast instead of the dialog for non-root-session viewers",
+        "rationale": "CommandPalette tests render without a QueryClientProvider, so the palette cannot query status; the host already has it and the Settings button applies the same root-session gate (PAN-1254 D-4)."
+      },
+      {
+        "summary": "Add openSettingsSection (URL door) and use it in SetUpPhoneDialog's 'Open the setting' button",
+        "rationale": "Opened from the palette on another page, the existing requestSettingsSection-only call would do nothing visible."
+      },
+      {
+        "summary": "The Home row is advanced-mode only, gated on a new optional onOpenSettings prop of GetSetUpCard",
+        "rationale": "SimpleHomePage has no Settings navigation callback and targets non-technical users; existing GetSetUpCard tests stay unchanged."
+      },
+      {
+        "summary": "The palette's Anywhere group is listed in the empty-query default view, right after Navigation",
+        "rationale": "The issue's goal is discoverability; hiding the actions until a query matches would defeat it."
+      },
+      {
+        "summary": "anywhere.mdx gets a new '## Getting started' section because the section the issue names does not exist",
+        "rationale": "The issue asks for the entry points to be documented in anywhere.mdx 'Getting started'; the page is the plans-and-pricing page with no such section."
+      }
+    ],
+    "items": [
+      {
+        "id": "anywhere-dialog-host",
+        "title": "Add the Anywhere dialog store and host mounted in main.tsx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T03:19:16Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4869",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/anywhereDialogStore.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/AnywhereDialogHost.tsx",
+            "src/dashboard/frontend/src/main.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/AnywhereDialogHost.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Settings/anywhere/__tests__/AnywhereDialogHost.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "AnywhereDialogHost.test.tsx passes every case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-6"
+          ],
+          "foundationFor": [
+            "palette-anywhere-actions"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-1 exactly: create anywhereDialogStore.ts (zustand store with dialog: AnywhereDialog | null, openDialog, close, and the exported openAnywhereDialog helper; AnywhereDialog is the union link-machine | add-fly-machine | add-ssh-machine | set-up-phone | pair-device | tailscale-setup). Create AnywhereDialogHost.tsx that renders LinkMachineDialog, AddFlyMachineDialog, AddSshMachineDialog, SetUpPhoneDialog, PairDeviceDialog and TailscaleSetupDialog with open = (dialog === id) and onClose = close. For tailscale-setup, query ANYWHERE_STATUS_QUERY_KEY/loadAnywhereStatus only while it is requested, render nothing while loading, render TailscaleSetupDialog only for viewer.kind === 'root-session', and otherwise call toast.info('Tailscale can be set up only from a browser on this machine.') and close (PRD D7). TailscaleSetupDialog onPair calls openAnywhereDialog('pair-device') (D8). Mount <AnywhereDialogHost /> in main.tsx after <NewConversationDialogHost />. Write AnywhereDialogHost.test.tsx with the cases listed in WI-1 and add it to scripts/frontend-test-subset.txt in sorted position. In the host test, vi.mock the six dialog modules with stubs that render data-testid dialog-<id> when open (the host owns wiring, not dialog behavior)."
+        },
+        "items": [
+          {
+            "id": "anywhere-dialog-host.ac1",
+            "title": "Given no dialog is requested, when AnywhereDialogHost renders, then it renders no dialog element",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anywhere-dialog-host.ac2",
+            "title": "When openAnywhereDialog is called with each of link-machine, add-fly-machine, add-ssh-machine, set-up-phone and pair-device, the host renders the same dialog component the Settings → Anywhere button opens",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anywhere-dialog-host.ac3",
+            "title": "When openAnywhereDialog('tailscale-setup') is called and /api/anywhere/status returns viewer.kind 'root-session', the host renders TailscaleSetupDialog",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anywhere-dialog-host.ac4",
+            "title": "When openAnywhereDialog('tailscale-setup') is called and the status returns viewer.kind 'device', the host calls toast.info with the D7 sentence and the store's dialog returns to null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anywhere-dialog-host.ac5",
+            "title": "main.tsx renders <AnywhereDialogHost /> inside the existing QueryClientProvider",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "palette-anywhere-actions",
+        "title": "Add the seven Anywhere actions to the command palette",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T03:19:16Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4869",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/palette-anywhere-actions.ts",
+            "src/dashboard/frontend/src/components/CommandPalette.tsx",
+            "src/dashboard/frontend/src/components/__tests__/palette-anywhere-actions.test.ts",
+            "src/dashboard/frontend/src/components/CommandPalette.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/__tests__/palette-anywhere-actions.test.ts src/components/CommandPalette.test.tsx",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "palette-anywhere-actions.test.ts and CommandPalette.test.tsx pass",
+            "typecheck completes without errors",
+            "file-size guard passes with CommandPalette.tsx at or under 1124 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-2 exactly: create components/palette-anywhere-actions.ts exporting ANYWHERE_PALETTE_GROUP = 'Anywhere' and anywherePaletteActions(onNavigate) that returns the seven rows from the WI-2 table (ids, labels, lucide icons, descriptions, keywords). Six rows call openAnywhereDialog with their dialog id; 'Open Anywhere settings' calls requestSettingsSection('anywhere') then onNavigate('settings'). The module must not import from CommandPalette.tsx and must not use react-query (D11). In CommandPalette.tsx append ...anywherePaletteActions(onNavigate) to staticActions and insert ANYWHERE_PALETTE_GROUP after 'Navigation' in the preferred group order; net growth at most 5 lines. Write the unit test and add one CommandPalette.test.tsx case, and add the new test path to scripts/frontend-test-subset.txt."
+        },
+        "items": [
+          {
+            "id": "palette-anywhere-actions.ac1",
+            "title": "anywherePaletteActions returns exactly the seven labels Link a machine, Add a Fly machine, Add an SSH machine, Set up a phone, Pair a device, Set up Tailscale, Open Anywhere settings, all in group 'Anywhere'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "palette-anywhere-actions.ac2",
+            "title": "When each of the six dialog rows' onSelect runs, it calls openAnywhereDialog with the dialog id from the WI-2 table and never calls onNavigate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "palette-anywhere-actions.ac3",
+            "title": "When 'Open Anywhere settings' onSelect runs, it calls requestSettingsSection('anywhere') and onNavigate('settings')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "palette-anywhere-actions.ac4",
+            "title": "When the operator types 'machine' in the palette, CommandPalette renders Link a machine, Add a Fly machine and Add an SSH machine under an 'Anywhere' cmdk group heading",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-link-from-any-page",
+        "title": "Make the phone dialog's settings link navigate from any page",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T03:19:16Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4869",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/settingsSection.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/SetUpPhoneDialog.tsx",
+            "src/dashboard/frontend/src/lib/__tests__/settingsSection.test.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/SetUpPhoneDialog.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/settingsSection.test.ts src/components/Settings/anywhere/__tests__/SetUpPhoneDialog.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "settingsSection.test.ts and SetUpPhoneDialog.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-3 exactly: add openSettingsSection(sectionId) to lib/settingsSection.ts, which calls requestSettingsSection(sectionId) and, only when window.location.pathname is not '/settings', pushes '/settings' with history.pushState({ tab: 'settings' }, '', '/settings') and dispatches a popstate event (the URL door used by openSessionVaultSettings). Change SetUpPhoneDialog's 'Open the setting' button to call openSettingsSection('access-tokens') before onClose(). Update SetUpPhoneDialog.test.tsx's module mock, import, mockClear and assertion from requestSettingsSection to openSettingsSection (the only allowed edits there). Write lib/__tests__/settingsSection.test.ts and add it to scripts/frontend-test-subset.txt."
+        },
+        "items": [
+          {
+            "id": "settings-link-from-any-page.ac1",
+            "title": "Given the page is at /command-deck, when openSettingsSection('access-tokens') runs, then window.location.pathname becomes /settings, one popstate event fires and sessionStorage overdeck.settingsSection holds 'access-tokens'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-link-from-any-page.ac2",
+            "title": "Given the page is at /settings, when openSettingsSection('access-tokens') runs, then history.pushState is called 0 times and the overdeck:settings-section event fires with detail 'access-tokens'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-link-from-any-page.ac3",
+            "title": "When the phone dialog's 'Open the setting' button is clicked, SetUpPhoneDialog calls openSettingsSection('access-tokens') and closes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sidebar-machines-entry",
+        "title": "Add the sidebar Machines row with the online-machine badge",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T03:19:16Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4869",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/sidebar/MachinesNavItem.tsx",
+            "src/dashboard/frontend/src/components/Sidebar.tsx",
+            "src/dashboard/frontend/src/components/sidebar/__tests__/MachinesNavItem.test.tsx",
+            "src/dashboard/frontend/src/components/Sidebar.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/sidebar/__tests__/MachinesNavItem.test.tsx src/components/Sidebar.test.tsx src/components/__tests__/Sidebar.workspaces.test.tsx",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "MachinesNavItem.test.tsx, Sidebar.test.tsx and Sidebar.workspaces.test.tsx pass",
+            "typecheck completes without errors",
+            "file-size guard passes with Sidebar.tsx at or under 1019 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-4 exactly: create components/sidebar/MachinesNavItem.tsx with useOnlineMachineCount (useQuery on MACHINES_QUERY_KEY/loadMachines, staleTime 15000, refetchInterval 30000; count links with state 'online', hidden links included; 0 when data.links is not an array) and MachinesNavItem({ collapsed, onOpenSettings }), a button with data-testid sidebar-machines, the Network icon, label Machines, the inactive nav-row classes copied from Sidebar renderNavItem, and a rounded-md info-tone badge (bg-info/8 border-info/32 text-info-foreground, data-testid sidebar-machines-online) shown only when expanded and the count is above 0; collapsed title is 'Machines · N online' or 'Machines'. Clicking calls requestSettingsSection('anywhere') then onOpenSettings. In Sidebar.tsx render it right after {PRIMARY_ITEMS.map(renderNavItem)} with onOpenSettings = onTabChange('settings') plus setMobileOpen(false), and update the rail comment. It is never active-highlighted (D3). Net Sidebar growth at most 6 lines. Add one Sidebar.test.tsx case asserting sidebar-machines is the next sibling of sidebar-orders (harness unchanged)."
+        },
+        "items": [
+          {
+            "id": "sidebar-machines-entry.ac1",
+            "title": "Given /api/machines returns links in states online, online and offline, MachinesNavItem renders the badge sidebar-machines-online with text 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sidebar-machines-entry.ac2",
+            "title": "Given no link is online or the /api/machines body has no links array, MachinesNavItem renders no sidebar-machines-online badge and does not throw",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sidebar-machines-entry.ac3",
+            "title": "When the Machines row is clicked, it calls requestSettingsSection('anywhere') and then the sidebar's onTabChange('settings')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sidebar-machines-entry.ac4",
+            "title": "Given the sidebar is collapsed with 2 online machines, the row shows no label or badge and its title attribute is 'Machines · 2 online'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sidebar-machines-entry.ac5",
+            "title": "Sidebar renders the Machines row as the next sibling of the Order Book row (sidebar-orders) in the primary rail, asserted by a new Sidebar.test.tsx case",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "home-anywhere-row",
+        "title": "Add the Reach this machine from anywhere row to the Get set up card",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T03:19:16Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4869",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/home/AnywhereSetUpRow.tsx",
+            "src/dashboard/frontend/src/components/home/GetSetUpCard.tsx",
+            "src/dashboard/frontend/src/pages/HomePage.tsx",
+            "src/dashboard/frontend/src/components/home/__tests__/AnywhereSetUpRow.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/home/__tests__/AnywhereSetUpRow.test.tsx src/components/home/__tests__/GetSetUpCard.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "AnywhereSetUpRow.test.tsx and GetSetUpCard.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-5 exactly: create components/home/AnywhereSetUpRow.tsx ({ setUpLabel, onOpenSettings }) that reads MACHINES_QUERY_KEY/loadMachines and ANYWHERE_STATUS_QUERY_KEY/loadAnywhereStatus (staleTime 60000) and renders a row (data-testid get-set-up-anywhere, AlertTriangle icon, label 'Reach this machine from anywhere', button labelled setUpLabel) only when links is an array of length 0 and tailscale.nextStep is a string other than 'ready'; loading, error or malformed data renders nothing. The button calls requestSettingsSection('anywhere') then onOpenSettings. GetSetUpCard gains an optional onOpenSettings prop and renders the row inside its list after the check rows and before the memory row only when that prop is given; hasRequiredFailing is untouched. HomePage passes onOpenSettings; SimpleHomePage stays unchanged (D12)."
+        },
+        "items": [
+          {
+            "id": "home-anywhere-row.ac1",
+            "title": "Given /api/machines returns links [] and /api/anywhere/status returns tailscale.nextStep 'login', AnywhereSetUpRow renders get-set-up-anywhere with the label 'Reach this machine from anywhere'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-anywhere-row.ac2",
+            "title": "Given one linked machine, or tailscale.nextStep 'ready', or a malformed response, AnywhereSetUpRow renders nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-anywhere-row.ac3",
+            "title": "When the row's Set up button is clicked, it calls requestSettingsSection('anywhere') and onOpenSettings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-anywhere-row.ac4",
+            "title": "Given GetSetUpCard renders without onOpenSettings (simple mode and the existing GetSetUpCard tests), it renders no get-set-up-anywhere row and preserves its existing rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-anywhere-row.ac5",
+            "title": "HomePage passes its onOpenSettings prop to GetSetUpCard",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-anywhere-entry-points",
+        "title": "Document the sidebar entry, palette actions and Home row",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T03:19:16Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4869",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "anywhere.mdx",
+            "configuration/linked-machines.mdx",
+            "configuration/remote-access.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '## Getting started' anywhere.mdx",
+            "grep -n 'command palette' configuration/linked-machines.mdx configuration/remote-access.mdx"
+          ],
+          "expected_outputs": [
+            "anywhere.mdx contains a ## Getting started heading before ## Plans",
+            "both configuration pages name the palette actions"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-6 exactly: insert a ## Getting started section in anywhere.mdx between the paragraph ending '\"Session Vault\" are working names.' and ## Plans, covering the sidebar Machines row and its online count, the command palette Anywhere group with all seven action names (noting Set up Tailscale works only in a browser on this machine), the Home Get set up row, and links to /configuration/remote-access, /configuration/linked-machines and /configuration/tailscale. In configuration/linked-machines.mdx name the palette's Link a machine, Add an SSH machine and Add a Fly machine actions beside the existing Settings → Anywhere → Machines sentences. In configuration/remote-access.mdx 'From the dashboard' step 1 mention the sidebar Machines row and the palette's Pair a device action."
+        },
+        "items": [
+          {
+            "id": "docs-anywhere-entry-points.ac1",
+            "title": "anywhere.mdx contains a '## Getting started' section placed before '## Plans' that names the Machines sidebar row, all seven palette action labels and the 'Reach this machine from anywhere' Home row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-anywhere-entry-points.ac2",
+            "title": "configuration/linked-machines.mdx shows the palette actions Link a machine, Add an SSH machine and Add a Fly machine next to the matching Settings → Anywhere → Machines instructions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-anywhere-entry-points.ac3",
+            "title": "configuration/remote-access.mdx 'From the dashboard' step 1 shows the sidebar Machines row and the palette's Pair a device action as entry points",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "anywhere-dialog-host",
+        "to": "palette-anywhere-actions",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-03-PAN-4869-anywhere-is-hard-to-find-add-a-sidebar-entry-and-command-palette-actions.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

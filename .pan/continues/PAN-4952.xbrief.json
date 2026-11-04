@@ -1,0 +1,119 @@
+{
+  "version": "1",
+  "issueId": "PAN-4952",
+  "created": "2026-11-03T21:44:01.651Z",
+  "updated": "2026-11-03T23:35:14.590Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-03T23:11Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-03T23:11:16.511Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-03T23:22:22.587Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-03T23:35:14.590Z"
+    }
+  ],
+  "items": {
+    "skill-text": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4952",
+      "claimedAt": "2026-11-03T21:44:01.651Z",
+      "doneAt": "2026-11-03T21:44:44.026Z"
+    },
+    "sync-script": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4952",
+      "claimedAt": "2026-11-03T21:44:52.469Z",
+      "doneAt": "2026-11-03T22:05:21.518Z"
+    },
+    "skill-copies": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4952",
+      "claimedAt": "2026-11-03T22:05:30.885Z",
+      "doneAt": "2026-11-03T22:07:38.127Z"
+    },
+    "integrations-readme": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4952",
+      "claimedAt": "2026-11-03T22:07:46.113Z",
+      "doneAt": "2026-11-03T22:08:47.084Z"
+    },
+    "skill-text.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:12:52.027Z"
+    },
+    "skill-text.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:13:09.583Z"
+    },
+    "skill-text.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:13:25.110Z"
+    },
+    "sync-script.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:13:42.906Z"
+    },
+    "sync-script.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:14:01.451Z"
+    },
+    "sync-script.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:14:19.375Z"
+    },
+    "sync-script.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:14:36.088Z"
+    },
+    "sync-script.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:14:54.069Z"
+    },
+    "skill-copies.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:15:13.243Z"
+    },
+    "skill-copies.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:15:32.603Z"
+    },
+    "skill-copies.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:15:52.850Z"
+    },
+    "skill-copies.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:16:11.590Z"
+    },
+    "integrations-readme.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:16:32.977Z"
+    },
+    "integrations-readme.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:16:49.430Z"
+    },
+    "integrations-readme.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:17:05.494Z"
+    },
+    "integrations-readme.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:17:21.171Z"
+    }
+  },
+  "feedback": [],
+  "agentModel": "claude-opus-5-5"
+}

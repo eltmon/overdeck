@@ -2,7 +2,17 @@ import { useMemo, useRef, useState, useEffect } from 'react';
 
 import { useCostStream, type CostEvent } from '../../hooks/useCostStream';
 import { useDashboardStore, selectAgents, selectIssues } from '../../lib/store';
-import { getPipelineIssuePhase, hasActualPendingQuestion, isAgentRunningStatus, type PipelineIssuePhase } from '../../lib/pipeline-state';
+import {
+  comparePipelineIssues,
+  derivedForIssue,
+  firstAgentByIssueId,
+  getPipelineIssuePhase,
+  hasActualPendingQuestion,
+  isAgentRunningStatus,
+  isOutsidePipeline,
+  PIPELINE_BOARD_PHASES,
+  type PipelineIssuePhase,
+} from '../../lib/pipeline-state';
 import { useSharedTick } from '../../lib/useSharedTick';
 import { cn } from '../../lib/utils';
 import type { Agent, DerivedIssueState, Issue } from '../../types';
@@ -17,7 +27,7 @@ import { IssueActionMenu } from '../IssueActionMenu';
 // 'todo' (raw backlog) is intentionally excluded from the rendered phases — only
 // Definition-of-Ready issues surface, in the 'ready' lane (PAN-1966). Backlog is
 // still grouped (see groupedIssues) but never shown.
-const PHASES: PipelineIssuePhase[] = ['ship', 'review', 'work', 'plan', 'ready'];
+const PHASES: PipelineIssuePhase[] = [...PIPELINE_BOARD_PHASES];
 const PHASE_FILTERS: Array<PipelineIssuePhase | 'all'> = ['all', ...PHASES];
 
 const PRIORITY_MAP: Record<number, IssueRowPriority> = {
@@ -46,39 +56,12 @@ function costEventsTotal(eventsByIssue: Record<string, CostEvent[]>) {
   );
 }
 
-function derivedForIssue(derivedByIssueId: Record<string, DerivedIssueState>, issue: Issue) {
-  return derivedByIssueId[issue.identifier] ?? derivedByIssueId[issue.identifier.toUpperCase()];
-}
-
 function priorityForIssue(priority: number): IssueRowPriority {
   return PRIORITY_MAP[priority] ?? 'low';
 }
 
 function agentSub(agent: Agent) {
   return [agent.model, agent.status].filter(Boolean).join(' · ');
-}
-
-function priorityRank(priority: number) {
-  return 5 - priority;
-}
-
-function comparePipelineIssues(a: Issue, b: Issue) {
-  const priorityDelta = priorityRank(b.priority) - priorityRank(a.priority);
-  if (priorityDelta !== 0) return priorityDelta;
-  return b.updatedAt.localeCompare(a.updatedAt);
-}
-
-function isClosedIssue(issue: Issue) {
-  const state = issue.state ?? issue.status;
-  return issue.stateType === 'completed' || issue.stateType === 'canceled'
-    || state === 'done' || state === 'canceled' || state === 'Canceled'
-    || state === 'Closed' || state === 'Completed' || state === 'completed';
-}
-
-function isOutsidePipeline(issue: Issue) {
-  return issue.pipelineMembership?.available !== false && issue.pipelineMembership
-    ? issue.pipelineMembership.inPipeline !== true
-    : isClosedIssue(issue);
 }
 
 function readFilterState(): PipelineFilterState {
@@ -283,16 +266,7 @@ export function PipelineView({ onSearchOpen, onTabChange, keyboardShortcutsDisab
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  const agentByIssueId = useMemo(() => {
-    const map = new Map<string, Agent>();
-    for (const agent of agents) {
-      const key = agent.issueId?.toLowerCase();
-      if (key && !map.has(key)) {
-        map.set(key, agent);
-      }
-    }
-    return map;
-  }, [agents]);
+  const agentByIssueId = useMemo(() => firstAgentByIssueId(agents), [agents]);
 
   const projectOptions = useMemo(() => {
     const map = new Map<string, ProjectOption>();

@@ -118,6 +118,7 @@ describe('remote agent provenance', () => {
 
     expect(state.startedBy).toBe('flywheel:RUN-42');
     expect(mocks.launcherOptions?.extraEnvExports).toEqual([
+      'export IS_SANDBOX=1',
       "export OVERDECK_AGENT_STARTED_BY='flywheel:RUN-42'",
     ]);
     const persisted = JSON.parse(readFileSync(
@@ -224,7 +225,7 @@ describe('remote agent provenance', () => {
     const launch = mocks.commands.find(command =>
       command.includes('new-session') && command.includes('agent-pan-3112'),
     );
-    expect(launch).toContain('OVERDECK_AGENT_STARTED_BY=');
+    expect(launch).toContain('IS_SANDBOX=1 OVERDECK_AGENT_STARTED_BY=');
     expect(launch).toContain('operator:dashboard');
     expect(launch).toContain('claude --permission-mode');
   });

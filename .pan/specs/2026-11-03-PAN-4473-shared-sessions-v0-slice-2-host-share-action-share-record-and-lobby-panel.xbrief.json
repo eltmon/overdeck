@@ -1,0 +1,931 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-03T04:06:04Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4473: Shared Sessions v0 (slice 2): host share action, share record and lobby panel",
+    "updated": "2026-11-03T04:12:39.473Z"
+  },
+  "plan": {
+    "id": "pan-4473",
+    "title": "Shared Sessions v0 (slice 2): host share action, share record and lobby panel",
+    "status": "running",
+    "uid": "aa1d4d28-5b00-4aa3-b081-122b76bf7186",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-03T04:06:04Z",
+    "updated": "2026-11-03T04:12:39.473Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4473",
+        "label": "PAN-4473",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4473.md",
+        "label": "PRD draft (.pan/drafts/PAN-4473.md)",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/pan-658.md",
+        "label": "Parent PRD PAN-658 rev 3",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "shared-sessions",
+      "sharing",
+      "dashboard",
+      "frontend",
+      "websocket"
+    ],
+    "metadata": {
+      "sizeJustification": "23 files across 8 path-subsystems only because mandated registries live outside src/ (tests/unit/lib/overdeck/no-loss-matrix.ts, scripts/frontend-test-subset.txt, the Miniflare harness under tests/integration/) and each docs/*.md counts as its own subsystem. The code is one vertical feature (create share -> host socket -> routes -> lobby UI); splitting it would ship a backend with no UI or a UI with no backend, and sibling slices PAN-4474..PAN-4482 already carry the rest of Shared Sessions.",
+      "canonicalFilename": "2026-11-03-PAN-4473-shared-sessions-v0-slice-2-host-share-action-share-record-and-lobby-panel.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Slice 1 (PAN-658) built the Cloudflare share service, but nothing on a user's machine can create a room, hold its host token, or admit anyone. Slices 3-11 all assume a host that has created a room, holds the host signaling socket, and can admit viewers from a lobby.",
+      "Proposal": "Add a 0600 share record file door (src/lib/sharing/share-record.ts), a share service HTTP client with anywhere.share_url config (src/lib/sharing/share-service.ts), a dashboard-server ShareManager that creates rooms with the PAN-4330 device token and parks one host WebSocket per room (src/dashboard/server/services/share-host.ts), four /api/shares routes that never expose the host token, and a frontend 'Share this conversation' menu action, share dialog and lobby panel with one-click Admit as contributor. Prove it with unit, route and Miniflare integration tests plus Playwright screenshots. Full design: .pan/drafts/PAN-4473.md.",
+      "NonGoals": "- WebRTC, data channels, the content wire format or the conversation bridge (slice 3, PAN-4474); signal and ice-servers frames are ignored\n- Reconnecting the host socket after a network drop or re-parking after a dashboard restart (slice 8, PAN-4479)\n- Viewer side: join intent, viewer socket, /#/shared/<roomId> route (slice 4, PAN-4475)\n- Controller handoff or reclaim; no set-controller command is exposed (slice 7, PAN-4478)\n- pan share / pan join CLI (slice 9, PAN-4480)\n- A /ws/rpc push event for share state\n- The sidebar right-click menu mirror in CommandDeck/ConversationActionMenu.tsx\n- Any change to services/share/ or its existing tests\n- New src/lib/errors.ts tags or new route-scopes.ts rows\n- Raising any file-size allowlist row or touching src/dashboard/server/main.ts\n- Deploying anything to Cloudflare\n- Exposing the host token to the browser, logs or error messages"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Host socket opens on create and does not reconnect or re-park in this slice (D-1).",
+        "rationale": "PAN-4479 (slice 8) explicitly owns reconnect after a network drop or restart; the room survives 5 minutes on the service either way."
+      },
+      {
+        "summary": "A stale record (no live socket) is listed as disconnected with snapshot null, and End share works on it (D-2).",
+        "rationale": "HTTP DELETE needs only the host token, so one end path handles live and stale shares."
+      },
+      {
+        "summary": "POST /api/shares on an already-live share returns 200 with the existing view; a stale record is ended first, then a new room is created (D-3).",
+        "rationale": "Re-opening the dialog must never mint a second link; one share per conversation is the PRD rule."
+      },
+      {
+        "summary": "Server-side eligibility: getConversationByName (404) and conversationWriteRefusal (409) gate POST /api/shares (D-4).",
+        "rationale": "The frontend runsHere gate is a convenience; the server must refuse linked, vault and released conversations itself."
+      },
+      {
+        "summary": "Signed-out machine -> 412 not_signed_in; unreadable account.json -> 500 account_unreadable (D-5).",
+        "rationale": "Gives the dialog a distinct, actionable signed-out state pointing at pan account login."
+      },
+      {
+        "summary": "Lobby live updates by polling GET /api/shares every 1000 ms while the dialog is open (D-6).",
+        "rationale": "Snapshot lives in server memory so a poll is a local read; a /ws/rpc event would touch 5+ files for a panel open only while sharing; 159 refetchInterval precedents."
+      },
+      {
+        "summary": "Share URL is config.yaml anywhere.share_url, default https://share.overdeck.ai, validated like anywhere.directory_url (D-7).",
+        "rationale": "Mirrors the dashboard-server precedent for the sibling overdeck.ai directory service; a Settings save keeps the anywhere block."
+      },
+      {
+        "summary": "Lib and service modules are plain async with injected seams; routes are Effect HttpRouter wrapping them with Effect.promise (D-8). Overrides the parent PRD 'Effect-native' sentence.",
+        "rationale": "directory-client.ts is the closest precedent and the one-variant-per-operation rule forbids Effect wrappers over Promise code."
+      },
+      {
+        "summary": "No new src/lib/errors.ts tags; JSON string error codes (D-9).",
+        "rationale": "Nothing in this slice runs in an Effect error channel; matches routes/triggers.ts and the share service."
+      },
+      {
+        "summary": "End share always uses HTTP DELETE /v1/rooms/:code; 204 and 404 both mean gone (D-10).",
+        "rationale": "Works with or without a live socket."
+      },
+      {
+        "summary": "Keepalive via ws protocol ping every 30 s, 75 s pong deadline, verified in Miniflare with a fallback (D-11).",
+        "rationale": "Detects a silently dead socket; the fallback keeps the slice shippable if workerd ignores pings."
+      },
+      {
+        "summary": "Commands answer 202 and the effect shows in the next snapshot; the latest service error frame is shown as lastError (D-12).",
+        "rationale": "Keeps the route simple; polling at 1 s surfaces the change quickly."
+      },
+      {
+        "summary": "Menu item lives in sharing/ShareDialog.tsx; ConversationPanel.tsx gets +2 lines; sidebar menu mirror is out of scope (D-13).",
+        "rationale": "ConversationPanel.tsx has 11 lines of headroom under its 1531 allowlist cap."
+      },
+      {
+        "summary": "Share record adds joinUrl to the PRD's record shape (D-15).",
+        "rationale": "A stale record can still show its link; additive for slice 8."
+      },
+      {
+        "summary": "The Playwright screenshot spec is not added to the test:playwright CI script (D-16).",
+        "rationale": "That script lists four layout specs; a mocked-API screenshot spec is verification evidence, not a per-PR gate."
+      },
+      {
+        "summary": "The issue's '/api/shares/*' route naming wins over the parent PRD's '/api/sessions' wording.",
+        "rationale": "The issue body is newer and the slice map in docs/SHARED-SESSIONS.md already says /api/shares/*."
+      }
+    ],
+    "items": [
+      {
+        "id": "share-contract-types",
+        "title": "Add host dashboard share API types to contracts sharing.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T04:06:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4473",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/sharing.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck (including typecheck:share and typecheck:frontend) completes with exit 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-5",
+            "NFR-1"
+          ],
+          "foundationFor": [
+            "share-host-manager",
+            "shares-routes",
+            "lobby-panel",
+            "share-dialog"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Append the 'Contracts' block from .pan/drafts/PAN-4473.md (section Design → Contracts) to packages/contracts/src/sharing.ts: ShareConnection, ShareCommand (= Extract<HostFrame, {type: 'admit'|'kick'|'revoke'|'unrevoke'|'set-contributor'}>), CreateShareRequest, ShareLastError, ShareView, ListSharesResponse. The file must stay type-only with no import statement (D-R3-8: services/share imports it by relative path). ShareView must not have a hostToken field. Update the header comment to mention PAN-4473."
+        },
+        "items": [
+          {
+            "id": "share-contract-types.ac1",
+            "title": "Given packages/contracts/src/sharing.ts after the change, when it is read, then it exports ShareView, ShareCommand, ShareConnection, CreateShareRequest, ListSharesResponse and contains no import statement",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-contract-types.ac2",
+            "title": "Given the ShareView interface, when its fields are listed, then it has shortCode, joinUrl, scope, createdAt, connection, snapshot and lastError and no hostToken field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-contract-types.ac3",
+            "title": "When npm run typecheck runs, then it exits 0, proving typecheck:share still compiles the Worker against the extended file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "share-record-door",
+        "title": "Create the shared-sessions.json share record door",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T04:06:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4473",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/sharing/share-record.ts",
+            "tests/unit/lib/sharing/share-record.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/sharing/share-record.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "share-record.test.ts passes",
+            "typecheck completes with exit 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-10",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2 and Design → 'Share record file door'. Create src/lib/sharing/share-record.ts exporting SHARED_SESSIONS_FILENAME, ShareRecord, ShareRecordFile, sharedSessionsPath, readShareRecords, putShareRecord, removeShareRecord, findShareRecordByScope. File ${OVERDECK_HOME}/shared-sessions.json, {version:1, rooms:{<shortCode>:{scopeKind,scopeId,hostToken,joinUrl,createdAt}}}. Import only Node built-ins and ../paths.js. Writes: one in-process queue (copy mutate() from src/lib/access-tokens.ts lines 277-286), mkdir 0o700, temp file <path>.<pid>.<uuid>.tmp with mode 0o600, rename, unlink temp on failure. Read validation per the PRD; errors name the path and never contain a token. putShareRecord throws when a different short code already holds the same (scopeKind, scopeId). Tests isolate OVERDECK_HOME with mkdtemp like tests/unit/lib/account/store.test.ts."
+        },
+        "items": [
+          {
+            "id": "share-record-door.ac1",
+            "title": "Given a temp OVERDECK_HOME, when putShareRecord writes a record, then readShareRecords returns it and the file mode & 0o777 equals 0o600",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-record-door.ac2",
+            "title": "Given a record for conversation X under code A, when putShareRecord is called for conversation X under code B, then it rejects with an error naming conversation X and code A",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-record-door.ac3",
+            "title": "Given a shared-sessions.json with invalid JSON or a malformed hostToken, when readShareRecords runs, then it throws an error whose message contains the file path and does not contain odh_",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-record-door.ac4",
+            "title": "Given no file, when readShareRecords runs, then it returns {} and removeShareRecord for an unknown code returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-record-door.ac5",
+            "title": "Given two concurrent putShareRecord calls for different codes and scopes, when both settle, then the file persists both records",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "share-service-client",
+        "title": "Create the share service HTTP client and anywhere.share_url config reader",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T04:06:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4473",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/sharing/share-service.ts",
+            "tests/unit/lib/sharing/share-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/sharing/share-service.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "share-service.test.ts passes",
+            "typecheck completes with exit 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3 and Design → 'Share service client'. Create src/lib/sharing/share-service.ts: DEFAULT_SHARE_URL='https://share.overdeck.ai', SHARE_HTTP_TIMEOUT_MS=10000, parseShareUrl/readShareUrl (config.yaml key anywhere.share_url; same validation as parseDirectoryUrl in src/lib/anywhere/directory-config.ts lines 24-41, reuse isLoopbackOrigin from src/lib/remote-access/loopback.ts), hostSocketUrl(base, code) -> ws(s)://.../v1/rooms/<code>/host?v=1, createRoom(base, deviceToken, scope, {fetch}) and deleteRoom(base, code, hostToken, {fetch}) returning {ok:true,...} | {ok:false,status,error}. Timeouts use AbortController + setTimeout (never AbortSignal.timeout). deleteRoom treats 204 and 404 as ok. Never log; never put a token in an error. Tests inject fetch and use vi.useFakeTimers + advanceTimersByTimeAsync for the timeout."
+        },
+        "items": [
+          {
+            "id": "share-service-client.ac1",
+            "title": "Given base https://share.overdeck.ai and code BCDFGHJK, when hostSocketUrl runs, then it returns wss://share.overdeck.ai/v1/rooms/BCDFGHJK/host?v=1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-service-client.ac2",
+            "title": "Given an injected fetch answering 201 with a valid CreateRoomResponse, when createRoom runs, then the request carries Authorization: Bearer odd_... and body {scope}, and the result is {ok:true, room}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-service-client.ac3",
+            "title": "Given an injected fetch that never resolves, when fake timers advance 10000 ms, then createRoom resolves {ok:false, status:null, error:'timeout'}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-service-client.ac4",
+            "title": "Given an injected fetch answering 404, when deleteRoom runs, then it resolves {ok:true}; given 503 it resolves {ok:false, status:503}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-service-client.ac5",
+            "title": "Given config.yaml with anywhere.share_url: http://example.com, when readShareUrl runs, then it returns an error; with no key it returns the default URL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "share-host-manager",
+        "title": "Create the ShareManager host socket manager in the dashboard server",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T04:06:04Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4473",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/dashboard/server/services/share-host.ts",
+            "src/dashboard/server/services/__tests__/share-host.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/share-host.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "share-host.test.ts passes",
+            "typecheck completes with exit 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-10",
+            "NFR-1",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "shares-routes",
+            "host-manager-miniflare-test"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 and Design → 'Host socket manager' (decisions D-1, D-3, D-5, D-10, D-11, D-12). Create src/dashboard/server/services/share-host.ts modeled on src/dashboard/server/services/directory-client.ts: ShareSocket interface over the ws package, ShareManagerDeps (readAccount, readShareUrl, createRoom, deleteRoom, records, openSocket, now), ShareManager with create/list/command/end/stop, defaultOpenSocket, getShareManager (lazy singleton), setShareManagerForTests. Plain async class, no Effect (D-8). Follow the create steps 1-8 exactly: existing live share -> existing; in-flight dedupe per scope; record written BEFORE openSocket; host socket Authorization: Bearer <hostToken>. Socket handling: room frame -> connected + snapshot; error frame -> lastError; close 4004 or unexpected-response 404/401 -> remove record; close 4008 -> lastError replaced; any other close/error/pong timeout -> disconnected, record kept, no reconnect. Protocol ping every 30 s, terminate after 75 s without pong. command rebuilds the frame from known keys. end uses HTTP deleteRoom. list builds views field-by-field, never spreading a record. Tests: fake ShareSocket (EventEmitter + sent[]), fake deps, vi.useFakeTimers."
+        },
+        "items": [
+          {
+            "id": "share-host-manager.ac1",
+            "title": "Given fake deps, when create runs for a new scope, then records.put is called before openSocket and openSocket receives Authorization: Bearer odh_<64 hex> and a URL ending /host?v=1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-host-manager.ac2",
+            "title": "Given two concurrent create calls for the same scope, when both settle, then createRoom was called once and the second result has kind existing or the same shortCode",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-host-manager.ac3",
+            "title": "Given a live host, when the socket emits close 4004, then the record is removed and list() omits it; when it emits close 1006 instead, then list() reports connection disconnected and the record stays",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-host-manager.ac4",
+            "title": "Given a connected host and fake timers, when 75000 ms pass with no pong, then the socket is terminated and the view becomes disconnected",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-host-manager.ac5",
+            "title": "Given any sequence of create/list calls, when JSON.stringify(await manager.list()) is evaluated, then it does not match /odh_[0-9a-f]{64}/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "shares-routes",
+        "title": "Add /api/shares routes with no-loss-matrix rows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T04:06:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4473",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/shares.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "tests/unit/dashboard/server/routes/shares.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/routes/shares.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "shares.test.ts and no-loss-matrix.test.ts pass",
+            "typecheck completes with exit 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5 and Design → 'Routes' (D-4, D-5). Create src/dashboard/server/routes/shares.ts in the routes/triggers.ts idiom: GET /api/shares, POST /api/shares, POST /api/shares/:code/commands, DELETE /api/shares/:code; exported plain async handlers wrapped with Effect.promise; rejectUnsafeDashboardMutationRequest on mutations, rejectUnauthorizedDashboardRequest on GET; Cache-Control: no-store. POST validates conversationName, checks getConversationByName (404 conversation_not_found) and conversationWriteRefusal (409), then ShareManager.create. Command validation allows only admit/kick/revoke/unrevoke/set-contributor with a positive safe integer githubId. Normalize :code like the Worker. Register sharesRouteLayer in src/dashboard/server/server.ts makeRoutesLayer next to triggersRouteLayer. Add the four rows from the PRD to tests/unit/lib/overdeck/no-loss-matrix.ts under a '// ── shares.ts ──' comment. Test harness: tests/unit/dashboard/server/routes/triggers-admin.test.ts; inject the manager with setShareManagerForTests."
+        },
+        "items": [
+          {
+            "id": "shares-routes.ac1",
+            "title": "Given a valid local conversation and a fake manager, when POST /api/shares runs, then it returns 201 with a joinUrl ending in /s/<shortCode>, and a repeat POST returns 200 with the same shortCode",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shares-routes.ac2",
+            "title": "Given an unknown conversation name, when POST /api/shares runs, then it returns 404 conversation_not_found; given a released conversation, then it returns 409",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shares-routes.ac3",
+            "title": "Given command bodies {type:'end'}, {type:'signal'}, {githubId:0} or set-contributor without contributor, when POST /api/shares/:code/commands runs, then each returns 400 invalid_command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shares-routes.ac4",
+            "title": "Given responses from all four routes in the test, when each body is checked, then none matches /odh_[0-9a-f]{64}/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shares-routes.ac5",
+            "title": "When npx vitest run tests/unit/lib/overdeck/no-loss-matrix.test.ts runs, then it reports zero missing surfaces and the matrix contains GET /api/shares, POST /api/shares, POST /api/shares/:code/commands and DELETE /api/shares/:code",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "host-manager-miniflare-test",
+        "title": "Integration test: stub viewer through lobby, admit, kick, revoke and end on real workerd",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T04:06:04Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-4473",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/integration/services/share/host-manager.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/integration/services/share/host-manager.test.ts"
+          ],
+          "expected_outputs": [
+            "host-manager.test.ts passes against Miniflare"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-5",
+            "FR-6",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Create tests/integration/services/share/host-manager.test.ts. Copy (do not import from or edit) the setup of tests/integration/services/share/miniflare.test.ts: ACCOUNT_STUB, tokenFor, OWNER, VIEWER_A, the wrangler dry-run bundle and Miniflare construction. Build a real ShareManager with readShareUrl -> the mf.ready URL without a trailing slash, readAccount -> an AccountRecord with accessToken tokenFor(OWNER.id), the real createRoom/deleteRoom, a temp OVERDECK_HOME for the record file, and the real defaultOpenSocket. Drive: create -> connected; stub viewer joins via mf.dispatchFetch(BASE + '/v1/rooms/<code>/join?v=1', {headers:{Upgrade:'websocket', Authorization:'Bearer '+tokenFor(VIEWER_A.id)}}) -> lobby; admit with contributor:true -> admitted + contributor; kick -> gone, viewer closed 4010; rejoin -> lobby; revoke -> blocked; unrevoke -> blocked empty; end -> record file empty, viewer closed 4004. Use vi.waitFor or socket events; no fixed sleeps. IMPLEMENTATION CHECKPOINT: if the ws client cannot reach the mf.ready URL, inject openSocket with an adapter wrapping mf.dispatchFetch(...).webSocket.accept() into ShareSocket and comment why. Also verify workerd answers ws protocol pings (D-11); if not, remove keepalive from share-host.ts and record the reason there. Give beforeAll and every it the same SLOW timeout (60_000 ms) as miniflare.test.ts: the wrangler dry-run bundle exceeds vitest's 5 s default."
+        },
+        "items": [
+          {
+            "id": "host-manager-miniflare-test.ac1",
+            "title": "Given a ShareManager pointed at Miniflare, when a stub viewer opens the join socket, then manager.list() shows that viewer with state lobby",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-manager-miniflare-test.ac2",
+            "title": "Given the viewer in the lobby, when the manager sends admit with contributor true, then the next snapshot shows the viewer admitted with contributor true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-manager-miniflare-test.ac3",
+            "title": "Given an admitted viewer, when kick is sent, then the viewer socket closes with 4010 and the snapshot no longer lists the viewer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-manager-miniflare-test.ac4",
+            "title": "Given a rejoined viewer, when revoke then unrevoke are sent, then the snapshot lists the viewer in blocked and then shows blocked empty",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-manager-miniflare-test.ac5",
+            "title": "When manager.end(code) runs, then shared-sessions.json holds no rooms and the viewer socket closes with 4004",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lobby-panel",
+        "title": "Create the shareApi module and SharingLobbyPanel component",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T04:06:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4473",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/sharing/shareApi.ts",
+            "src/dashboard/frontend/src/components/chat/sharing/SharingLobbyPanel.tsx",
+            "src/dashboard/frontend/src/components/chat/sharing/__tests__/SharingLobbyPanel.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/sharing/__tests__/SharingLobbyPanel.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "SharingLobbyPanel.test.tsx passes",
+            "typecheck completes with exit 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7 and Design → Frontend (shareApi.ts, SharingLobbyPanel.tsx). shareApi.ts: SHARES_QUERY_KEY=['shares'], listShares (fetchWithTimeout from lib/apiFetch.ts), createShare, sendShareCommand, endShare (fetch with dashboardMutationJsonHeaders from lib/wsTransport.ts), ShareApiError {status,error,message}, useShares({enabled}) with refetchInterval 1000. SharingLobbyPanel({share, onCommand, pending}): sections 'Waiting to join (N)', 'In the room (N)', 'Blocked (N)', empty-state text, avatar <img> 20px rounded-sm with alt='', @login in font-mono, markers contributor/offline/controller, lastError alert messages, seven buttons mapped exactly to the commands in the PRD, aria-labels including the login (e.g. 'Admit @alice as contributor'), buttons disabled unless connection === 'connected'. Follow pan-style-guide (no rounded-full, font-medium, no hex, Revoke/Kick as the destructive style). Add the test path to scripts/frontend-test-subset.txt in sorted position."
+        },
+        "items": [
+          {
+            "id": "lobby-panel.ac1",
+            "title": "Given a ShareView fixture with lobby, admitted and blocked identities, when SharingLobbyPanel renders, then it shows the headings 'Waiting to join', 'In the room' and 'Blocked' with each @login",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lobby-panel.ac2",
+            "title": "Given a lobby participant alice (githubId 100), when 'Admit @alice as contributor' is clicked, then onCommand receives exactly {type:'admit', githubId:100, contributor:true}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lobby-panel.ac3",
+            "title": "Given an admitted contributor, when 'Remove contributor' is clicked, then onCommand receives {type:'set-contributor', githubId, contributor:false}; Un-revoke on a blocked identity emits {type:'unrevoke', githubId}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lobby-panel.ac4",
+            "title": "Given connection 'disconnected', when the panel renders, then every action button is disabled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lobby-panel.ac5",
+            "title": "Given lastError {code:'unknown_participant'}, when the panel renders, then a role=alert element shows 'That person is no longer in the room.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "share-dialog",
+        "title": "Create the share dialog and the 'Share this conversation' menu action",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T04:06:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4473",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/sharing/ShareDialog.tsx",
+            "src/dashboard/frontend/src/components/chat/sharing/__tests__/ShareDialog.test.tsx",
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+            "src/dashboard/frontend/src/main.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/sharing/__tests__/ShareDialog.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "ShareDialog.test.tsx passes",
+            "typecheck and lint complete with exit 0 (file-size ratchet keeps ConversationPanel.tsx <= 1531)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8 and Design → Frontend (ShareDialog.tsx, ConversationPanel.tsx, main.tsx); decisions D-5, D-6, D-13, D-14. ShareDialog.tsx exports useShareDialogStore, openShareDialog, ShareDialogHost, ShareDialog and ShareConversationMenuItem. Build on components/shared/Modal.tsx (reference components/newConversation/NewConversationDialog.tsx). States: no share -> 'Create link' primary button; 412 not_signed_in -> signed-out text with 'pan account login'; share -> read-only font-mono link input + Copy (navigator.clipboard.writeText, toast.success('Link copied')), connection line (disconnected uses the amber signal), <SharingLobbyPanel>, destructive 'End share' gated by useConfirm. Commands invalidate SHARES_QUERY_KEY; errors toast. ShareConversationMenuItem returns null unless runsHere(conversation) (import from ../ConversationMachineBanner or conversationMachineState), else MenuItemButton with lucide Users icon size 14 and text 'Share this conversation' that calls openShareDialog and onDone. ConversationPanel.tsx: exactly one import line and one JSX line after the 'Continue on another device' block (~line 915); net +2 lines, file must stay <= 1531 lines. main.tsx: import + <ShareDialogHost /> after <NewConversationDialogHost />. Add the test path to scripts/frontend-test-subset.txt."
+        },
+        "items": [
+          {
+            "id": "share-dialog.ac1",
+            "title": "Given a conversation with no share, when 'Create link' is clicked, then createShare is called with that conversation name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-dialog.ac2",
+            "title": "Given createShare rejects with status 412 not_signed_in, when the dialog renders, then it shows 'Sign in to overdeck.ai to share conversations.' and the text pan account login",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-dialog.ac3",
+            "title": "Given a share for the conversation, when Copy is clicked, then navigator.clipboard.writeText receives the share's joinUrl; when End share is confirmed, then endShare receives the shortCode",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-dialog.ac4",
+            "title": "Given a conversation with origin 'linked' or a non-null releasedTo, when ShareConversationMenuItem renders, then it renders nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-dialog.ac5",
+            "title": "Given the change, when wc -l runs on ConversationPanel.tsx, then it reports at most 1522 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lobby-playwright-screenshots",
+        "title": "Playwright spec with light and dark screenshots of the share dialog and lobby panel",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T04:06:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4473",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-4473-share-lobby.spec.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npm run build && npx playwright test tests/pan-4473-share-lobby.spec.ts"
+          ],
+          "expected_outputs": [
+            "the spec passes and writes test-results/pan-4473/share-lobby-light.png and share-lobby-dark.png"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9 (D-16: not added to the test:playwright script). Copy the structure of src/dashboard/frontend/tests/pan-4455-continue-on-device.spec.ts: startIsolatedDashboard() from tests/fixtures/isolated-dashboard.ts (temp OVERDECK_HOME, random port, never 3011), seed one local conversation, page.route('**/api/shares', ...) fulfilling a ListSharesResponse fixture (two lobby joiners, two admitted incl. one contributor and one offline, one blocked), page.route('**/avatars.githubusercontent.com/**', ...) fulfilling a local 1x1 PNG, open 'More conversation actions' -> 'Share this conversation'. Set theme with addInitScript + localStorage['overdeck.ui.theme'] as in tests/pan-4754-decision-dialog.spec.ts. Capture POST /api/shares/<code>/commands via page.route and assert the body. Isolated browser instance and profile per run. The work agent opens and inspects both PNGs before marking done. Locate buttons with getByRole('button', { name, exact: true }): Playwright name matching is a case-insensitive substring match, so 'Admit @alice' would also match 'Admit @alice as contributor' and strict mode would throw."
+        },
+        "items": [
+          {
+            "id": "lobby-playwright-screenshots.ac1",
+            "title": "Given the mocked share fixture, when the dialog opens from the conversation menu, then the page shows 'Waiting to join', 'In the room' and 'Blocked' and a button named exactly 'Admit @<login> as contributor' (exact: true)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lobby-playwright-screenshots.ac2",
+            "title": "Given the dialog, when the button named exactly 'Admit @<login> as contributor' is clicked, then exactly one POST /api/shares/<code>/commands is sent with JSON {type:'admit', githubId:<id>, contributor:true}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lobby-playwright-screenshots.ac3",
+            "title": "When the spec finishes, then it writes test-results/pan-4473/share-lobby-light.png and test-results/pan-4473/share-lobby-dark.png showing avatars and @logins in all three sections",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "shared-sessions-docs",
+        "title": "Document the host side of sharing in SHARED-SESSIONS.md and DASHBOARD-ARCHITECTURE.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T04:06:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4473",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/SHARED-SESSIONS.md",
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Host side in the dashboard' docs/SHARED-SESSIONS.md",
+            "grep -n 'routes/shares.ts' docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "both greps print a matching line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-9",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. docs/SHARED-SESSIONS.md: add a section 'Host side in the dashboard (slice 2, PAN-4473)' after 'Configuration' covering the record file (path, mode 0600, JSON shape with joinUrl, one share per conversation, removal triggers), anywhere.share_url (default, validation), the four /api/shares routes with their status codes as implemented in routes/shares.ts, each lobby action and the host frame it sends (Admit as contributor = admit with contributor:true), the 412 not_signed_in answer, and what is not done yet (no WebRTC content: slice 3 PAN-4474; no reconnect or re-park after a network drop or restart: slice 8 PAN-4479). Add an anywhere.share_url row to the Configuration table. docs/DASHBOARD-ARCHITECTURE.md: a short paragraph near the color-themes route paragraph (~line 73) naming src/dashboard/server/routes/shares.ts, its four routes, services/share-host.ts and src/lib/sharing/."
+        },
+        "items": [
+          {
+            "id": "shared-sessions-docs.ac1",
+            "title": "Given docs/SHARED-SESSIONS.md, when read, then the section 'Host side in the dashboard (slice 2, PAN-4473)' names shared-sessions.json with mode 0600 and lists GET /api/shares, POST /api/shares, POST /api/shares/:code/commands and DELETE /api/shares/:code with their status codes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shared-sessions-docs.ac2",
+            "title": "Given docs/SHARED-SESSIONS.md, when read, then the Configuration table has an anywhere.share_url row with default https://share.overdeck.ai and the section states that reconnect after a restart is slice 8 (PAN-4479)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shared-sessions-docs.ac3",
+            "title": "Given docs/DASHBOARD-ARCHITECTURE.md, when read, then it names src/dashboard/server/routes/shares.ts and services/share-host.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "share-contract-types",
+        "to": "share-host-manager",
+        "type": "blocks"
+      },
+      {
+        "from": "share-contract-types",
+        "to": "shares-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "share-contract-types",
+        "to": "lobby-panel",
+        "type": "blocks"
+      },
+      {
+        "from": "share-contract-types",
+        "to": "share-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "share-record-door",
+        "to": "share-host-manager",
+        "type": "blocks"
+      },
+      {
+        "from": "share-service-client",
+        "to": "share-host-manager",
+        "type": "blocks"
+      },
+      {
+        "from": "share-host-manager",
+        "to": "shares-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "share-host-manager",
+        "to": "host-manager-miniflare-test",
+        "type": "blocks"
+      },
+      {
+        "from": "lobby-panel",
+        "to": "share-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "share-dialog",
+        "to": "lobby-playwright-screenshots",
+        "type": "blocks"
+      },
+      {
+        "from": "shares-routes",
+        "to": "shared-sessions-docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

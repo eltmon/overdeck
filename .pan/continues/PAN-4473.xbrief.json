@@ -1,0 +1,249 @@
+{
+  "version": "1",
+  "issueId": "PAN-4473",
+  "created": "2026-11-03T04:12:49.385Z",
+  "updated": "2026-11-03T05:38:59.806Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "share-contract-types": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4473",
+      "claimedAt": "2026-11-03T04:12:49.385Z",
+      "doneAt": "2026-11-03T04:20:58.255Z"
+    },
+    "share-record-door": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4473",
+      "claimedAt": "2026-11-03T04:21:26.900Z",
+      "doneAt": "2026-11-03T04:23:02.490Z"
+    },
+    "share-service-client": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4473",
+      "claimedAt": "2026-11-03T04:23:08.093Z",
+      "doneAt": "2026-11-03T04:25:25.870Z"
+    },
+    "share-host-manager": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4473",
+      "claimedAt": "2026-11-03T04:25:31.552Z",
+      "doneAt": "2026-11-03T04:29:52.898Z"
+    },
+    "shares-routes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4473",
+      "claimedAt": "2026-11-03T04:29:57.159Z",
+      "doneAt": "2026-11-03T04:38:24.024Z"
+    },
+    "host-manager-miniflare-test": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4473",
+      "claimedAt": "2026-11-03T04:38:30.698Z",
+      "doneAt": "2026-11-03T04:43:24.080Z"
+    },
+    "lobby-panel": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4473",
+      "claimedAt": "2026-11-03T04:43:31.716Z",
+      "doneAt": "2026-11-03T04:50:57.214Z"
+    },
+    "share-dialog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4473",
+      "claimedAt": "2026-11-03T04:51:04.621Z",
+      "doneAt": "2026-11-03T04:58:09.340Z"
+    },
+    "lobby-playwright-screenshots": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4473",
+      "claimedAt": "2026-11-03T04:58:16.610Z",
+      "doneAt": "2026-11-03T05:04:59.530Z"
+    },
+    "shared-sessions-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4473",
+      "claimedAt": "2026-11-03T05:05:05.509Z",
+      "doneAt": "2026-11-03T05:06:14.256Z"
+    },
+    "share-contract-types.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:23:40.944Z"
+    },
+    "share-contract-types.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:24:04.922Z"
+    },
+    "share-contract-types.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:24:26.294Z"
+    },
+    "share-record-door.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:24:45.266Z"
+    },
+    "share-record-door.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:25:07.716Z"
+    },
+    "share-record-door.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:25:31.026Z"
+    },
+    "share-record-door.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:25:55.866Z"
+    },
+    "share-record-door.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:26:20.461Z"
+    },
+    "share-service-client.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:26:43.342Z"
+    },
+    "share-service-client.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:27:04.601Z"
+    },
+    "share-service-client.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:27:26.957Z"
+    },
+    "share-service-client.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:27:52.823Z"
+    },
+    "share-service-client.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:28:16.318Z"
+    },
+    "share-host-manager.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:28:42.582Z"
+    },
+    "share-host-manager.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:29:05.997Z"
+    },
+    "share-host-manager.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:29:29.935Z"
+    },
+    "share-host-manager.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:29:57.567Z"
+    },
+    "share-host-manager.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:30:26.579Z"
+    },
+    "shares-routes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:30:50.226Z"
+    },
+    "shares-routes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:31:13.403Z"
+    },
+    "shares-routes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:31:34.772Z"
+    },
+    "shares-routes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:31:52.665Z"
+    },
+    "shares-routes.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:32:10.517Z"
+    },
+    "host-manager-miniflare-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:32:31.849Z"
+    },
+    "host-manager-miniflare-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:32:49.548Z"
+    },
+    "host-manager-miniflare-test.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:33:05.360Z"
+    },
+    "host-manager-miniflare-test.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:33:20.810Z"
+    },
+    "host-manager-miniflare-test.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:33:36.171Z"
+    },
+    "lobby-panel.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:33:52.710Z"
+    },
+    "lobby-panel.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:34:09.371Z"
+    },
+    "lobby-panel.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:34:26.434Z"
+    },
+    "lobby-panel.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:34:42.765Z"
+    },
+    "lobby-panel.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:34:59.372Z"
+    },
+    "share-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:35:19.215Z"
+    },
+    "share-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:35:39.198Z"
+    },
+    "share-dialog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:35:58.603Z"
+    },
+    "share-dialog.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:36:35.544Z"
+    },
+    "share-dialog.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:37:13.710Z"
+    },
+    "lobby-playwright-screenshots.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:37:32.846Z"
+    },
+    "lobby-playwright-screenshots.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:37:50.053Z"
+    },
+    "lobby-playwright-screenshots.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:38:07.285Z"
+    },
+    "shared-sessions-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:38:24.179Z"
+    },
+    "shared-sessions-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:38:40.932Z"
+    },
+    "shared-sessions-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T05:38:59.806Z"
+    }
+  }
+}

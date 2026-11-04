@@ -1,0 +1,360 @@
+{
+  "version": "1",
+  "issueId": "PAN-4755",
+  "created": "2026-11-02T01:00:42.371Z",
+  "updated": "2026-11-02T02:48:39.272Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-02T02:48Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-11-02T02:48:39.272Z"
+    }
+  ],
+  "items": {
+    "overlay-tokens": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4755",
+      "claimedAt": "2026-11-02T01:00:42.371Z",
+      "doneAt": "2026-11-02T01:11:59.273Z"
+    },
+    "modal-primitive": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4755",
+      "claimedAt": "2026-11-02T01:12:08.841Z",
+      "doneAt": "2026-11-02T01:19:50.216Z"
+    },
+    "picker-label-id": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4755",
+      "claimedAt": "2026-11-02T01:19:58.806Z",
+      "doneAt": "2026-11-02T01:23:59.456Z"
+    },
+    "skills-summary-data": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4755",
+      "claimedAt": "2026-11-02T01:24:09.529Z",
+      "doneAt": "2026-11-02T01:26:27.097Z"
+    },
+    "skills-field-restyle": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4755",
+      "claimedAt": "2026-11-02T01:26:35.800Z",
+      "doneAt": "2026-11-02T01:29:24.182Z"
+    },
+    "issue-picker-restyle": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4755",
+      "claimedAt": "2026-11-02T01:29:32.043Z",
+      "doneAt": "2026-11-02T01:31:20.040Z"
+    },
+    "dialog-shell": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4755",
+      "claimedAt": "2026-11-02T01:31:51.150Z",
+      "doneAt": "2026-11-02T01:37:04.466Z"
+    },
+    "dialog-sections": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4755",
+      "claimedAt": "2026-11-02T01:37:12.610Z",
+      "doneAt": "2026-11-02T01:44:10.163Z"
+    },
+    "effort-segmented": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4755",
+      "claimedAt": "2026-11-02T01:44:17.810Z",
+      "doneAt": "2026-11-02T01:47:47.925Z"
+    },
+    "context-switches": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4755",
+      "claimedAt": "2026-11-02T01:47:55.054Z",
+      "doneAt": "2026-11-02T01:50:52.297Z"
+    },
+    "skills-collapse": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4755",
+      "claimedAt": "2026-11-02T01:51:00.498Z",
+      "doneAt": "2026-11-02T01:54:18.381Z"
+    },
+    "footer-summary": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4755",
+      "claimedAt": "2026-11-02T01:54:28.604Z",
+      "doneAt": "2026-11-02T01:57:47.258Z"
+    },
+    "contracts-overlay-key": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4755",
+      "claimedAt": "2026-11-02T01:57:56.350Z",
+      "doneAt": "2026-11-02T02:01:42.890Z"
+    },
+    "vscode-import-overlay": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4755",
+      "claimedAt": "2026-11-02T02:01:50.283Z",
+      "doneAt": "2026-11-02T02:03:51.119Z"
+    },
+    "apply-overlay-tokens": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4755",
+      "claimedAt": "2026-11-02T02:04:00.016Z",
+      "doneAt": "2026-11-02T02:06:39.267Z"
+    },
+    "docs-style-guide": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4755",
+      "claimedAt": "2026-11-02T02:06:47.954Z",
+      "doneAt": "2026-11-02T02:09:35.741Z"
+    },
+    "docs-appearance": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4755",
+      "claimedAt": "2026-11-02T02:09:43.330Z",
+      "doneAt": "2026-11-02T02:10:44.389Z"
+    },
+    "uat-browser-checks": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4755",
+      "claimedAt": "2026-11-02T02:11:01.708Z",
+      "doneAt": "2026-11-02T02:21:11.240Z"
+    },
+    "overlay-tokens.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:24:05.684Z"
+    },
+    "overlay-tokens.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:24:46.719Z"
+    },
+    "overlay-tokens.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:25:02.683Z"
+    },
+    "overlay-tokens.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:25:19.140Z"
+    },
+    "modal-primitive.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:25:34.613Z"
+    },
+    "modal-primitive.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:25:50.148Z"
+    },
+    "modal-primitive.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:26:06.644Z"
+    },
+    "modal-primitive.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:26:21.143Z"
+    },
+    "modal-primitive.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:26:34.986Z"
+    },
+    "picker-label-id.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:26:48.891Z"
+    },
+    "picker-label-id.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:27:03.212Z"
+    },
+    "picker-label-id.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:27:17.406Z"
+    },
+    "skills-summary-data.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:27:30.546Z"
+    },
+    "skills-summary-data.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:27:43.778Z"
+    },
+    "skills-field-restyle.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:27:57.700Z"
+    },
+    "skills-field-restyle.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:28:12.099Z"
+    },
+    "skills-field-restyle.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:28:26.134Z"
+    },
+    "issue-picker-restyle.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:28:40.105Z"
+    },
+    "issue-picker-restyle.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:28:55.038Z"
+    },
+    "dialog-shell.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:29:08.975Z"
+    },
+    "dialog-shell.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:29:22.935Z"
+    },
+    "dialog-shell.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:29:38.329Z"
+    },
+    "dialog-shell.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:29:52.575Z"
+    },
+    "dialog-sections.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:30:07.627Z"
+    },
+    "dialog-sections.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:30:22.418Z"
+    },
+    "dialog-sections.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:30:38.147Z"
+    },
+    "dialog-sections.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:30:53.657Z"
+    },
+    "effort-segmented.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:31:08.377Z"
+    },
+    "effort-segmented.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:31:22.622Z"
+    },
+    "effort-segmented.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:31:39.393Z"
+    },
+    "effort-segmented.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:31:54.044Z"
+    },
+    "context-switches.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:32:08.618Z"
+    },
+    "context-switches.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:32:23.155Z"
+    },
+    "context-switches.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:32:38.488Z"
+    },
+    "skills-collapse.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:32:52.483Z"
+    },
+    "skills-collapse.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:33:07.247Z"
+    },
+    "skills-collapse.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:33:22.832Z"
+    },
+    "footer-summary.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:33:38.243Z"
+    },
+    "footer-summary.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:33:52.353Z"
+    },
+    "footer-summary.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:34:05.189Z"
+    },
+    "contracts-overlay-key.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:34:19.765Z"
+    },
+    "contracts-overlay-key.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:34:34.357Z"
+    },
+    "vscode-import-overlay.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:34:49.674Z"
+    },
+    "vscode-import-overlay.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:35:04.968Z"
+    },
+    "vscode-import-overlay.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:35:21.183Z"
+    },
+    "apply-overlay-tokens.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:35:37.638Z"
+    },
+    "apply-overlay-tokens.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:35:53.026Z"
+    },
+    "apply-overlay-tokens.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:36:08.287Z"
+    },
+    "docs-style-guide.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:36:22.255Z"
+    },
+    "docs-style-guide.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:36:35.853Z"
+    },
+    "docs-style-guide.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:36:51.042Z"
+    },
+    "docs-appearance.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:37:07.056Z"
+    },
+    "docs-appearance.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:37:21.414Z"
+    },
+    "uat-browser-checks.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:37:35.943Z"
+    },
+    "uat-browser-checks.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:37:51.217Z"
+    },
+    "uat-browser-checks.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:38:06.851Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-11-02T02:48:39Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-4755\n\n# Review — PAN-4755\n## Verdict: CHANGES REQUESTED — the five dialog `<section>`s never get the `.section` class, so sections run together with no spacing or dividers (FR-3 / mockup)\n\n## Context\n- Run ID: agent-pan-4755-review-1adb837d\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4755/.pan/review/agent-pan-4755-review-1adb837d/context.json\n- Branch / workspace: feature/pan-4755 / /home/eltmon/Projects/overdeck/workspaces/feature-pan-4755\n- PR: #4770\n- HEAD reviewed: 1adb837da185e65bb6f21e04d51f365902c099e8\n- Base: origin/main merge-base a445e73603ba047346525b2a6aaf42e0b09dba06; prior cycle: none\n\n## Blocking Findings\n\n### [requirements/UX] Section spacing and dividers are never applied — `src/dashboard/frontend/src/components/newConversation/NewConversationDialog.tsx:197`\n- Severity: `!` MUST\n- Classification / requirement scope: implementation defect (partly a spec omission); in_pr_scope (FR-3, WI-8, AC-14)\n- Trigger and changed-code connection: `NewConversationDialog.module.css` defines `.section { padding: 16px 0 18px; border-bottom: 1px solid color-mix(...) }` and `.section:last-child { border-bottom: 0 }` (WI-8 CSS, mockup line 177 `.after section {...}`). The five body blocks are rendered as `<section aria-labelledby={...}>` with **no** `className={styles.section}` (lines 197, 232, 278, 296, 340). `grep -rn \"styles.section\\b\"` in `components/newConversation/` finds nothing, so the rule is dead CSS. The mockup styled sections through an element selector; the CSS-module port needed the class on each element.\n- Expected / observed / impact: Expected each section padded 16px/18px with a hairline divider, as in the operator-approved mockup that FR-3 says to match. Observed in the work agent's own UAT screenshot `.tmp/pan-4755/broadsheet-light-dialog.jpg`: \"Where it runs\" sits flush against the body's top border (the body has 0 top padding), \"Agent\" starts directly under the Working directory field, \"Task\" directly under the Effort hint, and \"Context\" directly under the First message textarea. There are no dividers between sections. The dialog's main purpose is this visual redesign, and the five-section structure is its main grouping device, so the grouping is visibly lost.\n- Evidence: static trace (CSS defines `.section`; TSX never references it) plus the committed-run screenshot above. Commit eba77837d32 (\"verify the redesigned dialog in a real browser (no fix needed)\") checked computed colors, x-alignment and the 360px layout but did not compare the layout against the mockup, so it missed this.\n- Fix: add `className={styles.section}` to all five `<section>` elements in `NewConversationDialog.tsx`. Optionally add a test assertion `toHaveClass(styles.section)` on each `section` (per the PRD rule, class presence is testable; the rule's existence is grep-proven). Spec correction: WI-8's \"five `<section aria-labelledby={id}>` blocks\" bullet should say `<section className={styles.section} aria-labelledby={id}>`.\n\n## Non-blocking Findings\n\n- `~` **\"Linked issue\" label is not tied to its control** (`NewConversationDialog.tsx:280`). `<span id={issueLabelId}>Linked issue</span>` is rendered, but `issueLabelId` is never passed to `IssuePickerField`, whose combobox keeps `aria-label=\"Link to an issue\"`. The visible label and the accessible name differ, and the id is unused. The control still has a usable name, so this is minor. Fix: pass a `labelId` prop and use `aria-labelledby`, or drop the unused `id`.\n- `~` **Skills field unreachable when the skills fetch fails** (`NewConversationDialog.tsx:343-358`). On `skillsQuery.isError` the summary reads \"Skills unavailable\" and the Customize button is not rendered, so the field (and its own error state) stays inside `hidden`. Before this change the field was always visible. The impact is small (no overrides possible either way when the fetch fails), but the operator gets no detail or retry path.\n- `≉` **Dead initializer** (`NewConversationDialog.tsx:96`): `useState(() => Object.keys(skillOverrides).length > 0)` always yields `false`, because `skillOverrides` starts as `{}` on the same render. It is harmless and matches the PRD snippet verbatim. (The manifest's \"stub UI\" flag at `Modal.test.tsx:66` is a test harness `useState(false)` with a writer; it is a false positive.)\n- `?` **Escape with a Model/Harness dropdown open closes the whole dialog.** The Modal's panel `onKeyDown` treats Escape as dismiss, and `ModelSelect`/`HarnessSelect` do not stop Escape. This matches baseline behavior (the old dialog used a window Escape listener), so it is not a regression.\n\n## Coverage\n\n### Changed-file ledger\n| File | Status |\n|---|---|\n| `configuration/appearance.mdx` | reviewed — WI-17 row, 7 keys, derived-surface sentence present |\n| `design/style-guide/STYLE-GUIDE.md` | reviewed — overlay tokens + Modal recipe (10 token/path mentions) |\n| `sync-sources/dev-skills/pan-style-guide/SKILL.md` | reviewed — tokens + Modal rule line |\n| `packages/contracts/src/color-theme.ts` | reviewed — `overlay?` key + `UI_KEYS` |\n| `packages/contracts/src/__tests__/color-theme.test.ts` | reviewed — ran, passes |\n| `src/lib/color-themes/vscode-import.ts` | reviewed — quickInput → editorWidget fallback, `toOpaqueHex` only on hex |\n| `src/lib/color-themes/__tests__/vscode-import.test.ts` | reviewed — ran, passes |\n| `src/dashboard/frontend/src/index.css` | reviewed — four-scope block, exact FR-1 values, placed before F-9 |\n| `src/dashboard/frontend/src/__tests__/overlay-tokens.test.ts` | reviewed — ran, passes |\n| `src/dashboard/frontend/src/hooks/useColorTheme.ts` | reviewed — props added to clear list; overlay/derived/field/border set; `data-theme` is on `<html>` so inline values win |\n| `src/dashboard/frontend/src/hooks/__tests__/useColorTheme.test.ts` | reviewed — ran, passes |\n| `Settings/sections/ColorThemeImportPreview.tsx` | reviewed — `overlay` swatch key |\n| `components/shared/Modal.tsx` | reviewed — portal, ARIA, Escape via React onKeyDown, scrim press tracking, focus in/restore, Tab wrap, hidden-ancestor filter |\n| `components/shared/Modal.module.css` | reviewed — matches WI-2 incl. `--shadow-overlay`, reduced motion, bottom sheet |\n| `components/shared/__tests__/Modal.test.tsx` | reviewed — ten named behaviors, ran, passes |\n| `components/shared/ModelPicker/ModelPicker.tsx` | reviewed — `labelId` path; non-label output unchanged (same JSX moved into `picker`; `id`/`aria-labelledby` undefined) |\n| `components/shared/ModelPicker/ModelPicker.module.css` | reviewed — custom props with old values as fallbacks |\n| `components/shared/ModelPicker/ModelPicker.render.test.tsx` | reviewed — ran, passes; now in subset |\n| `newConversation/NewConversationDialog.tsx` | reviewed — blocking finding above; FR-5 behaviors preserved (no localStorage writes, preset key→name, effort fallback, fleet route, submitting state, Escape gated, `/conv` nav) |\n| `newConversation/NewConversationDialog.module.css` | reviewed — no `.dark`/`[data-theme]`, weights 400/500/600, `font-family: inherit`/mono token; `.section` unused (blocker) |\n| `newConversation/ConversationSkillsField.tsx` / `.module.css` | reviewed — hook + pure summary, Search lead, restyle; behavior unchanged |\n| `newConversation/IssuePickerField.tsx` / `.module.css` | reviewed — Search lead, restyle; Escape still stops propagation (D5 works with React onKeyDown) |\n| `newConversation/MachineField.tsx` | reviewed — fragment of grid children with `htmlFor` ids; only caller is the dialog |\n| `newConversation/__tests__/*.test.tsx` | reviewed — ran, all pass |\n| `scripts/frontend-test-subset.txt` | reviewed — three new paths in sorted order (NFR-3) |\n| `.pan/drafts`, `.pan/specs`, `.pan/continues` | not applicable — planning artifacts |\n\n### Dimensions\n- Correctness: Modal focus/Escape/scrim/Tab logic traced; dialog submit/error/navigation flow unchanged from baseline; `summarizeSkills` correct; theme derivation resolves on `<html>`. Only defect is the missing section class.\n- Security: no new trust boundary; imported theme strings go to CSS custom properties via `style.setProperty` exactly as existing `ui` keys do. No findings.\n- Performance: one shared skills query (dedup tested); no new loops or listeners beyond per-mount. No findings.\n- Requirements/UX: see AC matrix.\n\n### Acceptance criteria\n| AC | Status | Evidence |\n|---|---|---|\n| AC-1 | met | `overlay-tokens.test.ts` + `index-css-theme-scopes.test.ts` pass |\n| AC-2 | met | `Modal.test.tsx` 10 tests pass; grep finds `box-shadow: var(--shadow-overlay)` and `prefers-reduced-motion` |\n| AC-3 | met | `ModelPicker.render.test.tsx` passes; diff shows unchanged output without `labelId` |\n| AC-4 | met | `summarizeSkills` test passes; field calls `useConversationSkillGroups` |\n| AC-5 | met | Skills/IssuePicker tests pass; `--surface-overlay-field` and `Search` present in both |\n| AC-6 | met | name/description, pinned alert, Escape and submitting-Escape tests pass |\n| AC-7 | met at test level | five h3 in order, 124px track, placeholder text — but section styling missing (blocker) |\n| AC-8 | met | radiogroup tests pass |\n| AC-9 | met | switch tests pass |\n| AC-10 | met | summary, Customize/Done, override count, one fetch tests pass |\n| AC-11 | met | footer summary test passes |\n| AC-12 | met | vscode-import + useColorTheme tests pass |\n| AC-13 | met | grep of docs |\n| AC-14 | **unmet** | UAT screenshot shows the five sections without the mockup's spacing/dividers |\n\nNFRs: NFR-1 met (contrast test); NFR-2 met (grep: no `.dark`/`[data-theme]` in module CSS; weights within 400/500/600; switch thumb `#fff` is the PRD's own value); NFR-3 met.\n\n## Verification\n- `npm --prefix ./src/dashboard/frontend run test -- src/__tests__/overlay-tokens.test.ts src/__tests__/index-css-theme-scopes.test.ts src/components/shared/__tests__/Modal.test.tsx src/components/shared/ModelPicker/ModelPicker.render.test.tsx src/components/newConversation src/hooks/__tests__/useColorTheme.test.ts` → 10 files, 104 tests passed.\n- `npx vitest run src/lib/color-themes/__tests__/vscode-import.test.ts packages/contracts/src/__tests__/color-theme.test.ts` → 2 files, 30 tests passed.\n- CI on PR #4770 at 1adb837d (`gh pr checks 4770`): build, lint-group core/skills/state, test-e2e, test-shard 3/4, clean install smoke, overdeck/test (gate) pass. test-shard 1/4, 2/4, 4/4 and lint-group (effect) still **pending** at review time, so they are unverified.\n- `npm run lint:effect-diagnostics` run locally at 1adb837d → \"Effect diagnostics guard passed (227 known findings; none new)\".\n- NFR-2 font check: `.linkButton`, `.button`, `.primaryButton` use `font: 500 … var(--font-sans, inherit)`; `--font-sans` is declared in `index.css` (lines 56/63, Geist Variable under Broadsheet), so the shorthand is valid.\n- Visual evidence: `.tmp/pan-4755/broadsheet-light-dialog.jpg` (work agent's UAT capture).\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4755/.pan/review/agent-pan-4755-review-1adb837d/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-4755 -m \"Fixed review issues\"`"
+    }
+  ]
+}

@@ -8,10 +8,10 @@ import { readPrimeAgentSessionFile } from '../../lib/runtimes/storage/prime-agen
  * are implemented via TerminalService (dual-runtime PTY, B20).
  */
 
-import { Deferred, Effect, Layer, Queue, Schedule, Schema, Stream } from 'effect';
+import { Effect, Layer, Queue, Schedule, Schema, Scope, Stream } from 'effect';
 import { existsSync, watch as fsWatch } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
+import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { RpcSerialization, RpcServer } from 'effect/unstable/rpc';
 import { DomainEvent as DomainEventSchema, isAgentSessionName, PanRpcGroup, PanRpcError, WS_METHODS } from '@overdeck/contracts';
 import { PanOpen } from './services/open.js';
@@ -46,9 +46,7 @@ import { getConversationsConfig } from '../../lib/config-yaml.js';
 import type { RuntimeConversationsConfig } from '../../lib/config-yaml.js';
 import type { ConversationFilter, DiscoveredSession } from '../../lib/overdeck/discovered-sessions.js';
 import type { SessionsFeedRow } from '../../lib/overdeck/sessions-feed.js';
-import { authorizeDashboardUpgrade } from './ws-auth.js';
-import { registerDeviceConnection, revocableCredentialId } from './device-connections.js';
-import type { HeaderMap } from './routes/origin-validation.js';
+import { authorizeRpcUpgrade, restrictedRpcGroup, selectRpcHandler, withRpcRevocation } from './ws-rpc-auth.js';
 import { jsonResponse } from './http-helpers.js';
 import { runDashboardDbJob } from './services/dashboard-db-task.js';
 import { readWorkspaceFileEffect } from './services/read-workspace-file.js';
@@ -896,6 +894,13 @@ const PanRpcLayer = PanRpcGroup.toLayer(
           defaultCwd: panOpen.getDefaultCwd(),
         }),
 
+      // ── shellOpenInBrowser / getAvailableBrowsers — file links (PAN-4762) ──
+      [WS_METHODS.shellOpenInBrowser]: (input) =>
+        panOpen.openInBrowser(input),
+
+      [WS_METHODS.getAvailableBrowsers]: () =>
+        panOpen.getAvailableBrowsers().pipe(Effect.map((browsers) => ({ browsers }))),
+
       [WS_METHODS.scanConversations]: (input) =>
         getConversationsConfig().pipe(
           Effect.flatMap((config) => Effect.promise(async () => {
@@ -1117,41 +1122,22 @@ const PanRpcLayer = PanRpcGroup.toLayer(
  * The transport layer (WsRpcLayer + RpcSerialization.layerJson) is
  * provided inline so only ServerConfig leaks into the outer composition.
  */
-export function rejectUnauthorizedRpcUpgrade(
-  request: HttpServerRequest.HttpServerRequest,
-): HttpServerResponse.HttpServerResponse | null {
-  const auth = authorizeDashboardUpgrade(request.headers as HeaderMap, request.method);
-  return auth.ok ? null : jsonResponse({ error: auth.message }, { status: auth.status });
-}
-
 export const websocketRpcRouteLayer = Layer.unwrap(
   Effect.gen(function* () {
-    const rpcWebSocketHttp = yield* RpcServer.toHttpEffectWebsocket(PanRpcGroup).pipe(
-      Effect.provide(
-        Layer.mergeAll(
-          PanRpcLayer,
-          RpcSerialization.layerJson,
-        ),
-      ),
-    );
+    const scope = yield* Effect.scope;
+    // The transport layer (handlers + JSON serialization) is built once and
+    // shared by the full group and every scoped group (PAN-4645 D-4645-14).
+    const rpcContext = yield* Layer.build(Layer.mergeAll(PanRpcLayer, RpcSerialization.layerJson));
+    const rpcWebSocketHttp = yield* RpcServer.toHttpEffectWebsocket(PanRpcGroup).pipe(Effect.provide(rpcContext));
+    const buildRestricted = (omit: ReadonlyArray<string>) => RpcServer.toHttpEffectWebsocket(restrictedRpcGroup(omit))
+      .pipe(Effect.provide(rpcContext), Effect.provideService(Scope.Scope, scope));
 
     return HttpRouter.add('GET', '/ws/rpc', Effect.gen(function* () {
       const request = yield* HttpServerRequest.HttpServerRequest;
-      const auth = authorizeDashboardUpgrade(request.headers as HeaderMap, request.method);
+      const auth = authorizeRpcUpgrade(request);
       if (!auth.ok) return jsonResponse({ error: auth.message }, { status: auth.status });
-      const revocableId = revocableCredentialId(auth.credential);
-      if (revocableId === null) return yield* rpcWebSocketHttp;
-      // PAN-3762: revoking the device interrupts this socket's handler, which
-      // closes the socket (Effect's release closes it without a code, so this
-      // one cannot send 4401). The client's reconnect then gets 401.
-      const revoked = Deferred.makeUnsafe<void>();
-      const unregister = registerDeviceConnection(revocableId, () => {
-        Deferred.doneUnsafe(revoked, Effect.void);
-      });
-      return yield* Effect.raceFirst(
-        rpcWebSocketHttp,
-        Deferred.await(revoked).pipe(Effect.as(HttpServerResponse.empty())),
-      ).pipe(Effect.ensuring(Effect.sync(unregister)));
+      const rpcHttp = yield* selectRpcHandler(auth.credential, { full: rpcWebSocketHttp, build: buildRestricted });
+      return yield* withRpcRevocation(rpcHttp, auth.credential, request);
     }));
   }),
 );

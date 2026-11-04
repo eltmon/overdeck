@@ -154,6 +154,8 @@ export function summarizePipelineEntry(entry: PipelineJournalEntry): string {
       return `${data.reviewer ?? 'reviewer'} needs you — ${data.reason ?? 'stalled again'} (pane ${data.paneState ?? '?'})`;
     case 'review.dispatch-failed':
       return `${data.reviewer ?? 'reviewer'} never started — ${data.error ?? 'kickoff failed'}; request review again once fixed`;
+    case 'review.approval-carried':
+      return `approval carried ${shortSha(data.from)} → ${shortSha(data.to)} (patch unchanged by the merge-train rebase)`;
     case 'uat.verdict':
       return `${data.status ?? 'unknown'}${typeof data.anchor === 'string' ? ` head=${shortSha(data.anchor)}` : ''}`;
     case 'feedback.delivered':
@@ -169,6 +171,8 @@ export function summarizePipelineEntry(entry: PipelineJournalEntry): string {
       return `head=${shortSha(data.head)} sync-main repair to ${data.agentId ?? 'the work agent'}`;
     case 'conflict.repair-escalated':
       return `head=${shortSha(data.head)} needs you — ${data.reason ?? 'unknown'}`;
+    case 'review.stale-approval-rerequested':
+      return `head=${shortSha(data.head)} stale approval, review re-requested (${data.outcome ?? 'unknown'})`;
     case 'blocked.declared':
       return `${data.item ?? 'item'} waits on ${Array.isArray(data.blockers) ? data.blockers.join(', ') : '?'}`;
     case 'blocked.woken':
@@ -186,6 +190,8 @@ export function summarizePipelineEntry(entry: PipelineJournalEntry): string {
       return `PR #${data.prNumber ?? '?'} at ${shortSha(data.headSha)}`;
     case 'workspace.adoption-failed':
       return `${data.reason ?? 'failed'}${typeof data.detail === 'string' ? ` — ${data.detail}` : ''}`;
+    case 'workspace.synced-to-pr-head':
+      return `${data.repo ? `${data.repo}: ` : ''}${shortSha(data.from)} → PR head ${shortSha(data.to)} (${data.mode ?? 'moved'})`;
     default:
       return '';
   }

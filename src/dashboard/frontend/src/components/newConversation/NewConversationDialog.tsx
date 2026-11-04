@@ -10,15 +10,20 @@
  */
 import { useEffect, useId, useMemo, useState, type FormEvent } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { X } from 'lucide-react';
+import { ChevronDown, Folder } from 'lucide-react';
+import { toast } from 'sonner';
 import { EFFORT_LEVELS } from '@overdeck/contracts';
-import { HarnessSelect, ModelSelect, pickerEffortLevels, useAvailableModels, type Harness } from '../shared/ModelPicker';
+import { cn } from '../../lib/utils';
+import { Modal } from '../shared/Modal';
+import { HARNESS_OPTIONS, HarnessSelect, ModelSelect, pickerEffortLevels, useAvailableModels, type Harness } from '../shared/ModelPicker';
 import { loadStoredHarness, loadStoredModel, MODEL_EFFORT_SUPPORT } from '../chat/ModelPicker';
 import { fetchRegisteredProjects, type RegisteredProject } from '../CommandDeck/UnknownProjectState';
-import { ConversationSkillsField } from './ConversationSkillsField';
+import { buildConversationUrl } from '../../App/routes';
+import { ConversationSkillsField, summarizeSkills, useConversationSkillGroups } from './ConversationSkillsField';
 import { IssuePickerField } from './IssuePickerField';
-import { buildNewConversationPayload, createConversationWithOptions, fetchEffortDefault } from './newConversationApi';
+import { buildNewConversationPayload, createConversationWithOptions, createFleetConversation, fetchEffortDefault } from './newConversationApi';
 import { useNewConversationDialogStore } from './newConversationDialogStore';
+import { MachineField, type MachineChoice, parseNeedsInput, THIS_MACHINE, useMachineCwdHint } from './MachineField';
 import styles from './NewConversationDialog.module.css';
 
 /** D7: match the preset by yaml key, then by display name. */
@@ -41,7 +46,6 @@ export function NewConversationDialogHost() {
 
 export function NewConversationDialog({ presetProject, onClose }: { presetProject?: string; onClose: () => void }) {
   const queryClient = useQueryClient();
-  const titleId = useId();
   const { groups, harnessPolicy } = useAvailableModels();
   const { data: projects, isFetched: projectsFetched } = useQuery({
     queryKey: ['registered-projects'],
@@ -61,10 +65,34 @@ export function NewConversationDialog({ presetProject, onClose }: { presetProjec
   const [skillOverrides, setSkillOverrides] = useState<Record<string, boolean>>({});
   const [issueId, setIssueId] = useState<string | null>(null);
   const [message, setMessage] = useState('');
+  const [machine, setMachine] = useState<MachineChoice>(THIS_MACHINE);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const whereHeadingId = useId();
+  const agentHeadingId = useId();
+  const taskHeadingId = useId();
+  const contextHeadingId = useId();
+  const skillsHeadingId = useId();
+  const projectId = useId();
+  const cwdId = useId();
+  const modelLabelId = useId();
+  const harnessLabelId = useId();
+  const effortLabelId = useId();
+  const issueLabelId = useId();
+  const messageId = useId();
+  const bareLabelId = useId();
+  const bareDescId = useId();
+  const skipMdLabelId = useId();
+  const skipMdDescId = useId();
+  const skillsPanelId = useId();
+
   const project = useMemo(() => projects?.find((p) => p.key === projectKey), [projects, projectKey]);
+  const cwdHint = useMachineCwdHint(machine, project ? (project.name ?? project.key) : null);
+
+  const skillsQuery = useConversationSkillGroups(projectKey ?? undefined, issueId ?? undefined);
+  const [skillsOpen, setSkillsOpen] = useState(() => Object.keys(skillOverrides).length > 0);
+  const skillsSummary = skillsQuery.data ? summarizeSkills(skillsQuery.data, skillOverrides) : null;
 
   useEffect(() => {
     if (presetApplied || !projectsFetched) return;
@@ -90,14 +118,6 @@ export function NewConversationDialog({ presetProject, onClose }: { presetProjec
     setEffort(effortDefault.effort);
   }, [effortTouched, effortDefault]);
 
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !submitting) onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose, submitting]);
-
   // A picked effort the new model does not support falls back to the default.
   const chooseModel = (next: string) => {
     setModel(next);
@@ -111,6 +131,8 @@ export function NewConversationDialog({ presetProject, onClose }: { presetProjec
     const next = projects?.find((p) => p.key === key);
     setProjectKey(next ? next.key : null);
     setCwd(next?.path ?? '');
+    // PAN-4743: Fly (new VM) needs a project; clearing it resets the choice to this machine.
+    if (!next && machine.machine === 'fly') setMachine(THIS_MACHINE);
   };
 
   const submit = async (event: FormEvent) => {
@@ -118,7 +140,7 @@ export function NewConversationDialog({ presetProject, onClose }: { presetProjec
     setSubmitting(true);
     setError(null);
     try {
-      const conv = await createConversationWithOptions(buildNewConversationPayload({
+      const payload = buildNewConversationPayload({
         projectKey,
         projectPath: project?.path ?? null,
         cwd,
@@ -130,10 +152,19 @@ export function NewConversationDialog({ presetProject, onClose }: { presetProjec
         skillOverrides,
         issueId,
         message,
-      }));
+      });
+      // PAN-4651 D-4651-23: another machine, or Auto, goes through the fleet route.
+      let route: string;
+      if (machine.machine === '') {
+        route = `/conv/${(await createConversationWithOptions(payload)).id}`;
+      } else {
+        const created = await createFleetConversation(payload, machine.machine, parseNeedsInput(machine.needs));
+        if (created.reason) toast(created.reason);
+        route = buildConversationUrl(created.conversation);
+      }
       onClose();
       void queryClient.invalidateQueries({ queryKey: ['conversations'] });
-      window.history.pushState({}, '', `/conv/${conv.id}`);
+      window.history.pushState({}, '', route);
       window.dispatchEvent(new PopStateEvent('popstate'));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -141,133 +172,205 @@ export function NewConversationDialog({ presetProject, onClose }: { presetProjec
     }
   };
 
-  return (
-    <div className={styles.backdrop} onClick={() => { if (!submitting) onClose(); }}>
-      <form
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        className={styles.dialog}
-        onClick={(event) => event.stopPropagation()}
-        onSubmit={submit}
-      >
-        <div className={styles.header}>
-          <h2 id={titleId} className={styles.title}>New conversation with options</h2>
-          <button type="button" className={styles.iconButton} aria-label="Close" onClick={onClose} disabled={submitting}>
-            <X size={14} />
-          </button>
-        </div>
+  const harnessLabel = HARNESS_OPTIONS.find((h) => h.id === harness)?.label ?? harness;
+  const footerSummary = [
+    model,
+    harnessLabel,
+    ...(effortSupported ? [effort ?? effortDefault?.effort ?? '…'] : []),
+    projectKey ?? 'No project',
+  ].join(' · ');
 
-        <div className={styles.body}>
-          <label className={styles.row}>
-            <span className={styles.label}>Project</span>
-            <select aria-label="Project" className={styles.control} value={projectKey ?? ''} onChange={(e) => chooseProject(e.target.value)}>
+  return (
+    <Modal
+      title="New conversation"
+      description="These choices apply to this conversation only. Your sidebar defaults stay the same."
+      onClose={onClose}
+      dismissible={!submitting}
+      onSubmit={submit}
+      pinned={error
+        ? <p role="alert" className={styles.error}>{error}</p>
+        : (submitting && machine.machine === 'fly' ? <p role="status" className={styles.summary}>Starting a Fly machine. This takes a few minutes.</p> : null)}
+      footer={<>
+        <p className={styles.summary} data-component="new-conversation-summary">{footerSummary}</p>
+        <button type="button" className={styles.button} onClick={onClose} disabled={submitting}>Cancel</button>
+        <button type="submit" className={styles.primaryButton} aria-label="Create conversation" disabled={submitting}>
+          {submitting ? (machine.machine === 'fly' ? 'Starting…' : 'Creating…') : 'Create'}
+        </button>
+      </>}
+    >
+      <section className={styles.section} aria-labelledby={whereHeadingId}>
+        <h3 id={whereHeadingId} className={styles.sectionTitle}>Where it runs</h3>
+        <div className={styles.grid}>
+          <label htmlFor={projectId} className={styles.label}>Project</label>
+          <div className={styles.field}>
+            <select
+              id={projectId}
+              className={styles.select}
+              value={projectKey ?? ''}
+              onChange={(e) => chooseProject(e.target.value)}
+            >
               <option value="">No project</option>
               {(projects ?? []).map((p) => (
                 <option key={p.key} value={p.key}>{p.name ?? p.key}</option>
               ))}
             </select>
-          </label>
+            <ChevronDown size={14} className={styles.chev} />
+          </div>
 
-          <label className={styles.row}>
-            <span className={styles.label}>Working directory</span>
+          <MachineField value={machine} onChange={setMachine} hasProject={projectKey !== null} />
+
+          <label htmlFor={cwdId} className={styles.label}>Working directory</label>
+          <div className={styles.field}>
+            <span className={styles.lead} aria-hidden="true"><Folder size={14} /></span>
             <input
-              aria-label="Working directory"
-              className={styles.control}
-              value={cwd}
-              disabled={!projectKey}
-              placeholder={projectKey ? '' : 'Default working directory'}
+              id={cwdId}
+              className={cn(styles.input, styles.mono)}
+              spellCheck={false}
+              value={cwdHint === null ? cwd : ''}
+              disabled={!projectKey || cwdHint !== null}
+              placeholder={cwdHint ?? (projectKey ? '' : 'Default working directory')}
+              title={cwdHint ?? undefined}
               onChange={(e) => setCwd(e.target.value)}
             />
-          </label>
+          </div>
+        </div>
+      </section>
 
-          <ModelSelect label="Model" value={model} onChange={chooseModel} groups={groups} />
-          <HarnessSelect value={harness} onChange={setHarness} modelId={model} harnessPolicy={harnessPolicy} />
+      <section className={styles.section} aria-labelledby={agentHeadingId}>
+        <h3 id={agentHeadingId} className={styles.sectionTitle}>Agent</h3>
+        <div className={styles.grid}>
+          <span id={modelLabelId} className={styles.label}>Model</span>
+          <ModelSelect labelId={modelLabelId} label="Model" value={model} onChange={chooseModel} groups={groups} />
 
-          <div className={styles.row}>
-            <span className={styles.label}>Effort</span>
-            {effortSupported ? (
-              <div className={styles.effort}>
-                <select
-                  aria-label="Effort"
-                  className={styles.control}
-                  value={effort ?? ''}
-                  onChange={(e) => { setEffort(e.target.value); setEffortTouched(true); }}
-                >
-                  {effort === null && <option value="">…</option>}
-                  {effortLevels.map((level) => <option key={level} value={level}>{level}</option>)}
-                </select>
-                {effortDefault && (
-                  <span className={styles.hint}>
-                    Default: {effortDefault.effort} ({effortDefault.source})
-                    {effortDefault.clamped ? ` · clamped from ${effortDefault.requested}` : ''}
-                  </span>
-                )}
+          <span id={harnessLabelId} className={styles.label}>Harness</span>
+          <HarnessSelect labelId={harnessLabelId} value={harness} onChange={setHarness} modelId={model} harnessPolicy={harnessPolicy} />
+
+          <span id={effortLabelId} className={styles.label}>Effort</span>
+          {effortSupported ? (
+            <div className={styles.effortRow}>
+              <div role="radiogroup" aria-labelledby={effortLabelId} className={styles.segmented}>
+                {effortLevels.map((level) => {
+                  const isDefault = effortDefault?.effort === level;
+                  return (
+                    <button
+                      key={level}
+                      type="button"
+                      role="radio"
+                      aria-checked={effort === level}
+                      data-default={isDefault ? 'true' : undefined}
+                      className={styles.segment}
+                      onClick={() => { setEffort(level); setEffortTouched(true); }}
+                    >
+                      {level}
+                      {isDefault && <span className={styles.defaultDot} aria-hidden="true" />}
+                    </button>
+                  );
+                })}
               </div>
-            ) : (
-              <span className={styles.hint}>Not supported by this model</span>
-            )}
-          </div>
+              {effortDefault && (
+                <span className={styles.hint}>
+                  Default: {effortDefault.effort} ({effortDefault.source})
+                  {effortDefault.clamped ? ` · clamped from ${effortDefault.requested}` : ''}
+                </span>
+              )}
+            </div>
+          ) : (
+            <span className={styles.hint}>Not supported by this model</span>
+          )}
+        </div>
+      </section>
 
-          <fieldset className={styles.group}>
-            <legend className={styles.label}>Context</legend>
-            <label className={styles.check}>
-              <input type="checkbox" checked={bareContext} onChange={(e) => setBareContext(e.target.checked)} />
-              No context
-            </label>
-            <p className={styles.hint}>
-              New conversations start without Overdeck context: no bundled rules, session briefing, memory injection or resume message. Faster to spawn.
+      <section className={styles.section} aria-labelledby={taskHeadingId}>
+        <h3 id={taskHeadingId} className={styles.sectionTitle}>Task<span className={styles.aside}>Both optional</span></h3>
+        <div className={styles.grid}>
+          <span id={issueLabelId} className={styles.label}>Linked issue</span>
+          <IssuePickerField value={issueId} onChange={setIssueId} labelId={issueLabelId} />
+
+          <label htmlFor={messageId} className={cn(styles.label, styles.full)}>First message</label>
+          <textarea
+            id={messageId}
+            className={cn(styles.textarea, styles.full)}
+            rows={3}
+            placeholder="Sent as soon as the conversation starts"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+          />
+        </div>
+      </section>
+
+      <section className={styles.section} aria-labelledby={contextHeadingId}>
+        <h3 id={contextHeadingId} className={styles.sectionTitle}>Context</h3>
+        <div className={styles.option}>
+          <span className={styles.optionLabel}><span id={bareLabelId}>No context</span></span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={bareContext}
+            aria-labelledby={bareLabelId}
+            aria-describedby={bareDescId}
+            className={styles.switch}
+            onClick={() => setBareContext((v) => !v)}
+          />
+          <p id={bareDescId} className={styles.optionDescription}>
+            New conversations start without Overdeck context: no bundled rules, session briefing, memory injection or resume message. Faster to spawn.
+          </p>
+        </div>
+        {harness === 'claude-code' && (
+          <div className={styles.option}>
+            <span className={styles.optionLabel}>
+              <span id={skipMdLabelId}>Skip CLAUDE.md</span>
+              <span className={styles.tag}>Claude Code</span>
+            </span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={skipClaudeMd}
+              aria-labelledby={skipMdLabelId}
+              aria-describedby={skipMdDescId}
+              className={styles.switch}
+              onClick={() => setSkipClaudeMd((v) => !v)}
+            />
+            <p id={skipMdDescId} className={styles.optionDescription}>
+              Claude Code skips <code>~/.claude/CLAUDE.md</code>, project CLAUDE.md files and auto memory (<code>CLAUDE_CODE_DISABLE_CLAUDE_MDS</code>).
             </p>
-            {harness === 'claude-code' && (
-              <>
-                <label className={styles.check}>
-                  <input type="checkbox" checked={skipClaudeMd} onChange={(e) => setSkipClaudeMd(e.target.checked)} />
-                  Skip CLAUDE.md
-                </label>
-                <p className={styles.hint}>
-                  Claude Code skips ~/.claude/CLAUDE.md, project CLAUDE.md files and auto memory (CLAUDE_CODE_DISABLE_CLAUDE_MDS).
-                </p>
-              </>
-            )}
-          </fieldset>
-
-          <div className={styles.group}>
-            <span className={styles.label}>Skills</span>
-            <ConversationSkillsField
-              projectKey={projectKey ?? undefined}
-              issueId={issueId ?? undefined}
-              value={skillOverrides}
-              onChange={setSkillOverrides}
-            />
           </div>
+        )}
+      </section>
 
-          <div className={styles.group}>
-            <span className={styles.label}>Linked issue</span>
-            <IssuePickerField value={issueId} onChange={setIssueId} />
-          </div>
-
-          <label className={styles.group}>
-            <span className={styles.label}>First message</span>
-            <textarea
-              aria-label="First message"
-              className={styles.textarea}
-              rows={3}
-              placeholder="Optional"
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-            />
-          </label>
-
-          {error && <p role="alert" className={styles.error}>{error}</p>}
+      <section className={styles.section} aria-labelledby={skillsHeadingId}>
+        <h3 id={skillsHeadingId} className={styles.sectionTitle}>Skills</h3>
+        <div className={styles.skillsSummary}>
+          <p className={styles.skillsText}>
+            {skillsSummary === null ? (skillsQuery.isError ? 'Skills unavailable' : 'Loading skills…') : <>
+              {skillsSummary.on} of {skillsSummary.total} skills on{' '}
+              <span className={styles.skillsAside}>
+                {skillsSummary.overrides === 0
+                  ? '· inherited from project and global settings, no overrides'
+                  : `· ${skillsSummary.overrides} ${skillsSummary.overrides === 1 ? 'override' : 'overrides'} in this conversation`}
+              </span>
+            </>}
+          </p>
+          {(skillsSummary !== null || skillsQuery.isError) && (
+            <button
+              type="button"
+              className={styles.linkButton}
+              aria-expanded={skillsOpen}
+              aria-controls={skillsPanelId}
+              onClick={() => setSkillsOpen((v) => !v)}
+            >
+              {skillsOpen ? 'Done' : 'Customize'}
+            </button>
+          )}
         </div>
-
-        <div className={styles.footer}>
-          <button type="button" className={styles.button} onClick={onClose} disabled={submitting}>Cancel</button>
-          <button type="submit" className={styles.primaryButton} aria-label="Create conversation" disabled={submitting}>
-            {submitting ? 'Creating…' : 'Create'}
-          </button>
+        <div id={skillsPanelId} className={styles.skillsPanel} hidden={!skillsOpen}>
+          <ConversationSkillsField
+            projectKey={projectKey ?? undefined}
+            issueId={issueId ?? undefined}
+            value={skillOverrides}
+            onChange={setSkillOverrides}
+          />
         </div>
-      </form>
-    </div>
+      </section>
+    </Modal>
   );
 }

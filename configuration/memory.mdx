@@ -105,6 +105,15 @@ refuses with the exact line to add to `.gitignore`.
 `Operator memory:` and `Machine memory:` headings, before the usual observation hits below them. `--json` output is
 unchanged — it is still the observation array only.
 
+Pass `--facts` with `--json` to get both at once, as a single line of JSON: `pan memory search
+"release" --facts --json` prints `{ facts, observations }`. `facts` holds up to 5 matches per store
+(this checkout's project store — the one `add` writes; the operator store; the machine store), each
+as `{ scope, type, id, title, description, tags, file }` with no body. `observations` holds the same
+matches as plain `--json`, trimmed to a short form without the full narrative. Without a scope flag
+(`--project`, `--workspace`, `--issue`, `--global`), observations are scoped to the project that owns
+your current directory, falling back to `--global` when it owns none. `--facts` without `--json`
+exits 1.
+
 ## Facts vs. observation memory vs. OKF knowledge
 
 | | Curated facts (this page) | Observation memory | OKF knowledge |

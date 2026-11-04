@@ -16,7 +16,7 @@ refuse the wrong move; "Skill" means the orchestrator enforces it.
 | V4 | Builders commit and push their OWN branch as they go; only the supervisor merges | Skill (replaces the old shared-commit rule); door refuses a builder `done` report with a dirty tree or unpushed commits |
 | V5 | A branch that has posted DONE is frozen; rebase into a new branch | Skill; the report records `head`, so a later rewrite is visible |
 | V6 | Exactly one fresh blind critic per iteration; never reuse or re-task a critic | Door: a critic lane is always a new conversation; `pan tell` refuses a critic that already reported `done` |
-| V7 | The board's `critic` field must name the real spawned session | Skill: the field holds the lane's conversation id; `pan lane list` proves it exists |
+| V7 | The board's `critic` field must name the real spawned session | Skill: the field holds the lane's conversation name (a lane on another machine has no local id); `pan lane list` proves it exists |
 | V8 | An orchestrator never spawns its own critic | Door: only a root conversation (by effective launcher) may launch `critic` lanes |
 | V9 | Cold play-agents see nothing but the game: no repo, no CLAUDE.md | Door: `play` gets an empty directory outside the repo, `bareContext` and `skipClaudeMd` forced |
 | V10 | Subagents never park on a waiter | Lane contract text and skill |
@@ -33,6 +33,8 @@ refuse the wrong move; "Skill" means the orchestrator enforces it.
 | V21 | Merge and ACCEPTED are independent; frozen board vocabulary | Skill: adopt the frozen list in `status.json`; `gauntlet-index.html` renders it |
 | V22 | Deadline runs: a hard stop overrides the unbounded loop | Skill: optional `DEADLINE` slot; `pan lane list` + `pan lane stop` make the close-out mechanical |
 | V23 | Push egress blocked by a tool reviewer → `BLOCKED … push`, supervisor pushes | Skill (restated in the lane contract as "report blocked, do not stop working") |
+| V24 | A critic on another machine (`--machine`) judges only a pushed commit | Door: the owner fetches `origin` and refuses with 400 when the judged commit is not there |
+| V25 | Steer a lane on another machine as `@<machine>/<name>` | Skill: `pan tell conv-<name>` reaches only lanes on this machine; `pan lane list` shows the machine |
 
 ## The COMMON-brief pattern
 

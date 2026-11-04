@@ -19,6 +19,8 @@ export type SiblingOutcome =
   | { issueId: string; result: 'unaffected' }
   /** Clean rebase onto the new main — re-verification was dispatched. */
   | { issueId: string; result: 'rebased' }
+  /** PAN-4801: clean rebase that left the PR's patch unchanged — approval carried to the new head. */
+  | { issueId: string; result: 'approval-carried' }
   /** Genuine conflict — a resolver agent was dispatched. */
   | { issueId: string; result: 'conflict' }
   /** Something failed for this sibling; the rest still proceed. */
@@ -26,11 +28,22 @@ export type SiblingOutcome =
 
 export type RebaseStatus = 'up-to-date' | 'clean' | 'conflict';
 
+/**
+ * PAN-4801: a clean rebase whose PR patch (`git patch-id --stable` of
+ * merge-base..head) is the same before and after. The approval of `from` may
+ * be carried to `to`.
+ */
+export interface ApprovalCarry {
+  from: string;
+  to: string;
+  patchId: string;
+}
+
 export interface ReconcileDeps {
   /** Ready-for-merge sibling issue IDs (excluding the one that just merged). */
   getReadySiblings: (mergedIssueId: string) => Promise<string[]> | string[];
   /** Rebase this sibling's feature branch onto the updated main. */
-  rebaseSibling: (issueId: string) => Promise<{ status: RebaseStatus }>;
+  rebaseSibling: (issueId: string) => Promise<{ status: RebaseStatus; carry?: ApprovalCarry }>;
   /** Re-run review/test verification on a cleanly-rebased sibling. */
   reDispatchVerification: (issueId: string) => Promise<void> | void;
   /**
@@ -39,6 +52,11 @@ export interface ReconcileDeps {
    * just landed and conflicts with `issueId`.
    */
   dispatchConflictResolver: (issueId: string, mergedIssueId: string) => Promise<void> | void;
+  /**
+   * PAN-4801: carry the approval across a patch-preserving rebase. `true` when
+   * it was recorded; `false` (or a throw) falls back to a re-review.
+   */
+  carryApproval?: (issueId: string, carry: ApprovalCarry) => Promise<boolean>;
   log?: (msg: string) => void;
 }
 
@@ -58,9 +76,12 @@ export async function reconcileStaleSiblings(
 
   for (const issueId of siblings) {
     try {
-      const { status } = await deps.rebaseSibling(issueId);
+      const { status, carry } = await deps.rebaseSibling(issueId);
       if (status === 'up-to-date') {
         outcomes.push({ issueId, result: 'unaffected' });
+      } else if (status === 'clean' && carry && await carried(deps, issueId, carry, log)) {
+        log(`[merge-train] ${issueId} rebased clean onto main(+${mergedIssueId}) with its patch unchanged; approval carried`);
+        outcomes.push({ issueId, result: 'approval-carried' });
       } else if (status === 'clean') {
         await deps.reDispatchVerification(issueId);
         log(`[merge-train] ${issueId} rebased clean onto main(+${mergedIssueId}); re-verifying`);
@@ -78,4 +99,19 @@ export async function reconcileStaleSiblings(
   }
 
   return outcomes;
+}
+
+async function carried(
+  deps: ReconcileDeps,
+  issueId: string,
+  carry: ApprovalCarry,
+  log: (msg: string) => void,
+): Promise<boolean> {
+  if (!deps.carryApproval) return false;
+  try {
+    return await deps.carryApproval(issueId, carry);
+  } catch (err) {
+    log(`[merge-train] ${issueId} approval carry failed: ${err instanceof Error ? err.message : String(err)}; re-reviewing`);
+    return false;
+  }
 }

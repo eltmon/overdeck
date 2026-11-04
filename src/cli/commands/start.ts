@@ -22,7 +22,7 @@ import { syncMainIntoWorkspace } from '../../lib/cloister/merge-agent.js';
 import { resolveWorkspaceRepoRoots } from '../../lib/project-repos.js';
 import { resolveProjectFromIssueSync, hasProjects, type ResolvedProject } from '../../lib/projects.js';
 import { hasPRDDraft, getPRDDraftPath } from '../../lib/prd-draft.js';
-import { isGitHubIssue, resolveGitHubIssue } from '../../lib/tracker-utils.js';
+import { resolveGitHubIssue } from '../../lib/tracker-utils.js';
 import { Effect } from 'effect';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { getReadableWorkspacePanPaths } from '../../lib/pan-dir/index.js';
@@ -30,7 +30,7 @@ import { resolveSwarmPolicy } from '../../lib/swarm-policy.js';
 import type { RuntimeName } from '../../lib/runtimes/types.js';
 import { findPlanSync, readWorkspacePlanSync } from '../../lib/xbrief/io.js';
 import { checkPlanFreshness, formatPlanFreshnessRefusal } from '../../lib/xbrief/freshness.js';
-import { findSpecByIssue } from '../../lib/pan-dir/specs.js';
+import { findIssuePlan } from '../../lib/xbrief/issue-plan-lookup.js';
 import { writeAutoStartXBrief, type AutoSynthesizeIssueInput } from '../../lib/xbrief/auto-synthesize.js';
 import { transitionStartedXBrief, updateWorkspaceDraftPlanStatus } from './start-status.js';
 import { headDeletionEpoch } from './start-freshness.js';
@@ -47,42 +47,6 @@ function isLinearIssue(issueId: string): boolean {
   return /^[A-Z]+-\d+$/i.test(issueId);
 }
 
-/**
- * Update Linear issue status to "In Progress" when agent starts
- */
-async function updateLinearToInProgress(apiKey: string, issueIdentifier: string): Promise<boolean> {
-  try {
-    const { LinearClient } = await import('@linear/sdk');
-    const client = new LinearClient({ apiKey });
-
-    // Search for the issue by identifier
-    const results = await client.searchIssues(issueIdentifier, { first: 1 });
-    const issue = results.nodes[0];
-
-    if (!issue) return false;
-
-    // Get the team to find workflow states
-    const team = await issue.team;
-    if (!team) return false;
-
-    // Find the "In Progress" state
-    const states = await team.states();
-    const inProgressState = states.nodes.find((s) =>
-      s.name === 'In Progress' || s.type === 'started'
-    );
-
-    if (!inProgressState) return false;
-
-    // Update the issue state using client.updateIssue
-    await client.updateIssue(issue.id, { stateId: inProgressState.id });
-
-    return true;
-  } catch (error) {
-    // Silently fail - don't block agent spawn for Linear API issues
-    return false;
-  }
-}
-
 import { shouldSkipTrackerUpdate } from '../../lib/shadow-mode.js';
 import { createShadowState, updateShadowState } from '../../lib/shadow-state.js';
 import { getDashboardApiUrl, loadConfigSync } from '../../lib/config.js';
@@ -90,7 +54,7 @@ import {
   loadWorkspaceMetadata,
   findRemoteWorkspaceMetadata,
 } from '../../lib/remote/workspace-metadata.js';
-import { spawnRemoteAgent, isRemoteAgentRunning, createFlyProviderFromConfig, checkRemoteSpendCap, isRemoteAvailable } from '../../lib/remote/index.js';
+import { isRemoteAvailable } from '../../lib/remote/index.js';
 import type { RemoteWorkspaceMetadata } from '../../lib/remote/interface.js';
 import type { SpawnRemoteAgentOptions } from '../../lib/remote/remote-agents.js';
 import { assertCanStartFresh, getWorkAgentLifecycleState } from '../../lib/work-agent-lifecycle.js';
@@ -311,212 +275,6 @@ async function clearTroubledForForce(agentId: string, issueId: string): Promise<
 }
 
 /**
- * Handle remote workspace agent spawning
- */
-async function handleRemoteWorkspace(
-  issueId: string,
-  options: IssueOptions,
-  spinner: Ora,
-  clearPauseBeforeSpawn: boolean,
-  clearTroubledBeforeSpawn: boolean,
-  resolved?: ResolvedProject,
-): Promise<void> {
-  const config = loadConfigSync();
-
-  // Verify remote is enabled
-  if (!config.remote?.enabled) {
-    spinner.fail('Remote workspaces not enabled');
-    console.log('');
-    console.log(chalk.dim('Run: pan admin remote setup'));
-    console.log(chalk.dim('This writes the required remote settings to ~/.overdeck/config.toml'));
-    return exitCli(1);
-  }
-
-  // Check remote availability
-  spinner.text = 'Checking remote availability...';
-  const availability = await isRemoteAvailable();
-  if (!availability.available) {
-    spinner.fail('Remote not available');
-    console.log('');
-    console.log(chalk.yellow(availability.reason || 'Unknown error'));
-
-    // If user explicitly requested remote, fail
-    if (options.remote) {
-      return exitCli(1);
-    }
-
-    // Otherwise, suggest creating local workspace
-    console.log('');
-    console.log(chalk.bold('To create a local workspace instead:'));
-    console.log(`  ${chalk.cyan(`pan workspace ${issueId} --local`)}`);
-    console.log(`  ${chalk.cyan(`pan start ${issueId} --local`)}`);
-    return exitCli(1);
-  }
-
-  // Check for existing remote workspace
-  let remoteMetadata = findRemoteWorkspaceMetadata(issueId);
-
-  // Auto-create if not found
-  if (!remoteMetadata) {
-    spinner.text = 'Remote workspace not found, creating...';
-    try {
-      const { createRemoteWorkspace } = await import('../../lib/remote-workspace.js');
-      remoteMetadata = await createRemoteWorkspace(issueId, { spinner, tier: options.tier as 'ephemeral' | 'durable' | undefined });
-    } catch (error: any) {
-      spinner.fail(`Failed to create remote workspace: ${error.message}`);
-      return exitCli(1);
-    }
-  }
-
-  // Check if remote agent already running
-  spinner.text = 'Checking for existing agent...';
-  const agentId = `agent-${issueId.toLowerCase()}`;
-  const isRunning = await isRemoteAgentRunning(agentId, remoteMetadata.vmName);
-
-  if (isRunning) {
-    spinner.fail(`Agent ${agentId} already running on remote VM`);
-    console.log('');
-    console.log(chalk.dim(`Use 'pan tell ${issueId} "message"' to send commands`));
-    return exitCli(1);
-  }
-
-  // Resolve the effective tier up front so dry-run output and the provider
-  // both see the same value (CLI flag wins over config default).
-  const tier = (options.tier as 'ephemeral' | 'durable' | undefined) ?? config.remote?.resiliency_tier;
-
-  if (options.dryRun) {
-    spinner.info('Dry run mode (remote)');
-    console.log('');
-    console.log(chalk.bold('Would create:'));
-    console.log(`  Agent ID:   ${agentId}`);
-    console.log(`  VM:         ${chalk.cyan(remoteMetadata.vmName)}`);
-    console.log(`  Provider:   ${remoteMetadata.provider}`);
-    console.log(`  Tier:       ${tier ?? 'ephemeral'}`);
-    console.log(`  Model:      ${options.model || 'default'}`);
-    return;
-  }
-
-  // Build prompt for remote agent
-  spinner.text = 'Building agent prompt...';
-  const projectRoot = findProjectRoot(issueId);
-  const prompt = await buildWorkAgentPrompt({ issueId, env: 'REMOTE', workspacePath: '/workspace', skipDynamicContext: true });
-
-  // Sync all credentials before spawning (tokens may have expired)
-  spinner.text = 'Syncing credentials (Claude, GitHub)...';
-  const fly = createFlyProviderFromConfig(config.remote, tier);
-  const credsSynced = await fly.syncAllCredentials(remoteMetadata.vmName);
-  if (!credsSynced.claude) {
-    spinner.warn('Could not sync Claude credentials - agent may need to re-authenticate');
-  }
-  if (!credsSynced.github) {
-    spinner.warn('Could not sync GitHub CLI auth - gh commands may fail');
-  }
-
-  // Re-apply Claude Code config (onboarding marker, /workspace trust,
-  // settings.json permission mode) — idempotent, heals VMs created before
-  // a config change.
-  await fly.configureClaudeCode(remoteMetadata.vmName);
-
-  // Enforce remote.max_concurrent_agents spend guardrail before provisioning
-  // more Fly resources. A cap of zero or unset is unlimited.
-  const spendCap = checkRemoteSpendCap(config);
-  if (!spendCap.allowed) {
-    spinner.fail(spendCap.message!);
-    return exitCli(1);
-  }
-
-  // Spawn remote agent
-  spinner.text = 'Spawning remote agent...';
-  try {
-    if (clearPauseBeforeSpawn) {
-      await Effect.runPromise(clearAgentPaused(agentId));
-    }
-    if (clearTroubledBeforeSpawn) {
-      await clearTroubledForForce(agentId, issueId);
-    }
-
-    const remoteAgent = await spawnRemoteAgent({
-      issueId,
-      workspace: remoteMetadata,
-      // harness flows in once the remote-spawn path supports it; the front-end
-      // gate still rejects invalid combos before we reach this call so the
-      // remote agent will see harness=claude-code today (Pi is local-only
-      // until the Fly worker image bundles the pi binary — tracked separately).
-      model: options.model,
-      prompt,
-      startedBy: resolveCliStartedBy('operator:cli:pan-start'),
-      autoSpawnConsentRequired: process.env['OVERDECK_AUTO_SPAWN_CONSENT_REQUIRED'] === '1',
-      tier: fly.getResiliencyTier(),
-      effort: options.effort,
-    });
-    spinner.succeed(`Remote agent spawned: ${remoteAgent.id}`);
-
-    // Handle shadow mode
-    const skipTrackerUpdate = await shouldSkipTrackerUpdate(issueId, options.shadow);
-
-    if (skipTrackerUpdate) {
-      await createShadowState(issueId, 'open', 'pan start');
-      await updateShadowState(issueId, 'in_progress', 'pan start');
-      console.log(chalk.cyan(`  👻 Shadow mode: tracking status locally`));
-    } else if (isGitHubIssue(issueId)) {
-      // GitHub issue — add in-progress label
-      const gh = resolveGitHubIssue(issueId);
-      if (gh.isGitHub) {
-        try {
-          const { loadConfigSync: loadYamlConfig } = await import('../../lib/config-yaml.js');
-          const yamlConfig = loadYamlConfig();
-          const token = yamlConfig.config.trackerKeys?.github || process.env.GITHUB_TOKEN;
-          if (token) {
-            const { Octokit } = await import('@octokit/rest');
-            const octokit = new Octokit({ auth: token });
-            await octokit.issues.addLabels({ owner: gh.owner, repo: gh.repo, issue_number: gh.number, labels: ['in-progress'] });
-            console.log(chalk.green(`  ✓ Updated ${issueId.toUpperCase()} to In Progress`));
-          }
-        } catch (err: any) {
-          console.warn(chalk.dim(`  ⚠ Could not update GitHub label: ${err.message}`));
-        }
-      }
-    } else if (isLinearIssue(issueId)) {
-      const apiKey = await Effect.runPromise(getLinearApiKey());
-      if (apiKey) {
-        const updated = await updateLinearToInProgress(apiKey, issueId);
-        if (updated) {
-          console.log(chalk.green(`  ✓ Updated ${issueId.toUpperCase()} to In Progress`));
-        }
-      }
-    }
-
-    console.log('');
-    console.log(chalk.bold('Agent Details:'));
-    console.log(`  Session:    ${chalk.cyan(remoteAgent.id)}`);
-    console.log(`  VM:         ${chalk.cyan(remoteMetadata.vmName)}`);
-    console.log(`  Location:   ${chalk.yellow('Remote (Fly.io)')}`);
-    console.log(`  Model:      ${remoteAgent.model}`);
-
-    if (remoteMetadata.urls.frontend || remoteMetadata.urls.api) {
-      console.log('');
-      console.log(chalk.bold('URLs:'));
-      if (remoteMetadata.urls.frontend) {
-        console.log(`  Frontend: ${chalk.cyan(remoteMetadata.urls.frontend)}`);
-      }
-      if (remoteMetadata.urls.api) {
-        console.log(`  API:      ${chalk.cyan(remoteMetadata.urls.api)}`);
-      }
-    }
-
-    console.log('');
-    console.log(chalk.dim('Commands:'));
-    console.log(`  SSH:      pan workspace ssh ${issueId}`);
-    console.log(`  Message:  pan tell ${issueId} "your message"`);
-    console.log(`  Kill:     pan kill ${issueId}`);
-
-  } catch (error: any) {
-    spinner.fail(`Failed to spawn remote agent: ${error.message}`);
-    return exitCli(1);
-  }
-}
-
-/**
  * Ensure remote workspace exists, auto-create if needed
  */
 async function ensureRemoteWorkspace(
@@ -714,6 +472,12 @@ async function repairMainBranchWorkspace(workspace: string, normalizedId: string
 import { resolvePanStartSpawnModel } from './start-spawn-model.js';
 
 export async function issueCommand(id: string, options: IssueOptions): Promise<void> {
+  // PAN-4734 FR-2: `--machine fly` starts a work agent on a new Fly machine, the same as --remote.
+  if (options.machine?.toLowerCase() === 'fly') {
+    options.remote = true;
+    delete options.machine;
+  }
+  if (options.machine && await (await import('./start-machine.js')).startOnMachine(id, options)) return; // PAN-4651
   process.env['OVERDECK_AGENT_STARTED_BY'] = resolveCliStartedBy('operator:cli:pan-start');
   try {
     const model = normalizeModelOverride(options.model);
@@ -869,9 +633,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     // PAN-2407: route unplanned issues to the start-planning endpoint before
     // any workspace creation or remote provisioning.
     const projectRoot = findProjectRoot(id);
-    const existingPlan = workspacePath && !isRemote
-      ? findPlanSync(workspacePath)
-      : await Effect.runPromise(findSpecByIssue(projectRoot, id));
+    const existingPlan = await findIssuePlan({ issueId: id, projectRoot, localWorkspace: isRemote ? findLocalWorkspace(id) : workspacePath });
 
     if (!existingPlan) {
       if (resolvedPlanningMode === 'auto' || resolvedPlanningMode === 'interactive') {
@@ -965,7 +727,14 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 
     // Handle remote workspace
     if (effectiveRemote) {
-      await handleRemoteWorkspace(id, options, spinner, shouldClearPauseBeforeSpawn, shouldClearTroubledBeforeSpawn, resolved ?? undefined);
+      const agentId = `agent-${id.toLowerCase()}`;
+      await (await import('./start-remote.js')).startRemoteWorkAgent(id, options, spinner, {
+        projectRoot: resolved?.projectPath ?? findProjectRoot(id),
+        beforeStart: async () => {
+          if (shouldClearPauseBeforeSpawn) await Effect.runPromise(clearAgentPaused(agentId));
+          if (shouldClearTroubledBeforeSpawn) await clearTroubledForForce(agentId, id);
+        },
+      });
       return;
     }
 

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { usePrQuery, usePrDiffQuery } from '../../CommandDeck/ZoneCOverviewTabs/queries'
+import { ApprovedScopeCheck } from '../../deft/ApprovedScopeCheck'
 import styles from './changedFilesView.module.css'
 
 /**
@@ -141,6 +142,7 @@ export function ChangedFilesView({ issueId }: { issueId: string }) {
           {pr.data.pr.url && <a className={styles.btn} href={pr.data.pr.url} target="_blank" rel="noreferrer">Open PR ↗</a>}
         </span>
       </div>
+      <ApprovedScopeCheck issueId={issueId} files={files.map((f) => f.path)} />
       <div className={styles.grid}>
         <div className={styles.tree}>
           {files.length === 0 && <div className={styles.empty}>No files changed.</div>}

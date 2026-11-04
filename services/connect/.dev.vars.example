@@ -1,0 +1,11 @@
+# Copy to services/connect/.dev.vars (gitignored) for `wrangler dev --local`.
+# PUBLIC_BASE_URL and STUN_URLS come from wrangler.jsonc vars; override them here for local URLs if needed.
+# Leave the TURN values empty to run without the relay (/healthz then reports "turn":false).
+TURN_KEY_ID=
+TURN_KEY_API_TOKEN=
+# Leave the push values empty to run without phone push (/healthz then reports "apns":false,"fcm":false).
+APNS_KEY_P8=
+APNS_KEY_ID=
+APNS_TEAM_ID=
+FCM_SERVICE_ACCOUNT_JSON=
+FCM_PROJECT_ID=

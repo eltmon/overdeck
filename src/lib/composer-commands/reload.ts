@@ -63,13 +63,14 @@ export async function runComposerReload(
   };
 }
 
-type ReloadPhase = 'building' | 'awaiting-approval' | 'restarting' | 'completed' | 'failed';
+type ReloadPhase = 'building' | 'awaiting-approval' | 'restarting' | 'completed' | 'failed' | 'superseded';
 const PHASE_MESSAGES: Record<ReloadPhase, string> = {
   building: 'Reload started: preparing the dashboard build.',
   'awaiting-approval': 'The dashboard build is ready. Use the restart banner to put it live.',
   restarting: 'Restart approved. The dashboard is restarting; conversations and terminals will reconnect.',
   completed: 'Reload completed successfully.',
   failed: 'Reload failed. Check the activity details for the command output.',
+  superseded: 'A newer reload replaced this one. It builds a newer origin/main and asks for approval itself; this build was discarded.',
 };
 
 /** Runs in the detached CLI, so completion still arrives after server restart. */
@@ -85,7 +86,7 @@ export async function reportComposerReloadProgress(
 async function reportProgress(phase: ReloadPhase, activityId?: string, logPath?: string): Promise<void> {
   if (!activityId) return;
   let output: string | undefined;
-  if (logPath && (phase === 'failed' || phase === 'completed')) {
+  if (logPath && (phase === 'failed' || phase === 'completed' || phase === 'superseded')) {
     const handle = await open(logPath, 'r').catch(() => undefined);
     if (handle) {
       try {
@@ -101,7 +102,7 @@ async function reportProgress(phase: ReloadPhase, activityId?: string, logPath?:
   // Each phase is a durable, idempotent entry, including across dashboard boots.
   await emitActivityEntryOncePortable({
     id: `${activityId}:${phase}`, source: 'dashboard', command: '/pan reload',
-    status: phase === 'completed' ? 'completed' : phase === 'failed' ? 'failed' : 'running',
+    status: phase === 'completed' || phase === 'superseded' ? 'completed' : phase === 'failed' ? 'failed' : 'running',
     level: phase === 'failed' ? 'error' : phase === 'completed' ? 'success' : 'info',
     message: PHASE_MESSAGES[phase], output, details: output,
   });

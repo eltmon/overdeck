@@ -44,6 +44,7 @@ import { telemetryEnvironmentForcesOff } from './telemetry/config.js';
 import { synchronizeAnalyticsServices } from './telemetry/service.js';
 import { ensureOperatorHash } from './telemetry/operator-hash.js';
 import { invalidateRemoteAccessConfig, readRemoteAccessConfig } from './remote-access/config.js';
+import { keepTokenMintWhileServing } from './tailscale/token-mint-guard.js';
 
 export type ApiTtsConfig = Omit<TtsDaemonConfig, 'daemonPort' | 'daemonHost'>;
 
@@ -910,7 +911,7 @@ export function runSettingsWriteSerialized<T>(fn: () => Promise<T>): Promise<T> 
 
 /** Persist API settings through the serialized settings write queue. */
 export async function saveSettingsApi(settings: ApiSettingsConfig): Promise<void> {
-  return runSettingsWriteSerialized(() => saveSettingsApiPromiseUnlocked(settings));
+  return runSettingsWriteSerialized(async () => saveSettingsApiPromiseUnlocked(await keepTokenMintWhileServing(settings)));
 }
 
 /**
@@ -988,10 +989,19 @@ async function saveSettingsApiPromiseUnlocked(
     // only saveDesignLanguage's fresh-inside-the-queue read may set it.
     ui: ((honorThemeFromSettings && settings.ui?.theme !== undefined)
       || currentConfig.ui.theme !== DEFAULT_CONFIG.ui.theme
-      || currentConfig.ui.openInEditorCommand !== null)
+      || currentConfig.ui.openInEditorCommand !== null
+      || currentConfig.ui.colorTheme.light !== null || currentConfig.ui.colorTheme.dark !== null)
       ? {
           ...(currentConfig.ui.openInEditorCommand !== null ? { open_in_editor_command: currentConfig.ui.openInEditorCommand } : {}),
           theme: honorThemeFromSettings ? (settings.ui?.theme ?? currentConfig.ui.theme) : currentConfig.ui.theme,
+          ...(currentConfig.ui.colorTheme.light !== null || currentConfig.ui.colorTheme.dark !== null
+            ? {
+                color_theme: {
+                  ...(currentConfig.ui.colorTheme.light !== null ? { light: currentConfig.ui.colorTheme.light } : {}),
+                  ...(currentConfig.ui.colorTheme.dark !== null ? { dark: currentConfig.ui.colorTheme.dark } : {}),
+                },
+              }
+            : {}),
         }
       : undefined,
     conversationSearch: settings.conversationSearch,
@@ -1473,6 +1483,14 @@ export async function saveDesignLanguage(theme: DesignLanguage): Promise<void> {
       ...current,
       ui: { ...current.ui, theme },
     }, { honorThemeFromSettings: true });
+  });
+}
+
+/** Turn on `dashboard.require_token_mint` (PAN-1254 D-2) as one serialized settings turn. */
+export async function saveRequireTokenMint(): Promise<void> {
+  await runSettingsWriteSerialized(async () => {
+    const current = loadSettingsApi();
+    await saveSettingsApiPromiseUnlocked({ ...current, dashboard: { ...current.dashboard, require_token_mint: true } });
   });
 }
 

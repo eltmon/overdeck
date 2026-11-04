@@ -11,8 +11,12 @@ interface AutoSpawnConsentRecord {
   status: 'granted' | 'claimed' | 'spent';
   claimId?: string;
   workModel?: string;
+  /** PAN-4683: the planning request's location, so the post-planning start honors `--remote`. */
+  workspaceLocation?: WorkspaceLocation;
   updatedAt: string;
 }
+
+type WorkspaceLocation = 'local' | 'remote';
 
 export interface AutoSpawnConsentClaim {
   issueId: string;
@@ -38,9 +42,10 @@ function autoSpawnConsentLockPath(issueId: string): string {
 function parseConsentRecord(raw: string): AutoSpawnConsentRecord | null {
   const value = JSON.parse(raw) as Partial<AutoSpawnConsentRecord> & { autoSpawnOnFinalize?: unknown };
   const workModel = typeof value.workModel === 'string' && value.workModel.length > 0 ? value.workModel : undefined;
+  const workspaceLocation = value.workspaceLocation === 'local' || value.workspaceLocation === 'remote' ? value.workspaceLocation : undefined;
   if (value.version === 2 && typeof value.generation === 'string'
     && (value.status === 'granted' || value.status === 'claimed' || value.status === 'spent')) {
-    return { ...(value as AutoSpawnConsentRecord), workModel };
+    return { ...(value as AutoSpawnConsentRecord), workModel, workspaceLocation };
   }
   if (typeof value.autoSpawnOnFinalize === 'boolean') {
     return {
@@ -105,21 +110,26 @@ export async function readAutoSpawnOnFinalizeFlagAsync(issueId: string): Promise
 export async function writeAutoSpawnOnFinalizeFlag(
   issueId: string,
   enabled: boolean,
-  options: { workModel?: string | null } = {},
+  options: { workModel?: string | null; workspaceLocation?: WorkspaceLocation | null } = {},
 ): Promise<void> {
   await withConsentLock(issueId, 'planning-consent:new-cycle', async () => {
     // Read tolerantly (never throws — null on any unreadable/corrupt file) and
-    // only when workModel is omitted: an unreadable prior record must not
+    // only when an option is omitted: an unreadable prior record must not
     // block a fresh generation from overwriting it, which is the only
-    // self-heal path for a corrupt consent file.
-    const workModel = options.workModel === null
+    // self-heal path for a corrupt consent file. null clears, undefined preserves.
+    const prior = options.workModel === undefined || options.workspaceLocation === undefined
+      ? await readConsentRecord(issueId)
+      : null;
+    const workModel = options.workModel === null ? undefined : (options.workModel ?? prior?.workModel);
+    const workspaceLocation = options.workspaceLocation === null
       ? undefined
-      : (options.workModel ?? (await readConsentRecord(issueId))?.workModel);
+      : (options.workspaceLocation ?? prior?.workspaceLocation);
     await writeConsentRecord(issueId, {
       version: 2,
       generation: randomUUID(),
       status: enabled ? 'granted' : 'spent',
       workModel,
+      workspaceLocation,
       updatedAt: new Date().toISOString(),
     });
   });
@@ -149,6 +159,12 @@ export async function readAutoSpawnConsentWorkModel(issueId: string): Promise<st
   const record = await readConsentRecord(issueId);
   if (!record || record.status === 'spent') return undefined;
   return record.workModel;
+}
+
+export async function readAutoSpawnConsentWorkspaceLocation(issueId: string): Promise<WorkspaceLocation | undefined> {
+  const record = await readConsentRecord(issueId);
+  if (!record || record.status === 'spent') return undefined;
+  return record.workspaceLocation;
 }
 
 async function transitionClaim(

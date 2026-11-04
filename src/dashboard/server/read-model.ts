@@ -24,6 +24,7 @@ import {
 import type { AgentSnapshot, AgentStatus, Role, AgentResolution, AgentRuntimeSnapshot, BackendPane, DerivedIssueState } from '@overdeck/contracts';
 import { AgentsResolver, type Agent as OverdeckAgent } from '../../lib/overdeck/agents.js';
 import { foldRuntimeSeed, RUNTIME_SEED_EVENT_TYPES } from './services/runtime-seed.js';
+import { setAgentSnapshotsSource } from './services/agent-snapshots-access.js';
 
 // ─── Exported async helpers (used by bootstrap Effect + tests) ───────────────
 
@@ -740,6 +741,7 @@ export const ReadModelServiceLive = Layer.effect(
       }
     });
 
+    setAgentSnapshotsSource(() => Effect.runPromise(getSnapshot).then((snapshot) => snapshot.agents)); // PAN-4651 fleet Needs-You
     return {
       getSnapshot,
       getChannelPermissionRequest,

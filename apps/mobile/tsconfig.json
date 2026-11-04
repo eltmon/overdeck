@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "types": ["vite/client"],
+    "baseUrl": ".",
+    "paths": {
+      "@overdeck/contracts": ["../../packages/contracts/src/index.ts"]
+    },
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": [
+    "src",
+    "../../src/dashboard/frontend/src/vite-env.d.ts",
+    "../../src/dashboard/frontend/src/types/ambient.d.ts"
+  ],
+  "exclude": ["src/**/*.test.*", "src/**/__tests__/**"]
+}

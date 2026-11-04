@@ -1,0 +1,1121 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-03T09:04:53Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4475: Shared Sessions v0 (slice 4): viewer surface, join intent and localhost-detect",
+    "updated": "2026-11-03T09:11:31.930Z"
+  },
+  "plan": {
+    "id": "pan-4475",
+    "title": "Shared Sessions v0 (slice 4): viewer surface, join intent and localhost-detect",
+    "status": "running",
+    "uid": "219f5bac-6f7f-4b92-af81-853a35d732bb",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-03T09:04:53Z",
+    "updated": "2026-11-03T09:11:31.930Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4475",
+        "label": "PAN-4475",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "shared-sessions",
+      "webrtc",
+      "dashboard",
+      "frontend",
+      "share-service"
+    ],
+    "metadata": {
+      "sizeJustification": "About 28 files across about 13 path-subsystems because the lint counts each top-level doc file (docs.json, anywhere.mdx, configuration/…, each docs/*.md) and each test root (tests/unit, tests/integration, scripts/frontend-test-subset.txt) separately. The code is one vertical feature: the viewer server, its routes, the browser peer and the page are useless without each other, and the issue names the landing page and the user docs page as part of this slice (PRD D-21).",
+      "canonicalFilename": "2026-11-03-PAN-4475-shared-sessions-v0-slice-4-viewer-surface-join-intent-and-localhost-detect.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Slices 1-3 let a host create a share, admit viewers and stream the conversation over WebRTC, but no viewer-side code exists: nothing opens the join socket, no browser answers the host's offer, no page renders shared content, and the landing page tells joiners to run a pan join command that does not exist yet.",
+      "Proposal": "Add a viewer-server JoinManager (join socket with the device token, state table, keepalive, leave, signal relay, ICE servers, one-subscriber rule with socket restart, grace timer) behind /api/joins routes and an SSE event stream; a browser WebRtcViewer answerer that negotiates the hello and decodes conversation and presence; a /#/shared/<code> route with a Join confirmation and lobby/admitted/host-disconnected/removed screens reusing MessagesTimeline; a nonce'd localhost-detect script on the share service landing page backed by a CORS-restricted /api/share-probe; unit, route, frontend, Miniflare integration and two-context Playwright tests; and user plus developer docs. Full design: .pan/drafts/PAN-4475.md.",
+      "NonGoals": "- pan join / pan share CLI (slice 9), hosted web join (slice 10), forced-TURN and signaling-privacy e2e (slice 11)\n- Drafts, contributor direct-submit or any prompt sending from the viewer (slice 5); read-only terminal (slice 6); controller handoff (slice 7)\n- Automatic join-socket reconnect after a network drop, host re-park, host-side restore (slice 8)\n- A full roster UI, per-message avatars, or rendering SharedMessage.author\n- Rendering tool calls, work log, thinking, cost or context usage for viewers\n- A pan:// protocol handler or desktop-app join path\n- Probing ports other than 3011 from the landing page or a Worker variable for the port list\n- Changing routes/shares.ts, share-host.ts, peer-hub.ts, the room reducer, ws-rpc.ts or main.ts\n- Adding /api/share-probe to REMOTE_GATE_ALLOWLIST or sending CORS headers for any origin other than the configured share origin\n- A join started by navigation alone (GET or page load) without the user's Join click, except auto-resume of an 'away' join\n- New src/lib/errors.ts tags, allowlist raises, adding the Playwright spec to test:playwright, or deploying anything"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Join intent is an explicit Join click on the local /#/shared/<code> page, sent as a same-origin CSRF POST; the landing page only navigates and probes (D-1).",
+        "rationale": "Opening the join socket reveals the joiner's GitHub identity to the host; a drive-by navigation must not do that, and a cross-origin POST would have to bypass CSRF."
+      },
+      {
+        "summary": "Browser ⇄ viewer server uses server-sent events plus POSTs (D-2).",
+        "rationale": "Low-latency push for trickled ICE with an existing SSE precedent (machines-peer.ts); avoids new /ws upgrade plumbing or five-file /ws/rpc event changes."
+      },
+      {
+        "summary": "One subscriber per join, last one wins; a re-subscribe on an admitted join restarts the socket with a plain close to get a fresh offer (D-4, D-5).",
+        "rationale": "The host holds one peer per GitHub id and offers only on a connected false→true flip (slice-3 D-13); a leave frame would re-lobby the viewer."
+      },
+      {
+        "summary": "A 60 s unsubscribed grace timer closes the join to 'away'; the page auto-resumes an away join (D-7).",
+        "rationale": "Closed tabs must not leave a viewer listed in the room forever, while reloads must not drop admission."
+      },
+      {
+        "summary": "No automatic join-socket reconnect after an unexpected close; Rejoin button instead (D-8).",
+        "rationale": "Automatic restore is slice 8 (PAN-4479); the service already restores an admitted viewer on rejoin."
+      },
+      {
+        "summary": "Landing page probes only localhost:3011 and 127.0.0.1:3011 with a nonce'd inline script and always shows a manual link (D-14).",
+        "rationale": "3011 is the default dashboard port; a manual link covers other ports and a denied Chrome Local Network Access prompt."
+      },
+      {
+        "summary": "The landing page drops the 'pan join' line until slice 9 (D-15).",
+        "rationale": "pan join does not exist yet; telling users to run it would be wrong."
+      },
+      {
+        "summary": "/api/share-probe sends CORS headers only for the configured share origin, answers the PNA preflight, and stays off REMOTE_GATE_ALLOWLIST (D-16).",
+        "rationale": "Lets the landing page detect Overdeck without exposing it to other sites or LAN peers."
+      },
+      {
+        "summary": "MessagesTimeline is reused bare with workLog [] and a field-by-field SharedMessage→ChatMessage copy (D-13).",
+        "rationale": "TerminalPanel.tsx already renders it that way; tool calls and work log are not shared in v0."
+      },
+      {
+        "summary": "The Playwright spec is not added to test:playwright; the Miniflare integration test is the CI-run relay coverage (D-20).",
+        "rationale": "Follows slice-2 D-16; the spec needs two built dashboards and Chromium."
+      },
+      {
+        "summary": "The route is /#/shared/<shortCode> (the issue's <roomId>).",
+        "rationale": "The short code is the only room identifier that exists."
+      }
+    ],
+    "items": [
+      {
+        "id": "viewer-api-types",
+        "title": "Add the viewer dashboard API types to the sharing contracts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T09:04:53Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4475",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/sharing.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck (including typecheck:share) completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Append the 'Contracts' block of .pan/drafts/PAN-4475.md (JoinState, JoinView, CreateJoinRequest, JoinIceServersResponse, JoinEvent) to packages/contracts/src/sharing.ts after the wire format block, and add the header sentence 'PAN-4475 (slice 4) adds the viewer dashboard API types at the end: the shapes the viewer browser exchanges with its own dashboard server.' Type-only: no import, no runtime code. JoinView has no token field."
+        },
+        "items": [
+          {
+            "id": "viewer-api-types.ac1",
+            "title": "Given the edited sharing.ts, when a reviewer reads it, then it exports JoinState, JoinView, JoinEvent, CreateJoinRequest and JoinIceServersResponse and contains no import statement",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-api-types.ac2",
+            "title": "Given the new types, when `npm run typecheck` runs, then it exits 0 (typecheck:share still compiles the Worker against sharing.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-api-types.ac3",
+            "title": "Given the edited sharing.ts, when a reviewer reads JoinView, then it contains exactly shortCode, joinUrl, state, contributor, login, closeCode and error, and no field named accessToken or token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "share-service-join-url",
+        "title": "Add joinSocketUrl and shareOrigin helpers to the share service client",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T09:04:53Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-4475",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/sharing/share-service.ts",
+            "tests/unit/lib/sharing/share-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/sharing/share-service.test.ts"
+          ],
+          "expected_outputs": [
+            "share-service.test.ts passes including the joinSocketUrl and shareOrigin cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Add `joinSocketUrl(base, shortCode)` (https→wss, http→ws, path /v1/rooms/<code>/join?v=1) and `shareOrigin(base)` (new URL(base).origin) to src/lib/sharing/share-service.ts next to hostSocketUrl (line 72). Add the four test cases named in WI-2."
+        },
+        "items": [
+          {
+            "id": "share-service-join-url.ac1",
+            "title": "joinSocketUrl('https://share.overdeck.ai','BCDFGHJK') returns 'wss://share.overdeck.ai/v1/rooms/BCDFGHJK/join?v=1' and the http loopback base returns a ws:// URL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-service-join-url.ac2",
+            "title": "shareOrigin returns 'https://share.overdeck.ai' for the default base and 'http://127.0.0.1:8787' for a loopback base",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-service-join-url.ac3",
+            "title": "`npx vitest run tests/unit/lib/sharing/share-service.test.ts` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "join-manager-lifecycle",
+        "title": "Create JoinManager: join socket, state table, keepalive and leave",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T09:04:53Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4475",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/share-join.ts",
+            "src/dashboard/server/services/__tests__/share-join.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/share-join.test.ts"
+          ],
+          "expected_outputs": [
+            "share-join.test.ts passes, including every close code of the State table"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-5",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ],
+          "parallelSafeReason": "Touches only the new share-join.ts and its test; its DAG blockers are the type and URL-helper items."
+        },
+        "narrative": {
+          "Action": "PRD WI-3 and sections 'State table' and 'Viewer server'. Create src/dashboard/server/services/share-join.ts: plain async class JoinManager with injected deps (readAccount, readShareUrl, openSocket using the ShareSocket interface exported from share-host.ts, now), methods join/get/leave/stop, the full State table (status frames, close codes 1000/4003/4004/4008/4009/4010/4011/4013/other, unexpected-response 404/401/403/other, socket error, pong timeout), keepalive copied from share-host.ts lines 368-391 using its exported PING_INTERVAL_MS/PONG_TIMEOUT_MS, defaultJoinDeps, getJoinManager/setJoinManagerForTests. 412 body exactly { error: 'not_signed_in', message: 'Sign in with pan account login to join shared conversations.' }. Every socket listener checks a current() guard. Nothing logs; no view carries the device token. Tests per WI-3 with a fake ShareSocket and vi.useFakeTimers()."
+        },
+        "items": [
+          {
+            "id": "join-manager-lifecycle.ac1",
+            "title": "Given no account.json, when join('BCDFGHJK') runs, then it returns 412 not_signed_in with the exact message and opens no socket",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "join-manager-lifecycle.ac2",
+            "title": "Given a signed-in account, when join runs, then the fake socket is opened at wss://…/v1/rooms/BCDFGHJK/join?v=1 with header Authorization: Bearer odd_…, and a second join while live returns kind 'existing' without a second socket",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "join-manager-lifecycle.ac3",
+            "title": "Given an open join, when the socket closes with 4003, 4004, 4008, 4009, 4010, 4011, 4013 or 1006, then get() returns revoked, ended, replaced, is-host, kicked, revoked, full or disconnected respectively, and unexpected-response 404 gives ended and 401 gives rejected",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "join-manager-lifecycle.ac4",
+            "title": "Given an open join, when leave runs, then the socket received exactly {\"type\":\"leave\"} and any close (or 5 s with no close, under fake timers) gives state left",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "join-manager-lifecycle.ac5",
+            "title": "JSON.stringify of every JoinView returned by get() in the test file contains no 'odd_' substring",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "join-manager-relay",
+        "title": "Add the JoinManager relay: subscriber, signal buffer, restart, grace timer and ICE servers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T09:04:53Z",
+        "metadata": {
+          "difficulty": "expert",
+          "kind": "backend",
+          "issueLabel": "pan-4475",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/dashboard/server/services/share-join.ts",
+            "src/dashboard/server/services/__tests__/share-join.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/share-join.test.ts"
+          ],
+          "expected_outputs": [
+            "share-join.test.ts passes, including the restart and grace-timer cases under fake timers"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-6"
+          ],
+          "foundationFor": [
+            "viewer-routes",
+            "relay-integration-test",
+            "viewer-route-screens"
+          ],
+          "parallelSafeReason": "Shares files only with join-manager-lifecycle, which the DAG orders before it."
+        },
+        "narrative": {
+          "Action": "PRD WI-4 and decisions D-4, D-5, D-6, D-7, D-9. Add subscribe (last subscriber wins; previous gets {type:'replaced'}; emits current state at once; restart when state is admitted/host-disconnected and the generation already had a subscriber, else flush pendingSignals), signal (only when admitted and OPEN), iceServers (prefetch on status admitted, 50 min cache, 5 s timeout or turn_unavailable → []), the 60 s unsubscribed grace timer (plain close 1000 → away), and restart (close 1000 'reconnect' with NO leave frame, reopen only from the close event, terminate fallback after 5 s). Implementation checkpoint D-5: if WI-10 shows no second offer after restart, add JOIN_RESTART_REOPEN_DELAY_MS = 500 and comment why."
+        },
+        "items": [
+          {
+            "id": "join-manager-relay.ac1",
+            "title": "Given a join in lobby with a subscriber, when the test drives status lobby, then the subscriber has received no signal event; and signal frames that arrive with no subscriber are delivered in order to the next subscriber (at most 64 kept)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "join-manager-relay.ac2",
+            "title": "Given an admitted join that already had a subscriber, when a second subscriber attaches, then the first receives {type:'replaced'}, the socket is closed with code 1000 and no leave frame is sent, and a new socket opens only after the old socket's close event (or after 5 s via terminate)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "join-manager-relay.ac3",
+            "title": "Given a lobby join with no subscriber, when vi.advanceTimersByTimeAsync(60000) runs, then the socket is closed with 1000 and the state is away; a subscriber attached before 60 s cancels the close",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "join-manager-relay.ac4",
+            "title": "Given status admitted, then exactly one {\"type\":\"ice-servers\"} frame is sent, and iceServers resolves to the frame's list, to [] after error turn_unavailable, and to [] after 5 s under fake timers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "join-manager-relay.ac5",
+            "title": "Given a join in lobby, when signal() or iceServers() is called, then each returns not_admitted and the fake socket receives no frame",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "viewer-routes",
+        "title": "Add the /api/joins viewer routes with the event stream",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T09:04:53Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "api",
+          "issueLabel": "pan-4475",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/joins.ts",
+            "tests/unit/dashboard/server/routes/joins.test.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/routes/joins.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "joins.test.ts and no-loss-matrix.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-1"
+          ],
+          "parallelSafeReason": "New joins.ts plus one-line registrations in server.ts and the matrix; no other item edits those files except share-probe-route, which the DAG orders after it."
+        },
+        "narrative": {
+          "Action": "PRD WI-5 and section 'Routes'. Create src/dashboard/server/routes/joins.ts (Effect HttpRouter like routes/shares.ts) with POST /api/joins, GET /api/joins/:code, GET /api/joins/:code/events (SSE via ReadableStream + Stream.fromReadableStream + HttpServerResponse.stream as machines-peer.ts lines 155-187, 15 s keepalive comment, cancel unsubscribes), POST /api/joins/:code/signal, POST /api/joins/:code/ice-servers, DELETE /api/joins/:code; exported helpers parseJoinTarget, parseSignalBody (answer only, size limits, known keys only), formatJoinEvent. Mutations use rejectUnsafeDashboardMutationRequest; GETs use rejectUnauthorizedDashboardRequest; all answers Cache-Control: no-store. Import normalizeShareCode from ./shares.js. Register joinsRouteLayer in server.ts next to sharesRouteLayer (lines 137, 421). Add six no-loss-matrix rows after line 792 with door 'src/dashboard/server/services/share-join.ts'."
+        },
+        "items": [
+          {
+            "id": "viewer-routes.ac1",
+            "title": "Given a signed-in fake manager, when POST /api/joins is sent with {code:'bcdf-ghjk'} or {code:'https://share.overdeck.ai/s/BCDFGHJK'}, then it returns 201 with a JoinView for BCDFGHJK, and {code:'nope'} returns 400 invalid_code",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-routes.ac2",
+            "title": "POST /api/joins/:code/signal with an sdp of type 'offer' returns 400 invalid_signal; with an answer while lobby returns 409 join_not_admitted; while admitted returns 202 and the socket frame contains no key that was not in the SignalData allow-list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-routes.ac3",
+            "title": "GET /api/joins/:code/events returns Content-Type text/event-stream and its first chunk is 'event: state\\ndata: {…}\\n\\n'; GET for an unknown code returns 404 join_not_found",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-routes.ac4",
+            "title": "Every /api/joins response carries Cache-Control: no-store and no response body in joins.test.ts contains 'odd_'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-routes.ac5",
+            "title": "`npx vitest run tests/unit/lib/overdeck/no-loss-matrix.test.ts` passes with the six new /api/joins rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "share-probe-route",
+        "title": "Add the /api/share-probe route for the landing page",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T09:04:53Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4475",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/joins.ts",
+            "tests/unit/dashboard/server/routes/joins.test.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/routes/joins.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts"
+          ],
+          "expected_outputs": [
+            "joins.test.ts probe cases and no-loss-matrix.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ],
+          "foundationFor": [
+            "landing-detect",
+            "viewer-e2e"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6 and D-16. Add GET and OPTIONS /api/share-probe plus the exported probeCorsOrigin helper to joins.ts. GET answers 200 {overdeck:true, v:1}, Cache-Control: no-store, Vary: Origin, and Access-Control-Allow-Origin only when Origin equals shareOrigin(readShareUrl().url). OPTIONS answers 204 and, for that origin only, Access-Control-Allow-Origin, Access-Control-Allow-Methods: GET and Access-Control-Allow-Private-Network: true. No dashboard auth function is called; do NOT add the route to REMOTE_GATE_ALLOWLIST. Add two matrix rows (READ, door src/lib/sharing/share-service.ts)."
+        },
+        "items": [
+          {
+            "id": "share-probe-route.ac1",
+            "title": "Given anywhere.share_url http://127.0.0.1:8787, when GET /api/share-probe is sent with Origin http://127.0.0.1:8787, then it returns 200 {overdeck:true,v:1} with Access-Control-Allow-Origin http://127.0.0.1:8787 and Vary: Origin",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-probe-route.ac2",
+            "title": "When GET /api/share-probe is sent with Origin https://evil.example or with no Origin, then the response has no Access-Control-Allow-Origin header",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-probe-route.ac3",
+            "title": "OPTIONS /api/share-probe with the share origin returns 204 with Access-Control-Allow-Private-Network: true, and with another origin returns 204 without it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-probe-route.ac4",
+            "title": "Given the remote request gate module, when joins.test.ts reads REMOTE_GATE_ALLOWLIST, then it contains no 'GET /api/share-probe' entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "landing-detect",
+        "title": "Add the localhost-detect script to the share service landing page",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T09:04:53Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-4475",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/share/src/pages.ts",
+            "services/share/src/routes.ts",
+            "tests/unit/services/share/routes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/services/share/routes.test.ts",
+            "npm run typecheck:share",
+            "npm --prefix services/share run build:dry"
+          ],
+          "expected_outputs": [
+            "routes.test.ts passes with the nonce and CSP cases",
+            "typecheck:share completes without errors",
+            "build:dry exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7, D-14, D-15 and section 'Landing page'. In pages.ts add LOCAL_DASHBOARD_ORIGINS, invitePageCsp(nonce), make page() take the CSP, and change invitePage(shortCode, nonce) to render detect-status, the open-local link http://localhost:3011/#/shared/<CODE>, the pan up / LNA / other-port paragraph, install docs, and the nonce'd script from the PRD (values via JSON.stringify with '<' escaped). Remove the 'pan join' line. endedPage keeps HTML_CSP and no script. In routes.ts landingPage builds the nonce from rc.deps.randomBytes(16) (base64). Update routes.test.ts lines 364-392 per WI-7."
+        },
+        "items": [
+          {
+            "id": "landing-detect.ac1",
+            "title": "Given an active room, when GET /s/bcdf-ghjk is served, then the Content-Security-Policy equals invitePageCsp(nonce) where nonce is the page script's nonce attribute, and it contains \"script-src 'nonce-\" and 'connect-src http://localhost:3011 http://127.0.0.1:3011'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "landing-detect.ac2",
+            "title": "Given two requests for the same active room, when both pages are served, then the two script nonce attributes differ",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "landing-detect.ac3",
+            "title": "The invite page contains href=\"http://localhost:3011/#/shared/BCDFGHJK\" and 'pan up', and contains no 'pan join', host login or scope",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "landing-detect.ac4",
+            "title": "The 404 page still has HTML_CSP and contains no '<script'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "landing-detect.ac5",
+            "title": "Given the edited Worker source, when `npm run typecheck:share` and `npm --prefix services/share run build:dry` run, then both exit 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "browser-peer",
+        "title": "Create the browser WebRTC viewer (answerer, hello, conversation and presence)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T09:04:53Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-4475",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/sharing/webrtc-viewer.ts",
+            "src/dashboard/frontend/src/components/chat/sharing/__tests__/webrtc-viewer.test.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/sharing/__tests__/webrtc-viewer.test.ts"
+          ],
+          "expected_outputs": [
+            "webrtc-viewer.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-10"
+          ],
+          "parallelSafeReason": "New frontend module and test; its only shared file (frontend-test-subset.txt, merge=union) is also edited by viewer-route-screens, which the DAG orders after it."
+        },
+        "narrative": {
+          "Action": "PRD WI-8 and section 'Browser peer'. Create webrtc-viewer.ts: class WebRtcViewer with injected RTCPeerConnection (deps.RTCPeerConnection ?? globalThis.RTCPeerConnection, pattern packages/anywhere-channel/src/dial-machine.ts line 77), sendSignal, fetchIceServers; answers host offers, buffers early candidates, wires control/conversation/presence by label (no listener on drafts/terminal), runs negotiateHello with the scope copied from the host hello, replies with a control hello envelope seq 1, decodes conversation history/append/update/unavailable through SharedChannelReader and SeqTracker, readSharedMessage allow-list (never author or extra keys), notices, phases waiting/connecting/connected/lost, a new offer closes the old peer, close() silences callbacks. Add the test path to scripts/frontend-test-subset.txt in sorted position."
+        },
+        "items": [
+          {
+            "id": "browser-peer.ac1",
+            "title": "Given a fake RTCPeerConnection, when an offer signal arrives, then fetchIceServers is called once, the PC is built with those servers, and exactly one answer signal {sdp:{type:'answer'}} is sent; a candidate received before the offer is applied after setRemoteDescription",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "browser-peer.ac2",
+            "title": "Given the host hello on control, then the viewer sends one control envelope with seq 1 and payload.kind 'hello' echoing the host scope; a hello with scope kind 'task' emits notice scope_unsupported and sends nothing; a hello with v 2 emits host_newer and still replies",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "browser-peer.ac3",
+            "title": "Given history, append and update payloads, then onMessages receives the list in order with update replacing text by id, and a message carrying 'secret' and 'author' keys arrives without them",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "browser-peer.ac4",
+            "title": "connectionstatechange 'failed' sets phase lost, a second offer closes the first PC, and after close() no callback fires",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "browser-peer.ac5",
+            "title": "The test path is listed in scripts/frontend-test-subset.txt and the frontend test command exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "viewer-route-screens",
+        "title": "Add the /#/shared/<code> route, join hook and viewer screens",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T09:04:53Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-4475",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/sharing/joinApi.ts",
+            "src/dashboard/frontend/src/components/chat/sharing/useSharedJoin.ts",
+            "src/dashboard/frontend/src/components/chat/sharing/SharedConversationView.tsx",
+            "src/dashboard/frontend/src/components/chat/sharing/__tests__/useSharedJoin.test.tsx",
+            "src/dashboard/frontend/src/components/chat/sharing/__tests__/SharedConversationView.test.tsx",
+            "src/dashboard/frontend/src/App.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/sharing/__tests__/useSharedJoin.test.tsx src/components/chat/sharing/__tests__/SharedConversationView.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both frontend test files pass",
+            "typecheck (including typecheck:frontend) completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "NFR-4",
+            "NFR-5"
+          ],
+          "parallelSafeReason": "New frontend files plus App.tsx; shared files are ordered by the browser-peer edge."
+        },
+        "narrative": {
+          "Action": "PRD WI-9 and sections 'Browser API and hook', 'Viewer screens', 'App route'. Create joinApi.ts (sharedRouteCode, getJoin, createJoin, postSignal, fetchJoinIceServers, leaveJoin, openJoinEvents with EventSource), useSharedJoin.ts (phases checking/confirm/joining/live/replaced-here/error; auto-resume on away; teardown per D-10; reconnect per D-11), SharedConversationView.tsx (presentational screens with the exact texts of the Viewer screens table; MessagesTimeline mounted only when admitted with a received history, wrapped in data-testid=shared-conversation-timeline; toChatMessage field by field; header per D-19) and SharedConversationRoute. Edit App.tsx exactly as in 'App route' (≤ 12 added lines). Follow pan-style-guide. Add both test paths to scripts/frontend-test-subset.txt. openJoinEvents onError with EventSource readyState CLOSED closes the viewer and shows 'Lost the connection to your Overdeck.' with Try again; other errors are left to EventSource retry."
+        },
+        "items": [
+          {
+            "id": "viewer-route-screens.ac1",
+            "title": "Given no existing join, when the route mounts, then the screen shows 'Join a shared conversation' and a Join button, and clicking Join posts once and opens the event stream",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-route-screens.ac2",
+            "title": "Given view state lobby with non-empty messages props, when SharedConversationView renders, then 'Waiting for the host to let you in' is shown and no element has data-testid shared-conversation-timeline and no message text is in the DOM",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-route-screens.ac3",
+            "title": "Given view state admitted, peer phase connected and two messages, then the timeline renders both message texts; given state host-disconnected, the banner 'Host disconnected — reconnecting…' renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-route-screens.ac4",
+            "title": "Given state kicked, the screen shows 'Removed by host' with an 'Ask to join again' button; given revoked, 'Removed by host' and 'The host blocked you from this share.' with no rejoin button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-route-screens.ac5",
+            "title": "sharedRouteCode('#/shared/bcdf-ghjk') returns 'BCDFGHJK' and sharedRouteCode('#/shared/nope') returns null, and App.tsx grows by at most 12 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "relay-integration-test",
+        "title": "Add the Miniflare integration test for the full viewer relay",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T09:04:53Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-4475",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/integration/services/share/join-manager.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/integration/services/share/join-manager.test.ts"
+          ],
+          "expected_outputs": [
+            "join-manager.test.ts passes on real workerd"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-9"
+          ],
+          "parallelSafeReason": "A new test file only; it runs after join-manager-relay."
+        },
+        "narrative": {
+          "Action": "PRD WI-10. Copy the Miniflare harness from tests/integration/services/share/peer-hub.test.ts (do not edit it). Host: ShareManager + PeerHub (ConversationBridge on a JSONL fixture with the real parseEntireConversation and a fake watch). Viewer: JoinManager (VIEWER_A account, Miniflare share URL, defaultOpenSocket); subscriber signal events feed a LoopbackViewer whose signals go to joinManager.signal. Assert lobby gets zero signal events, admit yields hello + history + append, resubscribe with a fresh LoopbackViewer yields a second offer and history (D-5 checkpoint), kick yields kicked/4010; second case leave yields left and the host snapshot drops VIEWER_A. vi.waitFor only, SLOW = 120_000."
+        },
+        "items": [
+          {
+            "id": "relay-integration-test.ac1",
+            "title": "Given a viewer join in the lobby through the real share Worker, then its subscriber receives zero signal events before admit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-integration-test.ac2",
+            "title": "After manager.command(admit), the loopback viewer receives the host hello, a history with the fixture messages, and an append after the fake watch fires",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-integration-test.ac3",
+            "title": "After unsubscribing and subscribing again with a fresh LoopbackViewer, it receives a new offer and a new history",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-integration-test.ac4",
+            "title": "Given an admitted viewer, when manager.command(kick) runs, then joinManager.get(code) returns state kicked with closeCode 4010; and in the leave case it returns state left and the host's next snapshot contains no participant with VIEWER_A's id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "viewer-e2e",
+        "title": "Add the two-context Playwright spec for joining, admitting and the landing page",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T09:04:53Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-4475",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-4475-shared-viewer.spec.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build",
+            "cd src/dashboard/frontend && npx playwright test tests/pan-4475-shared-viewer.spec.ts"
+          ],
+          "expected_outputs": [
+            "build completes",
+            "the spec passes and writes screenshots to test-results/pan-4475/"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "FR-11"
+          ],
+          "parallelSafeReason": "A new spec file only; it runs after every feature item it exercises.",
+          "acJustification": "Six criteria: the spec covers lobby isolation, live admit, kick, landing navigation, artifacts and the no-production-token guard."
+        },
+        "narrative": {
+          "Action": "PRD WI-11. Two isolated dashboards (host with HOME set to a temp dir so claudeProjectDir resolves there; viewer with its own home), each with account.json (different tokens accepted by the Miniflare account stub) and config.yaml anywhere.share_url = Miniflare URL; host conversation seeded with claudeSessionId and a JSONL fixture. Test 1: host shares via the ⋮ menu, viewer opens /#/shared/<code>, clicks Join, sees the lobby with no message text, host clicks 'Admit @alice', viewer shows fixture messages, appended JSONL line appears live, host clicks 'Kick @alice', viewer shows 'Removed by host'. Test 2: landing page served by Miniflare with page.route stubs for http://localhost:3011 (probe + navigation) asserts navigation to http://localhost:3011/#/shared/<code>, and aborted probes show the fallback text. Never reach the real port 3011. Not added to test:playwright. Implementation checkpoint in the PRD covers a host dashboard that will not boot with a fake HOME. Both account.json files use baseUrl http://127.0.0.1:9 and both config.yaml files set anywhere.directory_url: http://127.0.0.1:9 so no fixture token reaches overdeck.ai (Anywhere boot opens the directory socket when signed in). Landing test routes http://localhost:3011/** and http://127.0.0.1:3011/** on the context before navigation and asserts the stub marker text 'PAN-4475 STUB DASHBOARD'."
+        },
+        "items": [
+          {
+            "id": "viewer-e2e.ac1",
+            "title": "Given a viewer in the lobby, then the viewer page has zero elements matching the fixture message texts and zero [data-testid=shared-conversation-timeline]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-e2e.ac2",
+            "title": "Given the host clicks 'Admit @alice', then the viewer context renders both fixture message texts within 60 s, and a line appended to the host JSONL renders within 30 s",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-e2e.ac3",
+            "title": "Given the host clicks 'Kick @alice', then the viewer context shows 'Removed by host'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-e2e.ac4",
+            "title": "Given a stubbed probe answering {overdeck:true}, when the landing page loads, then the page navigates to http://localhost:3011/#/shared/<code>; with both probes aborted it shows 'Overdeck is not running on this computer'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-e2e.ac5",
+            "title": "Given a passing run, then the spec saves lobby.png and admitted.png under test-results/pan-4475/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-e2e.ac6",
+            "title": "Given the landing test navigates to http://localhost:3011/#/shared/<code>, then the page shows 'PAN-4475 STUB DASHBOARD', and both test config.yaml files contain anywhere.directory_url: http://127.0.0.1:9",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "user-docs",
+        "title": "Write the Shared sessions user docs page and link it from Anywhere",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T09:04:53Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-4475",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/shared-sessions.mdx",
+            "docs.json",
+            "anywhere.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-12. Create configuration/shared-sessions.mdx with the sections What it is, Before you start, Share a conversation, Join a shared conversation, Roles, What viewers see, Limits (content per WI-12). Add 'configuration/shared-sessions' to docs.json after 'configuration/linked-machines'. In anywhere.mdx update the 'Share a live session' card (text + href), add the feature-table row, and replace the 'dashboard cannot share a session yet' sentence as WI-12 states. Use &#36; for dollar signs and &lt; before digits in mdx prose."
+        },
+        "items": [
+          {
+            "id": "user-docs.ac1",
+            "title": "Given configuration/shared-sessions.mdx, when a reader opens it, then it contains headings for sharing, joining (including the Allow prompt and the pan up fallback) and roles (host, controller, viewer, contributor)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "user-docs.ac2",
+            "title": "Given docs.json, then the Overdeck Anywhere group contains 'configuration/shared-sessions' directly after 'configuration/linked-machines'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "user-docs.ac3",
+            "title": "anywhere.mdx links /configuration/shared-sessions from the card and the feature table and no longer contains 'the dashboard cannot share a session yet'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "user-docs.ac4",
+            "title": "`npm run lint:docs` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dev-docs",
+        "title": "Document the viewer side in SHARED-SESSIONS.md and DASHBOARD-ARCHITECTURE.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T09:04:53Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4475",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/SHARED-SESSIONS.md",
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-6",
+            "FR-11",
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-13. In docs/SHARED-SESSIONS.md rewrite the /s/:code row (line 63) for the localhost-detect page and new CSP and say slice 9 adds pan join back; add '## Viewer side in the dashboard (slice 4, PAN-4475)' before '## Local development' covering D-1 click-to-join, JoinManager, state table summary, routes table, event stream + one-subscriber rule, restart and grace timer, ICE servers, probe CORS rule, browser peer and notices, the /#/shared/<code> route and screens, teardown rules. Extend the docs/DASHBOARD-ARCHITECTURE.md paragraph at line 83 with the sentence in WI-13."
+        },
+        "items": [
+          {
+            "id": "dev-docs.ac1",
+            "title": "docs/SHARED-SESSIONS.md contains the heading '## Viewer side in the dashboard (slice 4, PAN-4475)' naming /api/joins, /api/share-probe, the 60 s grace timer and the restart rule",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dev-docs.ac2",
+            "title": "Given docs/SHARED-SESSIONS.md, then its /s/:code row contains the nonce'd localhost-detect script description and no longer contains 'pan join <CODE>'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dev-docs.ac3",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md names routes/joins.ts and services/share-join.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "viewer-api-types",
+        "to": "join-manager-lifecycle",
+        "type": "blocks"
+      },
+      {
+        "from": "viewer-api-types",
+        "to": "viewer-route-screens",
+        "type": "blocks"
+      },
+      {
+        "from": "share-service-join-url",
+        "to": "join-manager-lifecycle",
+        "type": "blocks"
+      },
+      {
+        "from": "share-service-join-url",
+        "to": "share-probe-route",
+        "type": "blocks"
+      },
+      {
+        "from": "join-manager-lifecycle",
+        "to": "join-manager-relay",
+        "type": "blocks"
+      },
+      {
+        "from": "join-manager-relay",
+        "to": "viewer-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "join-manager-relay",
+        "to": "relay-integration-test",
+        "type": "blocks"
+      },
+      {
+        "from": "viewer-routes",
+        "to": "share-probe-route",
+        "type": "blocks"
+      },
+      {
+        "from": "browser-peer",
+        "to": "viewer-route-screens",
+        "type": "blocks"
+      },
+      {
+        "from": "viewer-route-screens",
+        "to": "viewer-e2e",
+        "type": "blocks"
+      },
+      {
+        "from": "share-probe-route",
+        "to": "viewer-e2e",
+        "type": "blocks"
+      },
+      {
+        "from": "landing-detect",
+        "to": "viewer-e2e",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

@@ -52,6 +52,7 @@ import {
   type StartRequestReviewOutcome,
 } from '../../../../lib/cloister/request-review-pipeline.js';
 import { appendPipelineEntry } from '../../../../lib/cloister/pipeline-journal.js';
+import { isDeftPipelineIssue } from '../../../../lib/deft/issue-pipeline.js';
 import { refreshIssuePullRequestStateNow } from '../../services/issue-pr-refresh.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { rejectUnsafeDashboardMutationRequest } from '../dashboard-auth.js';
@@ -245,6 +246,7 @@ export async function startRequestReviewPipeline(
   }
 
   if (!resolveProjectFromIssueSync(issueId)) return { started: false, reason: 'no-project' };
+  if (await isDeftPipelineIssue(issueId)) return { started: false, reason: 'deft-pipeline' }; // PAN-4820 (AD-5)
 
   transitionIssueToInReview(issueId, workspacePath).catch((err: unknown) => {
     console.warn(
@@ -386,7 +388,7 @@ const postWorkspaceReviewRoute = HttpRouter.add(
     // the local worktree before review (PAN-1676).
     if (workspaceInfo.isRemote) {
       return jsonResponse({
-        error: `${issueId} is executing remotely on ${workspaceInfo.vmName ?? 'a fly machine'} — run 'pan admin remote reap --issue ${issueId}' after the agent finishes, then review.`,
+        error: `${issueId} is executing remotely on ${workspaceInfo.vmName ?? 'a fly machine'} — Overdeck reaps it automatically after the agent writes REMOTE_DONE (force it with 'pan admin remote reap --issue ${issueId}'), then review starts.`,
       }, { status: 409 });
     }
     const workspacePath = workspaceInfo.localPath || join(projectPath, 'workspaces', `feature-${numericSuffix}`);
@@ -752,7 +754,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
     const rawSource = (body as { source?: unknown }).source;
     const requestSource: RequestReviewSource =
       rawSource === 'pan-done' || rawSource === 'pan-review-request' || rawSource === 'pan-unpause'
-        || rawSource === 'webhook' || rawSource === 'deacon-lite'
+        || rawSource === 'webhook' || rawSource === 'deacon-lite' || rawSource === 'remote-reap'
         ? rawSource
         : 'api';
     const eventStore = yield* EventStoreService;
@@ -817,7 +819,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
         if (wsInfoRerun.isRemote) {
           return jsonResponse({
             success: false,
-            message: `${canonicalIssueId} is executing remotely on ${wsInfoRerun.vmName ?? 'a fly machine'} — run 'pan admin remote reap --issue ${canonicalIssueId}' after the agent finishes, then review.`,
+            message: `${canonicalIssueId} is executing remotely on ${wsInfoRerun.vmName ?? 'a fly machine'} — Overdeck reaps it automatically after the agent writes REMOTE_DONE (force it with 'pan admin remote reap --issue ${canonicalIssueId}'), then review starts.`,
           }, { status: 409 });
         }
         const workspacePathRerun = wsInfoRerun.localPath || join(projectPathRerun, 'workspaces', `feature-${issueLowerRerun}`);
@@ -942,6 +944,8 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
           },
           { status: 500 }
         );
+      case 'deft-pipeline':
+        return jsonResponse({ success: false, error: `${canonicalIssueId} runs on Deft; Overdeck review is off` }, { status: 409 });
       case 'already-running':
         return jsonResponse({
           success: true,
