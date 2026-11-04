@@ -124,6 +124,20 @@ status` shows what is there.
 
 Serve needs Tailscale 1.52 or later.
 
+## Funnel on port 8443
+
+Overdeck never publishes the dashboard with Funnel. Two opt-in features use
+Funnel on port 8443 for single paths, and Overdeck prints the commands instead
+of running them: [webhook triggers](/configuration/triggers) mount `/hooks`,
+and [Public MCP](/configuration/mcp#public-mcp-for-hosted-bots) mounts `/mcp`,
+`/.well-known` and `/oauth` so a hosted bot such as Grok Bot can sign in.
+
+<Warning>
+With Public MCP on, anyone on the internet can reach the sign-in page. Only
+sign-ins you approve in this dashboard get access, and every other path
+answers 404. Turn Public MCP off when no hosted bot needs it.
+</Warning>
+
 ## Tailnet settings
 
 Serve HTTPS needs two tailnet-wide settings, which only the tailnet's admin can

@@ -1,0 +1,910 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T18:12:26Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4958: Agent MCP and bots (W-DOC): Documentation",
+    "updated": "2026-11-04T18:34:48.553Z"
+  },
+  "plan": {
+    "id": "pan-4958",
+    "title": "Agent MCP and bots (W-DOC): Documentation",
+    "status": "running",
+    "uid": "d03b2bbb-8680-45e2-b659-edf4e0f1a829",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-04T18:12:26Z",
+    "updated": "2026-11-04T18:34:48.553Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4958",
+        "label": "PAN-4958",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4927",
+        "label": "PAN-4927 (epic)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "docs",
+      "mcp",
+      "bots",
+      "pan-4927"
+    ],
+    "metadata": {
+      "sizeJustification": "One documentation sweep for the PAN-4927 epic with a single acceptance criterion (AC-30). The finalize lint counts the first two path segments as a subsystem, so every root-level or one-deep doc file (anywhere.mdx, CLAUDE.md, docs.json, configuration/*.mdx, cli/*.mdx, docs/*.md) counts as its own subsystem; the 15 files are 13 small, mostly independent text edits that already run in parallel slots. Splitting into sibling issues would only multiply review overhead for one-paragraph doc changes.",
+      "canonicalFilename": "2026-11-04-PAN-4958-agent-mcp-and-bots-w-doc-documentation.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Every PAN-4927 work item (PAN-4930..PAN-4957) has merged, and most documented their own surface, but W-DOC's remaining items are open: configuration/bots.mdx and cli/mcp.mdx were never created and are not in docs.json; the bot and connector guide sits inside configuration/mcp.mdx; mcp.mdx's description and intro still call the server a control surface for outside tools; cli/token.mdx is stale (v0.65.0 note, missing scopes, future-tense W-INJ1, no OAuth tokens); harnesses.mdx lacks the D-13 matrix and CP-1/CP-2 labels; DASHBOARD-AUTH.md lacks OAuth lifetimes and the Funnel pointer in /mcp; ROLES.md and CONNECT-SERVICE.md have one inaccurate sentence each; tailscale.mdx, remote-access.mdx and anywhere.mdx never mention Public MCP or bots; pan-4649.md lacks its revision note; CLAUDE.md lacks the MCP invariant; McpSignInsList.tsx has no module header.",
+      "Proposal": "Gap-fill per PRD .pan/drafts/pan-4958.md (WI-1..WI-13), which gives the exact text for every insertion. Move the bot guide out of configuration/mcp.mdx into a new configuration/bots.mdx (one commit) and leave a short '## Bots' pointer; create cli/mcp.mdx as the command reference copied from source; list both pages in docs.json next to configuration/mcp and cli/token in the 'Overdeck Anywhere' group; make the remaining one-file fixes. Verify with npm run lint:docs, the root-link checker and, before pan done, npm run lint (AC-30).",
+      "NonGoals": "- No change to docs/ANYWHERE-ARCHITECTURE.md (already complete)\n- No change to CLI help strings or any runtime code; the only source edit is one header comment in McpSignInsList.tsx\n- No rewrite of the 19 module headers that already name their child issue; no header on integrations/openclaw/vitest.config.ts\n- No re-dating of existing 'next release' rows in anywhere.mdx\n- No change to the Connect a bot dialog's Grok Build Tailscale option or the run-mcp.sh @overdeck/core@0.74.0 pin\n- No change to configuration/triggers.mdx or any integrations/*/README.md\n- No new tests and no pan-mcp skill under sync-sources/skills/\n- No duplicate copy of the moved bot guide left in configuration/mcp.mdx\n- No concrete @overdeck/core version number written into any doc (keep <version>)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Move the bot and connector guide from configuration/mcp.mdx into configuration/bots.mdx instead of duplicating or linking it",
+        "rationale": "The parent PRD assigns that content to bots.mdx; siblings front-ran it into mcp.mdx; one copy avoids drift and no inbound link targets the moved anchors."
+      },
+      {
+        "summary": "Place cli/mcp right after cli/token in the 'Overdeck Anywhere' docs.json group",
+        "rationale": "The parent PRD says 'next to cli/token'; cli/token lives in 'Overdeck Anywhere', not 'CLI Reference', so the concrete neighbor wins."
+      },
+      {
+        "summary": "Add a module header only to McpSignInsList.tsx",
+        "rationale": "79 of 81 new source files already name PAN-4927 or their child issue, which traces to the epic; the other header-less file is a vitest config, not a module; a 19-file sweep adds no information."
+      },
+      {
+        "summary": "New anywhere.mdx rows say 'next release' and existing rows are not re-dated",
+        "rationale": "Matches the page's own convention; versioning the table is release work, not W-DOC."
+      },
+      {
+        "summary": "Document Grok Build's Tailscale route as not yet working (#5029)",
+        "rationale": "integrations/grok-build/README.md:97-101 says so; docs describe what works, and the dialog mismatch is a code issue."
+      },
+      {
+        "summary": "Set plan.metadata.sizeJustification rather than splitting",
+        "rationale": "The quality lint treats each top-level doc file as a subsystem; this is one documentation issue with one acceptance criterion, already split from the epic."
+      }
+    ],
+    "items": [
+      {
+        "id": "cli-mcp-page",
+        "title": "Create cli/mcp.mdx, the pan mcp command reference, and list it in docs.json",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T18:12:26Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-4958",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/mcp.mdx",
+            "docs.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n '^## ' cli/mcp.mdx",
+            "grep -cE 'odk_[0-9a-f]{8}' cli/mcp.mdx || true"
+          ],
+          "expected_outputs": [
+            "lint:docs prints 'docs lint passed (87 docs files, 76 published pages)' (baseline on 7ca722ebb1c is 75) and exits 0",
+            "three lines: '## serve', '## oauth', '## connector'",
+            "0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/pan-4958.md WI-3 exactly. Create cli/mcp.mdx modeled on cli/token.mdx: frontmatter title 'pan mcp' and the given description, H1 `pan mcp`, intro linking /configuration/mcp and /configuration/bots, then exactly three H2 sections: '## serve', '## oauth', '## connector'. Copy every usage line, flag, default, help string and error message from source (src/cli/commands/mcp.ts:14-138, src/cli/commands/mcp-oauth.ts:25-170, src/cli/commands/mcp-connector.ts:13-114, src/lib/mcp/connector/home.ts, src/lib/mcp/oauth-flow.ts:19-33); never retype from memory. The serve config example uses OVERDECK_MCP_TOKEN_FILE with a placeholder path and never a token literal. Keep every <placeholder> inside backticks or fenced blocks (lint:docs rejects a bare '<' before a digit and any '$' in prose). Add \"cli/mcp\" to docs.json on the line right after \"cli/token\", in the 'Overdeck Anywhere' group (PRD D-2). It links to /configuration/bots, which the bots-page item creates next; the link check runs in that item."
+        },
+        "items": [
+          {
+            "id": "cli-mcp-page.ac1",
+            "title": "Given cli/mcp.mdx, when `grep -n '^## ' cli/mcp.mdx` runs, then it prints exactly '## serve', '## oauth' and '## connector' in that order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-mcp-page.ac2",
+            "title": "Given the oauth and connector sections, each subcommand (issue, list, revoke, pending, approve, deny; login, pair, serve, status, logout) renders its own ### heading whose usage line matches the command registration in src/cli/commands/mcp-oauth.ts and src/cli/commands/mcp-connector.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-mcp-page.ac3",
+            "title": "Given the serve section, it names OVERDECK_MCP_TOKEN and OVERDECK_MCP_TOKEN_FILE, states the 0600 requirement, and the file contains no 'odk_' followed by hex digits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-mcp-page.ac4",
+            "title": "Given docs.json, the 'Overdeck Anywhere' group lists cli/mcp immediately after cli/token, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "bots-page",
+        "title": "Move the bot guide from configuration/mcp.mdx into a new configuration/bots.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T18:12:26Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "docs",
+          "issueLabel": "pan-4958",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/bots.mdx",
+            "configuration/mcp.mdx",
+            "docs.json",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n '^## \\|^### ' configuration/bots.mdx",
+            "grep -c 'No direct path to' configuration/mcp.mdx configuration/bots.mdx",
+            "node -e \"const fs=require('fs');let bad=0;for(const f of process.argv.slice(1)){for(const m of fs.readFileSync(f,'utf8').matchAll(/\\]\\((\\/[^)#\\s]+)/g)){const p=m[1].slice(1);if(!fs.existsSync(p+'.mdx')&&!fs.existsSync(p+'.md')){console.log(f,m[1]);bad++}}}if(bad)process.exit(1);console.log('links ok')\" configuration/bots.mdx configuration/mcp.mdx cli/mcp.mdx"
+          ],
+          "expected_outputs": [
+            "lint:docs prints 'docs lint passed (87 docs files, 77 published pages)' (baseline 75, +1 cli/mcp, +1 configuration/bots) and exits 0",
+            "the 15 headings in the AC order",
+            "configuration/mcp.mdx:0 and configuration/bots.mdx:1",
+            "links ok"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1",
+            "NFR-2",
+            "NFR-4"
+          ],
+          "parallelSafeReason": "Its files (configuration/bots.mdx, configuration/mcp.mdx, docs.json, architecture.md) are shared only with cli-mcp-page, mcp-intro and anywhere-bots, which the DAG orders around it; every other item touches different files."
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/pan-4958.md WI-1 steps 1-9 exactly, in ONE commit (hazard H-3). Cut from configuration/mcp.mdx everything from the line '## Connect a bot' up to the line before '## Fleet reach'. Create configuration/bots.mdx with the PRD's skeleton: the frontmatter and intro text given in the PRD; '## The Connect a bot dialog' (the cut dialog text, verbatim); '## Platforms' with '### Hermes', '### OpenClaw', '### Grok Build' (the cut paragraphs, bold leads removed) and '### Grok Bot', '### xAI API' (new text from PRD steps 3-4); '## Run the Overdeck connector' with its five ### subsections verbatim; '## Tailscale instead of the connector' and '## Remove a bot' (new text from PRD steps 5-6). Insert the PRD's '## Bots' pointer section in configuration/mcp.mdx right before '## Fleet reach'. Add \"configuration/bots\" to docs.json right after \"configuration/mcp\". Append the Docs sentence from step 9 to the 'Overdeck connector (PAN-4927 W-CONN1/W-CONN2):' paragraph of .overdeck/context/codebase/architecture.md without touching its last-verified line. Anchor every edit on quoted text, never on line numbers."
+        },
+        "items": [
+          {
+            "id": "bots-page.ac1",
+            "title": "Given configuration/mcp.mdx after the move, `grep -c '^## Connect a bot$\\|^## Run the Overdeck connector$'` prints 0 and `grep -c '^## Bots$'` prints 1, and the Bots section links to /configuration/bots and /cli/mcp",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bots-page.ac2",
+            "title": "Given configuration/bots.mdx, `grep -n '^## \\|^### '` lists in order: The Connect a bot dialog, Platforms, Hermes, OpenClaw, Grok Build, Grok Bot, xAI API, Run the Overdeck connector, The connector home, The local endpoint, Routes and reconnects, What a connector can reach, Re-pairing and logout, Tailscale instead of the connector, Remove a bot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bots-page.ac3",
+            "title": "Given the moved connector text, the sentence 'No direct path to <machine>. Use the relay plan, or the Tailscale route in the README.' appears exactly once across configuration/mcp.mdx and configuration/bots.mdx (in bots.mdx), proving the content moved rather than duplicated",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bots-page.ac4",
+            "title": "Given the Tailscale section, it states that Grok Build's Tailscale route is not working yet and links issue #5029",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bots-page.ac5",
+            "title": "Given docs.json, configuration/bots follows configuration/mcp in the 'Overdeck Anywhere' group, npm run lint:docs exits 0, and the link checker prints 'links ok' for configuration/bots.mdx, configuration/mcp.mdx and cli/mcp.mdx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mcp-intro",
+        "title": "Fix configuration/mcp.mdx's description, intro and agent-only tool rows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T18:12:26Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4958",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/mcp.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -c 'control surface for' configuration/mcp.mdx || true",
+            "awk '/^### Agent-only tools/{f=1;next} /^#/{f=0} f && /^\\| `/' configuration/mcp.mdx | grep -vc 'agent tokens only' || true"
+          ],
+          "expected_outputs": [
+            "lint:docs prints 'docs lint passed (N docs files, M published pages)' and exits 0",
+            "0",
+            "0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. Replace the frontmatter description with the PRD text; replace the paragraph starting 'This is separate from the Channels bridge' (ending 'outside tools.') with the PRD's replacement paragraph; append ' (agent tokens only)' to the scope cell of each row in '### Agent-only tools' from delegate_task through the lane_* rows that lacks it, matching the wording of the rows above. Anchor on quoted text: the bots-page item has already changed this file's lower half."
+        },
+        "items": [
+          {
+            "id": "mcp-intro.ac1",
+            "title": "Given configuration/mcp.mdx, `grep -c 'control surface for' configuration/mcp.mdx` prints 0 and the frontmatter description names managed agents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-intro.ac2",
+            "title": "Given the '### Agent-only tools' table, every row whose first cell starts with a backtick contains 'agent tokens only' (the awk check in PRD WI-2 prints 0)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-intro.ac3",
+            "title": "Given the edited page, npm run lint:docs exits 0 and the intro links to #agents-get-these-tools",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-token",
+        "title": "Describe agent and OAuth tokens and the full scope list in cli/token.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T18:12:26Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4958",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/token.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -c 'v0.65.0\\|Once launch injection' cli/token.mdx || true",
+            "node -e \"const fs=require('fs');let bad=0;for(const f of process.argv.slice(1)){for(const m of fs.readFileSync(f,'utf8').matchAll(/\\]\\((\\/[^)#\\s]+)/g)){const p=m[1].slice(1);if(!fs.existsSync(p+'.mdx')&&!fs.existsSync(p+'.md')){console.log(f,m[1]);bad++}}}if(bad)process.exit(1);console.log('links ok')\" cli/token.mdx"
+          ],
+          "expected_outputs": [
+            "lint:docs prints 'docs lint passed (N docs files, M published pages)' and exits 0",
+            "0",
+            "links ok"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4: delete the <Note> block with 'Available from the next release (v0.65.0).'; replace the --scopes row's list with the ten scopes src/cli/commands/token.ts:111 accepts; replace the paragraph starting 'Agent tokens appear in the list too' with the PRD's replacement text (agent tokens, OAuth tokens, --json-only fields, prune timing per pruneEndedAccessTokens). It links to /cli/mcp#oauth, which the cli-mcp-page item creates."
+        },
+        "items": [
+          {
+            "id": "cli-token.ac1",
+            "title": "Given cli/token.mdx, `grep -c 'v0.65.0\\|Once launch injection' cli/token.mdx` prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-token.ac2",
+            "title": "Given the --scopes row, it lists read:events, read:state, read:conversations, read:costs, read:settings, tell, operate, approve, forward and admin",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-token.ac3",
+            "title": "Given the list section, it names the '(OAuth)' token name suffix, the agent:<role>:<agentId> name, and states that agentId, agentKind, role, oauthClientId, oauthFamilyId and expiresAt print only with --json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-token.ac4",
+            "title": "Given the edited page, npm run lint:docs exits 0 and the link checker prints 'links ok' for cli/token.mdx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "harnesses-matrix",
+        "title": "Add the D-13 MCP injection matrix and CP labels to configuration/harnesses.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T18:12:26Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4958",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/harnesses.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -c 'The CP-1 live check\\|The CP-2 live check\\|The CP-3 live check' configuration/harnesses.mdx"
+          ],
+          "expected_outputs": [
+            "lint:docs prints 'docs lint passed (N docs files, M published pages)' and exits 0",
+            "3"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5: insert the matrix table and the Docker / mcp.agents paragraph after the first paragraph of '### Overdeck MCP server'; prefix 'The CP-1 live check: ' to 'Claude Code 2.1.293 was checked against what the launcher emits:'; prefix 'The CP-2 live check: ' to 'Codex CLI 0.159.0 was checked separately,' and append the PRD's both-modes bullet after 'An unrelated unknown key elsewhere in the same table is ignored.'. Do not change the CP-3 paragraph."
+        },
+        "items": [
+          {
+            "id": "harnesses-matrix.ac1",
+            "title": "Given configuration/harnesses.mdx, `grep -c 'The CP-1 live check\\|The CP-2 live check\\|The CP-3 live check'` prints 3",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harnesses-matrix.ac2",
+            "title": "Given the matrix table, it lists claude-code, codex, acp and opencode as getting the overdeck MCP server and kimi-code, ohmypi, muse and prime-agent as getting the Overdeck commands block, and the paragraph after it names OVERDECK_DOCKER_WORKSPACE, PAN_DOCKER, mcp.agents and src/lib/mcp/overdeck-mcp-gate.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harnesses-matrix.ac3",
+            "title": "Given the CP-2 list, it states the -c mcp_servers.overdeck.* fallback was not needed and is not built, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "auth-oauth-constants",
+        "title": "State OAuth lifetimes, levels and the Funnel rule in docs/DASHBOARD-AUTH.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T18:12:26Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4958",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-AUTH.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -c 'ACCESS_TOKEN_TTL_MS\\|OAUTH_REFRESH_WINDOW_MS\\|apply only to Funnel requests' docs/DASHBOARD-AUTH.md"
+          ],
+          "expected_outputs": [
+            "lint:docs prints 'docs lint passed (N docs files, M published pages)' and exits 0",
+            "3 or more"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-6: add the 'Lifetimes and levels' bullet as the first bullet of '### OAuth sign-ins for /mcp (PAN-4945)'; add the Funnel-only rate-limit sentence to that section's '**Routes.**' bullet; add the Funnel sentence to '### `/mcp` (PAN-4649)' before 'See [configuration/mcp.mdx](../configuration/mcp.mdx).'. Values come from src/lib/mcp/oauth-flow.ts:19-40 and src/lib/access-token-records.ts:35; re-read them before writing."
+        },
+        "items": [
+          {
+            "id": "auth-oauth-constants.ac1",
+            "title": "Given docs/DASHBOARD-AUTH.md, the OAuth section states a 60 s code, a 10-minute pending approval, a 30-day access token (ACCESS_TOKEN_TTL_MS), an odr_ refresh token valid 90 days (OAUTH_REFRESH_WINDOW_MS) and the four levels with their scopes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auth-oauth-constants.ac2",
+            "title": "Given the Routes bullet, it contains 'apply only to Funnel requests'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auth-oauth-constants.ac3",
+            "title": "Given the /mcp subsection, it states that over Funnel /mcp accepts only OAuth tokens with 403 'public MCP accepts only OAuth sign-ins', and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "roles-scope-rows",
+        "title": "Show lane and Flywheel conversation scopes in docs/ROLES.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T18:12:26Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4958",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ROLES.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -c 'conversationTokenRole' docs/ROLES.md"
+          ],
+          "expected_outputs": [
+            "lint:docs prints 'docs lint passed (N docs files, M published pages)' and exits 0",
+            "1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-7: add the two table rows after the conversation row of '### Agent token scopes (PAN-4927)' and replace the sentence 'Only conversations get `approve`.' with the PRD's replacement naming conversationTokenRole in src/lib/mcp/agent-injection.ts. No Prompt-Change trailer is needed: docs/ROLES.md is not roles/*.md."
+        },
+        "items": [
+          {
+            "id": "roles-scope-rows.ac1",
+            "title": "Given docs/ROLES.md, the scope table renders rows for a lane conversation (worker scopes) and the Flywheel conversation (flywheel scopes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "roles-scope-rows.ac2",
+            "title": "Given the paragraph under the table, it names conversationTokenRole and src/lib/mcp/agent-injection.ts and no longer contains the sentence 'Only conversations get `approve`.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "roles-scope-rows.ac3",
+            "title": "Given the edited file, npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "connect-service-clients",
+        "title": "Say phones and connectors share the clients table in docs/CONNECT-SERVICE.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T18:12:26Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4958",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/CONNECT-SERVICE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -c 'Phones and connectors live in the' docs/CONNECT-SERVICE.md"
+          ],
+          "expected_outputs": [
+            "lint:docs prints 'docs lint passed (N docs files, M published pages)' and exits 0",
+            "1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-8: in the '**Storage.**' bullet change 'Phones live in the `clients` table.' to 'Phones and connectors live in the `clients` table.' and add the PRD's sentence that a node client never writes the push columns because push-register from a node client is bad_frame."
+        },
+        "items": [
+          {
+            "id": "connect-service-clients.ac1",
+            "title": "Given docs/CONNECT-SERVICE.md, `grep -c 'Phones and connectors live in the'` prints 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connect-service-clients.ac2",
+            "title": "Given the Storage bullet, it states that a connector never writes the push columns because push-register from a node client is bad_frame, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "public-mcp-tailscale",
+        "title": "Document Public MCP on Funnel port 8443 in tailscale.mdx and remote-access.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T18:12:26Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4958",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/tailscale.mdx",
+            "configuration/remote-access.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -c '^## Funnel on port 8443$' configuration/tailscale.mdx",
+            "grep -c '^## What the internet can reach$' configuration/remote-access.mdx",
+            "node -e \"const fs=require('fs');let bad=0;for(const f of process.argv.slice(1)){for(const m of fs.readFileSync(f,'utf8').matchAll(/\\]\\((\\/[^)#\\s]+)/g)){const p=m[1].slice(1);if(!fs.existsSync(p+'.mdx')&&!fs.existsSync(p+'.md')){console.log(f,m[1]);bad++}}}if(bad)process.exit(1);console.log('links ok')\" configuration/tailscale.mdx configuration/remote-access.mdx"
+          ],
+          "expected_outputs": [
+            "lint:docs prints 'docs lint passed (N docs files, M published pages)' and exits 0",
+            "1",
+            "1",
+            "links ok"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-9: add '## Funnel on port 8443' (with its <Warning>) right before '## Tailnet settings' in configuration/tailscale.mdx, and '## What the internet can reach' right before '## Local reverse proxies: `require_token_mint`' in configuration/remote-access.mdx, using the PRD text verbatim. The warning wording follows the Settings panel (PublicMcpPanel.tsx:66-67)."
+        },
+        "items": [
+          {
+            "id": "public-mcp-tailscale.ac1",
+            "title": "Given configuration/tailscale.mdx, it renders a '## Funnel on port 8443' section that names /hooks, /mcp, /.well-known and /oauth and contains a <Warning> saying only sign-ins you approve get access",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "public-mcp-tailscale.ac2",
+            "title": "Given configuration/remote-access.mdx, it renders a '## What the internet can reach' section that names port 8443, POST /hooks/*, /mcp, /.well-known/* and /oauth/mcp/* and says /mcp over Funnel accepts only approved OAuth sign-ins",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "public-mcp-tailscale.ac3",
+            "title": "Given both pages, npm run lint:docs exits 0 and the link checker prints 'links ok' for both files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "anywhere-bots",
+        "title": "Add bots, OAuth, Public MCP and the connector's relay use to anywhere.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T18:12:26Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4958",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "anywhere.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -c '/configuration/bots' anywhere.mdx",
+            "node -e \"const fs=require('fs');let bad=0;for(const f of process.argv.slice(1)){for(const m of fs.readFileSync(f,'utf8').matchAll(/\\]\\((\\/[^)#\\s]+)/g)){const p=m[1].slice(1);if(!fs.existsSync(p+'.mdx')&&!fs.existsSync(p+'.md')){console.log(f,m[1]);bad++}}}if(bad)process.exit(1);console.log('links ok')\" anywhere.mdx"
+          ],
+          "expected_outputs": [
+            "lint:docs prints 'docs lint passed (N docs files, M published pages)' and exits 0",
+            "2 or more",
+            "links ok"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-10: replace the 'What has shipped' row starting '| The MCP server (`pan mcp serve`, **Copy MCP URL**)' with the four PRD rows (all 'next release', PRD D-5); append the PRD's relay sentence to the paragraph starting '**Relay add-on:**' (ending 'There is no per-gigabyte billing.'). Do not re-date other rows. It links to /configuration/bots, which the bots-page item creates."
+        },
+        "items": [
+          {
+            "id": "anywhere-bots.ac1",
+            "title": "Given anywhere.mdx, the 'What has shipped' table renders four rows covering the agent MCP server, OAuth sign-in (pan mcp oauth), Public MCP and Connect a bot with the Overdeck connector, each with 'next release'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anywhere-bots.ac2",
+            "title": "Given the Relay add-on paragraph, it states the relay carries an Overdeck connector's encrypted traffic when a bot has no direct path, linking /configuration/bots#run-the-overdeck-connector",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anywhere-bots.ac3",
+            "title": "Given the edited page, npm run lint:docs exits 0 and the link checker prints 'links ok' for anywhere.mdx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan4649-note",
+        "title": "Add the PAN-4927 revision note to .pan/drafts/pan-4649.md Non-goals",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T18:12:26Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4958",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/drafts/pan-4649.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'Revision note (2026-11-04, PAN-4927)' .pan/drafts/pan-4649.md",
+            "grep -A1 '^## Non-goals' .pan/drafts/pan-4649.md"
+          ],
+          "expected_outputs": [
+            "1",
+            "the second line starts with '> **Revision note (2026-11-04, PAN-4927):**' (or a blank line followed by it)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-11: insert the PRD's revision-note blockquote right after the '## Non-goals' heading line of .pan/drafts/pan-4649.md. Leave the bullets as written. This is an ordinary commit on feature/pan-4958 (PRD D-8: no guard covers .pan/drafts)."
+        },
+        "items": [
+          {
+            "id": "pan4649-note.ac1",
+            "title": "Given .pan/drafts/pan-4649.md, `grep -c 'Revision note (2026-11-04, PAN-4927)'` prints 1 and the note sits directly under '## Non-goals'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan4649-note.ac2",
+            "title": "Given the note, it names PAN-4945, PAN-4946 and PAN-4944 as delivering OAuth and the approval tools and leaves every original Non-goals bullet unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "claude-md-invariant",
+        "title": "Add the managed-agent MCP line to CLAUDE.md Key Invariants",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T18:12:26Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4958",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "CLAUDE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'per-agent token minted at launch' CLAUDE.md"
+          ],
+          "expected_outputs": [
+            "1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-12: append the PRD's bullet verbatim as the last bullet of '## Key Invariants (one-liners)', after the bullet starting '- Curated facts live in'."
+        },
+        "items": [
+          {
+            "id": "claude-md-invariant.ac1",
+            "title": "Given CLAUDE.md, `grep -c 'per-agent token minted at launch' CLAUDE.md` prints 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-md-invariant.ac2",
+            "title": "Given the Key Invariants list, the new bullet is its last bullet and names route-scopes.ts as the authority",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "signins-header",
+        "title": "Add the PAN-4927 module header to McpSignInsList.tsx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T18:12:26Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "frontend",
+          "issueLabel": "pan-4958",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/McpSignInsList.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "head -3 src/dashboard/frontend/src/components/Settings/anywhere/McpSignInsList.tsx | grep -c PAN-4927",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "1",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-13: insert the PRD's /** ... */ header as the first lines of McpSignInsList.tsx, before the first import. First confirm the revoke route from revokeMcpSignIn in anywhereApi.ts (currently DELETE /api/mcp-oauth/sign-ins/:familyId) and use the real path. Comment only; no code change."
+        },
+        "items": [
+          {
+            "id": "signins-header.ac1",
+            "title": "Given McpSignInsList.tsx, `head -3` of the file contains 'PAN-4927' and 'PAN-4946'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "signins-header.ac2",
+            "title": "Given the header, it names the revoke route DELETE /api/mcp-oauth/sign-ins/:familyId, and `git diff` for the file shows only added comment lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "signins-header.ac3",
+            "title": "Given the edit, npm run typecheck exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "cli-mcp-page",
+        "to": "bots-page",
+        "type": "blocks"
+      },
+      {
+        "from": "bots-page",
+        "to": "mcp-intro",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-mcp-page",
+        "to": "cli-token",
+        "type": "blocks"
+      },
+      {
+        "from": "bots-page",
+        "to": "anywhere-bots",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

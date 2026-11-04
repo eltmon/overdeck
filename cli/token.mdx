@@ -5,10 +5,6 @@ description: Create, list or revoke scoped API tokens
 
 # `pan token`
 
-<Note>
-Available from the next release (v0.65.0).
-</Note>
-
 Create, list or revoke scoped API tokens: bearer tokens limited to named scopes, for a
 program such as an event sidecar or a notifier instead of a full device session. See the
 scope table at [Remote access](/configuration/remote-access#scoped-api-tokens).
@@ -21,7 +17,7 @@ pan token create <name> --scopes <list> [--json]
 
 | Flag | Effect |
 | --- | --- |
-| `--scopes <list>` | Required. Comma-separated, from `read:events, read:state, read:conversations, tell, operate, approve, admin`. |
+| `--scopes <list>` | Required. Comma-separated, from `read:events, read:state, read:conversations, read:costs, read:settings, tell, operate, approve, forward, admin`. |
 | `--json` | Print `{ id, name, scopes, token }` as JSON. |
 
 Prints the id, name, scopes, and the token (`odk_…`) once, followed by:
@@ -47,9 +43,22 @@ running dashboard.
 
 With no access tokens: `` `No access tokens. Create one with `pan token create`.` ``
 
-Agent tokens appear in the list too, named `agent:<role>:<agentId>`. Once launch injection
-(PAN-4927 W-INJ1) lands, Overdeck mints one for each managed agent or conversation. A token is
-revoked automatically when its agent stops, and removed from the list 7 days after it was revoked.
+The list also shows tokens Overdeck creates for you:
+
+- **Agent tokens**, named `agent:<role>:<agentId>`. Overdeck mints one for each
+  managed agent and conversation at launch and revokes it when the agent stops.
+  Their scopes follow the role (see [Agents get these tools](/configuration/mcp#agents-get-these-tools)).
+- **OAuth tokens**, named `<client name> (OAuth)`, one per approved MCP sign-in.
+  An OAuth token expires after 30 days unless the client refreshes it. Manage
+  sign-ins with [`pan mcp oauth`](/cli/mcp#oauth).
+
+The table does not show which agent or sign-in a token belongs to; `--json`
+prints every field, including `agentId`, `agentKind` and `role` for an agent
+token and `oauthClientId`, `oauthFamilyId` and `expiresAt` for an OAuth token.
+An agent token leaves the list 7 days after it is revoked, and an expired OAuth
+token 7 days after it expires. A revoked OAuth token stays 90 days longer, so a
+later refresh with its old refresh token still sees the revocation
+(`pruneEndedAccessTokens`, `src/lib/access-tokens.ts`).
 
 ## revoke
 
