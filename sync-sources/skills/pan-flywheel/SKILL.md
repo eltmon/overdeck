@@ -191,6 +191,12 @@ Flywheel's own picks — `pan spawn` is for the foreman dispatching item
 workers *within* an already-started issue, not for the Flywheel picking a
 new one.
 
+If `pan start` fails with "Disk low — new workspace starts are held", the
+disk cannot take another workspace setup. Launch nothing more this tick, put
+`needs-you=disk low (<free> GiB free)` in the tick marker (the free GiB is in
+the message), and do not retry that issue until a later tick. A planning
+handoff that was deferred for low disk retries on its own once space returns.
+
 ## Phase 4 — Watch to landing
 
 Poll the issue's derived state, not a stored one:

@@ -1487,6 +1487,32 @@ Auto-resume is intentionally suppressible:
 These gates are orthogonal to deacon-lite's own start/stop toggle
 (`pan admin cloister start|stop`).
 
+### Disk-low hold (PAN-4961)
+
+A work start whose workspace stack is unhealthy would rebuild it, and a stack
+rebuild writes about 2 GB. Before that rebuild, both start paths ask
+`resolveIssueStackDiskHold` (`src/lib/workspace/disk-cost.ts`) whether the
+project's measured stack cost fits above the 10 GiB disk floor once the
+in-flight reservations are counted (see "Disk floor and in-flight
+reservations" in [WORKSPACES-AND-PROJECTS.md](WORKSPACES-AND-PROJECTS.md)).
+When it does not, the start is held, not attempted:
+
+- `POST /api/agents` (the dashboard Start button and the finalize auto-handoff)
+  answers HTTP 507 with
+  `{ success: false, blocked: true, skipped: true, diskLow: true, error, hint }`.
+- CLI `pan start` spawns in-process, so `assertWorkspaceStackHealthyForSpawn`
+  (`src/lib/agents/spawn-prep.ts`) throws an error whose message is the
+  disk-low text. Review, test and ship fall back to the host instead, as they
+  do for any unhealthy stack.
+
+Both messages start with `Disk low — new workspace starts are held`. A start
+whose stack is already healthy adds no disk cost and is never held. The hold
+counts no rebuild attempt and sets no cooldown or escalation, so the first
+start after space returns rebuilds at once. Both spawn-refusal classifiers map
+`diskLow: true` to the retryable `guardrails` reason, so the finalize
+auto-handoff records the refusal as deferred and deacon-lite retries it with
+its usual backoff until free space recovers.
+
 ## GitHub quota policy (PAN-4264)
 
 GitHub limits each identity to 5,000 points per hour per bucket (GraphQL and
