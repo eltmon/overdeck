@@ -418,13 +418,17 @@ door that does not exist; a real record read door would be a separate change.
   holds PR links keyed by host/repository/number with a `source`, a `dismissed_at`
   tombstone, and a `snapshot_json`. The pull-request sync sweep
   (`services/pull-request-sync-service.ts`, primary dashboard only, boot +30 s then
-  every 60 s) reads each GitHub project's `gh pr list` once per sweep, links every PR
+  every 60 s) reads each GitHub project's combined PR listing once per sweep
+  (`readRepoPullRequests` — PAN-5042: the open plus the closed read), links every PR
   whose head branch equals a conversation's branch (`resolveConversationBranch`: a
   linked worktree's, an agent's, or — PAN-4457 — a live operator conversation's branch
   in the primary checkout, via the backend-agnostic pane inventory, `getBackendPanes`;
   liveness unknown or the inventory degraded skips primary-checkout matching that
   sweep; never the default branch) as a `branch` link, and refreshes stored snapshots of linked PRs
-  by due rule: unsynced and open every sweep, closed every 15 min, merged never. A
+  by due rule: unsynced and open every sweep, closed every 15 min, merged never. A row
+  from the closed listing never carries `statusCheckRollup`, so a refreshed snapshot
+  keeps the link's last observed checks instead of resetting to a bare
+  mergedAt/state guess (`snapshotFromGhRow`'s `previous` parameter). A
   due GitHub link no listing covered gets one `gh pr view` (the fallback), and 3
   consecutive failed reads skip that repository for 15 min. The last-read times
   and failure counts are in memory only. A change emits the in-memory
@@ -742,7 +746,7 @@ marker so the no-loss gate proves that no existing surface disappeared.
 
 **God View:** `/god-view` centers the Confluence production canvas from [PAN-3447](https://github.com/eltmon/overdeck/issues/3447); its deliberate style-guide exemption and live-data contract are documented in `docs/GOD-VIEW.md`.
 
-**Derived issue state on board routes (PAN-3925):** routes that derive many issues go through the server adapter's batch doors in `services/derived-issue-state.ts`: `loadIssueStatesForProject` for one project, and `loadIssueStatesForIssues` for ids from many projects (one batch per project, the projects in parallel). A batch costs one `gh pr list` per repo, two `git for-each-ref` calls, and no per-issue spawn. The server batch doors read the PR listing stale-while-revalidate (`listRepoPullRequestsStaleOk`): a busy repo's listing takes ~11s, so once the 30s TTL passes, reads get the last listing immediately while a single refresh runs. A read waits for the forge only when no listing is younger than two minutes. Gates that act on readiness (merge scheduling, the ready set) keep the strict `listRepoPullRequests`. Route code must not call `getDerivedIssueState` in a loop.
+**Derived issue state on board routes (PAN-3925):** routes that derive many issues go through the server adapter's batch doors in `services/derived-issue-state.ts`: `loadIssueStatesForProject` for one project, and `loadIssueStatesForIssues` for ids from many projects (one batch per project, the projects in parallel). A batch costs the open plus the closed PR listing per repo (PAN-5042: measured open 0.75s, closed 2.1s on a busy repo — a combined `--state all` read with `statusCheckRollup` measured an HTTP 504 at ~11s instead), two `git for-each-ref` calls, and no per-issue spawn. The server batch doors read the PR listing stale-while-revalidate (`listRepoPullRequestsStaleOk`): once the 30s TTL passes, reads get the last combined listing immediately while a single refresh runs. A read waits for the forge only when no listing is younger than two minutes. Gates that act on readiness (merge scheduling, the ready set) keep the strict `listRepoPullRequests`, or `readOpenRepoPullRequests` when only open PRs matter. Route code must not call `getDerivedIssueState` in a loop.
 
 **Session lifecycle rules:**
 - On WebSocket close, do NOT kill the PTY — the tmux session survives independently.
