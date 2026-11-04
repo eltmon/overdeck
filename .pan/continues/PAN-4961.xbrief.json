@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4961",
   "created": "2026-11-03T23:57:34.038Z",
-  "updated": "2026-11-04T00:23:46.985Z",
+  "updated": "2026-11-04T00:24:04.402Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -136,6 +136,10 @@
       "claimedBy": "agent-pan-4961",
       "claimedAt": "2026-11-04T00:21:21.080Z",
       "doneAt": "2026-11-04T00:23:46.985Z"
+    },
+    "spawn-disk-hold.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T00:24:04.402Z"
     }
   }
 }
