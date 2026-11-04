@@ -52,6 +52,9 @@ interface SettledListing {
   readonly settledAt: number;
 }
 
+/** A settled closed listing, stamped with the shrink generation it was loaded under. */
+type ClosedListing = SettledListing & { readonly generation: number };
+
 /**
  * The open-PR read, cached briefly — the batch door's forge read and every
  * caller that only needs open PRs (PAN-5042). PAN-4291: a listing with no
@@ -70,7 +73,7 @@ const cachedOpenPullRequests = createSettledTtlPromiseCache<string, SettledListi
  * `PR_CACHE_TTL_MS` on a failed read, so a transient failure retries at the
  * normal cadence instead of for five minutes.
  */
-const cachedClosedPullRequests = createSettledTtlPromiseCache<string, SettledListing | null>(
+const cachedClosedPullRequests = createSettledTtlPromiseCache<string, ClosedListing | null>(
   PR_CACHE_TTL_MS,
   undefined,
   (listing) => (listing ? PR_CACHE_IDLE_TTL_MS : PR_CACHE_TTL_MS),
@@ -78,6 +81,16 @@ const cachedClosedPullRequests = createSettledTtlPromiseCache<string, SettledLis
 
 /** The last combined listing each repo answered successfully, and when (PAN-3925). */
 const lastRepoPullRequests = new Map<string, SettledListing>();
+
+/** The open PR numbers the last successful open read saw, by repo (PAN-5042 FR-6). */
+const lastOpenNumbers = new Map<string, ReadonlySet<number>>();
+
+/**
+ * Bumped for a repo whenever a PR number drops out of its open listing — the
+ * forge told us something closed or merged, which the closed cache (idle TTL
+ * up to 5 minutes) may not reflect yet.
+ */
+const closedGeneration = new Map<string, number>();
 
 async function loadOpenPullRequests(projectPath: string): Promise<SettledListing | null> {
   try {
@@ -92,20 +105,34 @@ async function loadOpenPullRequests(projectPath: string): Promise<SettledListing
       'pr', 'list', '--state', 'open', '--limit', '100', '--json', GH_PR_FIELDS,
     ], { caller: 'pr-cache', cwd: projectPath, timeout: 20_000 });
     const rows = JSON.parse(stdout || '[]') as GhPrRow[];
+    const numbers = new Set(rows.map((row) => row.number).filter((n): n is number => typeof n === 'number'));
+    const previous = lastOpenNumbers.get(projectPath);
+    if (previous && [...previous].some((n) => !numbers.has(n))) {
+      // A PR left the open set: the cached closed listing may be missing it
+      // (or still showing it under a stale state), so force one more closed
+      // read even though the idle TTL has not expired.
+      closedGeneration.set(projectPath, (closedGeneration.get(projectPath) ?? 0) + 1);
+      cachedClosedPullRequests.invalidate(projectPath);
+    }
+    lastOpenNumbers.set(projectPath, numbers);
     return { rows, settledAt: Date.now() };
   } catch {
     return null;
   }
 }
 
-async function loadClosedPullRequests(projectPath: string): Promise<SettledListing | null> {
+async function loadClosedPullRequests(projectPath: string): Promise<ClosedListing | null> {
+  // Read before the exec: a concurrent open read may bump this while this
+  // call is in flight, which is exactly the staleness `readRepoPullRequests`
+  // checks for below.
+  const generation = closedGeneration.get(projectPath) ?? 0;
   try {
-    if (!(await shouldListPullRequests(projectPath))) return { rows: [], settledAt: Date.now() };
+    if (!(await shouldListPullRequests(projectPath))) return { rows: [], settledAt: Date.now(), generation };
     const { stdout } = await runGh([
       'pr', 'list', '--state', 'closed', '--limit', '100', '--json', GH_CLOSED_PR_FIELDS,
     ], { caller: 'pr-cache', cwd: projectPath, timeout: 20_000 });
     const rows = JSON.parse(stdout || '[]') as GhPrRow[];
-    return { rows, settledAt: Date.now() };
+    return { rows, settledAt: Date.now(), generation };
   } catch {
     return null;
   }
@@ -157,7 +184,16 @@ export function invalidateRepoPullRequests(projectPath: string): void {
 export async function readRepoPullRequests(projectPath: string): Promise<readonly GhPrRow[] | null> {
   const open = await cachedOpenPullRequests(projectPath, () => loadOpenPullRequests(projectPath));
   if (!open) return null;
-  const closed = await cachedClosedPullRequests(projectPath, () => loadClosedPullRequests(projectPath));
+  const seen = closedGeneration.get(projectPath) ?? 0;
+  let closed = await cachedClosedPullRequests(projectPath, () => loadClosedPullRequests(projectPath));
+  // The closed read this call got back was loaded under an older shrink
+  // generation than the open read just confirmed (it was already in flight,
+  // or cached, when the open side's shrink bumped it) — reread once, never in
+  // a loop, since a second bump mid-reread is the next call's problem.
+  if (closed && closed.generation < seen) {
+    cachedClosedPullRequests.invalidate(projectPath);
+    closed = await cachedClosedPullRequests(projectPath, () => loadClosedPullRequests(projectPath));
+  }
   if (!closed) return null;
   const rows = combineListings(open, closed);
   lastRepoPullRequests.set(projectPath, { rows, settledAt: open.settledAt });

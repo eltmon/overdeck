@@ -47,6 +47,7 @@ import {
   PR_LISTING_MAX_STALE_MS,
   listRepoPullRequests,
   listRepoPullRequestsStaleOk,
+  readRepoPullRequests,
 } from '../../../../src/lib/overdeck/derived-issue-state.js';
 
 const listing = (...branches: string[]) =>
@@ -210,5 +211,90 @@ describe('listRepoPullRequestsStaleOk (PAN-3925)', () => {
     expect(numbersOf(rows)).toEqual([8, 7, 5, 1]);
     const seven = rows.find((row) => row.number === 7);
     expect(seven?.state).toBe('OPEN');
+  });
+});
+
+describe('readRepoPullRequests closed-listing consistency (PAN-5042 FR-6)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    gh.calls = 0;
+    gh.pending.length = 0;
+    repo = `/repos/shrink-${++repoSeq}`;
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const openRow = (number: number) => ({ number, state: 'OPEN', headRefName: `feature/pan-${number}` });
+
+  it('re-reads the closed listing when a PR drops out of the open set, even inside the idle TTL (ac1)', async () => {
+    const first = readRepoPullRequests(repo);
+    await answerRead(JSON.stringify([openRow(7), openRow(8)]), '[]');
+    expect(numbersOf(await first)).toEqual([8, 7]);
+    expect(gh.calls).toBe(2);
+
+    // Past the open read's 30 s active TTL; the closed read's 5-minute idle
+    // TTL has not elapsed, yet PR 7 dropping out of the open set forces a
+    // second closed read.
+    await vi.advanceTimersByTimeAsync(PR_CACHE_TTL_MS + 1_000);
+    const second = readRepoPullRequests(repo);
+    await answerGh('open', JSON.stringify([openRow(8)]));
+    expect(pendingFor('closed')).toBeDefined();
+    await answerGh('closed', closedListing(7));
+
+    const rows = await second;
+    expect(numbersOf(rows)).toEqual([8, 7]);
+    expect(rows.find((row) => row.number === 7)?.state).toBe('MERGED');
+    expect(gh.calls).toBe(4);
+  });
+
+  it('a closed read already in flight when the open side bumps the generation is re-read exactly once more (ac2)', async () => {
+    const first = readRepoPullRequests(repo);
+    await answerRead(JSON.stringify([openRow(7)]), '[]');
+    await first;
+
+    // Expire both caches, then read A: its open read hits the forge but
+    // keeps PR 7 (no shrink yet), so A moves on to a closed read that goes
+    // in flight and is left unanswered for now.
+    await vi.advanceTimersByTimeAsync(5 * 60_000 + 1_000);
+    const readA = readRepoPullRequests(repo);
+    await answerGh('open', JSON.stringify([openRow(7)]));
+    expect(pendingFor('closed')).toBeDefined();
+
+    // 31 s later, read B's open refresh drops PR 7 — bumping the shrink
+    // generation while A's closed read is still pending, so the invalidate
+    // it triggers cannot touch A's in-flight entry.
+    await vi.advanceTimersByTimeAsync(PR_CACHE_TTL_MS + 1_000);
+    const readB = readRepoPullRequests(repo);
+    await answerGh('open', '[]');
+
+    // A's long-pending closed read finally answers — with stale information
+    // (no PR 7 yet) captured before B's bump.
+    await answerGh('closed', '[]');
+    expect(numbersOf(await readA)).toEqual([7]);
+
+    // B sees that stale generation and issues exactly one more closed read.
+    expect(pendingFor('closed')).toBeDefined();
+    expect(gh.pending.filter((call) => call.args.includes('closed'))).toHaveLength(1);
+    await answerGh('closed', closedListing(7));
+
+    const rowsB = await readB;
+    expect(numbersOf(rowsB)).toEqual([7]);
+    expect(rowsB.find((row) => row.number === 7)?.state).toBe('MERGED');
+  });
+
+  it('issues one open read and no closed read when the open set is unchanged (ac3)', async () => {
+    const first = readRepoPullRequests(repo);
+    await answerRead(JSON.stringify([openRow(7)]), '[]');
+    await first;
+    expect(gh.calls).toBe(2);
+
+    await vi.advanceTimersByTimeAsync(PR_CACHE_TTL_MS + 1_000);
+    const second = readRepoPullRequests(repo);
+    await answerGh('open', JSON.stringify([openRow(7)]));
+    expect(pendingFor('closed')).toBeUndefined();
+    await second;
+    expect(gh.calls).toBe(3);
   });
 });
