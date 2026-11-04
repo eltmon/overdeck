@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5046",
   "created": "2026-11-04T18:10:57.891Z",
-  "updated": "2026-11-04T18:32:54.593Z",
+  "updated": "2026-11-04T18:32:59.753Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,11 @@
       "claimedBy": "agent-pan-5046",
       "claimedAt": "2026-11-04T18:30:52.835Z",
       "doneAt": "2026-11-04T18:32:54.592Z"
+    },
+    "boot-wiring-order": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5046",
+      "claimedAt": "2026-11-04T18:32:59.753Z"
     }
   }
 }
