@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { buildConnectorPairLink, parseConnectorPairLink } from '@overdeck/contracts';
 
 import { ANYWHERE_STATUS_QUERY_KEY } from '../anywhereApi';
+import { PUBLIC_MCP_QUERY_KEY, type PublicMcpState } from '../botsApi';
 import { ConnectBotDialog } from '../ConnectBotDialog';
 
 vi.mock('../../../../lib/wsTransport', () => ({
@@ -74,7 +75,11 @@ function postedBody(path: string): { name: string; scopes: string[] } {
   return JSON.parse(String((call?.[1] as RequestInit).body)) as { name: string; scopes: string[] };
 }
 
-async function renderDialog(opts: { serveUrl?: string | null } = {}) {
+function postedTo(path: string): boolean {
+  return fetchMock.mock.calls.some(([input, init]) => input.toString() === path && (init as RequestInit | undefined)?.method === 'POST');
+}
+
+async function renderDialog(opts: { serveUrl?: string | null; publicMcp?: PublicMcpState } = {}) {
   const user = userEvent.setup();
   const writeText = vi.fn(async () => undefined);
   Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
@@ -83,6 +88,10 @@ async function renderDialog(opts: { serveUrl?: string | null } = {}) {
     // staleTime: Infinity keeps the mount-triggered background refetch from clobbering this with mockServer's default (null) response.
     queryClient.setQueryDefaults(ANYWHERE_STATUS_QUERY_KEY, { staleTime: Infinity });
     queryClient.setQueryData(ANYWHERE_STATUS_QUERY_KEY, statusBody(opts.serveUrl ?? null));
+  }
+  if (opts.publicMcp) {
+    queryClient.setQueryDefaults(PUBLIC_MCP_QUERY_KEY, { staleTime: Infinity });
+    queryClient.setQueryData(PUBLIC_MCP_QUERY_KEY, opts.publicMcp);
   }
   render(
     <QueryClientProvider client={queryClient}>
@@ -208,5 +217,58 @@ describe('ConnectBotDialog (PAN-4951 WI-3, WI-4)', () => {
     const configField = await screen.findByLabelText('Hermes config');
     expect(String((configField as HTMLTextAreaElement).value)).toContain('url: "https://YOUR-MACHINE.YOUR-TAILNET.ts.net/mcp"');
     expect(screen.getByText(/Tailscale Serve is not set up on this machine yet/)).toBeInTheDocument();
+  });
+
+  it('renders only the Public MCP reach for Grok Bot', async () => {
+    mockServer();
+    const { user } = await renderDialog({ publicMcp: { available: false, enabled: false, url: null } });
+
+    await user.click(screen.getByLabelText('Grok Bot'));
+
+    expect(screen.getByLabelText('Public MCP')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Overdeck connector')).not.toBeInTheDocument();
+  });
+
+  it('renders "Public MCP is off" and sends no POST when the route is off (404)', async () => {
+    mockServer();
+    const { user } = await renderDialog({ publicMcp: { available: false, enabled: false, url: null } });
+
+    await user.click(screen.getByLabelText('Grok Bot'));
+
+    expect(screen.getByText(/Public MCP is off/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show Public MCP settings' })).toBeInTheDocument();
+    expect(postedTo('/api/access-tokens')).toBe(false);
+    expect(postedTo('/api/connectors/pairing')).toBe(false);
+  });
+
+  it("puts the public URL in Grok Bot's mcp.json", async () => {
+    mockServer();
+    const { user } = await renderDialog({
+      publicMcp: { available: true, enabled: true, url: 'https://box.tail1.ts.net:8443/mcp' },
+    });
+
+    await user.click(screen.getByLabelText('Grok Bot'));
+    await user.click(screen.getByRole('button', { name: 'Show setup' }));
+
+    const mcpJson = await screen.findByLabelText("Grok Bot mcp.json");
+    expect(String((mcpJson as HTMLTextAreaElement).value)).toContain('https://box.tail1.ts.net:8443/mcp');
+    expect(postedTo('/api/access-tokens')).toBe(false);
+    expect(postedTo('/api/connectors/pairing')).toBe(false);
+  });
+
+  it('renders --level operate for the xAI API when operate is ticked', async () => {
+    mockServer();
+    const { user } = await renderDialog({
+      publicMcp: { available: true, enabled: true, url: 'https://box.tail1.ts.net:8443/mcp' },
+    });
+
+    await user.click(screen.getByLabelText('xAI API'));
+    await user.click(screen.getByLabelText('Operate', { exact: false }));
+    await user.click(screen.getByRole('button', { name: 'Show setup' }));
+
+    const getToken = await screen.findByLabelText('Get a token');
+    expect((getToken as HTMLInputElement).value).toContain('--level operate');
+    expect(postedTo('/api/access-tokens')).toBe(false);
+    expect(postedTo('/api/connectors/pairing')).toBe(false);
   });
 });

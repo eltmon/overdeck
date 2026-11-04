@@ -1,8 +1,7 @@
 /**
  * PAN-4927 W-BOT1 (PAN-4951): "Connect a bot" — one form (D-5) that gives an outside MCP
  * client (Hermes, OpenClaw, Grok Build, Grok Bot, the xAI API) scoped, revocable access to
- * this machine. The connector, tailscale and this-computer reaches are wired here; public
- * lands with dialog-public-reach.
+ * this machine. Every reach is wired here: connector, tailscale, this-computer and public.
  */
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -18,6 +17,7 @@ import {
 } from './anywhereApi';
 import {
   BOT_PLATFORMS,
+  PUBLIC_MCP_PLACEHOLDER_URL,
   REACH_LABELS,
   TAILSCALE_PLACEHOLDER_ORIGIN,
   defaultBotName,
@@ -28,11 +28,14 @@ import {
   BOTS_CONNECTORS_QUERY_KEY,
   BOT_DEFAULT_SCOPES,
   BOT_SCOPE_CHOICES,
+  PUBLIC_MCP_QUERY_KEY,
   type BotScope,
   botScopes,
   createConnectorPairing,
+  loadPublicMcp,
 } from './botsApi';
 import { ConnectBotOutput, type ConnectBotResult } from './ConnectBotOutput';
+import { requestSettingsSection } from '../../../lib/settingsSection';
 
 const TICKABLE_SCOPES = BOT_SCOPE_CHOICES.filter((scope) => scope !== 'read:state');
 
@@ -70,6 +73,8 @@ function ConnectBotDialogBody({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
   const [output, setOutput] = useState<ConnectBotResult | null>(null);
+
+  const { data: publicMcp } = useQuery({ queryKey: PUBLIC_MCP_QUERY_KEY, queryFn: loadPublicMcp, enabled: reach === 'public' });
 
   const platformEntry = BOT_PLATFORMS.find((entry) => entry.id === platform) ?? BOT_PLATFORMS[0]!;
   // D-10: Tailscale Serve's URL, or the placeholder plus a "not set up" note.
@@ -136,6 +141,24 @@ function ConnectBotDialogBody({ onClose }: { onClose: () => void }) {
 
   const canSubmit = (reach === 'connector' || reach === 'tailscale' || reach === 'this-computer')
     && name.trim().length > 0 && !creating;
+
+  // D-7: hand off to the Public MCP panel; W-FUN1 must give it data-component="public-mcp-panel".
+  const showPublicMcpSettings = () => {
+    requestSettingsSection('anywhere');
+    onClose();
+    document.querySelector('[data-component="public-mcp-panel"]')?.scrollIntoView({ block: 'center' });
+  };
+
+  const handleShowSetup = () => {
+    if (!publicMcp) return;
+    setOutput({
+      kind: 'public',
+      url: publicMcp.url ?? PUBLIC_MCP_PLACEHOLDER_URL,
+      urlUnknown: publicMcp.enabled && publicMcp.url === null, // D-6
+      name: name.trim(),
+      scopes: botScopes(ticked),
+    });
+  };
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
@@ -231,7 +254,30 @@ function ConnectBotDialogBody({ onClose }: { onClose: () => void }) {
                 />
               </div>
 
-              {forbidden ? (
+              {reach === 'public' ? (
+                publicMcp?.enabled ? (
+                  <button
+                    type="button"
+                    onClick={handleShowSetup}
+                    className="rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:bg-primary/90 transition-colors"
+                  >
+                    Show setup
+                  </button>
+                ) : (
+                  <>
+                    <p className="text-xs text-muted-foreground">
+                      Public MCP is off. Hosted bots need it: turn it on under Public MCP in Settings → Anywhere.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={showPublicMcpSettings}
+                      className="rounded-md border border-border px-3 py-1.5 text-xs text-foreground hover:bg-muted/50 transition-colors"
+                    >
+                      Show Public MCP settings
+                    </button>
+                  </>
+                )
+              ) : forbidden ? (
                 <p className="text-xs text-muted-foreground">Only a browser on this machine can connect bots.</p>
               ) : (
                 <button
@@ -240,7 +286,7 @@ function ConnectBotDialogBody({ onClose }: { onClose: () => void }) {
                   disabled={!canSubmit}
                   className="rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
                 >
-                  {reach === 'connector' ? 'Create pairing code' : reach === 'tailscale' || reach === 'this-computer' ? 'Create token' : 'Connect'}
+                  {reach === 'connector' ? 'Create pairing code' : 'Create token'}
                 </button>
               )}
               {error && <p className="text-xs text-destructive">{error}</p>}

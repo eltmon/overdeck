@@ -10,17 +10,22 @@ import {
   BOT_PLATFORMS,
   CONNECTOR_LOCAL_URL,
   connectorCommands,
+  grokBotMcpJson,
   grokBuildMcpJson,
   hermesConfig,
+  oauthIssueCommand,
+  oauthLevelForScopes,
   openclawConfig,
   tokenSetup,
+  xaiExample,
   type BotPlatform,
 } from './botSnippets';
 import { CopyField } from './McpUrlDialog';
 
 export type ConnectBotResult =
   | { kind: 'connector'; pairingString: string; expiresAt: string }
-  | { kind: 'token'; reach: 'tailscale' | 'this-computer'; token: string; origin: string; tailscaleSetUp: boolean };
+  | { kind: 'token'; reach: 'tailscale' | 'this-computer'; token: string; origin: string; tailscaleSetUp: boolean }
+  | { kind: 'public'; url: string; urlUnknown: boolean; name: string; scopes: readonly string[] };
 
 interface ConnectBotOutputProps {
   platform: BotPlatform;
@@ -53,7 +58,7 @@ export function ConnectBotOutput({ platform, result, onDone }: ConnectBotOutputP
 
   return (
     <div className="space-y-3">
-      {result.kind === 'connector' ? (
+      {result.kind === 'connector' && (
         <>
           <CopyField label="Pairing string" value={result.pairingString} />
           <p className="text-xs text-muted-foreground">{pairingExpiresInText(Date.parse(result.expiresAt))}</p>
@@ -64,7 +69,8 @@ export function ConnectBotOutput({ platform, result, onDone }: ConnectBotOutputP
           />
           <CopyField label={`${label} config`} value={connectorConfigFor(platform)} multiline />
         </>
-      ) : (
+      )}
+      {result.kind === 'token' && (
         <>
           <p className="text-xs text-muted-foreground">This token is shown once.</p>
           <CopyField
@@ -77,6 +83,30 @@ export function ConnectBotOutput({ platform, result, onDone }: ConnectBotOutputP
             <p className="text-xs text-muted-foreground">
               Tailscale Serve is not set up on this machine yet. Set up Tailscale, then replace the placeholder.
             </p>
+          )}
+        </>
+      )}
+      {result.kind === 'public' && (
+        <>
+          <CopyField label="Public MCP URL" value={result.url} />
+          {result.urlUnknown && (
+            <p className="text-xs text-muted-foreground">Tailscale is not set up, so the public URL is unknown.</p>
+          )}
+          {platform === 'grok-bot' ? (
+            <>
+              <CopyField label="Grok Bot mcp.json" value={grokBotMcpJson({ url: result.url })} multiline />
+              <p className="text-xs text-muted-foreground">
+                Grok Bot signs in with OAuth on first use. Approve the sign-in in this dashboard and pick its access level there.
+              </p>
+            </>
+          ) : (
+            <>
+              <CopyField
+                label="Get a token"
+                value={oauthIssueCommand({ name: result.name, level: oauthLevelForScopes(result.scopes) })}
+              />
+              <CopyField label="xAI API example" value={xaiExample({ url: result.url })} multiline />
+            </>
           )}
         </>
       )}
