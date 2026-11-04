@@ -1071,7 +1071,10 @@ The rule for harness-specific code:
 ### Overdeck MCP server
 
 A harness that declares `overdeckMcp` gets the `overdeck` MCP server at launch
-(see [Agents get these tools](/configuration/mcp#agents-get-these-tools)).
+(see [Agents get these tools](/configuration/mcp#agents-get-these-tools)). That
+same harness's launch context ends with the "Overdeck tools" block; every
+other harness gets "Overdeck commands" with the `pan` equivalents instead (see
+[What the agent is told](/configuration/mcp#what-the-agent-is-told)).
 Claude Code 2.1.293 was checked against what the launcher emits:
 
 - Two `--mcp-config=` flags load together, so the Channels bridge and
