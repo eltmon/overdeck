@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5011",
   "created": "2026-11-04T11:42:07.971Z",
-  "updated": "2026-11-04T13:19:24.332Z",
+  "updated": "2026-11-04T13:19:43.050Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -102,6 +102,10 @@
     "session-tree-work-pane.ac4": {
       "status": "completed",
       "doneAt": "2026-11-04T13:19:24.332Z"
+    },
+    "activity-route-presence.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:19:43.049Z"
     }
   }
 }
