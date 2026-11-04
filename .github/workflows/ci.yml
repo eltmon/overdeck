@@ -376,11 +376,12 @@ jobs:
 
   # `test` is the check name the close-out gate requires on main
   # (DEFAULT_MAIN_VERIFY_REQUIRED_CHECKS in src/lib/lifecycle/dod-gate.ts), so
-  # it stays one job: green only when every shard, test-e2e and mobile-android passed.
+  # it stays one job: green only when every shard, test-e2e, mobile-android and
+  # integrations passed.
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [test-shard, test-e2e, mobile-android]
+    needs: [test-shard, test-e2e, mobile-android, integrations]
     if: always()
     steps:
       - name: All test jobs passed
@@ -388,9 +389,11 @@ jobs:
           echo "test-shard:     ${{ needs.test-shard.result }}"
           echo "test-e2e:       ${{ needs.test-e2e.result }}"
           echo "mobile-android: ${{ needs.mobile-android.result }}"
+          echo "integrations:   ${{ needs.integrations.result }}"
           test "${{ needs.test-shard.result }}" = success
           test "${{ needs.test-e2e.result }}" = success
           test "${{ needs.mobile-android.result }}" = success
+          test "${{ needs.integrations.result }}" = success
 
   flake-lane:
     runs-on: ubuntu-latest
