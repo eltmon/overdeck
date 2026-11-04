@@ -64,9 +64,9 @@ describe('createMcpClient', () => {
     expect((await errorOf(client.callTool('t', {}))).message).toBe('Overdeck refused the token (HTTP 401). Check localToken.');
   });
 
-  it('reports other HTTP failures by status', async () => {
-    const { client } = clientWith(async () => new Response(TOKEN, { status: 406 }));
-    expect((await errorOf(client.callTool('t', {}))).message).toBe('Overdeck MCP request failed (HTTP 406)');
+  it.each([406, 500])('reports HTTP %i by status', async (status) => {
+    const { client } = clientWith(async () => new Response(TOKEN, { status }));
+    expect((await errorOf(client.callTool('t', {}))).message).toBe(`Overdeck MCP request failed (HTTP ${status})`);
   });
 
   it('reports a body that is not JSON', async () => {
