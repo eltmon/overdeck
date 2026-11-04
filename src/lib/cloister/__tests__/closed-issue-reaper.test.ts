@@ -360,6 +360,18 @@ describe('reconcileClosedIssueAgents', () => {
       rmSync(projectPath, { recursive: true, force: true });
     });
 
+    it('remembers a closed agent dir whose issue resolves to no project', async () => {
+      mkdirSync(join(overdeckHome, 'agents', 'agent-pan-7006'), { recursive: true });
+      mocks.resolveProjectForIssue.mockReturnValue(null);
+      mocks.isIssueClosed.mockResolvedValue(true);
+
+      await reconcileClosedIssueAgents();
+      await reconcileClosedIssueAgents();
+
+      expect(mocks.isIssueClosed).toHaveBeenCalledTimes(1);
+      expect(mocks.reapIssueResidue).not.toHaveBeenCalled();
+    });
+
     it('checks a reaped issue again once the recheck window has passed', async () => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date('2026-11-04T10:00:00.000Z'));

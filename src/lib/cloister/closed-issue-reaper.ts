@@ -85,7 +85,12 @@ async function reapResolvedIssueResidue(
   reapedIssueKeys: Set<string>,
 ): Promise<void> {
   const project = resolveProjectForIssue(issueId);
-  if (!project) return;
+  if (!project) {
+    // Nothing on disk to reap without a project; still remember the closed
+    // issue so the passive scans stop asking the tracker about it (PAN-5001).
+    residueReapedAt.set(issueId, Date.now());
+    return;
+  }
   await reapClosedIssueResidue(project.path, issueId, actions, reapedIssueKeys);
 }
 

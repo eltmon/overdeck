@@ -594,9 +594,10 @@ export function setPatrolRunObserver(fn: ((report: PatrolRunReport) => void) | n
  */
 export function runDeaconLitePatrol(): Promise<void> {
   if (!patrolInFlight) {
-    patrolInFlight = runDeaconLitePatrolOnce().finally(() => {
-      patrolInFlight = null;
+    const patrol: Promise<void> = runDeaconLitePatrolOnce().finally(() => {
+      if (patrolInFlight === patrol) patrolInFlight = null;
     });
+    patrolInFlight = patrol;
   }
   return patrolInFlight;
 }
@@ -632,6 +633,8 @@ export function stopDeaconLite(): void {
   if (!deaconLiteInterval) return;
   clearInterval(deaconLiteInterval);
   deaconLiteInterval = null;
+  // A restarted loop must not join a patrol left over from the stopped one.
+  patrolInFlight = null;
 }
 
 export function isDeaconLiteRunning(): boolean {
