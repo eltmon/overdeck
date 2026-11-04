@@ -46,6 +46,15 @@ touches the session vault.
 see answers `Unknown tool <name>`. Tools for managed agents are listed only to
 agent tokens.
 
+### Agent-only tools
+
+| Tool | What it does | Scope the token needs |
+| --- | --- | --- |
+| `wait_job` | Waits up to 50 s for a job another tool started. Answers `done` with the exit code and output, or `running` with `next`, the call to make again. Never poll or sleep; jobs are forgotten when the dashboard restarts. | `read:state` (agent tokens only) |
+
+Agent-only tools call routes under `/api/self/`, which refuse any token that
+is not an agent token.
+
 A tool the token's scopes hide answers `Unknown tool <name>`. A route can
 still refuse a listed tool, for example a linked machine's ceiling, with
 `HTTP 403: insufficient_scope (missingScope: approve)`.
@@ -138,6 +147,50 @@ A Claude Desktop config:
 ```
 
 The dashboard must be running: each tool calls it.
+
+## Agents get these tools
+
+Every Claude Code agent that Overdeck launches on this machine starts with the
+`overdeck` server: work agents, role runs (plan, review, test, ship, worker and
+the others), planning sessions and conversations. You do not create a token for
+them.
+
+Each agent holds its own agent token. It sits in `mcp-token` (mode 0600), next
+to `overdeck-mcp.json`, in `~/.overdeck/agents/<id>/` for an agent or
+`~/.overdeck/conversations/conv-<name>/` for a conversation. `overdeck-mcp.json`
+runs `pan mcp serve` and names only the token file, so neither it nor the
+launcher script holds the token. The launcher passes
+`--mcp-config=<file>` and, when the role has no tool allow-list,
+`--allowedTools=mcp__overdeck`, so a tool call does not stop at a permission
+prompt. Roles with a `tools:` list (review, test) get `mcp__overdeck` in that
+list instead.
+
+The token's scopes follow the agent's role:
+
+| Agent | Scopes |
+| --- | --- |
+| work, worker, plan, strike, sequencer, knowledge, flywheel | `read:events`, `read:state`, `read:conversations`, `tell`, `operate` |
+| review, test, ship | `read:events`, `read:state`, `read:conversations`, `tell` |
+| an operator conversation | the work scopes plus `approve` |
+| a lane conversation (`pan lane start`) | the `worker` scopes |
+| the Flywheel conversation | the `flywheel` scopes |
+
+A resumed, recovered or relaunched agent keeps the same server and reuses its
+live token. Stopping the agent revokes the token.
+
+To turn injection off, set this in `config.yaml`:
+
+```yaml
+mcp:
+  agents: false
+```
+
+These launches get no server: Docker workspaces (`OVERDECK_DOCKER_WORKSPACE=1`
+or `PAN_DOCKER=1`), bare conversations, Fly machines, and harnesses other than
+Claude Code (Codex and the ACP harnesses follow). When the token cannot be
+minted or the config cannot be written, the agent starts without the server and
+the log shows one `[agent-injection] overdeck MCP skipped for <id>: <reason>`
+warning. The agent can still reach Overdeck through `pan`.
 
 ## Scopes and the approve scope
 

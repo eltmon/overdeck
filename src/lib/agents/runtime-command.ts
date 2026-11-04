@@ -32,6 +32,7 @@ import { waitForReadySignal } from './identity.js';
 import { CLI_PROXY_MODEL_ALIASES } from './provider-env.js';
 import { getClaudeCodeLaunchModel } from '../kimi-claude-routing.js';
 import { codexSessionsRoot } from '../runtimes/storage/codex.js';
+import { OVERDECK_MCP_SERVER_NAME } from '../mcp/overdeck-mcp-args.js';
 
 const execAsync = promisify(exec);
 const missingRoleDefinitionWarnings = new Set<string>();
@@ -813,6 +814,7 @@ export function roleAgentDefinitionPath(role: Role, subRole?: string): string | 
  *   - `tools:`    → `--allowedTools` (PAN-2090), with each declared MCP server
  *     appended as `mcp__<name>` so the role can still call its own MCP tools —
  *     otherwise the strict allow-list would block e.g. playwright for `test`.
+ *     The allow-list always names `mcp__overdeck` too (PAN-4932 D-8).
  *
  * The role frontmatter's hooks are deliberately NOT reconstituted: they are
  * installed globally in `~/.claude/settings.json` and fire for every claude
@@ -871,7 +873,7 @@ export function roleSystemPromptInjection(definitionPath: string, explicitEffort
   if (Array.isArray(frontmatter.tools)) {
     const toolNames = frontmatter.tools.filter((t): t is string => typeof t === 'string');
     if (toolNames.length > 0) {
-      const allowed = [...toolNames, ...mcpNames.map((n) => `mcp__${n}`)];
+      const allowed = [...toolNames, ...mcpNames.map((n) => `mcp__${n}`), `mcp__${OVERDECK_MCP_SERVER_NAME}`];
       flags.push(` --allowedTools '${allowed.join(',')}'`);
     }
   }

@@ -624,6 +624,9 @@ export interface YamlConfig {
   /** Needs-you push to phones (PAN-2354) */
   push?: import('./push-config.js').PushYamlConfig;
 
+  /** Overdeck MCP for managed agents (PAN-4927) */
+  mcp?: import('./mcp-config.js').McpYamlConfig;
+
   /** Workhorse model slots for role model indirection. */
   workhorses?: WorkhorsesConfig;
 
@@ -961,6 +964,9 @@ export interface NormalizedConfig {
 
   /** Needs-you push configuration (PAN-2354; normalised, never undefined) */
   push: import('./push-config.js').NormalizedPushConfig;
+
+  /** Overdeck MCP (PAN-4927; normalised, never undefined) */
+  mcp: import('./mcp-config.js').NormalizedMcpConfig;
 
   /** TTS summarizer configuration (normalised, never undefined) */
   ttsSummarizer: {

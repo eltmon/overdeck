@@ -5,6 +5,7 @@ import { Effect } from 'effect';
 import { emitActivityEntry } from '../activity-logger.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { generateLauncherScript } from '../launcher-generator.js';
+import { prepareClaudeOverdeckMcp } from '../mcp/agent-injection.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
 import { appendOperatorInterventionEvent } from '../operator-interventions.js';
 import { logAgentLifecycle } from '../persistent-logger.js';
@@ -528,6 +529,7 @@ export async function messageAgent(
       supervisorScriptPath: fallbackSupervisorLaunch.supervisorScriptPath,
       ...fallbackPiFields,
       ...fallbackCodexFields,
+      ...(await prepareClaudeOverdeckMcp({ agentId: normalizedId, agentKind: 'agent', role: resumeRole, harness: fallbackHarness })),
     });
     writeFileSync(fallbackLauncher, fallbackContent, { mode: 0o755 });
     // PAN-3960: relaunch on the backend the host selects now, stamped like a spawn.
