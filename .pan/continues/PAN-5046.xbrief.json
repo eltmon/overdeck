@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5046",
   "created": "2026-11-04T18:10:57.891Z",
-  "updated": "2026-11-04T18:45:56.593Z",
+  "updated": "2026-11-04T18:46:15.817Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -66,6 +66,10 @@
     "dialer-ends-duplexes.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T18:45:56.592Z"
+    },
+    "dialer-ends-duplexes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:46:15.817Z"
     }
   }
 }
