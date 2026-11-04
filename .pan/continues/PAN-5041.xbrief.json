@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5041",
   "created": "2026-11-04T17:22:54.161Z",
-  "updated": "2026-11-04T17:45:19.595Z",
+  "updated": "2026-11-04T18:08:22.940Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,10 @@
       "claimedBy": "agent-pan-5041",
       "claimedAt": "2026-11-04T17:43:42.341Z",
       "doneAt": "2026-11-04T17:45:19.594Z"
+    },
+    "wi9-simulator-acceptance": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:08:22.940Z"
     }
   }
 }
