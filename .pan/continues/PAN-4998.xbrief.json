@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4998",
   "created": "2026-11-04T10:12:10.948Z",
-  "updated": "2026-11-04T10:49:03.991Z",
+  "updated": "2026-11-04T10:49:30.903Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -82,6 +82,10 @@
     "w5-doctor-size.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T10:49:03.990Z"
+    },
+    "w5-doctor-size.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:49:30.903Z"
     }
   }
 }
