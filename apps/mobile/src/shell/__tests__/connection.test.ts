@@ -45,6 +45,7 @@ function fakeDirectory(opts: { relayAllowed: boolean; online?: boolean; direct: 
     }),
     close: vi.fn(),
     evict: vi.fn(),
+    restartIce: vi.fn(async () => {}),
   };
   const stateListeners = new Set<(state: DirectoryWebState) => void>();
   const client = {
