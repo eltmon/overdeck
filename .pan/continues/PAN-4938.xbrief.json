@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4938",
   "created": "2026-11-04T03:39:16.629Z",
-  "updated": "2026-11-04T04:28:35.707Z",
+  "updated": "2026-11-04T04:28:55.320Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -98,6 +98,10 @@
     "tool-list-tests.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T04:28:35.706Z"
+    },
+    "extract-stand-in-wait.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:28:55.320Z"
     }
   }
 }
