@@ -72,4 +72,13 @@ describe('cockpitSessions', () => {
       presence: 'idle',
     });
   });
+
+  it('dedupes a restarted agent\'s exited pane against its live pane (CodeRabbit PAN-5011)', () => {
+    const exited = pane({ id: 'w1JA:p1', agentId: 'agent-pan-4841', state: 'exited' });
+    const live = pane({ id: 'w1JA:p2', agentId: 'agent-pan-4841', state: 'working' });
+    const sessions = cockpitSessions([exited, live], []);
+
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0]).toMatchObject({ sessionId: 'agent-pan-4841', presence: 'active' });
+  });
 });

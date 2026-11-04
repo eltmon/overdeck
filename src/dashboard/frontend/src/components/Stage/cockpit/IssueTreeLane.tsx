@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
-import { presenceForPaneState, type ProjectSessionTree, type SessionNode } from '@overdeck/contracts'
+import { indexPanesByAgentKey, presenceForPaneState, type ProjectSessionTree, type SessionNode } from '@overdeck/contracts'
 import { type ProjectFeature } from '../../CommandDeck/ProjectTree/ProjectNode'
 import { useIssueActions } from '../../IssueActionMenu/useIssueActions'
 import { useActivityQuery, type ActivitySection } from '../../CommandDeck/ZoneCOverviewTabs/queries'
@@ -115,7 +115,11 @@ function toCockpitSession(section: {
  * ConversationPanel, i.e. whether the composer appears at all).
  */
 export function cockpitSessions(panes: readonly BackendPane[], sections: readonly ActivitySection[]): SessionNode[] {
-  const base = panes
+  // PAN-5011 CodeRabbit: a restarted agent can leave its exited pane beside
+  // the new one; both would map to the same sessionId (pane.agentId ?? id)
+  // and double the row. Dedupe by agent key first — a live pane wins.
+  const dedupedPanes = [...indexPanesByAgentKey(panes).values()]
+  const base = dedupedPanes
     .map(paneToSession)
     .filter((session): session is SessionNode => session !== null)
     .map((session) => {
