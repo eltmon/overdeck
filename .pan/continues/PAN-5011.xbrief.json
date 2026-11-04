@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5011",
   "created": "2026-11-04T11:42:07.971Z",
-  "updated": "2026-11-04T13:21:31.267Z",
+  "updated": "2026-11-04T13:21:51.541Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -134,6 +134,10 @@
     "cockpit-pane-status.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T13:21:31.267Z"
+    },
+    "cockpit-pane-identity.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:21:51.541Z"
     }
   }
 }
