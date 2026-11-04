@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-04T01:10:56.489046Z · model: claude-opus-5-5 · open: 888_
+_Last sequenced: 2026-11-04T01:15:59.761093Z · model: claude-opus-5-5 · open: 887_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -449,7 +449,6 @@ _Last sequenced: 2026-11-04T01:10:56.489046Z · model: claude-opus-5-5 · open: 
 | 448 | PAN-4151 | L | medium | needs-refinement |  | PAN-3822 | Deferred remainder of PAN-3822/#4067: GitLab MR sync, PR page + search, handoff link copy, diffstat, link-dialog a11y, sync throttle |
 | 449 | PAN-1330 | S | medium | ok |  |  | CLI cannot address planning-*/specialist-* sessions |
 | 450 | PAN-4971 | S | medium | ok |  |  | Viewer header shows only host + count; roster of all participants with host/controller marked. Frontend-only, payload exists. |
-| 451 | PAN-4482 | S | medium | ok |  |  | Shared Sessions slice 11: signaling-privacy e2e, forced-TURN check (operator checkpoint) and full AC sweep |
 | 452 | PAN-1226 | L | medium | ok |  |  | PAN-1148 unified-dashboard redesign |
 | 453 | PAN-1173 | S | medium | ok |  |  | pan show <bare-number> derives wrong agent ID for PAN-prefixed issues |
 | 454 | PAN-1154 | M | medium | ok |  |  | pan up does not kill existing port holders |
@@ -1223,10 +1222,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-04T01:10:56.489046Z",
+  "generatedAt": "2026-11-04T01:15:59.761093Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 888,
+  "openCount": 887,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -6704,19 +6703,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "condition": "ok",
       "dependsOn": [],
       "why": "CLI cannot address planning-*/specialist-* sessions",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4482",
-      "rank": 451,
-      "size": "S",
-      "importance": "medium",
-      "score": 50,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Shared Sessions slice 11: signaling-privacy e2e, forced-TURN check (operator checkpoint) and full AC sweep",
-      "rationale": "Rank held: its prerequisite slice 10 (PAN-4481, hosted web join page) closed as completed, so this slice is now unblocked.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13902,13 +13888,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-4971",
-      "to": "PAN-4482",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
     }
   ]
 }
