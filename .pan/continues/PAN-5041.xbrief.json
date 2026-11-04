@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5041",
   "created": "2026-11-04T17:22:54.161Z",
-  "updated": "2026-11-04T18:14:45.629Z",
+  "updated": "2026-11-04T18:15:01.983Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -120,6 +120,10 @@
     "wi4-settings-row.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T18:14:45.628Z"
+    },
+    "wi5-shellapp-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:15:01.983Z"
     }
   }
 }
