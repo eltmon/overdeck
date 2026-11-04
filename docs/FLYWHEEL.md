@@ -33,7 +33,7 @@ PAN-3917 cut the Flywheel page and its `pause`/`resume`/`abort`/`report`/`stats`
 | State tab | `<planHome>/.pan/flywheel/state.md` | `readFlywheelStateFile()` |
 | Report | `<planHome>/.pan/flywheel/report.md` | `readFlywheelReportFile()` |
 | Stats tab | Tracker issues labelled `substrate-improvement` (`gh issue list`, cached for 60 seconds) and merged PRs from `listRepoPullRequests`. | `computeSubstrateStats()` |
-| Pending auto-merges | The merge train's cooldown queue (`pending`) and, for each candidate the scheduler's last completed pass skipped, "Not scheduled: <reason>" (`notScheduled`, PAN-4772), from `GET /api/merge-train/auto-merge/pending`. | `merge-train.ts`, `auto-merge-skip-reasons.ts` |
+| Pending auto-merges | The merge train's cooldown queue (`pending`) and, for each candidate the scheduler's last completed pass skipped, "Not scheduled: <reason>" (`notScheduled`, PAN-4772; a project whose PR listing could not be read shows one project row, PAN-5036), from `GET /api/merge-train/auto-merge/pending`. | `merge-train.ts`, `auto-merge-skip-reasons.ts` |
 
 The flywheel works on the project that contains its conversation's `cwd`. When no flywheel conversation exists, it uses the dashboard's working directory. The **plan home** is `resolvePlanHome(projectRoot)`.
 

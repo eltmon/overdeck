@@ -844,6 +844,16 @@ nothing while a review is already running. Every completed pass keeps each candi
 `GET /api/merge-train/auto-merge/pending` and shown on the Flywheel page's
 Pending auto-merges card as "Not scheduled: <reason>". A reason is logged only
 when it changes.
+PAN-5036: the scheduler never schedules nothing silently. When the project's
+PR listing read fails (`readRepoPullRequests` answers `null`), the project gets
+one skip entry, "PR listing unavailable", with `scope: 'project'` and the
+project key as `issueId`; it logs once when it appears and once when it clears.
+An open `feature/<id>` PR that the cached listing rules out (checks not green, or
+conflicting) passes through the free checks (policy, Deft hold, latest row)
+and is then skipped with a reason naming the head it judged, for example
+"checks pending in the PR listing at 697a05f8". A journaled `review.verdict`
+APPROVED drops that repo's cached listing (`invalidatePullRequestListingOnApproval`
+in `issue-pr-refresh.ts`), so the next pass reads fresh checks.
 Auto-merge eligibility applies the same rule. Nothing is stored; each input is
 read when the question is asked. The PR is merge-ready when, in order:
 

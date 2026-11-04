@@ -21,7 +21,7 @@ vi.mock('../issue-service-singleton.js', () => ({
   getSharedIssueService: () => ({ scheduleDerivedStateRefreshForIssues: mocks.scheduleDerivedStateRefreshForIssues }),
 }));
 
-import { refreshIssuePullRequestStateNow } from '../issue-pr-refresh.js';
+import { invalidatePullRequestListingOnApproval, refreshIssuePullRequestStateNow } from '../issue-pr-refresh.js';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -53,5 +53,35 @@ describe('refreshIssuePullRequestStateNow', () => {
     });
 
     expect(() => refreshIssuePullRequestStateNow('pan-7')).not.toThrow();
+  });
+});
+
+describe('invalidatePullRequestListingOnApproval (PAN-5036)', () => {
+  it('drops the repo listing when an APPROVED review verdict is journaled', () => {
+    mocks.resolveProjectFromIssueSync.mockReturnValue({ projectPath: '/repos/overdeck' });
+
+    invalidatePullRequestListingOnApproval({ type: 'review.verdict', issueId: 'PAN-7', data: { verdict: 'APPROVED' } });
+
+    expect(mocks.resolveProjectFromIssueSync).toHaveBeenCalledWith('PAN-7');
+    expect(mocks.invalidateRepoPullRequests).toHaveBeenCalledWith('/repos/overdeck');
+    expect(mocks.scheduleDerivedStateRefreshForIssues).not.toHaveBeenCalled();
+  });
+
+  it('leaves the listing alone for any other journal entry', () => {
+    mocks.resolveProjectFromIssueSync.mockReturnValue({ projectPath: '/repos/overdeck' });
+
+    invalidatePullRequestListingOnApproval({ type: 'review.verdict', issueId: 'PAN-7', data: { verdict: 'CHANGES_REQUESTED' } });
+    invalidatePullRequestListingOnApproval({ type: 'review.requested', issueId: 'PAN-7', data: { verdict: 'APPROVED' } });
+    invalidatePullRequestListingOnApproval({ type: 'review.verdict', issueId: 'PAN-7' });
+
+    expect(mocks.invalidateRepoPullRequests).not.toHaveBeenCalled();
+  });
+
+  it('never throws when the project cannot be resolved', () => {
+    mocks.resolveProjectFromIssueSync.mockImplementation(() => {
+      throw new Error('boom');
+    });
+
+    expect(() => invalidatePullRequestListingOnApproval({ type: 'review.verdict', issueId: 'PAN-7', data: { verdict: 'APPROVED' } })).not.toThrow();
   });
 });

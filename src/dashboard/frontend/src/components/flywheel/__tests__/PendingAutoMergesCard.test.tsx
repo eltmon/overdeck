@@ -81,6 +81,22 @@ describe('PendingAutoMergesCard (PAN-3964 FR-11)', () => {
     expect(onNavigateIssue).toHaveBeenCalledWith('PAN-4759');
   });
 
+  it('shows a project the scheduler could not list as plain text, not an issue link (PAN-5036)', async () => {
+    stubFetch((url) => (url === '/api/merge-train/auto-merge/pending'
+      ? Response.json({
+        pending: [],
+        notScheduled: [{
+          issueId: 'overdeck', projectKey: 'overdeck', scope: 'project', at: '2026-11-04T15:00:00.000Z',
+          reason: 'PR listing unavailable: the forge read failed, so no PR in this project can be scheduled until it answers',
+        }],
+      })
+      : undefined));
+    renderWithQuery(<PendingAutoMergesCard onNavigateIssue={vi.fn()} />);
+    const row = await screen.findByTestId('not-scheduled-auto-merge-project-overdeck');
+    expect(row).toHaveTextContent('overdeckNot scheduled: PR listing unavailable');
+    expect(screen.queryByRole('button', { name: 'overdeck' })).toBeNull();
+  });
+
   it('still reads a server that answers the bare cooldown queue', async () => {
     stubFetch((url) => (url === '/api/merge-train/auto-merge/pending' ? Response.json([entry()]) : undefined));
     renderWithQuery(<PendingAutoMergesCard />);
