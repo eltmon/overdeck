@@ -4,17 +4,17 @@
     "created": "2026-11-04T03:05:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4933: Agent MCP and bots (W-INJ2): Codex: [mcp_servers.overdeck]",
-    "updated": "2026-11-04T02:59:15.860Z"
+    "updated": "2026-11-04T03:00:53.454Z"
   },
   "plan": {
     "id": "pan-4933",
     "title": "Agent MCP and bots (W-INJ2): Codex: [mcp_servers.overdeck]",
-    "status": "proposed",
+    "status": "running",
     "uid": "95c9fdad-4456-4ac9-b548-83bf280d805e",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-04T03:05:00Z",
-    "updated": "2026-11-04T02:59:15.860Z",
+    "updated": "2026-11-04T03:00:53.454Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4933",
@@ -561,5 +561,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
