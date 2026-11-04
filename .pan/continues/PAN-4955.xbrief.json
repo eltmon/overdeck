@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4955",
   "created": "2026-11-04T14:23:26.498Z",
-  "updated": "2026-11-04T14:38:06.025Z",
+  "updated": "2026-11-04T14:53:02.823Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,10 @@
       "claimedBy": "agent-pan-4955",
       "claimedAt": "2026-11-04T14:33:41.144Z",
       "doneAt": "2026-11-04T14:38:06.025Z"
+    },
+    "manifest.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:53:02.823Z"
     }
   }
 }
