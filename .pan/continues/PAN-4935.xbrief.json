@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4935",
   "created": "2026-11-04T08:09:37.402Z",
-  "updated": "2026-11-04T09:20:23.626Z",
+  "updated": "2026-11-04T09:20:42.403Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -60,6 +60,10 @@
     "instructions-text.ac4": {
       "status": "completed",
       "doneAt": "2026-11-04T09:20:23.626Z"
+    },
+    "mcp-gate-leaf.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:20:42.403Z"
     }
   }
 }
