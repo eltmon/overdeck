@@ -4,17 +4,17 @@
     "created": "2026-11-04T08:02:02Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4935: Agent MCP and bots (W-INJ4): Instructions blocks and the no-MCP fallback",
-    "updated": "2026-11-04T08:08:32.228Z"
+    "updated": "2026-11-04T08:09:22.921Z"
   },
   "plan": {
     "id": "pan-4935",
     "title": "Agent MCP and bots (W-INJ4): Instructions blocks and the no-MCP fallback",
-    "status": "proposed",
+    "status": "running",
     "uid": "6e0cf004-7080-4ca6-acb6-0b223e9c1870",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-04T08:02:02Z",
-    "updated": "2026-11-04T08:08:32.228Z",
+    "updated": "2026-11-04T08:09:22.921Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4935",
@@ -519,5 +519,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
