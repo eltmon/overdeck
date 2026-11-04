@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4941",
   "created": "2026-11-04T02:31:39.368Z",
-  "updated": "2026-11-04T02:31:39.368Z",
+  "updated": "2026-11-04T02:39:33.922Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "store": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4941",
-      "claimedAt": "2026-11-04T02:31:39.368Z"
+      "claimedAt": "2026-11-04T02:31:39.368Z",
+      "doneAt": "2026-11-04T02:39:33.922Z"
     }
   }
 }
