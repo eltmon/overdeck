@@ -1,0 +1,198 @@
+{
+  "version": "1",
+  "issueId": "PAN-4942",
+  "created": "2026-11-04T05:29:28.990Z",
+  "updated": "2026-11-04T06:34:55.077Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "store-machine-link": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4942",
+      "claimedAt": "2026-11-04T05:29:28.990Z",
+      "doneAt": "2026-11-04T05:38:00.955Z"
+    },
+    "self-machine-link-routes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4942",
+      "claimedAt": "2026-11-04T05:38:10.317Z",
+      "doneAt": "2026-11-04T05:42:59.580Z"
+    },
+    "operator-linked-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4942",
+      "claimedAt": "2026-11-04T05:43:05.143Z",
+      "doneAt": "2026-11-04T05:49:20.346Z"
+    },
+    "link-machine-tools": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4942",
+      "claimedAt": "2026-11-04T05:49:25.644Z",
+      "doneAt": "2026-11-04T05:52:53.593Z"
+    },
+    "dialog-store-request-id": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4942",
+      "claimedAt": "2026-11-04T05:52:57.745Z",
+      "doneAt": "2026-11-04T05:56:46.380Z"
+    },
+    "machine-link-card": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4942",
+      "claimedAt": "2026-11-04T05:56:51.187Z",
+      "doneAt": "2026-11-04T06:01:42.268Z"
+    },
+    "dialog-resolves-request": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4942",
+      "claimedAt": "2026-11-04T06:01:48.532Z",
+      "doneAt": "2026-11-04T06:06:37.304Z"
+    },
+    "docs-link-machine": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4942",
+      "claimedAt": "2026-11-04T06:06:43.373Z",
+      "doneAt": "2026-11-04T06:08:25.271Z"
+    },
+    "store-machine-link.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:20:14.529Z"
+    },
+    "store-machine-link.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:20:30.396Z"
+    },
+    "store-machine-link.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:20:44.951Z"
+    },
+    "store-machine-link.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:20:59.514Z"
+    },
+    "store-machine-link.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:21:14.394Z"
+    },
+    "self-machine-link-routes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:21:28.246Z"
+    },
+    "self-machine-link-routes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:21:42.951Z"
+    },
+    "self-machine-link-routes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:21:59.383Z"
+    },
+    "self-machine-link-routes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:22:14.730Z"
+    },
+    "self-machine-link-routes.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:22:29.740Z"
+    },
+    "operator-linked-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:22:45.360Z"
+    },
+    "operator-linked-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:23:01.777Z"
+    },
+    "operator-linked-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:23:17.256Z"
+    },
+    "operator-linked-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:23:32.954Z"
+    },
+    "operator-linked-route.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:23:48.401Z"
+    },
+    "link-machine-tools.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:24:03.433Z"
+    },
+    "link-machine-tools.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:24:18.993Z"
+    },
+    "link-machine-tools.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:24:33.350Z"
+    },
+    "link-machine-tools.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:24:47.729Z"
+    },
+    "dialog-store-request-id.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:25:02.227Z"
+    },
+    "dialog-store-request-id.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:25:17.826Z"
+    },
+    "machine-link-card.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:25:34.197Z"
+    },
+    "machine-link-card.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:25:50.154Z"
+    },
+    "machine-link-card.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:26:05.356Z"
+    },
+    "machine-link-card.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:26:19.824Z"
+    },
+    "machine-link-card.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:26:33.259Z"
+    },
+    "dialog-resolves-request.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:26:47.676Z"
+    },
+    "dialog-resolves-request.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:27:02.170Z"
+    },
+    "dialog-resolves-request.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:27:16.515Z"
+    },
+    "dialog-resolves-request.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:27:30.983Z"
+    },
+    "dialog-resolves-request.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:27:44.512Z"
+    },
+    "docs-link-machine.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:27:57.576Z"
+    },
+    "docs-link-machine.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:28:11.000Z"
+    },
+    "docs-link-machine.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:28:25.063Z"
+    }
+  },
+  "feedback": []
+}

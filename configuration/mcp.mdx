@@ -72,6 +72,8 @@ agent tokens.
 | `watch_pull_request` | Watches a GitHub pull request (`url`); get a message in this conversation when its checks fail or pass, its review changes, it gets merge conflicts, or it is merged or closed. | `tell` (agent tokens only) |
 | `list_pull_request_watches` | Lists your own pull request watches. | `read:state` (agent tokens only) |
 | `unwatch_pull_request` | Stops a watch by its `id` (from `watch_pull_request` or `list_pull_request_watches`). | `tell` (agent tokens only) |
+| `link_machine` | Asks the operator to link a machine the agent was told about, by a `hint` such as "my desk Mac"; answers a `requestId` and `next`, the `link_machine_wait` call to make. | `tell` (agent tokens only) |
+| `link_machine_wait` | Waits up to 50 s. Answers `pending` with `next`, `linked` with `machine` (`environmentId` and `label`), `declined` or `expired`. | `read:state` (agent tokens only) |
 | `memory_add` | Records a curated memory fact by running `pan memory add` in the agent's checkout: `id`, `type` (`feedback`, `project`, `reference`, `user`), a one-line `description`, optional `title`, `body`, `tags` and `store` (`project` by default, `user` for type `user`, or `machine`). A project fact is written uncommitted, so the agent commits `.overdeck/memory/<id>.md`. | `tell` (agent tokens only) |
 | `memory_search` | Searches memory by running `pan memory search --facts`: up to 5 matching facts from the agent's checkout, the operator store and the machine store, each with its file path, then observations from the agent's project (`limit` 1-20, default 10). | `read:state` (agent tokens only) |
 | `delegate_task` | Starts a worker on your own issue to do `task`, here or on `machine`; you are its parent. Optional `harness`, `model`, `effort`, `readOnly`, `name`, `needs`. A caller without an issue gets `delegate_task needs an issue; use start_conversation`. | `operate` |
@@ -119,6 +121,33 @@ of asking in chat, so the value never enters its transcript.
   or the dashboard log. The agent reads the file straight into the program
   that needs it, for example `KEY="$(cat <file>)" some-command`, and never
   prints it.
+
+### Machine links
+
+An agent told to work on a machine that is not linked yet calls
+`link_machine` with the operator's words for it, such as "my desk Mac". It
+never asks for a pairing link in chat, so no pairing code enters its
+transcript.
+
+- The request appears as a **Machine link requested** card in the Decisions
+  panel. Only this machine's own dashboard, opened in a browser on this
+  machine, can answer it. A phone, a paired device or another machine's
+  browser shows "Answer this on <machine>'s own dashboard".
+- **Link a machine…** opens the usual Link a machine dialog. After the link
+  succeeds, the agent's `link_machine_wait` answers `linked` with the new
+  machine's `environmentId` and `label`. The agent passes that label as
+  `machine` to `delegate_task`, `start_worker` or `start_conversation`.
+- **Dismiss** declines the request, and the wait answers `declined`.
+- The agent never sees the pairing link. The label it gets comes from the
+  link itself.
+- Only the card's dialog answers a request. A link made any other way (`pan
+  machines link`, the Machines panel, the SSH or Fly dialogs, or the command
+  palette) does not; dismiss the card instead.
+- A request expires after 24 hours. A dashboard restart forgets every pending
+  request, and the agent must call `link_machine` again.
+- An agent may hold 20 pending requests, secret and machine-link requests
+  together. Asking again with the same hint (ignoring case and outer spaces)
+  answers the pending request.
 
 ### Memory
 

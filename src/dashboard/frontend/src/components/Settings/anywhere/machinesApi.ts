@@ -66,6 +66,18 @@ export async function linkMachine(input: LinkMachineInput): Promise<ApiResult<Ma
   }));
 }
 
+/** PAN-4942: tell the agent that asked which machine was linked. Root sessions only (the route refuses everything else). */
+export async function markAgentRequestLinked(
+  requestId: string,
+  environmentId: string,
+): Promise<ApiResult<{ requestId: string; status: 'linked'; machine: { environmentId: string; label: string } }>> {
+  return readResult(await fetch(`/api/agent-requests/${encodeURIComponent(requestId)}/linked`, {
+    method: 'POST',
+    headers: await dashboardMutationJsonHeaders(),
+    body: JSON.stringify({ environmentId }),
+  }));
+}
+
 export interface AddFlyMachineResponse {
   link: MachineLinkView;
   record: { label: string; appName: string; region: string; docker: boolean };

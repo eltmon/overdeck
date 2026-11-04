@@ -43,6 +43,8 @@ const SINGLE_ROUTE_PATHS: Record<string, { method: string; path: string }> = {
   watch_pull_request: { method: 'POST', path: '/api/self/pull-request-watches' },
   list_pull_request_watches: { method: 'GET', path: '/api/self/pull-request-watches' },
   unwatch_pull_request: { method: 'DELETE', path: '/api/self/pull-request-watches/abc' },
+  link_machine: { method: 'POST', path: '/api/self/machine-link-requests' },
+  link_machine_wait: { method: 'GET', path: '/api/self/machine-link-requests/abc/wait' },
   memory_add: { method: 'POST', path: '/api/self/memory/facts' },
   memory_search: { method: 'POST', path: '/api/self/memory/search' },
 };
