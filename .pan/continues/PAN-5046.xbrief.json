@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5046",
   "created": "2026-11-04T18:10:57.891Z",
-  "updated": "2026-11-04T18:50:45.481Z",
+  "updated": "2026-11-04T18:51:00.636Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -138,6 +138,10 @@
     "shell-link-recovery.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T18:50:45.481Z"
+    },
+    "shell-link-recovery.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:51:00.636Z"
     }
   }
 }
