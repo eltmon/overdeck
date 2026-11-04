@@ -137,6 +137,7 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'GET', path: '/api/self/workers/:id', scope: 'read:state' },
   { method: 'POST', path: '/api/self/lanes', scope: 'operate' },
   { method: 'POST', path: '/api/self/lanes/wait', scope: 'read:state' },
+  { method: 'POST', path: '/api/self/lanes/report', scope: 'tell' },
   // PAN-4650 WI-9: the owner's half of Pull here (a linked machine's operator only, checked by the routes).
   { method: 'POST', path: '/api/conversations/:name/release', scope: 'operate' },
   { method: 'GET', path: '/api/conversations/:name/release/transfer/:transferId', scope: 'operate' },

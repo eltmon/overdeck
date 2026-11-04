@@ -14,6 +14,7 @@ const ROUTES: Record<string, { method: string; path: string }> = {
   lane_status: { method: 'GET', path: '/api/lanes/abc-builder-1' },
   lane_stop: { method: 'POST', path: '/api/lanes/abc-builder-1/stop' },
   lane_wait: { method: 'POST', path: '/api/self/lanes/wait' },
+  lane_report: { method: 'POST', path: '/api/self/lanes/report' },
 };
 
 describe('MCP lane tools (PAN-4938 W-DEL1)', () => {
@@ -72,5 +73,13 @@ describe('MCP lane tools (PAN-4938 W-DEL1)', () => {
       { method: 'POST', path: '/api/self/lanes/wait', body: { timeoutMs: 50_000, run: 'r', after: '1.a.1' } },
       { method: 'POST', path: '/api/self/lanes/wait', body: { timeoutMs: 50_000 } },
     ]);
+  });
+
+  it('lane_report posts the report, status, verdict and defects', async () => {
+    const api = fakeApi({ 'POST /api/self/lanes/report': { status: 200, json: { status: 'done', exitCode: 0 } } });
+    const client = await connectClient(api, SCOPES, true);
+    expect(resultJson(await callTool(client, 'lane_report', { report: '# Verdict', verdict: 'DEFECTS', defects: 3 }))).toEqual({ status: 'done', exitCode: 0 });
+    expect(api.calls).toEqual([{ method: 'POST', path: '/api/self/lanes/report', body: { report: '# Verdict', verdict: 'DEFECTS', defects: 3 } }]);
+    expect((await callTool(client, 'lane_report', { report: 'r', defects: -1 })).isError).toBe(true);
   });
 });

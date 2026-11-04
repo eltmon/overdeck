@@ -16,6 +16,12 @@
  *   agent-kind caller without `run` gets 409 `not-a-conversation`; a malformed
  *   cursor is 400 `bad-cursor`. A cancelled request keeps polling until its
  *   deadline: `waitForLaneSet` takes no signal (bounded by 50 s).
+ * - `POST /api/self/lanes/report { report, status?, verdict?, defects? }`
+ *   (`tell`, D-12) → the existing `lane-report` self job, `pan lane report
+ *   --status=<s> --stdin [--verdict=<v>] [--defects=<n>]` with the report on
+ *   stdin, waited on for up to 50 s; answers `selfJobAnswer` (a job still
+ *   running names `wait_job` as `next`). Only a lane conversation may report:
+ *   any other caller gets 409 `not-a-lane`.
  *
  * Auth: the route-scope table judges the scope; the handler then requires an
  * agent token (`self-caller.ts`), so every other credential gets 403
@@ -25,12 +31,16 @@
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
+import { isLaneVerdict, isWorkerReportStatus, MAX_WORKER_REPORT_BYTES } from '../../../lib/agents/worker/report.js';
 import { waitForLaneSet } from '../../../lib/lanes/wait.js';
 import { listLaneViews, type LaneView, type LaneViewFilter } from '../../../lib/lanes/views.js';
 import { WAIT_CHUNK_MS } from '../../../lib/mcp/tool.js';
+import { getConversationByName } from '../../../lib/overdeck/conversations.js';
 import { channelOfRequest } from '../channel-peer.js';
 import { jsonResponse } from '../http-helpers.js';
 import { type SelfCallerDeps, selfCallerFromCredential } from '../self-caller.js';
+import type { SelfJobArg } from '../services/self-job-argv.js';
+import { selfJobAnswer, selfJobs, type SelfJobs } from '../services/self-jobs.js';
 import { type DashboardCredential, resolveRequestCredential } from './dashboard-auth.js';
 import { fleetCaller } from './fleet-work.js';
 import { httpHandler } from './http-handler.js';
@@ -137,6 +147,54 @@ export async function handleSelfLaneWait(credential: DashboardCredential | null,
   };
 }
 
+export const NOT_A_LANE = { code: 'not-a-lane', error: 'lane_report runs only inside a lane conversation' } as const;
+
+export interface SelfLaneReportDeps {
+  caller?: SelfCallerDeps;
+  jobs?: SelfJobs;
+  laneOf?: (name: string) => { laneKey: string | null } | null;
+}
+
+/** `POST /api/self/lanes/report`. */
+export async function handleSelfLaneReport(
+  credential: DashboardCredential | null,
+  raw: unknown,
+  signal?: AbortSignal,
+  deps: SelfLaneReportDeps = {},
+): Promise<SelfRouteResult> {
+  const resolved = selfCallerFromCredential(credential, deps.caller);
+  if (!resolved.ok) return { status: resolved.status, body: resolved.body };
+  const { caller } = resolved;
+  if (caller.agentKind !== 'conversation' || !(deps.laneOf ?? getConversationByName)(caller.agentId)?.laneKey) return { status: 409, body: NOT_A_LANE };
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return { status: 400, body: { error: 'body must be a JSON object' } };
+  const input = raw as Record<string, unknown>;
+  const report = input['report'];
+  if (typeof report !== 'string' || !report.trim()) return { status: 400, body: { error: 'report is required' } };
+  if (Buffer.byteLength(report, 'utf8') > MAX_WORKER_REPORT_BYTES) {
+    return { status: 400, body: { error: `report is larger than ${MAX_WORKER_REPORT_BYTES} bytes; write a summary and point at files instead` } };
+  }
+  const status = input['status'] ?? 'done';
+  if (!isWorkerReportStatus(status)) return { status: 400, body: { error: 'status must be done, blocked or failed' } };
+  const verdict = input['verdict'];
+  if (verdict !== undefined && !isLaneVerdict(verdict)) return { status: 400, body: { error: 'verdict must be WOWED, IMPRESSED, NOT_YET, PASS or DEFECTS' } };
+  const defects = input['defects'];
+  if (defects !== undefined && (typeof defects !== 'number' || !Number.isInteger(defects) || defects < 0)) {
+    return { status: 400, body: { error: 'defects must be a non-negative integer' } };
+  }
+  const args: SelfJobArg[] = [
+    { flag: 'status', value: status },
+    { switch: 'stdin' },
+    ...(verdict !== undefined ? [{ flag: 'verdict', value: verdict }] : []),
+    ...(defects !== undefined ? [{ flag: 'defects', value: String(defects) }] : []),
+  ];
+  const jobs = deps.jobs ?? selfJobs;
+  const started = jobs.start(caller, 'lane-report', args, { stdin: report });
+  if (!started.ok) return { status: 429, body: { code: started.code, error: started.error } };
+  const state = await jobs.wait(started.jobId, caller, WAIT_CHUNK_MS, signal);
+  // The job was started for this caller a moment ago, so the store holds it.
+  return { status: 200, body: selfJobAnswer(state!) };
+}
+
 /** The JSON body of a request; `undefined` when it is not JSON. */
 const readJsonBody = (request: HttpServerRequest.HttpServerRequest) => Effect.gen(function* () {
   const text = yield* request.text;
@@ -179,7 +237,22 @@ export function makeSelfLanesRouteLayer() {
     })),
   );
 
-  return Layer.mergeAll(startSelfLaneRoute, waitSelfLanesRoute);
+  const reportSelfLaneRoute = HttpRouter.add(
+    'POST',
+    '/api/self/lanes/report',
+    httpHandler(Effect.gen(function* () {
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      const originCheck = validateOrigin(request);
+      if (!originCheck.ok) return jsonResponse({ error: originCheck.error }, { status: 403 });
+      const body = yield* readJsonBody(request);
+      if (body === undefined) return jsonResponse({ error: 'body must be JSON' }, { status: 400 });
+      const credential = resolveRequestCredential(request);
+      const result = yield* Effect.promise((signal) => handleSelfLaneReport(credential, body, signal));
+      return jsonResponse(result.body, { status: result.status });
+    })),
+  );
+
+  return Layer.mergeAll(startSelfLaneRoute, waitSelfLanesRoute, reportSelfLaneRoute);
 }
 
 export const selfLanesRouteLayer = makeSelfLanesRouteLayer();

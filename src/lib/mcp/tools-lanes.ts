@@ -3,10 +3,11 @@
  * launches a gauntlet lane under the calling conversation through
  * `POST /api/self/lanes`, which takes the parent from the agent token; the
  * tool sends no parent and no CPU-pressure `force`. `lane_status` and
- * `lane_stop` call the lane routes.
+ * `lane_stop` call the lane routes; `lane_wait` and `lane_report` call the
+ * self lane routes (D-12).
  */
 import { MACHINE_PROPERTY, NEEDS_PROPERTY } from './tools-write.js';
-import { optionalString, type OverdeckTool, requiredString, routeResult, WAIT_CHUNK_MS } from './tool.js';
+import { optionalInteger, optionalString, type OverdeckTool, requiredString, routeResult, WAIT_CHUNK_MS } from './tool.js';
 
 const LANE_PROPERTY = { type: 'string', description: 'The lane conversation name.' } as const;
 
@@ -98,4 +99,35 @@ const laneWait: OverdeckTool = {
   },
 };
 
-export const LANE_TOOLS: readonly OverdeckTool[] = [laneStart, laneStatus, laneStop, laneWait];
+const laneReport: OverdeckTool = {
+  name: 'lane_report',
+  description: 'File this lane\'s report (Markdown). A critic or verifier\'s done report needs a verdict. A builder\'s done report needs a clean, pushed tree.',
+  scope: 'tell',
+  audience: 'agent',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      report: { type: 'string', description: 'The report, in Markdown.' },
+      status: { type: 'string', enum: ['done', 'blocked', 'failed'], description: 'Default done.' },
+      verdict: { type: 'string', enum: ['WOWED', 'IMPRESSED', 'NOT_YET', 'PASS', 'DEFECTS'], description: 'A critic or verifier\'s verdict.' },
+      defects: { type: 'integer', minimum: 0, description: 'With verdict DEFECTS: how many defects.' },
+    },
+    required: ['report'],
+  },
+  async run(args, ctx) {
+    const report = requiredString(args, 'report');
+    if (!report.ok) return report.error;
+    const body: Record<string, unknown> = { report: report.value };
+    for (const field of ['status', 'verdict']) {
+      const value = optionalString(args, field);
+      if (!value.ok) return value.error;
+      if (value.value !== undefined) body[field] = value.value;
+    }
+    const defects = optionalInteger(args, 'defects', 0, 1_000_000, undefined);
+    if (!defects.ok) return defects.error;
+    if (defects.value !== undefined) body['defects'] = defects.value;
+    return routeResult(await ctx.api.request('POST', '/api/self/lanes/report', body));
+  },
+};
+
+export const LANE_TOOLS: readonly OverdeckTool[] = [laneStart, laneStatus, laneStop, laneWait, laneReport];

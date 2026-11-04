@@ -13,7 +13,8 @@ import { jsonResponse } from '../http-helpers.js';
 import type { SelfCallerDeps } from '../self-caller.js';
 import type { DashboardCredential } from '../routes/dashboard-auth.js';
 import type { FleetCaller } from '../routes/fleet-work.js';
-import { handleSelfLaneStart, handleSelfLaneWait, NOT_A_CONVERSATION } from '../routes/self-lanes.js';
+import { handleSelfLaneReport, handleSelfLaneStart, handleSelfLaneWait, NOT_A_CONVERSATION, NOT_A_LANE } from '../routes/self-lanes.js';
+import { createSelfJobs, type SelfJobRunInput, type SelfJobRunResult } from '../services/self-jobs.js';
 
 const AGENT_TOKEN: DashboardCredential = { kind: 'token', tokenId: 't', scopes: ['operate'], agentId: 'agent-pan-1', agentKind: 'agent', role: 'work' };
 const CONVERSATION_TOKEN: DashboardCredential = { kind: 'token', tokenId: 't', scopes: ['operate'], agentId: 'abc', agentKind: 'conversation', role: 'conversation' };
@@ -123,5 +124,56 @@ describe('POST /api/self/lanes/wait (PAN-4938 D-12)', () => {
     const { deps } = setup([BUILDER], () => []);
     expect(await handleSelfLaneWait(CONVERSATION_TOKEN, { after: 'nonsense' }, deps)).toMatchObject({ status: 400, body: { code: 'bad-cursor' } });
     expect(await handleSelfLaneWait(CONVERSATION_TOKEN, { timeoutMs: 50_001 }, deps)).toMatchObject({ status: 400, body: { code: 'bad-timeout' } });
+  });
+});
+
+describe('POST /api/self/lanes/report (PAN-4938 D-12)', () => {
+  const laneOf = (name: string) => (name === 'abc' ? { laneKey: 'k' } : { laneKey: null });
+
+  function finishedJobs(result: Partial<SelfJobRunResult> = {}) {
+    const calls: SelfJobRunInput[] = [];
+    let next = 0;
+    const jobs = createSelfJobs({
+      runner: async (input) => {
+        calls.push(input);
+        return { exitCode: 0, signal: null, timedOut: false, stdout: 'Reported.', stderr: '', error: null, ...result };
+      },
+      newId: () => `job-${++next}`,
+    });
+    return { jobs, calls };
+  }
+
+  it('a non-lane conversation and an agent get 409 not-a-lane', async () => {
+    const { jobs, calls } = finishedJobs();
+    const notLane = (name: string) => ({ laneKey: name === 'never' ? 'k' : null });
+    expect(await handleSelfLaneReport(CONVERSATION_TOKEN, { report: 'r' }, undefined, { caller: callerDeps, jobs, laneOf: notLane })).toEqual({ status: 409, body: NOT_A_LANE });
+    expect(await handleSelfLaneReport(AGENT_TOKEN, { report: 'r' }, undefined, { caller: callerDeps, jobs, laneOf })).toEqual({ status: 409, body: NOT_A_LANE });
+    expect(calls).toEqual([]);
+  });
+
+  it('runs pan lane report --status=done --stdin with the report on stdin and answers done with the exit code', async () => {
+    const { jobs, calls } = finishedJobs();
+    const result = await handleSelfLaneReport(CONVERSATION_TOKEN, { report: '# Built' }, undefined, { caller: callerDeps, jobs, laneOf });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.args.slice(-4)).toEqual(['lane', 'report', '--status=done', '--stdin']);
+    expect(calls[0]!.stdin).toBe('# Built');
+    expect(calls[0]!.env.OVERDECK_CONVERSATION).toBe('conv-abc');
+    expect(result).toMatchObject({ status: 200, body: { status: 'done', verb: 'lane-report', exitCode: 0, stdout: 'Reported.' } });
+  });
+
+  it('adds --verdict and --defects when given', async () => {
+    const { jobs, calls } = finishedJobs();
+    await handleSelfLaneReport(CONVERSATION_TOKEN, { report: 'r', status: 'done', verdict: 'PASS', defects: 2 }, undefined, { caller: callerDeps, jobs, laneOf });
+    expect(calls[0]!.args.slice(-6)).toEqual(['lane', 'report', '--status=done', '--stdin', '--verdict=PASS', '--defects=2']);
+  });
+
+  it('refuses an unknown verdict, negative defects, an unknown status and an empty report with 400', async () => {
+    const { jobs, calls } = finishedJobs();
+    const deps = { caller: callerDeps, jobs, laneOf };
+    expect((await handleSelfLaneReport(CONVERSATION_TOKEN, { report: 'r', verdict: 'GREAT' }, undefined, deps)).status).toBe(400);
+    expect((await handleSelfLaneReport(CONVERSATION_TOKEN, { report: 'r', defects: -1 }, undefined, deps)).status).toBe(400);
+    expect((await handleSelfLaneReport(CONVERSATION_TOKEN, { report: 'r', status: 'finished' }, undefined, deps)).status).toBe(400);
+    expect((await handleSelfLaneReport(CONVERSATION_TOKEN, { report: '' }, undefined, deps)).status).toBe(400);
+    expect(calls).toEqual([]);
   });
 });
