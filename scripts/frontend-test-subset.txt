@@ -60,6 +60,7 @@ src/components/Settings/anywhere/__tests__/CompareSettingsDialog.test.tsx
 src/components/Settings/anywhere/__tests__/ConnectBotDialog.test.tsx
 src/components/Settings/anywhere/__tests__/DevicesPanel.test.tsx
 src/components/Settings/anywhere/__tests__/DirectoryPanel.test.tsx
+src/components/Settings/anywhere/__tests__/LinkMachineDialog.test.tsx
 src/components/Settings/anywhere/__tests__/FleetVersionsPanel.test.tsx
 src/components/Settings/anywhere/__tests__/MachinesPanel.load.test.tsx
 src/components/Settings/anywhere/__tests__/MachinesPanel.test.tsx
@@ -89,6 +90,7 @@ src/components/Stage/cockpit/IssueMissionControl.render-count.test.tsx
 src/components/Stage/launcherFocusStore.test.ts
 src/components/Stage/panes/EditorPane.test.tsx
 src/components/XTerminal.test.tsx
+src/components/__tests__/AgentRequestCard.test.tsx
 src/components/__tests__/AskUserQuestionDialog.test.tsx
 src/components/__tests__/DecisionsPanel.test.tsx
 src/components/__tests__/DegradedModeBanner.test.tsx

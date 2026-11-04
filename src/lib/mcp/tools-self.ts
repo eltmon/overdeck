@@ -7,7 +7,10 @@
  * route and passes the job answer through. `request_secret` and
  * `secret_wait` (PAN-4941 W-SEC1) ask the operator for a secret through the
  * dashboard and wait for the answer: the value lands in a 0600 file and
- * never passes through a tool argument or result. `memory_add` and
+ * never passes through a tool argument or result. `link_machine` and
+ * `link_machine_wait` (PAN-4942 W-LINK1) ask the operator to link a machine
+ * through a dashboard card and wait for the linked machine's label: no
+ * pairing code or link ever reaches the agent. `memory_add` and
  * `memory_search` (PAN-4940 W-MEM1) run `pan memory add` and `pan memory
  * search --facts` as jobs.
  */
@@ -204,6 +207,42 @@ const secretWait: OverdeckTool = {
   },
 };
 
+const linkMachine: OverdeckTool = {
+  name: 'link_machine',
+  description:
+    'Ask the operator to link another machine to this Overdeck, when they name a machine that is not linked yet. hint (1 to 200 characters) is how they named it, for example "my desk Mac". The dashboard shows a card; the operator links the machine through that card\'s Link a machine… button. You never see or handle a pairing code or link: never ask the operator for one. Then call next (link_machine_wait).',
+  scope: 'tell',
+  audience: 'agent',
+  inputSchema: {
+    type: 'object',
+    properties: { hint: { type: 'string', maxLength: 200, description: 'The operator\'s words for the machine.' } },
+    required: ['hint'],
+  },
+  async run(args, ctx) {
+    const hint = requiredString(args, 'hint');
+    if (!hint.ok) return hint.error;
+    return routeResult(await ctx.api.request('POST', '/api/self/machine-link-requests', { hint: hint.value }));
+  },
+};
+
+const linkMachineWait: OverdeckTool = {
+  name: 'link_machine_wait',
+  description:
+    'Wait up to 50 s for the operator to link the machine a link_machine call asked for. Answers status "pending" with next: call next again, never sleep or poll. On "linked" it answers machine { environmentId, label }: pass the label as machine to delegate_task, start_worker or start_conversation. "declined" or "expired" means no machine was linked for you. An unknown request (HTTP 404) means the dashboard restarted: call link_machine again.',
+  scope: 'read:state',
+  audience: 'agent',
+  inputSchema: {
+    type: 'object',
+    properties: { requestId: { type: 'string', description: 'The requestId link_machine returned.' } },
+    required: ['requestId'],
+  },
+  async run(args, ctx) {
+    const requestId = requiredString(args, 'requestId');
+    if (!requestId.ok) return requestId.error;
+    return routeResult(await ctx.api.request('GET', `/api/self/machine-link-requests/${encodeURIComponent(requestId.value)}/wait?timeoutMs=${WAIT_CHUNK_MS}`));
+  },
+};
+
 const memoryAdd: OverdeckTool = {
   name: 'memory_add',
   description:
@@ -288,6 +327,8 @@ export const SELF_TOOLS: readonly OverdeckTool[] = [
   workerReport,
   requestSecret,
   secretWait,
+  linkMachine,
+  linkMachineWait,
   memoryAdd,
   memorySearch,
 ];

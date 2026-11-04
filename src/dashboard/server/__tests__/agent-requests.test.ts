@@ -1,6 +1,7 @@
 /**
  * PAN-4927 W-SEC1 WI-1: the in-memory agent request store, its lazy expiry
- * and bounded waits, and the 0600 secret file writer.
+ * and bounded waits, and the 0600 secret file writer. PAN-4942 W-LINK1 WI-1:
+ * the machine-link kind.
  */
 import { chmod, mkdir, mkdtemp, readdir, readFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -14,6 +15,7 @@ import {
   agentRequestOwnerDir,
   createAgentRequests,
   ENDED_REQUEST_TTL_MS,
+  MACHINE_LINK_REQUEST_TIMEOUT_MS,
   SECRET_REQUEST_DEFAULT_TIMEOUT_MS,
   writeAgentSecretFile,
 } from '../services/agent-requests.js';
@@ -227,6 +229,104 @@ describe('agent requests', () => {
     if (!result.ok) throw new Error('create failed');
     result.request.status = 'delivered';
     expect(store.getForCaller(result.request.id, agent)?.status).toBe('pending');
+  });
+});
+
+describe('machine-link requests', () => {
+  const label = 'agent-pan-1 · PAN-1';
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(START_MS);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('creates a pending request with the trimmed hint that expires 24 h later', () => {
+    const store = createAgentRequests();
+    const result = store.createMachineLink(agent, { hint: '  my desk Mac ', label });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.created).toBe(true);
+    expect(result.request.id).toMatch(/^[0-9a-f]{32}$/);
+    expect(result.request).toMatchObject({
+      kind: 'machine-link',
+      agentId: 'agent-pan-1',
+      agentKind: 'agent',
+      label,
+      hint: 'my desk Mac',
+      status: 'pending',
+      endedAt: null,
+      createdAt: new Date(START_MS).toISOString(),
+      expiresAt: new Date(START_MS + MACHINE_LINK_REQUEST_TIMEOUT_MS).toISOString(),
+    });
+    expect(Date.parse(result.request.expiresAt) - Date.parse(result.request.createdAt)).toBe(24 * 60 * 60_000);
+    expect(result.request).not.toHaveProperty('name');
+    expect(result.request).not.toHaveProperty('prompt');
+  });
+
+  it('answers the pending request again for the same hint in another case, and makes a new one for another hint', () => {
+    const store = createAgentRequests({ newId: hexIds() });
+    const first = store.createMachineLink(agent, { hint: '  my desk Mac ', label });
+    const again = store.createMachineLink(agent, { hint: 'MY DESK MAC', label });
+    const different = store.createMachineLink(agent, { hint: 'build box', label });
+    if (!first.ok || !again.ok || !different.ok) throw new Error('create failed');
+    expect(again.created).toBe(false);
+    expect(again.request.id).toBe(first.request.id);
+    expect(different.created).toBe(true);
+    expect(different.request.id).not.toBe(first.request.id);
+    // Another owner with the same hint gets its own request.
+    const otherOwner = store.createMachineLink(other, { hint: 'my desk Mac', label });
+    expect(otherOwner).toMatchObject({ ok: true, created: true });
+    expect(store.listPending()).toHaveLength(3);
+  });
+
+  it('shares the limit of 20 pending requests with secret requests', () => {
+    const store = createAgentRequests({ newId: hexIds() });
+    for (let i = 0; i < AGENT_REQUEST_PENDING_LIMIT - 1; i += 1) {
+      expect(store.createSecret(agent, ask(`KEY_${i}`)).ok).toBe(true);
+    }
+    expect(store.createMachineLink(agent, { hint: 'desk', label })).toMatchObject({ ok: true, created: true });
+    expect(store.createMachineLink(agent, { hint: 'build box', label })).toEqual({ ok: false, code: 'too-many-requests' });
+    expect(store.createSecret(agent, ask('KEY_EXTRA'))).toEqual({ ok: false, code: 'too-many-requests' });
+    // A repeated hint at the limit still answers the existing request.
+    expect(store.createMachineLink(agent, { hint: 'DESK', label })).toMatchObject({ ok: true, created: false });
+  });
+
+  it('resolves a running wait as linked with the machine, and returns a copy of the machine', async () => {
+    const store = createAgentRequests();
+    const result = store.createMachineLink(agent, { hint: 'desk', label });
+    if (!result.ok) throw new Error('create failed');
+    const waiting = store.wait(result.request.id, agent, 50_000);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(store.settle(result.request.id, 'linked', { machine: { environmentId: 'env-1', label: 'desk' } })).toBe(true);
+    await vi.advanceTimersByTimeAsync(0);
+    const view = await waiting;
+    expect(view).toMatchObject({ status: 'linked', result: { machine: { environmentId: 'env-1', label: 'desk' } } });
+    view!.result!.machine!.label = 'changed';
+    expect(store.getForCaller(result.request.id, agent)?.result?.machine).toEqual({ environmentId: 'env-1', label: 'desk' });
+  });
+
+  it('keeps the settled machine apart from the object the caller passed', () => {
+    const store = createAgentRequests();
+    const result = store.createMachineLink(agent, { hint: 'desk', label });
+    if (!result.ok) throw new Error('create failed');
+    const machine = { environmentId: 'env-1', label: 'desk' };
+    store.settle(result.request.id, 'linked', { machine });
+    machine.label = 'changed';
+    expect(store.getForCaller(result.request.id, agent)?.result?.machine?.label).toBe('desk');
+  });
+
+  it('expires after 24 h', async () => {
+    const store = createAgentRequests();
+    const result = store.createMachineLink(agent, { hint: 'desk', label });
+    if (!result.ok) throw new Error('create failed');
+    await vi.advanceTimersByTimeAsync(MACHINE_LINK_REQUEST_TIMEOUT_MS - 1);
+    expect(store.getForCaller(result.request.id, agent)?.status).toBe('pending');
+    await vi.advanceTimersByTimeAsync(1);
+    expect(store.getForCaller(result.request.id, agent)?.status).toBe('expired');
+    expect(store.listPending()).toEqual([]);
   });
 });
 

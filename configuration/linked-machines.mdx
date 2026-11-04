@@ -40,6 +40,11 @@ tokens, and the new link shows up as **Online** on both sides.
 Both servers on one host (for a test) need `--allow-loopback`, because a `localhost`
 pairing link only works on the machine that printed it.
 
+An agent can ask you for a link. Its `link_machine` tool shows a **Machine link
+requested** card in the Decisions panel, and the card's **Link a machine…** button
+opens this dialog. After the link succeeds, the agent learns the new machine's label,
+never the pairing link. See [Machine links](/configuration/mcp#machine-links).
+
 ## SSH machines
 
 A machine that this one reaches only over SSH (a VPS, a lab box behind a bastion) can be
