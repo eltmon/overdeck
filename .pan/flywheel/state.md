@@ -612,3 +612,9 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
 - `pan handoff self` fails in conv-flywheel ("Could not determine the current conversation"); pass the conversation id (3399) instead.
 - Landed 2026-11-04: PR #4994 merged. `evaluateReviewConvergence` now judges only the rounds after the last 0-blocker round; the operator message still shows the full series.
 - Learning: a handoff worktree must not run `pan review request` right after `gh pr create`. The PR-opened webhook already adopts the branch, and the request races it: verification merged main into the half-adopted workspace and adoption refused with `workspace-head-mismatch` (false needs-you; self-healed when verification passed and pushed). Filed PAN-4995.
+
+## 2026-11-04 — Phone app store setup released; connect Worker deployed
+
+- Operator released PAN-4841 (store, Firebase, APNs, directory setup) to the pipeline, overriding the earlier "orchestrator-driven" hold. PAN-4842 (docs) is still held.
+- The operator already has Apple Developer Program membership and a Google Play developer account. Mind Your Now (`~/Projects/myn`) is the reference setup for Firebase push, the Android upload keystore (`release-secrets/android/`) and signed builds. Overdeck gets its own Firebase project, never MYN's service account.
+- Operator ran the connect and account Worker deploys (wrangler had been waiting on the D1 migration confirmation). That unblocked PAN-4950, which is started; PAN-4953/4954/4955 follow it.
