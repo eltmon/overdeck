@@ -14,11 +14,14 @@
  * stdout carries only JSON-RPC (NFR-6); every diagnostic goes to stderr.
  *
  * `src/cli/index.ts` imports this module at startup to register the verb, so
- * it imports only Commander types statically. Everything else loads inside
- * the handler.
+ * it imports only Commander types and `./mcp-oauth.js` (`pan mcp oauth`,
+ * PAN-4945, itself type-only at load) statically. Everything else loads
+ * inside the handler.
  */
 import type { Readable, Writable } from 'node:stream';
 import type { Command } from 'commander';
+
+import { registerMcpOAuthCommands } from './mcp-oauth.js';
 
 export interface McpServeDeps {
   env: NodeJS.ProcessEnv;
@@ -129,4 +132,5 @@ export function registerMcpCommands(program: Command): void {
       const { exitCli } = await import('../exit.js');
       await exitCli(code);
     });
+  registerMcpOAuthCommands(mcp);
 }

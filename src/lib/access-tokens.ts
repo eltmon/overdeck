@@ -39,6 +39,10 @@
  * agent id or a conversation name), `agentKind` and `role`. Those fields are
  * valid only on `kind: 'token'` and only all together; on any other kind they
  * make the file corrupt. An agent token never carries `admin` or `forward`.
+ * An OAuth token (PAN-4945) is a `token` record with `oauthClientId`,
+ * `oauthFamilyId` and `expiresAt`, under the same all-or-none rule and never
+ * with the agent fields; it stops verifying at `expiresAt` and never carries
+ * `admin`, `forward`, `read:settings`, `read:costs` or `read:events`.
  * A CLI process has an empty snapshot, so `readActiveAccessTokenRecord`,
  * `revokeAccessTokensMatching` and `pruneEndedAccessTokens` read the file fresh.
  *
@@ -75,6 +79,8 @@ import {
   isMachineAccess,
   isRecord,
   MACHINE_ACCESS_LEVELS,
+  OAUTH_REFRESH_WINDOW_MS,
+  oauthFieldsValid,
   MACHINE_KEY_HEX,
   UUID_V4,
 } from './access-token-records.js';
@@ -335,7 +341,13 @@ export interface CreateAccessTokenInput {
   agentKind?: 'agent' | 'conversation';
   /** `token` only: the agent's role, or 'conversation'. */
   role?: string;
+  /** `token` only (PAN-4945), all three or none: the OAuth client, its sign-in (family) and the expiry (ISO 8601). */
+  oauthClientId?: string;
+  oauthFamilyId?: string;
+  expiresAt?: string;
 }
+
+const OAUTH_FORBIDDEN_SCOPES: readonly AccessTokenScope[] = ['admin', 'forward', 'read:settings', 'read:costs', 'read:events'];
 
 export async function createAccessToken(input: CreateAccessTokenInput): Promise<{ token: string; record: PublicAccessTokenRecord }> {
   const name = typeof input.name === 'string' ? input.name.trim() : '';
@@ -419,6 +431,14 @@ export async function createAccessToken(input: CreateAccessTokenInput): Promise<
     }
     agent = { agentId: input.agentId, agentKind: input.agentKind, role: input.role };
   }
+  const oauth = input.oauthClientId !== undefined || input.oauthFamilyId !== undefined || input.expiresAt !== undefined;
+  if (oauth) {
+    if (input.kind !== 'token' || agent.agentId !== undefined) throw new Error('oauthClientId, oauthFamilyId and expiresAt belong to kind: token only, never with agent fields');
+    if (!oauthFieldsValid(input)) throw new Error('An OAuth token needs oauthClientId, oauthFamilyId and expiresAt');
+    if (scopes.some((scope) => OAUTH_FORBIDDEN_SCOPES.includes(scope))) {
+      throw new Error('An OAuth token never carries admin, forward, read:settings, read:costs or read:events (PAN-4945)');
+    }
+  }
   const token = `${ACCESS_TOKEN_PREFIX}${randomBytes(32).toString('hex')}`;
   const record: AccessTokenRecord = {
     id: randomUUID(),
@@ -430,15 +450,22 @@ export async function createAccessToken(input: CreateAccessTokenInput): Promise<
     ...(input.kind ? { kind: input.kind } : {}),
     ...binding,
     ...agent,
+    ...(oauth ? { oauthClientId: input.oauthClientId, oauthFamilyId: input.oauthFamilyId, expiresAt: input.expiresAt } : {}),
   };
   await mutate((records) => ({ records: [...records, record], result: undefined }));
   return { token, record: toPublic(record) };
 }
 
-/** Active (not revoked) records of one kind, from the in-memory snapshot. */
+/** Not revoked and, for an OAuth token, not past `expiresAt`. */
+function isLive(record: AccessTokenRecord, now: number): boolean {
+  return !record.revokedAt && !(record.expiresAt !== undefined && Date.parse(record.expiresAt) <= now);
+}
+
+/** Active (not revoked, not expired) records of one kind, from the in-memory snapshot. */
 export function listActiveRecordsOfKind(kind: AccessTokenKind): PublicAccessTokenRecord[] {
+  const now = Date.now();
   return snapshot.records
-    .filter((record) => !record.revokedAt && (record.kind ?? 'device') === kind)
+    .filter((record) => isLive(record, now) && (record.kind ?? 'device') === kind)
     .map(toPublic);
 }
 
@@ -512,12 +539,19 @@ export async function revokeAccessTokensMatching(match: (record: PublicAccessTok
   return revoked.map(toPublic);
 }
 
-/** Remove records with `agentId` whose `revokedAt` is older than `olderThanMs` before `now`. Never removes a record without `agentId`. Returns the count removed. */
+/**
+ * Remove records that ended more than `olderThanMs` before `now`: agent tokens at `revokedAt`; OAuth tokens (PAN-4945)
+ * at `expiresAt`, or when revoked at `revokedAt` + the 90-day refresh window, so a refresh still sees a revocation (D-8.6).
+ * Never removes any other record. Returns the count removed. */
 export async function pruneEndedAccessTokens(olderThanMs: number, now = Date.now()): Promise<number> {
   return mutate((records) => {
-    const kept = records.filter(
-      (record) => !(record.agentId !== undefined && record.revokedAt !== undefined && now - Date.parse(record.revokedAt) > olderThanMs),
-    );
+    const kept = records.filter((record) => {
+      // NaN (a record that never ends) fails the comparison and is kept.
+      const revoked = record.revokedAt !== undefined ? Date.parse(record.revokedAt) : NaN;
+      const ended = record.oauthClientId === undefined ? (record.agentId !== undefined ? revoked : NaN)
+        : record.revokedAt !== undefined ? revoked + OAUTH_REFRESH_WINDOW_MS : Date.parse(record.expiresAt!);
+      return !(now - ended > olderThanMs);
+    });
     const removed = records.length - kept.length;
     return removed === 0 ? { records, result: 0, write: false } : { records: kept, result: removed };
   });
@@ -555,15 +589,16 @@ function recordLastUsed(record: AccessTokenRecord): void {
 
 /**
  * Check a presented token against the snapshot. Synchronous and constant-time
- * per record. A revoked token, an unknown token, or a corrupt registry fails.
+ * per record. A revoked or expired token, an unknown token, or a corrupt registry fails.
  */
 export function verifyAccessToken(presented: string | null | undefined): VerifyAccessTokenResult {
   if (!presented || !presented.startsWith(ACCESS_TOKEN_PREFIX) || snapshot.error) return { ok: false };
   const presentedHash = Buffer.from(hashToken(presented), 'hex');
+  const now = Date.now();
   let match: AccessTokenRecord | null = null;
   for (const record of snapshot.records) {
     const stored = Buffer.from(record.tokenHash, 'hex');
-    if (stored.length === presentedHash.length && timingSafeEqual(stored, presentedHash) && !record.revokedAt) {
+    if (stored.length === presentedHash.length && timingSafeEqual(stored, presentedHash) && isLive(record, now)) {
       match = record;
     }
   }

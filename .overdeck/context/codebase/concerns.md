@@ -669,31 +669,56 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   missing from the `✓ root <file>` list. Spy `process.kill` in any test whose code under test
   signals a fixture PID. 39 test files carry literal PIDs without a `process.kill` spy; most only
   use the PID as data, but none were audited.
-<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4931, PAN-4944) -->
-<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4925) -->
-<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917) -->
-<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4931) -->
-<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4929) -->
 - **The access-token snapshot is per process** (PAN-4930 planning) — `verifyAccessToken` and
   `listActiveRecordsOfKind` (`src/lib/access-tokens.ts`) read an in-memory snapshot that only the dashboard
   fills (`startAccessTokenRefresh`, every 5 s). A CLI process (`pan kill`, `pan start`) sees zero records
   unless it calls `refreshAccessTokens()` first (as `pan mcp serve` does) or reads the file with
   `listAccessTokens()`. `verifyAccessToken` also writes `lastUsedAt`, and `mutate` serializes writes only
   within one process, so a CLI write and a dashboard `lastUsedAt` write can lose each other.
+- **Self jobs see only the identity env they are given** (PAN-4937 planning) — a self route's `pan` job
+  (`src/dashboard/server/services/self-jobs.ts` `selfJobEnv`) has no `$TMUX` and drops every inherited
+  identity variable. `pan handoff self` finds its source through `OVERDECK_AGENT_ID` (`src/lib/conversations/current.ts`)
+  and `pan task claim` records `OVERDECK_CLAIM_ID || OVERDECK_AGENT_ID || cli-<pid>` (`src/lib/xbrief/claim-check.ts`),
+  so a job for a conversation needs `OVERDECK_AGENT_ID=<tmuxSession>` like the conversation's own launcher, or
+  handoff fails and the claim is a `cli-<pid>` that `probeHolder` treats as dead. Work agents have no conversation
+  row (only `*-review` role runs do), so `pan handoff self` refuses them.
+<!-- last-verified: 2026-11-04 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4930, PAN-4931, PAN-4482, PAN-4937) -->
 <!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4930) -->
 <!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4482) -->
+- **MCP SDK clients require the advertised `resource` to share the origin they called** (PAN-4945
+  planning) — `@modelcontextprotocol/sdk` 1.30.1 `selectResourceURL` (`client/auth.js:344-357`) throws
+  unless `checkResourceAllowed` finds the protected-resource metadata's `resource` on the same origin as
+  the `/mcp` URL the client used. Any OAuth issuer for `/mcp` must be derived from the request's host
+  (checked against `getTrustedOrigins()`), never a fixed `127.0.0.1`. A stock SDK client also requests
+  every `scopes_supported` value at once (`auth.js:229`) and may send no `state` (`auth.js:732`).
+<!-- last-verified: 2026-11-04 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4930, PAN-4931, PAN-4482, PAN-4945) -->
 - **One merge path per feature (PAN-4970)** — the UAT reconciler drops features
   `mergePathOwner` (`src/dashboard/server/services/merge-path-owner.ts`) assigns to the
   per-PR train from its ready set before it ever assembles a batch; any new merge path
   must ask the same function, or batches churn (30 generations invalidated in a day was
   the original symptom, caused by the per-PR scheduler and the batch reconciler both
   claiming the same unheld, gate-approved PR).
-<!-- last-verified: 2026-11-04 (PAN-4970) -->
 - **Claude Code variadic flags swallow a positional prompt** (PAN-4932 planning, Claude Code 2.1.293) —
   `--allowedTools <x> "prompt"` reads the prompt as another tool name (`claude -p` then fails with
   "Input must be provided"); `--mcp-config <configs...>` is declared variadic the same way in `claude --help`. Launchers that end with `"$prompt"` must
   emit the equals form (`--allowedTools=mcp__overdeck`, `--mcp-config=<path>`) or put another flag
   between. Two equals-form `--mcp-config=` flags both load.
+- **Worker waits restart their startup grace on every call** (PAN-4938 planning) — `waitForWorkerReport`
+  (`src/lib/agents/worker/wait.ts`) takes `startedAt = now()` per call and counts a death or idleness only
+  after `startupGraceMs` (default 60 s) has passed in that call, unless it saw the worker alive. A caller
+  that waits in chunks shorter than 60 s (the 50 s MCP wait chunks) never sees a dead worker die: every
+  chunk answers `timeout`. Chunked callers pass `startupGraceMs` from the worker's launch time
+  (`worker.json` `startedAt`, or a stand-in's `createdAt`). PAN-4938 moves the stand-in wait helpers from
+  `src/cli/commands/worker-remote.ts` to `src/lib/agents/worker/wait-any.ts`, because server code never imports `src/cli/`.
+<!-- last-verified: 2026-11-04 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4930, PAN-4931, PAN-4932, PAN-4938, PAN-4944, PAN-4970, PAN-4482) -->
+- **Codex blocks un-annotated MCP tools** (PAN-4933 planning, Codex CLI 0.159.0) — an MCP tool without a
+  `readOnlyHint` annotation needs approval: under `approval_policy = "never"` the call fails with "MCP tool call
+  requires approval, but approval policy is never" (observed through `codex exec`), and under `on-request` the TUI
+  would prompt (inferred; `codex exec` forces `never`), which wedges an unattended agent. Overdeck's tools carry no annotations, so a server Overdeck provisions into a Codex
+  `config.toml` must set `default_tools_approval_mode = "approve"` in its `[mcp_servers.<name>]` table. Codex
+  refuses the whole config (the agent never starts) if that key holds anything but `auto`, `prompt`, `writes` or
+  `approve`; unknown keys in the table are ignored.
+<!-- last-verified: 2026-11-04 (PAN-4482, PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4930, PAN-4931, PAN-4932, PAN-4933) -->
 - **ACP agents spawn stdio MCP servers from `session/new` and `session/load`** (PAN-4934 planning probe) —
   opencode 1.18.31 and kimi 2.0.2 both start a stdio `mcpServers` entry, pass its `env` array, keep the
   inherited `PATH`/`HOME`, and call `initialize` then `tools/list`, on a new session and on a load. Both

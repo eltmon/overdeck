@@ -1056,7 +1056,7 @@ name. Every field is required, so a harness cannot leave a decision undeclared.
 | `answersQuestionByMessage` | The MCP `answer_question` tool may answer this harness's pending question with a composed message. It is narrower than `askAnswerDelivery`: the tool carries no tool-use id, so it cannot tell a Codex approval from a question, and only Claude Code declares it. |
 | `askAnswerDelivery` | How the dashboard delivers an answer to a conversation's pending question: `message` sends it as a message; `pi-ask-modal` drives the open ask modal with keystrokes; `codex-approval` means it is really a numbered approval prompt, answered with `answer_codex_approval` (PAN-4944), not a question. |
 | `runsOnFlyMachine` | A conversation may be started on a Fly machine (`pan machines add-fly`). Only Claude Code declares it; other harnesses on Fly are #4296. |
-| `overdeckMcp` | Launches get the `overdeck` MCP server with a per-agent token. Claude Code, `acp` and `opencode` declare it; Codex follows. |
+| `overdeckMcp` | Launches get the `overdeck` MCP server with a per-agent token. Claude Code, Codex, `acp` and `opencode` declare it. |
 
 The rule for harness-specific code:
 
@@ -1083,6 +1083,19 @@ Claude Code 2.1.293 was checked against what the launcher emits:
 - The space form `--allowedTools <x>` reads a following prompt argument as
   another tool name, so Overdeck always emits the equals form
   (`--allowedTools=mcp__overdeck`, `--mcp-config=<path>`).
+
+Codex CLI 0.159.0 was checked separately, because Codex has no CLI allow-list
+flag and Overdeck's MCP tools carry no `readOnlyHint` annotations:
+
+- Under `approval_policy = "never"`, a model-initiated call to an un-annotated
+  tool fails with `MCP tool call requires approval, but approval policy is
+  never` (observed through `codex exec`).
+- Setting `default_tools_approval_mode = "approve"` in the server's
+  `[mcp_servers.<name>]` table fixes it; Codex also accepts `auto`, `prompt`
+  and `writes` there.
+- An invalid value in that key is not silently dropped: Codex refuses to load
+  the whole config and the agent never starts.
+- An unrelated unknown key elsewhere in the same table is ignored.
 
 **ACP harnesses (PAN-4934).** The launcher passes `--mcp-config <file>` to the
 ACP host. The host reads the same `overdeck-mcp.json` and sends its server as

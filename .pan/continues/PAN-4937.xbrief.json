@@ -1,0 +1,170 @@
+{
+  "version": "1",
+  "issueId": "PAN-4937",
+  "created": "2026-11-04T02:50:38.682Z",
+  "updated": "2026-11-04T04:26:40.209Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-04T04:26Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-04T04:26:40.209Z"
+    }
+  ],
+  "items": {
+    "job-env-conversation-id": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4937",
+      "claimedAt": "2026-11-04T02:50:38.682Z",
+      "doneAt": "2026-11-04T03:02:26.568Z"
+    },
+    "task-claim-done": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4937",
+      "claimedAt": "2026-11-04T03:02:36.670Z",
+      "doneAt": "2026-11-04T03:22:22.244Z"
+    },
+    "task-block": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4937",
+      "claimedAt": "2026-11-04T03:22:34.601Z",
+      "doneAt": "2026-11-04T03:27:15.108Z"
+    },
+    "done-tool": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4937",
+      "claimedAt": "2026-11-04T03:27:21.523Z",
+      "doneAt": "2026-11-04T03:32:07.562Z"
+    },
+    "handoff-tool": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4937",
+      "claimedAt": "2026-11-04T03:32:15.576Z",
+      "doneAt": "2026-11-04T03:37:29.754Z"
+    },
+    "worker-report-tool": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4937",
+      "claimedAt": "2026-11-04T03:37:36.378Z",
+      "doneAt": "2026-11-04T03:43:43.246Z"
+    },
+    "self-workflow-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4937",
+      "claimedAt": "2026-11-04T03:43:50.897Z",
+      "doneAt": "2026-11-04T03:54:03.981Z"
+    },
+    "job-env-conversation-id.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:56:21.764Z"
+    },
+    "job-env-conversation-id.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:56:38.049Z"
+    },
+    "job-env-conversation-id.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:56:53.782Z"
+    },
+    "task-claim-done.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:57:14.364Z"
+    },
+    "task-claim-done.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:57:32.655Z"
+    },
+    "task-claim-done.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:57:49.518Z"
+    },
+    "task-claim-done.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:58:05.196Z"
+    },
+    "task-claim-done.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:58:21.537Z"
+    },
+    "task-block.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:58:41.245Z"
+    },
+    "task-block.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:58:58.088Z"
+    },
+    "task-block.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:59:13.696Z"
+    },
+    "done-tool.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:59:29.248Z"
+    },
+    "done-tool.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:59:44.318Z"
+    },
+    "done-tool.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:59:59.825Z"
+    },
+    "handoff-tool.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:00:19.823Z"
+    },
+    "handoff-tool.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:00:36.236Z"
+    },
+    "handoff-tool.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:00:53.577Z"
+    },
+    "handoff-tool.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:01:10.610Z"
+    },
+    "handoff-tool.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:01:26.320Z"
+    },
+    "worker-report-tool.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:01:45.953Z"
+    },
+    "worker-report-tool.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:02:01.747Z"
+    },
+    "worker-report-tool.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:02:18.570Z"
+    },
+    "self-workflow-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:02:35.566Z"
+    },
+    "self-workflow-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:02:52.362Z"
+    },
+    "self-workflow-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:03:09.624Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-04T04:26:40Z",
+      "markdownBody": "# CodeRabbit findings for PAN-4937 (PR #4984)\n\nCodeRabbit posted 1 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4463569205 · .overdeck/context/codebase/architecture.md:322 [Minor]: Remove the stale \"planned\" status for W-SELF2.\n  https://github.com/eltmon/overdeck/pull/4984#discussion_r4463569205\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/4984/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-4937`.\n   If you only replied, you are done.\n5. If PR #4984 has already merged when you read this, nothing more lands on it: open a follow-up issue\n   for the findings you agree with instead of pushing."
+    }
+  ]
+}
