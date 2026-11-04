@@ -364,16 +364,34 @@ a wait answers **404** `unknown-request`, as it does for another agent's id,
 and the agent calls `request_secret` again. The MCP tools over these routes
 are `request_secret` and `secret_wait`.
 
+Machine-link requests (PAN-4942, W-LINK1) work the same way.
+`POST /api/self/machine-link-requests` (`tell`) takes `{ hint }`: the trimmed
+hint is 1–200 characters with no control characters, else **400** `bad-hint`
+(or `bad-body`). It answers **201** with
+`{ requestId, status: "pending", expiresAt, next }`, or **200** with the
+agent's pending request for the same hint (compared trimmed and
+case-insensitive). The request expires after 24 hours, and it counts against
+the same limit of 20 pending requests as secret requests (**429**
+`too-many-requests`). `GET /api/self/machine-link-requests/:id/wait`
+(`read:state`) blocks at most 50 s and answers `pending` with `next`, `linked`
+with `machine` (`{ environmentId, label }`), `declined` or `expired`. Each wait
+route answers only its own kind: a secret request's id on the machine-link wait,
+or a machine-link request's id on the secret wait, is **404**
+`unknown-request` at once. The MCP tools over these routes are `link_machine`
+and `link_machine_wait`.
+
 ### Agent requests (`/api/agent-requests`)
 
 The operator answers agent requests here
 (`src/dashboard/server/routes/agent-requests.ts`).
 
 - `GET /api/agent-requests` needs `read:conversations` and answers the pending
-  requests for the Decisions panel. It never answers a value, a result or the
+  requests for the Decisions panel: a secret request's `name` and `prompt`, or
+  a machine-link request's `hint`. It never answers a value, a result or the
   agent's directory.
-- `POST /api/agent-requests/:id/secret` (`{ value }`, at most 65,536 bytes)
-  and `POST /api/agent-requests/:id/decline` have no route-scope row, so the
+- `POST /api/agent-requests/:id/secret` (`{ value }`, at most 65,536 bytes),
+  `POST /api/agent-requests/:id/linked` and
+  `POST /api/agent-requests/:id/decline` have no route-scope row, so the
   gate refuses every registry credential (a token, device, machine or phone,
   even one holding `approve`) with **403** `insufficient_scope`. The handler
   also accepts only the internal token or the root session (**403**
@@ -386,6 +404,18 @@ The operator answers agent requests here
 - The value is never echoed, logged or put in an activity entry. A malformed
   body is **400** with a fixed message, and a failed write logs only the
   error's name. Revoking an agent's tokens deletes its `secrets/` directory.
+- `/linked` resolves a machine-link request after the operator linked a
+  machine. It reads only `environmentId` from the body (a string of 1–200
+  characters, else **400** `bad-environment-id`) and ignores every other
+  field, such as a `label` or a pairing link. It finds the active link with
+  that environment id in the link store; an unknown or revoked one is **400**
+  `unknown-machine`. The label it stores and answers is the link's own. It
+  answers **200** `{ requestId, status: "linked", machine }`. A secret request
+  is **409** `wrong-kind`, an ended request **409** `not-pending`, and an agent
+  that no longer holds an active agent token **409** `agent-stopped` (the
+  request expires; the machine stays linked). `/secret` answers **409**
+  `wrong-kind` for a machine-link request.
+- `/decline` declines a pending request of either kind.
 
 Only root credentials may create or revoke access tokens, issue pairing
 credentials, or revoke a device other than the caller's own (D-11). A device or
