@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4934",
   "created": "2026-11-04T02:59:33.455Z",
-  "updated": "2026-11-04T03:01:55.538Z",
+  "updated": "2026-11-04T03:02:56.184Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-11-04T03:01:51.339Z"
     },
     "acp-mcp-config-reader": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4934",
-      "claimedAt": "2026-11-04T03:01:55.538Z"
+      "claimedAt": "2026-11-04T03:01:55.538Z",
+      "doneAt": "2026-11-04T03:02:56.184Z"
     }
   }
 }
