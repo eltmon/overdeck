@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4953",
   "created": "2026-11-04T13:46:40.439Z",
-  "updated": "2026-11-04T14:24:33.679Z",
+  "updated": "2026-11-04T14:24:47.654Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,6 +80,10 @@
     "pending-routing.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T14:24:33.679Z"
+    },
+    "pending-routing.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:24:47.653Z"
     }
   }
 }
