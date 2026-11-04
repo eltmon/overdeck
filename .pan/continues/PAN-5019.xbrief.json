@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5019",
   "created": "2026-11-04T13:12:00.752Z",
-  "updated": "2026-11-04T14:36:19.590Z",
+  "updated": "2026-11-04T14:36:32.321Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -132,6 +132,10 @@
     "prefs-route.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T14:36:19.590Z"
+    },
+    "prefs-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:36:32.321Z"
     }
   }
 }
