@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4932",
   "created": "2026-11-04T01:06:56.441Z",
-  "updated": "2026-11-04T01:15:31.834Z",
+  "updated": "2026-11-04T01:16:44.735Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -40,9 +40,10 @@
       "doneAt": "2026-11-04T01:15:25.774Z"
     },
     "role-allowlist-overdeck": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4932",
-      "claimedAt": "2026-11-04T01:15:31.833Z"
+      "claimedAt": "2026-11-04T01:15:31.833Z",
+      "doneAt": "2026-11-04T01:16:44.735Z"
     }
   }
 }
