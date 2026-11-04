@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4970",
   "created": "2026-11-04T00:20:58.327Z",
-  "updated": "2026-11-04T01:52:58.556Z",
+  "updated": "2026-11-04T01:53:14.530Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -146,6 +146,10 @@
     "fe-extract.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T01:52:58.556Z"
+    },
+    "fe-promote-failure.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:53:14.529Z"
     }
   }
 }
