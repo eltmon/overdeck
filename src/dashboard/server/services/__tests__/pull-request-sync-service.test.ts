@@ -2,6 +2,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { mkdirSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
+import type { PullRequestSnapshot } from '@overdeck/contracts';
 
 // PAN-3822: the pull-request sync sweep links PRs to conversations by branch
 // and keeps their snapshots fresh. Real temp overdeck.db; the forge listing and
@@ -325,6 +326,40 @@ describe('runPullRequestSyncOnce — snapshots', () => {
 
     expect(result.updated).toBe(0);
     expect(listConversationPullRequests(name)[0]?.snapshot?.title).toBe('PR 5');
+  });
+
+  it('carries a link\'s last observed checks forward for a merged row with no statusCheckRollup (PAN-5042)', async () => {
+    const name = conversation('feature/checks-carry');
+    prRows = [pr(60, 'feature/checks-carry', { statusCheckRollup: [{ status: 'COMPLETED', conclusion: 'FAILURE' }] })];
+    await runPullRequestSyncOnce();
+    expect(listConversationPullRequests(name)[0]?.snapshot).toEqual(
+      expect.objectContaining({ state: 'open', checks: 'red' }),
+    );
+
+    // The closed listing never carries statusCheckRollup (PAN-5042); without
+    // the link's previous snapshot, this would read as a bare 'green' guess.
+    prRows = [pr(60, 'feature/checks-carry', {
+      state: 'MERGED', mergedAt: '2026-09-25T00:00:00Z', statusCheckRollup: undefined,
+    })];
+    const result = await runPullRequestSyncOnce();
+
+    expect(result.updated).toBe(1);
+    expect(listConversationPullRequests(name)[0]?.snapshot).toEqual(
+      expect.objectContaining({ state: 'merged', checks: 'red' }),
+    );
+  });
+
+  it('a fresh branch-detected link for a merged row with no statusCheckRollup gets checks green (PAN-5042)', async () => {
+    const name = conversation('feature/new-merged');
+    prRows = [pr(61, 'feature/new-merged', {
+      state: 'MERGED', mergedAt: '2026-09-25T00:00:00Z', statusCheckRollup: undefined,
+    })];
+
+    await runPullRequestSyncOnce();
+
+    expect(listConversationPullRequests(name)[0]?.snapshot).toEqual(
+      expect.objectContaining({ state: 'merged', checks: 'green' }),
+    );
   });
 });
 
@@ -725,6 +760,16 @@ describe('PR watch pass (PAN-4943 WI-5, epic AC-14)', () => {
     };
   }
 
+  /** Captures the raw snapshots map `runWatchPass` hands to `notify`, bypassing the real notifier. */
+  function capturingWatchDeps() {
+    const seen: Array<ReadonlyMap<string, PullRequestSnapshot>> = [];
+    return {
+      listKeys: listWatchedPullRequestKeys,
+      notify: async (snapshots: ReadonlyMap<string, PullRequestSnapshot>) => { seen.push(snapshots); },
+      seen,
+    };
+  }
+
   function watch(number: number, last: { state: 'open' | 'merged' | 'closed'; checks: 'green' | 'red' | 'pending'; reviewState: string; mergeable: boolean | null }) {
     return addPullRequestWatch({
       agentId: 'agent-pan-1',
@@ -778,6 +823,55 @@ describe('PR watch pass (PAN-4943 WI-5, epic AC-14)', () => {
     const read = vi.fn(async () => null);
     await runPullRequestSyncOnce(T0, read, undefined, watchDeps());
     expect(read).not.toHaveBeenCalled();
+  });
+
+  it('re-reads a watched PR the listing covered without statusCheckRollup, keeping the real checks (PAN-5042 ac1)', async () => {
+    conversation('feature/unrelated');
+    await watch(88, { state: 'open', checks: 'pending', reviewState: 'none', mergeable: null });
+    // The closed listing never carries statusCheckRollup (PAN-5042).
+    prRows = [pr(88, 'some-other-branch', {
+      state: 'MERGED', mergedAt: '2026-11-04T00:00:00Z', statusCheckRollup: undefined,
+    })];
+    const read = vi.fn(async () => pr(88, 'some-other-branch', {
+      state: 'MERGED', mergedAt: '2026-11-04T00:00:00Z',
+      statusCheckRollup: [{ status: 'COMPLETED', conclusion: 'FAILURE' }],
+    }) as never);
+    const deps = capturingWatchDeps();
+
+    await runPullRequestSyncOnce(T0, read, undefined, deps);
+
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(read).toHaveBeenCalledWith(expect.objectContaining({ host: 'github.com', repository: 'eltmon/overdeck', number: 88 }));
+    const snapshots = [...deps.seen[0]!.values()];
+    expect(snapshots).toContainEqual(expect.objectContaining({ state: 'merged', checks: 'red' }));
+  });
+
+  it('drops an unobserved watched key from the notified snapshots when the re-read fails (PAN-5042 ac2)', async () => {
+    conversation('feature/unrelated');
+    await watch(89, { state: 'open', checks: 'pending', reviewState: 'none', mergeable: null });
+    prRows = [pr(89, 'some-other-branch', {
+      state: 'MERGED', mergedAt: '2026-11-04T00:00:00Z', statusCheckRollup: undefined,
+    })];
+    const read = vi.fn(async () => null);
+    const deps = capturingWatchDeps();
+
+    await runPullRequestSyncOnce(T0, read, undefined, deps);
+
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(deps.seen[0]!.has('github.com/eltmon/overdeck#89')).toBe(false);
+  });
+
+  it('an observed watched key (statusCheckRollup present) makes no re-read and notifies the listing snapshot (PAN-5042 ac3)', async () => {
+    conversation('feature/unrelated');
+    await watch(90, { state: 'open', checks: 'pending', reviewState: 'none', mergeable: null });
+    prRows = [pr(90, 'some-other-branch', { statusCheckRollup: [{ status: 'COMPLETED', conclusion: 'SUCCESS' }] })];
+    const read = vi.fn(async () => null);
+    const deps = capturingWatchDeps();
+
+    await runPullRequestSyncOnce(T0, read, undefined, deps);
+
+    expect(read).not.toHaveBeenCalled();
+    expect(deps.seen[0]!.get('github.com/eltmon/overdeck#90')).toEqual(expect.objectContaining({ state: 'open', checks: 'green' }));
   });
 
   it('an uncovered watched key makes exactly one readPullRequest call per sweep', async () => {
