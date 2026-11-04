@@ -362,6 +362,18 @@ jobs:
       - name: Hermes tests
         run: python -m pytest integrations/hermes
 
+      - name: Install the OpenClaw plugin
+        working-directory: integrations/openclaw
+        run: npm ci
+
+      - name: Build the OpenClaw plugin
+        working-directory: integrations/openclaw
+        run: npm run build
+
+      - name: OpenClaw tests
+        working-directory: integrations/openclaw
+        run: npm test
+
   # `test` is the check name the close-out gate requires on main
   # (DEFAULT_MAIN_VERIFY_REQUIRED_CHECKS in src/lib/lifecycle/dod-gate.ts), so
   # it stays one job: green only when every shard, test-e2e and mobile-android passed.
