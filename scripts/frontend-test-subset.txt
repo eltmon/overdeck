@@ -7,6 +7,7 @@
 src/App/AppLiveStoreHost.render-count.test.tsx
 src/App/BackendConnectionBoundary.test.tsx
 src/App/api.test.ts
+src/App/appChromeLabels.test.ts
 src/App/routes.linked.test.ts
 src/__tests__/fr7-conversation-pending-input.test.tsx
 src/__tests__/overlay-tokens.test.ts
