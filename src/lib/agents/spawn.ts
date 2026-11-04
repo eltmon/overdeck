@@ -324,7 +324,7 @@ async function spawnRunWithoutConsentClaim(
     ? getCodexLauncherFields(agentId, selectedModel, workspace, role, options.effort, await prepareCodexOverdeckMcp({ agentId, agentKind: 'agent', role, harness: resolvedHarness }))
     : {};
   const acpLauncherFields = isAcp
-    ? getAcpLauncherFields(
+    ? await getAcpLauncherFields(
         agentId,
         selectedModel,
         workspace,
