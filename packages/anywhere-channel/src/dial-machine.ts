@@ -27,6 +27,12 @@ export interface MachineDialer {
   dialMachine(environmentId: string, opts: { relay: boolean; signal?: AbortSignal; timeoutMs?: number }): Promise<RtcDuplexWeb>;
   /** Close the peer connections to one machine, or all of them. */
   close(environmentId?: string): void;
+  /**
+   * Close the peer connection that carried `raw`, but only while it is still the current connection
+   * for its machine and route, so a late failure on an older connection never closes a newer one
+   * (PAN-5046 FR-3).
+   */
+  evict(raw: RtcDuplexWeb, reason: string): void;
 }
 
 type Candidate = NonNullable<SignalData['candidate']>;
@@ -83,6 +89,8 @@ export function createMachineDialer(
   const PeerConnection = deps.RTCPeerConnection ?? globalThis.RTCPeerConnection;
   const log = deps.log ?? ((message: string) => console.warn(`[overdeck] ${message}`));
   const byKey = new Map<string, PeerEntry>();
+  /** The peer connection each handed-out raw channel runs on. */
+  const owners = new WeakMap<RtcDuplexWeb, PeerEntry>();
   /** Peer connections being created, so concurrent dials to one machine share one connection. */
   const creating = new Map<string, Promise<{ entry: PeerEntry; channel: RTCDataChannel }>>();
 
@@ -226,6 +234,7 @@ export function createMachineDialer(
         entry.everOpen = true;
         const duplex = new RtcDuplexWeb(channel, entry.peer);
         entry.duplexes.add(duplex);
+        owners.set(duplex, entry);
         duplex.once('close', () => entry.duplexes.delete(duplex));
         resolve(duplex);
       };
@@ -293,6 +302,10 @@ export function createMachineDialer(
       for (const entry of [...byKey.values()]) {
         if (environmentId === undefined || entry.peer === environmentId) closeEntry(entry, new Error('dialer closed'));
       }
+    },
+    evict(raw, reason) {
+      const owner = owners.get(raw);
+      if (owner && !owner.closed && byKey.get(owner.key) === owner) closeEntry(owner, new Error(reason));
     },
   };
 }

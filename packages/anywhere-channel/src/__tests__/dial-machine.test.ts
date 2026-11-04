@@ -324,6 +324,37 @@ describe('createMachineDialer', () => {
     expect(logs.some((line) => line.includes('v=0'))).toBe(false);
   });
 
+  it('evict closes only the owning connection while it is current', async () => {
+    const { dialer } = setup();
+    const stale = await openRaw(dialer, 'env-1');
+    stale.on('error', () => {});
+    FakePeerConnection.instances[0]!.setState('failed');
+    const current = await openRaw(dialer, 'env-1');
+    current.on('error', () => {});
+    const relayDial = dialer.dialMachine('env-1', { relay: true });
+    await flush();
+    FakePeerConnection.instances[2]!.channels[0]!.open();
+    (await relayDial).on('error', () => {});
+    const [, directPc, relayPc] = FakePeerConnection.instances;
+
+    // A late failure on the replaced connection leaves the current one alone.
+    dialer.evict(stale, 'secure open timeout');
+    expect(directPc!.closed).toBe(false);
+
+    // The current owner closes; the machine's other connection stays open.
+    dialer.evict(current, 'secure open timeout');
+    await flush();
+    expect(directPc!.closed).toBe(true);
+    expect(current.destroyed).toBe(true);
+    expect(relayPc!.closed).toBe(false);
+
+    // A new dial builds a fresh connection.
+    void dialer.dialMachine('env-1', { relay: false }).catch(() => {});
+    await flush();
+    expect(FakePeerConnection.instances).toHaveLength(4);
+    dialer.close();
+  });
+
   it('rejects with an AbortError when the caller aborts', async () => {
     const { dialer } = setup();
     const controller = new AbortController();
