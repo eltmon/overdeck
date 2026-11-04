@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4961",
   "created": "2026-11-03T23:57:34.038Z",
-  "updated": "2026-11-04T00:21:21.080Z",
+  "updated": "2026-11-04T00:23:46.985Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -132,9 +132,10 @@
       "doneAt": "2026-11-04T00:21:13.466Z"
     },
     "spawn-disk-hold": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4961",
-      "claimedAt": "2026-11-04T00:21:21.080Z"
+      "claimedAt": "2026-11-04T00:21:21.080Z",
+      "doneAt": "2026-11-04T00:23:46.985Z"
     }
   }
 }
