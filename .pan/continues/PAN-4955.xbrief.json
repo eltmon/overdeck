@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4955",
   "created": "2026-11-04T14:23:26.498Z",
-  "updated": "2026-11-04T14:55:20.081Z",
+  "updated": "2026-11-04T14:55:35.622Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -88,6 +88,10 @@
     "skill-section.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T14:55:20.080Z"
+    },
+    "readme.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:55:35.622Z"
     }
   }
 }
