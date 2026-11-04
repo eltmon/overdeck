@@ -8,7 +8,7 @@
  * forward with **Open** and **Stop**. A port the owner refuses (one of
  * Overdeck's own) shows why.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ExternalLink, Globe, Square } from 'lucide-react';
 
@@ -64,6 +64,15 @@ export function OpenPreviewPopover({ conversation }: { conversation: Conversatio
     enabled: open,
     staleTime: 30_000,
   });
+
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [open]);
 
   const forwardPort = async (port: number) => {
     if (!Number.isInteger(port) || port <= 0) return setError('Type a port number.');

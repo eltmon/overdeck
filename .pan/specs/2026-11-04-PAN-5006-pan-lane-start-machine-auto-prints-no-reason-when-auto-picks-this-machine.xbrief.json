@@ -1,0 +1,410 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T12:05:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5006: pan lane start --machine auto prints no reason when Auto picks this machine",
+    "updated": "2026-11-04T12:27:32.381Z"
+  },
+  "plan": {
+    "id": "pan-5006",
+    "title": "pan lane start --machine auto prints no reason when Auto picks this machine",
+    "status": "running",
+    "uid": "7e1d9621-66e0-46c4-99ef-42e5b63deca7",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-04T12:05:00Z",
+    "updated": "2026-11-04T12:27:32.381Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5006",
+        "label": "PAN-5006",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "anywhere",
+      "lanes",
+      "placement",
+      "cli"
+    ],
+    "narratives": {
+      "Problem": "pan lane start --machine auto prints Auto's reason only when Auto picks a linked machine. When Auto picks this machine, laneMachineResolver returns null (dropping target.reason), resolveTargetMachine never carried answer.rejections, and the result is machine: null like a plain local launch, so the operator cannot tell Auto ran or what it passed over.",
+      "Proposal": "Carry Auto's explanation end to end as a new sibling field LaneLaunchResult.placement { label, reason, rejections }, set for any Auto pick (this machine or a linked one). FleetTarget gains optional rejections; resolveMachine returns RemoteLaneTarget | LocalLanePlacement | null; the route returns a LocalLanePlacement for a self Auto pick; the CLI prints the reason and a 'Passed over: …' line. machine keeps meaning null = runs here so the follower and stdout format are unchanged.",
+      "NonGoals": "- No change to pan worker run, pan start --machine or fleet conversation spawn output (they only gain an optional FleetTarget.rejections they ignore)\n- No change when --machine is absent; resolveMachine stays uncalled on that path\n- No change to LaneLaunchResult.machine's shape or meaning (null = runs here), the human stdout lane line, or pan lane list\n- No change to the frontend lane feed (GauntletRunFeedCard)\n- No change to placementReason() or noMachineFits() wording"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Add a sibling LaneLaunchResult.placement field instead of putting the self pick into machine with self: true",
+        "rationale": "machine being non-null starts the remote-lane follower (lanes.ts line 209) and selects the 'on <label>' stdout format (lane.ts line 281); three tests assert machine null for local lanes. A sibling field changes none of them."
+      },
+      {
+        "summary": "Print passed-over machines as a second stderr line 'Passed over: <label>: <reason>; …' for every Auto pick, local or remote",
+        "rationale": "The issue asks for the rejections ideally; a separate line keeps placementReason() shared with workers unchanged, and printing it for remote picks too keeps one consistent rule."
+      },
+      {
+        "summary": "Keep machine.reason for remote Auto picks and have the CLI read placement.reason ?? machine.reason",
+        "rationale": "A new CLI against an older dashboard still prints the reason, and the reason never prints twice."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-04-PAN-5006-pan-lane-start-machine-auto-prints-no-reason-when-auto-picks-this-machine.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "fleet-target-rejections",
+        "title": "FleetTarget carries Auto's passed-over machines",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T12:05:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5006",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/fleet-target.ts",
+            "src/dashboard/server/__tests__/fleet-target.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/fleet-target.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "fleet-target.test.ts passes including the new PAN-5006 case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-5006.md WI-1. Add optional `rejections?: readonly PlacementRejection[]` to both ok:true variants of FleetTarget in src/dashboard/server/services/fleet-target.ts and set it from `answer.rejections` in resolveTargetMachine's auto branch: the self return (line 137), the link return (line 139) and the auto Fly fallback (line 133). Explicit-machine branches and startFlyTarget stay unchanged. Add the test `PAN-5006: auto answers the rejections it passed over, for a self pick too` to src/dashboard/server/__tests__/fleet-target.test.ts using the file's deps() helper (self tagged docker via selfProfile, one online link without docker, needs ['docker']), and extend the ac8 case to assert the exact rejections array."
+        },
+        "items": [
+          {
+            "id": "fleet-target-rejections.ac1",
+            "title": "Given this machine tagged docker and an online link without docker, when resolveTargetMachine('auto', null, ['docker']) runs, then it returns ok:true, self:true and rejections containing { label: 'desk', reason: 'no docker' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fleet-target-rejections.ac2",
+            "title": "Given Auto picks a linked machine (the ac8 case), resolveTargetMachine returns that pick with a rejections array equal to choosePlacement's rejections",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fleet-target-rejections.ac3",
+            "title": "Given an explicit machine label, resolveTargetMachine returns a target with no rejections field and the existing explicit-machine tests still pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lane-core-placement",
+        "title": "Lane launch result carries a placement for Auto picks",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T12:05:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5006",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lanes/types.ts",
+            "src/lib/lanes/launch.ts",
+            "src/lib/lanes/__tests__/launch-remote.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/lanes/__tests__/launch-remote.test.ts src/lib/lanes/__tests__/views-remote.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "launch-remote.test.ts and views-remote.test.ts pass including the new PAN-5006 case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "FR-5"
+          ],
+          "foundationFor": [
+            "route-self-placement"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. In src/lib/lanes/types.ts add `LanePlacement { label; reason; rejections: PlacementRejection[] }` and a required `placement: LanePlacement | null` on LaneLaunchResult. In src/lib/lanes/launch.ts: RemoteLaneTarget gains `rejections: PlacementRejection[]`; export `LocalLanePlacement { self: true; label; reason: string; rejections }`; resolveMachine returns `Promise<RemoteLaneTarget | LocalLanePlacement | null>`; add helper `remoteOf()` that maps a LocalLanePlacement or null to undefined. Only the --machine call site (line ~414) builds `placement` (when the resolved value's reason is non-null); the --reuse site (~418) and stopRow (~481) use remoteOf and ignore placement. Both result literals (remote ~562, local ~656) include `placement`. `machine` keeps null for a local lane. Add test `PAN-5006: a LocalLanePlacement from resolveMachine launches here with placement set and machine null` to launch-remote.test.ts; add `rejections: []` to its RemoteLaneTarget fixture."
+        },
+        "items": [
+          {
+            "id": "lane-core-placement.ac1",
+            "title": "Given resolveMachine returns a LocalLanePlacement { self: true, label: 'home', reason, rejections }, when launchLane runs, then it creates the lane row locally and returns machine: null with placement equal to { label: 'home', reason, rejections }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-core-placement.ac2",
+            "title": "Given resolveMachine returns a RemoteLaneTarget with reason null (explicit machine), launchLane returns placement: null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-core-placement.ac3",
+            "title": "Given no --machine, launchLane returns placement: null and never calls resolveMachine",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-core-placement.ac4",
+            "title": "Given a --reuse whose newest lane facts resolve to a LocalLanePlacement, launchLane launches locally exactly as it does for null today",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "route-self-placement",
+        "title": "POST /api/lanes passes an Auto pick of this machine through as placement",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T12:05:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-5006",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/lanes.ts",
+            "src/dashboard/server/routes/__tests__/lanes-route-machine.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/lanes-route-machine.test.ts src/dashboard/server/routes/__tests__/lanes-route.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "lanes-route-machine.test.ts and lanes-route.test.ts pass including the new PAN-5006 case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In laneMachineResolver (src/dashboard/server/routes/lanes.ts line 174) replace `if (target.self) return null;` with: reason null → null, else `{ self: true, label: target.label, reason: target.reason, rejections: [...(target.rejections ?? [])] }`. Keep the gitOrigin===null 409 after it. The returned RemoteLaneTarget gains `rejections: [...(target.rejections ?? [])]`. Leave handleLaneLaunch's `if (result.machine) deps.follow(...)` unchanged. Update the file header comment and the laneMachineResolver doc comment. Add test `PAN-5006: auto that picks this machine launches here and answers placement with the passed-over machines` to lanes-route-machine.test.ts with a FULL FleetTargetDeps fixture (self, links, status, selfProfile tags ['docker','linux'], selfLoad, selfProjectOrigins [ORIGIN], linkProjectOrigins [ORIGIN], autoFly false) — the file's TARGET_DEPS lacks selfLoad/selfProjectOrigins/linkProjectOrigins/autoFly and would throw on the auto branch. Extend ac1/ac2 to assert placement is null."
+        },
+        "items": [
+          {
+            "id": "route-self-placement.ac1",
+            "title": "Given home tagged docker and linked desk without docker, when POST /api/lanes runs with machine 'auto' and needs ['docker'], then it returns 201 with machine: null and placement.reason starting with 'Auto → home ('",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-self-placement.ac2",
+            "title": "Given the same request, the 201 body's placement.rejections equals [{ environmentId: 'env-desk', label: 'desk', reason: 'no docker' }]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-self-placement.ac3",
+            "title": "Given the same request, the route creates the lane locally and calls neither fetchPeer nor follow",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-self-placement.ac4",
+            "title": "Given machine 'desk' or machine 'home' (explicit labels), the 201 body has placement: null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-auto-reason",
+        "title": "pan lane start prints Auto's reason and the passed-over line",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T12:05:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5006",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/lane.ts",
+            "src/cli/commands/__tests__/lane.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/lane.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "lane.test.ts passes including the three PAN-5006 cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In src/cli/commands/lane.ts (lines ~250-258) add `placement?: { label; reason; rejections: { label; reason }[] } | null` to the inline result type; replace `if (result.machine?.reason) deps.stderr(result.machine.reason);` with: print `result.placement?.reason ?? result.machine?.reason` once, then, when placement.rejections is non-empty, print `Passed over: <label>: <reason>; <label>: <reason>` to stderr. Do not reuse noMachineFits(). Leave the stdout lane lines unchanged. Add the three tests named in the PRD to lane.test.ts using its harness()/fetchMock 201 pattern."
+        },
+        "items": [
+          {
+            "id": "cli-auto-reason.ac1",
+            "title": "Given a 201 body with machine: null and placement { reason: 'Auto → home (CPU pressure 0%, 31 GB free, 2 agents)', rejections: mac no docker, fly-1 no docker }, pan lane start --machine auto writes exactly those two stderr lines: the reason, then 'Passed over: mac: no docker; fly-1: no docker'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-auto-reason.ac2",
+            "title": "Given a 201 body where machine.reason and placement.reason are the same string R with no rejections, the CLI writes R to stderr exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-auto-reason.ac3",
+            "title": "Given a 201 body with machine.reason R and no placement field (older dashboard), the CLI falls back to printing R once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-auto-reason.ac4",
+            "title": "Given a 201 body with placement: null and machine: null, the CLI writes no reason line and no Passed over line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-auto-placement",
+        "title": "Document the Auto explanation for lanes placed on this machine",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T12:05:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5006",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/linked-machines.mdx",
+            "reference/lanes.mdx",
+            "docs/ANYWHERE-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Passed over' configuration/linked-machines.mdx reference/lanes.mdx",
+            "grep -n 'LocalLanePlacement' docs/ANYWHERE-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "each grep prints at least one matching line per named file"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. configuration/linked-machines.mdx 'Auto placement' (~line 554): add the `Passed over: laptop: no docker; desk: offline` example and say both lines print when Auto picks this machine too; in '### Gauntlet lanes' (~592) say --json carries placement { label, reason, rejections } and machine stays null for a lane Auto placed here. reference/lanes.mdx: extend the `start` row (line 61) with the stderr reason and Passed over lines, and add a 'What to know' bullet in 'Lanes on other machines' describing placement. docs/ANYWHERE-ARCHITECTURE.md 'Gauntlet lanes across machines (#4638)' resolver paragraph (~1210): say an Auto pick of this machine resolves to a LocalLanePlacement, so placement explains it while machine stays null and home follows nothing (#5006)."
+        },
+        "items": [
+          {
+            "id": "docs-auto-placement.ac1",
+            "title": "configuration/linked-machines.mdx shows a 'Passed over: …' example and states that Auto prints its reason when it picks this machine",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-auto-placement.ac2",
+            "title": "When a reader opens reference/lanes.mdx, the start row and 'Lanes on other machines' section show the stderr 'Passed over: …' line and the placement JSON field, and state that machine is null for a lane that runs here",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-auto-placement.ac3",
+            "title": "When `grep -n LocalLanePlacement docs/ANYWHERE-ARCHITECTURE.md` runs, it returns the lanes resolver paragraph, which states that home does not follow a lane Auto placed on this machine",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "fleet-target-rejections",
+        "to": "route-self-placement",
+        "type": "blocks"
+      },
+      {
+        "from": "lane-core-placement",
+        "to": "route-self-placement",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

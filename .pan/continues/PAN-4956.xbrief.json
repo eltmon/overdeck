@@ -1,0 +1,144 @@
+{
+  "version": "1",
+  "issueId": "PAN-4956",
+  "created": "2026-11-04T09:00:33.744Z",
+  "updated": "2026-11-04T09:39:01.848Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-04T09:39Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-04T09:39:01.848Z"
+    }
+  ],
+  "items": {
+    "snippet-fix": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4956",
+      "claimedAt": "2026-11-04T09:00:33.744Z",
+      "doneAt": "2026-11-04T09:01:42.625Z"
+    },
+    "manifest": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4956",
+      "claimedAt": "2026-11-04T09:05:26.224Z",
+      "doneAt": "2026-11-04T09:07:08.492Z"
+    },
+    "ts-example": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4956",
+      "claimedAt": "2026-11-04T09:07:13.929Z",
+      "doneAt": "2026-11-04T09:10:26.127Z"
+    },
+    "py-example": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4956",
+      "claimedAt": "2026-11-04T09:10:30.679Z",
+      "doneAt": "2026-11-04T09:11:46.270Z"
+    },
+    "docs-readme": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4956",
+      "claimedAt": "2026-11-04T09:11:51.481Z",
+      "doneAt": "2026-11-04T09:14:33.285Z"
+    },
+    "publish-meta": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4956",
+      "claimedAt": "2026-11-04T09:14:37.508Z",
+      "doneAt": "2026-11-04T09:16:00.539Z"
+    },
+    "snippet-fix.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:25:40.641Z"
+    },
+    "snippet-fix.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:26:15.477Z"
+    },
+    "snippet-fix.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:26:30.097Z"
+    },
+    "manifest.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:26:48.933Z"
+    },
+    "manifest.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:27:03.455Z"
+    },
+    "manifest.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:27:17.519Z"
+    },
+    "manifest.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:27:30.820Z"
+    },
+    "ts-example.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:27:46.069Z"
+    },
+    "ts-example.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:28:00.889Z"
+    },
+    "ts-example.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:28:13.910Z"
+    },
+    "py-example.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:28:26.910Z"
+    },
+    "py-example.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:28:40.058Z"
+    },
+    "py-example.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:28:53.380Z"
+    },
+    "py-example.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:29:06.568Z"
+    },
+    "docs-readme.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:29:19.614Z"
+    },
+    "docs-readme.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:29:32.286Z"
+    },
+    "docs-readme.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:29:45.137Z"
+    },
+    "publish-meta.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:29:58.222Z"
+    },
+    "publish-meta.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:30:12.060Z"
+    },
+    "publish-meta.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:30:26.290Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-04T09:39:01Z",
+      "markdownBody": "# CodeRabbit findings for PAN-4956 (PR #4996)\n\nCodeRabbit posted 3 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4465994077 · integrations/grok-bot/examples/xai-api.py:98 [Minor]: Handle invalid JSON responses as API failures.\n  https://github.com/eltmon/overdeck/pull/4996#discussion_r4465994077\n- Thread 4465994115 · integrations/grok-bot/examples/xai-api.ts:88 [Minor]: Handle invalid JSON in successful responses.\n  https://github.com/eltmon/overdeck/pull/4996#discussion_r4465994115\n- Thread 4465994130 · integrations/grok-bot/README.md:113 [Major]: Document the `authorization` format as unresolved.\n  https://github.com/eltmon/overdeck/pull/4996#discussion_r4465994130\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/4996/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-4956`.\n   If you only replied, you are done.\n5. If PR #4996 has already merged when you read this, nothing more lands on it: open a follow-up issue\n   for the findings you agree with instead of pushing."
+    }
+  ]
+}

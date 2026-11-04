@@ -78,8 +78,23 @@ describe('resolveTargetMachine (D-4651-10)', () => {
     };
     const d = deps({}, live);
     const target = await resolveTargetMachine('auto', 'github.com/eltmon/overdeck', [], d.value);
-    expect(target).toMatchObject({ ok: true, self: false, label: 'desk', reason: 'Auto → desk (CPU pressure 2%, 64 GB free, 0 agents)' });
+    expect(target).toMatchObject({
+      ok: true, self: false, label: 'desk', reason: 'Auto → desk (CPU pressure 2%, 64 GB free, 0 agents)',
+      rejections: [{ environmentId: 'env-lab', label: 'lab', reason: 'CPU saturated' }],
+    });
     expect(d.selfLoad).toHaveBeenCalledTimes(1);
+  });
+
+  it('PAN-5006: auto answers the rejections it passed over, for a self pick too', async () => {
+    const d = deps({
+      selfProfile: () => ({ tags: ['docker'], placement: 'auto' }),
+      links: async () => [link('desk')],
+    }, { 'link-desk': { state: 'online', tags: [] } });
+    const target = await resolveTargetMachine('auto', null, ['docker'], d.value);
+    expect(target).toMatchObject({
+      ok: true, self: true, environmentId: 'env-laptop', label: 'laptop',
+      rejections: [{ environmentId: 'env-desk', label: 'desk', reason: 'no docker' }],
+    });
   });
 
   it('auto with nothing that fits answers 409 no-machine-fits with the rejection line', async () => {

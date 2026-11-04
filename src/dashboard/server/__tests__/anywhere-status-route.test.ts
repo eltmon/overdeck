@@ -26,7 +26,9 @@ const tailscaleState = vi.hoisted(() => ({
 }));
 vi.mock('../../../lib/tailscale/state.js', () => ({ readTailscaleState: async () => tailscaleState.current }));
 
-const { _resetAccessTokensForTests, _settleAccessTokenWritesForTests, createAccessToken, revokeAccessToken } = await import('../../../lib/access-tokens.js');
+const {
+  _resetAccessTokensForTests, _settleAccessTokenWritesForTests, createAccessToken, revokeAccessToken, isPairedDeviceRecord, PHONE_TOKEN_SCOPES,
+} = await import('../../../lib/access-tokens.js');
 const { _resetInternalTokenCacheForTests, INTERNAL_TOKEN_HEADER } = await import('../../../lib/internal-token.js');
 const { _resetDashboardSessionTokenForTests } = await import('../routes/dashboard-auth.js');
 const { _resetTrustedOriginsForTests } = await import('../routes/origin-validation.js');
@@ -102,8 +104,12 @@ describe('GET /api/anywhere/status (PAN-4445)', () => {
     }
   });
 
-  it('counts only active devices, lists loopback addresses, and is not cacheable', async () => {
+  it('counts both paired browsers and paired phones as active devices, lists loopback addresses, and is not cacheable', async () => {
     await createAccessToken({ name: 'phone', scopes: ['admin'], kind: 'device' });
+    await createAccessToken({
+      name: 'iris', kind: 'phone', scopes: [...PHONE_TOKEN_SCOPES],
+      phoneKey: 'ab'.repeat(32), clientId: '22222222-2222-4222-8222-222222222222',
+    });
     const lost = await createAccessToken({ name: 'lost', scopes: ['admin'], kind: 'device' });
     await createAccessToken({ name: 'ci', scopes: ['admin'], kind: 'token' });
     await revokeAccessToken(lost.record.id);
@@ -111,7 +117,7 @@ describe('GET /api/anywhere/status (PAN-4445)', () => {
     const res = await get({ [INTERNAL_TOKEN_HEADER]: INTERNAL_TOKEN });
     expect(res.status).toBe(200);
     expect(res.headers['cache-control']).toBe('no-store');
-    expect(res.json.devices).toEqual({ active: 1 });
+    expect(res.json.devices).toEqual({ active: 2 });
     expect(res.json.addresses).toContainEqual({ origin: 'http://127.0.0.1:3999', loopback: true });
     expect(res.json.machine).toEqual({ environmentId: expect.any(String), label: expect.any(String) });
     expect(res.json.vault).toEqual({ state: 'off', backend: null });
@@ -119,6 +125,15 @@ describe('GET /api/anywhere/status (PAN-4445)', () => {
     for (const problem of res.json.problems as Array<{ message: string }>) {
       expect(problem.message).not.toMatch(/\bpan [a-z]/);
     }
+  });
+
+  it('isPairedDeviceRecord treats device, phone and no kind as paired, and token, machine and connector as not (PAN-5000)', () => {
+    expect(isPairedDeviceRecord({ kind: 'device' })).toBe(true);
+    expect(isPairedDeviceRecord({ kind: 'phone' })).toBe(true);
+    expect(isPairedDeviceRecord({ kind: undefined })).toBe(true);
+    expect(isPairedDeviceRecord({ kind: 'token' })).toBe(false);
+    expect(isPairedDeviceRecord({ kind: 'machine' })).toBe(false);
+    expect(isPairedDeviceRecord({ kind: 'connector' })).toBe(false);
   });
 
   it('lists a trusted reachable address as not loopback and reports no address problem', async () => {

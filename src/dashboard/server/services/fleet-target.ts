@@ -17,7 +17,7 @@
  *   the Fly target door too (PAN-4743);
  * - anything else ⇒ 404 `unknown-machine`.
  */
-import type { LoadSample, PlacementAnswer } from '@overdeck/contracts';
+import type { LoadSample, PlacementAnswer, PlacementRejection } from '@overdeck/contracts';
 
 import { listLinks, type MachineLink } from '../../../lib/anywhere/link-store.js';
 import { currentMachineProfile, type MachineProfile } from '../../../lib/anywhere/machine-capabilities.js';
@@ -66,7 +66,15 @@ export const defaultFleetTargetDeps = (): FleetTargetDeps => ({
 });
 
 export type FleetTarget =
-  | { ok: true; self: true; environmentId: string; label: string; reason: string | null }
+  | {
+      ok: true;
+      self: true;
+      environmentId: string;
+      label: string;
+      reason: string | null;
+      /** Auto's passed-over machines (PAN-5006); absent for an explicit machine. */
+      rejections?: readonly PlacementRejection[];
+    }
   | {
       ok: true;
       self: false;
@@ -74,6 +82,7 @@ export type FleetTarget =
       environmentId: string;
       label: string;
       reason: string | null;
+      rejections?: readonly PlacementRejection[];
       /** Unlinks and destroys a Fly machine this spawn just created (PAN-4743). */
       discard?: () => Promise<void>;
     }
@@ -130,13 +139,13 @@ export async function resolveTargetMachine(
       const flyFits = spawn !== undefined && gitOrigin !== null && needs.every((tag) => FLY_MACHINE_TAGS.includes(tag));
       if (flyFits && (await deps.autoFly())) {
         const fly = await deps.startFly({ ...spawn, gitOrigin, needs });
-        return fly.ok ? { ...fly, reason: `Auto → ${fly.label} (new Fly machine). ${noMachineFits(answer.rejections)}` } : fly;
+        return fly.ok ? { ...fly, reason: `Auto → ${fly.label} (new Fly machine). ${noMachineFits(answer.rejections)}`, rejections: answer.rejections } : fly;
       }
       return refuse(409, 'no-machine-fits', noMachineFits(answer.rejections), { rejections: answer.rejections });
     }
-    if (answer.self) return { ok: true, self: true, environmentId: answer.environmentId, label: answer.label, reason: answer.reason };
+    if (answer.self) return { ok: true, self: true, environmentId: answer.environmentId, label: answer.label, reason: answer.reason, rejections: answer.rejections };
     const link = links.find((candidate) => candidate.environmentId === answer.environmentId)!;
-    return { ok: true, self: false, link, environmentId: link.environmentId, label: link.label, reason: answer.reason };
+    return { ok: true, self: false, link, environmentId: link.environmentId, label: link.label, reason: answer.reason, rejections: answer.rejections };
   }
   const self = await deps.self();
   if (wanted === '' || wanted === self.environmentId || wanted.toLowerCase() === self.label.toLowerCase()) {

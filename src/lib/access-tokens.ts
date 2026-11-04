@@ -469,6 +469,11 @@ export function listActiveRecordsOfKind(kind: AccessTokenKind): PublicAccessToke
     .map(toPublic);
 }
 
+/** A paired device: a browser pairing (`device`, or no `kind` — PAN-2351 FR-10) or an Overdeck app `phone`. */
+export function isPairedDeviceRecord(record: Pick<PublicAccessTokenRecord, 'kind'>): boolean {
+  return (record.kind ?? 'device') === 'device' || record.kind === 'phone';
+}
+
 /** The active `machine` record bound to `machineKey` (64 hex), from the snapshot; null when none. */
 export function findActiveMachineTokenByKey(machineKey: string): PublicAccessTokenRecord | null {
   const match = snapshot.records.find(

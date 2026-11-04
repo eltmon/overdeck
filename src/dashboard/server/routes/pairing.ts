@@ -23,7 +23,7 @@
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
-import { createAccessToken, listAccessTokens, revokeAccessToken, type PublicAccessTokenRecord } from '../../../lib/access-tokens.js';
+import { createAccessToken, isPairedDeviceRecord, listAccessTokens, revokeAccessToken, type PublicAccessTokenRecord } from '../../../lib/access-tokens.js';
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
 import { capturePhoneRemoved } from '../../../lib/telemetry/anywhere.js';
@@ -178,7 +178,7 @@ const listDevicesRoute = HttpRouter.add(
     const authError = rejectUnauthorizedDashboardRequest(request);
     if (authError) return noStore(authError);
     const records = yield* Effect.promise(() => listAccessTokens());
-    return noStore(jsonResponse({ devices: records.filter((record) => record.kind === 'device' || record.kind === 'phone').map(deviceView) }));
+    return noStore(jsonResponse({ devices: records.filter(isPairedDeviceRecord).map(deviceView) }));
   }),
 );
 
@@ -197,7 +197,7 @@ const revokeDeviceRoute = HttpRouter.add(
     }
 
     const records = yield* Effect.promise(() => listAccessTokens());
-    const target = records.find((record) => record.id === id && (record.kind === 'device' || record.kind === 'phone'));
+    const target = records.find((record) => record.id === id && isPairedDeviceRecord(record));
     if (!target) return noStore(jsonResponse({ error: `no paired device with id ${id}` }, { status: 404 }));
 
     if (credential?.kind === 'device' && credential.deviceId !== id) {
