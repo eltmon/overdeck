@@ -304,6 +304,65 @@ describe('AccessTokensSection — create-token dialog (PAN-4435 WI-5)', () => {
   });
 });
 
+describe('AccessTokensSection — agent token fold (PAN-4946)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const RECORD_AGENT_1 = {
+    id: 'tok-agent-1',
+    name: 'agent-pan-1',
+    scopes: ['read:state', 'operate'],
+    createdAt: '2026-10-01T00:00:00.000Z',
+    lastUsedAt: null,
+    agentId: 'agent-pan-1',
+  };
+
+  const RECORD_AGENT_2 = {
+    id: 'tok-agent-2',
+    name: 'agent-pan-2',
+    scopes: ['read:state'],
+    createdAt: '2026-09-01T00:00:00.000Z',
+    lastUsedAt: null,
+    revokedAt: '2026-09-02T00:00:00.000Z',
+    agentId: 'agent-pan-2',
+  };
+
+  it('ac1: renders the own token, hides agent tokens, and shows "Show agent tokens (2)" counting a revoked one', async () => {
+    mockFetch({ tokens: [RECORD_A, RECORD_AGENT_1, RECORD_AGENT_2] });
+    renderSection();
+
+    expect(await screen.findByText('ci-bot')).toBeInTheDocument();
+    expect(screen.queryByText('agent-pan-1')).not.toBeInTheDocument();
+    expect(screen.queryByText('agent-pan-2')).not.toBeInTheDocument();
+    const toggle = screen.getByTestId('show-agent-tokens');
+    expect(toggle).toHaveTextContent('Show agent tokens (2)');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('ac2: clicking the toggle reveals both agent tokens and flips to "Hide agent tokens (2)"', async () => {
+    mockFetch({ tokens: [RECORD_A, RECORD_AGENT_1, RECORD_AGENT_2] });
+    renderSection();
+    await screen.findByText('ci-bot');
+
+    fireEvent.click(screen.getByTestId('show-agent-tokens'));
+
+    expect(screen.getByText('agent-pan-1')).toBeInTheDocument();
+    expect(screen.getByText('agent-pan-2')).toBeInTheDocument();
+    const toggle = screen.getByTestId('show-agent-tokens');
+    expect(toggle).toHaveTextContent('Hide agent tokens (2)');
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('ac3: renders no toggle when no record carries an agentId', async () => {
+    mockFetch();
+    renderSection();
+    await screen.findByText('ci-bot');
+
+    expect(screen.queryByTestId('show-agent-tokens')).not.toBeInTheDocument();
+  });
+});
+
 describe('AccessTokensSection — require_token_mint toggle row (PAN-4435 WI-6)', () => {
   afterEach(() => {
     vi.restoreAllMocks();

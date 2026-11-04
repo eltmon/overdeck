@@ -9,6 +9,7 @@ import { RequireTokenMintRow } from './RequireTokenMintRow';
 import {
   ACCESS_TOKENS_FORBIDDEN_EXPLANATION,
   AccessTokensForbiddenError,
+  partitionAgentTokens,
   throwForAccessTokensResponse,
   type AccessTokenRecord,
 } from './accessTokensShared';
@@ -45,12 +46,14 @@ export function AccessTokensSection({ formData, onSettingsChange }: AccessTokens
   const queryClient = useQueryClient();
   const [error, setError] = useState<Error | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [showAgentTokens, setShowAgentTokens] = useState(false);
 
   const { data: tokens, error: queryError } = useQuery({
     queryKey: ['access-tokens'],
     queryFn: fetchAccessTokens,
     retry: false,
   });
+  const { own, agent } = partitionAgentTokens(tokens ?? []);
 
   const revoke = useMutation({
     mutationFn: revokeAccessToken,
@@ -65,6 +68,29 @@ export function AccessTokensSection({ formData, onSettingsChange }: AccessTokens
   const activeError = error ?? queryError;
   const forbidden = activeError instanceof AccessTokensForbiddenError ? activeError : null;
   const otherError = activeError && !forbidden ? activeError : null;
+
+  const tokenRow = (record: AccessTokenRecord) => (
+    <tr key={record.id} className="border-b border-border/50">
+      <td className="py-2 pr-4 text-foreground">{record.name}</td>
+      <td className="py-2 pr-4 text-muted-foreground">{record.scopes.join(', ')}</td>
+      <td className="py-2 pr-4 text-muted-foreground">{new Date(record.createdAt).toLocaleString()}</td>
+      <td className="py-2 pr-4 text-muted-foreground">{formatTimestamp(record.lastUsedAt)}</td>
+      <td className="py-2 pr-4 text-muted-foreground">{record.revokedAt ? new Date(record.revokedAt).toLocaleString() : '—'}</td>
+      <td className="py-2">
+        {!record.revokedAt && (
+          <button
+            type="button"
+            data-testid={`access-token-revoke-${record.id}`}
+            onClick={() => void handleRevoke(record)}
+            disabled={revoke.isPending}
+            className="text-xs px-2 py-1 rounded-md border border-border bg-background hover:bg-muted/50 disabled:opacity-50"
+          >
+            Revoke
+          </button>
+        )}
+      </td>
+    </tr>
+  );
 
   const handleRevoke = async (record: AccessTokenRecord) => {
     const ok = await confirm({
@@ -124,35 +150,27 @@ export function AccessTokensSection({ formData, onSettingsChange }: AccessTokens
           </tr>
         </thead>
         <tbody>
-          {tokens?.length === 0 && (
+          {tokens && own.length === 0 && agent.length === 0 && (
             <tr>
               <td colSpan={6} className="py-3 text-muted-foreground">No access tokens yet.</td>
             </tr>
           )}
-          {tokens?.map((record) => (
-            <tr key={record.id} className="border-b border-border/50">
-              <td className="py-2 pr-4 text-foreground">{record.name}</td>
-              <td className="py-2 pr-4 text-muted-foreground">{record.scopes.join(', ')}</td>
-              <td className="py-2 pr-4 text-muted-foreground">{new Date(record.createdAt).toLocaleString()}</td>
-              <td className="py-2 pr-4 text-muted-foreground">{formatTimestamp(record.lastUsedAt)}</td>
-              <td className="py-2 pr-4 text-muted-foreground">{record.revokedAt ? new Date(record.revokedAt).toLocaleString() : '—'}</td>
-              <td className="py-2">
-                {!record.revokedAt && (
-                  <button
-                    type="button"
-                    data-testid={`access-token-revoke-${record.id}`}
-                    onClick={() => void handleRevoke(record)}
-                    disabled={revoke.isPending}
-                    className="text-xs px-2 py-1 rounded-md border border-border bg-background hover:bg-muted/50 disabled:opacity-50"
-                  >
-                    Revoke
-                  </button>
-                )}
-              </td>
-            </tr>
-          ))}
+          {own.map((record) => tokenRow(record))}
+          {agent.length > 0 && showAgentTokens && agent.map((record) => tokenRow(record))}
         </tbody>
       </table>
+
+      {agent.length > 0 && (
+        <button
+          type="button"
+          data-testid="show-agent-tokens"
+          aria-expanded={showAgentTokens}
+          onClick={() => setShowAgentTokens((open) => !open)}
+          className="mt-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          {showAgentTokens ? 'Hide' : 'Show'} agent tokens ({agent.length})
+        </button>
+      )}
 
       <CreateAccessTokenDialog
         open={createOpen}
