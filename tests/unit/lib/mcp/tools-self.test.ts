@@ -1,7 +1,8 @@
 /**
  * PAN-4927 W-SELF1 WI-5: `wait_job` is listed only to agent tokens and passes
  * the wait route's answer through, `running` with `next` or `done`. Also the
- * workflow, secret (W-SEC1) and machine-link (PAN-4942 W-LINK1) self tools.
+ * workflow, secret (W-SEC1), machine-link (PAN-4942 W-LINK1) and memory
+ * (PAN-4940 W-MEM1) self tools.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -180,6 +181,95 @@ describe('MCP self tools (PAN-4927 W-SELF1)', () => {
       const result = await callTool(client, 'link_machine_wait', { requestId: 'l1' });
       expect(result.isError).toBe(true);
       expect(resultText(result).startsWith('HTTP 404')).toBe(true);
+    });
+  });
+
+  describe('memory_add (PAN-4940 W-MEM1)', () => {
+    it('is hidden from a non-agent token and listed for an agent token', async () => {
+      const api = fakeApi({});
+      const human = await connectClient(api, ['tell']);
+      expect((await human.listTools()).tools.map((tool) => tool.name)).not.toContain('memory_add');
+      const call = await callTool(human, 'memory_add', { id: 'x', type: 'feedback', description: 'd' });
+      expect(call.isError).toBe(true);
+      expect(resultText(call)).toBe('Unknown tool memory_add');
+      expect(api.calls).toEqual([]);
+
+      const agent = await connectClient(api, ['tell'], true);
+      expect((await agent.listTools()).tools.map((tool) => tool.name)).toContain('memory_add');
+    });
+
+    it('records exactly POST /api/self/memory/facts with the given body', async () => {
+      const done = { status: 'done', jobId: 'j1', verb: 'memory-add', exitCode: 0, stdout: '{"file":"/w/.overdeck/memory/x.md"}', stderr: '', error: null };
+      const api = fakeApi({ 'POST /api/self/memory/facts': { status: 200, json: done } });
+      const client = await connectClient(api, ['tell'], true);
+      const result = await callTool(client, 'memory_add', { id: 'x', type: 'feedback', description: 'd', tags: ['x'] });
+      expect(resultJson(result)).toEqual(done);
+      expect(api.calls).toEqual([
+        { method: 'POST', path: '/api/self/memory/facts', body: { id: 'x', type: 'feedback', description: 'd', tags: ['x'] } },
+      ]);
+    });
+
+    it('a missing description is a tool error naming description, with no call', async () => {
+      const api = fakeApi({});
+      const client = await connectClient(api, ['tell'], true);
+      const result = await callTool(client, 'memory_add', { id: 'x', type: 'feedback' });
+      expect(result.isError).toBe(true);
+      expect(resultText(result)).toContain('description');
+      expect(api.calls).toEqual([]);
+    });
+
+    it('tags: "x" is a tool error, with no call', async () => {
+      const api = fakeApi({});
+      const client = await connectClient(api, ['tell'], true);
+      const result = await callTool(client, 'memory_add', { id: 'x', type: 'feedback', description: 'd', tags: 'x' });
+      expect(result.isError).toBe(true);
+      expect(resultText(result)).toContain('tags');
+      expect(api.calls).toEqual([]);
+    });
+  });
+
+  describe('memory_search (PAN-4940 W-MEM1)', () => {
+    it('is hidden from a non-agent token and listed for an agent token', async () => {
+      const api = fakeApi({});
+      const human = await connectClient(api, ['read:state']);
+      expect((await human.listTools()).tools.map((tool) => tool.name)).not.toContain('memory_search');
+      const call = await callTool(human, 'memory_search', { query: 'decide' });
+      expect(call.isError).toBe(true);
+      expect(resultText(call)).toBe('Unknown tool memory_search');
+      expect(api.calls).toEqual([]);
+
+      const agent = await connectClient(api, ['read:state'], true);
+      expect((await agent.listTools()).tools.map((tool) => tool.name)).toContain('memory_search');
+    });
+
+    it('records exactly POST /api/self/memory/search with query, and limit when given', async () => {
+      const done = { status: 'done', jobId: 'j1', verb: 'memory-search', exitCode: 0, stdout: '{"facts":[],"observations":[]}', stderr: '', error: null };
+      const api = fakeApi({ 'POST /api/self/memory/search': { status: 200, json: done } });
+      const client = await connectClient(api, ['read:state'], true);
+      expect(resultJson(await callTool(client, 'memory_search', { query: 'decide' }))).toEqual(done);
+      await callTool(client, 'memory_search', { query: 'decide', limit: 5 });
+      expect(api.calls).toEqual([
+        { method: 'POST', path: '/api/self/memory/search', body: { query: 'decide' } },
+        { method: 'POST', path: '/api/self/memory/search', body: { query: 'decide', limit: 5 } },
+      ]);
+    });
+
+    it('a missing query is a tool error naming query, with no call', async () => {
+      const api = fakeApi({});
+      const client = await connectClient(api, ['read:state'], true);
+      const result = await callTool(client, 'memory_search', {});
+      expect(result.isError).toBe(true);
+      expect(resultText(result)).toContain('query');
+      expect(api.calls).toEqual([]);
+    });
+
+    it('a bad limit is a tool error naming limit, with no call', async () => {
+      const api = fakeApi({});
+      const client = await connectClient(api, ['read:state'], true);
+      const result = await callTool(client, 'memory_search', { query: 'decide', limit: 21 });
+      expect(result.isError).toBe(true);
+      expect(resultText(result)).toContain('limit');
+      expect(api.calls).toEqual([]);
     });
   });
 });

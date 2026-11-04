@@ -380,6 +380,26 @@ or a machine-link request's id on the secret wait, is **404**
 `unknown-request` at once. The MCP tools over these routes are `link_machine`
 and `link_machine_wait`.
 
+Memory routes (PAN-4940, W-MEM1) are self routes too.
+`POST /api/self/memory/facts` (`tell`) takes
+`{ id, type, description, title?, body?, tags?, store? }`: `id` matches
+`^[a-z0-9][a-z0-9-]{0,79}$`, `type` is one of `feedback`, `project`,
+`reference`, `user`, `description` is 1–200 characters on one line, `title`
+(optional) is 1–200 characters on one line, `body` (optional) is at most
+16,384 characters, `tags` (optional) is at most 20 tags each matching
+`^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$`, and `store` (optional) is `project`,
+`user` or `machine` (`project` by default, `user` for `type: "user"`; `type:
+"user"` with `store: "project"` is refused). It runs
+`pan memory add <id> --type=… --description=… [--title=…] [--body=…]
+[--tags=…] [--user|--machine] --json`. `POST /api/self/memory/search`
+(`read:state`) takes `{ query, limit? }`: `query` is 1–500 characters and
+`limit` (optional) is an integer 1–20 (default 10), and it runs
+`pan memory search --limit=<n> --facts --json -- <query>`. Both run in the
+caller's cwd, wait up to 50 s and answer 200 with the job answer; a bad body
+is **400** `bad-body`, a bad field is **400** `bad-request`, a bad argv piece
+is **400** `bad-job-arg`, and a full job store is **429** `too-many-jobs`. The
+MCP tools over these routes are `memory_add` and `memory_search`.
+
 ### Agent requests (`/api/agent-requests`)
 
 The operator answers agent requests here

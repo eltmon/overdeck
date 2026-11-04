@@ -540,6 +540,8 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/agent-requests/:id/secret',        kind: 'http', disposition: 'WRITE',       door: 'services/agent-requests.writeAgentSecretFile + settle, root credentials only (PAN-4927 W-SEC1)' },
   { surface: 'POST /api/agent-requests/:id/linked',        kind: 'http', disposition: 'WRITE',       door: 'services/agent-requests.settle(linked) after link-store.listLinks finds the active link, root credentials only (PAN-4927 W-LINK1)' },
   { surface: 'POST /api/agent-requests/:id/decline',       kind: 'http', disposition: 'WRITE',       door: 'services/agent-requests.settle, either kind, root credentials only (PAN-4927 W-SEC1, W-LINK1)' },
+  { surface: 'POST /api/self/memory/facts',                kind: 'http', disposition: 'WRITE',       door: 'services/self-jobs.start pan memory add in the caller cwd, agent tokens only (PAN-4927 W-MEM1)' },
+  { surface: 'POST /api/self/memory/search',               kind: 'http', disposition: 'READ',        door: 'services/self-jobs.start pan memory search --facts in the caller cwd, agent tokens only (PAN-4927 W-MEM1)' },
   { surface: '* /api/conversations/@<machine>/*',          kind: 'http', disposition: 'RELOCATE',    door: "linked-conversation-proxy -> owner's /api/conversations/* over the machine link (PAN-4650)" },
   { surface: 'POST /api/conversations/:name/release',      kind: 'http', disposition: 'WRITE',       door: 'conversation-release-service.releaseConversation (settle + pack + stop) (PAN-4650)' },
   { surface: 'GET /api/conversations/:name/release/transfer/:transferId', kind: 'http', disposition: 'READ', door: 'conversation-release-service.readTransferPack (PAN-4650)' },
