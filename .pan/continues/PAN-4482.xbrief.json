@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4482",
   "created": "2026-11-03T23:55:28.272Z",
-  "updated": "2026-11-04T00:33:10.535Z",
+  "updated": "2026-11-04T00:33:26.653Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -126,6 +126,10 @@
     "ice-candidate-classifier.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T00:33:10.535Z"
+    },
+    "forced-turn-checkpoint.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T00:33:26.653Z"
     }
   }
 }
