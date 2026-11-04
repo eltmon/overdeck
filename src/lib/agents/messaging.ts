@@ -5,7 +5,7 @@ import { Effect } from 'effect';
 import { emitActivityEntry } from '../activity-logger.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { generateLauncherScript } from '../launcher-generator.js';
-import { prepareClaudeOverdeckMcp } from '../mcp/agent-injection.js';
+import { prepareClaudeOverdeckMcp, prepareCodexOverdeckMcp } from '../mcp/agent-injection.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
 import { appendOperatorInterventionEvent } from '../operator-interventions.js';
 import { logAgentLifecycle } from '../persistent-logger.js';
@@ -500,7 +500,7 @@ export async function messageAgent(
       ? await getOhmypiLauncherFields(normalizedId, resumeModel, relaunchEffort.effort)
       : {};
     const fallbackCodexFields = fallbackHarness === 'codex'
-      ? getCodexLauncherFields(normalizedId, resumeModel, agentState.workspace, resumeRole, relaunchEffort.effort)
+      ? getCodexLauncherFields(normalizedId, resumeModel, agentState.workspace, resumeRole, relaunchEffort.effort, await prepareCodexOverdeckMcp({ agentId: normalizedId, agentKind: 'agent', role: resumeRole, harness: fallbackHarness }))
       : {};
     const fallbackSupervisorLaunch = await prepareSupervisorForRelaunch(normalizedId, agentState, resumeModel, fallbackHarness);
     const fallbackContent = generateLauncherScript({
