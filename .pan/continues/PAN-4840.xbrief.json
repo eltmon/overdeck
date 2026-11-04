@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4840",
   "created": "2026-11-03T20:58:06.302Z",
-  "updated": "2026-11-04T18:50:31.807Z",
+  "updated": "2026-11-04T18:50:46.761Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -70,6 +70,10 @@
     "fixture.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T18:50:31.806Z"
+    },
+    "fixture.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:50:46.761Z"
     }
   }
 }
