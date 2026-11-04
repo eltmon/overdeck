@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4954",
   "created": "2026-11-04T14:48:01.762Z",
-  "updated": "2026-11-04T15:18:10.149Z",
+  "updated": "2026-11-04T15:18:25.916Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -242,6 +242,10 @@
     "cp7.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T15:18:10.149Z"
+    },
+    "cp7.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:18:25.915Z"
     }
   }
 }
