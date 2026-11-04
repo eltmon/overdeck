@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5045",
   "created": "2026-11-04T18:04:56.381Z",
-  "updated": "2026-11-04T18:35:53.911Z",
+  "updated": "2026-11-04T18:36:03.014Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,11 @@
       "claimedBy": "agent-pan-5045",
       "claimedAt": "2026-11-04T18:35:12.080Z",
       "doneAt": "2026-11-04T18:35:53.911Z"
+    },
+    "phone-screenshot": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5045",
+      "claimedAt": "2026-11-04T18:36:03.014Z"
     }
   }
 }
