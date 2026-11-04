@@ -28,6 +28,7 @@
 		7FE6EBFF0A8EE117A18044A7 /* OverdeckActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 845F7ADD636D24E374419B32 /* OverdeckActivityAttributes.swift */; };
 		9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9582B6822FE993A50072D4E8 /* SceneDelegate.swift */; };
 		B2C74262D2CCA344562C9527 /* OverdeckLiveActivityPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BFAEE49B4A06BD0735C3A0A /* OverdeckLiveActivityPlugin.swift */; };
+		CE6ED2673FC26B4D386BF571 /* OverdeckAppearancePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83A763C86972D8991C365743 /* OverdeckAppearancePlugin.swift */; };
 		F24760087A074D2C0F975CAF /* MainViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E29945D56D2C3D38A2BAB379 /* MainViewController.swift */; };
 		F57818C3CC2865D61F4D8915 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8DABE8E80AE765698C03387A /* Foundation.framework */; };
 /* End PBXBuildFile section */
@@ -81,6 +82,7 @@
 		504EC3111FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		504EC3131FED79650016851F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
+		83A763C86972D8991C365743 /* OverdeckAppearancePlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OverdeckAppearancePlugin.swift; sourceTree = "<group>"; };
 		845F7ADD636D24E374419B32 /* OverdeckActivityAttributes.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OverdeckActivityAttributes.swift; sourceTree = "<group>"; };
 		86FAFA136A15D56BC054345E /* OverdeckWidgetsBundle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OverdeckWidgetsBundle.swift; sourceTree = "<group>"; };
 		8DABE8E80AE765698C03387A /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
@@ -192,6 +194,7 @@
 				2FAD9762203C412B000D30F8 /* config.xml */,
 				50B271D01FEDC1A000F3C39B /* public */,
 				9BFAEE49B4A06BD0735C3A0A /* OverdeckLiveActivityPlugin.swift */,
+				83A763C86972D8991C365743 /* OverdeckAppearancePlugin.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -380,6 +383,7 @@
 				9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */,
 				7FE6EBFF0A8EE117A18044A7 /* OverdeckActivityAttributes.swift in Sources */,
 				B2C74262D2CCA344562C9527 /* OverdeckLiveActivityPlugin.swift in Sources */,
+				CE6ED2673FC26B4D386BF571 /* OverdeckAppearancePlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

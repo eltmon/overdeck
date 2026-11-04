@@ -3,6 +3,7 @@ import { PHONE_NOTIFICATION_CATEGORIES, type PhoneNotificationCategory, type Pho
 import { useState } from 'react';
 
 import type { PushPermission } from '../native/push';
+import { APPEARANCES, type Appearance } from './appearance';
 import { APP_VERSION } from './config';
 import { isPaused, type PauseChoice } from './notificationPrefs';
 import type { AccountRecord, PairedMachine } from './types';
@@ -41,6 +42,37 @@ interface SettingsScreenProps {
   onBack(): void;
   /** The Notifications switch and pause/type controls; absent where push is not supported. */
   notifications?: NotificationsSetting;
+  /** The phone's System/Light/Dark appearance setting (PAN-5041). */
+  appearance: Appearance;
+  onAppearanceChange(appearance: Appearance): void;
+}
+
+const APPEARANCE_LABEL: Record<Appearance, string> = { system: 'System', light: 'Light', dark: 'Dark' };
+
+function AppearanceSection({ value, onChange }: { value: Appearance; onChange(appearance: Appearance): void }) {
+  return (
+    <div data-component="appearance-setting" className="flex flex-col gap-2">
+      <h3 id="appearance-label" className="text-sm font-medium text-foreground">
+        Appearance
+      </h3>
+      <div role="radiogroup" aria-labelledby="appearance-label" className="flex flex-col">
+        {APPEARANCES.map((a) => (
+          <button
+            key={a}
+            type="button"
+            role="radio"
+            aria-checked={value === a}
+            onClick={() => onChange(a)}
+            className="flex min-h-11 items-center justify-between gap-3 border-b border-border text-sm text-foreground"
+          >
+            <span>{APPEARANCE_LABEL[a]}</span>
+            <span className="text-muted-foreground">{value === a ? '✓' : ''}</span>
+          </button>
+        ))}
+      </div>
+      <p className="text-xs text-muted-foreground">{"System follows this phone's light or dark setting. Stored on this phone only."}</p>
+    </div>
+  );
 }
 
 const CATEGORY_LABEL: Record<PhoneNotificationCategory, string> = {
@@ -52,7 +84,17 @@ const CATEGORY_LABEL: Record<PhoneNotificationCategory, string> = {
   stopped: 'Agent stopped responding',
 };
 
-export function SettingsScreen({ account, machines, liveActivity, onForget, onSignOut, onBack, notifications }: SettingsScreenProps) {
+export function SettingsScreen({
+  account,
+  machines,
+  liveActivity,
+  onForget,
+  onSignOut,
+  onBack,
+  notifications,
+  appearance,
+  onAppearanceChange,
+}: SettingsScreenProps) {
   const [signingOut, setSigningOut] = useState(false);
 
   return (
@@ -69,6 +111,7 @@ export function SettingsScreen({ account, machines, liveActivity, onForget, onSi
         <span className="text-foreground">{account.label || 'This phone'}</span>
         <span className="font-mono text-xs text-muted-foreground">{account.deviceId}</span>
       </div>
+      <AppearanceSection value={appearance} onChange={onAppearanceChange} />
       {notifications ? (
         <div className="flex flex-col gap-2">
           <h3 className="text-sm font-medium text-foreground">Notifications</h3>
