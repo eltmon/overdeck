@@ -1,3 +1,8 @@
+/**
+ * PAN-4927 W-OAUTH2 (PAN-4946): the Sign-ins list in Settings → Access Tokens.
+ * Lists every active MCP OAuth sign-in with its access level and times, and
+ * ends one with Revoke (`DELETE /api/mcp-oauth/sign-ins/:familyId`).
+ */
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
