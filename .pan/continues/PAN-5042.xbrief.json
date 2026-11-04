@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5042",
   "created": "2026-11-04T17:47:47.339Z",
-  "updated": "2026-11-04T19:05:32.695Z",
+  "updated": "2026-11-04T19:06:15.381Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -144,6 +144,10 @@
     "open-only-readers.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T19:05:32.695Z"
+    },
+    "merged-row-checks.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:06:15.380Z"
     }
   }
 }
