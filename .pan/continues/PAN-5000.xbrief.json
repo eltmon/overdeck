@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5000",
+  "created": "2026-11-04T11:38:38.802Z",
+  "updated": "2026-11-04T11:38:38.802Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "paired-count": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5000",
+      "claimedAt": "2026-11-04T11:38:38.802Z"
+    }
+  }
+}
