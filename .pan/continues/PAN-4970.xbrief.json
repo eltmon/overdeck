@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4970",
   "created": "2026-11-04T00:20:58.327Z",
-  "updated": "2026-11-04T01:50:06.143Z",
+  "updated": "2026-11-04T01:50:23.749Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -106,6 +106,10 @@
     "reconciler-partition.ac6": {
       "status": "completed",
       "doneAt": "2026-11-04T01:50:06.143Z"
+    },
+    "promote-fast-refusal.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:50:23.748Z"
     }
   }
 }
