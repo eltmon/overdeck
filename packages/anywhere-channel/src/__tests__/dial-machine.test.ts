@@ -348,7 +348,7 @@ describe('createMachineDialer', () => {
   });
 
   it('evict closes only the owning connection while it is current', async () => {
-    const { dialer } = setup();
+    const { dialer, signals } = setup();
     const stale = await openRaw(dialer, 'env-1');
     stale.on('error', () => {});
     FakePeerConnection.instances[0]!.setState('failed');
@@ -371,10 +371,12 @@ describe('createMachineDialer', () => {
     expect(current.destroyed).toBe(true);
     expect(relayPc!.closed).toBe(false);
 
-    // A new dial builds a fresh connection.
+    // A new dial builds a fresh connection with a fresh offer.
+    const offersBefore = signals().filter((s) => s.data.sdp?.type === 'offer').length;
     void dialer.dialMachine('env-1', { relay: false }).catch(() => {});
     await flush();
     expect(FakePeerConnection.instances).toHaveLength(4);
+    expect(signals().filter((s) => s.data.sdp?.type === 'offer')).toHaveLength(offersBefore + 1);
     dialer.close();
   });
 

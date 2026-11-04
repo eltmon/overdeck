@@ -336,10 +336,12 @@ describe('RtcTransport ICE restart (PAN-5046 FR-6)', () => {
     expect(lines).toContain(`rtc session ${s8} ice restart from 00000000`);
     expect(lines.filter((line) => line === `rtc session ${s8} answered`)).toHaveLength(2);
     expect(lines.some((line) => line.includes('a new offer replaced it'))).toBe(false);
+    expect([...lines, ...bLogs.debug.mock.calls.map(([line]) => line as string)].some((line) => line.includes('v=0'))).toBe(false);
     expect(b.peerConnectionCount()).toBe(1);
     // The machine sends no candidate of the new generation before its answer.
     const fromMachine = h.sent.slice(before).filter((frame) => frame.from === B && frame.session === p.session);
     expect(fromMachine[0]?.data.sdp?.type).toBe('answer');
+    expect(fromMachine.filter((frame) => frame.data.sdp?.type === 'answer')).toHaveLength(1);
 
     expect((await toPhone(Buffer.from('9876543210'))).toString()).toBe('9876543210');
     const back = readBytes(accepted, 10);

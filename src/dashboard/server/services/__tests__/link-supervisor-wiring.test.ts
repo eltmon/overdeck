@@ -17,4 +17,19 @@ describe('startLinkSupervisorWired (PAN-5046 FR-9)', () => {
     expect(calls).toEqual(['status', 'presence', 'route', 'start']);
     expect(wired).toEqual([supervisor, supervisor, supervisor]);
   });
+
+  it('lets a link that comes online during start() find the route source', () => {
+    let route: unknown = null;
+    let seenByProbe: unknown = 'not run';
+    const supervisor = {
+      // A link online at once runs the linked syncs, which read the route source.
+      start: () => {
+        seenByProbe = route;
+      },
+    };
+
+    startLinkSupervisorWired(supervisor, [(source) => (route = source)]);
+
+    expect(seenByProbe).toBe(supervisor);
+  });
 });
