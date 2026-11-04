@@ -219,7 +219,7 @@ does not list needs `admin` (D-6):
 | Scope | `METHOD path` |
 | --- | --- |
 | `read:events` | `GET /events/stream`, `GET /events/version`, RPC `pan.replayEvents` (PAN-4835) |
-| `read:state` | `GET /api/issues`, `GET /api/agents`, `GET /api/agent-directory`, `GET /api/flywheel/status`, `GET /api/pipeline/membership`, `GET /api/versions/self`, `GET /api/activity` (PAN-4835), `GET /api/pull-requests`, `GET /api/pull-requests/conversations` (PAN-4943 W-PR1), RPC `pan.getSnapshot` (PAN-4835), `GET /api/lanes`, `GET /api/lanes/:name`, `GET /api/self/workers`, `GET /api/self/workers/:id`, `GET /api/self/workers/:id/wait`, `POST /api/self/lanes/wait` (PAN-4938) |
+| `read:state` | `GET /api/issues`, `GET /api/agents`, `GET /api/agent-directory`, `GET /api/flywheel/status`, `GET /api/pipeline/membership`, `GET /api/registered-projects` (PAN-5045), `GET /api/versions/self`, `GET /api/activity` (PAN-4835), `GET /api/pull-requests`, `GET /api/pull-requests/conversations` (PAN-4943 W-PR1), RPC `pan.getSnapshot` (PAN-4835), `GET /api/lanes`, `GET /api/lanes/:name`, `GET /api/self/workers`, `GET /api/self/workers/:id`, `GET /api/self/workers/:id/wait`, `POST /api/self/lanes/wait` (PAN-4938) |
 | `read:conversations` | `GET /api/conversations`, `GET /api/conversations/:id`, `GET /api/conversations/:name/messages`, `GET /api/conversations/:name/about`, `GET /api/palette/search`, `GET /api/conversations/pending-input` (explicit row, PAN-4835), `GET /api/needs-you` (PAN-4944), `GET /api/conversations/:name/pull-requests` (PAN-4943 W-PR1) |
 | `tell` | `POST /api/agents/:id/message`, `POST /api/agents/:id/tell`, `POST /api/conversations/:name/message`, `POST /api/conversations/:name/delete-image` (the undo of `upload-image`, PAN-4835), `PUT /api/phones/self/push-key`, `PUT /api/phones/self/notification-preferences` (PAN-5019), `DELETE /api/phones/self` (PAN-4835), `POST /api/conversations/:name/pull-requests`, `DELETE /api/conversations/:name/pull-requests`, `POST /api/conversations/:name/pull-requests/sync` (PAN-4943 W-PR1), `POST /api/self/lanes/report` (PAN-4938) |
 | `operate` | WebSocket `/ws/terminal` (`WS_TERMINAL_SCOPE`), `POST /api/conversations`, `POST /api/workers`, `POST /api/versions/self/update`, `DELETE /api/versions/self/update`, `POST /api/self/workers`, `POST /api/self/lanes` (PAN-4938) |
@@ -230,7 +230,10 @@ The rows PAN-4835 added are not phone-exclusive (D-8): they widen the same
 scope for a linked machine's operator token and any API token holding that
 scope too, since those credentials already hold the scope as part of their
 own grant. `POST /api/conversations/:name/delete-image` pairs with
-`upload-image`, already `tell`.
+`upload-image`, already `tell`. The PAN-5045 row follows the same rule; it
+exposes project keys, names, paths, repos and tracker ids to every
+`read:state` holder, and paths were already derivable from conversation
+cwds under `read:conversations`.
 
 A `:param` segment matches exactly one non-empty segment; matching is exact and
 case-sensitive on the normalized path, so any mismatch needs `admin`. Three
