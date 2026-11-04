@@ -19,9 +19,9 @@ Create or refresh these four files:
 Each file should be an orientation digest, not full documentation:
 
 - Keep each file to roughly 150 lines or fewer.
-- End each file with exactly one `<!-- last-verified: YYYY-MM-DD -->` line. A union merge of concerns.md can leave a second one mid-file; delete it.
+- End each file with exactly one `<!-- last-verified: YYYY-MM-DD -->` line. The line holds only the date, never issue ids or other text; provenance belongs in commit messages. `npm run lint:last-verified` fails any other form. A union merge of concerns.md can leave a second one mid-file; delete it.
 - Prefer stable facts and conclusions over broad file listings.
-- Update stale statements and the `last-verified` date when you confirm a change.
+- Correct a stale statement whenever you find one, and leave the date unchanged. Change the `last-verified` date only when you re-verify the whole file with this workflow, so parallel PRs do not all edit the same line.
 
 ## Workflow
 

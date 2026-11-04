@@ -1,0 +1,148 @@
+{
+  "version": "1",
+  "issueId": "PAN-4955",
+  "created": "2026-11-04T14:23:26.498Z",
+  "updated": "2026-11-04T15:08:46.213Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-04T15:08Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-04T15:08:46.213Z"
+    }
+  ],
+  "items": {
+    "manifest": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4955",
+      "claimedAt": "2026-11-04T14:23:26.498Z",
+      "doneAt": "2026-11-04T14:26:07.849Z"
+    },
+    "run-mcp": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4955",
+      "claimedAt": "2026-11-04T14:26:14.155Z",
+      "doneAt": "2026-11-04T14:28:39.384Z"
+    },
+    "skill-section": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4955",
+      "claimedAt": "2026-11-04T14:28:43.304Z",
+      "doneAt": "2026-11-04T14:29:39.732Z"
+    },
+    "readme": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4955",
+      "claimedAt": "2026-11-04T14:29:57.537Z",
+      "doneAt": "2026-11-04T14:32:27.190Z"
+    },
+    "mcp-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4955",
+      "claimedAt": "2026-11-04T14:32:32.079Z",
+      "doneAt": "2026-11-04T14:33:11.258Z"
+    },
+    "live-verify": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4955",
+      "claimedAt": "2026-11-04T14:33:41.144Z",
+      "doneAt": "2026-11-04T14:38:06.025Z"
+    },
+    "manifest.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:53:02.823Z"
+    },
+    "manifest.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:53:15.501Z"
+    },
+    "manifest.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:53:27.886Z"
+    },
+    "manifest.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:53:40.759Z"
+    },
+    "run-mcp.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:53:55.026Z"
+    },
+    "run-mcp.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:54:08.258Z"
+    },
+    "run-mcp.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:54:22.299Z"
+    },
+    "run-mcp.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:54:36.809Z"
+    },
+    "skill-section.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:54:49.819Z"
+    },
+    "skill-section.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:55:04.527Z"
+    },
+    "skill-section.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:55:20.080Z"
+    },
+    "readme.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:55:35.622Z"
+    },
+    "readme.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:55:50.729Z"
+    },
+    "readme.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:56:06.233Z"
+    },
+    "readme.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:56:21.540Z"
+    },
+    "mcp-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:56:36.652Z"
+    },
+    "mcp-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:56:50.991Z"
+    },
+    "live-verify.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:57:05.233Z"
+    },
+    "live-verify.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:57:20.162Z"
+    },
+    "live-verify.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:57:34.805Z"
+    },
+    "live-verify.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:57:49.443Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-04T15:08:46Z",
+      "markdownBody": "# CodeRabbit findings for PAN-4955 (PR #5032)\n\nCodeRabbit posted 9 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4469282397 · integrations/grok-build/docs/verification.md:22 [Minor]: Keep the verification token out of stdout.\n  https://github.com/eltmon/overdeck/pull/5032#discussion_r4469282397\n- Thread 4469282429 · integrations/grok-build/docs/verification.md:25 [Major]: Do not overwrite the existing plugin token.\n  https://github.com/eltmon/overdeck/pull/5032#discussion_r4469282429\n- Thread 4469282445 · integrations/grok-build/docs/verification.md:29 [Major]: Keep the bearer token out of the process arguments.\n  https://github.com/eltmon/overdeck/pull/5032#discussion_r4469282445\n- Thread 4469282463 · integrations/grok-build/docs/verification.md:50 [Minor]: Isolate connector state before the local check.\n  https://github.com/eltmon/overdeck/pull/5032#discussion_r4469282463\n- Thread 4469282478 · integrations/grok-build/docs/verification.md:49 [Minor]: Use the paired-machine count for the connector check.\n  https://github.com/eltmon/overdeck/pull/5032#discussion_r4469282478\n- Thread 4469282496 · integrations/grok-build/scripts/run-mcp.sh:9 [Major]: Pin the npx fallback to a published release that includes the connector.\n  https://github.com/eltmon/overdeck/pull/5032#discussion_r4469282496\n- Thread 4469282510 · integrations/shared/SKILL.md:59 [Minor]: Do not infer connector mode from missing `list_machines`.\n  https://github.com/eltmon/overdeck/pull/5032#discussion_r4469282510\n- Thread 4469282527 · integrations/shared/SKILL.md:59 [Minor]: Do not report a conversation page as the total count.\n  https://github.com/eltmon/overdeck/pull/5032#discussion_r4469282527\n- Thread 4469282548 · integrations/shared/SKILL.md:63 [Major]: Report unavailable linked-machine results in `/overdeck pending`.\n  https://github.com/eltmon/overdeck/pull/5032#discussion_r4469282548\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5032/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-4955`.\n   If you only replied, you are done.\n5. If PR #5032 has already merged when you read this, nothing more lands on it: open a follow-up issue\n   for the findings you agree with instead of pushing."
+    }
+  ]
+}

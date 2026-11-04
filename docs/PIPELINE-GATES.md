@@ -562,6 +562,26 @@ run in the deacon child yet
 waits for the next request. [PAN-4622](https://github.com/eltmon/overdeck/issues/4622)
 tracks closing this window.
 
+### Review dispatch touches neither the stack nor tracked files (PAN-4690)
+
+After verification passes, review dispatch keeps the window in which a
+dashboard restart can strand it short, and it leaves the workspace in a state
+from which `recoverUndispatchedReviews` can re-request the review:
+
+- **No stack gate for review.** `assertWorkspaceStackHealthyForSpawn`
+  (`agents/spawn-prep.ts`) returns at once for the `review` role, after the
+  missing-workspace check. Review reads only the committed diff, so it never
+  checks stack health, never rebuilds the stack, and runs on the host. Before
+  this, review dispatch could tear the stack down and run `docker compose up -d
+  --build` before spawning. A restart in that window killed the rebuild and the
+  spawn together, and left the containers in `Created`. Other non-`work` roles
+  keep the bounded rebuild with host fallback.
+- **No uncommitted tracked writes.** Dispatch clears only the gitignored
+  feedback mirror, never the continue file's `feedback[]`, and a no-op
+  continue-file update writes nothing (see [XBRIEF.md](XBRIEF.md)). Otherwise
+  the dirty-tree gate refuses the dispatched review and every deacon-lite
+  re-request of it.
+
 ## Verification artifacts (FR-8)
 
 Each verification run writes an immutable artifact named by run time and
@@ -1068,8 +1088,9 @@ both intents, build and run the gates, commit, push, and run
 
 - `scripts/file-size-allowlist.txt`: take main's rows, never raise a cap, and
   shrink a file that is over its cap.
-- `.overdeck/context/codebase/*.md`: keep both sides and refresh the
-  `last-verified` date.
+- `.overdeck/context/codebase/*.md`: keep both sides; on a conflicting
+  `last-verified` footer, keep one footer with the later date only, never
+  issue ids.
 - `bun.lock`: take main's version, then run `bun install`.
 - The slash-command manifest: run `npm run generate:slash-commands`.
 - `.pan/continues` and `.pan/specs`: `pan sync-main` already prefers main.
@@ -1588,6 +1609,8 @@ failures, and the closed-issue reaper treats the issue as not closed.
 - A minted App installation token is reused until 5 minutes before it expires.
 - Boot-warm refreshes are staggered over 60 seconds and periodic convergence over 4 minutes, one project per refresh batch; the first CI refill runs at boot + 2 minutes.
 - The close-out merged-PR lookup (`isSquashMergedViaPr`) runs through `runGh` instead of a raw unmetered exec, and a "not merged" answer for a `(project, branch, tip SHA)` is cached for one hour so the deacon's 60-second closed-issue reaper does not re-ask GitHub every tick for a still-unmerged branch (PAN-4291).
+- The closed-issue reaper's passive scans (workspace dirs, `agent-<issue>` state dirs, leaked `_devnet` networks) skip an issue whose residue the same deacon process reaped in the last 6 hours (`REAPED_RESIDUE_RECHECK_MS`). Reaping keeps the `agent-<issue>` directory, so without this every closed issue was re-checked against GitHub forever; 400+ of them spent the whole App REST quota. The running-agent loops still check every tick (PAN-5001).
+- A deacon-lite patrol tick, or a manual patrol request, that arrives while a patrol is still running joins it instead of starting an overlapping sweep (PAN-5001).
 - `readRepoPullRequests` skips the `gh pr list` call entirely — no exec, no ledger line — for a repo with no git remote or a project with no resolvable tracker.
 - The PR-cache listing is capped at 100 rows, not 200, and a listing with no OPEN PR is cached for `PR_CACHE_IDLE_TTL_MS` (5 minutes) instead of the flat 30 seconds, since nothing in it can change without a new PR opening.
 - `gh pr list`/`gh issue list` calls are priced by the GraphQL pages they actually walk (`priceGhListCall`), weighted by which `--json` fields GitHub joins in, instead of a flat 1 point.

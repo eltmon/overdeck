@@ -15,6 +15,7 @@ import { loadConfigSync as loadYamlConfig, type RoleEffort } from '../config-yam
 import { resolveEffort } from './resolve-effort.js';
 import { getClaudeAuthStatus } from '../claude-auth.js';
 import { materializeAcpContextFile } from '../acp/context.js';
+import { overdeckMcpEnabledFor } from '../mcp/overdeck-mcp-gate.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { hostLabel, hostLaunchErrorFile, hostSessionIdFile, hostSocketPath, hostTokenFile, type HostTransport } from '../runtimes/host-transport.js';
 import { initCodexHome, type CodexMcpServerDef } from '../runtimes/codex.js';
@@ -119,14 +120,14 @@ export async function getOhmypiLauncherFields(agentId: string, model: string, ef
   };
 }
 
-export function getAcpLauncherFields(
+export async function getAcpLauncherFields(
   agentId: string,
   model: string,
   workspace: string,
   binaryPath: string,
   role?: Role,
   effort?: string,
-): {
+): Promise<{
   harness: 'acp' | 'opencode';
   acpAgentId: string;
   acpProvider: string;
@@ -136,7 +137,7 @@ export function getAcpLauncherFields(
   acpEffort: string;
   model: string;
   unsetProviderEnv: true;
-} {
+}> {
   const harness = model.startsWith('opencode/') || model.startsWith('opencode-go/') ? 'opencode' : 'acp';
   return {
     harness,
@@ -144,7 +145,7 @@ export function getAcpLauncherFields(
     acpProvider: getProviderForModel(model).name,
     acpWorkspace: workspace,
     acpBinaryPath: binaryPath,
-    acpContextFile: materializeAcpContextFile(getAgentDir(agentId), workspace, harness),
+    acpContextFile: materializeAcpContextFile(getAgentDir(agentId), workspace, harness, { overdeckMcp: await overdeckMcpEnabledFor(harness).catch(() => false) }),
     acpEffort: harness === 'opencode' && effort && !isEffortLevel(effort) ? effort : resolveEffort({ explicit: effort, role, model, harness }).effort,
     model,
     unsetProviderEnv: true,

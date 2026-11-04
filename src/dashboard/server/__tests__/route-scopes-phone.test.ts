@@ -47,6 +47,7 @@ const PHONE_SURFACE_HTTP: ReadonlyArray<[string, string]> = [
   ['POST', '/api/conversations/c1/plan-action'],
   ['POST', '/api/conversations/c1/pane-choice'],
   ['PUT', '/api/phones/self/push-key'],
+  ['PUT', '/api/phones/self/notification-preferences'],
   ['DELETE', '/api/phones/self'],
 ];
 

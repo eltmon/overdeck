@@ -121,6 +121,7 @@ export function createNeedsYouDispatcher(deps: {
       windowSends.push(now());
       deliver({
         kind: 'summary',
+        category: 'summary',
         tag: 'summary',
         title: `${count} more items need you`,
         publicTitle: `${count} more items need you`,

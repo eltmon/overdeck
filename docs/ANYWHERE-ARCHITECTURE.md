@@ -198,6 +198,21 @@ Other URLs, such as the directory, keep the original implementations. The client
 tested against `installChannelListener` in `tests/integration/anywhere/phone-channel.test.ts`;
 the package README has the details and the CP-2 direct-URL audit.
 
+A failed link is logged on the phone (PAN-5018): `[overdeck] link <label>: direct dial failed: …`,
+`relay dial failed: …`, and `secure open failed over <direct|relay> (<code>): …` with the
+`ChannelOpenError` code. A secure open that fails with `timeout` or `protocol` means a raw channel
+opened but the handshake got no valid reply, so the peer connection under it is suspect: the phone
+closes its peer connections to that machine and forgets the remembered route, and the next dial
+sends a fresh offer. Definitive refusals (`unknown-peer`, `pairing-refused`, `identity-refused`,
+`unsupported`) and `busy` keep the connection. A web bundle built with
+`VITE_OVERDECK_DEBUG_ERRORS=1` appends the code to the on-screen text, for example
+"Could not open a secure channel to desk. (timeout)".
+
+Opening a machine reloads the page and a resume reconnects the directory socket, so a dial waits up
+to 10 s for an off or connecting socket before it reports "Not connected to overdeck.ai."
+(`DIRECTORY_WAIT_MS`). The shell's failure text over the machine view clears on the next dial that
+succeeds; before PAN-5018 one failed dial kept its text on screen while later dials worked.
+
 ## One session per connection; the same port (D-4645-3, D-4645-4)
 
 Every transport connection is one Noise session with a one-round-trip IK handshake; there
@@ -219,6 +234,13 @@ in the narrow window between the pool handing it out and the request reaching th
 channel, when it dies with `ECONNRESET` or `EPIPE` on a reused channel before any response
 byte arrives. Every other method, and any request that already got a response, is never
 resent.
+
+Opening a channel to a link has two budgets. A `connecting` link gets `LINK_WAIT_MS` (2.5 s) to come
+online, and an `offline`, `revoked` or `unsupported` link fails at once. The open itself (transport
+connect plus handshake) to an online link gets `LINK_OPEN_MS` (10 s): over the public Fly route, TLS to
+the edge, the `fly-force-instance-id` pin and the handshake missed 2.5 s often enough that two of three
+worker starts failed against an online link (PAN-4885). Callers that need a shorter bound pass their own
+signal; fleet search and usage keep 2.5 s per machine that way.
 
 No new port is opened. `installChannelListener` (`src/dashboard/server/channel-listener.ts`)
 is installed in the `NodeHttpServer.make` factory and reads the first byte of every
@@ -337,9 +359,52 @@ W-CONN1)". The facts that belong here:
 - **Handshake pin.** `isPinnedPeer` (`server.ts`) accepts a key held by an
   active `machine`, `phone` or `connector` record
   (`findActiveChannelTokenByKey`).
-- **One machine only.** Fleet routes and the linked-conversation proxy refuse
-  every channel caller, so a connector reaches only the machine it paired
-  with.
+- **One machine only.** The three fleet spawn routes (`POST
+  /api/fleet/conversations`, `/api/fleet/workers`,
+  `/api/fleet/issues/:id/start`) admit a connector through its link channel
+  for a target on this machine only and answer 403 `connector-local-only` for
+  any other target, before any side effect (PAN-4950 D-5). Placement, worker
+  stop, the fleet reads and the linked-conversation proxy still refuse every
+  channel caller, so a connector reaches only the machine it paired with.
+
+## The connector process (PAN-4927 W-CONN2)
+
+`pan mcp connector login|pair|serve|status|logout` (PAN-4950) is the process a
+self-hosted bot runs. The CLI group is `src/cli/commands/mcp-connector.ts`
+(type-only at load; each action imports its module); the modules live in
+`src/lib/mcp/connector/` and import nothing from `src/dashboard/`:
+
+- `home.ts` — the connector home, `$OVERDECK_CONNECTOR_HOME` (default
+  `~/.overdeck-connector`, 0700) with `account.json`, `identity.json`,
+  `pairing.json` and `local-token` (0600, written atomically). It never reads
+  or writes `~/.overdeck`; in particular the connector never uses
+  `ensureMachineKey` or `readDirectoryUrl`.
+- `account.ts` — `login` (the overdeck.ai device flow with
+  `environment_id` = the connector's `clientId`) and `status`.
+- `directory.ts` — `DirectoryWebClient` in the client role with
+  `platform: 'node'`: the account token rides in the `overdeck.bearer.<token>`
+  subprotocol, `hello-client.publicKeyHex` is the home's install key (not a
+  push key), and the client id is the home's `clientId`.
+- `dial.ts` — an `RtcTransport` whose signalling port is that directory
+  socket (`signal` frames with purpose `link`, `ice-servers` requests),
+  registered with `setRtcDialer`. It only dials. Relay channels are metered
+  like the phone's (`relay-usage` every 60 s and on close, at most 1e9 bytes
+  per frame), because the directory counts only the initiator's reports; a
+  `relay-status` with `stopped: true` closes them and refuses new relay dials.
+- `channel-api.ts` — `ConnectorLink`, a `LinkRouteSource`, and the tools'
+  `DashboardApi` over `linkFetch(environmentId, path, { routeSource })`, so
+  the connector reuses `LinkAgent`'s pool. `openLinkSocket` bounds a dial at
+  `LINK_WAIT_MS` (2.5 s), which a cold ICE negotiation through TURN can
+  exceed, so the link reports `online` only after a probe channel (15 s
+  timeout, then closed) has set up the peer connection; later dials reuse it.
+  Each later probe first closes the transport entry. Direct first, relay only
+  when allowed; failed rounds back off 1 s doubling to 60 s.
+- `pair.ts` — `pair` (a pairing-mode channel with the `odp_` code and a fresh
+  link key, then `POST /api/connectors/exchange`; the proven key and the
+  descriptor's `machineKey` must both equal the string's `k`) and `logout`.
+- `serve.ts` — `127.0.0.1:7466` `POST /mcp` (stateless, local-token bearer,
+  constant-time compare) or stdio, with the shared tool module minus
+  `list_machines` and with the start tools' `machine`/`needs` removed.
 
 ## Phone Live Activity (PAN-4839)
 
@@ -402,6 +467,37 @@ Cloudflare Durable Object per account that knows the account's machines and intr
 - `OVERDECK_ANYWHERE_NO_ADVERTISE=1` makes a dashboard advertise no endpoints (the directory
   smoke uses it so only `direct` can link two dashboards on one host). `OVERDECK_PUBLIC_LINK_ONLY=1`
   has the same effect (PAN-4741).
+
+### Diagnosing a link that does not open (PAN-5018)
+
+Every layer of a direct or relayed link writes `[anywhere]` lines to `dashboard.log`. Ids are cut
+to 8 characters; no line carries SDP, ICE candidate text, keys, tokens or pairing codes. These
+lines are always on, because they are bounded by real events:
+
+- `rtc offer from <from> session <session> (<purpose>, <direct|relay>)`: an offer reached
+  `RtcTransport`. Its outcome follows: `rtc session <session> answered`,
+  `rtc offer dropped: <reason>` (the session belongs to another peer, is closed, or is already
+  open), or `rtc session <session> from <from> failed at <step>: <message>`, where the step is
+  `ice-servers`, `peer-connection`, `remote-description` or `answer`.
+- `rtc closing session <session> for <from>: a new offer replaced it`.
+- `rtc session <session> <peer> connected|failed|closed`: a peer connection changed state.
+- `directory online (plan <plan>, <n> machines)`, `directory socket closed (<code>)`,
+  `directory refused: <message>` (for example close 4011, "Another Overdeck process registered
+  this machine with the directory"), `directory upgrade refused (<status>)`,
+  `directory silent for <s> s; reconnecting` and `directory account changed; reconnecting`.
+- `channel refused (<code>, <mode>): <message>` for every secure-channel refusal except `closed`
+  and `timeout`. `<mode>` is `link`, `pairing`, `approval`, or `unknown` before the preamble.
+
+`OVERDECK_ANYWHERE_DEBUG=1` in the dashboard's environment adds the routine lines:
+`rtc candidate dropped: …`, `rtc answer dropped: …`,
+`directory signal from <from> session <session> (offer|answer|candidate)`,
+`directory message on a replaced socket ignored`, and the `closed` and `timeout` channel
+refusals, which the supervisor's phased probing causes whenever it aborts a losing channel. The
+helper is `src/lib/anywhere/debug-log.ts`.
+
+`acceptChannel` errors carry the handshake mode once the preamble is parsed (`null` before). An
+unexpected exception inside the handshake has the code `internal`, not `closed`, so a bug in the
+responder is always logged instead of looking like a peer that went away.
 
 ## Approval (D-2356-9/10)
 
@@ -1205,7 +1301,9 @@ origin, a 403 `no-chained-hops` for a secure-channel caller (D-4638-12), `isFly`
 Fly machine store, and the owner calls through `postWorkDoor` as the caller's actor
 (`x-overdeck-sender`, 30 s, 503 `machine-unreachable`), with refusals through
 `ownerRefusal`. The same resolver serves a `--reuse` whose newest lane ran elsewhere and
-`--replace` of a live lane on another machine.
+`--replace` of a live lane on another machine. An Auto pick of this machine resolves to a
+`LocalLanePlacement` (`self: true`, reason, rejections), never to `null`, so the result's
+`placement` explains it while `machine` stays `null` and home follows nothing (#5006).
 
 The owner doors live in `routes/machines-work-lanes.ts`, machine credential only:
 `POST /api/machines/work/lanes`, `GET /api/machines/work/lanes/:name/status?after=<seq>` and
@@ -1261,6 +1359,15 @@ linked row with the stand-in's parent, run, key, role, critic link and home's pr
 so the Command Deck tree nests it under its orchestrator and the Awareness rail counts it
 in the run card, with no frontend change.
 
+PAN-5005: lane list fields (`laneReport`, `laneIteration`, `laneVerdict`, `laneLatestVerdict`)
+come from `laneFieldsByRun` in `lanes/lane-list-fields.ts`, which pairs over
+`listAllLaneRows` (local and remote lanes of a run) instead of the home-only context
+`conversation-list.ts` used before. `getMergedConversationList` passes them to
+`mergeConversationRows` through `RemoteLaneEntry.fields`, which is spread onto the stamped
+row alongside the lane facts above. `laneLatestVerdict.criticRoute` is the critic's route
+key — `@<environmentId>/<name>` for a remote critic, its numeric id as a string for a local
+one — so a builder's verdict link opens the right row on either machine.
+
 Live check, 2026-11-01: the three-machine run (orchestrator and builders on the desktop,
 critics on a Fly machine and the laptop) did not run before merge: no laptop or Fly machine
 was linked to the desktop, and the desktop dashboard runs `main`, which has no lane doors
@@ -1268,3 +1375,10 @@ until this lands. Fallback per the plan: the two-machine smoke on this branch (t
 servers, A as home and B as the laptop) passed `lane-remote`, `lane-report`, `lane-nest`
 and `lane-reap`. The three-machine check (laptop rig and a Fly machine) runs after release
 and `pan reload`, tracked in #4760.
+
+Live check, 2026-11-04 (build `65e3b1adf86`, 0.73.1 on all three machines): passed. Three builders on the
+desktop; critics on a Fly machine (`add-fly`) and the laptop rig each judged a builder's pushed head and
+reported PASS; `--machine auto` chose the Fly machine by CPU pressure, `--needs macos` the laptop and
+`--needs docker` the desktop. All 8 lanes were listed under the orchestrator in `pan lane list` and the
+Command Deck. The tree showed no report badges for remote lanes, fixed by #5005. Auto prints no reason when it
+picks this machine (#5006). Evidence: `.pan/uat/pan-4638/check-1-three-machine-gauntlet.md`.

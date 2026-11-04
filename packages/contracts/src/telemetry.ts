@@ -1,3 +1,4 @@
+import type { ROUTE_KINDS } from "./machines"
 import type { Harness } from "./types"
 
 export const TELEMETRY_EVENT_NAMES = [
@@ -19,6 +20,13 @@ export const TELEMETRY_EVENT_NAMES = [
   "github_quota_sample",
   "github_rate_limited",
   "instance_heartbeat",
+  "machine_link_started",
+  "machine_link_approved",
+  "machine_link_failed",
+  "phone_paired",
+  "phone_removed",
+  "anywhere_channel_opened",
+  "relay_usage_sampled",
 ] as const
 
 export type TelemetryEventName = typeof TELEMETRY_EVENT_NAMES[number]
@@ -106,11 +114,16 @@ const TELEMETRY_GITHUB_CALLERS = [
   "other",
 ] as const
 
+/** PAN-5016: route kinds (ROUTE_KINDS in ./machines) plus `stored`, the stored-route probe phase. */
+const TELEMETRY_CHANNEL_ROUTES = ["lan", "tailnet", "ssh", "public", "direct", "relay", "stored"] as const satisfies readonly ((typeof ROUTE_KINDS)[number] | "stored")[]
+
 export const TELEMETRY_PROPERTY_DOMAINS = {
   agent_spawn_mode: ["spawn-and-send", "spawn-work-and-send"],
   answer_type: ["custom", "selection", "note", "selection+note"],
   auto_merge_variant: ["segmented", "badge"],
   boolean: [false, true],
+  channel_error_class: ["none", "unreachable", "identity_refused", "unknown_peer", "unsupported", "no_relay_plan", "descriptor_failed", "wrong_machine", "heartbeat_failed", "revoked"],
+  channel_route: TELEMETRY_CHANNEL_ROUTES,
   cli_verb: TELEMETRY_CLI_VERBS,
   close_out_variant: ["card", "inspector"],
   count_bucket: ["0", "1-2", "3-5", "6-10", "11+"],
@@ -147,8 +160,12 @@ export const TELEMETRY_PROPERTY_DOMAINS = {
   fork_kind: ["summary", "handoff", "plain"],
   github_caller: TELEMETRY_GITHUB_CALLERS,
   harness: TELEMETRY_HARNESSES,
+  link_failure_reason: ["bad_pairing_url", "unreachable", "pairing_refused", "unsupported", "identity_mismatch", "exchange_failed", "grant_refused", "offline", "approval_refused", "approval_failed", "other"],
+  link_method: ["pairing_code", "ssh", "fly", "directory_approval", "other"],
+  link_side: ["requester", "approver"],
   merge_kind: ["pipeline"],
   model_family: ["claude", "gpt", "gemini", "kimi", "minimax", "glm", "mimo", "other"],
+  phone_removed_by: ["operator", "phone"],
   pipeline_stage: ["work_done", "review_passed", "verification_passed", "merged", "closed_out"],
   // "clone" ships with PAN-3836; without it the dimension cannot show whether
   // cloning is actually used, which is the reason the event carries a mode.
@@ -156,6 +173,7 @@ export const TELEMETRY_PROPERTY_DOMAINS = {
   quota_points_bucket: ["0", "1-49", "50-199", "200-499", "500-999", "1000-2499", "2500+"],
   quota_remaining_bucket: ["0", "1-99", "100-499", "500-999", "1000-2499", "2500+", "unknown"],
   rate_limit_kind: ["primary", "secondary"],
+  relay_bytes_bucket: ["under_1mb", "1mb-9mb", "10mb-99mb", "100mb-999mb", "1gb+"],
 } as const
 
 export type TelemetryPropertyDomainName = keyof typeof TELEMETRY_PROPERTY_DOMAINS
@@ -215,6 +233,13 @@ export const TELEMETRY_EVENT_CATALOG = {
   },
   github_rate_limited: { caller: "github_caller", kind: "rate_limit_kind", own_usage_low: "boolean" },
   instance_heartbeat: { project_count: "count_bucket", active_agent_count: "count_bucket", dashboard_running: "boolean" },
+  machine_link_started: { method: "link_method" },
+  machine_link_approved: { method: "link_method", side: "link_side" },
+  machine_link_failed: { method: "link_method", side: "link_side", reason: "link_failure_reason" },
+  phone_paired: { replaced_previous: "boolean" },
+  phone_removed: { by: "phone_removed_by" },
+  anywhere_channel_opened: { route: "channel_route", ok: "boolean", error_class: "channel_error_class" },
+  relay_usage_sampled: { bytes: "relay_bytes_bucket" },
 } as const satisfies Record<TelemetryEventName, Record<string, TelemetryPropertyDomainName>>
 
 type TelemetryPropertyValue<Domain extends TelemetryPropertyDomainName> =
@@ -250,9 +275,22 @@ export type PipelineStageChangedProperties = EventProperties<"pipeline_stage_cha
 export type GitHubQuotaSampleProperties = EventProperties<"github_quota_sample">
 export type GitHubRateLimitedProperties = EventProperties<"github_rate_limited">
 export type InstanceHeartbeatProperties = EventProperties<"instance_heartbeat">
+export type MachineLinkStartedProperties = EventProperties<"machine_link_started">
+export type MachineLinkApprovedProperties = EventProperties<"machine_link_approved">
+export type MachineLinkFailedProperties = EventProperties<"machine_link_failed">
+export type PhonePairedProperties = EventProperties<"phone_paired">
+export type PhoneRemovedProperties = EventProperties<"phone_removed">
+export type AnywhereChannelOpenedProperties = EventProperties<"anywhere_channel_opened">
+export type RelayUsageSampledProperties = EventProperties<"relay_usage_sampled">
 export type TelemetryQuotaPointsBucket = TelemetryPropertyValue<"quota_points_bucket">
 export type TelemetryQuotaRemainingBucket = TelemetryPropertyValue<"quota_remaining_bucket">
 export type TelemetryGitHubCaller = TelemetryPropertyValue<"github_caller">
+export type TelemetryLinkMethod = TelemetryPropertyValue<"link_method">
+export type TelemetryLinkSide = TelemetryPropertyValue<"link_side">
+export type TelemetryLinkFailureReason = TelemetryPropertyValue<"link_failure_reason">
+export type TelemetryChannelRoute = TelemetryPropertyValue<"channel_route">
+export type TelemetryChannelErrorClass = TelemetryPropertyValue<"channel_error_class">
+export type TelemetryRelayBytesBucket = TelemetryPropertyValue<"relay_bytes_bucket">
 
 /** PAN-4264: GitHub quota points as a coarse bucket (raw counts are never sent). */
 export function bucketQuotaPoints(points: number): TelemetryQuotaPointsBucket {
@@ -274,6 +312,15 @@ export function bucketQuotaRemaining(remaining: number | undefined): TelemetryQu
   if (remaining < 1000) return "500-999"
   if (remaining < 2500) return "1000-2499"
   return "2500+"
+}
+
+/** PAN-5016: relayed bytes as a coarse bucket (raw byte counts are never sent). */
+export function bucketRelayBytes(bytes: number): TelemetryRelayBytesBucket {
+  if (!(bytes >= 1_000_000)) return "under_1mb"
+  if (bytes < 10_000_000) return "1mb-9mb"
+  if (bytes < 100_000_000) return "10mb-99mb"
+  if (bytes < 1_000_000_000) return "100mb-999mb"
+  return "1gb+"
 }
 
 export type TelemetryEventProperties = {

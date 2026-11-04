@@ -250,3 +250,130 @@ answered:
   as exempt (mass-market), so `usesNonExemptEncryption` is false; internal build state
   READY_FOR_BETA_TESTING; in the internal group "Operator" (automatic distribution on), whose
   tester (the operator) is INVITED.
+
+## PAN-5018 link after a long machine uptime
+
+Evidence for PRD WI-8 (`.pan/drafts/pan-5018.md`). Run on 2026-11-04, 14:23–14:45 UTC.
+
+**Result: the machine-side silence from the issue was not reproduced; two phone-side causes were.**
+In about 17 minutes of uptime, the branch-built test machine answered every phone offer, including
+after a 90 s freeze, and logged each one. The phone, however, showed a failure text after almost
+every machine open and every resume, and the text stayed on screen after later dials succeeded.
+
+### Deviations from the plan
+
+- **Local overdeck.ai stack instead of the real one (D-7, D-8).** The Simulator cannot complete a
+  GitHub sign-in unattended, and the operator could not sign in on it. The run used the real
+  `services/connect` Worker in Miniflare (as `scripts/anywhere/directory-smoke.mjs` does), with an
+  `AccountRpc` stub that puts the machine token and the phone token on one `tester` account, plus a
+  stub account service whose `/auth/start` answers with the same `302` to
+  `ai.overdeck.app:/oauth/callback` that the real one sends after GitHub. The Simulator reached both
+  through an SSH reverse tunnel to the rig's loopback (`127.0.0.1:8790` and `:8791`). No STUN or TURN,
+  so only the `direct` route can link; the relay dial always fails with "relay credentials are not
+  available". The phone bundle was built with `VITE_OVERDECK_ACCOUNT_URL`, `VITE_OVERDECK_DIRECTORY_URL`
+  pointing there and `VITE_OVERDECK_DEBUG_ERRORS=1`.
+- **Version stamp.** The app hides machines older than `MIN_PAN_VERSION` (0.74.0); this branch's
+  `package.json` says 0.73.1. The test dashboard ran from a copy of this branch's `dist/` beside a
+  `package.json` stamped 0.74.0. No product code was changed for the run.
+- **Shared terminal backend.** The test home's `~/.config` is a symlink to the real one, so the peer
+  dashboard attached to the operator's Herdr session and seeded 31 agent snapshots. It ran with
+  `OVERDECK_DISABLE_DEACON=1` and spawned nothing.
+- **Shorter run.** About 17 minutes of machine uptime, not 30; the 2-hour rerun was not done. The
+  rerun with the fixed build (below) adds more uptime.
+- **Phone logs.** `log show` does not contain the app's `console` lines; the README command was
+  corrected to launch with `SIMCTL_CHILD_NSUnbufferedIO=YES … --stdout=<file>`.
+
+### Setup
+
+- Machine: `pan5018-test` (`95b91f02…`), this branch, port 3061, `OVERDECK_DISABLE_DEACON=1`,
+  `OVERDECK_ANYWHERE_SUPERVISOR=1`, `OVERDECK_ANYWHERE_DEBUG=1`, own `HOME` and `OVERDECK_HOME`.
+- Phone: Debug build, Simulator `overdeck-5018` (iPhone 17 Pro, iOS 26.5) on the Mac rig, client id
+  `ae6b5071…`. Taps with `idb ui tap`; pair link delivered through Safari from a stub page that
+  redirects to `ai.overdeck.app:/pair#…` (`simctl openurl` rewrites `ai.overdeck.app:/x` to
+  `ai.overdeck.app:///x`, which the app's prefix checks reject).
+
+### Steps
+
+Machine lines are `[anywhere] …` from the test dashboard log; phone lines are `[overdeck] …` from
+the app's stdout. Ids are cut to 8 characters by the logs themselves.
+
+| Time (UTC) | Step | Phone on screen | Machine | Phone log |
+| --- | --- | --- | --- | --- |
+| 14:27:26 | Sign in (stub) | Machine list, `pan5018-test` online | `directory online (plan tester, 1 machines)` | — |
+| 14:29:26 | Pair (first) | Stayed on the Pair screen | `rtc offer from ae6b5071 session eecabc92 (link, direct)`, `answered`, `connected`; the machine created the phone's device record | — |
+| 14:30:5x | Pair again, same code | "This pairing code expired or was already used. Create a new one on pan5018-test. (pairing-refused)" | `channel refused (pairing-refused, pairing): Unknown or expired pairing id …` | — |
+| 14:32:16 | Relaunch | List shows `pan5018-test` **Paired** | — | — |
+| 14:32:2x | Open machine | "Not connected to overdeck.ai." stays | `rtc offer … 1c222290 … answered`, `connected`; device `lastUsedAt` 14:37:38 (requests served) | none (this failure path logged nothing) |
+| 14:38–14:40 | Close and open ×5 | "Not connected to overdeck.ai." after every open | each open: `rtc offer from ae6b5071 … (link, direct)`, `rtc closing session … a new offer replaced it`, `answered`, `connected` | none |
+| 14:40–14:42 | Background/foreground ×3 | "Could not reach pan5018-test directly or through the relay." stays | `channel refused (closed, unknown): Peer closed the connection during the handshake`, then a new offer `answered`, `connected` | `direct dial failed: dialer closed`, `relay dial failed: Not connected to the overdeck.ai directory` |
+| 14:42:18 | Machine `kill -STOP` 90 s, open machine | "Could not reach …" | nothing (frozen) | `direct dial failed: No direct connection to 95b91f02… within 8000 ms`, `relay dial failed: relay credentials are not available` (repeated per request) |
+| 14:43:2x | `kill -CONT` | "Could not reach …" stays | `directory silent for 79 s; reconnecting`, `rtc session 63cf40e2 … failed`/`closed`, `directory online`, then `rtc offer … 4a939a5e … answered`, `connected` | direct dials fail until the new connection opens |
+| 14:44:58 | Cold launch | Machine list | — | `dialer closed` lines from the previous process's resume |
+
+### What the run shows
+
+None of the PRD decision-table rows matched: no `dropped:`, no `failed at <step>`, no refusal other
+than the expected `pairing-refused` and the debug-level `closed` refusals of channels cut by a resume,
+and every offer forwarded by the directory reached `RtcTransport` (`directory signal …` then
+`rtc offer from …`). So the machine-side cause in the issue (offers forwarded but never answered by a
+long-running process) is **not reproduced**; the always-on lines now record it if it recurs.
+
+Two phone-side causes were reproduced every time:
+
+1. **The failure text never clears.** `session.ts` stores the last dial error and clears it only when
+   the selected machine changes. One failed dial leaves its text over the machine view after later
+   dials succeed (the machine shows `connected` and serves requests). From the operator's seat every
+   later link "fails". This is how a single "Could not open a secure channel" stays on screen.
+2. **Each machine open and each resume makes the first requests fail.** Opening a machine reloads
+   the page, so the directory socket starts over, and `dialRaw` throws `directory-offline` at once
+   instead of waiting for it. On resume, `forgetRoutes()` closes the dialer under in-flight dials
+   ("dialer closed") and the relay fallback then fails because the directory socket is reconnecting.
+
+Root-cause fixes and the rerun are in the next section.
+
+### Fix and rerun (PAN-5018 WI-9)
+
+- **Fix 1 (`session.ts`):** a dial that succeeds clears the stored dial error and notifies the shell,
+  so a transient failure no longer stays over the machine view.
+- **Fix 2 (`connection.ts`):** `dialRaw` waits up to `DIRECTORY_WAIT_MS` (10 s) for an off or
+  connecting directory socket to come online before it reports `directory-offline`, gives up at once
+  on `refused` or an abort, and logs `link <label>: directory not online after 10000 ms (<state>)`
+  when it gives up (this failure path logged nothing before).
+- **Regression tests:** `session.test.ts` "clears the dial error when a later dial succeeds" and
+  `connection.test.ts` "waits for a connecting directory and dials once it is online", "refuses with
+  directory-offline when the directory does not come online in time", "stops waiting when the dial is
+  aborted". All four failed on the pre-fix code and pass after it.
+
+Rerun on the same Simulator and the same test machine process (up since 14:28 UTC), fixed phone
+build installed 14:48:39:
+
+| Time (UTC) | Step | Phone on screen | Machine |
+| --- | --- | --- | --- |
+| 14:48:43–14:49:58 | Open the machine ×4 (each a page reload) | "Nothing needs you.", no failure text | each: `rtc offer from ae6b5071 … (link, direct)`, `connected` |
+| 14:50:46–14:52:14 | Background/foreground ×3 | Machine view, no failure text | each resume: new offer, `connected`; no `dialer closed` on the phone |
+| 14:52:3x–14:53:5x | Machine `kill -STOP` 75 s, then `kill -CONT` | "Nothing needs you.", no failure text | `directory silent for 85 s; reconnecting`, `directory online`, new offer `connected` |
+
+The step that failed before (open the machine, and resume) now links every time.
+
+## PAN-5019 notification preferences
+
+**Not run: needs a real iPhone and is blocked on link channels working after pairing
+([PAN-5018](https://github.com/eltmon/overdeck/issues/5018)); the pairing-time exchange path
+(WI-6) does not need a post-pairing link channel and is covered by the unit tests in
+`src/dashboard/server/__tests__/phones-routes.test.ts`.** Device steps for when PAN-5018 lands:
+
+1. **Pause suppresses a real event.** In the app's Settings, turn on **Pause notifications**. On
+   the paired desktop, raise a real needs-you event (an AskUserQuestion in a conversation — not
+   **Send test**, which deliberately bypasses pause per D-3). `npx wrangler tail overdeck-connect
+   --format json` shows no `push` frame for this phone's `clientId`, and no notification arrives.
+2. **Resume delivers the next event.** Turn **Pause notifications** off. Raise another AskUserQuestion.
+   The notification arrives.
+3. **A muted type is suppressed; others are not.** Turn off **Agent stopped responding**. Kill a
+   running agent's heartbeat. No notification arrives for it. Raise an AskUserQuestion (a different,
+   still-on type): its notification still arrives.
+4. **Settings survive a restart.** Force-quit and reopen the app. Pause state and muted types are
+   unchanged.
+5. **Settings survive a re-pair.** Forget the machine and pair it again with a fresh link from its
+   Settings → Anywhere (pair links are single-use).
+   Pause state and muted types are unchanged and still applied (the exchange carries the
+   phone's current prefs, so the machine does not need a separate sync pass to pick them up).

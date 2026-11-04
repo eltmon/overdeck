@@ -38,6 +38,7 @@ import {
 } from './forge-identity.js';
 import { listFailedChecks, listFailedTestChecks, type FailedCheck } from './check-failures.js';
 import type { GitLabMrApprovals, GitLabMrView } from './gitlab-mr-types.js';
+import { readReviewDatabaseIds, verdictOutranks } from './review-order.js';
 import { parseUatVerdict } from './uat-verdict-marker.js';
 import { isCiTestRollupCheck } from './verification-tests-mode.js';
 
@@ -693,6 +694,8 @@ async function readPrFacts(issueId: string, deps: PrFactsDeps, options: PrFactsO
 export interface GitHubReviewRecord {
   /** The review's GraphQL node id, by which its author's type is read. */
   id?: string | null;
+  /** PAN-4702: the numeric review id, its posting order (`review-order.ts`). */
+  databaseId?: number | null;
   state?: string;
   submittedAt?: string | null;
   authorAssociation?: string | null;
@@ -732,9 +735,11 @@ async function defaultReadGitHubReviews(
     { encoding: 'utf-8', timeout: 30_000, maxBuffer: 8 * 1024 * 1024 },
   );
   const read = JSON.parse(stdout) as GitHubReviewsAtHead;
+  const ids = await readReviewDatabaseIds(repo, number);
+  const reviews = (read.reviews ?? []).map((review) => ({ ...review, databaseId: review.id ? ids.get(review.id) ?? null : null }));
   // #4066 review (R3-2): the review agent's verdicts are the App bot's
   // reviews (`CONTRIBUTOR`), trusted only as a typed `Bot`.
-  return { ...read, reviews: await withAuthorKinds(read.reviews ?? [], reviewNeedsIdentity, readAuthorKinds) };
+  return { ...read, reviews: await withAuthorKinds(reviews, reviewNeedsIdentity, readAuthorKinds) };
 }
 
 /**
@@ -753,26 +758,22 @@ function isTrustedReview(review: GitHubReviewRecord, trusted: TrustedAuthors): b
  * later `CHANGES_REQUESTED` or a dismissal replaces an earlier approval, the
  * way GitHub itself reads a reviewer's standing verdict; a `COMMENTED` review
  * does not. A review with no author login cannot be attributed, so it is
- * ignored.
+ * ignored. PAN-4702: "later" is posting order, ranked by `verdictOutranks`.
  */
 function latestTrustedVerdicts(
   reviews: ReadonlyArray<GitHubReviewRecord>,
   trusted: TrustedAuthors,
+  head: string,
 ): GitHubReviewRecord[] {
-  const latest = new Map<string, { review: GitHubReviewRecord; at: number; index: number }>();
+  const latest = new Map<string, { review: GitHubReviewRecord; index: number }>();
   reviews.forEach((review, index) => {
     if (!VERDICT_REVIEW_STATES.has(normalize(review.state))) return;
     const login = review.author?.login;
     if (!login || !isTrustedReview(review, trusted)) return;
     // A person and a bot may share a login; each is its own reviewer.
     const key = `${review.author?.__typename ?? ''}:${normalizeLogin(login)}`;
-    const parsed = Date.parse(review.submittedAt ?? '');
-    const at = Number.isNaN(parsed) ? Number.NEGATIVE_INFINITY : parsed;
     const current = latest.get(key);
-    // `gh` lists reviews oldest first; the index breaks a tie or a missing date.
-    if (!current || at > current.at || (at === current.at && index > current.index)) {
-      latest.set(key, { review, at, index });
-    }
+    if (!current || verdictOutranks({ review, index }, current, head)) latest.set(key, { review, index });
   });
   return [...latest.values()].map((entry) => entry.review);
 }
@@ -819,7 +820,7 @@ export async function forgeApprovalAtHead(
         trusted = NO_TRUSTED_AUTHORS;
       }
     }
-    const standing = latestTrustedVerdicts(reviews, trusted);
+    const standing = latestTrustedVerdicts(reviews, trusted, head);
     if (standing.some((review) => normalize(review.state) === 'CHANGES_REQUESTED')) return false;
     return standing.some((review) => (
       normalize(review.state) === 'APPROVED' && review.commit?.oid?.toLowerCase() === head

@@ -1,0 +1,67 @@
+{
+  "version": "1",
+  "issueId": "PAN-4885",
+  "created": "2026-11-04T10:36:33.533Z",
+  "updated": "2026-11-04T10:55:05.376Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "link-open-budget": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4885",
+      "claimedAt": "2026-11-04T10:36:33.533Z",
+      "doneAt": "2026-11-04T10:40:32.440Z"
+    },
+    "link-open-budget-tests": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4885",
+      "claimedAt": "2026-11-04T10:40:46.061Z",
+      "doneAt": "2026-11-04T10:46:27.604Z"
+    },
+    "docs-two-budgets": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4885",
+      "claimedAt": "2026-11-04T10:46:40.523Z",
+      "doneAt": "2026-11-04T10:48:01.245Z"
+    },
+    "link-open-budget.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:50:35.121Z"
+    },
+    "link-open-budget.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:51:32.021Z"
+    },
+    "link-open-budget-tests.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:52:05.453Z"
+    },
+    "link-open-budget-tests.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:52:52.434Z"
+    },
+    "link-open-budget-tests.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:53:25.177Z"
+    },
+    "link-open-budget-tests.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:53:54.941Z"
+    },
+    "docs-two-budgets.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:54:10.966Z"
+    },
+    "docs-two-budgets.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:54:34.940Z"
+    },
+    "link-open-budget.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:55:05.375Z"
+    }
+  }
+}

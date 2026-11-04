@@ -12,8 +12,10 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../lib/activity-logger.js', () => ({ emitActivityEntry: vi.fn() }));
+const telemetry = vi.hoisted(() => ({ capturePhoneRemoved: vi.fn() }));
+vi.mock('../../../lib/telemetry/anywhere.js', () => telemetry);
 
-const { _resetAccessTokensForTests, _settleAccessTokenWritesForTests, createAccessToken } = await import('../../../lib/access-tokens.js');
+const { _resetAccessTokensForTests, _settleAccessTokenWritesForTests, createAccessToken, PHONE_TOKEN_SCOPES } = await import('../../../lib/access-tokens.js');
 const { _resetInternalTokenCacheForTests, INTERNAL_TOKEN_HEADER } = await import('../../../lib/internal-token.js');
 const { _resetDashboardSessionTokenForTests, dashboardCsrfToken, rejectUnauthorizedDashboardRequest } = await import('../routes/dashboard-auth.js');
 const { pairingRouteLayer } = await import('../routes/pairing.js');
@@ -52,6 +54,7 @@ beforeEach(async () => {
   _resetInternalTokenCacheForTests();
   _resetDashboardSessionTokenForTests();
   _resetAccessTokensForTests();
+  telemetry.capturePhoneRemoved.mockClear();
 });
 
 afterEach(async () => {
@@ -122,5 +125,21 @@ describe('device list and revoke routes (PAN-3762)', () => {
     expect(res.json.error).toBe('an access token cannot revoke devices');
     expect(stillAuthenticates(device.token)).toBe(true);
     expect((await call('DELETE', '/api/devices/no-such-device', { authorization: `Bearer ${token}` })).status).toBe(403);
+  });
+});
+
+describe('phone removal telemetry (PAN-5016 WI-6)', () => {
+  it('an operator revoking a phone record records phone_removed(operator)', async () => {
+    const phone = await createAccessToken({
+      name: 'phone:iris', kind: 'phone', scopes: [...PHONE_TOKEN_SCOPES], phoneKey: 'a1'.repeat(32), clientId: '55555555-5555-4555-8555-555555555555',
+    });
+    expect((await call('DELETE', `/api/devices/${phone.record.id}`, asInternal)).status).toBe(200);
+    expect(telemetry.capturePhoneRemoved.mock.calls).toEqual([['operator']]);
+  });
+
+  it('revoking a browser device records nothing', async () => {
+    const { record } = await createAccessToken({ name: 'laptop', scopes: ['admin'], kind: 'device' });
+    expect((await call('DELETE', `/api/devices/${record.id}`, asInternal)).status).toBe(200);
+    expect(telemetry.capturePhoneRemoved).not.toHaveBeenCalled();
   });
 });

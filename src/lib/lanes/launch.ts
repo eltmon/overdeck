@@ -20,7 +20,7 @@ import { mkdir, realpath, rm, stat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 
-import { getHarnessBehavior } from '@overdeck/contracts';
+import { getHarnessBehavior, type PlacementRejection } from '@overdeck/contracts';
 
 import { getEventStore } from '../../dashboard/server/event-store.js';
 import { workerDir } from '../agents/worker/ids.js';
@@ -62,7 +62,7 @@ import {
   type RemoteLaneFacts,
   type RemoteLaneMirror,
 } from './remote-lanes.js';
-import { LaneLaunchError, type LaneLaunchRequest, type LaneLaunchResult, type OwnerLaneSpec } from './types.js';
+import { LaneLaunchError, type LaneLaunchRequest, type LaneLaunchResult, type LanePlacement, type OwnerLaneSpec } from './types.js';
 import { addBranchWorktree, addDetachedWorktree, applySparse, fetchBase, laneDirName, removeWorktree } from './worktree.js';
 
 export const RUN_PATTERN = /^[a-z0-9][a-z0-9-]{0,31}$/;
@@ -100,10 +100,19 @@ export interface RemoteLaneTarget {
   label: string;
   reason: string | null;
   isFly: boolean;
+  rejections: PlacementRejection[];
   /** Posts the owner lane door; answers its status and JSON body. A throw means the owner was not reached. */
   launch: (spec: OwnerLaneSpec) => Promise<{ status: number; body: Record<string, unknown> }>;
   /** Stops a lane on this owner through its conversation stop door (D-4638-13). */
   stop: (name: string) => Promise<void>;
+}
+
+/** PAN-5006: Auto picked this machine; `resolveMachine` returns this instead of a `RemoteLaneTarget`. */
+export interface LocalLanePlacement {
+  self: true;
+  label: string;
+  reason: string;
+  rejections: PlacementRejection[];
 }
 
 /** Test seams; production callers use the defaults. */
@@ -112,10 +121,12 @@ export interface LaneLaunchDeps {
   remote?: RemoteLaneTarget;
   /**
    * PAN-4638: resolves a machine (label, environment id or `auto`) for the
-   * project; null means this machine. Used for `--machine`, for a `--reuse`
-   * whose newest lane ran elsewhere, and to stop a live lane on another machine.
+   * project; null or a `LocalLanePlacement` means this machine. Used for
+   * `--machine`, for a `--reuse` whose newest lane ran elsewhere, and to stop
+   * a live lane on another machine. A `LocalLanePlacement` also carries
+   * Auto's reason (PAN-5006).
    */
-  resolveMachine?: (machine: string, needs: readonly string[], projectKey: string) => Promise<RemoteLaneTarget | null>;
+  resolveMachine?: (machine: string, needs: readonly string[], projectKey: string) => Promise<RemoteLaneTarget | LocalLanePlacement | null>;
   git?: LaneGit;
   resolveConfig?: (project: string) => Promise<LaneConfig>;
   resolveHarness?: (requested: string | undefined, model: string) => Promise<RuntimeName>;
@@ -133,6 +144,9 @@ export interface LaneLaunchDeps {
   /** PAN-4311: the stateless CPU pressure check. Default `assessCpuPressure`. */
   cpuPressure?: () => Promise<CpuPressureVerdict>;
 }
+
+const remoteOf = (target: RemoteLaneTarget | LocalLanePlacement | null): RemoteLaneTarget | undefined =>
+  target && !('self' in target) ? target : undefined;
 
 const projectLocks = new Map<string, Promise<void>>();
 
@@ -409,13 +423,16 @@ export async function launchLane(request: LaneLaunchRequest, deps: LaneLaunchDep
   if (!project) throw new LaneLaunchError(400, `parent conversation ${parent.name} has no project: name --project`);
 
   // The machine (FR-1): --machine, or the machine of the newest lane a --reuse continues (D-4638-8).
+  let placement: LanePlacement | null = null;
   if (!remote && request.machine !== undefined) {
     if (!deps.resolveMachine) throw new LaneLaunchError(400, '--machine needs the dashboard: launch through POST /api/lanes');
-    remote = (await deps.resolveMachine(request.machine, request.needs ?? [], project)) ?? undefined;
+    const resolved = await deps.resolveMachine(request.machine, request.needs ?? [], project);
+    remote = remoteOf(resolved);
+    if (resolved && resolved.reason !== null) placement = { label: resolved.label, reason: resolved.reason, rejections: [...resolved.rejections] };
   }
   if (!remote && request.reuse && deps.resolveMachine) {
     const newestFacts = (await listAllLaneRows({ run, key, role })).at(-1)?.remote?.facts;
-    if (newestFacts) remote = (await deps.resolveMachine(newestFacts.environmentId, [], project)) ?? undefined;
+    if (newestFacts) remote = remoteOf(await deps.resolveMachine(newestFacts.environmentId, [], project));
   }
   // D-4638-9: an orchestrator lane on another machine would launch lanes listed only there.
   if (remote && role === 'orchestrator') throw new LaneLaunchError(400, "orchestrator lanes run on the orchestrator's machine");
@@ -478,7 +495,7 @@ export async function launchLane(request: LaneLaunchRequest, deps: LaneLaunchDep
       if (!row.remote) return stop(row.local!);
       const { facts } = row.remote;
       if (remote && facts.environmentId === remote.environmentId) return remote.stop(row.name);
-      const owner = deps.resolveMachine ? await deps.resolveMachine(facts.environmentId, [], project) : null;
+      const owner = deps.resolveMachine ? remoteOf(await deps.resolveMachine(facts.environmentId, [], project)) ?? null : null;
       if (owner) return owner.stop(row.name);
       throw new LaneLaunchError(409, `lane ${run}/${key} ${role} is live on ${facts.label} as ${row.name}; stop it there first`);
     };
@@ -560,6 +577,7 @@ export async function launchLane(request: LaneLaunchRequest, deps: LaneLaunchDep
         result: (name, cwd, ownerBranch, ownerWarnings) => ({
           conversation: identity(null, name), cwd, branch: ownerBranch, iteration, warnings: [...warnings, ...ownerWarnings],
           machine: { environmentId: remote.environmentId, label: remote.label, reason: remote.reason },
+          placement,
         }),
       });
     }
@@ -653,7 +671,7 @@ export async function launchLane(request: LaneLaunchRequest, deps: LaneLaunchDep
           console.error(`[lanes] runtime start failed for ${name}:`, error instanceof Error ? error.message : String(error));
         });
 
-      return { conversation: identity(conversation.id, name), cwd: target, branch, iteration, warnings, machine: null };
+      return { conversation: identity(conversation.id, name), cwd: target, branch, iteration, warnings, machine: null, placement };
     } catch (error) {
       await undoCreate();
       throw error;

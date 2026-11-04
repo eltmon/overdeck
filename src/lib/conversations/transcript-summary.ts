@@ -245,12 +245,19 @@ export function fallbackTranscriptTitle(transcript: string): string {
   return derivePromptTitle(source);
 }
 
+/** A composer attachment reference line (`@/path/to/file`, PAN-5000) — never part of the derived title. */
+const ATTACHMENT_REFERENCE_LINE = /^@(?:[A-Za-z]:)?[\\/]\S*$/;
+
 /**
  * Generate a deterministic title directly from a raw prompt string.
  * Zero model calls; returns '' only for empty/whitespace-only input.
  */
 export function derivePromptTitle(prompt: string): string {
-  const trimmed = prompt.trim();
+  const trimmed = prompt
+    .split('\n')
+    .filter((line) => !ATTACHMENT_REFERENCE_LINE.test(line.trim()))
+    .join('\n')
+    .trim();
   if (!trimmed) return '';
 
   const compact = trimmed

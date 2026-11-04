@@ -121,6 +121,19 @@ A steer never falls back silently to a queued message. A harness without steer a
   receive neither override, so Claude Code's native context behavior remains in
   control.
 
+#### Scratch directory
+
+Managed Claude Code sessions keep their scratchpad under
+`~/.overdeck/tmp/claude-<uid>/` because Overdeck sets
+`CLAUDE_CODE_TMPDIR=~/.overdeck/tmp` (mode `0700`) in every local launch —
+`/tmp` is emptied at boot on many Linux distributions, which otherwise loses
+in-progress scratch files on a reboot. `TMPDIR` is left unchanged, so build
+tools still use `/tmp`. Fly (remote) launches are unchanged. The Deacon
+removes a session's directory once nothing in it has changed for 14 days and
+no live agent owns the session, checking hourly, and `pan doctor` shows the
+folder's size and warns above 10 GiB. Other harnesses (Codex, pi) already
+keep their session state under `~/.overdeck/agents/`.
+
 #### Claude Code version requirements
 
 Some models need a newer Claude Code CLI than an older install recognizes.
@@ -1071,7 +1084,10 @@ The rule for harness-specific code:
 ### Overdeck MCP server
 
 A harness that declares `overdeckMcp` gets the `overdeck` MCP server at launch
-(see [Agents get these tools](/configuration/mcp#agents-get-these-tools)).
+(see [Agents get these tools](/configuration/mcp#agents-get-these-tools)). That
+same harness's launch context ends with the "Overdeck tools" block; every
+other harness gets "Overdeck commands" with the `pan` equivalents instead (see
+[What the agent is told](/configuration/mcp#what-the-agent-is-told)).
 Claude Code 2.1.293 was checked against what the launcher emits:
 
 - Two `--mcp-config=` flags load together, so the Channels bridge and

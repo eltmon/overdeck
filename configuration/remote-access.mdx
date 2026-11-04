@@ -203,7 +203,8 @@ appears in **Settings → Anywhere** and on the **Health** page, and shows:
 - **This machine:** its label and the start of its environment id.
 - **Reachable at:** the trusted addresses another device can open, or "Only
   this machine".
-- **Paired devices:** how many device sessions are active (not revoked).
+- **Paired devices:** how many paired browsers and Overdeck app phones are
+  active (not revoked).
 - **Tailscale:** "Not installed", "Signed out", "Needs HTTPS", "Ready" with the
   Serve address, or "Set up unfinished". See [Tailscale](/configuration/tailscale).
 - **Session Vault:** "Not set up", "Locked on this machine", "Key rotation
@@ -371,8 +372,9 @@ and linked machines (whose traffic is already inside the secure channel) are not
 
 ## Find your machines through overdeck.ai
 
-A machine signed in with `pan account login` registers in your account's **directory** at
-overdeck.ai and keeps one connection to it. From any signed-in machine you can then see all of
+A machine signed in to overdeck.ai (with **Sign in** on the Account card in **Settings → Anywhere**,
+or `pan account login`) registers in your account's **directory** at overdeck.ai and keeps one
+connection to it. From any signed-in machine you can then see all of
 your machines, link two of them without a pairing code, and reach a linked machine with no
 Tailscale. A machine that is not signed in opens no connection and nothing else changes.
 
@@ -380,6 +382,12 @@ Tailscale. A machine that is not signed in opens no connection and nothing else 
   fingerprint, whether it is online (with the time it was last seen) and the LAN and Tailscale
   addresses it advertises. It also passes the short connection setup messages between two of
   your machines. It never carries your conversations and never vouches for a key.
+- **The Account card** (**Settings → Anywhere → Account**) shows the GitHub account this machine
+  is signed in as, the plan (Free account or Tester), this month's relay use against the 50 GB
+  allowance with its reset date, and **Manage account**, which opens your account page at
+  overdeck.ai. **Sign in** appears only in a browser on this machine; it opens overdeck.ai in a
+  new tab and returns to `http://127.0.0.1:<port>/oauth/account/callback`. Other devices see the
+  `pan account login` hint.
 - **See your machines:** **Settings → Anywhere → Directory**, or `pan machines directory`.
 - **Link two machines (approval):** on the new machine, click **Link** on the other machine's
   row (or run `pan machines join`). The other machine shows the request; click **Review** there

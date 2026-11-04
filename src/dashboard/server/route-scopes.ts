@@ -156,6 +156,7 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'POST', path: '/api/self/memory/search', scope: 'read:state' },
   { method: 'GET', path: '/api/agent-requests', scope: 'read:conversations' },
   // POST /api/agent-requests/:id/secret, /decline and /linked have no row: root credentials only (D-4).
+  // PAN-4960: GET /api/account has no row (admin); POST /api/account/sign-in has no row (root credentials from this machine only); GET /oauth/account/callback is outside /api/.
   // PAN-4943 W-PR1: PR-link routes (PAN-3822), for the MCP link/watch tools.
   { method: 'GET', path: '/api/conversations/:name/pull-requests', scope: 'read:conversations' },
   { method: 'POST', path: '/api/conversations/:name/pull-requests', scope: 'tell' },
@@ -200,6 +201,7 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   // (the handlers also require a phone credential).
   { method: 'GET', path: '/api/activity', scope: 'read:state' },
   { method: 'PUT', path: '/api/phones/self/push-key', scope: 'tell' },
+  { method: 'PUT', path: '/api/phones/self/notification-preferences', scope: 'tell' },
   { method: 'DELETE', path: '/api/phones/self', scope: 'tell' },
   // PAN-4927 W-CONN1: a connector's logout (the handler also requires a connector credential).
   { method: 'DELETE', path: '/api/connectors/self', scope: 'read:state' },

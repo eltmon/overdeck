@@ -5,6 +5,7 @@ import { requestSettingsSection } from '../../../lib/settingsSection';
 import { SettingsSection } from '../primitives/SettingsSection';
 import { AccessTokensPanel } from '../anywhere/AccessTokensPanel';
 import { BotsPanel } from '../anywhere/BotsPanel';
+import { AccountCard } from '../anywhere/AccountCard';
 import { AnywhereStatusCard } from '../anywhere/AnywhereStatusCard';
 import { ANYWHERE_STATUS_QUERY_KEY, loadAnywhereStatus, type AnywhereAction } from '../anywhere/anywhereApi';
 import { DevicesPanel } from '../anywhere/DevicesPanel';
@@ -88,6 +89,7 @@ export function AnywhereSection({ pairDialogOpen, onPairDialogChange }: Anywhere
     >
       <div className="space-y-4">
         <AnywhereStatusCard onAction={handleAction} />
+        <AccountCard />
         <DevicesPanel />
         <MachinesPanel />
         <DirectoryPanel />

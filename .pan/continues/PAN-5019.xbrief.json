@@ -1,0 +1,217 @@
+{
+  "version": "1",
+  "issueId": "PAN-5019",
+  "created": "2026-11-04T13:12:00.752Z",
+  "updated": "2026-11-04T14:41:07.004Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "contracts-prefs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5019",
+      "claimedAt": "2026-11-04T13:12:00.752Z",
+      "doneAt": "2026-11-04T13:16:41.495Z"
+    },
+    "classify-category": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5019",
+      "claimedAt": "2026-11-04T13:16:53.226Z",
+      "doneAt": "2026-11-04T13:25:53.308Z"
+    },
+    "machine-store": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5019",
+      "claimedAt": "2026-11-04T13:26:03.790Z",
+      "doneAt": "2026-11-04T13:36:14.732Z"
+    },
+    "native-filter": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5019",
+      "claimedAt": "2026-11-04T13:36:22.215Z",
+      "doneAt": "2026-11-04T13:44:06.820Z"
+    },
+    "prefs-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5019",
+      "claimedAt": "2026-11-04T13:44:14.210Z",
+      "doneAt": "2026-11-04T13:51:04.880Z"
+    },
+    "exchange-prefs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5019",
+      "claimedAt": "2026-11-04T13:51:13.696Z",
+      "doneAt": "2026-11-04T13:57:26.229Z"
+    },
+    "phone-prefs-model": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5019",
+      "claimedAt": "2026-11-04T13:57:33.452Z",
+      "doneAt": "2026-11-04T14:04:52.696Z"
+    },
+    "prefs-sync": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5019",
+      "claimedAt": "2026-11-04T14:05:00.395Z",
+      "doneAt": "2026-11-04T14:15:05.600Z"
+    },
+    "settings-ui": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5019",
+      "claimedAt": "2026-11-04T14:15:14.119Z",
+      "doneAt": "2026-11-04T14:24:53.552Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5019",
+      "claimedAt": "2026-11-04T14:25:01.284Z",
+      "doneAt": "2026-11-04T14:28:13.841Z"
+    },
+    "contracts-prefs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:32:23.559Z"
+    },
+    "contracts-prefs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:32:48.768Z"
+    },
+    "contracts-prefs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:33:03.866Z"
+    },
+    "contracts-prefs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:33:17.553Z"
+    },
+    "classify-category.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:33:30.353Z"
+    },
+    "classify-category.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:33:47.452Z"
+    },
+    "classify-category.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:34:00.656Z"
+    },
+    "classify-category.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:34:14.797Z"
+    },
+    "machine-store.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:34:27.149Z"
+    },
+    "machine-store.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:34:39.632Z"
+    },
+    "machine-store.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:34:52.752Z"
+    },
+    "native-filter.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:35:06.557Z"
+    },
+    "native-filter.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:35:21.364Z"
+    },
+    "native-filter.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:35:35.965Z"
+    },
+    "native-filter.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:35:50.604Z"
+    },
+    "prefs-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:36:19.590Z"
+    },
+    "prefs-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:36:32.321Z"
+    },
+    "prefs-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:36:45.499Z"
+    },
+    "exchange-prefs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:36:58.599Z"
+    },
+    "exchange-prefs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:37:12.076Z"
+    },
+    "exchange-prefs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:37:24.548Z"
+    },
+    "phone-prefs-model.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:37:36.702Z"
+    },
+    "phone-prefs-model.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:37:49.294Z"
+    },
+    "phone-prefs-model.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:38:02.155Z"
+    },
+    "prefs-sync.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:38:15.344Z"
+    },
+    "prefs-sync.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:38:29.373Z"
+    },
+    "prefs-sync.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:38:44.090Z"
+    },
+    "prefs-sync.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:38:58.696Z"
+    },
+    "settings-ui.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:39:19.869Z"
+    },
+    "settings-ui.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:39:34.301Z"
+    },
+    "settings-ui.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:39:49.208Z"
+    },
+    "settings-ui.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:40:03.930Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:40:19.884Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:40:34.996Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:40:50.818Z"
+    },
+    "docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:41:07.004Z"
+    }
+  }
+}

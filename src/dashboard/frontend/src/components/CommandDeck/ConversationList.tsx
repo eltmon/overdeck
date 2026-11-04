@@ -139,7 +139,7 @@ export interface Conversation extends LinkedRowFields {
   /** Critic and verifier lanes: the verdict, or `pending` before a done report. */
   laneVerdict?: { value: string; defects: number | null } | null;
   /** Builder lanes: the newest critic verdict for this iteration. */
-  laneLatestVerdict?: { value: string; defects: number | null; criticId: number } | null;
+  laneLatestVerdict?: { value: string; defects: number | null; criticId: number | null; criticRoute: string } | null;
   /** PAN-1990: the projects/workspaces registry row this conversation belongs to. Null for pre-migration rows. */
   workspaceId?: string | null;
   /** PAN-1577: explicit project assignment override. Null = fall back to deriving the project from cwd. */

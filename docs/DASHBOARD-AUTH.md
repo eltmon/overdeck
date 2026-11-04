@@ -221,7 +221,7 @@ does not list needs `admin` (D-6):
 | `read:events` | `GET /events/stream`, `GET /events/version`, RPC `pan.replayEvents` (PAN-4835) |
 | `read:state` | `GET /api/issues`, `GET /api/agents`, `GET /api/agent-directory`, `GET /api/flywheel/status`, `GET /api/pipeline/membership`, `GET /api/versions/self`, `GET /api/activity` (PAN-4835), `GET /api/pull-requests`, `GET /api/pull-requests/conversations` (PAN-4943 W-PR1), RPC `pan.getSnapshot` (PAN-4835), `GET /api/lanes`, `GET /api/lanes/:name`, `GET /api/self/workers`, `GET /api/self/workers/:id`, `GET /api/self/workers/:id/wait`, `POST /api/self/lanes/wait` (PAN-4938) |
 | `read:conversations` | `GET /api/conversations`, `GET /api/conversations/:id`, `GET /api/conversations/:name/messages`, `GET /api/conversations/:name/about`, `GET /api/palette/search`, `GET /api/conversations/pending-input` (explicit row, PAN-4835), `GET /api/needs-you` (PAN-4944), `GET /api/conversations/:name/pull-requests` (PAN-4943 W-PR1) |
-| `tell` | `POST /api/agents/:id/message`, `POST /api/agents/:id/tell`, `POST /api/conversations/:name/message`, `POST /api/conversations/:name/delete-image` (the undo of `upload-image`, PAN-4835), `PUT /api/phones/self/push-key`, `DELETE /api/phones/self` (PAN-4835), `POST /api/conversations/:name/pull-requests`, `DELETE /api/conversations/:name/pull-requests`, `POST /api/conversations/:name/pull-requests/sync` (PAN-4943 W-PR1), `POST /api/self/lanes/report` (PAN-4938) |
+| `tell` | `POST /api/agents/:id/message`, `POST /api/agents/:id/tell`, `POST /api/conversations/:name/message`, `POST /api/conversations/:name/delete-image` (the undo of `upload-image`, PAN-4835), `PUT /api/phones/self/push-key`, `PUT /api/phones/self/notification-preferences` (PAN-5019), `DELETE /api/phones/self` (PAN-4835), `POST /api/conversations/:name/pull-requests`, `DELETE /api/conversations/:name/pull-requests`, `POST /api/conversations/:name/pull-requests/sync` (PAN-4943 W-PR1), `POST /api/self/lanes/report` (PAN-4938) |
 | `operate` | WebSocket `/ws/terminal` (`WS_TERMINAL_SCOPE`), `POST /api/conversations`, `POST /api/workers`, `POST /api/versions/self/update`, `DELETE /api/versions/self/update`, `POST /api/self/workers`, `POST /api/self/lanes` (PAN-4938) |
 | `approve` | `POST /api/conversations/:id/permission`, `POST /api/conversations/:id/pane-choice`, `POST /api/conversations/:id/pi-ask-answer`, `POST /api/conversations/:id/codex-approval`, `POST /api/conversations/:name/plan-action`, `POST /api/agents/:id/answer-question`, `POST /api/agents/:id/plan-action`, `POST /api/agents/:id/permissions/:requestId/respond` |
 | `admin` | everything else, including `/ws/rpc`, `/ws/voice`, `/ws/autopreso` |
@@ -347,6 +347,13 @@ gets **400** `use-local-start`, because the CLI starts locally itself. When a
 token's call is forwarded to a linked machine, an agent-kind agent token is
 forwarded with actor `{ agentId }` (PAN-4927 D-9); any other token goes as the
 operator, and every token carries its scopes as the ceiling.
+
+A `connector` credential (PAN-4950 D-5) may call `POST /api/fleet/conversations`,
+`POST /api/fleet/workers` and `POST /api/fleet/issues/:id/start` through its link
+channel for a target on this machine: it acts as the operator with its scopes
+as the ceiling and never creates a Fly machine. Any other target answers
+**403** `{ "code": "connector-local-only" }` before any side effect. Every other
+fleet route still refuses channel callers.
 
 Secret requests (PAN-4941, W-SEC1) are self routes too.
 `POST /api/self/secret-requests` (`tell`) takes `{ name, prompt, timeoutMs? }`:
@@ -767,13 +774,21 @@ registry corrupt, exactly like an incomplete `machine` record (H-1).
   already held by an active phone record answers **409**
   `{ error, code: 'link-key-in-use' }` rather than revoking its own pairing
   channel's record (D-2) — the phone app must generate a fresh link key for
-  every pairing.
-- **`DELETE /api/phones/self`** and **`PUT /api/phones/self/push-key`** are
+  every pairing. It also takes an optional `notificationPreferences` field
+  (PAN-5019 WI-6): a valid value is stored for the new `clientId` and the
+  answer carries `notificationPreferencesStored: true`; an invalid or absent
+  value never fails the pairing, it just omits the flag.
+- **`DELETE /api/phones/self`**, **`PUT /api/phones/self/push-key`** and
+  **`PUT /api/phones/self/notification-preferences`** (PAN-5019 WI-5) are
   the phone's own self-service routes: the scope table admits them with
   `tell`, and the handler then requires `credential.kind === 'phone'` (403
   otherwise). Self-revoke may drop the response before it arrives (the
   caller's own channel closes first); the app treats a dropped connection
-  after the DELETE as success.
+  after the DELETE as success. The notification-preferences route stores a
+  parsed `PhoneNotificationPreferences` under the credential's `clientId` in
+  `<OVERDECK_HOME>/push/phone-preferences.json` (mode 0600, keyed by
+  `clientId` rather than the token record so a re-pair keeps it); a body that
+  fails to parse answers 400 without touching the store.
 - **Revocation.** Revoking a phone record (by the operator, by
   `DELETE /api/phones/self`, or by another process) closes its `/ws/rpc`
   sockets with 4401 and destroys every channel bound to its `phoneKey` within

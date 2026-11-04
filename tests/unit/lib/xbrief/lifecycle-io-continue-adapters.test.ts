@@ -7,7 +7,8 @@
  *
  * AC1 — appendContinueSessionEntryForIssue / appendFeedbackEntryForIssue
  *        persist to the workspace's continue file and return true.
- * AC2 — clearFeedbackForIssue empties its feedback list.
+ * AC2 — retired (PAN-4690): clearFeedbackForIssue is removed. Review dispatch
+ *        no longer clears the tracked feedback[]; it is kept as history.
  * AC3 — readContinueStateForIssue surfaces what those adapters wrote, and
  *        returns null when the issue has no continue file anywhere.
  * AC4 — no base workspace: every writer returns false and creates no file.
@@ -24,7 +25,6 @@ import { join } from 'node:path';
 import {
   appendContinueSessionEntryForIssue,
   appendFeedbackEntryForIssue,
-  clearFeedbackForIssue,
   readContinueStateForIssue,
 } from '../../../../src/lib/xbrief/lifecycle-io.js';
 import { writeContinueState } from '../../../../src/lib/xbrief/continue-state.js';
@@ -110,23 +110,6 @@ describe('lifecycle-io continue adapters → .pan/continues (PAN-4225)', () => {
     expect(readContinueStateForIssue(projectRoot, ISSUE)?.feedback).toEqual([entry]);
   });
 
-  it('AC2: clearFeedbackForIssue empties the feedback list', () => {
-    mkdirSync(workspaceDir(), { recursive: true });
-    appendFeedbackEntryForIssue(projectRoot, ISSUE, {
-      seq: 1, specialist: 'test-agent', outcome: 'FAILED',
-      timestamp: '2026-06-21T00:00:00.000Z', markdownBody: 'failures',
-    });
-    appendFeedbackEntryForIssue(projectRoot, ISSUE, {
-      seq: 2, specialist: 'review-agent', outcome: 'APPROVED',
-      timestamp: '2026-06-21T01:00:00.000Z', markdownBody: 'lgtm',
-    });
-
-    const cleared = clearFeedbackForIssue(projectRoot, ISSUE);
-
-    expect(cleared).toBe(true);
-    expect(readContinueStateForIssue(projectRoot, ISSUE)?.feedback).toEqual([]);
-  });
-
   it('AC3: readContinueStateForIssue returns what the adapters wrote', () => {
     mkdirSync(workspaceDir(), { recursive: true });
     appendContinueSessionEntryForIssue(projectRoot, ISSUE, { reason: 'resume', note: 'init' });
@@ -155,7 +138,6 @@ describe('lifecycle-io continue adapters → .pan/continues (PAN-4225)', () => {
       seq: 1, specialist: 'review-agent', outcome: 'APPROVED',
       timestamp: '2026-06-21T00:00:00.000Z', markdownBody: 'x',
     })).toBe(false);
-    expect(clearFeedbackForIssue(projectRoot, ISSUE)).toBe(false);
 
     expect(existsSync(workspaceDir())).toBe(false);
     expect(existsSync(join(projectRoot, '.pan'))).toBe(false);

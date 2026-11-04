@@ -58,7 +58,7 @@ another machine is messaged with `pan tell @<label>/<name>`. See
 
 | Command | What it does |
 |---------|--------------|
-| `start` | Creates the lane's directory, writes the brief once to `~/.overdeck/agents/conv-<name>/lane-brief.md`, creates the conversation with the lane contract as its first message, and waits up to 180 s until it has started (`--no-wait` returns at once). Prints `Lane <run>/<key> <role> i<n>: conv <id> (<name>) in <cwd>`, or `… : <name> on <machine> in <cwd>` for a lane on another machine. |
+| `start` | Creates the lane's directory, writes the brief once to `~/.overdeck/agents/conv-<name>/lane-brief.md`, creates the conversation with the lane contract as its first message, and waits up to 180 s until it has started (`--no-wait` returns at once). Prints `Lane <run>/<key> <role> i<n>: conv <id> (<name>) in <cwd>`, or `… : <name> on <machine> in <cwd>` for a lane on another machine. With `--machine auto` it first prints Auto's reason line, and a `Passed over: …` line when Auto skipped machines, on stderr, also when Auto picks this machine. |
 | `list` | Every lane with `ID`, `RUN/KEY`, `ROLE`, `MACHINE`, `ITER`, `ACTIVITY`, `REPORT`, `FOR`, `VERDICT`, `BRANCH@SHA`, `AHEAD`, `DIRTY`, `MODEL` and `COST`. An archived lane reads `archived` in `ACTIVITY`. `MACHINE` is `-` for a lane on this machine. |
 | `show` | The builder → critic chain of one run and key, then one line per lane. See [Critics and builders](#critics-and-builders). |
 | `wait <lane>` | Waits for the lane's next report, with `pan worker wait` semantics. |
@@ -118,6 +118,8 @@ What to know:
 - `list` and `show` print the conversation name in `ID` for a remote lane, and the
   machine in `MACHINE` (`(offline)` while it cannot be reached). The JSON has
   `id: null` and `machine: { environmentId, label, reachable, lastSeenAt }`.
+- The `start` JSON has `placement: { label, reason, rejections }` when Auto chose the
+  machine, and `null` otherwise; `machine` is `null` whenever the lane runs here.
 - `wait` keeps waiting while the machine is unreachable: a sleeping laptop delays a
   report, never fails the wait (it times out with exit 3, never exit 2).
 - A critic or verifier on another machine judges a commit that is on `origin`: the
@@ -128,7 +130,10 @@ What to know:
   runs Claude Code and Codex lanes only. It is destroyed after `remote.fly.machine_idle_minutes`
   (default 30) of idle conversations, so raise that for runs with long waits.
 - The Command Deck nests a remote lane under the orchestrator that launched it, and
-  the Awareness rail counts it in the run card.
+  the Awareness rail counts it in the run card. The row also shows the lane's report
+  badge (`DONE`, `BLOCKED`, `FAILED`) and, for a critic or verifier, its verdict; a
+  builder's verdict link opens its newest critic on whichever machine it ran. The
+  group summary counts remote lanes in `reported` too.
 - A request that arrives from another linked machine may not place a lane on a third
   one (403 `no-chained-hops`).
 

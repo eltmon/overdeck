@@ -46,7 +46,7 @@ import { listSessionNames } from '../../../lib/tmux.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { IssueDataService } from '../services/issue-data-service.js';
 import { ReadModelService } from '../read-model.js';
-import { compareIssueIds, type AgentSnapshot, type SessionNode, type SessionNodeType } from '@overdeck/contracts';
+import { compareIssueIds, indexPanesByAgentKey, type AgentSnapshot, type SessionNode, type SessionNodeType } from '@overdeck/contracts';
 import { normalizeAgentStatus } from '../services/agent-status.js';
 import { buildLintSessionNode } from './command-deck-lint-node.js';
 import { getBackendPanesForIssue } from '../services/backend-inventory.js';
@@ -235,6 +235,14 @@ async function collectSessionTreeNodes(
     }
   }
 
+  // PAN-5011: resolved here (not where it was used, below) so the pane-first
+  // presence check in the loop below has every agent's backend pane.
+  const [treeDerived, treePanes] = await Promise.all([
+    getDerivedIssueState(issueId),
+    getBackendPanesForIssue(issueId),
+  ]);
+  const panesByAgent = indexPanesByAgentKey(treePanes);
+
   for (const checkId of [...candidateSessionIds].sort((a, b) => compareSessionTreeSessionIds(a, b, issueLower))) {
     // PAN-1908: the agents registry decides whether a session exists — never
     // the ~/.overdeck/agents/<id>/ dir, which janitors remove after sessions end.
@@ -253,7 +261,8 @@ async function collectSessionTreeNodes(
             : 'work';
       if (isPlanning) hasPlanningSection = true;
       const rtState = await Effect.runPromise(getAgentRuntimeState(checkId));
-      const presence = await deriveSessionPresence(checkId, rtState, context.tmuxSessionNames);
+      const pane = panesByAgent.get(checkId);
+      const presence = await deriveSessionPresence(checkId, rtState, context.tmuxSessionNames, pane);
       const projectedAwaitingInput = awaitingInputFromProjection(checkId, context.agentSnapshotsById);
       const awaitingInput = projectedAwaitingInput !== undefined
         ? projectedAwaitingInput
@@ -267,10 +276,14 @@ async function collectSessionTreeNodes(
 
       // Terminal-end signal: endedAt is populated only when the session has
       // actually ended. duration is preserved as elapsed seconds for existing UI.
+      // PAN-5011: a live backend pane (any state short of 'exited') overrides
+      // the stoppedAt/tmux-absence fallback below — Herdr holds no tmux entry.
       const tmuxAlive = context.tmuxSessionNames.has(checkId);
-      const sessionEnded = rtState?.state === 'suspended'
-        || presence === 'ended'
-        || (!!state.stoppedAt && !tmuxAlive);
+      const paneLive = pane !== undefined && pane.state !== 'exited';
+      const sessionEnded = !paneLive
+        && (rtState?.state === 'suspended'
+          || presence === 'ended'
+          || (!!state.stoppedAt && !tmuxAlive));
       const endedAt = sessionEnded
         ? (state.stoppedAt || state.lastActivity || state.startedAt)
         : undefined;
@@ -368,10 +381,6 @@ async function collectSessionTreeNodes(
   // are the issue's own panes plus the PR's review state; the ship row comes
   // from the in-memory ship log the merge writes as it runs.
   const shipLog = getShipLog(issueId.toUpperCase());
-  const [treeDerived, treePanes] = await Promise.all([
-    getDerivedIssueState(issueId),
-    getBackendPanesForIssue(issueId),
-  ]);
 
   // Lint node (PAN-2665): the verification quality-gate run, shown between
   // Work and Review (TYPE_PRIORITY orders it client-side). Unlike agent nodes

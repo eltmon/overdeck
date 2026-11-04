@@ -112,8 +112,9 @@ describe('POST /api/lanes with a machine (PAN-4638 WI-5)', () => {
     const response = readJsonResponse(await handleLaneLaunch(request(root(), 'r1', 'desk'), { viaChannel: false, caller: AGENT }, d));
 
     expect(response.status).toBe(201);
-    const body = response.body as { conversation: { id: number | null; name: string }; machine: { label: string } };
+    const body = response.body as { conversation: { id: number | null; name: string }; machine: { label: string }; placement: unknown };
     expect(body.machine).toEqual({ environmentId: 'env-desk', label: 'desk', reason: null });
+    expect(body.placement).toBeNull();
     expect(body.conversation.id).toBeNull();
     const [environmentId, path, init] = fetchPeer.mock.calls[0]!;
     expect(environmentId).toBe('env-desk');
@@ -128,8 +129,9 @@ describe('POST /api/lanes with a machine (PAN-4638 WI-5)', () => {
     const d = deps(fetchPeer);
     const response = readJsonResponse(await handleLaneLaunch(request(root(), 'r2', 'home'), { viaChannel: false, caller: AGENT }, d));
     expect(response.status).toBe(201);
-    const body = response.body as { conversation: { name: string }; machine: unknown };
+    const body = response.body as { conversation: { name: string }; machine: unknown; placement: unknown };
     expect(body.machine).toBeNull();
+    expect(body.placement).toBeNull();
     expect(getConversationByName(body.conversation.name)?.laneKey).toBe('r2');
     expect(fetchPeer).not.toHaveBeenCalled();
     expect(d.follow).not.toHaveBeenCalled();
@@ -159,5 +161,32 @@ describe('POST /api/lanes with a machine (PAN-4638 WI-5)', () => {
     const response = readJsonResponse(await handleLaneLaunch(request(root(), 'r6', 'desk'), { viaChannel: false, caller: AGENT }, deps(fetchPeer)));
     expect(response).toMatchObject({ status: 503, body: { code: 'machine-unreachable' } });
     expect((response.body as { error: string }).error).toBe('desk: ECONNREFUSED');
+  });
+
+  it('PAN-5006: auto that picks this machine launches here and answers placement with the passed-over machines', async () => {
+    const fetchPeer = owner();
+    const d = deps(fetchPeer);
+    const targetDeps = {
+      self: async () => ({ environmentId: 'env-home', label: 'home' }),
+      links: async () => [DESK],
+      status: () => ({ state: 'online', tags: ['linux'], load: null, placement: 'auto' as const }),
+      selfProfile: () => ({ tags: ['docker', 'linux'], placement: 'auto' as const }),
+      selfLoad: async () => ({ cpuPsiSomeAvg10: 3, cpuSaturated: false, memAvailableBytes: 41 * 2 ** 30, workingAgents: 2, sampledAt: '2026-11-04T12:00:00.000Z' }),
+      selfProjectOrigins: async () => [ORIGIN],
+      linkProjectOrigins: () => [ORIGIN],
+      autoFly: async () => false,
+    } as unknown as FleetTargetDeps;
+    const dAuto: LaneRouteDeps = { ...d, resolveTarget: (machine, gitOrigin, needs) => resolveTargetMachine(machine, gitOrigin, needs, targetDeps) };
+    const response = readJsonResponse(await handleLaneLaunch({ ...request(root(), 'r7', 'auto'), needs: ['docker'] }, { viaChannel: false, caller: AGENT }, dAuto));
+
+    expect(response.status).toBe(201);
+    const body = response.body as { conversation: { name: string }; machine: unknown; placement: { label: string; reason: string; rejections: unknown[] } };
+    expect(body.machine).toBeNull();
+    expect(body.placement.label).toBe('home');
+    expect(body.placement.reason.startsWith('Auto → home (')).toBe(true);
+    expect(body.placement.rejections).toEqual([{ environmentId: 'env-desk', label: 'desk', reason: 'no docker' }]);
+    expect(fetchPeer).not.toHaveBeenCalled();
+    expect(d.follow).not.toHaveBeenCalled();
+    expect(getConversationByName(body.conversation.name)?.laneKey).toBe('r7');
   });
 });

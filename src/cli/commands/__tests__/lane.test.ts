@@ -118,6 +118,41 @@ describe('pan lane start', () => {
     expect(await laneStartCommand({ key: '663', role: 'builder', prompt: 'go', run: 'hotel' }, failed.deps)).toBe(1);
     expect(failed.err.at(-1)).toContain('codex not installed');
   });
+
+  it('PAN-5006: prints the Auto reason and the passed-over machines when Auto picks this machine', async () => {
+    const { deps, fetchMock, err } = harness({ env: { OVERDECK_CONVERSATION: 'conv-abc' } });
+    fetchMock.mockResolvedValueOnce(json(201, {
+      ...LAUNCHED,
+      machine: null,
+      placement: {
+        label: 'home',
+        reason: 'Auto → home (CPU pressure 0%, 31 GB free, 2 agents)',
+        rejections: [{ environmentId: 'env-mac', label: 'mac', reason: 'no docker' }, { environmentId: 'env-fly', label: 'fly-1', reason: 'no docker' }],
+      },
+    }));
+    expect(await laneStartCommand({ key: '663', role: 'builder', prompt: 'go', run: 'hotel', machine: 'auto', wait: false }, deps)).toBe(0);
+    expect(err).toEqual(['Auto → home (CPU pressure 0%, 31 GB free, 2 agents)', 'Passed over: mac: no docker; fly-1: no docker']);
+  });
+
+  it('PAN-5006: prints a remote Auto reason once', async () => {
+    const { deps, fetchMock, err } = harness({ env: { OVERDECK_CONVERSATION: 'conv-abc' } });
+    const reason = 'Auto → desk (CPU pressure 2%, 64 GB free, 0 agents)';
+    fetchMock.mockResolvedValueOnce(json(201, {
+      ...LAUNCHED,
+      machine: { environmentId: 'env-desk', label: 'desk', reason },
+      placement: { label: 'desk', reason, rejections: [] },
+    }));
+    expect(await laneStartCommand({ key: '663', role: 'builder', prompt: 'go', run: 'hotel', machine: 'auto', wait: false }, deps)).toBe(0);
+    expect(err).toEqual([reason]);
+  });
+
+  it('PAN-5006: prints machine.reason from a dashboard without placement', async () => {
+    const { deps, fetchMock, err } = harness({ env: { OVERDECK_CONVERSATION: 'conv-abc' } });
+    const reason = 'Auto → desk (CPU pressure 2%, 64 GB free, 0 agents)';
+    fetchMock.mockResolvedValueOnce(json(201, { ...LAUNCHED, machine: { environmentId: 'env-desk', label: 'desk', reason } }));
+    expect(await laneStartCommand({ key: '663', role: 'builder', prompt: 'go', run: 'hotel', machine: 'auto', wait: false }, deps)).toBe(0);
+    expect(err).toEqual([reason]);
+  });
 });
 
 describe('pan lane wait', () => {

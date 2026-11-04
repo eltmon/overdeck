@@ -19,7 +19,7 @@ describe('push classifier (PAN-2354)', () => {
       pendingAskUserQuestion: { toolUseId: 'toolu_01', askedAt: NOW, questions: [{ question: QUESTION_TEXT }] },
     });
     expect(subject).toBe('agent:agent-pan-1');
-    expect(items).toEqual([expect.objectContaining({ key: 'auq:toolu_01', kind: 'question', url: '/m?subject=agent-pan-1', label: 'PAN-1 work' })]);
+    expect(items).toEqual([expect.objectContaining({ key: 'auq:toolu_01', kind: 'question', category: 'question', url: '/m?subject=agent-pan-1', label: 'PAN-1 work' })]);
   });
 
   it('treats a pan ask operator decision as a question', () => {
@@ -32,7 +32,7 @@ describe('push classifier (PAN-2354)', () => {
 
   it('maps an agent permission request to perm:pending', () => {
     const { items } = pendingItemsFromEnrichment({ agentId: 'agent-pan-3', pendingInputKinds: ['permissionRequest'] });
-    expect(items).toEqual([expect.objectContaining({ key: 'perm:pending', kind: 'approval' })]);
+    expect(items).toEqual([expect.objectContaining({ key: 'perm:pending', kind: 'approval', category: 'permission' })]);
   });
 
   it('maps an agent plan to plan:<id>', () => {
@@ -40,7 +40,17 @@ describe('push classifier (PAN-2354)', () => {
       agentId: 'agent-pan-4',
       pendingProposedPlan: { toolUseId: 'toolu_p', askedAt: NOW, plan: '\n# Plan\nstep' },
     });
-    expect(items).toEqual([expect.objectContaining({ key: 'plan:toolu_p', kind: 'approval', preview: '# Plan' })]);
+    expect(items).toEqual([expect.objectContaining({ key: 'plan:toolu_p', kind: 'approval', category: 'plan', preview: '# Plan' })]);
+  });
+
+  it('gives an AUQ, a plan and a permission the categories question, plan, permission', () => {
+    const { items } = pendingItemsFromEnrichment({
+      agentId: 'agent-pan-cat',
+      pendingAskUserQuestion: { toolUseId: 'toolu_cat', askedAt: NOW, questions: [{ question: QUESTION_TEXT }] },
+      pendingProposedPlan: { toolUseId: 'toolu_cat_p', askedAt: NOW, plan: 'step' },
+      pendingInputKinds: ['permissionRequest'],
+    });
+    expect(items.map(item => item.category)).toEqual(['question', 'plan', 'permission']);
   });
 
   it('keys a conversation permission by signature and encodes the subject', () => {
@@ -68,7 +78,7 @@ describe('push classifier (PAN-2354)', () => {
       timestamp: NOW,
       payload: { issueId: 'PAN-9', entry: { type, issueId: 'PAN-9', at: NOW } },
     });
-    expect(n).toEqual(expect.objectContaining({ kind, body, url: '/m', tag: `journal:PAN-9:${type}:${NOW}`, title: expect.stringContaining('PAN-9') }));
+    expect(n).toEqual(expect.objectContaining({ kind, category: kind, body, url: '/m', tag: `journal:PAN-9:${type}:${NOW}`, title: expect.stringContaining('PAN-9') }));
   });
 
   it('ignores verification.failed and other journal types', () => {
@@ -79,7 +89,7 @@ describe('push classifier (PAN-2354)', () => {
 
   it('maps agent.heartbeat_dead to failed and ignores agent.stopped', () => {
     expect(edgeNotificationFromEvent({ type: 'agent.heartbeat_dead', timestamp: NOW, payload: { agentId: 'agent-pan-5', issueId: 'PAN-5' } }))
-      .toEqual(expect.objectContaining({ kind: 'failed', tag: `dead:agent-pan-5:${NOW}`, body: 'The agent stopped responding.', url: '/m' }));
+      .toEqual(expect.objectContaining({ kind: 'failed', category: 'stopped', tag: `dead:agent-pan-5:${NOW}`, body: 'The agent stopped responding.', url: '/m' }));
     expect(edgeNotificationFromEvent({ type: 'agent.stopped', timestamp: NOW, payload: { agentId: 'agent-pan-5' } })).toBeNull();
   });
 

@@ -1,0 +1,115 @@
+{
+  "version": "1",
+  "issueId": "PAN-5006",
+  "created": "2026-11-04T12:27:52.516Z",
+  "updated": "2026-11-04T13:02:32.953Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "fleet-target-rejections": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5006",
+      "claimedAt": "2026-11-04T12:27:52.516Z",
+      "doneAt": "2026-11-04T12:30:27.548Z"
+    },
+    "lane-core-placement": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5006",
+      "claimedAt": "2026-11-04T12:30:33.670Z",
+      "doneAt": "2026-11-04T12:36:31.820Z"
+    },
+    "route-self-placement": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5006",
+      "claimedAt": "2026-11-04T12:36:39.915Z",
+      "doneAt": "2026-11-04T12:39:27.092Z"
+    },
+    "cli-auto-reason": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5006",
+      "claimedAt": "2026-11-04T12:39:31.198Z",
+      "doneAt": "2026-11-04T12:41:13.530Z"
+    },
+    "docs-auto-placement": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5006",
+      "claimedAt": "2026-11-04T12:41:18.052Z",
+      "doneAt": "2026-11-04T12:42:36.095Z"
+    },
+    "fleet-target-rejections.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:58:06.230Z"
+    },
+    "fleet-target-rejections.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:58:21.281Z"
+    },
+    "fleet-target-rejections.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:58:36.799Z"
+    },
+    "lane-core-placement.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:58:55.544Z"
+    },
+    "lane-core-placement.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:59:10.646Z"
+    },
+    "lane-core-placement.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:59:26.125Z"
+    },
+    "lane-core-placement.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:59:40.104Z"
+    },
+    "route-self-placement.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:59:57.739Z"
+    },
+    "route-self-placement.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:00:14.588Z"
+    },
+    "route-self-placement.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:00:31.296Z"
+    },
+    "route-self-placement.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:00:47.731Z"
+    },
+    "cli-auto-reason.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:01:07.236Z"
+    },
+    "cli-auto-reason.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:01:22.541Z"
+    },
+    "cli-auto-reason.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:01:36.867Z"
+    },
+    "cli-auto-reason.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:01:50.734Z"
+    },
+    "docs-auto-placement.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:02:06.644Z"
+    },
+    "docs-auto-placement.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:02:19.739Z"
+    },
+    "docs-auto-placement.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:02:32.952Z"
+    }
+  }
+}

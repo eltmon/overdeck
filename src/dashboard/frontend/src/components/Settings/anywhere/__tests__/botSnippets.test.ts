@@ -32,6 +32,16 @@ describe('hermesConfig', () => {
     expect(text).toContain(TAILSCALE_URL);
     expect(text).toContain('Bearer ${OVERDECK_MCP_TOKEN}');
   });
+
+  it('puts summary and allow_answers under settings', () => {
+    for (const text of [
+      hermesConfig({ reach: 'connector', url: CONNECTOR_LOCAL_URL }),
+      hermesConfig({ reach: 'tailscale', url: TAILSCALE_URL }),
+    ]) {
+      expect(text).toContain('      settings:\n        summary: true\n        allow_answers: false');
+      expect(text).not.toContain('\n      summary: true');
+    }
+  });
 });
 
 describe('openclawConfig', () => {
@@ -72,6 +82,14 @@ describe('xaiExample', () => {
     for (const tool of XAI_ALLOWED_TOOLS) {
       expect(text).toContain(tool);
     }
+  });
+
+  it('uses the current xAI model and the overdeck server label', () => {
+    const text = xaiExample({ url: PUBLIC_MCP_PLACEHOLDER_URL });
+    expect(text).toContain('model: "grok-4.7"');
+    expect(text).toContain('server_label: "overdeck"');
+    expect(text).toContain('authorization: process.env.OVERDECK_MCP_TOKEN');
+    expect(text).not.toContain('"grok-4",');
   });
 });
 

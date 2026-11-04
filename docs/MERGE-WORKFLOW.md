@@ -344,6 +344,13 @@ PAN-4616. For the frontend test list this residual case needs two PRs that
 add tests sorting into the same gap; inserts into different gaps merge
 cleanly even without union. JSON state files under `.pan/` never get union.
 
+Each codebase-map file ends with one `<!-- last-verified: YYYY-MM-DD -->`
+footer that holds only the date (PAN-5020). Agents correct statements
+without touching it; only a full `/pan-map` refresh changes the date, so
+parallel PRs do not edit the same line. `npm run lint:last-verified` fails
+any footer with issue ids or other text after the date. It does not count
+footers, because a union merge of concerns.md can leave two date-only ones.
+
 An agent that parked an item with `pan task block <issue> <item> --on <ref>...`
 gets one `BLOCKERS MERGED` message within about two minutes of the last of
 those issues or PRs merging. See
@@ -562,7 +569,8 @@ destroy by hand"; destroy it by hand there.
 This dashboard-triggered cleanup does not replace the **closed-issue reaper**
 (`reconcileClosedIssueAgents`, run by deacon-lite every 60s): the reaper
 removes the workspace and deletes the local and remote feature branch of any
-closed issue whose branch is merged, **independent of these settings**. The
+closed issue whose branch is merged, **independent of these settings**. It
+re-checks an issue it already reaped only every 6 hours (PAN-5001). The
 disk line and "Clean up now" are the backstop for when the reaper cannot run —
 for example while `deacon.globally_paused` is set (PAN-4210) or during a
 GitHub quota pause, either of which lets closed workspaces accumulate.

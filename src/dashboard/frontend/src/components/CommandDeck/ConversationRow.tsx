@@ -244,13 +244,13 @@ export function ConversationRow({
     <span className={`${styles.laneReportBadge} ${verdictBadgeTone(conv.laneVerdict.value)}`}>{verdictBadgeText(conv.laneVerdict)}</span>
   ) : latestVerdict ? (
     <a
-      href={`/conv/${latestVerdict.criticId}`}
-      aria-label={`open critic #${latestVerdict.criticId}`}
+      href={`/conv/${latestVerdict.criticRoute}`}
+      aria-label={`open critic ${latestVerdict.criticId === null ? latestVerdict.criticRoute : `#${latestVerdict.criticId}`}`}
       className={`${styles.laneReportBadge} ${styles.laneVerdictLink} ${verdictBadgeTone(latestVerdict.value)}`}
       onClick={(event) => {
         event.preventDefault();
         event.stopPropagation();
-        window.location.href = `/conv/${latestVerdict.criticId}`;
+        window.location.href = `/conv/${latestVerdict.criticRoute}`;
       }}
     >
       {verdictBadgeText(latestVerdict)}

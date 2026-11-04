@@ -253,9 +253,14 @@ export async function laneStartCommand(options: LaneStartOptions, deps: LaneCliD
     iteration: number;
     warnings?: string[];
     machine?: { environmentId: string; label: string; reason: string | null } | null;
+    placement?: { label: string; reason: string; rejections: { label: string; reason: string }[] } | null;
   };
   for (const warning of result.warnings ?? []) deps.stderr(`warning: ${warning}`);
-  if (result.machine?.reason) deps.stderr(result.machine.reason);
+  // PAN-5006: placement explains an Auto pick of this machine too; machine.reason covers an older dashboard.
+  const reason = result.placement?.reason ?? result.machine?.reason;
+  if (reason) deps.stderr(reason);
+  const passedOver = result.placement?.rejections ?? [];
+  if (passedOver.length > 0) deps.stderr(`Passed over: ${passedOver.map((rejection) => `${rejection.label}: ${rejection.reason}`).join('; ')}`);
   const { conversation } = result;
 
   if (options.wait !== false) {

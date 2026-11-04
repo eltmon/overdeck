@@ -7,6 +7,8 @@ export const CONNECTOR_LOCAL_URL = 'http://127.0.0.1:7466/mcp';
 export const TAILSCALE_PLACEHOLDER_ORIGIN = 'https://YOUR-MACHINE.YOUR-TAILNET.ts.net';
 export const PUBLIC_MCP_PLACEHOLDER_URL = 'https://YOUR-MACHINE.YOUR-TAILNET.ts.net:8443/mcp';
 export const XAI_ALLOWED_TOOLS = ['list_conversations', 'read_conversation', 'list_pending_input'] as const;
+export const XAI_DEFAULT_MODEL = 'grok-4.7';
+export const XAI_SERVER_LABEL = 'overdeck';
 
 export type BotPlatform = 'hermes' | 'openclaw' | 'grok-build' | 'grok-bot' | 'xai-api';
 export type BotReach = 'connector' | 'tailscale' | 'this-computer' | 'public';
@@ -58,8 +60,9 @@ export function hermesConfig({ reach, url }: { reach: 'connector' | 'tailscale';
     '  entries:',
     '    overdeck:',
     '      mcp_allowlist: ["overdeck"]',
-    '      summary: true',
-    '      allow_answers: false',
+    '      settings:',
+    '        summary: true',
+    '        allow_answers: false',
   ].join('\n');
 }
 
@@ -99,11 +102,12 @@ export function xaiExample({ url }: { url: string }): string {
     '  method: "POST",',
     '  headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.XAI_API_KEY}` },',
     '  body: JSON.stringify({',
-    '    model: "grok-4",',
+    `    model: "${XAI_DEFAULT_MODEL}",`,
     '    input: "List my Overdeck conversations.",',
     '    tools: [{',
     '      type: "mcp",',
     `      server_url: "${url}",`,
+    `      server_label: "${XAI_SERVER_LABEL}",`,
     '      authorization: process.env.OVERDECK_MCP_TOKEN,',
     `      allowed_tools: [${allowedTools}],`,
     '    }],',

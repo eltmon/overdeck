@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { ROUTE_KINDS } from '../../../packages/contracts/src/machines.js';
 import {
   TELEMETRY_EVENT_NAMES,
+  TELEMETRY_PROPERTY_DOMAINS,
+  bucketRelayBytes,
   type TelemetryEventName,
   type TelemetryEventProperties,
 } from '../../../packages/contracts/src/telemetry.js';
@@ -37,15 +40,38 @@ const EXPECTED_EVENTS = [
   'github_quota_sample',
   'github_rate_limited',
   'instance_heartbeat',
+  'machine_link_started',
+  'machine_link_approved',
+  'machine_link_failed',
+  'phone_paired',
+  'phone_removed',
+  'anywhere_channel_opened',
+  'relay_usage_sampled',
 ] as const satisfies readonly TelemetryEventName[];
 
 describe('telemetry event schema', () => {
-  it('exports all eighteen telemetry event names', () => {
+  it('exports all twenty-five telemetry event names', () => {
     expect(TELEMETRY_EVENT_NAMES).toEqual(EXPECTED_EVENTS);
   });
 
   it('maps every event to properties without broad string or number values', () => {
     expect(PROPERTY_MAP_IS_EXACT).toBe(true);
     expect(PROPERTY_VALUES_ARE_RESTRICTED).toBe(true);
+  });
+
+  it('buckets relayed bytes in decimal megabytes', () => {
+    expect(bucketRelayBytes(0)).toBe('under_1mb');
+    expect(bucketRelayBytes(999_999)).toBe('under_1mb');
+    expect(bucketRelayBytes(1_000_000)).toBe('1mb-9mb');
+    expect(bucketRelayBytes(9_999_999)).toBe('1mb-9mb');
+    expect(bucketRelayBytes(10_000_000)).toBe('10mb-99mb');
+    expect(bucketRelayBytes(999_999_999)).toBe('100mb-999mb');
+    expect(bucketRelayBytes(1_000_000_000)).toBe('1gb+');
+  });
+
+  it('lists every route kind, plus the stored probe phase, as a channel route', () => {
+    const channelRoutes: readonly string[] = TELEMETRY_PROPERTY_DOMAINS.channel_route;
+    for (const kind of ROUTE_KINDS) expect(channelRoutes).toContain(kind);
+    expect(channelRoutes).toContain('stored');
   });
 });

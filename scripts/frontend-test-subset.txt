@@ -7,6 +7,7 @@
 src/App/AppLiveStoreHost.render-count.test.tsx
 src/App/BackendConnectionBoundary.test.tsx
 src/App/api.test.ts
+src/App/appChromeLabels.test.ts
 src/App/routes.linked.test.ts
 src/__tests__/fr7-conversation-pending-input.test.tsx
 src/__tests__/overlay-tokens.test.ts
@@ -16,6 +17,7 @@ src/components/CommandDeck/CommandDeck.test.tsx
 src/components/CommandDeck/ProjectTree/FeatureItem.linkedConversation.test.tsx
 src/components/CommandDeck/ProjectTree/FeatureItem.pullRequest.test.tsx
 src/components/CommandDeck/ProjectTree/featureStateBadge.test.ts
+src/components/CommandDeck/SessionView/SessionPanel.test.tsx
 src/components/CommandDeck/__tests__/CommandDeck.render-count.test.tsx
 src/components/CommandDeck/__tests__/ConversationList.render-count.test.tsx
 src/components/CommandDeck/__tests__/ConversationList.sort.test.ts
@@ -53,6 +55,7 @@ src/components/Settings/__tests__/gemini-qwen-glm-catalog.test.ts
 src/components/Settings/anywhere/__tests__/AddSshMachineDialog.test.tsx
 src/components/Settings/anywhere/__tests__/AddTriggerDialog.test.tsx
 src/components/Settings/anywhere/__tests__/AccessTokensPanel.test.tsx
+src/components/Settings/anywhere/__tests__/AccountCard.test.tsx
 src/components/Settings/anywhere/__tests__/AnywhereDialogHost.test.tsx
 src/components/Settings/anywhere/__tests__/AnywhereStatusCard.test.tsx
 src/components/Settings/anywhere/__tests__/BotsPanel.test.tsx
@@ -80,6 +83,7 @@ src/components/Settings/anywhere/__tests__/TailscaleSetupDialog.test.tsx
 src/components/Settings/anywhere/__tests__/botSnippets.test.ts
 src/components/Settings/anywhere/__tests__/botsApi.test.ts
 src/components/Settings/anywhere/__tests__/mcpOAuthApi.test.ts
+src/components/Settings/primitives/__tests__/SettingsSection.test.tsx
 src/components/Settings/sections/__tests__/AccessTokensSection.test.tsx
 src/components/Settings/sections/__tests__/AutoSettleIdleRow.test.tsx
 src/components/Settings/sections/__tests__/AutoSettleOnMergeRow.test.tsx
@@ -89,6 +93,7 @@ src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx
 src/components/Settings/sections/__tests__/tiered-crews.test.ts
 src/components/Stage/HomePane/Launcher.test.tsx
 src/components/Stage/cockpit/IssueMissionControl.render-count.test.tsx
+src/components/Stage/cockpit/IssueTreeLane.test.ts
 src/components/Stage/launcherFocusStore.test.ts
 src/components/Stage/panes/EditorPane.test.tsx
 src/components/XTerminal.test.tsx

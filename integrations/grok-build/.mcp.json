@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "overdeck": {
+      "command": "${GROK_PLUGIN_ROOT}/scripts/run-mcp.sh",
+      "env": {}
+    }
+  }
+}

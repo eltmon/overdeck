@@ -25,6 +25,7 @@ function item(key: string, overrides: Partial<PendingItem> = {}): PendingItem {
     subject: 'agent:a',
     key,
     kind: key.startsWith('auq:') ? 'question' : 'approval',
+    category: key.startsWith('auq:') ? 'question' : key.startsWith('plan:') ? 'plan' : 'permission',
     askedAt: new Date(START).toISOString(),
     issueId: 'PAN-1',
     label: 'PAN-1 work',
@@ -111,7 +112,7 @@ describe('needs-you dispatcher (PAN-2354)', () => {
   it('sends nothing when disabled', () => {
     const { provider, dispatcher } = setup({ enabled: false });
     dispatcher.observeSubject('agent:a', [item('auq:1')]);
-    dispatcher.observeEdge({ kind: 'failed', tag: 'journal:x', title: 't', publicTitle: 'p', body: 'b', url: '/m', issueId: null });
+    dispatcher.observeEdge({ kind: 'failed', category: 'failed', tag: 'journal:x', title: 't', publicTitle: 'p', body: 'b', url: '/m', issueId: null });
     expect(provider.sent).toHaveLength(0);
   });
 
@@ -131,7 +132,7 @@ describe('needs-you dispatcher (PAN-2354)', () => {
 
   it('dedups edge notifications by tag', () => {
     const { provider, dispatcher } = setup();
-    const edge = { kind: 'failed' as const, tag: 'journal:PAN-1:merge.failed:t', title: 't', publicTitle: 'p', body: 'b', url: '/m', issueId: 'PAN-1' };
+    const edge = { kind: 'failed' as const, category: 'failed' as const, tag: 'journal:PAN-1:merge.failed:t', title: 't', publicTitle: 'p', body: 'b', url: '/m', issueId: 'PAN-1' };
     dispatcher.observeEdge(edge);
     dispatcher.observeEdge(edge);
     expect(provider.sent).toHaveLength(1);

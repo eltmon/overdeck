@@ -106,7 +106,13 @@ address comes from DHCP). The rig needs no bun or Node.
    notifications. Also, `simctl push` on Xcode 26.6 does not run the Notification Service
    Extension, so the banner shows the placeholder. Decryption is checked by `swift test` and on a
    device (`ACCEPTANCE.md`, "PAN-4838 iOS notifications").
-6. When you are done, run `xcrun simctl delete $U`.
+6. To read the app's link diagnostics (failed dials and secure opens, PAN-5018), launch it with its
+   output in a file: `SIMCTL_CHILD_NSUnbufferedIO=YES xcrun simctl launch --terminate-running-process
+   --stdout=$HOME/app-stdout.log $U ai.overdeck.app`, then `grep '\[overdeck\]' ~/app-stdout.log`.
+   Capacitor prints the WebView's `console` lines (`⚡️  [warn] - [overdeck] link …`) to stdout, not to
+   the unified log, so `log show` does not have them. Without `NSUnbufferedIO` the file stays empty
+   until the buffer fills. Each launch truncates the file.
+7. When you are done, run `xcrun simctl delete $U`.
 
 `ios/scripts/add-widgets-target.rb` needs the `xcodeproj` gem 1.28 or later
 (`gem install --user-install xcodeproj`): older versions cannot read the project's local Swift
@@ -121,6 +127,7 @@ These are read at build time.
 | `VITE_OVERDECK_ACCOUNT_URL` | `https://account.overdeck.ai` | The account service for sign-in and device revocation. |
 | `VITE_OVERDECK_DIRECTORY_URL` | `https://connect.overdeck.ai` | The directory socket. |
 | `VITE_OVERDECK_REQUEST_LOG` | unset | `1` records every routed `/api/` request and RPC tag in `globalThis.__overdeckRequestLog` (FR-14). |
+| `VITE_OVERDECK_DEBUG_ERRORS` | unset | `1` appends the error code to a failed link's text, for example "Could not open a secure channel to desk. (timeout)" (PAN-5018). |
 
 ## Keys and secrets
 
@@ -162,6 +169,13 @@ own App ID, `ai.overdeck.app.widgets`, registered in checklist step A1 of `RELEA
 - **Settings switch:** Settings → Notifications turns needs-you alerts off and on
   (`overdeck.notifications`). Off sends `push-unregister`; on registers again. When iOS
   permission is denied, Settings says how to turn it on in iOS Settings.
+- **Pause and types** (`src/shell/notificationPrefs.ts`, `notificationPrefsSync.ts`): a pause switch,
+  two timed pauses and six notification-type switches, held in `localStorage` as
+  `overdeck.notificationPrefs` (`{ revision, prefs }`). The exchange at pairing (`pairing.ts`) carries
+  the current prefs in its `notificationPreferences` field; every later change syncs over
+  `PUT /api/phones/self/notification-preferences` on a link channel, one machine at a time. Each
+  paired machine's sync state (`synced` / `pending` / `outdated` / `failed`) tracks in
+  `overdeck.notificationPrefsSynced`, surfaced in Settings as the lines under each unsynced machine.
 - **Decryption:** the directory sends Apple only the placeholder **Overdeck · Something needs
   you** and the sealed payload `s`. The Notification Service Extension opens `s` with the push key
   and shows the real title and text. If it cannot, for example before the first unlock after a

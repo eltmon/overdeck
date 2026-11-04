@@ -4,7 +4,7 @@
  */
 import { randomBytes } from 'node:crypto';
 import type { Duplex } from 'node:stream';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SignalData } from '@overdeck/contracts';
 
 import { RtcDialAbortedError, type RtcPurpose, type RtcSignalingPort, RtcTransport } from '../rtc-transport.js';
@@ -19,8 +19,15 @@ function hub() {
   const handlers = new Map<string, Set<SignalHandler>>();
   /** The `relay` argument of every `iceServers` call, in order. */
   const iceRelays: boolean[] = [];
-  const port = (self: string): RtcSignalingPort => ({
+  /** Every frame sent through the hub, in order. */
+  const sent: Array<{ from: string; to: string; session: string; data: SignalData }> = [];
+  /** Hand a frame straight to `to`'s handlers, as the directory would. */
+  const deliver = (to: string, from: string, session: string, purpose: RtcPurpose, relay: boolean, data: SignalData): void => {
+    for (const handler of handlers.get(to) ?? []) handler(from, session, purpose, relay, data);
+  };
+  const port = (self: string, iceServers?: RtcSignalingPort['iceServers']): RtcSignalingPort => ({
     send(to, session, purpose, relay, data) {
+      sent.push({ from: self, to, session, data });
       setImmediate(() => {
         for (const handler of handlers.get(to) ?? []) handler(self, session, purpose, relay, data);
       });
@@ -31,12 +38,12 @@ function hub() {
       set.add(handler);
       return () => set.delete(handler);
     },
-    iceServers: async (relay) => {
+    iceServers: iceServers ?? (async (relay) => {
       iceRelays.push(relay);
       return [];
-    },
+    }),
   });
-  return { port, iceRelays };
+  return { port, iceRelays, sent, deliver };
 }
 
 function readBytes(stream: Duplex, count: number): Promise<Buffer> {
@@ -171,5 +178,73 @@ describe('RtcTransport (PAN-2356 WI-10)', () => {
     raw.destroy();
     await closed;
     expect(accepted.raw.destroyed).toBe(true);
+  }, 20_000);
+});
+
+describe('RtcTransport diagnostics (PAN-5018 FR-6)', () => {
+  const C = 'cccccccc-0000-4000-8000-00000000000c';
+
+  function loggedPair(bIceServers?: RtcSignalingPort['iceServers']) {
+    const h = hub();
+    const aLogs = { log: vi.fn(), debug: vi.fn() };
+    const bLogs = { log: vi.fn(), debug: vi.fn() };
+    const incoming: Duplex[] = [];
+    const a = new RtcTransport(h.port(A), () => undefined, aLogs);
+    const b = new RtcTransport(h.port(B, bIceServers), (raw) => incoming.push(raw), bLogs);
+    transports.push(a, b);
+    const lines = (logs: { log: ReturnType<typeof vi.fn>; debug: ReturnType<typeof vi.fn> }): string[] =>
+      [...logs.log.mock.calls, ...logs.debug.mock.calls].map(([line]) => line as string);
+    return { h, a, b, aLogs, bLogs, incoming, lines };
+  }
+
+  it('logs the offer and the answer for an accepted dial', async () => {
+    const { a, bLogs, incoming } = loggedPair();
+    await a.dial(B, { relay: false, purpose: 'link', signal: new AbortController().signal });
+    await vi.waitFor(() => expect(incoming).toHaveLength(1));
+    const lines = bLogs.log.mock.calls.map(([line]) => line as string);
+    expect(lines).toContainEqual(expect.stringMatching(/^rtc offer from 00000000 session [0-9a-f]{8} \(link, direct\)$/));
+    expect(lines).toContainEqual(expect.stringMatching(/^rtc session [0-9a-f]{8} answered$/));
+  }, 20_000);
+
+  it('logs the failing step when ICE servers cannot be fetched', async () => {
+    const { a, bLogs } = loggedPair(async () => {
+      throw new Error('no directory');
+    });
+    const controller = new AbortController();
+    const dialed = a.dial(B, { relay: false, purpose: 'link', signal: controller.signal }).catch((error: unknown) => error);
+    await vi.waitFor(() => expect(bLogs.log).toHaveBeenCalledWith(expect.stringMatching(/failed at ice-servers: no directory$/)));
+    controller.abort();
+    expect(await dialed).toBeInstanceOf(RtcDialAbortedError);
+  }, 20_000);
+
+  it('logs a dropped offer whose session belongs to another peer', async () => {
+    const { h, a, bLogs, incoming } = loggedPair();
+    await a.dial(B, { relay: false, purpose: 'link', signal: new AbortController().signal });
+    await vi.waitFor(() => expect(incoming).toHaveLength(1));
+    const offer = h.sent.find((frame) => frame.from === A && frame.data.sdp?.type === 'offer')!;
+    h.deliver(B, C, offer.session, 'link', false, offer.data);
+    await vi.waitFor(() =>
+      expect(bLogs.log).toHaveBeenCalledWith(`rtc offer dropped: session ${offer.session.slice(0, 8)} belongs to 00000000, not cccccccc`),
+    );
+  }, 20_000);
+
+  it('logs a candidate for an unknown session through debug only', async () => {
+    const { h, bLogs } = loggedPair();
+    h.deliver(B, A, 'f'.repeat(32), 'link', false, { candidate: { candidate: 'candidate:1 1 udp 1 127.0.0.1 9 typ host', sdpMid: '0', sdpMLineIndex: 0 } });
+    await vi.waitFor(() => expect(bLogs.debug).toHaveBeenCalledWith('rtc candidate dropped: unknown session ffffffff from 00000000'));
+    expect(bLogs.log).not.toHaveBeenCalled();
+  });
+
+  it('never logs SDP or candidate text', async () => {
+    const { a, aLogs, bLogs, incoming, lines } = loggedPair();
+    await a.dial(B, { relay: false, purpose: 'link', signal: new AbortController().signal });
+    await vi.waitFor(() => expect(incoming).toHaveLength(1));
+    const all = [...lines(aLogs), ...lines(bLogs)];
+    expect(all.length).toBeGreaterThan(0);
+    for (const line of all) {
+      expect(line).not.toContain('v=0');
+      expect(line).not.toContain('a=');
+      expect(line).not.toContain('candidate:');
+    }
   }, 20_000);
 });
