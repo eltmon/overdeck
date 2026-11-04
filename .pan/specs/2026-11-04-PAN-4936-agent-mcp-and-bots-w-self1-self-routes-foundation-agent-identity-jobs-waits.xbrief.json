@@ -1,0 +1,577 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T00:53:19Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4936: Agent MCP and bots (W-SELF1): Self routes foundation: agent identity, jobs, waits",
+    "updated": "2026-11-04T00:55:05.068Z"
+  },
+  "plan": {
+    "id": "pan-4936",
+    "title": "Agent MCP and bots (W-SELF1): Self routes foundation: agent identity, jobs, waits",
+    "status": "proposed",
+    "uid": "ab6fa01f-0048-4ee0-9d02-c6083303af41",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-04T00:53:19Z",
+    "updated": "2026-11-04T00:55:05.068Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4936",
+        "label": "PAN-4936",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4927",
+        "label": "PAN-4927 (epic)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "mcp",
+      "agent-tokens",
+      "self-routes",
+      "dashboard-server",
+      "security"
+    ],
+    "narratives": {
+      "Problem": "Agent tokens exist (W-TOK1) and the MCP module can show agent-only tools (W-MCP1), but the dashboard has no single place that turns an agent token into the calling agent, no way to run a CLI-only pan operation for an agent asynchronously, and no bounded wait an agent can call instead of polling. Every later agent-workflow item (W-SELF2, W-DEL1, W-MEM1, W-SEC1, W-PR1) needs these.",
+      "Proposal": "Lower PRD .pan/drafts/PAN-4936.md (epic W-SELF1, D-10/D-11/D-12): a self caller resolver (403 not-an-agent-token for any non-agent credential, 404 agent-gone), a closed job verb table with a validated argv builder, an in-memory job store that runs pan through panCliInvocation + promisified execFile with only the caller's identity env and keeps a 16 KiB tail, owner-only GET /api/self/jobs/:id and /wait routes (at most 50 s, read:state rows, no-loss rows), the agent-only wait_job tool, and the matching docs.",
+      "NonGoals": "- No route that starts a job (W-SELF2, W-DEL1, W-MEM1, W-PR1 add them)\n- No per-verb flags or positionals beyond the verb-word prefixes\n- No streaming of partial job output and no persistence of jobs across a dashboard restart\n- No per-agent job quota\n- wait_job does not forward MCP request cancellation to the route\n- No /api/self/ path other than /api/self/jobs/:id and /api/self/jobs/:id/wait\n- No MCP injection into agents (W-INJ1-3) and no instructions block (W-INJ4)\n- No CLAUDE.md Key Invariants line (W-DOC / W-INJ1)\n- No execSync, spawnSync, execFileSync or new *Sync function\n- Never read the calling agent, issue or conversation from a request body, query or header"
+    },
+    "autoDecisions": [
+      {
+        "summary": "W-SELF1 defines the whole closed SELF_JOB_VERBS table (nine verbs, verb-word prefixes only); flags stay with each later route item.",
+        "rationale": "Argv safety is one security boundary (epic H-7) best reviewed once; W-SELF2, W-DEL1 and W-MEM1 do not list self-jobs.ts in their files, so the epic expects the union to exist already, and parallel items avoid editing one union."
+      },
+      {
+        "summary": "The wait route, not the tool, builds next via selfJobAnswer.",
+        "rationale": "Epic D-12 says every wait route returns { status: 'running', next }; one helper keeps W-SELF2's routes on the same shape."
+      },
+      {
+        "summary": "Every finished job answers status 'done'; failure shows in exitCode, signal, timedOut and error.",
+        "rationale": "Epic AC-7 names only running and done."
+      },
+      {
+        "summary": "At 200 held jobs, drop the oldest finished; refuse with too-many-jobs when 200 are running. No per-agent quota.",
+        "rationale": "Epic D-11 caps at 200 without naming the overflow rule; refusing only when every slot is busy loses no running work."
+      },
+      {
+        "summary": "Another caller's job and an unknown job both answer 404 unknown-job.",
+        "rationale": "A job id's existence must not leak between agents."
+      },
+      {
+        "summary": "Conversation jobs set OVERDECK_CONVERSATION to the tmux session and every inherited identity variable (OVERDECK_AGENT_ID, OVERDECK_CONVERSATION, OVERDECK_ISSUE_ID, OVERDECK_CLAIM_ID, OVERDECK_AGENT_STARTED_BY, OVERDECK_MCP_TOKEN, OVERDECK_MCP_TOKEN_FILE) is removed first.",
+        "rationale": "PAN-4930 C-2 found the variable holds the tmux session; the dashboard may run from an agent's or the Flywheel's shell, and claim-check and worker run read these variables."
+      },
+      {
+        "summary": "The ref pattern's first character is [A-Za-z0-9#], not any of the epic's set.",
+        "rationale": "The epic's pattern admits '-x', which pan would parse as a flag."
+      },
+      {
+        "summary": "Store tests inject a fake runner; runPanJob is tested once against a real process.execPath -e child with no timers.",
+        "rationale": "Avoids mocking node:child_process while still proving the real execFile failure shapes; keeps the fake-timers rule."
+      },
+      {
+        "summary": "WAIT_CHUNK_MS lives in src/lib/mcp/tool.ts.",
+        "rationale": "Both the server job store and the MCP tool module need it, and lib/mcp must never import dashboard server code."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Small: 22 files, all in the dashboard server, the MCP module, their tests and two doc pages.",
+      "canonicalFilename": "2026-11-04-PAN-4936-agent-mcp-and-bots-w-self1-self-routes-foundation-agent-identity-jobs-waits.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "self-caller",
+        "title": "Add the self caller resolver that turns an agent token into the calling agent",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T00:53:19Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4936",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "self-job-store",
+            "self-jobs-routes"
+          ],
+          "files_scope": [
+            "src/dashboard/server/self-caller.ts",
+            "src/dashboard/server/__tests__/self-caller.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/dashboard/server/__tests__/self-caller.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "src/dashboard/server/__tests__/self-caller.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-4936.md WI-1 steps 1-3. Create src/dashboard/server/self-caller.ts exporting SelfCaller { agentId, agentKind, role: string|null, cwd, issueId: string|null, tmuxSession: string|null }, NOT_AN_AGENT_TOKEN = { error: 'self routes need an agent token', code: 'not-an-agent-token' }, AGENT_GONE = { error: 'the agent for this token no longer exists', code: 'agent-gone' }, SelfCallerResult, SelfCallerDeps (getAgentState, getConversationByName, defaulting to the real functions from src/lib/agents/agent-state-read.ts and src/lib/overdeck/conversations.ts), selfCallerFromCredential(credential, deps) and resolveSelfCaller(request, deps) = selfCallerFromCredential(resolveRequestCredential(request), deps). Rules in order: null credential, any kind other than 'token', a token without a non-empty agentId, or agentKind not 'agent'|'conversation' -> 403 NOT_AN_AGENT_TOKEN; agent -> getAgentState(agentId) null or empty workspace -> 404 AGENT_GONE, else cwd = workspace, issueId = state.issueId || null, tmuxSession null; conversation -> getConversationByName(agentId) null or empty cwd -> 404 AGENT_GONE, else cwd = conv.cwd, issueId = conv.issueId, tmuxSession = conv.tmuxSession. role = credential.role ?? null. Never read identity from the request body, query or headers. Do not catch lookup exceptions. No HTTP response objects in this module."
+        },
+        "items": [
+          {
+            "id": "self-caller.ac1",
+            "title": "Given credential null, internal-token, root-session, device, phone, or a kind 'token' credential without agentId, when selfCallerFromCredential runs, then it returns status 403 with body exactly { error: 'self routes need an agent token', code: 'not-an-agent-token' } (asserted in self-caller.test.ts).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "self-caller.ac2",
+            "title": "Given an agent token whose injected getAgentState returns { workspace: '/w/feature-pan-1', issueId: 'PAN-1' }, when resolved, then the caller has cwd '/w/feature-pan-1', issueId 'PAN-1', tmuxSession null and the token's role.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "self-caller.ac3",
+            "title": "Given a conversation token whose row has cwd '/p', tmuxSession 'conv-abc' and issueId null, when resolved, then the caller carries cwd '/p' and tmuxSession 'conv-abc'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "self-caller.ac4",
+            "title": "Given a token whose agent state or conversation row is missing, or whose workspace is empty, when resolved, then it returns status 404 with code 'agent-gone'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "self-job-argv",
+        "title": "Add the closed job verb table and the validated argv builder",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T00:53:19Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4936",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "self-job-store"
+          ],
+          "files_scope": [
+            "src/dashboard/server/services/self-job-argv.ts",
+            "src/dashboard/server/__tests__/self-job-argv.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/dashboard/server/__tests__/self-job-argv.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "src/dashboard/server/__tests__/self-job-argv.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-4936.md WI-2 steps 1-3. Create the leaf module src/dashboard/server/services/self-job-argv.ts (imports nothing) exporting SELF_JOB_VERBS with exactly nine verbs and verb-word prefixes only: 'task-claim' ['task','claim'], 'task-done' ['task','done'], 'task-block' ['task','block'], done ['done'], handoff ['handoff'], 'worker-report' ['worker','report'], 'lane-report' ['lane','report'], 'memory-add' ['memory','add'], 'memory-search' ['memory','search']; type SelfJobVerb; SelfJobArg = {ref} | {flag,value} | {switch} | {rest}; SELF_JOB_REF_PATTERN = /^[A-Za-z0-9#][A-Za-z0-9#/:._-]{0,199}$/ (first character never '-'); class SelfJobArgError (code 'bad-job-arg'); buildSelfJobArgv(verb, args). Rules: verb must be an own key (Object.hasOwn) else throw; ref must match the pattern; flag and switch names must match /^[a-z][a-z0-9-]{0,39}$/ and produce one '--<flag>=<value>' or '--<switch>' element; values with NUL throw; rest only as the last piece, at most once, emitted as '--' then the values. Add no per-verb flags; later route items build them."
+        },
+        "items": [
+          {
+            "id": "self-job-argv.ac1",
+            "title": "Given each of the nine verbs, when buildSelfJobArgv runs with no args, then the result equals that verb's fixed prefix, and Object.keys(SELF_JOB_VERBS) equals the nine names in the PRD.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "self-job-argv.ac2",
+            "title": "Given a ref of '--steal', '-x', '', 'a b' or a 201-character string, when buildSelfJobArgv runs, then it throws SelfJobArgError.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "self-job-argv.ac3",
+            "title": "Given { flag: 'title', value: '--allow-primary' }, when built, then argv contains the single element '--title=--allow-primary' and no element equal to '--allow-primary'; a flag name 'Title' or '--x' throws.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "self-job-argv.ac4",
+            "title": "Given { rest: ['--cwd', '/'] } as the last piece, when built, then argv ends with '--', '--cwd', '/'; a rest that is not last, or a value containing NUL, throws.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "self-job-argv.ac5",
+            "title": "Given buildSelfJobArgv('rm' as SelfJobVerb), when it runs, then it throws SelfJobArgError.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "self-job-store",
+        "title": "Add the in-memory job store with the execFile runner, identity env and 50 s waits",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T00:53:19Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4936",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "self-jobs-routes",
+            "wait-job-tool"
+          ],
+          "files_scope": [
+            "src/dashboard/server/services/self-jobs.ts",
+            "src/lib/mcp/tool.ts",
+            "src/dashboard/server/__tests__/self-jobs.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/dashboard/server/__tests__/self-jobs.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "src/dashboard/server/__tests__/self-jobs.test.ts passes, including the fake-timer wait cases and the real-child runPanJob case"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-1",
+            "NFR-2",
+            "NFR-4",
+            "NFR-5",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-4936.md WI-3 steps 1-7. Add `export const WAIT_CHUNK_MS = 50_000;` to src/lib/mcp/tool.ts. Create src/dashboard/server/services/self-jobs.ts with the constants (15 min timeout, 4 MiB maxBuffer, 16,384-byte tail, 200 jobs, 1 h TTL), SelfJobRunInput/SelfJobRunResult/SelfJobRunner, SelfJobState, SelfJobAnswer, tailUtf8, selfJobEnv, selfJobAnswer, runPanJob, SelfJobs, createSelfJobs({ runner, now, newId }) and the singleton selfJobs. runPanJob uses promisify(execFile) exactly as the PRD snippet: attach an 'error' listener to child.stdin, end stdin with the input or '', read stdout/stderr from the rejection error on non-zero exit, map ERR_CHILD_PROCESS_STDIO_MAXBUFFER to error 'job output exceeded 4 MiB' and killed+signal to timedOut. Build the command only with panCliInvocation(buildSelfJobArgv(verb, args)). selfJobEnv deletes OVERDECK_AGENT_ID, OVERDECK_CONVERSATION, OVERDECK_ISSUE_ID, OVERDECK_CLAIM_ID, OVERDECK_AGENT_STARTED_BY, OVERDECK_MCP_TOKEN, OVERDECK_MCP_TOKEN_FILE from the base env, then sets OVERDECK_AGENT_ID (agent) or OVERDECK_CONVERSATION = tmuxSession (conversation), OVERDECK_ISSUE_ID when known, and OVERDECK_DASHBOARD_URL http://127.0.0.1:<API_PORT ?? PORT ?? 3011>. Store: owner `${agentKind}:${agentId}`; prune finished jobs older than 1 h on start/get/wait; at 200 jobs drop the oldest finished, else return { ok: false, code: 'too-many-jobs' }; get/wait return null for unknown or foreign jobs; wait clamps timeoutMs to 1..WAIT_CHUNK_MS and races settle vs setTimeout vs AbortSignal, always clearing the timer and listener. selfJobAnswer: done -> every state field; running -> { status, jobId, verb, startedAt, next: { tool: 'wait_job', arguments: { jobId } } }. No execSync/execFileSync, no Effect wrappers. Tests put vi.useFakeTimers()/vi.useRealTimers() in beforeEach/afterEach of a nested describe('waits and retention') that holds every wait/TTL case and an injected fake runner; the runPanJob cases sit outside that describe (real timers) and are the only ones that spawn a real process.execPath -e child."
+        },
+        "items": [
+          {
+            "id": "self-job-store.ac1",
+            "title": "Given a running job and fake timers, when wait(jobId, owner, 50000) runs, then it is still pending after advanceTimersByTimeAsync(49999) and resolves with status 'running' after 1 more ms.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "self-job-store.ac2",
+            "title": "Given a running job whose runner settles at 10 s, when a 50 s wait is pending, then the wait resolves at 10 s with status 'done' and the runner's exitCode and stdout.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "self-job-store.ac3",
+            "title": "Given a job started by one caller, when a caller with a different agentId or agentKind calls get or wait, then both return null.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "self-job-store.ac4",
+            "title": "Given a base env holding OVERDECK_AGENT_ID=agent-other, OVERDECK_CONVERSATION=conv-flywheel, OVERDECK_CLAIM_ID and OVERDECK_MCP_TOKEN, when selfJobEnv runs for a conversation caller with tmuxSession conv-abc, then the result has OVERDECK_CONVERSATION=conv-abc, OVERDECK_DASHBOARD_URL set, and no OVERDECK_AGENT_ID, OVERDECK_CLAIM_ID or OVERDECK_MCP_TOKEN.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "self-job-store.ac5",
+            "title": "Given a real child that writes 17,408 bytes to stdout and exits 3, when runPanJob runs, then it returns exitCode 3, a 16,384-character stdout and error null; with 200 running jobs start returns code 'too-many-jobs'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "self-jobs-routes",
+        "title": "Add the GET self job state and wait routes with scope and no-loss rows",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T00:53:19Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4936",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/self-jobs.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/__tests__/self-jobs-routes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/dashboard/server/__tests__/self-jobs-routes.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts src/dashboard/server/__tests__/route-scopes.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "self-jobs-routes.test.ts, no-loss-matrix.test.ts and route-scopes.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-4936.md WI-4 steps 1-4. Create src/dashboard/server/routes/self-jobs.ts exporting SelfJobsRouteDeps { jobs?, caller? }, parseWaitTimeoutMs (null -> 50000; only /^\\d{1,5}$/ in 1..50000), handleSelfJobGet, handleSelfJobWait(credential, jobId, rawTimeout, signal, deps), makeSelfJobsRouteLayer(deps) and selfJobsRouteLayer. Handler order: selfCallerFromCredential (403 not-an-agent-token / 404 agent-gone), then timeout (400 { error: 'timeoutMs must be an integer from 1 to 50000', code: 'bad-timeout' }), then the job (null -> 404 { error: 'no such job', code: 'unknown-job' }), else 200 selfJobAnswer(state). Register HttpRouter.add('GET', '/api/self/jobs/:id', ...) and HttpRouter.add('GET', '/api/self/jobs/:id/wait', ...) inside httpHandler(Effect.gen(...)), reading resolveRequestCredential(request), the :id param and the timeoutMs query; run the wait with Effect.promise((signal) => handleSelfJobWait(..., signal, deps)). Add two ROUTE_SCOPES rows (read:state) after the POST /api/workers/:id/stop row, two NO_LOSS_MATRIX rows after the POST /api/workers/:id/stop row (line 500), and register selfJobsRouteLayer in src/dashboard/server/server.ts after workersRouteLayer. Test through the real gate with the mcp-route.test.ts pattern (temporary OVERDECK_HOME, real access tokens, LAN peer) plus handler-level cases."
+        },
+        "items": [
+          {
+            "id": "self-jobs-routes.ac1",
+            "title": "Given a plain kind 'token' access token with read:state and no agentId, when it sends GET /api/self/jobs/abc and GET /api/self/jobs/abc/wait through remoteRequestGateLayer plus the self-jobs layer, then both answer 403 with body { error: 'self routes need an agent token', code: 'not-an-agent-token' }.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "self-jobs-routes.ac2",
+            "title": "Given an agent token (agentId agent-pan-1, agentKind agent) with read:state and injected caller deps, when it requests an unknown job id or another agent's job, then the route answers 404 with code 'unknown-job'; for its own finished job it answers 200 with status 'done'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "self-jobs-routes.ac3",
+            "title": "Given rawTimeout '0', '50001', 'abc' or '1.5', when handleSelfJobWait runs for a valid caller, then it answers 400 with code 'bad-timeout'; a null rawTimeout waits with 50000.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "self-jobs-routes.ac4",
+            "title": "Given the new rows, when no-loss-matrix.test.ts and route-scopes.test.ts run, then the matrix holds a row for both GET /api/self/jobs/:id and GET /api/self/jobs/:id/wait, and requiredScopeFor('GET', '/api/self/jobs/x/wait') returns 'read:state'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wait-job-tool",
+        "title": "Add the agent-only wait_job MCP tool and update the tool enumeration tests",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T00:53:19Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4936",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/mcp/tools-self.ts",
+            "src/lib/mcp/server.ts",
+            "tests/unit/lib/mcp/tools-self.test.ts",
+            "tests/unit/lib/mcp/tools-approve.test.ts",
+            "tests/unit/lib/mcp/visibility.test.ts",
+            "tests/unit/lib/mcp/tools-read.test.ts",
+            "tests/unit/lib/mcp/tool-annotations.test.ts",
+            "src/dashboard/server/__tests__/mcp-route.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run tests/unit/lib/mcp/ src/dashboard/server/__tests__/mcp-route.test.ts src/dashboard/server/__tests__/mcp-acceptance.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "every test under tests/unit/lib/mcp/ passes, plus mcp-route.test.ts and mcp-acceptance.test.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-4936.md WI-5 steps 1-4. Create src/lib/mcp/tools-self.ts with the wait_job tool exactly as the PRD snippet (scope 'read:state', audience 'agent', required jobId, GET /api/self/jobs/<encodeURIComponent(jobId)>/wait?timeoutMs=<WAIT_CHUNK_MS> through routeResult) and export SELF_TOOLS = [waitJob]. In src/lib/mcp/server.ts append ...SELF_TOOLS last to ALL_TOOLS. Update the five enumerating tests named in PRD Fact 13 and WI-5 step 3: tools-approve.test.ts appends 'wait_job' to the exact list; visibility.test.ts keeps toHaveLength(8) for the non-agent client, compares the approve case with ALL_TOOLS.filter(audience === 'any') and adds an agent read:state client that lists ['list_machines', 'wait_job']; tools-read.test.ts compares with the audience 'any' filter; tool-annotations.test.ts asserts audience 'agent' for SELF_TOOLS and 'any' for the rest and adds wait_job to SINGLE_ROUTE_PATHS as GET /api/self/jobs/abc/wait; mcp-route.test.ts line 128 filters scope !== 'approve' && audience === 'any'. Write tests/unit/lib/mcp/tools-self.test.ts with the fake API harness."
+        },
+        "items": [
+          {
+            "id": "wait-job-tool.ac1",
+            "title": "Given a non-agent client with read:state, when it lists tools, then wait_job is absent and tools/call wait_job answers 'Unknown tool wait_job'; given an agent client with read:state, then the list is ['list_machines', 'wait_job'].",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wait-job-tool.ac2",
+            "title": "Given the fake route GET /api/self/jobs/j1/wait?timeoutMs=50000 answering status 'running' with next, when wait_job is called with jobId j1, then the recorded call is exactly that path and the result JSON has status 'running' and next { tool: 'wait_job', arguments: { jobId: 'j1' } }.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wait-job-tool.ac3",
+            "title": "Given the route answering 200 { status: 'done', exitCode: 0, stdout: 'ok' }, when wait_job is called, then the result JSON has status 'done', exitCode 0 and stdout 'ok'; a 404 answer yields a tool error starting with 'HTTP 404'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wait-job-tool.ac4",
+            "title": "Given ALL_TOOLS with wait_job appended last, when the updated tests run, then tools-approve's expected ALL_TOOLS list ends with 'wait_job', visibility's non-agent read:state/read:conversations/operate client still lists eight tools without wait_job, and mcp-route's plain-token list excludes wait_job.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "self-docs",
+        "title": "Document the self routes, the job model and wait_job",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T00:53:19Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4936",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-AUTH.md",
+            "configuration/mcp.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint",
+            "grep -n 'not-an-agent-token' docs/DASHBOARD-AUTH.md",
+            "grep -n 'wait_job' configuration/mcp.mdx"
+          ],
+          "expected_outputs": [
+            "npm run lint passes, including lint:docs",
+            "both grep commands print at least one line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-4936.md WI-6 steps 1-2. In docs/DASHBOARD-AUTH.md add a subsection '### `/api/self/*` (PAN-4927)' after the /mcp subsection (after the line ending 'See [configuration/mcp.mdx](../configuration/mcp.mdx).', before 'Only root credentials may create or revoke access tokens'): self routes act for the calling agent; read:state rows admit them; the handler requires a token credential with agentId and gives every other credential, including the internal token, the root session and an unauthenticated local call, 403 not-an-agent-token; a gone owner is 404 agent-gone; the job model (closed verb set, validated argv, execFile in the agent's workspace or conversation cwd with only that agent's identity variables and never an MCP token, 15-minute timeout, 16 KiB output tail, owner-only with 404 unknown-job, in memory for 1 hour, at most 200, lost on restart, waits of at most 50 s answering running with next or done) and the accepted risk that a job runs pan with the dashboard user's rights. In configuration/mcp.mdx add '### Agent-only tools' after the paragraph ending 'Tools for managed agents are listed only to agent tokens.' with a Tool | What it does | Scope table holding the wait_job row (scope read:state, agent tokens only) and one sentence saying agent-only tools call /api/self/ routes that refuse non-agent tokens."
+        },
+        "items": [
+          {
+            "id": "self-docs.ac1",
+            "title": "Given the edited docs/DASHBOARD-AUTH.md, when a reader opens the /api/self/* subsection, then it names the codes not-an-agent-token, agent-gone and unknown-job and states the 50 s wait limit and the 1-hour in-memory retention.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "self-docs.ac2",
+            "title": "Given the edited configuration/mcp.mdx, when rendered, then an 'Agent-only tools' table lists wait_job with scope read:state and says it is shown only to agent tokens.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "self-docs.ac3",
+            "title": "Given both edits, when npm run lint runs, then it exits 0 including lint:docs.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "self-caller",
+        "to": "self-job-store",
+        "type": "blocks"
+      },
+      {
+        "from": "self-job-argv",
+        "to": "self-job-store",
+        "type": "blocks"
+      },
+      {
+        "from": "self-caller",
+        "to": "self-jobs-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "self-job-store",
+        "to": "self-jobs-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "self-job-store",
+        "to": "wait-job-tool",
+        "type": "blocks"
+      },
+      {
+        "from": "self-jobs-routes",
+        "to": "wait-job-tool",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
