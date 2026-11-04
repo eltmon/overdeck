@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4960",
   "created": "2026-11-04T10:12:59.940Z",
-  "updated": "2026-11-04T10:33:53.030Z",
+  "updated": "2026-11-04T10:33:54.372Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,11 @@
       "claimedBy": "agent-pan-4960",
       "claimedAt": "2026-11-04T10:31:26.217Z",
       "doneAt": "2026-11-04T10:33:53.029Z"
+    },
+    "account-card": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4960",
+      "claimedAt": "2026-11-04T10:33:54.372Z"
     }
   }
 }
