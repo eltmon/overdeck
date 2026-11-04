@@ -36,8 +36,12 @@ vi.mock('../styles/command-deck.module.css', () => ({
 }));
 
 vi.mock('../../chat/ConversationPanel', () => ({
-  ConversationPanel: ({ conversation }: { conversation: { name: string } }) => (
-    <div data-testid="conversation-panel">{conversation.name}</div>
+  // PAN-5011: sessionAlive and agentId decide whether the composer appears
+  // and where it sends — surface both as data attributes for assertions.
+  ConversationPanel: ({ conversation, agentId }: { conversation: { name: string; sessionAlive: boolean }; agentId?: string }) => (
+    <div data-testid="conversation-panel" data-session-alive={String(conversation.sessionAlive)} data-agent-id={agentId}>
+      {conversation.name}
+    </div>
   ),
 }));
 
@@ -111,6 +115,18 @@ describe('SessionPanel', () => {
   it('defaults to conversation view', () => {
     render(<SessionPanel session={makeSession({ hasJsonl: true })} />);
     expect(screen.getByTestId('conversation-panel')).toBeInTheDocument();
+  });
+
+  it('hands ConversationPanel sessionAlive true and the agent id for an idle session (PAN-5011)', () => {
+    render(<SessionPanel session={makeSession({ sessionId: 'agent-pan-4841', presence: 'idle', hasJsonl: true })} />);
+    const panel = screen.getByTestId('conversation-panel');
+    expect(panel).toHaveAttribute('data-session-alive', 'true');
+    expect(panel).toHaveAttribute('data-agent-id', 'agent-pan-4841');
+  });
+
+  it('hands ConversationPanel sessionAlive false for an ended session', () => {
+    render(<SessionPanel session={makeSession({ presence: 'ended', hasJsonl: true })} />);
+    expect(screen.getByTestId('conversation-panel')).toHaveAttribute('data-session-alive', 'false');
   });
 
   it('falls back to ChatMarkdown when no hasJsonl but transcript exists', () => {

@@ -17,6 +17,7 @@ src/components/CommandDeck/CommandDeck.test.tsx
 src/components/CommandDeck/ProjectTree/FeatureItem.linkedConversation.test.tsx
 src/components/CommandDeck/ProjectTree/FeatureItem.pullRequest.test.tsx
 src/components/CommandDeck/ProjectTree/featureStateBadge.test.ts
+src/components/CommandDeck/SessionView/SessionPanel.test.tsx
 src/components/CommandDeck/__tests__/CommandDeck.render-count.test.tsx
 src/components/CommandDeck/__tests__/ConversationList.render-count.test.tsx
 src/components/CommandDeck/__tests__/ConversationList.sort.test.ts
