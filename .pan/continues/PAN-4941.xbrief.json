@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4941",
   "created": "2026-11-04T02:31:39.368Z",
-  "updated": "2026-11-04T03:24:38.633Z",
+  "updated": "2026-11-04T03:24:55.148Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -126,6 +126,10 @@
     "revoke-secrets.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T03:24:38.633Z"
+    },
+    "revoke-secrets.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:24:55.148Z"
     }
   }
 }
