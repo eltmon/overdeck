@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4957",
   "created": "2026-11-04T16:52:59.952Z",
-  "updated": "2026-11-04T16:55:42.689Z",
+  "updated": "2026-11-04T16:56:27.378Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-11-04T16:55:33.524Z"
     },
     "ci-job-openclaw": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4957",
-      "claimedAt": "2026-11-04T16:55:42.689Z"
+      "claimedAt": "2026-11-04T16:55:42.689Z",
+      "doneAt": "2026-11-04T16:56:27.377Z"
     }
   }
 }
