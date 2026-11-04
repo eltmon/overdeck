@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4961",
   "created": "2026-11-03T23:57:34.038Z",
-  "updated": "2026-11-04T00:11:21.763Z",
+  "updated": "2026-11-04T00:11:49.363Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -66,6 +66,10 @@
       "claimedBy": "agent-pan-4961",
       "claimedAt": "2026-11-04T00:08:34.156Z",
       "doneAt": "2026-11-04T00:11:21.762Z"
+    },
+    "create-admission.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T00:11:49.362Z"
     }
   }
 }
