@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5046",
   "created": "2026-11-04T18:10:57.891Z",
-  "updated": "2026-11-04T18:49:17.672Z",
+  "updated": "2026-11-04T18:49:32.819Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -114,6 +114,10 @@
     "server-ice-restart-answer.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T18:49:17.672Z"
+    },
+    "server-ice-restart-answer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:49:32.818Z"
     }
   }
 }
