@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5006",
   "created": "2026-11-04T12:27:52.516Z",
-  "updated": "2026-11-04T12:58:06.230Z",
+  "updated": "2026-11-04T12:58:21.281Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -42,6 +42,10 @@
     "fleet-target-rejections.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T12:58:06.230Z"
+    },
+    "fleet-target-rejections.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:58:21.281Z"
     }
   }
 }
