@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5006",
   "created": "2026-11-04T12:27:52.516Z",
-  "updated": "2026-11-04T13:00:14.589Z",
+  "updated": "2026-11-04T13:00:31.297Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,6 +74,10 @@
     "route-self-placement.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T13:00:14.588Z"
+    },
+    "route-self-placement.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:00:31.296Z"
     }
   }
 }
