@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4951",
   "created": "2026-11-04T04:17:47.457Z",
-  "updated": "2026-11-04T05:58:34.670Z",
+  "updated": "2026-11-04T06:00:45.965Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -54,6 +54,10 @@
       "claimedBy": "agent-pan-4951",
       "claimedAt": "2026-11-04T05:47:59.778Z",
       "doneAt": "2026-11-04T05:58:34.669Z"
+    },
+    "bot-snippets.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:00:45.965Z"
     }
   }
 }
