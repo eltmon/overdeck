@@ -1,0 +1,139 @@
+{
+  "version": "1",
+  "issueId": "PAN-4998",
+  "created": "2026-11-04T10:12:10.948Z",
+  "updated": "2026-11-04T10:55:58.029Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "w1-agent-tmp-path": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4998",
+      "claimedAt": "2026-11-04T10:12:10.948Z",
+      "doneAt": "2026-11-04T10:15:48.227Z"
+    },
+    "w2-launcher-export": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4998",
+      "claimedAt": "2026-11-04T10:15:55.995Z",
+      "doneAt": "2026-11-04T10:20:02.573Z"
+    },
+    "w3-tmp-sweep": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4998",
+      "claimedAt": "2026-11-04T10:20:11.756Z",
+      "doneAt": "2026-11-04T10:26:25.952Z"
+    },
+    "w4-sweep-schedule": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4998",
+      "claimedAt": "2026-11-04T10:26:33.926Z",
+      "doneAt": "2026-11-04T10:29:34.059Z"
+    },
+    "w5-doctor-size": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4998",
+      "claimedAt": "2026-11-04T10:29:38.936Z",
+      "doneAt": "2026-11-04T10:32:57.360Z"
+    },
+    "w6-no-tmp-rule": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4998",
+      "claimedAt": "2026-11-04T10:33:02.128Z",
+      "doneAt": "2026-11-04T10:34:33.242Z"
+    },
+    "w7-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4998",
+      "claimedAt": "2026-11-04T10:34:40.375Z",
+      "doneAt": "2026-11-04T10:36:41.352Z"
+    },
+    "w1-agent-tmp-path.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:42:38.861Z"
+    },
+    "w1-agent-tmp-path.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:43:52.695Z"
+    },
+    "w2-launcher-export.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:44:20.762Z"
+    },
+    "w2-launcher-export.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:44:54.486Z"
+    },
+    "w3-tmp-sweep.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:46:57.423Z"
+    },
+    "w4-sweep-schedule.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:47:36.720Z"
+    },
+    "w4-sweep-schedule.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:48:15.622Z"
+    },
+    "w5-doctor-size.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:49:03.990Z"
+    },
+    "w5-doctor-size.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:49:30.903Z"
+    },
+    "w5-doctor-size.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:50:00.848Z"
+    },
+    "w5-doctor-size.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:50:31.120Z"
+    },
+    "w6-no-tmp-rule.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:50:53.935Z"
+    },
+    "w7-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:51:29.156Z"
+    },
+    "w7-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:52:19.281Z"
+    },
+    "w1-agent-tmp-path.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:53:19.383Z"
+    },
+    "w2-launcher-export.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:53:50.363Z"
+    },
+    "w3-tmp-sweep.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:54:17.368Z"
+    },
+    "w3-tmp-sweep.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:54:41.376Z"
+    },
+    "w3-tmp-sweep.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:55:15.112Z"
+    },
+    "w6-no-tmp-rule.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:55:38.155Z"
+    },
+    "w7-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:55:58.029Z"
+    }
+  }
+}
