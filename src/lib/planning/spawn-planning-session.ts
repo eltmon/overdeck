@@ -44,6 +44,7 @@ import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { launchAndCaptureManagedKimiSession } from '../runtimes/kimi-code.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { generateLauncherScript } from '../launcher-generator.js';
+import { prepareClaudeOverdeckMcp } from '../mcp/agent-injection.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { ensureWorkspacePanDir, getWorkspacePanPaths, writeWorkspaceContext } from '../pan-dir/index.js';
 import { resolvePlanningDraftPath } from '../pan-dir/drafts.js';
@@ -627,6 +628,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         ...acpLauncherFields,
         ...kimiCodeLauncherFields,
         ...(primeLaunch?.fields ?? {}),
+        ...(await prepareClaudeOverdeckMcp({ agentId: sessionName, agentKind: 'agent', role: 'plan', harness: effectiveHarness })),
         ...(effectiveHarness === 'muse' ? { museModel: planningModel, museEffort: resolvedEffort.effort, museContextFile: await materializeMuseContext(sessionName, workspacePath, roleAgentDefinitionPath('plan')) } : {}),
       }),
       { mode: 0o755 },

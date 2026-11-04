@@ -255,6 +255,44 @@ an unknown one. `pan mcp serve` takes the token from `OVERDECK_MCP_TOKEN` or a
 server per `POST`, no session); `GET /mcp` and `DELETE /mcp` answer 405 with
 `Allow: POST`. See [configuration/mcp.mdx](../configuration/mcp.mdx).
 
+### `/api/self/*` (PAN-4927)
+
+A self route acts for the agent that calls it. The route-scope table admits it
+by scope like any other route: `GET /api/self/jobs/:id` and
+`GET /api/self/jobs/:id/wait` need `read:state`. The handler then requires an
+agent token, a `token` credential with `agentId` (`src/dashboard/server/self-caller.ts`).
+Every other credential gets **403**
+`{ "error": "self routes need an agent token", "code": "not-an-agent-token" }`,
+including the internal token, the root session, a device, a plain token and an
+unauthenticated local call that the gate let through. A token whose agent has
+no `state.json` (or an empty workspace), or whose conversation has no row,
+gets **404** `{ "code": "agent-gone" }`. The agent always comes from the
+token; a self route never reads an agent, issue or conversation from the body,
+query or headers.
+
+Self routes that run a CLI-only operation start a **job**
+(`src/dashboard/server/services/self-jobs.ts`). A job runs one verb from a
+closed set of `pan` commands (`services/self-job-argv.ts`), with argv built
+only from validated pieces, so caller text never lands before the verb's
+fixed prefix or as a flag. It runs through `execFile` in the agent's
+workspace, or the conversation's `cwd`, with only that agent's identity
+variables: `OVERDECK_AGENT_ID` for an agent, `OVERDECK_CONVERSATION` (the tmux
+session, not the name) for a conversation, plus `OVERDECK_ISSUE_ID` and
+`OVERDECK_DASHBOARD_URL`. Identity variables the dashboard inherited, and any
+MCP token, are removed. A job times out after 15 minutes and keeps the last
+16 KiB of stdout and of stderr. Only its owner can read it; another agent's
+job, like an unknown id, gets **404** `{ "code": "unknown-job" }`. Jobs live in
+dashboard memory: a finished job is dropped one hour after it ends, at most
+200 are held, and a dashboard restart forgets them all.
+
+A wait blocks at most 50 s (`timeoutMs` 1–50,000, default 50,000; anything
+else is **400** `bad-timeout`) and returns early when the job ends. It answers
+`{ "status": "done", … }` with the exit code and output, or
+`{ "status": "running", …, "next": { "tool": "wait_job", "arguments": { "jobId" } } }`,
+the call to make again. The accepted risk: a job runs `pan` with the
+dashboard user's rights, so the closed verb set, the argv builder and the
+token-only caller are the boundary.
+
 Only root credentials may create or revoke access tokens, issue pairing
 credentials, or revoke a device other than the caller's own (D-11). A device or
 token credential gets 403 on those operations, even with `admin`.

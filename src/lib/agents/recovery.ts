@@ -9,6 +9,7 @@ import { getLatestSessionId } from './activity.js';
 import { sendGracefulRestartWarning } from '../graceful-restart.js';
 import { checkHook, generateFixedPointPrompt } from '../hooks.js';
 import { generateLauncherScript } from '../launcher-generator.js';
+import { prepareClaudeOverdeckMcp } from '../mcp/agent-injection.js';
 import { resolveHarness } from '../harness-resolve.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
 import { normalizeModelOverride, requireModelOverride } from '../model-validation.js';
@@ -830,6 +831,7 @@ export async function recoverAgent(
     useSupervisor: recoverySupervisorLaunch.useSupervisor,
     supervisorScriptPath: recoverySupervisorLaunch.supervisorScriptPath,
     ...recoveryCodexFields,
+    ...(await prepareClaudeOverdeckMcp({ agentId: normalizedId, agentKind: 'agent', role: recoveryRole, harness: recoveryHarness })),
   });
   const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
   await writeLauncherScriptAtomic(launcherScript, recoveryLauncherContent);

@@ -15,6 +15,7 @@ function internalDashboardOrigin(): string {
 
 function classifySpawnSkip(status: number, body: Record<string, unknown>): string {
   const error = typeof body['error'] === 'string' ? body['error'] : '';
+  if (body['diskLow'] === true) return 'guardrails'; // PAN-4961: retryable once space returns
   if (status === 401 || status === 403) return 'unauthorized';
   if (body['stackHealth'] || /workspace docker stack/i.test(error)) return 'stack-unhealthy';
   if (body['paused'] === true) return 'paused';

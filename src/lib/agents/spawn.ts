@@ -17,6 +17,7 @@ import { createConversation, getConversationByName, reactivateConversationForSpa
 import { startWork } from '../cv.js';
 import { generateFixedPointPrompt, checkHook, initHook } from '../hooks.js';
 import { generateLauncherScript } from '../launcher-generator.js';
+import { prepareClaudeOverdeckMcp } from '../mcp/agent-injection.js';
 import { getProviderForModel, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
 import { resolveHarness } from '../harness-resolve.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
@@ -430,6 +431,7 @@ async function spawnRunWithoutConsentClaim(
     ...kimiCodeLauncherFields,
     ...museLauncherFields,
     ...(primeLaunch?.fields ?? {}),
+    ...(await prepareClaudeOverdeckMcp({ agentId, agentKind: 'agent', role, harness: resolvedHarness })),
   });
 
   const launcherScript = join(getAgentDir(agentId), 'launcher.sh');

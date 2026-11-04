@@ -52,9 +52,12 @@
   runs only the frontend files listed in `scripts/frontend-test-subset.txt` (one path per line,
   relative to `src/dashboard/frontend`, `merge=union`; run by `npm run test:frontend-subset`);
   add new must-run frontend tests there in sorted position.
-- Tests that run the real `createWorkspace` (`src/lib/workspace-manager/create.ts`) must mock
-  `src/lib/disk-floor.js` as well as `util.promisify`: its 10 GiB disk floor reads the temp dir's
-  real free space with `statfs`, and CI runners sometimes have less (PAN-4723).
+- Tests that run the real `createWorkspace` (`src/lib/workspace-manager/create.ts`) or
+  `rebuildWorkspaceStack` (`src/lib/workspace/rebuild-stack.ts`) must mock `checkDiskFloor` and
+  `reserveDiskFloor` in `src/lib/disk-floor.js` and `estimateWorkspaceDiskCost` in
+  `src/lib/workspace/disk-cost.js` (as well as `util.promisify` for `createWorkspace`): the floor
+  reads the temp dir's real free space with `statfs`, CI runners sometimes have less (PAN-4723),
+  and the estimator runs real `git` and `docker` (PAN-4961).
 - Issue actions: every menu/overflow surface renders from `ISSUE_ACTIONS`
   (`src/dashboard/frontend/src/lib/issueActions.ts`) via `useIssueActions`; removing a key needs a
   `RETIREMENT_AUDIT` row in `issueActions.parity.test.tsx`.

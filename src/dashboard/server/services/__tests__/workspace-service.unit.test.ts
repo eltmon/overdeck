@@ -25,9 +25,34 @@ const mockLoadProjectsConfig = vi.fn();
 vi.mock('../../../../lib/projects.js', () => ({
   resolveProjectFromIssue: mockResolveProjectFromIssue,
   resolveProjectFromIssueSync: mockResolveProjectFromIssue,
+  getProjectSync: vi.fn(() => null),
   loadProjectsConfig: mockLoadProjectsConfig,
   loadProjectsConfigSync: mockLoadProjectsConfig,
 }));
+
+// ─── Mock disk admission and child_process exec (PAN-4961) ────────────────────
+
+const mockReserveDiskFloor = vi.fn();
+const mockRelease = vi.fn();
+vi.mock('../../../../lib/disk-floor.js', () => ({
+  reserveDiskFloor: mockReserveDiskFloor,
+}));
+
+vi.mock('../../../../lib/workspace/disk-cost.js', () => ({
+  SEED_STACK_DISK_COST_BYTES: 2 * 1024 ** 3,
+  estimateWorkspaceDiskCost: vi.fn(async () => ({ hostBytes: 1, stackBytes: 2_000, hostSource: 'measured', stackSource: 'measured' })),
+  invalidateWorkspaceDiskCostMemo: vi.fn(),
+}));
+
+const mockExec = vi.fn();
+vi.mock('node:child_process', () => {
+  const kCustom = Symbol.for('nodejs.util.promisify.custom');
+  function exec() {
+    throw new Error('exec is only called through promisify');
+  }
+  (exec as any)[kCustom] = (...args: unknown[]) => mockExec(...args);
+  return { exec };
+});
 
 // ─── Mock fs.existsSync ───────────────────────────────────────────────────────
 
@@ -168,6 +193,57 @@ describe('WorkspaceService — integration', () => {
 
       const err = await runProgramFail(program);
       expect((err as any)._tag).toBe('WorkspaceNotFound');
+    });
+  });
+
+  describe('containerize disk admission (PAN-4961)', () => {
+    const HELD = 'Disk low — new workspace starts are held: 11.0 GiB free on the filesystem holding /w, 0.0 GiB reserved by 0 in-flight workspace setup(s), this step needs 2.0 GiB, and the safety floor is 10.0 GiB. Free disk space (see /resources) and retry.';
+    const upCalls = () => mockExec.mock.calls.filter(([command]) => String(command).includes('up -d --build'));
+
+    beforeEach(() => {
+      mockExistsSync.mockImplementation((p: string) =>
+        p.endsWith('feature-pan-1') || p.endsWith('docker-compose.devcontainer.yml'));
+      mockExec.mockResolvedValue({ stdout: '', stderr: '' });
+      mockRelease.mockResolvedValue(undefined);
+      mockReserveDiskFloor.mockResolvedValue({ ok: true, reservation: { release: mockRelease } });
+    });
+
+    it('containerize-admission.ac3: a refusal fails with WorkspaceCreateError and never runs up', async () => {
+      mockReserveDiskFloor.mockResolvedValue({ ok: false, error: HELD });
+      const { WorkspaceService, WorkspaceServiceLive } = await import('../workspace-service.js');
+
+      const program = Effect.gen(function* () {
+        const ws = yield* WorkspaceService;
+        return yield* ws.containerize('PAN-1');
+      }).pipe(Effect.provide(WorkspaceServiceLive));
+
+      const err = await runProgramFail(program);
+      expect((err as any)._tag).toBe('WorkspaceCreateError');
+      expect((err as any).message.startsWith('Disk low — new workspace starts are held')).toBe(true);
+      expect(upCalls()).toHaveLength(0);
+    });
+
+    it('containerize-admission.ac4: an admission runs up, then releases once', async () => {
+      const order: string[] = [];
+      mockExec.mockImplementation(async () => {
+        order.push('up');
+        return { stdout: '', stderr: '' };
+      });
+      mockRelease.mockImplementation(async () => {
+        order.push('release');
+      });
+      const { WorkspaceService, WorkspaceServiceLive } = await import('../workspace-service.js');
+
+      const program = Effect.gen(function* () {
+        const ws = yield* WorkspaceService;
+        return yield* ws.containerize('PAN-1');
+      }).pipe(Effect.provide(WorkspaceServiceLive));
+
+      await runProgram(program);
+      expect(upCalls()).toHaveLength(1);
+      expect(mockReserveDiskFloor).toHaveBeenCalledWith(expect.objectContaining({ bytes: 2_000, label: 'containerize:pan-1' }));
+      expect(mockRelease).toHaveBeenCalledTimes(1);
+      expect(order).toEqual(['up', 'release']);
     });
   });
 });

@@ -138,7 +138,7 @@ describe('/mcp route (PAN-4649 W-8)', () => {
     expect(listed.headers['cache-control']).toBe('no-store');
     expect(listed.headers['mcp-session-id']).toBeUndefined();
     const result = (listed.json as { result: { tools: Array<{ name: string }> } }).result;
-    expect(result.tools.map((tool) => tool.name)).toEqual(ALL_TOOLS.filter((tool) => tool.scope !== 'approve').map((tool) => tool.name));
+    expect(result.tools.map((tool) => tool.name)).toEqual(ALL_TOOLS.filter((tool) => tool.scope !== 'approve' && tool.audience === 'any').map((tool) => tool.name));
 
     await revokeAccessToken(record.id);
     expect((await send('POST', headers, TOOLS_LIST)).status).toBe(401);

@@ -682,3 +682,11 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   (checked against `getTrustedOrigins()`), never a fixed `127.0.0.1`. A stock SDK client also requests
   every `scopes_supported` value at once (`auth.js:229`) and may send no `state` (`auth.js:732`).
 <!-- last-verified: 2026-11-04 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4930, PAN-4931, PAN-4482, PAN-4945) -->
+<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4930) -->
+<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4482) -->
+- **Claude Code variadic flags swallow a positional prompt** (PAN-4932 planning, Claude Code 2.1.293) —
+  `--allowedTools <x> "prompt"` reads the prompt as another tool name (`claude -p` then fails with
+  "Input must be provided"); `--mcp-config <configs...>` is declared variadic the same way in `claude --help`. Launchers that end with `"$prompt"` must
+  emit the equals form (`--allowedTools=mcp__overdeck`, `--mcp-config=<path>`) or put another flag
+  between. Two equals-form `--mcp-config=` flags both load.
+<!-- last-verified: 2026-11-04 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4930, PAN-4931, PAN-4932) -->

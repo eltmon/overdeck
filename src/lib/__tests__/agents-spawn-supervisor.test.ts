@@ -358,8 +358,10 @@ describe('spawnAgent PTY supervisor wiring', () => {
     expect(persisted.supervisorEnabled).toBe(true);
     expect(persisted.channelsEnabled).toBeUndefined();
     expect(launcher).toContain(`exec node '${supervisorScriptPath}' claude`);
-    expect(launcher).not.toContain('--mcp-config');
+    // The Channels bridge config is the space form; the overdeck MCP server (PAN-4932) is the equals form.
+    expect(launcher).not.toContain(`--mcp-config '${join(workspace, '.pan', 'agent-mcp.json')}'`);
     expect(launcher).not.toContain('--dangerously-load-development-channels');
+    expect(launcher).toContain(`--mcp-config='${join(agentDir, 'overdeck-mcp.json')}'`);
     expect(sendRawKeystrokeMock).not.toHaveBeenCalled();
     expect(ensureLifecycleHooksMock).toHaveBeenCalledWith('agent-pan-1405', 'claude-code');
     expect(ensureLifecycleHooksMock.mock.invocationCallOrder[0]).toBeLessThan(
@@ -570,6 +572,27 @@ describe('spawnAgent PTY supervisor wiring', () => {
       expect(persisted.effortSource).toBe('role');
     },
   );
+
+  it('gives claude-code role runs the overdeck MCP server with one allow-list (PAN-4932)', async () => {
+    writeSupervisorArtifact();
+    const { spawnRun } = await import('../agents.js');
+
+    await spawnRun('PAN-1405', 'review', { workspace, model: 'claude-sonnet-4-6' });
+    await spawnRun('PAN-1405', 'worker', { workspace, model: 'claude-sonnet-4-6', agentId: 'agent-pan-1405-worker-9', registerConversation: false });
+
+    const reviewDir = join(tmpHome, 'agents', 'agent-pan-1405-review');
+    const review = readFileSync(join(reviewDir, 'launcher.sh'), 'utf8');
+    expect(review).toContain(`--mcp-config='${join(reviewDir, 'overdeck-mcp.json')}'`);
+    const allowLists = review.match(/--allowedTools[= ]'?[^ ]*/g) ?? [];
+    expect(allowLists).toHaveLength(1);
+    expect(allowLists[0]).toContain('mcp__overdeck');
+    expect(review).not.toContain('odk_');
+
+    const workerDir = join(tmpHome, 'agents', 'agent-pan-1405-worker-9');
+    const worker = readFileSync(join(workerDir, 'launcher.sh'), 'utf8');
+    expect(worker).toContain(`--mcp-config='${join(workerDir, 'overdeck-mcp.json')}'`);
+    expect(worker).toContain('--allowedTools=mcp__overdeck');
+  });
 
   it('persists provider-default harnesses from resolveHarness for OpenAI and Kimi work agents', async () => {
     writeSupervisorArtifact();
