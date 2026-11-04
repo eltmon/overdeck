@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4939",
+  "created": "2026-11-04T00:21:28.043Z",
+  "updated": "2026-11-04T00:21:28.043Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "schedule-route-scopes": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4939",
+      "claimedAt": "2026-11-04T00:21:28.043Z"
+    }
+  }
+}
