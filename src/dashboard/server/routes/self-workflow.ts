@@ -12,6 +12,7 @@
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
+import { MAX_WORKER_REPORT_BYTES } from '../../../lib/agents/worker/report.js';
 import { WAIT_CHUNK_MS } from '../../../lib/mcp/tool.js';
 import { jsonResponse } from '../http-helpers.js';
 import { type SelfCaller, type SelfCallerDeps, selfCallerFromCredential } from '../self-caller.js';
@@ -176,6 +177,39 @@ export async function handleSelfHandoff(
   return startSelfJobAnswer(jobs, caller, 'handoff', args, {}, signal);
 }
 
+const NOT_A_WORKER = { error: 'worker_report is for worker agents only', code: 'not-a-worker' } as const;
+const WORKER_REPORT_STATUSES = ['done', 'blocked', 'failed'] as const;
+
+export async function handleSelfWorkerReport(
+  credential: DashboardCredential | null,
+  text: string,
+  signal?: AbortSignal,
+  deps: SelfWorkflowRouteDeps = {},
+): Promise<SelfRouteResult> {
+  const resolved = selfCallerFromCredential(credential, deps.caller);
+  if (!resolved.ok) return { status: resolved.status, body: resolved.body };
+  const caller = resolved.caller;
+  if (caller.agentKind !== 'agent' || caller.role !== 'worker') return { status: 403, body: NOT_A_WORKER };
+  const body = parseSelfBody(text);
+  if (body === null) return { status: 400, body: BAD_BODY };
+  const jobs = deps.jobs ?? selfJobs;
+
+  const status = body['status'];
+  if (typeof status !== 'string' || !WORKER_REPORT_STATUSES.includes(status as (typeof WORKER_REPORT_STATUSES)[number])) {
+    return badRequest('status must be done, blocked or failed');
+  }
+  const report = body['report'];
+  if (typeof report !== 'string' || !report.trim()) {
+    return badRequest('report is required and must be a non-empty string');
+  }
+  if (Buffer.byteLength(report, 'utf8') > MAX_WORKER_REPORT_BYTES) {
+    return badRequest(`report is larger than ${MAX_WORKER_REPORT_BYTES} bytes; write a summary and point at files instead`);
+  }
+
+  const args: SelfJobArg[] = [{ ref: caller.agentId }, { flag: 'status', value: status }, { switch: 'stdin' }];
+  return startSelfJobAnswer(jobs, caller, 'worker-report', args, { stdin: report }, signal);
+}
+
 export async function handleSelfDone(
   credential: DashboardCredential | null,
   text: string,
@@ -250,7 +284,19 @@ export function makeSelfWorkflowRouteLayer(deps: SelfWorkflowRouteDeps = {}) {
     })),
   );
 
-  return Layer.mergeAll(selfTaskClaimRoute, selfTaskDoneRoute, selfTaskBlockRoute, selfDoneRoute, selfHandoffRoute);
+  const selfWorkerReportRoute = HttpRouter.add(
+    'POST',
+    '/api/self/worker-report',
+    httpHandler(Effect.gen(function* () {
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      const text = yield* request.text;
+      const credential = resolveRequestCredential(request);
+      const result = yield* Effect.promise((signal) => handleSelfWorkerReport(credential, text, signal, deps));
+      return jsonResponse(result.body, { status: result.status });
+    })),
+  );
+
+  return Layer.mergeAll(selfTaskClaimRoute, selfTaskDoneRoute, selfTaskBlockRoute, selfDoneRoute, selfHandoffRoute, selfWorkerReportRoute);
 }
 
 export const selfWorkflowRouteLayer = makeSelfWorkflowRouteLayer();

@@ -129,4 +129,27 @@ const handoff: OverdeckTool = {
   },
 };
 
-export const SELF_TOOLS: readonly OverdeckTool[] = [waitJob, taskClaim, taskDone, taskBlock, done, handoff];
+const workerReport: OverdeckTool = {
+  name: 'worker_report',
+  description:
+    'Record your report as a worker, in Markdown, for the agent that started you (runs pan worker report). status: done, blocked or failed. Only worker agents can call it. Answers like task_claim.',
+  scope: 'tell',
+  audience: 'agent',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      status: { type: 'string', enum: ['done', 'blocked', 'failed'] },
+      report: { type: 'string', description: 'Your report, in Markdown.' },
+    },
+    required: ['status', 'report'],
+  },
+  async run(args, ctx) {
+    const status = requiredString(args, 'status');
+    if (!status.ok) return status.error;
+    const report = requiredString(args, 'report');
+    if (!report.ok) return report.error;
+    return postSelf(ctx, '/api/self/worker-report', { status: status.value, report: report.value });
+  },
+};
+
+export const SELF_TOOLS: readonly OverdeckTool[] = [waitJob, taskClaim, taskDone, taskBlock, done, handoff, workerReport];

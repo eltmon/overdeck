@@ -205,3 +205,40 @@ describe('handoff (PAN-4927 W-SELF2)', () => {
     expect(api.calls).toEqual([]);
   });
 });
+
+describe('worker_report (PAN-4927 W-SELF2)', () => {
+  const path = '/api/self/worker-report';
+
+  it('is hidden from a non-agent token with tell and listed for an agent token with tell', async () => {
+    const api = fakeApi({});
+    const human = await connectClient(api, ['tell']);
+    expect((await human.listTools()).tools.map((tool) => tool.name)).not.toContain('worker_report');
+    const call = await callTool(human, 'worker_report', { status: 'done', report: 'R' });
+    expect(call.isError).toBe(true);
+    expect(resultText(call)).toBe('Unknown tool worker_report');
+
+    const agent = await connectClient(api, ['tell'], true);
+    expect((await agent.listTools()).tools.map((tool) => tool.name)).toContain('worker_report');
+  });
+
+  it('posts status and report', async () => {
+    const doneAnswer = { status: 'done', jobId: 'j1', verb: 'worker-report', exitCode: 0, stdout: '', stderr: '', error: null };
+    const api = fakeApi({ [`POST ${path}`]: { status: 200, json: doneAnswer } });
+    const client = await connectClient(api, ['tell'], true);
+    expect(resultJson(await callTool(client, 'worker_report', { status: 'blocked', report: 'R' }))).toEqual(doneAnswer);
+    expect(api.calls).toEqual([{ method: 'POST', path, body: { status: 'blocked', report: 'R' } }]);
+  });
+
+  it('requires status and report', async () => {
+    const api = fakeApi({});
+    const client = await connectClient(api, ['tell'], true);
+    const missingStatus = await callTool(client, 'worker_report', { report: 'R' });
+    expect(missingStatus.isError).toBe(true);
+    expect(resultText(missingStatus)).toContain('status');
+
+    const missingReport = await callTool(client, 'worker_report', { status: 'done' });
+    expect(missingReport.isError).toBe(true);
+    expect(resultText(missingReport)).toContain('report');
+    expect(api.calls).toEqual([]);
+  });
+});

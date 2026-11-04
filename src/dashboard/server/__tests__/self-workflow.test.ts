@@ -27,6 +27,7 @@ const { _resetDashboardSessionTokenForTests } = await import('../routes/dashboar
 const { remoteRequestGateLayer } = await import('../remote-request-gate.js');
 const { requiredScopeFor } = await import('../route-scopes.js');
 const { createSelfJobs } = await import('../services/self-jobs.js');
+const { MAX_WORKER_REPORT_BYTES } = await import('../../../lib/agents/worker/report.js');
 const {
   badRequest,
   handleSelfDone,
@@ -34,6 +35,7 @@ const {
   handleSelfTaskBlock,
   handleSelfTaskClaim,
   handleSelfTaskDone,
+  handleSelfWorkerReport,
   makeSelfWorkflowRouteLayer,
   parseSelfBody,
   requiredBodyString,
@@ -61,6 +63,20 @@ const conversationCredential = (name: string): DashboardCredential => ({
   agentKind: 'conversation',
   role: 'conversation',
 });
+
+const workerCredential = (agentId: string, role: 'worker' | 'work' | null = 'worker'): DashboardCredential => ({
+  kind: 'token',
+  tokenId: `tok-${agentId}`,
+  scopes: ['tell'],
+  agentId,
+  agentKind: 'agent',
+  ...(role === null ? {} : { role }),
+});
+
+const workerCallerDeps: SelfCallerDeps = {
+  getAgentState: (agentId) => (agentId === 'agent-pan-1-worker-2' ? { workspace: '/w/feature-pan-1', issueId: 'PAN-1' } : null),
+  getConversationByName: () => null,
+};
 
 function controlledJobs() {
   const resolvers: Array<(result: SelfJobRunResult) => void> = [];
@@ -312,6 +328,60 @@ describe('handleSelfHandoff', () => {
   });
 });
 
+describe('handleSelfWorkerReport', () => {
+  it('builds argv worker report <caller id> --status=<s> --stdin, with the report on stdin and in no argv element', async () => {
+    const { jobs, recorded, finish } = controlledJobs();
+    const promise = handleSelfWorkerReport(workerCredential('agent-pan-1-worker-2'), '{"status":"blocked","report":"R"}', undefined, {
+      jobs,
+      caller: workerCallerDeps,
+    });
+    finish(0, { exitCode: 0, stdout: 'ok' });
+    const result = await promise;
+    expect(result.status).toBe(200);
+    const args = recorded[0]!.args.slice(1);
+    expect(args).toEqual(['worker', 'report', 'agent-pan-1-worker-2', '--status=blocked', '--stdin']);
+    expect(recorded[0]?.stdin).toBe('R');
+    expect(args.some((element) => element.includes('R'))).toBe(false);
+  });
+
+  it.each([
+    ['a work-role agent', workerCredential('agent-pan-1-worker-2', 'work')],
+    ['a null-role agent', workerCredential('agent-pan-1-worker-2', null)],
+    ['a conversation caller', conversationCredential('conv-abc')],
+  ])('refuses %s with 403 not-a-worker, starting no job', async (_label, credential) => {
+    const { jobs, recorded } = controlledJobs();
+    const deps: SelfCallerDeps = {
+      getAgentState: (agentId) => (agentId === 'agent-pan-1-worker-2' ? { workspace: '/w/feature-pan-1', issueId: 'PAN-1' } : null),
+      getConversationByName: (name) => (name === 'conv-abc' ? { cwd: '/home/u/proj', tmuxSession: 'conv-abc', issueId: null } : null),
+    };
+    const result = await handleSelfWorkerReport(credential, '{"status":"done","report":"R"}', undefined, { jobs, caller: deps });
+    expect(result).toEqual({ status: 403, body: { error: 'worker_report is for worker agents only', code: 'not-a-worker' } });
+    expect(recorded).toEqual([]);
+  });
+
+  it('refuses status maybe, a blank report, and a report over MAX_WORKER_REPORT_BYTES with 400 bad-request', async () => {
+    const { jobs: jobsA, recorded: recordedA } = controlledJobs();
+    const badStatus = await handleSelfWorkerReport(workerCredential('agent-pan-1-worker-2'), '{"status":"maybe","report":"R"}', undefined, { jobs: jobsA, caller: workerCallerDeps });
+    expect(badStatus).toEqual({ status: 400, body: { error: 'status must be done, blocked or failed', code: 'bad-request' } });
+    expect(recordedA).toEqual([]);
+
+    const { jobs: jobsB, recorded: recordedB } = controlledJobs();
+    const blankReport = await handleSelfWorkerReport(workerCredential('agent-pan-1-worker-2'), '{"status":"done","report":"  "}', undefined, { jobs: jobsB, caller: workerCallerDeps });
+    expect(blankReport).toEqual({ status: 400, body: { error: 'report is required and must be a non-empty string', code: 'bad-request' } });
+    expect(recordedB).toEqual([]);
+
+    const { jobs: jobsC, recorded: recordedC } = controlledJobs();
+    const tooBig = await handleSelfWorkerReport(
+      workerCredential('agent-pan-1-worker-2'),
+      JSON.stringify({ status: 'done', report: 'x'.repeat(MAX_WORKER_REPORT_BYTES + 1) }),
+      undefined,
+      { jobs: jobsC, caller: workerCallerDeps },
+    );
+    expect(tooBig).toEqual({ status: 400, body: { error: `report is larger than ${MAX_WORKER_REPORT_BYTES} bytes; write a summary and point at files instead`, code: 'bad-request' } });
+    expect(recordedC).toEqual([]);
+  });
+});
+
 describe('waits', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -379,12 +449,13 @@ describe('self workflow routes through the gate', () => {
     expect(doneResponse.json).toMatchObject({ status: 'done', exitCode: 0, stdout: 'ok' });
   });
 
-  it('requires tell for all three task routes and handoff, and operate for done', () => {
+  it('requires tell for all task, handoff and worker-report routes, and operate for done', () => {
     expect(requiredScopeFor('POST', '/api/self/tasks/claim')).toBe('tell');
     expect(requiredScopeFor('POST', '/api/self/tasks/done')).toBe('tell');
     expect(requiredScopeFor('POST', '/api/self/tasks/block')).toBe('tell');
     expect(requiredScopeFor('POST', '/api/self/done')).toBe('operate');
     expect(requiredScopeFor('POST', '/api/self/handoff')).toBe('tell');
+    expect(requiredScopeFor('POST', '/api/self/worker-report')).toBe('tell');
   });
 
   it('refuses a review-role agent token with 403 missingScope operate on /api/self/done, and allows a work agent token', async () => {
