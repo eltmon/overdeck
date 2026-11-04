@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-04T03:40:18.297204Z · model: claude-opus-5-5 · open: 881_
+_Last sequenced: 2026-11-04T03:41:30.138470Z · model: claude-opus-5-5 · open: 881_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1216,7 +1216,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-04T03:40:18.297204Z",
+  "generatedAt": "2026-11-04T03:41:30.138470Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 881,
