@@ -4,17 +4,17 @@
     "created": "2026-11-04T15:21:23Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5015: Review verdicts are lost when GitHub returns 'Something went wrong' or 'non-200 OK status code: 502': the transient-error regex misses both",
-    "updated": "2026-11-04T15:24:36.144Z"
+    "updated": "2026-11-04T15:25:40.135Z"
   },
   "plan": {
     "id": "pan-5015",
     "title": "Review verdicts are lost when GitHub returns 'Something went wrong' or 'non-200 OK status code: 502': the transient-error regex misses both",
-    "status": "proposed",
+    "status": "running",
     "uid": "3013da2d-93f8-4de1-b3e3-38bd8ea4f103",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-04T15:21:23Z",
-    "updated": "2026-11-04T15:24:36.144Z",
+    "updated": "2026-11-04T15:25:40.135Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5015",
@@ -252,5 +252,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
