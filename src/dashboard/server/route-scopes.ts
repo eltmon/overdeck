@@ -49,6 +49,11 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'POST', path: '/api/conversations/:name/scheduled-messages', scope: 'tell' },
   { method: 'PATCH', path: '/api/conversations/:name/scheduled-messages/:id', scope: 'tell' },
   { method: 'DELETE', path: '/api/conversations/:name/scheduled-messages/:id', scope: 'tell' },
+  // PAN-4927 W-SCHED1: recurring schedules (PAN-4640), for the MCP schedule tools.
+  { method: 'GET', path: '/api/conversations/:name/schedules', scope: 'read:conversations' },
+  { method: 'POST', path: '/api/conversations/:name/schedules', scope: 'tell' },
+  { method: 'PATCH', path: '/api/conversations/:name/schedules/:id', scope: 'tell' },
+  { method: 'DELETE', path: '/api/conversations/:name/schedules/:id', scope: 'tell' },
   // PAN-4649: approvals need approve.
   { method: 'POST', path: '/api/conversations/:id/permission', scope: 'approve' },
   { method: 'POST', path: '/api/conversations/:id/pane-choice', scope: 'approve' },

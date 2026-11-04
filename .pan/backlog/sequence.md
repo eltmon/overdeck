@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-04T00:55:19.346723Z · model: claude-opus-5-5 · open: 891_
+_Last sequenced: 2026-11-04T01:40:44.461075Z · model: claude-opus-5-5 · open: 887_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -333,12 +333,12 @@ _Last sequenced: 2026-11-04T00:55:19.346723Z · model: claude-opus-5-5 · open: 
 | 328 | PAN-1480 | L | high | ok |  |  | TLDR: 93% bypass rate |
 | 329 | PAN-1479 | M | high | ok |  |  | RTK: Add telemetry to measure token savings from bash output compression |
 | 330 | PAN-2950 | L | high | ok |  |  | Refactor god files back under file-size ceilings after the UX overhaul |
-| 331 | PAN-4930 | L | high | ok |  |  | Root of PAN-4927: per-agent scoped MCP token minted, delivered as 0600 file, revoked on kill/exit/close-out, swept. |
+| 331 | PAN-4949 | M | medium | ok |  |  | Machine side of bot connectors: credential, pairing intents and exchange; W-TOK1 closed, so it is unblocked. Unblocks CONN2. |
 | 332 | PAN-2720 | M | high | ok |  |  | File-size ratchet counts lines, so it rewards line-packing on the god files it means to improve |
 | 333 | PAN-2650 | S | high | ok |  |  | Shed-stack half is moot (slot merges verify on host); remaining: pan swarm recover path for a stuck ready-to-merge slot. |
 | 334 | PAN-2358 | M | high | ok |  |  | PAN-2145 follow-up: restore PAN-1535 hardening in transformMessageForHarness (rewritten during conversations.ts decomposition) |
 | 335 | PAN-2334 | XS | high | ok |  |  | write a Definition of Ready (DoR) |
-| 336 | PAN-4932 | M | high | ok |  | PAN-4930 | Inject Overdeck MCP server into Claude Code agents, role runs and conversations; W-MCP1 closed, now waits only on PAN-4930. |
+| 336 | PAN-4932 | M | high | ok |  |  | Inject Overdeck MCP server into Claude Code agents, role runs and conversations; W-MCP1 closed, now waits only on PAN-4930. |
 | 337 | PAN-2193 | S | high | ok |  |  | Held issues (objection/parked/vetoed/needs-handoff) are invisible in the Command Deck tree |
 | 338 | PAN-1984 | XS | high | ok |  |  | Migrate or delete the 18 dead panopticon.db modules referenced by ~30 test files (#1983 follow-up) |
 | 339 | PAN-1913 | XS | high | ok |  |  | Project description: show on click, edit in dashboard, mirror into the project layer (and document what's in .pan and ~/.panopticon) |
@@ -398,7 +398,7 @@ _Last sequenced: 2026-11-04T00:55:19.346723Z · model: claude-opus-5-5 · open: 
 | 393 | PAN-3014 | XS | medium | ok |  |  | Background title/about spawns use --bare, which now skips credential reads, so every one fails 'Not logged in' with empty stderr. |
 | 394 | PAN-3944 | S | medium | needs-refinement |  |  | Main fix landed (host-backed targets skip Herdr agent.prompt); remaining: buffer bracketed paste in the app-server host, placeholder guard |
 | 395 | PAN-4208 | M | medium | ok |  |  | #4205 follow-ups: Effect-free config read for telemetry to hit <100ms pan --version; CI import test for lazy command targets |
-| 396 | PAN-4936 | M | high | ok |  | PAN-4930 | Self routes foundation: agent identity, jobs and waits; W-MCP1 closed, now waits only on PAN-4930. Unblocks SELF2, DEL1, MEM1. |
+| 396 | PAN-4936 | M | high | ok |  |  | Self routes foundation: agent identity, jobs and waits; W-MCP1 closed, now waits only on PAN-4930. Unblocks SELF2, DEL1, MEM1. |
 | 397 | PAN-3829 | L | medium | ok |  |  | Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main) |
 | 398 | PAN-2280 | M | medium | ok |  |  | Resumed conversations wedge without writing transcripts when dashboard is black-holed |
 | 399 | PAN-2197 | S | medium | ok |  |  | work agents skip `pan done` (manual push instead) |
@@ -449,7 +449,6 @@ _Last sequenced: 2026-11-04T00:55:19.346723Z · model: claude-opus-5-5 · open: 
 | 448 | PAN-4151 | L | medium | needs-refinement |  | PAN-3822 | Deferred remainder of PAN-3822/#4067: GitLab MR sync, PR page + search, handoff link copy, diffstat, link-dialog a11y, sync throttle |
 | 449 | PAN-1330 | S | medium | ok |  |  | CLI cannot address planning-*/specialist-* sessions |
 | 450 | PAN-4971 | S | medium | ok |  |  | Viewer header shows only host + count; roster of all participants with host/controller marked. Frontend-only, payload exists. |
-| 451 | PAN-4482 | S | medium | ok |  |  | Shared Sessions slice 11: signaling-privacy e2e, forced-TURN check (operator checkpoint) and full AC sweep |
 | 452 | PAN-1226 | L | medium | ok |  |  | PAN-1148 unified-dashboard redesign |
 | 453 | PAN-1173 | S | medium | ok |  |  | pan show <bare-number> derives wrong agent ID for PAN-prefixed issues |
 | 454 | PAN-1154 | M | medium | ok |  |  | pan up does not kill existing port holders |
@@ -868,16 +867,13 @@ _Last sequenced: 2026-11-04T00:55:19.346723Z · model: claude-opus-5-5 · open: 
 | 873 | PAN-4593 | L | low | needs-refinement |  | PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
 | 877 | PAN-4840 | M | medium | ok |  |  | Phone app W-AND1: FCM FirebaseMessagingService decrypts sealed data payloads and posts notifications. |
 | 878 | PAN-4841 | M | medium | ok |  |  | Phone app W-REL1: Apple/Firebase/Play/Cloudflare setup and first store builds; operator approves purchases. |
-| 879 | PAN-4839 | S | low | ok |  |  | Phone app W-IOS2: counts-only Live Activity, on by default with a Settings off switch; OD-1 settled; after PAN-4838. |
 | 880 | PAN-4842 | S | medium | ok |  |  | Phone app W-DOC: phone-app.mdx and updates to Anywhere, push, tailscale and service docs; finished last. |
 | 881 | PAN-4851 | S | low | needs-refinement |  |  | Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them |
 | 882 | PAN-4887 | M | medium | ok |  |  | Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); PAN-4835 merged. |
-| 884 | PAN-4952 | S | medium | ok |  |  | Shared Overdeck skill text reused by Hermes, OpenClaw and Grok plugins; no deps, unblocks all four integrations. |
 | 885 | PAN-4958 | S | low | ok |  |  | Docs for agent MCP and bot plugins; no hard deps but best written once Part A and B surfaces have landed. |
 | 888 | PAN-4939 | S | medium | ok |  |  | MCP tools for scheduled messages and recurring schedules; needs only the tool module (W-MCP1). |
 | 889 | PAN-4944 | M | medium | ok |  |  | Approvals for every harness plus a fleet-wide pending list exposed as tools; needs only W-MCP1. |
-| 890 | PAN-4945 | L | medium | ok |  | PAN-4930 | OAuth 2.1 server for /mcp with access levels and expiry; gates dashboard OAuth UI, Funnel and Grok bot. |
-| 891 | PAN-4949 | M | medium | ok |  | PAN-4930 | Machine side of bot connectors: credential, pairing intents and exchange; unblocks CONN2 and Connect-a-bot UI. |
+| 890 | PAN-4945 | L | medium | ok |  |  | OAuth 2.1 server for /mcp with access levels and expiry; gates dashboard OAuth UI, Funnel and Grok bot. |
 | 892 | PAN-4937 | M | medium | ok |  | PAN-4936 | Checklist, done, handoff and worker-report as MCP tools so agents stop shelling to pan over Bash. |
 | 893 | PAN-4938 | M | medium | ok |  | PAN-4936 | Delegation, lanes, issue start and conversation stop/interrupt as MCP tools for managed agents. |
 | 894 | PAN-4940 | S | medium | ok |  | PAN-4936 | Memory add and search as MCP tools scoped to the calling agent. |
@@ -890,10 +886,10 @@ _Last sequenced: 2026-11-04T00:55:19.346723Z · model: claude-opus-5-5 · open: 
 | 901 | PAN-4950 | M | medium | ok |  | PAN-4949 | pan mcp connector process bridging outside bots to /mcp; gates Hermes, OpenClaw and Grok Build plugins. |
 | 902 | PAN-4951 | M | medium | ok |  | PAN-4949 | "Connect a bot" flow in Settings > Anywhere for pairing outside bots. |
 | 903 | PAN-4947 | L | medium | ok |  | PAN-4945, PAN-4932 | Opt-in public /mcp via Tailscale Funnel, TLS ends on the user machine; no plaintext relay on overdeck.ai. |
-| 904 | PAN-4953 | M | medium | ok |  | PAN-4952, PAN-4950 | integrations/hermes/: Hermes plugin with its own revocable scoped token. |
-| 905 | PAN-4954 | M | medium | ok |  | PAN-4952, PAN-4950 | integrations/openclaw/: OpenClaw plugin with its own revocable scoped token. |
-| 906 | PAN-4955 | S | medium | ok |  | PAN-4952, PAN-4950 | integrations/grok-build/: Grok Build plugin with its own revocable scoped token. |
-| 907 | PAN-4956 | S | low | ok |  | PAN-4952, PAN-4946, PAN-4947 | integrations/grok-bot/ and xAI API example; needs OAuth UI and public Funnel /mcp, not the connector. |
+| 904 | PAN-4953 | M | medium | ok |  | PAN-4950 | integrations/hermes/: Hermes plugin with its own revocable scoped token. |
+| 905 | PAN-4954 | M | medium | ok |  | PAN-4950 | integrations/openclaw/: OpenClaw plugin with its own revocable scoped token. |
+| 906 | PAN-4955 | S | medium | ok |  | PAN-4950 | integrations/grok-build/: Grok Build plugin with its own revocable scoped token. |
+| 907 | PAN-4956 | S | low | ok |  | PAN-4946, PAN-4947 | integrations/grok-bot/ and xAI API example; needs OAuth UI and public Funnel /mcp, not the connector. |
 | 908 | PAN-4935 | M | medium | ok |  | PAN-4932, PAN-4937, PAN-4938, PAN-4939, PAN-4940, PAN-4941, PAN-4942, PAN-4943, PAN-4944 | Instruction blocks and no-MCP fallback; lands last in Part A since it documents every tool to agents. |
 | 909 | PAN-4957 | S | low | ok |  | PAN-4953, PAN-4954, PAN-4955, PAN-4956 | CI for the four integration packages; lands after all integrations exist. |
 
@@ -1226,10 +1222,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-04T00:55:19.346723Z",
+  "generatedAt": "2026-11-04T01:40:44.461075Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 891,
+  "openCount": 887,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -6711,19 +6707,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "planning": "auto"
     },
     {
-      "issue": "PAN-4482",
-      "rank": 451,
-      "size": "S",
-      "importance": "medium",
-      "score": 50,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Shared Sessions slice 11: signaling-privacy e2e, forced-TURN check (operator checkpoint) and full AC sweep",
-      "rationale": "Rank held: its prerequisite slice 10 (PAN-4481, hosted web join page) closed as completed, so this slice is now unblocked.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1226",
       "rank": 452,
       "size": "L",
@@ -11847,20 +11830,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "condition": "ok",
       "dependsOn": [],
       "why": "Phone app W-REL1: Apple/Firebase/Play/Cloudflare setup and first store builds; operator approves purchases.",
-      "rationale": "Rank held: new comments from PAN-4838 and PAN-4839 add device checks (AC-11, AC-12) to this run; feature work, still below substrate.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4839",
-      "rank": 879,
-      "size": "S",
-      "importance": "low",
-      "score": 22,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Phone app W-IOS2: counts-only Live Activity, on by default with a Settings off switch; OD-1 settled; after PAN-4838.",
-      "rationale": "PAN-4774 (Anywhere release AC run) closed as completed, so that dependency is removed; rank held because the phone-app epic is feature work that still ranks below substrate items.",
+      "rationale": "Rank held: PAN-4839 (Live Activity) closed completed 2026-11-04, removing its informs edge; release setup is still feature work below substrate.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11925,36 +11895,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "condition": "ok",
       "dependsOn": [],
       "why": "Epic: Overdeck MCP in every managed agent, OAuth /mcp, Hermes/OpenClaw/Grok plugins; PRD written, 29 children filed.",
-      "rationale": "The PRD (.pan/drafts/pan-4927.md) is now written and 29 child issues (PAN-4930 to PAN-4958) were filed per work item, so the epic moves from needs-refinement to ok and keeps rank 324. Its two roots, W-TOK1 and W-MCP1, take free slots 331 and 336; the other children sit at the tail in build order only because an incremental pass preserves existing ranks.",
+      "rationale": "The PRD (.pan/drafts/pan-4927.md) is written and child issues were filed per work item, so the epic is ok and keeps rank 324. Roots W-TOK1 and W-MCP1 have closed; W-INJ1, W-SELF1 and W-OAUTH1 are in the pipeline and W-CONN1 now holds slot 331.",
       "gate": "auto",
       "planning": "auto",
       "isEpic": true
-    },
-    {
-      "issue": "PAN-4930",
-      "rank": 331,
-      "size": "L",
-      "importance": "high",
-      "score": 62,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Root of PAN-4927: per-agent scoped MCP token minted, delivered as 0600 file, revoked on kill/exit/close-out, swept.",
-      "rationale": "New child W-TOK1 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Placed in a free slot next to the epic because it is a root that unblocks most of the epic.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4952",
-      "rank": 884,
-      "size": "S",
-      "importance": "medium",
-      "score": 42,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Shared Overdeck skill text reused by Hermes, OpenClaw and Grok plugins; no deps, unblocks all four integrations.",
-      "rationale": "New child W-INT0 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
-      "gate": "auto",
-      "planning": "auto"
     },
     {
       "issue": "PAN-4958",
@@ -11976,9 +11920,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "importance": "high",
       "score": 58,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4930"
-      ],
+      "dependsOn": [],
       "why": "Inject Overdeck MCP server into Claude Code agents, role runs and conversations; W-MCP1 closed, now waits only on PAN-4930.",
       "rationale": "W-MCP1 (PAN-4931) closed, so this now depends only on the in-pipeline token work PAN-4930; lifted into the slot PAN-4931 vacated.",
       "gate": "auto",
@@ -11991,9 +11933,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "importance": "high",
       "score": 58,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4930"
-      ],
+      "dependsOn": [],
       "why": "Self routes foundation: agent identity, jobs and waits; W-MCP1 closed, now waits only on PAN-4930. Unblocks SELF2, DEL1, MEM1.",
       "rationale": "W-MCP1 (PAN-4931) closed, so this high-importance root of the self-route tools now depends only on PAN-4930; lifted from the tail.",
       "gate": "auto",
@@ -12032,9 +11972,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "importance": "medium",
       "score": 47,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4930"
-      ],
+      "dependsOn": [],
       "why": "OAuth 2.1 server for /mcp with access levels and expiry; gates dashboard OAuth UI, Funnel and Grok bot.",
       "rationale": "New child W-OAUTH1 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
       "gate": "auto",
@@ -12042,16 +11980,14 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4949",
-      "rank": 891,
+      "rank": 331,
       "size": "M",
       "importance": "medium",
       "score": 46,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4930"
-      ],
-      "why": "Machine side of bot connectors: credential, pairing intents and exchange; unblocks CONN2 and Connect-a-bot UI.",
-      "rationale": "New child W-CONN1 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
+      "dependsOn": [],
+      "why": "Machine side of bot connectors: credential, pairing intents and exchange; W-TOK1 closed, so it is unblocked. Unblocks CONN2.",
+      "rationale": "Its only dependency PAN-4930 (W-TOK1) closed on 2026-11-04, so this unblocked root of the bot-connector track moves from the tail into slot 331, which PAN-4930 vacated next to the epic.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12244,11 +12180,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "score": 40,
       "condition": "ok",
       "dependsOn": [
-        "PAN-4952",
         "PAN-4950"
       ],
       "why": "integrations/hermes/: Hermes plugin with its own revocable scoped token.",
-      "rationale": "New child W-INT1 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
+      "rationale": "Rank held: dependency PAN-4952 (shared skill text) closed completed 2026-11-04; still waits on PAN-4950.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12260,11 +12195,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "score": 38,
       "condition": "ok",
       "dependsOn": [
-        "PAN-4952",
         "PAN-4950"
       ],
       "why": "integrations/openclaw/: OpenClaw plugin with its own revocable scoped token.",
-      "rationale": "New child W-INT2 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
+      "rationale": "Rank held: dependency PAN-4952 (shared skill text) closed completed 2026-11-04; still waits on PAN-4950.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12276,11 +12210,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "score": 36,
       "condition": "ok",
       "dependsOn": [
-        "PAN-4952",
         "PAN-4950"
       ],
       "why": "integrations/grok-build/: Grok Build plugin with its own revocable scoped token.",
-      "rationale": "New child W-INT3 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
+      "rationale": "Rank held: dependency PAN-4952 (shared skill text) closed completed 2026-11-04; still waits on PAN-4950.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12292,12 +12225,11 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "score": 32,
       "condition": "ok",
       "dependsOn": [
-        "PAN-4952",
         "PAN-4946",
         "PAN-4947"
       ],
       "why": "integrations/grok-bot/ and xAI API example; needs OAuth UI and public Funnel /mcp, not the connector.",
-      "rationale": "New child W-INT4 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
+      "rationale": "Rank held: dependency PAN-4952 (shared skill text) closed completed 2026-11-04; still waits on PAN-4946 and PAN-4947.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13483,13 +13415,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "from": "PAN-4823",
-      "to": "PAN-4839",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4823",
       "to": "PAN-4842",
       "type": "contains",
       "source": "github-ref",
@@ -13567,43 +13492,15 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "from": "PAN-4927",
-      "to": "PAN-4930",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4927",
-      "to": "PAN-4952",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4927",
       "to": "PAN-4958",
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
     },
     {
-      "from": "PAN-4930",
-      "to": "PAN-4932",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4927",
       "to": "PAN-4932",
       "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4930",
-      "to": "PAN-4936",
-      "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
     },
@@ -13629,23 +13526,9 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "confidence": 1
     },
     {
-      "from": "PAN-4930",
-      "to": "PAN-4945",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4927",
       "to": "PAN-4945",
       "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4930",
-      "to": "PAN-4949",
-      "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
     },
@@ -13832,13 +13715,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "confidence": 1
     },
     {
-      "from": "PAN-4952",
-      "to": "PAN-4953",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4950",
       "to": "PAN-4953",
       "type": "unblocks",
@@ -13849,13 +13725,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "from": "PAN-4927",
       "to": "PAN-4953",
       "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4952",
-      "to": "PAN-4954",
-      "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
     },
@@ -13874,13 +13743,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "confidence": 1
     },
     {
-      "from": "PAN-4952",
-      "to": "PAN-4955",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4950",
       "to": "PAN-4955",
       "type": "unblocks",
@@ -13891,13 +13753,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "from": "PAN-4927",
       "to": "PAN-4955",
       "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4952",
-      "to": "PAN-4956",
-      "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
     },
@@ -14028,25 +13883,11 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "confidence": 1
     },
     {
-      "from": "PAN-4839",
-      "to": "PAN-4841",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
       "from": "PAN-2350",
       "to": "PAN-4960",
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-4971",
-      "to": "PAN-4482",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
     }
   ]
 }

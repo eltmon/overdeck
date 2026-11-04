@@ -128,7 +128,7 @@ describe('pan mcp serve (PAN-4649 W-9)', () => {
     const messages = lines.map((line) => JSON.parse(line) as { jsonrpc: string; id: number; result: { tools?: Array<{ name: string }> } });
     for (const message of messages) expect(message.jsonrpc).toBe('2.0');
     expect(messages[1]?.id).toBe(2);
-    expect(messages[1]?.result.tools?.map((tool) => tool.name)).toEqual(['list_conversations', 'search_conversations', 'read_conversation', 'list_pending_input']);
+    expect(messages[1]?.result.tools?.map((tool) => tool.name)).toEqual(['list_conversations', 'search_conversations', 'read_conversation', 'list_scheduled', 'list_pending_input']);
 
     deps.stdin.end();
     await expect(serving).resolves.toBe(0);
@@ -140,7 +140,7 @@ describe('pan mcp serve (PAN-4649 W-9)', () => {
     const path = await tokenFile(token, 0o600);
     const deps = io({ OVERDECK_MCP_TOKEN_FILE: path });
     const { serving, names } = await exchangeToolsList(deps);
-    await expect(names).resolves.toEqual(['list_conversations', 'search_conversations', 'read_conversation', 'list_pending_input']);
+    await expect(names).resolves.toEqual(['list_conversations', 'search_conversations', 'read_conversation', 'list_scheduled', 'list_pending_input']);
     await expect(serving).resolves.toBe(0);
     expect(stderr).toEqual([]);
   });
@@ -159,7 +159,7 @@ describe('pan mcp serve (PAN-4649 W-9)', () => {
     const path = await tokenFile(revokedToken, 0o600);
     const deps = io({ OVERDECK_MCP_TOKEN: goodToken, OVERDECK_MCP_TOKEN_FILE: path });
     const { serving, names } = await exchangeToolsList(deps);
-    await expect(names).resolves.toEqual(['list_conversations', 'search_conversations', 'read_conversation', 'list_pending_input']);
+    await expect(names).resolves.toEqual(['list_conversations', 'search_conversations', 'read_conversation', 'list_scheduled', 'list_pending_input']);
     await expect(serving).resolves.toBe(0);
   });
 

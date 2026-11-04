@@ -12,11 +12,12 @@ import { callTool, connectClient, fakeApi, resultJson, resultText } from './harn
 const APPROVER = ['approve', 'tell', 'read:conversations'];
 
 describe('MCP approval tools (PAN-4649 W-7)', () => {
-  it('the approval tools follow the write tools', () => {
+  it('the approval tools follow the schedule tools', () => {
     expect(APPROVE_TOOLS.map((tool) => tool.name)).toEqual(['list_pending_input', 'answer_question', 'answer_permission']);
     expect(ALL_TOOLS.map((tool) => tool.name)).toEqual([
       'list_machines', 'list_conversations', 'search_conversations', 'read_conversation',
       'send_message', 'start_conversation', 'start_worker',
+      'schedule_message', 'schedule_recurring', 'list_scheduled', 'update_scheduled', 'delete_scheduled',
       'list_pending_input', 'answer_question', 'answer_permission',
       'wait_job',
     ]);
