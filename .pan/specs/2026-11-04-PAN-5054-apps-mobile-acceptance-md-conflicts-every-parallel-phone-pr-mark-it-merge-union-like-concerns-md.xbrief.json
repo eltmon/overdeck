@@ -4,17 +4,17 @@
     "created": "2026-11-04T19:47:50Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5054: apps/mobile/ACCEPTANCE.md conflicts every parallel phone PR: mark it merge=union like concerns.md",
-    "updated": "2026-11-04T19:55:45.393Z"
+    "updated": "2026-11-04T19:56:42.008Z"
   },
   "plan": {
     "id": "pan-5054",
     "title": "apps/mobile/ACCEPTANCE.md conflicts every parallel phone PR: mark it merge=union like concerns.md",
-    "status": "proposed",
+    "status": "running",
     "uid": "0329abff-b1e5-4d0c-9eef-4b5b8740b111",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-04T19:47:50Z",
-    "updated": "2026-11-04T19:55:45.393Z",
+    "updated": "2026-11-04T19:56:42.008Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5054",
@@ -407,5 +407,5 @@
     ],
     "edges": []
   },
-  "status": "proposed"
+  "status": "active"
 }
