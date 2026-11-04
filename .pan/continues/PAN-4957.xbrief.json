@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4957",
   "created": "2026-11-04T16:52:59.952Z",
-  "updated": "2026-11-04T17:13:32.336Z",
+  "updated": "2026-11-04T17:13:50.313Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,6 +50,10 @@
     "ci-job-skill-check.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T17:13:32.336Z"
+    },
+    "ci-job-hermes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:13:50.313Z"
     }
   }
 }
