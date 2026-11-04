@@ -4,17 +4,17 @@
     "created": "2026-11-04T11:25:43Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5011: Composer is locked for every idle Herdr work agent: pane state 'done' (turn finished) is treated as 'ended'",
-    "updated": "2026-11-04T11:39:42.307Z"
+    "updated": "2026-11-04T11:40:38.141Z"
   },
   "plan": {
     "id": "pan-5011",
     "title": "Composer is locked for every idle Herdr work agent: pane state 'done' (turn finished) is treated as 'ended'",
-    "status": "proposed",
+    "status": "running",
     "uid": "672f1a08-08d0-47e2-bfb0-fbf4296bc43f",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-04T11:25:43Z",
-    "updated": "2026-11-04T11:39:42.307Z",
+    "updated": "2026-11-04T11:40:38.141Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5011",
@@ -666,5 +666,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
