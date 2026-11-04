@@ -4,17 +4,17 @@
     "created": "2026-11-04T18:12:26Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4958: Agent MCP and bots (W-DOC): Documentation",
-    "updated": "2026-11-04T18:20:15.465Z"
+    "updated": "2026-11-04T18:34:48.553Z"
   },
   "plan": {
     "id": "pan-4958",
     "title": "Agent MCP and bots (W-DOC): Documentation",
-    "status": "proposed",
+    "status": "running",
     "uid": "d03b2bbb-8680-45e2-b659-edf4e0f1a829",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-04T18:12:26Z",
-    "updated": "2026-11-04T18:20:15.465Z",
+    "updated": "2026-11-04T18:34:48.553Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4958",
@@ -906,5 +906,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
