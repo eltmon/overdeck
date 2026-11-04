@@ -274,6 +274,16 @@ describe('agent-target (PAN-4465)', () => {
       expect(conversationMocks.getConversationById).not.toHaveBeenCalled();
     });
 
+    it('routes a Rally-style issue ID to the issue branch without consulting the conversation table', async () => {
+      const { resolveCliAgentTarget } = await import('../agent-target.js');
+
+      const result = await resolveCliAgentTarget('F29698');
+
+      expect(result).toEqual({ kind: 'issue', issueId: 'F29698' });
+      expect(conversationMocks.getConversationByName).not.toHaveBeenCalled();
+      expect(conversationMocks.getConversationById).not.toHaveBeenCalled();
+    });
+
     it('keeps the issue path for a name-shaped target whose agent directory exists', async () => {
       mkdirSync(AGENT_DIR, { recursive: true });
       const { resolveCliAgentTarget } = await import('../agent-target.js');

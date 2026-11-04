@@ -39,7 +39,24 @@ export const ACCEPTED_TARGET_FORMS: readonly string[] = [
 
 const CONV_URL = /^https?:\/\/[^/]+\/conv\/([^/?#]+)\/?(?:[?#].*)?$/i;
 const CONV_PREFIX = /^conv[/:](.+)$/i;
-const ISSUE_ID_SHAPE = /^[A-Za-z]+-\d+$/;
+
+const STANDARD_ISSUE_ID_SHAPE = /^[A-Za-z]+-\d+$/;
+// Mirrors the Rally prefixes parseIssueId (../lib/issue-id.js) recognizes
+// (Feature/User Story/Defect/Task/Test Case). Kept local rather than
+// imported: issue-id.js is fully replaced (not importOriginal) by several
+// command test files' vi.mock, so importing a new export from it there
+// would break every one of those mocks.
+const RALLY_ISSUE_ID_SHAPE = /^(?:F|US|DE|TA|TC)\d+$/i;
+
+/**
+ * True for standard (`PAN-1148`) and Rally-style (`F29698`, `US12345`,
+ * `DE118304`, `TA4567`) issue ID shapes — the forms `resolveIssueId` already
+ * canonicalizes. Rally IDs have no dash, so a plain `PREFIX-NUMBER` regex
+ * would miss them and route them into the conversation-name lookup.
+ */
+function isIssueShaped(input: string): boolean {
+  return STANDARD_ISSUE_ID_SHAPE.test(input) || RALLY_ISSUE_ID_SHAPE.test(input);
+}
 
 interface ConversationLookupRow {
   id: number;
@@ -140,11 +157,12 @@ async function resolveNameShaped(input: string): Promise<AgentTargetResolution> 
 
 /**
  * Resolves a CLI target string to an agent, an issue (caller decides
- * fan-out), or a failure (FR-1…FR-5). Besides issue IDs, qualified agent
- * IDs, bare numerics and explicit `conv/…` forms, a bare name that isn't
- * shaped like `PREFIX-NUMBER` (e.g. a conversation name like
- * `20260928-7563`) resolves through the conversation table before falling
- * back to the issue ID it would otherwise have been treated as (PAN-4999).
+ * fan-out), or a failure (FR-1…FR-5). Besides issue IDs (standard
+ * `PREFIX-NUMBER` or Rally-style `F29698`), qualified agent IDs, bare
+ * numerics and explicit `conv/…` forms, a bare name that isn't shaped like
+ * either issue form (e.g. a conversation name like `20260928-7563`)
+ * resolves through the conversation table before falling back to the issue
+ * ID it would otherwise have been treated as (PAN-4999).
  */
 export async function resolveCliAgentTarget(input: string): Promise<AgentTargetResolution> {
   const urlMatch = input.match(CONV_URL);
@@ -157,7 +175,7 @@ export async function resolveCliAgentTarget(input: string): Promise<AgentTargetR
 
   if (/^\d+$/.test(input)) return resolveBareDigits(input);
 
-  if (ISSUE_ID_SHAPE.test(input)) return { kind: 'issue', issueId: resolveIssueId(input) };
+  if (isIssueShaped(input)) return { kind: 'issue', issueId: resolveIssueId(input) };
   return resolveNameShaped(input);
 }
 
