@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5016",
   "created": "2026-11-04T13:28:40.332Z",
-  "updated": "2026-11-04T14:00:26.504Z",
+  "updated": "2026-11-04T14:00:42.908Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -152,6 +152,10 @@
     "phone-paired.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T14:00:26.503Z"
+    },
+    "phone-removed.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:00:42.907Z"
     }
   }
 }
