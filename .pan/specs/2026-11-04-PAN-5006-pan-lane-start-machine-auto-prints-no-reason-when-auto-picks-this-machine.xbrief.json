@@ -4,17 +4,17 @@
     "created": "2026-11-04T12:05:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5006: pan lane start --machine auto prints no reason when Auto picks this machine",
-    "updated": "2026-11-04T12:03:39.169Z"
+    "updated": "2026-11-04T12:27:32.381Z"
   },
   "plan": {
     "id": "pan-5006",
     "title": "pan lane start --machine auto prints no reason when Auto picks this machine",
-    "status": "proposed",
+    "status": "running",
     "uid": "7e1d9621-66e0-46c4-99ef-42e5b63deca7",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-04T12:05:00Z",
-    "updated": "2026-11-04T12:03:39.169Z",
+    "updated": "2026-11-04T12:27:32.381Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5006",
@@ -406,5 +406,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
