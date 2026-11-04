@@ -2,9 +2,18 @@
  * Agent-only tools over the self routes (PAN-4927 W-SELF1, D-10, D-12).
  * `wait_job` waits on a job a self tool started, in chunks of at most 50 s;
  * the route builds the answer, including `next`, and the tool passes it
- * through. W-SELF2, W-MEM1 and W-SEC1 add their tools to SELF_TOOLS.
+ * through. W-SELF2 adds the workflow tools: task_claim, task_done,
+ * task_block, done, handoff, worker_report; each posts to its `/api/self/`
+ * route and passes the job answer through. W-MEM1 and W-SEC1 add their
+ * tools to SELF_TOOLS.
  */
-import { type OverdeckTool, requiredString, routeResult, WAIT_CHUNK_MS } from './tool.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+
+import { type McpToolContext, type OverdeckTool, requiredString, routeResult, WAIT_CHUNK_MS } from './tool.js';
+
+async function postSelf(ctx: McpToolContext, path: string, body: Record<string, unknown>): Promise<CallToolResult> {
+  return routeResult(await ctx.api.request('POST', path, body));
+}
 
 const waitJob: OverdeckTool = {
   name: 'wait_job',
@@ -24,4 +33,40 @@ const waitJob: OverdeckTool = {
   },
 };
 
-export const SELF_TOOLS: readonly OverdeckTool[] = [waitJob];
+const taskClaim: OverdeckTool = {
+  name: 'task_claim',
+  description:
+    'Claim a checklist item of your issue before you start it (runs pan task claim). Answers status "done" with exitCode and stdout (the item state as JSON), or status "running" with next: call next. A non-zero exitCode means pan refused; stderr says why.',
+  scope: 'tell',
+  audience: 'agent',
+  inputSchema: {
+    type: 'object',
+    properties: { itemId: { type: 'string', description: 'The checklist item id to claim.' } },
+    required: ['itemId'],
+  },
+  async run(args, ctx) {
+    const itemId = requiredString(args, 'itemId');
+    if (!itemId.ok) return itemId.error;
+    return postSelf(ctx, '/api/self/tasks/claim', { itemId: itemId.value });
+  },
+};
+
+const taskDone: OverdeckTool = {
+  name: 'task_done',
+  description:
+    'Mark a checklist item done after its commit, with a body line "Item: <itemId>", is pushed (runs pan task done). Answers status "done" with exitCode and stdout, or status "running" with next: call next. A non-zero exitCode means pan refused; stderr says why.',
+  scope: 'tell',
+  audience: 'agent',
+  inputSchema: {
+    type: 'object',
+    properties: { itemId: { type: 'string', description: 'The checklist item id to mark done.' } },
+    required: ['itemId'],
+  },
+  async run(args, ctx) {
+    const itemId = requiredString(args, 'itemId');
+    if (!itemId.ok) return itemId.error;
+    return postSelf(ctx, '/api/self/tasks/done', { itemId: itemId.value });
+  },
+};
+
+export const SELF_TOOLS: readonly OverdeckTool[] = [waitJob, taskClaim, taskDone];

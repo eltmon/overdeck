@@ -62,3 +62,45 @@ describe('MCP self tools (PAN-4927 W-SELF1)', () => {
     expect(api.calls).toHaveLength(1);
   });
 });
+
+describe.each(['task_claim', 'task_done'] as const)('%s (PAN-4927 W-SELF2)', (name) => {
+  const path = `/api/self/tasks/${name === 'task_claim' ? 'claim' : 'done'}`;
+
+  it('is hidden from a non-agent token with tell and listed for an agent token with tell', async () => {
+    const api = fakeApi({});
+    const human = await connectClient(api, ['tell']);
+    expect((await human.listTools()).tools.map((tool) => tool.name)).not.toContain(name);
+    const call = await callTool(human, name, { itemId: 'item-a' });
+    expect(call.isError).toBe(true);
+    expect(resultText(call)).toBe(`Unknown tool ${name}`);
+    expect(api.calls).toEqual([]);
+
+    const agent = await connectClient(api, ['tell'], true);
+    expect((await agent.listTools()).tools.map((tool) => tool.name)).toContain(name);
+  });
+
+  it('posts exactly itemId and passes the job answer through', async () => {
+    const running = { status: 'running', jobId: 'j1', verb: 'task-claim', startedAt: '2026-11-03T00:00:00.000Z', next: { tool: 'wait_job', arguments: { jobId: 'j1' } } };
+    const api = fakeApi({ [`POST ${path}`]: { status: 200, json: running } });
+    const client = await connectClient(api, ['tell'], true);
+    expect(resultJson(await callTool(client, name, { itemId: 'item-a' }))).toEqual(running);
+    expect(api.calls).toEqual([{ method: 'POST', path, body: { itemId: 'item-a' } }]);
+  });
+
+  it('requires itemId', async () => {
+    const api = fakeApi({});
+    const client = await connectClient(api, ['tell'], true);
+    const result = await callTool(client, name, {});
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toContain('itemId');
+    expect(api.calls).toEqual([]);
+  });
+
+  it('maps a route 409 to a tool error', async () => {
+    const api = fakeApi({ [`POST ${path}`]: { status: 409, json: { error: 'this agent has no issue', code: 'no-issue' } } });
+    const client = await connectClient(api, ['tell'], true);
+    const result = await callTool(client, name, { itemId: 'item-a' });
+    expect(result.isError).toBe(true);
+    expect(resultText(result).startsWith('HTTP 409')).toBe(true);
+  });
+});
