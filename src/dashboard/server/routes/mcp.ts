@@ -11,7 +11,8 @@
  * token, the root session, a paired device) → 403, a token with `admin` → 403.
  * MCP is always fenced (D-21): it never runs with a root credential. The 401
  * carries `WWW-Authenticate` naming the OAuth protected-resource metadata when
- * the request's host is a trusted origin (PAN-4945).
+ * the request's host is a trusted origin (PAN-4945). Over Tailscale Funnel
+ * (PAN-4947) a token without `oauthClientId` gets 403.
  *
  * Each tool proxies a dashboard route over the loopback URL with the caller's
  * own Bearer token, so the route-scope table judges every tool call and a
@@ -28,7 +29,7 @@ import { createFetchDashboardApi, type DashboardApi } from '../../../lib/mcp/das
 import { createOverdeckMcpServer, hasAgentId } from '../../../lib/mcp/server.js';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
-import { credentialScopes, dashboardDeviceTokenFromHeaders, resolveDashboardCredential } from './dashboard-auth.js';
+import { credentialScopes, dashboardDeviceTokenFromHeaders, isTailscaleFunnelRequest, resolveDashboardCredential } from './dashboard-auth.js';
 import { issuerFor } from './mcp-oauth.js';
 import { getHeaderFromMap, validateOriginHeaders, type HeaderMap } from './origin-validation.js';
 
@@ -38,6 +39,7 @@ export interface McpRouteDeps {
 
 const NO_STORE = { 'Cache-Control': 'no-store' };
 const FENCED_ERROR = 'MCP needs an access token without admin scope; use Copy MCP URL in Settings → Anywhere';
+const PUBLIC_OAUTH_ONLY = 'public MCP accepts only OAuth sign-ins';
 
 function headersOf(request: HttpServerRequest.HttpServerRequest): Headers {
   const headers = new Headers();
@@ -102,6 +104,10 @@ export function makeMcpRouteLayer(deps: McpRouteDeps) {
       const token = dashboardDeviceTokenFromHeaders(headers);
       if (credential.kind !== 'token' || !token || credentialScopes(credential).includes('admin')) {
         return jsonResponse({ error: FENCED_ERROR }, { status: 403, headers: NO_STORE });
+      }
+      // PAN-4947 FR-3: over Tailscale Funnel only an OAuth sign-in may use MCP.
+      if (isTailscaleFunnelRequest(headers) && !credential.oauthClientId) {
+        return jsonResponse({ error: PUBLIC_OAUTH_ONLY }, { status: 403, headers: NO_STORE });
       }
       const body = yield* request.text;
       return yield* Effect.promise(() => serveMcpRequest(deps, token, credential.scopes, hasAgentId(credential), headersOf(request), body));
