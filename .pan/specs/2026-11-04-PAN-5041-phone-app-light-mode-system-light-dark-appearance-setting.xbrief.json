@@ -4,17 +4,17 @@
     "created": "2026-11-04T17:20:02Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5041: Phone app: light mode (System / Light / Dark appearance setting)",
-    "updated": "2026-11-04T17:21:45.805Z"
+    "updated": "2026-11-04T17:22:37.902Z"
   },
   "plan": {
     "id": "pan-5041",
     "title": "Phone app: light mode (System / Light / Dark appearance setting)",
-    "status": "proposed",
+    "status": "running",
     "uid": "36efb246-2fd2-49f5-9617-5960fd580c03",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-04T17:20:02Z",
-    "updated": "2026-11-04T17:21:45.805Z",
+    "updated": "2026-11-04T17:22:37.902Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5041",
@@ -769,5 +769,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
