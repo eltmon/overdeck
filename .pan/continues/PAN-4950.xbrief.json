@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4950",
   "created": "2026-11-04T10:02:21.153Z",
-  "updated": "2026-11-04T11:25:13.877Z",
+  "updated": "2026-11-04T11:25:29.030Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -224,6 +224,10 @@
     "conn-integration.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T11:25:13.877Z"
+    },
+    "fleet-connector-local.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T11:25:29.029Z"
     }
   }
 }
