@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5019",
   "created": "2026-11-04T13:12:00.752Z",
-  "updated": "2026-11-04T14:40:03.930Z",
+  "updated": "2026-11-04T14:40:19.885Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -196,6 +196,10 @@
     "settings-ui.ac4": {
       "status": "completed",
       "doneAt": "2026-11-04T14:40:03.930Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:40:19.884Z"
     }
   }
 }
