@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4840",
   "created": "2026-11-03T20:58:06.302Z",
-  "updated": "2026-11-04T19:30:15.452Z",
+  "updated": "2026-11-04T19:30:30.653Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -186,7 +186,8 @@
       "status": "cancelled"
     },
     "device-acceptance.ac4": {
-      "status": "pending"
+      "status": "completed",
+      "doneAt": "2026-11-04T19:30:30.652Z"
     }
   },
   "feedback": [
