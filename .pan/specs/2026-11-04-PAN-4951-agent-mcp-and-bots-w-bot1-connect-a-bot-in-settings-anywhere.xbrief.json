@@ -4,17 +4,17 @@
     "created": "2026-11-04T04:00:40Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4951: Agent MCP and bots (W-BOT1): \"Connect a bot\" in Settings → Anywhere",
-    "updated": "2026-11-04T04:02:39.335Z"
+    "updated": "2026-11-04T04:03:47.214Z"
   },
   "plan": {
     "id": "pan-4951",
     "title": "Agent MCP and bots (W-BOT1): \"Connect a bot\" in Settings → Anywhere",
-    "status": "proposed",
+    "status": "running",
     "uid": "3955b46a-c7f6-4e1c-8526-d054962520f5",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-04T04:00:40Z",
-    "updated": "2026-11-04T04:02:39.335Z",
+    "updated": "2026-11-04T04:03:47.214Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4951",
@@ -679,5 +679,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
