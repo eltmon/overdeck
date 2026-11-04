@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "212766764959",
+    "project_id": "overdeck-app",
+    "storage_bucket": "overdeck-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:212766764959:android:4d69a7a36610eba84e17aa",
+        "android_client_info": {
+          "package_name": "ai.overdeck.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDguAyQdPzojskNq6VYXqQ9-X5rO8-YFKs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
