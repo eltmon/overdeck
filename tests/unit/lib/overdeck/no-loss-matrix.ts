@@ -500,6 +500,8 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/workers/:id/stop',                 kind: 'http', disposition: 'WRITE',       door: 'agents/termination.stopAgent (operator) (PAN-4651)' },
   { surface: 'GET /api/self/jobs/:id',                     kind: 'http', disposition: 'READ',        door: 'services/self-jobs.get, owner-only, agent tokens only (PAN-4927 W-SELF1)' },
   { surface: 'GET /api/self/jobs/:id/wait',                kind: 'http', disposition: 'READ',        door: 'services/self-jobs.wait (at most 50 s), owner-only, agent tokens only (PAN-4927 W-SELF1)' },
+  { surface: 'POST /api/self/secret-requests',             kind: 'http', disposition: 'WRITE',       door: 'services/agent-requests.createSecret, agent tokens only (PAN-4927 W-SEC1)' },
+  { surface: 'GET /api/self/secret-requests/:id/wait',     kind: 'http', disposition: 'READ',        door: 'services/agent-requests.wait (at most 50 s), owner-only, agent tokens only (PAN-4927 W-SEC1)' },
   { surface: '* /api/conversations/@<machine>/*',          kind: 'http', disposition: 'RELOCATE',    door: "linked-conversation-proxy -> owner's /api/conversations/* over the machine link (PAN-4650)" },
   { surface: 'POST /api/conversations/:name/release',      kind: 'http', disposition: 'WRITE',       door: 'conversation-release-service.releaseConversation (settle + pack + stop) (PAN-4650)' },
   { surface: 'GET /api/conversations/:name/release/transfer/:transferId', kind: 'http', disposition: 'READ', door: 'conversation-release-service.readTransferPack (PAN-4650)' },
