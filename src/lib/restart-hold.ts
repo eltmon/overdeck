@@ -20,7 +20,7 @@ import { getOverdeckHome } from './paths.js';
 
 export interface RestartHold {
   reason: string;
-  /** Who set the hold: the restart initiator, the agent id, or the OS user. */
+  /** Who set the hold: the restart initiator, agent id, conversation, or OS user. */
   who: string;
   /** ISO time the hold was set. */
   setAt: string;
@@ -82,9 +82,13 @@ function osUserName(): string {
   }
 }
 
-/** Who is running this command, with the same precedence restart-status uses for `initiator`. */
+/**
+ * Who is running this command: restart-status's `initiator` precedence, then
+ * the conversation every harness exports, so a hold names the conversation
+ * that set it.
+ */
 export function restartHoldActor(env: NodeJS.ProcessEnv = process.env): string {
-  return env.OVERDECK_RESTART_INITIATOR || env.OVERDECK_AGENT_ID || osUserName();
+  return env.OVERDECK_RESTART_INITIATOR || env.OVERDECK_AGENT_ID || env.OVERDECK_CONVERSATION || osUserName();
 }
 
 /** Write (or replace) the hold atomically with mode 0600. */

@@ -88,9 +88,10 @@ describe('restart hold (PAN-5007)', () => {
     expect(() => parseRestartHoldUntil('2026-11-04T09:00:00Z')).toThrow(/must be in the future/);
   });
 
-  it('names the setter from the initiator, then the agent id, then the OS user', () => {
+  it('names the setter from the initiator, agent id, conversation, then the OS user', () => {
     expect(restartHoldActor({ OVERDECK_RESTART_INITIATOR: 'flywheel', OVERDECK_AGENT_ID: 'agent-1' })).toBe('flywheel');
-    expect(restartHoldActor({ OVERDECK_AGENT_ID: 'agent-1' })).toBe('agent-1');
+    expect(restartHoldActor({ OVERDECK_AGENT_ID: 'agent-1', OVERDECK_CONVERSATION: 'conv-9' })).toBe('agent-1');
+    expect(restartHoldActor({ OVERDECK_CONVERSATION: 'conv-9' })).toBe('conv-9');
     expect(restartHoldActor({})).toBeTruthy();
   });
 

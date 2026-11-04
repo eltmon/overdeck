@@ -579,6 +579,17 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
     return exitCli(2);
   }
 
+  // PAN-5007: the operator restart hold stops every voluntary dashboard
+  // restart, `--now` included. The supervisor watchdog is exempt: it restarts a
+  // dashboard that is already failing, so the live links are already gone.
+  if (
+    (scope === 'dashboard' || scope === 'full')
+    && !INVOLUNTARY_RESTART_INITIATORS.has(process.env.OVERDECK_RESTART_INITIATOR ?? '')
+    && await refuseIfRestartHeld('restart the dashboard')
+  ) {
+    return;
+  }
+
   const bootGates = resolveBootGates(options);
   console.log(chalk.dim(`  Boot gates: ${formatBootGateState(bootGates)}`));
 
@@ -595,17 +606,6 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
       process.exitCode = 2;
       return;
     }
-  }
-
-  // PAN-5007: the operator restart hold stops every voluntary dashboard
-  // restart, `--now` included. The supervisor watchdog is exempt: it restarts a
-  // dashboard that is already failing, so the live links are already gone.
-  if (
-    (scope === 'dashboard' || scope === 'full')
-    && !INVOLUNTARY_RESTART_INITIATORS.has(process.env.OVERDECK_RESTART_INITIATOR ?? '')
-    && await refuseIfRestartHeld('restart the dashboard')
-  ) {
-    return;
   }
 
   const lockInherited = process.env.OVERDECK_RESTART_LOCK_HELD === '1';

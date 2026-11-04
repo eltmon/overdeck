@@ -664,7 +664,7 @@ pan restart release
 
 `hold` writes `~/.overdeck/restart-hold.json` (mode 0600, atomic rename) with
 the reason, who set it (`OVERDECK_RESTART_INITIATOR`, else `OVERDECK_AGENT_ID`,
-else the OS user), when, and the optional expiry. A second `hold` replaces the
+else `OVERDECK_CONVERSATION`, else the OS user), when, and the optional expiry. A second `hold` replaces the
 first. An expired hold reads as released; nothing deletes the file except
 `pan restart release`. The module is
 [`restart-hold.ts`](../src/lib/restart-hold.ts).
