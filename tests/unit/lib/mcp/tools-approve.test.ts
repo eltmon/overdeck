@@ -32,7 +32,8 @@ describe('MCP approval tools (PAN-4649 W-7)', () => {
       'list_pending_input', 'answer_question', 'answer_permission',
       'answer_pane_choice', 'answer_codex_approval', 'answer_pi_ask', 'answer_plan',
       'answer_agent_plan', 'answer_agent_permission',
-      'wait_job', 'request_secret', 'secret_wait',
+      'wait_job', 'task_claim', 'task_done', 'task_block', 'done', 'handoff', 'worker_report',
+      'request_secret', 'secret_wait',
     ]);
   });
 

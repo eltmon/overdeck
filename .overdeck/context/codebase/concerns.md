@@ -680,6 +680,16 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   unless it calls `refreshAccessTokens()` first (as `pan mcp serve` does) or reads the file with
   `listAccessTokens()`. `verifyAccessToken` also writes `lastUsedAt`, and `mutate` serializes writes only
   within one process, so a CLI write and a dashboard `lastUsedAt` write can lose each other.
+- **Self jobs see only the identity env they are given** (PAN-4937 planning) — a self route's `pan` job
+  (`src/dashboard/server/services/self-jobs.ts` `selfJobEnv`) has no `$TMUX` and drops every inherited
+  identity variable. `pan handoff self` finds its source through `OVERDECK_AGENT_ID` (`src/lib/conversations/current.ts`)
+  and `pan task claim` records `OVERDECK_CLAIM_ID || OVERDECK_AGENT_ID || cli-<pid>` (`src/lib/xbrief/claim-check.ts`),
+  so a job for a conversation needs `OVERDECK_AGENT_ID=<tmuxSession>` like the conversation's own launcher, or
+  handoff fails and the claim is a `cli-<pid>` that `probeHolder` treats as dead. Work agents have no conversation
+  row (only `*-review` role runs do), so `pan handoff self` refuses them.
+<!-- last-verified: 2026-11-04 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4930, PAN-4931, PAN-4482, PAN-4937) -->
+<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4930) -->
+<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4482) -->
 - **MCP SDK clients require the advertised `resource` to share the origin they called** (PAN-4945
   planning) — `@modelcontextprotocol/sdk` 1.30.1 `selectResourceURL` (`client/auth.js:344-357`) throws
   unless `checkResourceAllowed` finds the protected-resource metadata's `resource` on the same origin as

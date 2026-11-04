@@ -26,6 +26,12 @@ const SINGLE_ROUTE_PATHS: Record<string, { method: string; path: string }> = {
   answer_agent_plan: { method: 'POST', path: '/api/agents/agent-pan-1/plan-action' },
   answer_agent_permission: { method: 'POST', path: '/api/agents/agent-pan-1/permissions/req-1/respond' },
   wait_job: { method: 'GET', path: '/api/self/jobs/abc/wait' },
+  task_claim: { method: 'POST', path: '/api/self/tasks/claim' },
+  task_done: { method: 'POST', path: '/api/self/tasks/done' },
+  task_block: { method: 'POST', path: '/api/self/tasks/block' },
+  done: { method: 'POST', path: '/api/self/done' },
+  handoff: { method: 'POST', path: '/api/self/handoff' },
+  worker_report: { method: 'POST', path: '/api/self/worker-report' },
   request_secret: { method: 'POST', path: '/api/self/secret-requests' },
   secret_wait: { method: 'GET', path: '/api/self/secret-requests/abc/wait' },
 };

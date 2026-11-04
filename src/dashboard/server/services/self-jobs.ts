@@ -5,8 +5,10 @@
  *
  * A job runs one closed verb (`self-job-argv.ts`) through `panCliInvocation`
  * and promisified `execFile`, in the caller's workspace or conversation cwd,
- * with only the caller's identity variables (D-5) and never an MCP token
- * (NFR-4). It keeps the last 16 KiB of each stream; output arrives when the
+ * with only the caller's identity variables (D-5; a conversation gets
+ * `OVERDECK_AGENT_ID` and `OVERDECK_CONVERSATION`, both its tmux session,
+ * PAN-4937) and never an MCP token (NFR-4). It keeps the last 16 KiB of
+ * each stream; output arrives when the
  * child exits (D-7). Jobs live in memory only: a finished job is dropped one
  * hour after it ends, at most 200 are held (D-6), and a dashboard restart
  * forgets them all. Only the job's owner can read or wait on it. A wait
@@ -88,7 +90,12 @@ export function selfJobEnv(caller: SelfCaller, base: NodeJS.ProcessEnv = process
   const env: NodeJS.ProcessEnv = { ...base };
   for (const name of INHERITED_IDENTITY_VARS) delete env[name];
   if (caller.agentKind === 'agent') env.OVERDECK_AGENT_ID = caller.agentId;
-  else if (caller.tmuxSession !== null) env.OVERDECK_CONVERSATION = caller.tmuxSession;
+  else if (caller.tmuxSession !== null) {
+    // PAN-4937 D-5: like the conversation's own launcher (conversation-runtime.ts:806-812),
+    // so `pan handoff self` and the claimant resolve to this conversation.
+    env.OVERDECK_CONVERSATION = caller.tmuxSession;
+    env.OVERDECK_AGENT_ID = caller.tmuxSession;
+  }
   if (caller.issueId !== null) env.OVERDECK_ISSUE_ID = caller.issueId;
   env.OVERDECK_DASHBOARD_URL = `http://127.0.0.1:${base.API_PORT ?? base.PORT ?? '3011'}`;
   return env;
