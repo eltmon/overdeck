@@ -668,6 +668,7 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   signals a fixture PID. 39 test files carry literal PIDs without a `process.kill` spy; most only
   use the PID as data, but none were audited.
 <!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4925) -->
+<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917) -->
 <!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4931) -->
 <!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4929) -->
 - **The access-token snapshot is per process** (PAN-4930 planning) — `verifyAccessToken` and
