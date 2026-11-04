@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4950",
   "created": "2026-11-04T10:02:21.153Z",
-  "updated": "2026-11-04T11:23:42.339Z",
+  "updated": "2026-11-04T11:23:55.462Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -196,6 +196,10 @@
     "conn-serve.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T11:23:42.339Z"
+    },
+    "conn-serve.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T11:23:55.462Z"
     }
   }
 }
