@@ -31,8 +31,34 @@ vi.mock('sonner', () => ({
 
 type FetchResponses = Record<string, unknown>;
 
+interface MockErrorResponse { __mockKind: 'error'; status: number; body: unknown }
+interface MockSequenceResponse { __mockKind: 'sequence'; values: unknown[] }
+
+/** A non-200 response for a mockFetch key (PAN-4970). */
+function errorResponse(status: number, body: unknown): MockErrorResponse {
+  return { __mockKind: 'error', status, body };
+}
+
+/**
+ * Successive calls to this key get the next value, clamped to the last once
+ * exhausted (PAN-4970) — e.g. the first GET /generations returns a ready
+ * batch, the refetch after a failed promote returns it invalidated.
+ */
+function sequence(...values: unknown[]): MockSequenceResponse {
+  return { __mockKind: 'sequence', values };
+}
+
+function isMockError(value: unknown): value is MockErrorResponse {
+  return typeof value === 'object' && value !== null && (value as { __mockKind?: string }).__mockKind === 'error';
+}
+
+function isMockSequence(value: unknown): value is MockSequenceResponse {
+  return typeof value === 'object' && value !== null && (value as { __mockKind?: string }).__mockKind === 'sequence';
+}
+
 /** Keys are `'<METHOD> <url-substring>'`, or a bare url substring for GET. */
 function mockFetch(responses: FetchResponses): ReturnType<typeof vi.fn> {
+  const callCounts = new Map<string, number>();
   const fn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     if (url.includes('/api/dashboard/session')) {
@@ -43,7 +69,16 @@ function mockFetch(responses: FetchResponses): ReturnType<typeof vi.fn> {
       (k) => url.includes(k.split(' ').pop()!) && (k.includes(' ') ? k.startsWith(method) : method === 'GET'),
     );
     if (!key) return { ok: true, json: async () => ({}) } as Response;
-    return { ok: true, json: async () => responses[key] } as Response;
+    let value = responses[key];
+    if (isMockSequence(value)) {
+      const n = callCounts.get(key) ?? 0;
+      callCounts.set(key, n + 1);
+      value = value.values[Math.min(n, value.values.length - 1)];
+    }
+    if (isMockError(value)) {
+      return { ok: false, status: value.status, json: async () => value.body } as Response;
+    }
+    return { ok: true, json: async () => value } as Response;
   });
   vi.stubGlobal('fetch', fn);
   return fn;
@@ -116,7 +151,8 @@ function renderView(props: { showProjectFilter?: boolean } = {}) {
 }
 
 beforeEach(() => {
-  mocks.confirm.mockClear();
+  // PAN-4970: toast.error assertions need a clean call count per test.
+  vi.clearAllMocks();
   mocks.confirm.mockResolvedValue(true);
   window.localStorage.clear();
 });
@@ -946,6 +982,84 @@ describe('actions post to the new endpoints behind confirms (ac3)', () => {
         ),
       ).toBe(true),
     );
+  });
+});
+
+// ── PAN-4970 ──────────────────────────────────────────────────────────────────
+describe('PAN-4970 promote refusal', () => {
+  it('toasts the wrong-status refusal and drops the stale card once the refetch resolves', async () => {
+    const invalidatedResponses = twoProjectResponses({
+      '/api/merge-train/generations': sequence(
+        [
+          { projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, generations: [PAN_ASSEMBLING_GEN, PAN_READY_GEN] },
+          { projectKey: 'myn', projectName: 'Mind Your Now', enabled: true, generations: [MIN_READY_GEN] },
+        ],
+        [
+          { projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, generations: [PAN_ASSEMBLING_GEN, { ...PAN_READY_GEN, status: 'invalidated' }] },
+          { projectKey: 'myn', projectName: 'Mind Your Now', enabled: true, generations: [MIN_READY_GEN] },
+        ],
+      ),
+      'POST /api/merge-train/generations/pan-otter-0610/promote': errorResponse(409, {
+        success: false,
+        reason: 'wrong-status',
+        message: 'uat/pan-otter-0610 is invalidated — only a ready or superseded batch can be merged to main',
+      }),
+    });
+    const { toast } = await import('sonner');
+    mockFetch(invalidatedResponses);
+    renderView();
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy());
+
+    fireEvent.click(screen.getAllByText(/Merge batch \(2\) to main/)[0]!);
+    await waitFor(() => expect(mocks.confirm).toHaveBeenCalled());
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledTimes(1));
+    const [message] = (toast.error as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    expect(message).toContain('pan-otter-0610');
+    expect(message).toContain('is invalidated');
+
+    await waitFor(() => {
+      expect(screen.queryByText('uat/pan-otter-0610')).toBeNull();
+      expect(screen.queryByText(/Merge batch \(2\) to main/)).toBeNull();
+    });
+  });
+
+  it('toasts a merge-failed refusal without dropping the card', async () => {
+    const { toast } = await import('sonner');
+    mockFetch(twoProjectResponses({
+      'POST /api/merge-train/generations/pan-otter-0610/promote': errorResponse(500, {
+        success: false,
+        reason: 'merge-failed',
+        message: 'push rejected (non-fast-forward)',
+      }),
+    }));
+    renderView();
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy());
+
+    fireEvent.click(screen.getAllByText(/Merge batch \(2\) to main/)[0]!);
+    await waitFor(() => expect(mocks.confirm).toHaveBeenCalled());
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledTimes(1));
+    const [message] = (toast.error as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    expect(message).toMatch(/^Batch pan-otter-0610 did not merge:/);
+
+    await waitFor(() => expect(screen.getAllByText(/Merge batch \(2\) to main/).length).toBeGreaterThan(0));
+  });
+
+  it('renders no Merge batch button when every generation is invalidated or failed', async () => {
+    mockFetch(twoProjectResponses({
+      '/api/merge-train/generations': [
+        { projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, generations: [
+          { ...PAN_READY_GEN, status: 'invalidated' },
+          { ...PAN_ASSEMBLING_GEN, status: 'failed' },
+        ] },
+        { projectKey: 'myn', projectName: 'Mind Your Now', enabled: true, generations: [] },
+      ],
+    }));
+    renderView();
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy());
+
+    expect(screen.queryByText(/Merge batch/)).toBeNull();
   });
 });
 

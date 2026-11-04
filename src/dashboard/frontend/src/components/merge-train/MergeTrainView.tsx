@@ -27,10 +27,11 @@ import {
   SINGLE_FEATURE_READY_LINE,
   canRetryAssembly,
   mergeRowConfirmCopy,
+  promoteFailureCopy,
   retryAssemblyConfirmCopy,
   shortName,
 } from './mergeTrainCopy';
-import { fetchJson, generationParam, postJson } from './mergeTrainApi';
+import { MergeTrainRequestError, fetchJson, generationParam, postJson } from './mergeTrainApi';
 import { SectionIntroLine } from './SectionIntroLine';
 
 export { SINGLE_FEATURE_READY_LINE, shortName };
@@ -333,12 +334,21 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
       toast.success(`Merged ${data.members.length} feature${data.members.length === 1 ? '' : 's'} to main (${data.members.join(', ')})`);
       invalidate();
     },
-    onError: (err) => {
-      toast.error(err instanceof Error ? err.message : 'Batch merge failed');
+    onError: (err, variables) => {
+      const copy = promoteFailureCopy(shortName(variables.name), {
+        message: err instanceof Error ? err.message : undefined,
+        reason: err instanceof MergeTrainRequestError ? err.reason : undefined,
+      });
+      toast.error(copy.message, { duration: 10_000 });
       // The most common rejection is a stale card (batch already promoted or
       // invalidated under us — e.g. the post-merge deploy restarted the server
-      // before the refetch landed). Refetch so the stale button disappears
-      // instead of inviting another doomed click.
+      // before the refetch landed). Drop it from the cache immediately so a
+      // second click can't fire before the refetch resolves, then refetch so
+      // every other view of this data (and any other project) catches up.
+      if (copy.dropCard) {
+        queryClient.setQueryData<GenerationsEntry[]>(['merge-train-generations'], (old) =>
+          old?.map((entry) => ({ ...entry, generations: entry.generations.filter((g) => g.name !== variables.name) })));
+      }
       invalidate();
     },
   });

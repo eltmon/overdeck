@@ -68,6 +68,28 @@ export function canRetryAssembly(input: { featureCount: number; holdsForUat?: bo
   return input.featureCount >= 2 || (input.featureCount === 1 && input.holdsForUat !== false);
 }
 
+/**
+ * PAN-4970: a failed promote's toast and whether the operator's card is
+ * stale. `wrong-status` and `not-found` mean the generation already changed
+ * under them (promoted, invalidated, or gone) — the card should drop rather
+ * than invite another doomed click. Plain inputs only, so `onError` can call
+ * this with strings pulled off the thrown error.
+ */
+export function promoteFailureCopy(
+  batchName: string,
+  failure: { message?: string; reason?: string },
+): { message: string; dropCard: boolean } {
+  const detail = failure.message || 'Batch merge failed';
+  const reason = failure.reason;
+  const dropCard = reason === 'wrong-status' || reason === 'not-found';
+  return {
+    message: dropCard
+      ? `Batch ${batchName} can no longer be merged: ${detail}. The list now shows the current batches.`
+      : `Batch ${batchName} did not merge: ${detail}`,
+    dropCard,
+  };
+}
+
 export function retryAssemblyConfirmCopy(input: { projectName: string; failedName: string; readyCount: number }): ConfirmCopy {
   const { projectName, failedName, readyCount } = input;
   return {
