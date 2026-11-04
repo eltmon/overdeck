@@ -137,7 +137,6 @@ export async function revokeAgentMcpTokens(agentId: string, opts: { agentKind?: 
   const id = ownerId(agentId, agentKind);
   try {
     const revoked = await revokeAccessTokensMatching((record) => record.kind === 'token' && record.agentId === id && record.agentKind === agentKind);
-    await removePullRequestWatchesForOwner({ agentId: id, agentKind }); // PAN-4943: a stopped agent watches nothing
     // C-1: a conversation's directory is never guessed; only the caller knows it.
     const dir = opts.dir ?? (agentKind === 'agent' ? getAgentDir(id) : undefined);
     if (dir !== undefined) {
@@ -145,6 +144,13 @@ export async function revokeAgentMcpTokens(agentId: string, opts: { agentKind?: 
         if (error.code !== 'ENOENT') throw error;
       });
       await removeAgentSecretsDir(dir);
+    }
+    // PAN-4943: a stopped agent watches nothing. Its own try/catch, so a
+    // corrupt watch store never skips the token-file and secrets cleanup above.
+    try {
+      await removePullRequestWatchesForOwner({ agentId: id, agentKind });
+    } catch (error) {
+      console.warn(`[agent-token] PR watch cleanup failed for ${id}: ${(error as Error).message}`);
     }
     return revoked.length;
   } catch (error) {

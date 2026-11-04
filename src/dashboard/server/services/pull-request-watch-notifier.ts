@@ -88,6 +88,17 @@ export function watchWake(watch: PullRequestWatch, snapshot: PullRequestSnapshot
   return { events, last: nextLast, quietWakes, ends, text };
 }
 
+/** WI-2's "a change that alters nothing writes nothing": true when a no-event wake leaves every stored field equal. */
+function baselineUnchanged(watch: PullRequestWatch, wake: WatchWakeResult): boolean {
+  return (
+    wake.quietWakes === watch.quietWakes
+    && wake.last.state === watch.last.state
+    && wake.last.checks === watch.last.checks
+    && wake.last.reviewState === watch.last.reviewState
+    && wake.last.mergeable === watch.last.mergeable
+  );
+}
+
 function keyString(watch: Pick<PullRequestWatch, 'host' | 'repository' | 'number'>): string {
   return `${watch.host}/${watch.repository}#${watch.number}`;
 }
@@ -188,7 +199,7 @@ export async function notifyPullRequestWatches(
       }
       const wake = watchWake(watch, snapshot);
       if (wake.text === null) {
-        next.push({ ...watch, last: wake.last, quietWakes: wake.quietWakes });
+        next.push(baselineUnchanged(watch, wake) ? watch : { ...watch, last: wake.last, quietWakes: wake.quietWakes });
         continue;
       }
       const wakes = watch.wakes + 1;

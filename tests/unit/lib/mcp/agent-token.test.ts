@@ -161,17 +161,18 @@ describe('agent MCP tokens (PAN-4930 W-4)', () => {
     expect(await listPullRequestWatches({ agentId: 'conv-a', agentKind: 'conversation' })).toHaveLength(1);
   });
 
-  it('PAN-4943 WI-3: a corrupt PR watch store still resolves (not rejects) and the token is still revoked', async () => {
+  it('PAN-4943 WI-3: a corrupt PR watch store still resolves with the real revoked count, and token-file/secrets cleanup still happens', async () => {
     const owner = workOwner();
     await ensureAgentMcpToken(owner);
     await writeFile(join(home, 'pr-watches.json'), 'not json', { mode: 0o600 });
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    // The watch-removal failure is caught by the same outer catch as a corrupt
-    // access-token registry, so it resolves 0 even though the token (revoked
-    // before the watch store was touched) is already gone from the registry.
-    await expect(revokeAgentMcpTokens('agent-pan-1')).resolves.toBe(0);
+    // The watch-removal failure has its own try/catch, after token-file and
+    // secrets cleanup, so it never masks the real revoked count or skips that
+    // cleanup (unlike a corrupt access-token registry, which does both).
+    await expect(revokeAgentMcpTokens('agent-pan-1')).resolves.toBe(1);
     expect(await activeFor('agent-pan-1')).toEqual([]);
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('[agent-token] revoke failed for agent-pan-1'));
+    await expect(stat(agentMcpTokenPath(owner.dir))).rejects.toMatchObject({ code: 'ENOENT' });
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('[agent-token] PR watch cleanup failed for agent-pan-1'));
   });
 
   it('PAN-4941: revokeAgentMcpTokens deletes the owner secrets directory for an agent and for a conversation with dir', async () => {

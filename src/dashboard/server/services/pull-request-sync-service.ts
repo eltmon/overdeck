@@ -513,11 +513,11 @@ export async function runPullRequestSyncOnce(
   return { inserted, updated };
 }
 
-async function runGuarded(trigger: string): Promise<void> {
+async function runGuarded(trigger: string, watches: WatchPassDeps): Promise<void> {
   if (running || stopped) return;
   running = true;
   try {
-    const result = await runPullRequestSyncOnce();
+    const result = await runPullRequestSyncOnce(undefined, undefined, undefined, watches);
     if (result.inserted > 0 || result.updated > 0) {
       console.log(`${LOG_PREFIX} ${trigger} sweep: ${result.inserted} linked, ${result.updated} refreshed`);
     }
@@ -528,14 +528,14 @@ async function runGuarded(trigger: string): Promise<void> {
   }
 }
 
-export function startPullRequestSyncService(): void {
+export function startPullRequestSyncService(watches: WatchPassDeps = defaultWatchPassDeps): void {
   if (bootTimer !== null || intervalTimer !== null) return;
   stopped = false;
   bootTimer = setTimeout(() => {
     bootTimer = null;
-    void runGuarded('boot');
+    void runGuarded('boot', watches);
     intervalTimer = setInterval(() => {
-      void runGuarded('interval');
+      void runGuarded('interval', watches);
     }, PR_SYNC_INTERVAL_MS);
     if (typeof intervalTimer.unref === 'function') intervalTimer.unref();
   }, PR_SYNC_BOOT_DELAY_MS);

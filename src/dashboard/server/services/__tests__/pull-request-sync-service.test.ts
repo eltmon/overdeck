@@ -596,6 +596,13 @@ describe('runPullRequestSyncOnce — auto-settle on merge (PAN-4653)', () => {
 });
 
 describe('startPullRequestSyncService — schedule', () => {
+  // PAN-4943: the default watch pass does real file I/O (listWatchedPullRequestKeys
+  // reads pr-watches.json); under fake timers that I/O can still be settling when
+  // the next tick fires, leaving `running` true and skipping that tick. These
+  // schedule tests care about the listing cadence, not the watch pass, so they
+  // inject a no-op watch pass instead.
+  const NOOP_WATCHES = { listKeys: async () => [], notify: async () => {} };
+
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -604,7 +611,7 @@ describe('startPullRequestSyncService — schedule', () => {
     conversation('feature/timed');
     prRows = [pr(6, 'feature/timed')];
 
-    startPullRequestSyncService();
+    startPullRequestSyncService(NOOP_WATCHES);
     await vi.advanceTimersByTimeAsync(PR_SYNC_BOOT_DELAY_MS - 1);
     expect(listRepoPullRequestsMock).not.toHaveBeenCalled();
 
@@ -623,7 +630,7 @@ describe('startPullRequestSyncService — schedule', () => {
     conversation('feature/rate-limited');
     prRows = null;
 
-    startPullRequestSyncService();
+    startPullRequestSyncService(NOOP_WATCHES);
     await vi.advanceTimersByTimeAsync(PR_SYNC_BOOT_DELAY_MS + 2 * PR_SYNC_INTERVAL_MS);
     expect(listRepoPullRequestsMock).toHaveBeenCalledTimes(3);
 

@@ -145,14 +145,18 @@ GitHub pull requests only; GitLab merge requests are refused.
 
 A watch delivers one message per change, naming every event the change
 produced: the checks failed or passed, the review state changed, merge
-conflicts appeared, or the pull request was merged or closed. A merged or
-closed pull request ends the watch, as does the eleventh consecutive
-message that only reports a review-state change (`watch_pull_request` again
-to keep watching after that). Each agent may hold 20 watches, and 50 may
-exist across every agent on this machine; past either limit,
-`watch_pull_request` answers an error instead of a new watch. A watch works
-whether or not its pull request is linked to any conversation, and a
-stopped agent's watches are removed when its token is revoked.
+conflicts appeared, or the pull request was merged or closed. The message
+reads `[Overdeck] <repository>#<number>: <phrase>; <phrase>. <url>`, for
+example `[Overdeck] eltmon/overdeck#4943: checks failed (was pending).
+https://github.com/eltmon/overdeck/pull/4943`; a message that ends the watch
+adds a trailing sentence saying so. A merged or closed pull request ends the
+watch, as does the eleventh consecutive message that only reports a
+review-state change (`watch_pull_request` again to keep watching after
+that). Each agent may hold 20 watches, and 50 may exist across every agent
+on this machine; past either limit, `watch_pull_request` answers an error
+instead of a new watch. A watch works whether or not its pull request is
+linked to any conversation, and a stopped agent's watches are removed when
+its token is revoked.
 
 ## Over HTTP
 
