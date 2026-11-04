@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5011",
   "created": "2026-11-04T11:42:07.971Z",
-  "updated": "2026-11-04T13:22:18.437Z",
+  "updated": "2026-11-04T13:22:32.226Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -146,6 +146,10 @@
     "specialist-presence.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T13:22:18.436Z"
+    },
+    "specialist-presence.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:22:32.226Z"
     }
   }
 }
