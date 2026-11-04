@@ -1,0 +1,255 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T06:00:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4896: pan connect on macOS prints a Linux-only systemd-run warning",
+    "updated": "2026-11-04T05:33:51.217Z"
+  },
+  "plan": {
+    "id": "pan-4896",
+    "title": "pan connect on macOS prints a Linux-only systemd-run warning",
+    "status": "proposed",
+    "uid": "a07c079b-9ae5-4916-a09b-b4f40a83d9a7",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-04T06:00:00.000Z",
+    "updated": "2026-11-04T05:33:51.217Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4896",
+        "label": "PAN-4896",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4896.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "bug",
+      "macos",
+      "dashboard",
+      "pan-connect",
+      "cli"
+    ],
+    "narratives": {
+      "Problem": "On macOS, `pan connect` (and `pan up`/`pan restart`) print the PAN-2804 warning '[dashboard] WARNING (PAN-2804): could not start the dashboard via systemd-run…'. spawnDashboardSystemdUnit in src/cli/commands/restart.ts already returns null on non-Linux without trying systemd-run, but spawnDashboardDetached prints the warning unconditionally after the null return, so darwin gets a warning about an attempt that never happened.",
+      "Proposal": "Wrap the existing PAN-2804 console.warn in spawnDashboardDetached with `if (process.platform === 'linux')`, leaving the warning text, systemd-run arguments and spawn options untouched. Add a darwin unit test (no systemd-run call, no PAN-2804 warning, pid handle still works) and a linux positive-control test (exactly one PAN-2804 warning when systemd-run throws) to tests/unit/cli/restart-spawn-pid.test.ts. Add one sentence to the D-10 macOS bullet in docs/ANYWHERE-ARCHITECTURE.md describing the darwin spawn path.",
+      "NonGoals": "- Fixing the tmux '[tmux] WARNING (PAN-1798)' sibling in src/lib/tmux.ts (file is at its 1167-line allowlist cap; tmux backend is not pan connect's default path)\n- Adding a second platform guard around the systemd-run call (spawnDashboardSystemdUnit already guards it)\n- Changing spawnDashboardSystemdUnit's return type to distinguish skipped from failed\n- Any launchd-based process isolation for the dashboard on macOS\n- Changing behavior, warning text, or systemd-run arguments on Linux, including non-systemd Linux which must still warn\n- Editing scripts/file-size-allowlist.txt"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Gate only the console.warn on process.platform === 'linux'; do not add a guard around the systemd-run call.",
+        "rationale": "spawnDashboardSystemdUnit already returns null on non-Linux (restart.ts line 363), so the attempt is already Linux-only; the warning is the only defect. Minimum diff."
+      },
+      {
+        "summary": "Use the predicate process.platform === 'linux' rather than 'systemd is available'.",
+        "rationale": "Non-systemd Linux, or a failing systemd-run --user, is exactly the cgroup-sharing hazard PAN-2804 warns about, so those hosts must keep the warning."
+      },
+      {
+        "summary": "Exclude the tmux PAN-1798 warning in src/lib/tmux.ts from this issue.",
+        "rationale": "It only fires under terminal.backend: tmux (not pan connect's Herdr default) and src/lib/tmux.ts is at its 1167-line allowlist cap, so a fix needs an extraction item; that is a separate issue."
+      },
+      {
+        "summary": "Add a linux positive-control test alongside the darwin test.",
+        "rationale": "The existing 'systemd-run is unavailable' test silences console.warn without asserting it, so nothing proves the warning still fires on Linux; without it the darwin assertion could pass because the warning was deleted outright."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Three small items in one subsystem; well under the files_scope and subsystem limits.",
+      "canonicalFilename": "2026-11-04-PAN-4896-pan-connect-on-macos-prints-a-linux-only-systemd-run-warning.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "gate-pan2804-warning-linux",
+        "title": "Gate the PAN-2804 dashboard warning on process.platform === 'linux'",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T06:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4896",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/restart.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "git diff origin/main -- src/cli/commands/restart.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "diff shows only the added platform check and comment around the unchanged PAN-2804 console.warn"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/restart.ts, function spawnDashboardDetached, after `child.unref();` (line 314 at base 22769ffffe8), wrap the existing console.warn('[dashboard] WARNING (PAN-2804): could not start the dashboard via systemd-run. ' + 'It shares the invoking process tree\\'s cgroup; restarting that unit/scope will kill it.') in `if (process.platform === 'linux') { … }`, preceded by the comment `// PAN-4896: only Linux tries systemd-run; elsewhere (macOS launchd) the` / `// detached child is the normal path, so there is nothing to warn about.` Do not change the warning text, spawnDashboardSystemdUnit, the spawn call, or the returned handle. See PRD WI-1 for the exact before/after."
+        },
+        "items": [
+          {
+            "id": "gate-pan2804-warning-linux.ac1",
+            "title": "Given src/cli/commands/restart.ts, when grepping for `if (process.platform === 'linux')` in spawnDashboardDetached, then it returns the line directly enclosing the PAN-2804 console.warn",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-pan2804-warning-linux.ac2",
+            "title": "Given the diff against origin/main, the PAN-2804 warning string is byte-identical and spawnDashboardSystemdUnit, the spawn options and the returned stop/pid handle are unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-pan2804-warning-linux.ac3",
+            "title": "npm run typecheck exits 0 with the change applied",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "test-darwin-no-warning",
+        "title": "Unit-test that darwin emits no PAN-2804 warning while linux still warns",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T06:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4896",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/cli/restart-spawn-pid.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/restart-spawn-pid.test.ts"
+          ],
+          "expected_outputs": [
+            "restart-spawn-pid.test.ts passes, including the new darwin test and the new linux warning test"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In tests/unit/cli/restart-spawn-pid.test.ts, inside describe('dashboard spawn pid handles'), add two tests (PRD WI-2). (1) 'does not attempt systemd-run or warn on darwin (PAN-4896)': vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin'); processMocks.spawn.mockReturnValue({ pid: 4321, unref: vi.fn() }); const warn = vi.spyOn(console, 'warn').mockImplementation(() => {}); call spawnDashboardDetached(config, createDashboardBundleFixture()); assert processMocks.execFileSync.mock.calls has no call with first arg 'systemd-run', warn.mock.calls has no call whose first arg contains 'PAN-2804', and await handle.pid!() resolves to 4321. (2) 'warns once on linux when systemd-run fails (PAN-2804)': keep the beforeEach linux pin, make processMocks.execFileSync throw, mock spawn, spy console.warn, call spawnDashboardDetached, assert exactly one warn call whose first arg contains 'could not start the dashboard via systemd-run'. Filter warn calls by substring rather than asserting zero total warns. Use the existing fake timers from beforeEach; no real waits. Checkpoint: if loadConfigSync/openDashboardLogStdio throw under the darwin mock, vi.mock the offending module at file top in the style of the existing child_process mock."
+        },
+        "items": [
+          {
+            "id": "test-darwin-no-warning.ac1",
+            "title": "Given process.platform mocked to 'darwin' and spawn mocked, when spawnDashboardDetached runs, then the test asserts execFileSync receives no 'systemd-run' call and console.warn receives no message containing 'PAN-2804'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-darwin-no-warning.ac2",
+            "title": "Given process.platform 'linux' and execFileSync throwing, when spawnDashboardDetached runs, then the test asserts console.warn emits exactly one message containing 'could not start the dashboard via systemd-run'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-darwin-no-warning.ac3",
+            "title": "npx vitest run tests/unit/cli/restart-spawn-pid.test.ts exits 0 with all existing and new tests passing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-darwin-no-warning.ac4",
+            "title": "Given the platform gate from gate-pan2804-warning-linux is reverted locally, when the test file runs, then the darwin test fails (the test pins the gate)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-d10-darwin-spawn",
+        "title": "Document the darwin dashboard spawn path in ANYWHERE-ARCHITECTURE D-10",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T06:00:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4896",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ANYWHERE-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'only Linux starts it in a `systemd-run` transient unit' docs/ANYWHERE-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "grep prints one line inside the D-10 macOS bullet"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In docs/ANYWHERE-ARCHITECTURE.md, in the '- **D-10 macOS.**' bullet under '## pan connect (W-LINK9, FR-25)', after the sentence ending '`pan up` on a Mac with the agent loaded does not start a second supervisor.', insert: 'The dashboard server itself runs as a plain detached child of the supervisor: only Linux starts it in a `systemd-run` transient unit, so macOS prints no PAN-2804 systemd warning (PAN-4896).' Keep the bullet's existing line wrapping style (~90 columns, two-space continuation indent). No other doc mentions PAN-2804; docs/TERMINAL-BACKENDS.md needs no change."
+        },
+        "items": [
+          {
+            "id": "docs-d10-darwin-spawn.ac1",
+            "title": "docs/ANYWHERE-ARCHITECTURE.md D-10 macOS bullet contains the phrase 'only Linux starts it in a `systemd-run` transient unit' and states that macOS prints no PAN-2804 systemd warning",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-d10-darwin-spawn.ac2",
+            "title": "The inserted sentence renders inside the existing D-10 bullet (continuation-indented), and the following 'macOS 15+'s Local Network privacy' text is preserved unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "gate-pan2804-warning-linux",
+        "to": "test-darwin-no-warning",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
