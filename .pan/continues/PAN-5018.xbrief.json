@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5018",
   "created": "2026-11-04T13:12:52.932Z",
-  "updated": "2026-11-04T15:09:12.544Z",
+  "updated": "2026-11-04T15:09:25.809Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -124,6 +124,10 @@
     "listener-refusal-logging.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T15:09:12.543Z"
+    },
+    "listener-refusal-logging.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:09:25.809Z"
     }
   }
 }
