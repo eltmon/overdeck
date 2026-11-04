@@ -1,4 +1,7 @@
+import { mkdirSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { AGENTS_DIR } from '../../lib/paths.js';
 
 const conversationMocks = vi.hoisted(() => ({
   getConversationById: vi.fn(),
@@ -239,6 +242,120 @@ describe('agent-target (PAN-4465)', () => {
     });
   });
 
+  describe('resolveCliAgentTarget — conversation name (PAN-4999)', () => {
+    const AGENT_DIR = join(AGENTS_DIR, 'agent-pan-1148-review');
+
+    afterEach(() => {
+      rmSync(join(AGENTS_DIR, 'agent-pan-1148-review'), { recursive: true, force: true });
+    });
+
+    it('resolves the bare name, the conv- name and the rowid of one live conversation to the same agent', async () => {
+      conversationMocks.getConversationByName.mockReturnValue(CONV_ROW);
+      conversationMocks.getConversationById.mockReturnValue(CONV_ROW);
+      const { resolveCliAgentTarget } = await import('../agent-target.js');
+
+      const byName = await resolveCliAgentTarget('20260928-7563');
+      const byAgentId = await resolveCliAgentTarget('conv-20260928-7563');
+      const byRowId = await resolveCliAgentTarget('2972');
+
+      expect(byName).toEqual({ kind: 'agent', agentId: 'conv-20260928-7563', via: 'conversation' });
+      expect(byAgentId).toEqual({ kind: 'agent', agentId: 'conv-20260928-7563', via: 'agent-id' });
+      expect(byRowId).toEqual({ kind: 'agent', agentId: 'conv-20260928-7563', via: 'conversation' });
+      expect(conversationMocks.getConversationByName).toHaveBeenCalledWith('20260928-7563');
+    });
+
+    it('never consults the conversation table for an issue-shaped target', async () => {
+      const { resolveCliAgentTarget } = await import('../agent-target.js');
+
+      const result = await resolveCliAgentTarget('PAN-1148');
+
+      expect(result).toEqual({ kind: 'issue', issueId: 'PAN-1148' });
+      expect(conversationMocks.getConversationByName).not.toHaveBeenCalled();
+      expect(conversationMocks.getConversationById).not.toHaveBeenCalled();
+    });
+
+    it('keeps the issue path for a name-shaped target whose agent directory exists', async () => {
+      mkdirSync(AGENT_DIR, { recursive: true });
+      const { resolveCliAgentTarget } = await import('../agent-target.js');
+
+      const result = await resolveCliAgentTarget('PAN-1148-review');
+
+      expect(result).toEqual({ kind: 'issue', issueId: 'PAN-1148-REVIEW' });
+    });
+
+    it('is ambiguous when a conversation and an agent directory share the name', async () => {
+      mkdirSync(AGENT_DIR, { recursive: true });
+      conversationMocks.getConversationByName.mockReturnValue({
+        id: 77,
+        name: 'pan-1148-review',
+        tmuxSession: 'conv-pan-1148-review',
+        origin: 'local' as const,
+        title: null,
+      });
+      const { resolveCliAgentTarget } = await import('../agent-target.js');
+
+      const result = await resolveCliAgentTarget('PAN-1148-review');
+
+      expect(result).toEqual({
+        kind: 'ambiguous',
+        input: 'PAN-1148-review',
+        candidates: [
+          { explicitForm: 'agent-pan-1148-review', label: 'agent agent-pan-1148-review' },
+          { explicitForm: 'conv/77', label: 'conversation 77 "pan-1148-review" (conv-pan-1148-review)' },
+        ],
+      });
+    });
+
+    it('is unresolved and names every form tried for an unknown name', async () => {
+      const { resolveCliAgentTarget } = await import('../agent-target.js');
+
+      const result = await resolveCliAgentTarget('20261103-zzzz');
+
+      expect(result).toEqual({
+        kind: 'unresolved',
+        input: '20261103-zzzz',
+        reason: 'no conversation named 20261103-zzzz and no agent agent-20261103-zzzz',
+      });
+    });
+
+    it('treats a vault-only conversation name as no conversation', async () => {
+      conversationMocks.getConversationByName.mockReturnValue(VAULT_ROW);
+      const { resolveCliAgentTarget } = await import('../agent-target.js');
+
+      const result = await resolveCliAgentTarget('20260101-0001');
+
+      expect(result).toEqual({
+        kind: 'unresolved',
+        input: '20260101-0001',
+        reason: 'no conversation named 20260101-0001 and no agent agent-20260101-0001',
+      });
+    });
+
+    it('reports the lookup failure and the agent form when the name lookup throws', async () => {
+      conversationMocks.getConversationByName.mockImplementation(() => {
+        throw new Error('db is locked');
+      });
+      const { resolveCliAgentTarget } = await import('../agent-target.js');
+
+      const result = await resolveCliAgentTarget('20261103-zzzz');
+
+      expect(result).toEqual({
+        kind: 'unresolved',
+        input: '20261103-zzzz',
+        reason: 'conversation lookup failed: db is locked; no agent agent-20261103-zzzz',
+      });
+    });
+
+    it('resolveCliSingleAgentId returns the conversation agent for a bare name', async () => {
+      conversationMocks.getConversationByName.mockReturnValue(CONV_ROW);
+      const { resolveCliSingleAgentId } = await import('../agent-target.js');
+
+      const result = await resolveCliSingleAgentId('20260928-7563');
+
+      expect(result).toEqual({ ok: true, agentId: 'conv-20260928-7563' });
+    });
+  });
+
   describe('printAgentTargetFailure', () => {
     let errorSpy: ReturnType<typeof vi.spyOn>;
 
@@ -271,6 +388,23 @@ describe('agent-target (PAN-4465)', () => {
       }
       expect(printed).toContain('PAN-2972');
       expect(printed).toContain('conv/2972');
+    });
+
+    it('prints the tried forms for an unresolved bare name', async () => {
+      const { printAgentTargetFailure } = await import('../agent-target.js');
+
+      printAgentTargetFailure(
+        {
+          kind: 'unresolved',
+          input: '20261103-zzzz',
+          reason: 'no conversation named 20261103-zzzz and no agent agent-20261103-zzzz',
+        },
+        'tell',
+      );
+
+      const printed = errorSpy.mock.calls.map(([line]) => String(line)).join('\n');
+      expect(printed).toContain('no conversation named 20261103-zzzz and no agent agent-20261103-zzzz');
+      expect(printed).toContain('its name 20260928-7563');
     });
   });
 });
