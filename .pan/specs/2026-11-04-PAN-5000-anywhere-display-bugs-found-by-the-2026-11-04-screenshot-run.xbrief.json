@@ -1,0 +1,668 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T11:30:03Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5000: Anywhere display bugs found by the 2026-11-04 screenshot run",
+    "updated": "2026-11-04T11:37:23.901Z"
+  },
+  "plan": {
+    "id": "pan-5000",
+    "title": "Anywhere display bugs found by the 2026-11-04 screenshot run",
+    "status": "proposed",
+    "uid": "1d853f13-689e-44b6-9dfe-7105f9059e01",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-04T11:30:03Z",
+    "updated": "2026-11-04T11:37:23.901Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5000",
+        "label": "PAN-5000",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "anywhere",
+      "frontend",
+      "linked-machines",
+      "settings",
+      "bugfix"
+    ],
+    "metadata": {
+      "sizeJustification": "One issue, one acceptance (each of five reported display bugs fixed with a test, plus after-fix screenshots on one PR). The code spans only src/lib and src/dashboard; the other counted subsystems are four single doc pages (configuration/remote-access.mdx, configuration/linked-machines.mdx, configuration/push-notifications.mdx, features/conversations.mdx) and the CI test list scripts/frontend-test-subset.txt, which the size lint counts one by one because they sit directly under a top-level directory. Every item is a small independent slice; splitting into sibling issues would duplicate the screenshot run five times.",
+      "canonicalFilename": "2026-11-04-PAN-5000-anywhere-display-bugs-found-by-the-2026-11-04-screenshot-run.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The 2026-11-04 Anywhere screenshot run found five display bugs: the status card counts paired devices but not phones (0 while the list shows an Android phone); the app bar shows the raw deck key __no-project__ in its crumb and search placeholder; linked conversations with no title show their @<env-id>/<name> list name, and one shows an attachment file path as its title; the linked conversation Preview popover ignores Escape; the Anywhere section description is cut off at 1600 px and the Phone notifications empty state says 'No device' next to 'Overdeck app: 1 phone'.",
+      "Proposal": "Fix each bug at its root, per the PRD at .pan/drafts/PAN-5000.md: one shared isPairedDeviceRecord predicate for the count, the list and revoke; pure app-bar label helpers that map the no-project sentinel to 'No project'; a server-side linkedRowTitle guard in linkedListRow; derivePromptTitle drops composer attachment reference lines; a document Escape listener in OpenPreviewPopover; a wrapping SettingsSection header without truncate; browser-specific empty-state copy. Every fix ships with a Vitest test and its doc line, and an isolated-dashboard Playwright spec captures after-fix screenshots into .pan/uat/pan-5000/.",
+      "NonGoals": "- No migration or rewrite of conversation titles already stored in any machine's database; only linked rows get the display guard.\n- No change to how local conversation rows fall back to their name when their title is null.\n- No change to src/dashboard/server/services/resource-discovery-shared.ts (issue-tree linked rows).\n- No outside-click dismissal for the Preview popover and no change to any other popover.\n- No change to the 'Move to project…' link on a linked conversation in the no-project deck.\n- No second dashboard on the operator's live OVERDECK_HOME and no screenshots captured from :3011.\n- The new Playwright spec is not added to the CI test:playwright script.\n- No change to the AI title generator."
+    },
+    "autoDecisions": [
+      {
+        "summary": "One exported isPairedDeviceRecord predicate ((kind ?? 'device') === 'device' || kind === 'phone') is used by the status count, the device list and revoke.",
+        "rationale": "The access-token module documents that a record with no kind is a device; one predicate keeps the count and the list from drifting again."
+      },
+      {
+        "summary": "The count acceptance check is 'count equals active records in the list', never 'count equals list length'.",
+        "rationale": "DevicesPanel also lists revoked rows labelled 'Revoked … ago'."
+      },
+      {
+        "summary": "The no-project deck shows the crumb 'No project' and the global search placeholder.",
+        "rationale": "The issue names 'No project' as acceptable, and search is not scoped to that deck, so 'Search No project…' would mislead."
+      },
+      {
+        "summary": "Linked titles are fixed once on the server in linkedListRow, with a guard for null, blank and leading-absolute-path titles.",
+        "rationale": "Every renderer (desktop list, panel header, machine banner, phone list) reads the merged row, and an owner on an older version keeps sending path titles."
+      },
+      {
+        "summary": "derivePromptTitle removes whole lines matching ^@<absolute path>$ and returns '' when nothing is left.",
+        "rationale": "That is the composer's attachment prefix format (ComposerFooter.tsx lines 493-496); callers already skip an empty derived title and the AI title still runs."
+      },
+      {
+        "summary": "The Preview popover gets Escape only, not outside-click dismissal.",
+        "rationale": "The issue asks for Escape; outside-click is not requested (Karpathy: no unrequested features)."
+      },
+      {
+        "summary": "The truncation is fixed in the shared SettingsSection header with flex-wrap and no truncate class.",
+        "rationale": "The description text is short; four shrink-0 action buttons take the row. Wrapping changes nothing where the header already fits."
+      },
+      {
+        "summary": "Screenshots come from a Playwright spec on the isolated dashboard with page.route mocks; linked rows in the mock are produced by the real mergeConversationRows. Screens 15/16 (linked panel) have an implementation checkpoint: if the panel does not render from REST mocks, the PR lists them for recapture after deploy.",
+        "rationale": "The fixed build is not on :3011 until merge, and a second dashboard on the live OVERDECK_HOME is forbidden."
+      }
+    ],
+    "items": [
+      {
+        "id": "paired-count",
+        "title": "Count phones in the Anywhere paired-devices total",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T11:30:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5000",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/access-tokens.ts",
+            "src/dashboard/server/routes/anywhere.ts",
+            "src/dashboard/server/routes/pairing.ts",
+            "src/dashboard/server/__tests__/anywhere-status-route.test.ts",
+            "configuration/remote-access.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/anywhere-status-route.test.ts src/dashboard/server/__tests__/pairing.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "anywhere-status-route.test.ts and pairing.test.ts pass, including the new device+phone count case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-9",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Add `export function isPairedDeviceRecord(record: Pick<PublicAccessTokenRecord, 'kind'>): boolean` returning `(record.kind ?? 'device') === 'device' || record.kind === 'phone'` to src/lib/access-tokens.ts after listActiveRecordsOfKind. Use it in anywhere.ts line 116 (`records.filter((record) => isPairedDeviceRecord(record) && !record.revokedAt).length`, update the header bullet) and in pairing.ts line 180 (list filter) and line 199 (revoke lookup). Extend anywhere-status-route.test.ts: one device, one phone (phoneKey 'ab'.repeat(32), a UUID v4 clientId, scopes without admin/forward), one revoked device, one token → devices { active: 2 }; assert the predicate per kind. Replace configuration/remote-access.mdx line 206 with the PRD's 'Paired devices' bullet."
+        },
+        "items": [
+          {
+            "id": "paired-count.ac1",
+            "title": "Given an active device, an active phone, a revoked device and a token in the registry, GET /api/anywhere/status returns devices equal to { active: 2 }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "paired-count.ac2",
+            "title": "isPairedDeviceRecord returns true for kind 'device', 'phone' and an absent kind, and false for 'token', 'machine' and 'connector'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "paired-count.ac3",
+            "title": "When the routes run, anywhere.ts, the GET /api/devices filter and the DELETE /api/devices/:id lookup in pairing.ts all apply isPairedDeviceRecord, and neither route file contains an inline kind === 'phone' check",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "paired-count.ac4",
+            "title": "configuration/remote-access.mdx contains a Paired devices bullet that covers paired browsers and Overdeck app phones that are not revoked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "no-project-crumb",
+        "title": "Show 'No project' instead of __no-project__ in the app bar",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T11:30:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5000",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/App/appChromeLabels.ts",
+            "src/dashboard/frontend/src/App/appChromeLabels.test.ts",
+            "src/dashboard/frontend/src/App/AppChrome.tsx",
+            "scripts/frontend-test-subset.txt",
+            "features/conversations.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/App/appChromeLabels.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "appChromeLabels.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-9",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Create src/dashboard/frontend/src/App/appChromeLabels.ts with projectCrumbLabel(key) (NO_PROJECT_KEY → NO_PROJECT_LABEL, else key) and searchButtonText(key | null) (null or NO_PROJECT_KEY → 'Search issues, conversations, commands…', else `Search ${key}…`), importing both constants from components/CommandDeck/projectsData. In AppChrome.tsx replace `{selectedProjectKey}` in the crumb (line 178) with projectCrumbLabel(selectedProjectKey) and the placeholder expression (line 192) with searchButtonText(selectedProjectKey). Add appChromeLabels.test.ts and list `src/App/appChromeLabels.test.ts` in scripts/frontend-test-subset.txt between src/App/api.test.ts and src/App/routes.linked.test.ts. Add the PRD sentence to features/conversations.mdx after the 'No project deck' sentence (around line 125)."
+        },
+        "items": [
+          {
+            "id": "no-project-crumb.ac1",
+            "title": "projectCrumbLabel('__no-project__') returns 'No project' and projectCrumbLabel('overdeck') returns 'overdeck'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "no-project-crumb.ac2",
+            "title": "searchButtonText returns 'Search issues, conversations, commands…' for '__no-project__' and for null, and returns 'Search overdeck…' for 'overdeck'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "no-project-crumb.ac3",
+            "title": "AppChrome.tsx renders the crumb through projectCrumbLabel and the search button text through searchButtonText, and scripts/frontend-test-subset.txt contains src/App/appChromeLabels.test.ts in sorted order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "no-project-crumb.ac4",
+            "title": "features/conversations.mdx states that the app bar reads No project when the No project deck is selected",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "linked-row-title",
+        "title": "Untitled and path-titled linked conversation rows read 'New conversation'",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T11:30:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5000",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/linked-conversation-title.ts",
+            "src/lib/overdeck/linked-conversations-merge.ts",
+            "src/lib/overdeck/__tests__/linked-conversations-merge-title.test.ts",
+            "configuration/linked-machines.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/linked-conversations-merge-title.test.ts src/lib/overdeck/__tests__/linked-conversations-merge-spawn-error.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both merge test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-9",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Create the import-free leaf module src/lib/overdeck/linked-conversation-title.ts exporting UNTITLED_CONVERSATION_TITLE = 'New conversation' and linkedRowTitle(title) that returns the trimmed title, or 'New conversation' when the title is null/undefined/blank or matches /^@?(?:~|[A-Za-z]:)?[\\\\/][^\\s\\\\/]+[\\\\/]/ (a leading absolute path with at least two separators). In linked-conversations-merge.ts line 83 change `title: row.title,` to `title: linkedRowTitle(row.title),` and add the PAN-5000 header bullet. Add linked-conversations-merge-title.test.ts modelled on linked-conversations-merge-spawn-error.test.ts. Add the PRD sentence to configuration/linked-machines.mdx 'Sharing conversations'."
+        },
+        "items": [
+          {
+            "id": "linked-row-title.ac1",
+            "title": "mergeConversationRows returns the title 'New conversation' for linked records whose owner title is null, '   ', or '/Users/eltmon/.overdeck/conversation-attachments/c1/a.png fix'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linked-row-title.ac2",
+            "title": "mergeConversationRows preserves the owner title 'Fix the login form' unchanged, and linkedRowTitle('/pan-flywheel start') returns '/pan-flywheel start'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linked-row-title.ac3",
+            "title": "linkedRowTitle('C:\\\\Users\\\\x\\\\a.png') returns 'New conversation'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linked-row-title.ac4",
+            "title": "configuration/linked-machines.mdx contains a sentence stating that a linked conversation with no title, or a title that is only a file path, shows as New conversation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "derived-title-attachments",
+        "title": "Leave composer attachment paths out of the derived conversation title",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T11:30:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5000",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/conversations/transcript-summary.ts",
+            "src/lib/conversations/__tests__/transcript-summary.test.ts",
+            "features/conversations.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/conversations/__tests__/transcript-summary.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "transcript-summary.test.ts passes, including the PAN-5000 attachment cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-9",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In src/lib/conversations/transcript-summary.ts add `const ATTACHMENT_REFERENCE_LINE = /^@(?:[A-Za-z]:)?[\\\\/]\\S*$/;` above derivePromptTitle and make its first step split the prompt on '\\n', drop lines whose trimmed text matches the pattern, rejoin and trim; return '' when nothing is left. Leave the rest of the function unchanged. Add a describe('derivePromptTitle attachments (PAN-5000)') block with the four PRD cases. Add the PRD sentence to features/conversations.mdx after the line 'After **Create**, the dialog closes and the new conversation opens.' (line 102). This item and no-project-crumb both edit features/conversations.mdx at different lines."
+        },
+        "items": [
+          {
+            "id": "derived-title-attachments.ac1",
+            "title": "derivePromptTitle('@/Users/op/.overdeck/conversation-attachments/c1/a.png\\nfix the login button') returns the same string as derivePromptTitle('fix the login button')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "derived-title-attachments.ac2",
+            "title": "derivePromptTitle of one or more attachment reference lines with no other text returns ''",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "derived-title-attachments.ac3",
+            "title": "derivePromptTitle('look at /etc/hosts') still returns a title containing '/etc/hosts', because only whole @-path lines are removed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "derived-title-attachments.ac4",
+            "title": "features/conversations.mdx contains a sentence stating that the first title leaves out attached files and that an attachments-only first message keeps the title New conversation until the generated title arrives",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "preview-popover-escape",
+        "title": "Escape closes the linked conversation Preview popover",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T11:30:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5000",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/OpenPreviewPopover.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/OpenPreviewPopover.test.tsx",
+            "configuration/linked-machines.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/OpenPreviewPopover.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "OpenPreviewPopover.test.tsx passes, including the two Escape cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-9",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. In OpenPreviewPopover.tsx import useEffect and, after the useQuery call, register a document 'keydown' listener only while `open` is true that calls setOpen(false) on event.key === 'Escape', removing it in the cleanup. Do not call stopForward on close and do not add outside-click handling. Add two tests to the existing OpenPreviewPopover.test.tsx: Escape removes [data-testid=\"preview-popover\"]; with a forward active, Escape closes the popover, the button still reads 'Preview :5173', and fetchMock saw no DELETE. Add the PRD sentence to configuration/linked-machines.mdx 'Open preview'. This item and linked-row-title both edit configuration/linked-machines.mdx in different sections."
+        },
+        "items": [
+          {
+            "id": "preview-popover-escape.ac1",
+            "title": "Given the Preview popover is open, when keydown Escape fires on document, then [data-testid=\"preview-popover\"] is no longer rendered",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preview-popover-escape.ac2",
+            "title": "Given a forward to port 5173 is active, when Escape is pressed, then the popover closes, the button text remains 'Preview :5173', and no DELETE request is sent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preview-popover-escape.ac3",
+            "title": "configuration/linked-machines.mdx states that Escape closes the Preview popover and a running forward keeps running until Stop",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-header-wrap",
+        "title": "Settings section header wraps its actions instead of cutting the description",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-11-04T11:30:03Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "frontend",
+          "issueLabel": "pan-5000",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/primitives/SettingsSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/primitives/__tests__/SettingsSection.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/primitives/__tests__/SettingsSection.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "SettingsSection.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. In SettingsSection.tsx change the header row class (line 28) to 'flex flex-wrap items-center justify-between gap-x-4 gap-y-2 mb-4' and remove 'truncate' from the description span (line 54), keeping 'hidden @lg:inline'. Add SettingsSection.test.tsx under components/Settings/primitives/__tests__/ and list src/components/Settings/primitives/__tests__/SettingsSection.test.tsx in scripts/frontend-test-subset.txt in sorted order. No doc page describes this layout. This item and no-project-crumb both add a line to scripts/frontend-test-subset.txt at different sorted positions."
+        },
+        "items": [
+          {
+            "id": "settings-header-wrap.ac1",
+            "title": "Rendering SettingsSection with description 'Reach this machine from your other devices' and an action renders the full text '— Reach this machine from your other devices'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-header-wrap.ac2",
+            "title": "The rendered description element does not carry the class 'truncate', and the header row element renders with the class 'flex-wrap'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-header-wrap.ac3",
+            "title": "scripts/frontend-test-subset.txt contains src/components/Settings/primitives/__tests__/SettingsSection.test.tsx in sorted order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "push-empty-copy",
+        "title": "Phone notifications empty state names browsers",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-11-04T11:30:03Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "frontend",
+          "issueLabel": "pan-5000",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/PushPanel.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/PushPanel.test.tsx",
+            "configuration/push-notifications.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/anywhere/__tests__/PushPanel.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "PushPanel.test.tsx passes, including the empty-browser-list case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-9",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. In PushPanel.tsx line 95 change the text to 'No browser receives notifications yet.'. In the existing PushPanel.test.tsx add a case using the file's loadPushStatus mock with webpush.subscriptions [] and native.phones 1. In configuration/push-notifications.mdx 'The Overdeck app' section, after the sentence showing `Overdeck app: 2 phones`, add the PRD sentence about the browser-only list and its empty state."
+        },
+        "items": [
+          {
+            "id": "push-empty-copy.ac1",
+            "title": "Given no web-push subscriptions and one paired phone, the Phone notifications panel renders 'No browser receives notifications yet.' and push-native-line reads 'Overdeck app: 1 phone'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-empty-copy.ac2",
+            "title": "The string 'No device receives notifications yet' no longer appears in src/dashboard/frontend/src",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-empty-copy.ac3",
+            "title": "configuration/push-notifications.mdx states that the list above the Overdeck app line holds browsers only and quotes its empty state 'No browser receives notifications yet.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "after-fix-screenshots",
+        "title": "Capture after-fix screenshots of the five screens into .pan/uat/pan-5000",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T11:30:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-5000",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-5000-anywhere-display.spec.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run build",
+            "cd src/dashboard/frontend && npx playwright test tests/pan-5000-anywhere-display.spec.ts"
+          ],
+          "expected_outputs": [
+            "build completes",
+            "pan-5000-anywhere-display.spec.ts passes and writes PNGs under src/dashboard/frontend/test-results/pan-5000/",
+            ".pan/uat/pan-5000/ holds the committed PNGs"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8 and decision D-10. Write src/dashboard/frontend/tests/pan-5000-anywhere-display.spec.ts on startIsolatedDashboard (pattern: pan-4445-anywhere-devices.spec.ts and pan-2355-mobile.spec.ts), using page.route mocks: **/api/anywhere/status ({ devices: { active: 1 } }) and **/api/devices (one active phone) for Settings → Anywhere at 1600x1000; the No project deck for the crumb; **/api/conversations built by calling the real mergeConversationRows with linked records titled null and '/Users/op/.overdeck/conversation-attachments/c1/a.png' (desktop list and the /m phone list at 390x844); the Preview popover after Escape; **/api/push/status with no web-push subscriptions and native.phones 1. Run npm run build first. Never point at :3011 or the live OVERDECK_HOME. Do not add the spec to the test:playwright script. Copy the PNGs to .pan/uat/pan-5000/, commit them, and link each from the PR body. Implementation checkpoint: if the linked conversation panel title bar does not render from REST mocks, capture the other screens and list screens 15/16 in the PR body as 'recapture after deploy'. Never add test.skip, skipIf or .only."
+        },
+        "items": [
+          {
+            "id": "after-fix-screenshots.ac1",
+            "title": ".pan/uat/pan-5000/ contains committed PNGs showing the Anywhere card with Paired devices 1 and the full section description, the No project crumb, the linked rows titled New conversation on desktop and phone, and the Phone notifications browser empty state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "after-fix-screenshots.ac2",
+            "title": "The spec produces its /api/conversations mock from mergeConversationRows output and opens pages only on startIsolatedDashboard, never on port 3011",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "after-fix-screenshots.ac3",
+            "title": "The PR body contains a link to each PNG and names any screen deferred by the D-10 checkpoint",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "paired-count",
+        "to": "after-fix-screenshots",
+        "type": "blocks"
+      },
+      {
+        "from": "no-project-crumb",
+        "to": "after-fix-screenshots",
+        "type": "blocks"
+      },
+      {
+        "from": "linked-row-title",
+        "to": "after-fix-screenshots",
+        "type": "blocks"
+      },
+      {
+        "from": "preview-popover-escape",
+        "to": "after-fix-screenshots",
+        "type": "blocks"
+      },
+      {
+        "from": "settings-header-wrap",
+        "to": "after-fix-screenshots",
+        "type": "blocks"
+      },
+      {
+        "from": "push-empty-copy",
+        "to": "after-fix-screenshots",
+        "type": "blocks"
+      },
+      {
+        "from": "no-project-crumb",
+        "to": "derived-title-attachments",
+        "type": "blocks"
+      },
+      {
+        "from": "linked-row-title",
+        "to": "preview-popover-escape",
+        "type": "blocks"
+      },
+      {
+        "from": "no-project-crumb",
+        "to": "settings-header-wrap",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
