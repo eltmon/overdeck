@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4841",
   "created": "2026-11-04T10:01:07.580Z",
-  "updated": "2026-11-04T17:32:59.960Z",
+  "updated": "2026-11-04T17:33:12.276Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -162,6 +162,10 @@
     "rel-ios-privacy-manifest.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T17:32:59.960Z"
+    },
+    "rel-ios-privacy-manifest.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:33:12.275Z"
     }
   }
 }
