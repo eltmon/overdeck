@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5046",
   "created": "2026-11-04T18:10:57.891Z",
-  "updated": "2026-11-04T18:22:58.467Z",
+  "updated": "2026-11-04T18:23:04.540Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-5046",
       "claimedAt": "2026-11-04T18:16:07.087Z",
       "doneAt": "2026-11-04T18:22:58.466Z"
+    },
+    "server-ice-restart-answer": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5046",
+      "claimedAt": "2026-11-04T18:23:04.540Z"
     }
   }
 }
