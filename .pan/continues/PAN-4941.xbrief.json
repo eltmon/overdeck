@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4941",
   "created": "2026-11-04T02:31:39.368Z",
-  "updated": "2026-11-04T03:22:37.107Z",
+  "updated": "2026-11-04T03:22:55.109Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -98,6 +98,10 @@
     "self-routes.ac5": {
       "status": "completed",
       "doneAt": "2026-11-04T03:22:37.107Z"
+    },
+    "operator-routes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:22:55.109Z"
     }
   }
 }
