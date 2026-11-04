@@ -113,7 +113,7 @@ export function buildConflictRepairPrompt(input: {
     `2. Read what main changed and what ${issueId} intended; resolve every conflict so both intents survive.`,
     '3. Generated files: do not hand-merge conflict markers.',
     "   - scripts/file-size-allowlist.txt: take main's rows and keep only rows this branch already had on main or legitimately added; never raise a cap (the pre-push guard refuses agent raises). If a file is over its cap, shrink the file.",
-    "   - .overdeck/context/codebase/*.md: keep both sides' statements and refresh the `<!-- last-verified: -->` date.",
+    "   - .overdeck/context/codebase/*.md: keep both sides' statements. On a conflicting `<!-- last-verified: YYYY-MM-DD -->` line, keep one line with the later date only, never issue ids.",
     "   - bun.lock: take main's version, then run `bun install`.",
     '   - Slash-command manifest: run `npm run generate:slash-commands`.',
     '   - .pan/continues and .pan/specs: pan sync-main already prefers main.',
