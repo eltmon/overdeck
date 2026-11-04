@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-04T07:21:40.956916Z · model: claude-opus-5-5 · open: 871_
+_Last sequenced: 2026-11-04T07:33:40.430086Z · model: claude-opus-5-5 · open: 870_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -869,7 +869,6 @@ _Last sequenced: 2026-11-04T07:21:40.956916Z · model: claude-opus-5-5 · open: 
 | 881 | PAN-4851 | S | low | needs-refinement |  |  | Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them |
 | 882 | PAN-4887 | M | medium | ok |  |  | Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); PAN-4835 merged. |
 | 885 | PAN-4958 | S | low | ok |  |  | Docs for agent MCP and bot plugins; no hard deps but best written once Part A and B surfaces have landed. |
-| 902 | PAN-4951 | M | medium | ok |  |  | "Connect a bot" flow in Settings > Anywhere for pairing outside bots. |
 | 904 | PAN-4953 | M | medium | ok |  | PAN-4950 | integrations/hermes/: Hermes plugin with its own revocable scoped token. |
 | 905 | PAN-4954 | M | medium | ok |  | PAN-4950 | integrations/openclaw/: OpenClaw plugin with its own revocable scoped token. |
 | 906 | PAN-4955 | S | medium | ok |  | PAN-4950 | integrations/grok-build/: Grok Build plugin with its own revocable scoped token. |
@@ -1206,10 +1205,10 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-04T07:21:40.956916Z",
+  "generatedAt": "2026-11-04T07:33:40.430086Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 871,
+  "openCount": 870,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -11963,19 +11962,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-4951",
-      "rank": 902,
-      "size": "M",
-      "importance": "medium",
-      "score": 40,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "\"Connect a bot\" flow in Settings > Anywhere for pairing outside bots.",
-      "rationale": "New child W-BOT1 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4953",
       "rank": 904,
       "size": "M",
@@ -13257,13 +13243,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     {
       "from": "PAN-4927",
       "to": "PAN-4950",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4927",
-      "to": "PAN-4951",
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
