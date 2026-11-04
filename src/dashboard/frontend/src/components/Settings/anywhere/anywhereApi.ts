@@ -274,3 +274,28 @@ export async function loadTriggers(): Promise<TriggersList> {
   if (!isOk(result)) throw new Error(apiError(result));
   return { ...result.body, triggers: result.body.triggers ?? [] };
 }
+
+export const ANYWHERE_PUBLIC_MCP_QUERY_KEY = ['anywhere-public-mcp'] as const;
+
+/** `GET /api/mcp/public` (PAN-4947): the switch, the Funnel commands and the public `/mcp` URL. */
+export interface PublicMcpStatus {
+  enabled: boolean;
+  funnelCommands: string[];
+  funnelOffCommands: string[];
+  mcpUrl: string | null;
+}
+
+/** Query function for `['anywhere-public-mcp']`, or a thrown error. */
+export async function loadPublicMcp(): Promise<PublicMcpStatus> {
+  const result = await readResult<PublicMcpStatus>(await fetch('/api/mcp/public'));
+  if (!isOk(result)) throw new Error(apiError(result));
+  return result.body;
+}
+
+export async function savePublicMcp(enabled: boolean): Promise<ApiResult<PublicMcpStatus>> {
+  return readResult(await fetch('/api/mcp/public', {
+    method: 'PUT',
+    headers: await dashboardMutationJsonHeaders(),
+    body: JSON.stringify({ enabled }),
+  }));
+}
