@@ -7,6 +7,17 @@
  * `(environmentId, relay)` and opens one more ordered `ovdl` data channel on it per dial. The first
  * channel exists before the offer so the SDP carries the SCTP section. A dial resolves with an
  * {@link RtcDuplexWeb} once its channel opens.
+ *
+ * Closing a peer connection ends every raw channel the dialer handed out on it (PAN-5046 FR-1):
+ * `RTCPeerConnection.close()` fires no `close` on its data channels, so without this an open stream
+ * or an in-flight handshake would hang until its own timeout.
+ *
+ * A connection that turns `disconnected` (a network change, a cell handover) is kept and reused. If it
+ * is still `disconnected` after {@link DISCONNECT_GRACE_MS}, the dialer sends one ICE-restart offer on
+ * the same session, so every open channel survives once the new path connects; if it is not
+ * connected {@link ICE_RESTART_TIMEOUT_MS} after that offer, the dialer closes it and the next dial
+ * sends a fresh offer (PAN-5046 FR-4). `onRecovered` reports a machine whose link came back: an ICE
+ * restart that connected, or a new connection after the previous one failed (FR-8).
  */
 import type { IceServer, SignalData } from '@overdeck/contracts';
 
@@ -15,6 +26,10 @@ import { RtcDuplexWeb } from './rtc-duplex-web.js';
 
 export const RTC_DATA_CHANNEL_LABEL = 'ovdl';
 export const DIAL_TIMEOUT_MS = 15_000;
+/** How long a connection may stay `disconnected` before the dialer restarts ICE on it. */
+export const DISCONNECT_GRACE_MS = 2_000;
+/** How long an ICE restart may take, from its offer, before the dialer closes the connection. */
+export const ICE_RESTART_TIMEOUT_MS = 10_000;
 
 /** What the dialer needs from the directory socket. */
 export type ClientSignaling = Pick<DirectoryWebClient, 'send' | 'on' | 'iceServers'>;
@@ -23,6 +38,24 @@ export interface MachineDialer {
   dialMachine(environmentId: string, opts: { relay: boolean; signal?: AbortSignal; timeoutMs?: number }): Promise<RtcDuplexWeb>;
   /** Close the peer connections to one machine, or all of them. */
   close(environmentId?: string): void;
+  /**
+   * Close the peer connection that carried `raw`, but only while it is still the current connection
+   * for its machine and route, so a late failure on an older connection never closes a newer one
+   * (PAN-5046 FR-3).
+   */
+  evict(raw: RtcDuplexWeb, reason: string): void;
+  /**
+   * Restart ICE on every open connection to one machine, whatever its state. Resolves once each is
+   * connected again and rejects when one closes instead. A connection whose restart is already in
+   * flight is not offered twice; the call waits on that restart.
+   */
+  restartIce(environmentId: string): Promise<void>;
+  /**
+   * Called with a machine's id when its link comes back: an ICE restart reached `connected`, or a new
+   * connection connected after the previous one for the same route closed for any reason other than
+   * {@link MachineDialer.close} (resume and teardown are not recoveries). Returns the unsubscriber.
+   */
+  onRecovered(listener: (environmentId: string) => void): () => void;
 }
 
 type Candidate = NonNullable<SignalData['candidate']>;
@@ -39,12 +72,20 @@ interface PeerEntry {
   readonly pendingLocal: Candidate[];
   /** Pending dials on this connection; each is told when the connection dies. */
   readonly waiters: Set<(error: Error) => void>;
+  /** Raw channels handed out on this connection and not yet closed; each ends when the connection closes. */
+  readonly duplexes: Set<RtcDuplexWeb>;
   readonly unsubscribe: Array<() => void>;
   remoteSet: boolean;
   localSent: boolean;
   closed: boolean;
   /** A data channel on this connection has opened at least once. */
   everOpen: boolean;
+  /** Running from the first `disconnected` until the ICE restart starts. */
+  graceTimer: ReturnType<typeof setTimeout> | null;
+  /** Running from the ICE-restart offer until the connection is back. */
+  restartTimer: ReturnType<typeof setTimeout> | null;
+  /** The ICE restart in flight, if any. */
+  restart: { promise: Promise<void>; resolve: () => void; reject: (error: Error) => void } | null;
 }
 
 function entryKey(environmentId: string, relay: boolean): string {
@@ -72,17 +113,34 @@ function toRtcIceServers(servers: readonly IceServer[]): RTCIceServer[] {
 
 export function createMachineDialer(
   directory: ClientSignaling,
-  deps: { RTCPeerConnection?: typeof RTCPeerConnection } = {},
+  deps: { RTCPeerConnection?: typeof RTCPeerConnection; log?: (message: string) => void } = {},
 ): MachineDialer {
   const PeerConnection = deps.RTCPeerConnection ?? globalThis.RTCPeerConnection;
+  const log = deps.log ?? ((message: string) => console.warn(`[overdeck] ${message}`));
   const byKey = new Map<string, PeerEntry>();
+  /** The peer connection each handed-out raw channel runs on. */
+  const owners = new WeakMap<RtcDuplexWeb, PeerEntry>();
+  /** Keys whose current connection closed by failure; the next connection there to connect is a recovery. */
+  const lost = new Set<string>();
+  const recoveredListeners = new Set<(environmentId: string) => void>();
+
+  function notifyRecovered(environmentId: string): void {
+    for (const listener of [...recoveredListeners]) listener(environmentId);
+  }
   /** Peer connections being created, so concurrent dials to one machine share one connection. */
   const creating = new Map<string, Promise<{ entry: PeerEntry; channel: RTCDataChannel }>>();
 
   function closeEntry(entry: PeerEntry, error: Error): void {
     if (entry.closed) return;
     entry.closed = true;
-    if (byKey.get(entry.key) === entry) byKey.delete(entry.key);
+    log(`rtc ${entry.peer.slice(0, 8)} closing session ${entry.session.slice(0, 8)}: ${error.message}`);
+    clearTimers(entry);
+    entry.restart?.reject(error);
+    entry.restart = null;
+    if (byKey.get(entry.key) === entry) {
+      byKey.delete(entry.key);
+      lost.add(entry.key);
+    }
     for (const off of entry.unsubscribe.splice(0)) off();
     try {
       entry.pc.close();
@@ -90,6 +148,77 @@ export function createMachineDialer(
       // Already closed.
     }
     for (const waiter of [...entry.waiters]) waiter(error);
+    for (const duplex of [...entry.duplexes]) {
+      // With an error, so a handshake reading it fails at once; a channel nobody watches for errors just
+      // closes, since an error event without a listener would be thrown.
+      duplex.destroy(duplex.listenerCount('error') > 0 ? new Error(`direct connection closed: ${error.message}`) : undefined);
+    }
+    entry.duplexes.clear();
+  }
+
+  function clearTimers(entry: PeerEntry): void {
+    if (entry.graceTimer) clearTimeout(entry.graceTimer);
+    if (entry.restartTimer) clearTimeout(entry.restartTimer);
+    entry.graceTimer = null;
+    entry.restartTimer = null;
+  }
+
+  /**
+   * Start an ICE restart on `entry`, or join the one in flight. While the first offer is still
+   * unanswered nothing is sent; the restart counts as done once that negotiation connects.
+   */
+  function restart(entry: PeerEntry): Promise<void> {
+    if (entry.closed) return Promise.reject(new Error('direct connection closed'));
+    if (entry.restart) return entry.restart.promise;
+    if (entry.graceTimer) clearTimeout(entry.graceTimer);
+    entry.graceTimer = null;
+    let resolve!: () => void;
+    let reject!: (error: Error) => void;
+    const promise = new Promise<void>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    // The grace timer starts restarts nobody awaits; a failure there is already logged by closeEntry.
+    promise.catch(() => {});
+    entry.restart = { promise, resolve, reject };
+    if (entry.pc.signalingState === 'stable') void sendRestartOffer(entry);
+    return promise;
+  }
+
+  async function sendRestartOffer(entry: PeerEntry): Promise<void> {
+    // Hold both sides' candidates of the new ICE generation until the new descriptions are in place:
+    // ours until the offer is out, the machine's until its answer is applied.
+    entry.remoteSet = false;
+    entry.localSent = false;
+    try {
+      const offer = await entry.pc.createOffer({ iceRestart: true });
+      await entry.pc.setLocalDescription(offer);
+      if (entry.closed) return;
+      send(entry, { sdp: { type: 'offer', sdp: entry.pc.localDescription?.sdp ?? offer.sdp ?? '' } });
+    } catch (error) {
+      closeEntry(entry, error instanceof Error ? error : new Error(String(error)));
+      return;
+    }
+    entry.localSent = true;
+    for (const candidate of entry.pendingLocal.splice(0)) send(entry, { candidate });
+    log(`rtc ${entry.peer.slice(0, 8)} ice restart sent`);
+    entry.restartTimer = setTimeout(() => {
+      entry.restartTimer = null;
+      log(`rtc ${entry.peer.slice(0, 8)} ice restart timed out; closing`);
+      closeEntry(entry, new Error('ice restart timed out'));
+    }, ICE_RESTART_TIMEOUT_MS);
+  }
+
+  /** An ICE restart is done once its answer is applied and the connection is connected. */
+  function settleRestart(entry: PeerEntry): void {
+    const restarting = entry.restart;
+    if (!restarting || entry.pc.signalingState !== 'stable' || entry.pc.connectionState !== 'connected') return;
+    if (entry.restartTimer) clearTimeout(entry.restartTimer);
+    entry.restartTimer = null;
+    entry.restart = null;
+    log(`rtc ${entry.peer.slice(0, 8)} ice restart recovered`);
+    restarting.resolve();
+    notifyRecovered(entry.peer);
   }
 
   function send(entry: PeerEntry, data: SignalData): void {
@@ -114,10 +243,12 @@ export function createMachineDialer(
 
   async function onSignal(entry: PeerEntry, data: SignalData): Promise<void> {
     try {
-      if (data.sdp?.type === 'answer' && !entry.remoteSet) {
+      // The first answer and each ICE-restart answer; a repeated or stray answer is ignored.
+      if (data.sdp?.type === 'answer' && entry.pc.signalingState === 'have-local-offer') {
         await entry.pc.setRemoteDescription({ type: 'answer', sdp: data.sdp.sdp });
         entry.remoteSet = true;
         for (const candidate of entry.pendingRemote.splice(0)) await addRemoteCandidate(entry, candidate);
+        settleRestart(entry);
       }
       if (data.candidate) await addRemoteCandidate(entry, data.candidate);
     } catch (error) {
@@ -135,11 +266,15 @@ export function createMachineDialer(
       pendingRemote: [],
       pendingLocal: [],
       waiters: new Set(),
+      duplexes: new Set(),
       unsubscribe: [],
       remoteSet: false,
       localSent: false,
       closed: false,
       everOpen: false,
+      graceTimer: null,
+      restartTimer: null,
+      restart: null,
     };
     byKey.set(key, entry);
     entry.unsubscribe.push(
@@ -164,7 +299,22 @@ export function createMachineDialer(
     });
     pc.addEventListener('connectionstatechange', () => {
       const state = pc.connectionState;
-      if (state === 'failed' || state === 'closed') closeEntry(entry, new Error(`direct connection ${state}`));
+      if (entry.closed) return;
+      if (state === 'failed' || state === 'closed') {
+        closeEntry(entry, new Error(`direct connection ${state}`));
+      } else if (state === 'disconnected') {
+        if (entry.graceTimer || entry.restart) return;
+        log(`rtc ${entry.peer.slice(0, 8)} disconnected; ice restart in ${DISCONNECT_GRACE_MS} ms`);
+        entry.graceTimer = setTimeout(() => {
+          entry.graceTimer = null;
+          if (!entry.closed && pc.connectionState === 'disconnected') void restart(entry);
+        }, DISCONNECT_GRACE_MS);
+      } else if (state === 'connected') {
+        if (entry.graceTimer) clearTimeout(entry.graceTimer);
+        entry.graceTimer = null;
+        if (lost.delete(entry.key)) notifyRecovered(entry.peer);
+        settleRestart(entry);
+      }
     });
     // The machine never opens a channel toward the phone.
     pc.addEventListener('datachannel', (event: RTCDataChannelEvent) => event.channel.close());
@@ -213,7 +363,11 @@ export function createMachineDialer(
           return;
         }
         entry.everOpen = true;
-        resolve(new RtcDuplexWeb(channel, entry.peer));
+        const duplex = new RtcDuplexWeb(channel, entry.peer);
+        entry.duplexes.add(duplex);
+        owners.set(duplex, entry);
+        duplex.once('close', () => entry.duplexes.delete(duplex));
+        resolve(duplex);
       };
       const onOpen = (): void => finish(null);
       const onClose = (): void => finish(new Error('data channel closed before it opened'));
@@ -233,7 +387,8 @@ export function createMachineDialer(
     if (signal.aborted) throw signal.reason instanceof Error ? signal.reason : abortError();
     const key = entryKey(environmentId, relay);
     let entry = byKey.get(key);
-    if (entry && (entry.closed || ['failed', 'closed', 'disconnected'].includes(entry.pc.connectionState))) {
+    // A `disconnected` connection is kept: ICE often recovers, and the dialer restarts it if not.
+    if (entry && (entry.closed || ['failed', 'closed'].includes(entry.pc.connectionState))) {
       closeEntry(entry, new Error(`direct connection ${entry.pc.connectionState}`));
       entry = undefined;
     }
@@ -279,6 +434,21 @@ export function createMachineDialer(
       for (const entry of [...byKey.values()]) {
         if (environmentId === undefined || entry.peer === environmentId) closeEntry(entry, new Error('dialer closed'));
       }
+      // A closed dialer starts over: the next connection is not a recovery.
+      for (const key of [...lost]) {
+        if (environmentId === undefined || key.startsWith(`${environmentId}|`)) lost.delete(key);
+      }
+    },
+    evict(raw, reason) {
+      const owner = owners.get(raw);
+      if (owner && !owner.closed && byKey.get(owner.key) === owner) closeEntry(owner, new Error(reason));
+    },
+    async restartIce(environmentId) {
+      await Promise.all([...byKey.values()].filter((entry) => entry.peer === environmentId).map(restart));
+    },
+    onRecovered(listener) {
+      recoveredListeners.add(listener);
+      return () => recoveredListeners.delete(listener);
     },
   };
 }

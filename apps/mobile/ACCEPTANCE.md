@@ -562,3 +562,71 @@ as **machine view not reachable** below.
 
 `git diff --stat origin/main -- apps/mobile/ios/App/OverdeckWidgets apps/mobile/ios/App/NotificationService`
 is empty — Live Activity and notifications are unchanged by this issue.
+
+## PAN-5046 network change
+
+**Device run not done yet; it is the one open verification step for
+[PAN-5046](https://github.com/eltmon/overdeck/issues/5046).** The plan's fallback applies: the
+evidence below is the automated two-restart reproduction. The Mac rig answered over SSH on
+2026-11-04, but the run was not started, for three reasons:
+
+- The dashboard under test must be a linked machine running this branch's server (the ICE-restart
+  answer, FR-6). The home dashboard runs `main` until this branch merges and `pan reload` ships it,
+  so a run before the merge only shows the old server dropping the restart offer.
+- The rig's only network service is Wi-Fi. Toggling it twice cuts the SSH session that drives the
+  run and the network of the other Simulators booted on the shared rig.
+- The Simulator app must be signed in to the account and paired to that machine.
+
+### Before (PRD Finding 1, home dashboard log, 2026-11-04 ~17:45Z)
+
+27 replacements for the phone in a few minutes, every offer `(link, direct)`:
+
+```
+rtc closing session <s> for 933e853d: a new offer replaced it    (×27)
+rtc session <s> 933e853d failed                                  (×3)
+```
+
+### Automated reproduction (WI-7)
+
+`npx vitest run tests/integration/anywhere/phone-ice-restart.test.ts`: the phone's real dialer on
+werift peer connections against the machine's real `RtcTransport` and channel listener, one secure
+channel serving an HTTP request before and after each of two `restartIce` calls.
+
+```
+✓ keeps one secure channel serving requests across two ICE restarts on the same session 2343ms
+✓ evicting a raw channel from a closed connection sends no new offer 428ms
+Tests  2 passed (2)
+```
+
+Machine lines (one session throughout; 2 × `ice restart from`, 0 × `a new offer replaced it`):
+
+```
+rtc offer from 00000000 session ebabca4b (link, direct)
+rtc session ebabca4b answered
+rtc session ebabca4b 00000000 connected
+rtc session ebabca4b ice restart from 00000000
+rtc session ebabca4b answered
+rtc session ebabca4b ice restart from 00000000
+rtc session ebabca4b answered
+```
+
+Phone lines:
+
+```
+rtc 00000000 ice restart sent
+rtc 00000000 ice restart recovered
+rtc 00000000 ice restart sent
+rtc 00000000 ice restart recovered
+```
+
+### Device steps after the merge
+
+1. After `pan reload` ships this branch to the home dashboard, build the web bundle and the iOS app
+   from `main` on the rig and launch it in a Simulator of its own, capturing `[overdeck]` lines
+   (README step 6: `SIMCTL_CHILD_NSUnbufferedIO=YES xcrun simctl launch … --stdout=$HOME/app-stdout.log`).
+2. Open a conversation on the home machine. Cause two network changes 20 s apart (toggle the rig's
+   Wi-Fi off and on from a detached script, or use the operator's iPhone on 5G and Wi-Fi). Type a
+   message during the second change.
+3. Record here: the phone's `ice restart sent` / `ice restart recovered` lines, the dashboard's
+   `ice restart from` lines and the count of `a new offer replaced it` for the phone (expected 0),
+   and whether the typed message sent within 15 s of `ice restart recovered`.

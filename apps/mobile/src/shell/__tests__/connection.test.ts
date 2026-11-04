@@ -1,6 +1,16 @@
 import { EventEmitter } from 'node:events';
 
-import { ChannelOpenError, type ChannelOpenErrorCode, type DirectoryWebState, type MachineDialer, type RtcDuplexWeb } from '@overdeck/anywhere-channel/web';
+import {
+  ChannelOpenError,
+  type ChannelOpenErrorCode,
+  type ClientSignaling,
+  createMachineDialer,
+  type DirectoryWebClient,
+  type DirectoryWebState,
+  type MachineDialer,
+  type RtcDuplexWeb,
+  type SecureChannel,
+} from '@overdeck/anywhere-channel/web';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MIN_PAN_VERSION } from '../config';
@@ -34,6 +44,9 @@ function fakeDirectory(opts: { relayAllowed: boolean; online?: boolean; direct: 
       return raw as unknown as RtcDuplexWeb;
     }),
     close: vi.fn(),
+    evict: vi.fn(),
+    restartIce: vi.fn(async () => {}),
+    onRecovered: vi.fn(() => () => {}),
   };
   const stateListeners = new Set<(state: DirectoryWebState) => void>();
   const client = {
@@ -291,11 +304,12 @@ describe('debug error codes and eviction (PAN-5018 FR-2, FR-3)', () => {
     expect(error.message).toBe('Could not open a secure channel to desk.');
   });
 
-  it("closes the machine's peer connections after a handshake timeout", async () => {
+  it('closes the peer connection under the channel after a handshake timeout', async () => {
     const f = fakeDirectory({ relayAllowed: true, direct: 'fail', relay: 'ok' });
     const connection = createConnection({ directory: f.directory, meter, openSecureChannel: failingOpen('timeout'), log: vi.fn() });
     await rejection(connection.openLink(MACHINE));
-    expect(f.dialer.close).toHaveBeenCalledWith(MACHINE.environmentId);
+    expect(f.dialer.evict).toHaveBeenCalledWith(f.raws[0], 'secure open timeout');
+    expect(f.dialer.close).not.toHaveBeenCalled();
     expect(f.dials.map((d) => d.relay)).toEqual([false, true]);
     await connection.dialRaw(MACHINE.environmentId, 'desk');
     expect(f.dials.map((d) => d.relay)).toEqual([false, true, false, true]);
@@ -306,7 +320,7 @@ describe('debug error codes and eviction (PAN-5018 FR-2, FR-3)', () => {
     const connection = createConnection({ directory: f.directory, meter, openSecureChannel: failingOpen('protocol'), log: vi.fn() });
     const localKey = { publicKey: new Uint8Array(32), secretKey: new Uint8Array(32) };
     await rejection(connection.openPairing(MACHINE.environmentId, 'desk', 'odp_test', localKey));
-    expect(f.dialer.close).toHaveBeenCalledWith(MACHINE.environmentId);
+    expect(f.dialer.evict).toHaveBeenCalledWith(f.raws[0], 'secure open protocol');
   });
 
   it.each<ChannelOpenErrorCode>(['unknown-peer', 'pairing-refused', 'identity-refused', 'unsupported', 'busy'])(
@@ -315,7 +329,81 @@ describe('debug error codes and eviction (PAN-5018 FR-2, FR-3)', () => {
       const f = fakeDirectory({ relayAllowed: false, direct: 'ok' });
       const connection = createConnection({ directory: f.directory, meter, openSecureChannel: failingOpen(code), log: vi.fn() });
       await rejection(connection.openLink(MACHINE));
+      expect(f.dialer.evict).not.toHaveBeenCalled();
       expect(f.dialer.close).not.toHaveBeenCalled();
     },
   );
+});
+
+/** A data channel that opens on the next microtask. */
+class OpeningChannel extends EventTarget {
+  readyState: RTCDataChannelState = 'connecting';
+  binaryType: BinaryType = 'blob';
+  bufferedAmount = 0;
+  bufferedAmountLowThreshold = 0;
+  constructor() {
+    super();
+    queueMicrotask(() => {
+      this.readyState = 'open';
+      this.dispatchEvent(new Event('open'));
+    });
+  }
+  send(): void {}
+  close(): void {
+    this.readyState = 'closed';
+  }
+}
+
+class StubPeerConnection extends EventTarget {
+  static instances: StubPeerConnection[] = [];
+  connectionState: RTCPeerConnectionState = 'new';
+  localDescription: RTCSessionDescriptionInit | null = null;
+  closed = false;
+  constructor() {
+    super();
+    StubPeerConnection.instances.push(this);
+  }
+  createDataChannel(): OpeningChannel {
+    return new OpeningChannel();
+  }
+  async createOffer(): Promise<RTCSessionDescriptionInit> {
+    return { type: 'offer', sdp: 'v=0' };
+  }
+  async setLocalDescription(description: RTCSessionDescriptionInit): Promise<void> {
+    this.localDescription = description;
+  }
+  close(): void {
+    this.closed = true;
+    this.connectionState = 'closed';
+  }
+}
+
+describe('eviction against the real dialer (PAN-5046 FR-3)', () => {
+  it('a timeout on a raw channel from a replaced connection does not close the current one', async () => {
+    StubPeerConnection.instances = [];
+    const signaling = { send: () => true, on: () => () => {}, iceServers: async () => [] } as unknown as ClientSignaling;
+    const dialer = createMachineDialer(signaling, { RTCPeerConnection: StubPeerConnection as unknown as typeof RTCPeerConnection, log: () => {} });
+    const client = { state: 'online', relayAllowed: false, onStateChange: () => () => {} } as unknown as DirectoryWebClient;
+    let failStale: (error: Error) => void = () => {};
+    const open = vi.fn((raw: RtcDuplexWeb): Promise<SecureChannel> => {
+      // Closing a connection ends its raw channels with an error.
+      raw.on('error', () => {});
+      if (open.mock.calls.length === 1) return new Promise((_resolve, reject) => (failStale = reject));
+      return Promise.resolve({ stream: raw, channel: {} } as unknown as SecureChannel);
+    });
+    const connection = createConnection({ directory: { client, dialer, relayStopped: () => false }, meter, openSecureChannel: open, log: vi.fn() });
+
+    const stale = rejection(connection.openLink(MACHINE));
+    await vi.advanceTimersByTimeAsync(0);
+    // Resume closes the first connection while its handshake is still running.
+    connection.forgetRoutes();
+    await connection.openLink(MACHINE);
+    const [replaced, current] = StubPeerConnection.instances;
+    expect(replaced!.closed).toBe(true);
+
+    failStale(new ChannelOpenError('timeout', 'no handshake reply'));
+    await stale;
+    expect(current!.closed).toBe(false);
+    dialer.close();
+  });
 });

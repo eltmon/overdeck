@@ -361,6 +361,11 @@ connection change and each refused secure channel. For the full detail, set
 ICE candidates, every `signal` frame from the directory, and channels that closed or timed out
 during the handshake.
 
+A phone that changes network (Wi-Fi to cellular, or a cell handover) keeps its link: after 2
+seconds without a path it restarts ICE on the same connection, and the dashboard logs
+`rtc session <id> ice restart from <phone>` instead of replacing the session. Messages typed while
+the link was down show "Waiting to send" and send as soon as it recovers.
+
 ## Sharing conversations
 
 Once two machines are linked, each lists the other's conversations next to its own.
