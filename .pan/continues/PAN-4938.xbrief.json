@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4938",
   "created": "2026-11-04T03:39:16.629Z",
-  "updated": "2026-11-04T04:29:32.017Z",
+  "updated": "2026-11-04T04:29:48.939Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -110,6 +110,10 @@
     "extract-stand-in-wait.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T04:29:32.017Z"
+    },
+    "token-link-actor.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:29:48.939Z"
     }
   }
 }
