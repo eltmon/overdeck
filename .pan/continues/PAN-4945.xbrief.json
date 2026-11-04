@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4945",
   "created": "2026-11-04T01:22:40.341Z",
-  "updated": "2026-11-04T02:57:48.308Z",
+  "updated": "2026-11-04T02:58:05.763Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -254,6 +254,10 @@
     "mcp-challenge.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T02:57:48.308Z"
+    },
+    "mcp-challenge.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T02:58:05.763Z"
     }
   }
 }
