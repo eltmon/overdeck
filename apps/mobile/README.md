@@ -106,8 +106,12 @@ address comes from DHCP). The rig needs no bun or Node.
    notifications. Also, `simctl push` on Xcode 26.6 does not run the Notification Service
    Extension, so the banner shows the placeholder. Decryption is checked by `swift test` and on a
    device (`ACCEPTANCE.md`, "PAN-4838 iOS notifications").
-6. To read the app's link diagnostics (failed dials and secure opens, PAN-5018), run
-   `xcrun simctl spawn $U log show --last 5m --predicate 'eventMessage CONTAINS "[overdeck]"'`.
+6. To read the app's link diagnostics (failed dials and secure opens, PAN-5018), launch it with its
+   output in a file: `SIMCTL_CHILD_NSUnbufferedIO=YES xcrun simctl launch --terminate-running-process
+   --stdout=$HOME/app-stdout.log $U ai.overdeck.app`, then `grep '\[overdeck\]' ~/app-stdout.log`.
+   Capacitor prints the WebView's `console` lines (`⚡️  [warn] - [overdeck] link …`) to stdout, not to
+   the unified log, so `log show` does not have them. Without `NSUnbufferedIO` the file stays empty
+   until the buffer fills. Each launch truncates the file.
 7. When you are done, run `xcrun simctl delete $U`.
 
 `ios/scripts/add-widgets-target.rb` needs the `xcodeproj` gem 1.28 or later
