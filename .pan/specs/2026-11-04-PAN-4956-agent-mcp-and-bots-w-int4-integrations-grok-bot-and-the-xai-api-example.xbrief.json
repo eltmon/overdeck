@@ -4,17 +4,17 @@
     "created": "2026-11-04T08:55:54Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4956: Agent MCP and bots (W-INT4): integrations/grok-bot/ and the xAI API example",
-    "updated": "2026-11-04T08:59:11.992Z"
+    "updated": "2026-11-04T09:00:13.386Z"
   },
   "plan": {
     "id": "pan-4956",
     "title": "Agent MCP and bots (W-INT4): integrations/grok-bot/ and the xAI API example",
-    "status": "proposed",
+    "status": "running",
     "uid": "a441facd-6d18-4b45-8c58-442c0f1e62cb",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-04T08:55:54Z",
-    "updated": "2026-11-04T08:59:11.992Z",
+    "updated": "2026-11-04T09:00:13.386Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4956",
@@ -534,5 +534,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
