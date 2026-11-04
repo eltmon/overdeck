@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4938",
   "created": "2026-11-04T03:39:16.629Z",
-  "updated": "2026-11-04T04:40:40.808Z",
+  "updated": "2026-11-04T04:40:59.011Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -266,6 +266,10 @@
     "lane-report.ac4": {
       "status": "completed",
       "doneAt": "2026-11-04T04:40:40.808Z"
+    },
+    "docs-delegation.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:40:59.011Z"
     }
   }
 }
