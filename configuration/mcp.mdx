@@ -57,9 +57,35 @@ agent tokens.
 | Tool | What it does | Scope the token needs |
 | --- | --- | --- |
 | `wait_job` | Waits up to 50 s for a job another tool started. Answers `done` with the exit code and output, or `running` with `next`, the call to make again. Never poll or sleep; jobs are forgotten when the dashboard restarts. | `read:state` (agent tokens only) |
+| `request_secret` | Asks the operator for a secret, such as an API key, by an environment-variable-style `name` and a short `prompt`; answers a `requestId` and `next`, the `secret_wait` call to make. | `tell` (agent tokens only) |
+| `secret_wait` | Waits up to 50 s for the operator's answer. Answers `pending` with `next`, `delivered` with `file` (the path of the secret, never the value), `declined` or `expired`. | `read:state` (agent tokens only) |
 
 Agent-only tools call routes under `/api/self/`, which refuse any token that
 is not an agent token.
+
+### Secrets
+
+An agent that needs an API key or a password calls `request_secret` instead
+of asking in chat, so the value never enters its transcript.
+
+- The request appears as a **Secret requested** card in the Decisions panel.
+  Only this machine's own dashboard, opened in a browser on this machine, can
+  answer it. A phone, a paired device or another machine's browser shows
+  "Answer this on <machine>'s own dashboard".
+- The operator types the value into the masked input and chooses **Send**, or
+  chooses **Decline**.
+- The value lands in a file: `~/.overdeck/agents/<agentId>/secrets/<NAME>` for
+  an agent, or `~/.overdeck/conversations/<tmux session>/secrets/<NAME>` for a
+  conversation. The file has mode 0600 in a directory with mode 0700.
+- The `secrets/` directory is deleted when the agent stops, is killed, exits
+  or is closed out.
+- A request expires after 10 minutes by default (`timeoutMs` allows 1 to 60
+  minutes). A dashboard restart forgets every pending request, and the agent
+  must call `request_secret` again.
+- The value never appears in a tool result, the transcript, the activity feed
+  or the dashboard log. The agent reads the file straight into the program
+  that needs it, for example `KEY="$(cat <file>)" some-command`, and never
+  prints it.
 
 A tool the token's scopes hide answers `Unknown tool <name>`. A route can
 still refuse a listed tool, for example a linked machine's ceiling, with
@@ -156,8 +182,8 @@ The dashboard must be running: each tool calls it.
 
 ## Agents get these tools
 
-Every Claude Code agent that Overdeck launches on this machine starts with the
-`overdeck` server: work agents, role runs (plan, review, test, ship, worker and
+Every Claude Code, Kimi Code ACP (`acp`) and OpenCode (`opencode`) agent that
+Overdeck launches on this machine starts with the `overdeck` server: work agents, role runs (plan, review, test, ship, worker and
 the others), planning sessions and conversations. You do not create a token for
 them.
 
@@ -170,6 +196,11 @@ launcher script holds the token. The launcher passes
 `--allowedTools=mcp__overdeck`, so a tool call does not stop at a permission
 prompt. Roles with a `tools:` list (review, test) get `mcp__overdeck` in that
 list instead.
+
+An ACP agent gets the same `overdeck-mcp.json`. The launcher passes
+`--mcp-config <file>` to the ACP host, which sends the server to the agent in
+`session/new` and `session/load`. The ACP host approves the agent's permission
+requests itself, so no allow-list is needed.
 
 The token's scopes follow the agent's role:
 
@@ -193,7 +224,7 @@ mcp:
 
 These launches get no server: Docker workspaces (`OVERDECK_DOCKER_WORKSPACE=1`
 or `PAN_DOCKER=1`), bare conversations, Fly machines, and harnesses other than
-Claude Code (Codex and the ACP harnesses follow). When the token cannot be
+Claude Code, `acp` and `opencode` (Codex follows). When the token cannot be
 minted or the config cannot be written, the agent starts without the server and
 the log shows one `[agent-injection] overdeck MCP skipped for <id>: <reason>`
 warning. The agent can still reach Overdeck through `pan`.

@@ -4,14 +4,16 @@ import { createElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { useDashboardStore } from '../store';
-import { isBlockingDecision, useDecisions } from '../useDecisions';
+import { describePendingInput } from '../pendingInput';
+import { type AgentRequestRow, isBlockingDecision, useDecisions } from '../useDecisions';
 
-function renderDecisions(convRows: unknown[] = []) {
+function renderDecisions(convRows: unknown[] = [], agentRequestRows: AgentRequestRow[] = []) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
   });
   queryClient.setQueryData(['conv-ask-user-question'], convRows);
   queryClient.setQueryData(['fleet-needs-you'], []); // PAN-4651: no linked machines
+  queryClient.setQueryData(['agent-requests'], agentRequestRows); // PAN-4941
 
   return renderHook(() => useDecisions(), {
     wrapper: ({ children }: { children: ReactNode }) =>
@@ -117,7 +119,54 @@ describe('useDecisions held kickoff (PAN-4596)', () => {
   });
 });
 
+describe('useDecisions secret requests (PAN-4941)', () => {
+  const secretRow: AgentRequestRow = {
+    id: '0123456789abcdef0123456789abcdef',
+    kind: 'secret',
+    agentId: 'agent-pan-1',
+    agentKind: 'agent',
+    label: 'agent-pan-1 · PAN-1',
+    name: 'OPENAI_API_KEY',
+    prompt: 'The key for the eval run',
+    createdAt: '2026-11-04T00:00:00.000Z',
+    expiresAt: '2026-11-04T00:10:00.000Z',
+  };
+
+  it('maps a secret row to a blocking secretRequest decision keyed by the request id', () => {
+    const { result } = renderDecisions([], [secretRow]);
+    expect(result.current).toEqual([{
+      id: secretRow.id,
+      source: 'agent',
+      label: 'agent-pan-1 · PAN-1',
+      kinds: ['secretRequest'],
+      since: '2026-11-04T00:00:00.000Z',
+      blocking: true,
+      agentRequest: {
+        id: secretRow.id,
+        kind: 'secret',
+        name: 'OPENAI_API_KEY',
+        prompt: 'The key for the eval run',
+        agentId: 'agent-pan-1',
+        expiresAt: '2026-11-04T00:10:00.000Z',
+      },
+    }]);
+  });
+
+  it('gives a conversation requester the conversation source', () => {
+    const { result } = renderDecisions([], [{ ...secretRow, agentId: 'abc', agentKind: 'conversation', label: 'abc' }]);
+    expect(result.current[0]).toMatchObject({ source: 'conversation', label: 'abc', agentRequest: { agentId: 'abc' } });
+  });
+
+  it('labels the kind "Secret requested"', () => {
+    expect(describePendingInput(['secretRequest'])).toBe('Secret requested');
+  });
+});
+
 describe('isBlockingDecision', () => {
+  it('treats a secret request as blocking — the agent is parked in secret_wait', () => {
+    expect(isBlockingDecision(['secretRequest'])).toBe(true);
+  });
+
   it('treats a waiting question as blocking — the agent has stopped', () => {
     expect(isBlockingDecision(['askUserQuestion'])).toBe(true);
   });
