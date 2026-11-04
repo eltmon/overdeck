@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4954",
   "created": "2026-11-04T14:48:01.762Z",
-  "updated": "2026-11-04T15:09:09.925Z",
+  "updated": "2026-11-04T15:09:23.533Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -94,6 +94,10 @@
     "config.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T15:09:09.925Z"
+    },
+    "config.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:09:23.533Z"
     }
   }
 }
