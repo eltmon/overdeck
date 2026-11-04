@@ -89,6 +89,7 @@ src/components/__tests__/DecisionsPanel.test.tsx
 src/components/__tests__/DegradedModeBanner.test.tsx
 src/components/__tests__/GitHubQuotaPill.test.tsx
 src/components/__tests__/GitHubRateLimitBanner.test.tsx
+src/components/__tests__/McpSignInCard.test.tsx
 src/components/__tests__/PanOpenInPicker.remote.test.tsx
 src/components/__tests__/Sidebar.workspacePullRequest.test.tsx
 src/components/__tests__/palette-anywhere-actions.test.ts
