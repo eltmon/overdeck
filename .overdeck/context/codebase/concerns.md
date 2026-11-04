@@ -738,7 +738,7 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   cannot unlock the login keychain for codesign; the upload uses the Xcode Apple ID session, not
   App Store Connect API keys. `connect.overdeck.ai/healthz` `apns:true`/`fcm:true` only means the
   secrets parse; a delivered push is the proof. Steps and store facts: `apps/mobile/RELEASE.md`.
-<!-- last-verified: 2026-11-04 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4930, PAN-4931, PAN-4932, PAN-4933, PAN-4934, PAN-4937, PAN-4938, PAN-4940, PAN-4943, PAN-4944, PAN-4945, PAN-4970, PAN-4482, PAN-4841) -->
+<!-- last-verified: 2026-11-04 -->
 
 - **Launch-context tools block keys on the MCP gate** (PAN-4935 planning) — the managed launch context ends with
   an "Overdeck tools" (MCP) or "Overdeck commands" (`pan`) block chosen by `overdeckMcpEnabledFor`, the same gate
@@ -776,5 +776,4 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   `done` is a finished turn with the harness alive, never an exit; only `exited` (or no pane) ends a session. Other
   code still treating `done` as not-live: PAN-4666 (Flywheel `paneIsLive`), PAN-5013 (derived issue state, parked
   route, read-model `activityForPaneState`).
-<!-- last-verified: 2026-11-04 -->
 <!-- last-verified: 2026-11-04 -->
