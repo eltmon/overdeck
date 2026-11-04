@@ -1,0 +1,1245 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T01:30:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4945: Agent MCP and bots (W-OAUTH1): OAuth 2.1 server for /mcp",
+    "updated": "2026-11-04T01:21:14.573Z"
+  },
+  "plan": {
+    "id": "pan-4945",
+    "title": "Agent MCP and bots (W-OAUTH1): OAuth 2.1 server for /mcp",
+    "status": "proposed",
+    "uid": "b83262e3-a865-46f3-a93a-ce5b05f78291",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-04T01:30:00Z",
+    "updated": "2026-11-04T01:21:14.573Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4945",
+        "label": "PAN-4945",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4927",
+        "label": "PAN-4927 (epic)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4945.md",
+        "label": "PRD",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/pan-4927.md",
+        "label": "Epic PRD (W-OAUTH1)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "mcp",
+      "oauth",
+      "auth",
+      "security",
+      "dashboard-server",
+      "cli"
+    ],
+    "narratives": {
+      "Problem": "Hosted MCP clients (Claude Desktop connectors, Grok Bot, the xAI API) cannot be handed a token file; they expect the MCP authorization flow (discover, register, authorize, token). Overdeck's /mcp accepts only hand-made access tokens, so these clients cannot connect at all.",
+      "Proposal": "Add an OAuth 2.1 authorization server for /mcp: RFC 9728 and RFC 8414 metadata, dynamic client registration, PKCE S256 authorize with an operator approval in the dashboard (approval code on the page and in the dashboard), a token endpoint issuing 30-day odk_ access tokens and rotating 90-day odr_ refresh tokens with reuse detection, revocation, root-only operator endpoints, a WWW-Authenticate challenge on the /mcp 401, and pan mcp oauth CLI verbs. Access tokens are ordinary kind:'token' registry records with oauthClientId, oauthFamilyId and expiresAt; families live in ~/.overdeck/mcp-oauth.json; approvals and codes live in memory. See .pan/drafts/PAN-4945.md.",
+      "NonGoals": "- No dashboard approval card or sign-in list UI (W-OAUTH2, PAN-4946)\n- No Tailscale Funnel access, public switch, rate limits or Funnel audit entries; Funnel requests to the new routes must still get 404 (W-FUN1, PAN-4947)\n- No change to remote-request-gate.ts or route-scopes.ts\n- No CORS headers on the OAuth endpoints\n- No socket close or revocation event when an OAuth token expires\n- No custom URI-scheme redirect URIs, confidential clients, client secrets, client_credentials or password grants\n- No OpenID Connect (openid-configuration, ID tokens)\n- No change to routes/access-tokens.ts or src/cli/commands/token.ts\n- No cli/mcp.mdx page (epic W-DOC)\n- No token, refresh token, code or state value in any log line, URL other than the registered redirect, or error body"
+    },
+    "metadata": {
+      "sizeJustification": "One OAuth 2.1 authorization server is one security protocol: discovery, registration, authorize, token and revocation are useless alone, and the epic already split everything separable (W-OAUTH2 UI, W-FUN1 Funnel). The plan touches exactly 25 files; the subsystem count (7) exceeds 6 only because the lint counts each top-level doc file (configuration/mcp.mdx, docs/DASHBOARD-AUTH.md) as its own subsystem.",
+      "prd": ".pan/drafts/PAN-4945.md",
+      "canonicalFilename": "2026-11-04-PAN-4945-agent-mcp-and-bots-w-oauth1-oauth-2-1-server-for-mcp.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Issuer is matched from the request Host / X-Forwarded-Host against getTrustedOrigins() (Funnel requests use triggerFunnelBaseUrl); the epic's fixed 127.0.0.1 loopback branch is dropped.",
+        "rationale": "The MCP SDK (client/auth.js:344-357, shared/auth-utils.js:23-43) throws unless the advertised resource has the origin the client called; trusted origins already include http://localhost:<port> and http://127.0.0.1:<port>, and an allowlist never trusts an arbitrary Host."
+      },
+      {
+        "summary": "state is optional at authorize; PKCE S256 is mandatory.",
+        "rationale": "The SDK sets state only when the provider supplies one (client/auth.js:732); OAuth 2.1 relies on PKCE for CSRF protection, so requiring state would break stock clients."
+      },
+      {
+        "summary": "requestedLevel is the lowest level named in scope (default read); unknown scope names are ignored.",
+        "rationale": "A stock SDK client requests every scopes_supported value (client/auth.js:229), and the requested level becomes the approval card's default (W-OAUTH2), so the least-privilege reading is the safe default; RFC 6749 lets a server ignore unknown scopes."
+      },
+      {
+        "summary": "Families keep up to 20 retired refresh hashes (priorRefreshHashes) and the current accessTokenId.",
+        "rationale": "The epic's single refreshHash cannot detect reuse after rotation; accessTokenId lets a refresh detect that the operator revoked the current access token through Settings or pan token revoke."
+      },
+      {
+        "summary": "Revoking an OAuth access token through Settings → Access Tokens or pan token revoke ends the sign-in at its next refresh (no change to routes/access-tokens.ts or token.ts).",
+        "rationale": "pan token revoke writes the registry directly, so only a check at refresh time covers every revoke path."
+      },
+      {
+        "summary": "Add pan mcp oauth pending, approve and deny beyond the epic's issue, list and revoke.",
+        "rationale": "The approval card is PAN-4946; without these verbs this slice's sign-in could be approved only with a hand-written curl and the internal token."
+      },
+      {
+        "summary": "Loopback http redirect URIs match at authorize with any port; the token endpoint compares redirect_uri exactly.",
+        "rationale": "RFC 8252 §7.3 and OAuth 2.1 §8.4.2 require port flexibility for native loopback clients; the token endpoint must repeat the exact URI used at authorize."
+      },
+      {
+        "summary": "client_name is optional and defaults to 'Unnamed MCP client'.",
+        "rationale": "RFC 7591 makes client_name optional; the name is self-declared and never trusted, so a default costs nothing."
+      },
+      {
+        "summary": "The authorize page CSP adds connect-src 'self', frame-ancestors 'none', base-uri 'none' and form-action 'none' to the epic's CSP.",
+        "rationale": "default-src 'none' alone blocks the page's own status poll; the other directives stop framing and form or base hijacking."
+      },
+      {
+        "summary": "Unused-client and ended-family pruning runs lazily on every store read and mutation; no new timer.",
+        "rationale": "The store is small and only the dashboard writes it; access-token pruning already rides the existing agent-token sweep."
+      },
+      {
+        "summary": "Capacity: 50 clients (evict the oldest client without a family, refuse only when all have one) and 20 pending approvals (drop the oldest).",
+        "rationale": "Refusing at capacity would let any LAN or Funnel peer lock out registration; eviction only touches registrations that never completed a sign-in."
+      },
+      {
+        "summary": "cli/mcp.mdx is left to the epic's W-DOC item; this issue documents the CLI in configuration/mcp.mdx.",
+        "rationale": "W-DOC creates cli/mcp.mdx together with the connector verbs; keeping two doc files keeps the plan inside the 25-file finalize limit."
+      }
+    ],
+    "items": [
+      {
+        "id": "oauth-records",
+        "title": "Add OAuth fields, expiry and prune to access-token records",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T01:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-4945",
+          "inspectionDepth": "deep",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "backend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "oauth-service-authorize",
+            "oauth-service-refresh",
+            "mcp-challenge",
+            "oauth-acceptance"
+          ],
+          "files_scope": [
+            "src/lib/access-token-records.ts",
+            "src/lib/access-tokens.ts",
+            "src/dashboard/server/routes/dashboard-auth.ts",
+            "tests/unit/lib/access-tokens-oauth.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/access-tokens-oauth.test.ts tests/unit/lib/access-tokens.test.ts tests/unit/lib/access-tokens-agent.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the three access-token test files report 0 failed",
+            "file-size guard reports no file over its cap"
+          ],
+          "traces": [
+            "FR-1",
+            "NFR-2",
+            "NFR-5",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Execute PRD .pan/drafts/PAN-4945.md WI-1 exactly. Add oauthClientId/oauthFamilyId/expiresAt (all-or-none, kind token only, never with agent fields) to src/lib/access-token-records.ts (OAUTH_CLIENT_ID, OAUTH_FAMILY_ID, oauthFieldsValid, isRecord). In src/lib/access-tokens.ts extend CreateAccessTokenInput/createAccessToken (refuse admin, forward, read:settings, read:costs, read:events with OAuth fields), add isLive(record, now) used by verifyAccessToken and listActiveRecordsOfKind only (readActiveAccessTokenRecord unchanged), and extend pruneEndedAccessTokens to OAuth records ended more than olderThanMs ago. Net growth of access-tokens.ts <= 35 lines. In src/dashboard/server/routes/dashboard-auth.ts the token credential gains oauthClientId. Tests fake only Date (vi.useFakeTimers({ toFake: ['Date'] }))."
+        },
+        "items": [
+          {
+            "id": "oauth-records.ac1",
+            "title": "Given an OAuth token record with expiresAt in the future, verifyAccessToken returns ok; when Date passes expiresAt it returns { ok: false } and listActiveRecordsOfKind('token') omits it, while readActiveAccessTokenRecord still returns it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "oauth-records.ac2",
+            "title": "createAccessToken rejects OAuth fields on kind device, partial OAuth fields, OAuth plus agent fields, and each of admin, forward, read:settings, read:costs, read:events",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "oauth-records.ac3",
+            "title": "A registry file holding a device record with oauthClientId is treated as corrupt: verifyAccessToken refuses every token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "oauth-records.ac4",
+            "title": "pruneEndedAccessTokens(7 days) deletes an OAuth record expired 8 days ago, preserves one expired 6 days ago, and preserves a plain token revoked 30 days ago",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "oauth-records.ac5",
+            "title": "resolveDashboardCredential with an OAuth Bearer token returns { kind: 'token', oauthClientId: <odc_ id> }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "oauth-flow",
+        "title": "Create the pure OAuth protocol helpers and authorize page renderer",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T01:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-4945",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "backend",
+          "requiresInspection": false,
+          "parallelSafeReason": "New pure module plus its own new test file; no other item writes either file.",
+          "files_scope": [
+            "src/lib/mcp/oauth-flow.ts",
+            "tests/unit/lib/mcp/oauth-flow.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/mcp/oauth-flow.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "oauth-flow.test.ts reports 0 failed"
+          ],
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-3",
+            "NFR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Execute PRD .pan/drafts/PAN-4945.md WI-2: create src/lib/mcp/oauth-flow.ts with exactly the exports listed there (levels D-3, registration rules D-4, redirect matching D-5a, authorize params D-5 step 2, PKCE S256, approval code format, resolveIssuer D-2, both metadata bodies, error bodies, escapeHtml, renderAuthorizePage/renderOAuthErrorPage/authorizePageCsp per D-11). The module is pure: no I/O, no clock, no randomness, no import from src/dashboard/."
+        },
+        "items": [
+          {
+            "id": "oauth-flow.ac1",
+            "title": "pkceS256Matches returns true for the RFC 7636 appendix B verifier/challenge pair and false when one character changes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "oauth-flow.ac2",
+            "title": "validateRegistration accepts https and http loopback (127.0.0.1, [::1], localhost) redirect URIs, rejects http://example.com, a fragment, 6 URIs and token_endpoint_auth_method client_secret_basic, and defaults a missing client_name to 'Unnamed MCP client'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "oauth-flow.ac3",
+            "title": "requestedLevelFromScope returns 'read' for 'read message operate approve' and for null, and 'operate' for 'operate approve'; validateAuthorizeParams accepts a request with no state and rejects code_challenge_method=plain",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "oauth-flow.ac4",
+            "title": "resolveIssuer returns the trusted origin whose host equals the Host header, falls back to X-Forwarded-Host, returns funnelBase for a Funnel request, and returns null for Host evil.example",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "oauth-flow.ac5",
+            "title": "renderAuthorizePage with clientName '<img src=x onerror=alert(1)>' contains '&lt;img' and no '<img', every script and style tag carries the nonce, and authorizePageCsp contains connect-src 'self' and frame-ancestors 'none'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "oauth-store",
+        "title": "Create the mcp-oauth.json store door",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T01:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-4945",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/mcp/oauth-store.ts",
+            "tests/unit/lib/mcp/oauth-store.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/mcp/oauth-store.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "oauth-store.test.ts reports 0 failed"
+          ],
+          "traces": [
+            "FR-3",
+            "FR-5",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Execute PRD .pan/drafts/PAN-4945.md WI-3: create src/lib/mcp/oauth-store.ts with the listed exports and the D-10 schema (clients, families with refreshHash, priorRefreshHashes, accessTokenId). Prune on every read and mutation against the caller's now; serialize mutations in one in-process queue; write 0600 by temp file plus rename (same shape as access-tokens.ts writeRegistry); a malformed file throws naming the path and is never rewritten."
+        },
+        "items": [
+          {
+            "id": "oauth-store.ac1",
+            "title": "mutateMcpOAuthData persists ~/.overdeck/mcp-oauth.json with mode 0600, and readMcpOAuthData returns { clients: [], families: [] } when the file is missing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "oauth-store.ac2",
+            "title": "pruneMcpOAuthData deletes a family revoked 8 days before now, preserves one revoked 6 days before now, deletes a client with no family created 25 h before now, and preserves one created 23 h before now",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "oauth-store.ac3",
+            "title": "A malformed store file makes readMcpOAuthData and mutateMcpOAuthData reject with the file path in the message and preserves the file bytes unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "oauth-store.ac4",
+            "title": "When two mutateMcpOAuthData calls each append a client concurrently, readMcpOAuthData then returns both clients",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "oauth-service-authorize",
+        "title": "Implement client registration, approvals and code exchange in the OAuth service",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T01:30:00Z",
+        "metadata": {
+          "difficulty": "expert",
+          "issueLabel": "pan-4945",
+          "inspectionDepth": "deep",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "backend",
+          "requiresInspection": true,
+          "parallelSafeReason": "Creates oauth-service.ts and its test; the two later service items that share those files are ordered after it by blocks edges.",
+          "foundationFor": [
+            "oauth-service-refresh",
+            "oauth-service-admin",
+            "routes-discovery-register",
+            "routes-authorize",
+            "routes-token-revoke",
+            "oauth-acceptance"
+          ],
+          "files_scope": [
+            "src/lib/mcp/oauth-service.ts",
+            "tests/unit/lib/mcp/oauth-service.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/mcp/oauth-service.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "oauth-service.test.ts reports 0 failed"
+          ],
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-1",
+            "NFR-3",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Execute PRD .pan/drafts/PAN-4945.md WI-4: create src/lib/mcp/oauth-service.ts with createMcpOAuthService(deps: now, randomBytes) and mcpOAuthService, implementing registerClient (D-4 incl. 50-client capacity with eviction of the oldest client without a family), authorize (D-5, D-6: in-memory approvals, 20 pending max, approval code), approvalStatus, listApprovals, decideApproval, exchangeCode (D-7: code consumed before checks, reused code revokes its family, mint access token then write family, revoke minted token if the family write fails). Never log a token."
+        },
+        "items": [
+          {
+            "id": "oauth-service-authorize.ac1",
+            "title": "Given register, authorize and approve at level operate, approvalStatus returns approved with a redirect carrying code and the original state, and exchangeCode returns tokens whose access token verifies with scopes read:state, read:conversations, tell, operate and an oauthClientId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "oauth-service-authorize.ac2",
+            "title": "exchangeCode rejects a wrong code_verifier with invalid_grant and then rejects the correct verifier for the same code with invalid_grant (the code is consumed)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "oauth-service-authorize.ac3",
+            "title": "exchangeCode rejects a code at now + 61 s with invalid_grant, and a second exchange of a used code returns invalid_grant and revokes the access token the first exchange produced",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "oauth-service-authorize.ac4",
+            "title": "authorize returns an error-page (no redirect) for an unknown client_id or an unregistered redirect_uri, and a redirect carrying error=invalid_request for code_challenge_method=plain",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "oauth-service-authorize.ac5",
+            "title": "approvalStatus returns expired at createdAt + 10 min + 1 s, decideApproval returns 409 for an already decided approval and 400 for approve without a level, and the 21st pending approval drops the oldest",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "oauth-service-refresh",
+        "title": "Implement refresh rotation, reuse detection and revocation in the OAuth service",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T01:30:00Z",
+        "metadata": {
+          "difficulty": "expert",
+          "issueLabel": "pan-4945",
+          "inspectionDepth": "deep",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "backend",
+          "requiresInspection": true,
+          "parallelSafeReason": "Shares oauth-service.ts only with the authorize and admin service items, which blocks edges order before and after it.",
+          "foundationFor": [
+            "routes-token-revoke",
+            "oauth-service-admin",
+            "oauth-acceptance"
+          ],
+          "files_scope": [
+            "src/lib/mcp/oauth-service.ts",
+            "tests/unit/lib/mcp/oauth-service.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/mcp/oauth-service.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "oauth-service.test.ts reports 0 failed"
+          ],
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Execute PRD .pan/drafts/PAN-4945.md WI-5 (D-8, D-9): add refresh, revokeToken and revokeFamily to the service, all run through one serialized queue. Rotation writes the new refresh hash, prepends the old one to priorRefreshHashes (max 20), sets accessTokenId, then revokes every other access record of the family. A retired refresh token revokes the family; a revoked current access record (outside revocation) revokes the family; a pruned (missing) current record does not."
+        },
+        "items": [
+          {
+            "id": "oauth-service-refresh.ac1",
+            "title": "refresh returns a new access token and a new refresh token; the previous access token then fails verifyAccessToken and the new one verifies",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "oauth-service-refresh.ac2",
+            "title": "When the first refresh token is presented again after rotation, refresh returns invalid_grant and afterwards both the newest access token and the newest refresh token are refused",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "oauth-service-refresh.ac3",
+            "title": "After revokeAccessToken(<current access token id>) the next refresh returns invalid_grant and the family is marked revoked; when the current access record is missing from the registry, refresh still succeeds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "oauth-service-refresh.ac4",
+            "title": "refresh with a different client_id returns invalid_grant and preserves the family; refresh at refreshExpiresAt + 1 ms returns invalid_grant",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "oauth-service-refresh.ac5",
+            "title": "Two concurrent refreshes with the same refresh token produce exactly one success and leave the family revoked; revokeToken resolves for 'garbage' and revokes the family for a Date-expired access token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "oauth-service-admin",
+        "title": "Add headless issue and the sign-in list to the OAuth service",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T01:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-4945",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/mcp/oauth-service.ts",
+            "tests/unit/lib/mcp/oauth-service.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/mcp/oauth-service.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "oauth-service.test.ts reports 0 failed"
+          ],
+          "traces": [
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Execute PRD .pan/drafts/PAN-4945.md WI-6: add issueHeadless(name, level) (headless client with redirectUris [], approved family at once, same mint as D-7.5) and listSignIns() (active families joined with listAccessTokens on accessTokenId, D-12 shape)."
+        },
+        "items": [
+          {
+            "id": "oauth-service-admin.ac1",
+            "title": "issueHeadless('xAI', 'message') returns tokens whose access token verifies with tell and without operate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "oauth-service-admin.ac2",
+            "title": "listSignIns returns that family with headless: true and clientName 'xAI', and omits it after revokeFamily",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "oauth-service-admin.ac3",
+            "title": "authorize with the headless client's id returns an error-page, and issueHeadless('', 'read') and issueHeadless('x', 'admin') return status 400",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "routes-discovery-register",
+        "title": "Serve OAuth discovery metadata and client registration routes",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T01:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-4945",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "api",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/routes/mcp-oauth.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/mcp-oauth.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/__tests__/mcp-oauth.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts src/dashboard/server/__tests__/route-scopes.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "mcp-oauth.test.ts, no-loss-matrix.test.ts and route-scopes.test.ts report 0 failed"
+          ],
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-7",
+            "NFR-8",
+            "NFR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Execute PRD .pan/drafts/PAN-4945.md WI-7: create src/dashboard/server/routes/mcp-oauth.ts with issuerFor(request), makeMcpOAuthRouteLayer({ service, issuerFor }) and mcpOAuthRouteLayer, serving GET /.well-known/oauth-protected-resource, GET /.well-known/oauth-protected-resource/mcp, GET /.well-known/oauth-authorization-server and POST /oauth/mcp/register (all Cache-Control: no-store; unknown issuer -> 400 'unknown host'). Register the layer in src/dashboard/server/server.ts right after mcpRouteLayer and before staticRouteLayer. Add one no-loss-matrix row per route after the DELETE /mcp row. No route-scopes.ts row."
+        },
+        "items": [
+          {
+            "id": "routes-discovery-register.ac1",
+            "title": "Given Host localhost:3011, GET /.well-known/oauth-authorization-server returns JSON with issuer http://localhost:3011 and token_endpoint http://localhost:3011/oauth/mcp/token, never the SPA stub body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routes-discovery-register.ac2",
+            "title": "GET /.well-known/oauth-protected-resource/mcp returns resource http://localhost:3011/mcp, and Host evil.example returns 400 with error 'unknown host'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routes-discovery-register.ac3",
+            "title": "POST /oauth/mcp/register with a loopback redirect URI returns 201 with an odc_ client_id, and a text/plain body returns 400",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routes-discovery-register.ac4",
+            "title": "A request carrying Tailscale-Funnel-Request to /.well-known/oauth-authorization-server returns 404 from the unchanged remote gate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "routes-authorize",
+        "title": "Serve the authorize page and its status route",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T01:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-4945",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "api",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/routes/mcp-oauth.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/mcp-oauth.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/__tests__/mcp-oauth.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "mcp-oauth.test.ts and no-loss-matrix.test.ts report 0 failed"
+          ],
+          "traces": [
+            "FR-4",
+            "NFR-3",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Execute PRD .pan/drafts/PAN-4945.md WI-8: add GET /oauth/mcp/authorize (page -> 200 HTML with a fresh nonce and the D-11 headers; error-page -> 400 HTML with no Location; redirect -> 302) and GET /oauth/mcp/authorize/status to routes/mcp-oauth.ts, plus two no-loss-matrix rows."
+        },
+        "items": [
+          {
+            "id": "routes-authorize.ac1",
+            "title": "GET /oauth/mcp/authorize for a registered client renders HTML that contains the approval code and returns a Content-Security-Policy header containing connect-src 'self', never the SPA stub",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routes-authorize.ac2",
+            "title": "An unregistered redirect_uri returns 400 HTML with no Location header, and code_challenge_method=plain redirects (302) to the registered URI with error=invalid_request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routes-authorize.ac3",
+            "title": "A client_name containing <script> renders escaped, and GET /oauth/mcp/authorize/status for an unknown request id returns { \"status\": \"expired\" }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "routes-token-revoke",
+        "title": "Serve the token and revocation routes",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T01:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-4945",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "api",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/routes/mcp-oauth.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/mcp-oauth.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/__tests__/mcp-oauth.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "mcp-oauth.test.ts and no-loss-matrix.test.ts report 0 failed"
+          ],
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Execute PRD .pan/drafts/PAN-4945.md WI-9: add POST /oauth/mcp/token (form body only; authorization_code -> exchangeCode, refresh_token -> refresh, else 400 unsupported_grant_type; Cache-Control: no-store and Pragma: no-cache) and POST /oauth/mcp/revoke (always 200 {}) to routes/mcp-oauth.ts, plus two no-loss-matrix rows."
+        },
+        "items": [
+          {
+            "id": "routes-token-revoke.ac1",
+            "title": "POST /oauth/mcp/token with a JSON body returns 400 invalid_request and grant_type=password returns 400 unsupported_grant_type",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routes-token-revoke.ac2",
+            "title": "An approved code with the right verifier returns 200 with token_type Bearer, expires_in 2592000 and Cache-Control no-store",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routes-token-revoke.ac3",
+            "title": "POST /oauth/mcp/revoke returns 200 for an unknown token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "routes-admin",
+        "title": "Serve the root-only MCP sign-in operator routes",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T01:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-4945",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "api",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/routes/mcp-oauth-admin.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/mcp-oauth-admin.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/__tests__/mcp-oauth-admin.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts src/dashboard/server/__tests__/route-scopes.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "mcp-oauth-admin.test.ts, no-loss-matrix.test.ts and route-scopes.test.ts report 0 failed"
+          ],
+          "traces": [
+            "FR-7",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Execute PRD .pan/drafts/PAN-4945.md WI-10: create src/dashboard/server/routes/mcp-oauth-admin.ts with the five D-12 routes (GET/POST approvals, GET/DELETE sign-ins, POST issue), each gated by rejectUnauthorizedDashboardRequest or rejectUnsafeDashboardMutationRequest and then a local root-credential check shaped like rejectNonRootCredential in routes/access-tokens.ts. Register it in server.ts after mcpOAuthRouteLayer; five no-loss-matrix rows; no route-scopes.ts row."
+        },
+        "items": [
+          {
+            "id": "routes-admin.ac1",
+            "title": "The remote gate rejects a kind token bearer with operate on GET /api/mcp-oauth/approvals with 403, and the handler rejects a device credential with admin with 403",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routes-admin.ac2",
+            "title": "With the internal token, GET /api/mcp-oauth/approvals returns a pending approval, POST approvals/:id with level message returns 200, and a second decision returns 409",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routes-admin.ac3",
+            "title": "POST /api/mcp-oauth/issue returns 201 with both tokens, GET sign-ins lists the family, DELETE sign-ins/:familyId returns 200 and a second DELETE returns 404",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mcp-challenge",
+        "title": "Send WWW-Authenticate with the resource metadata URL on the /mcp 401",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T01:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-4945",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "api",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/routes/mcp.ts",
+            "src/dashboard/server/__tests__/mcp-route.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/__tests__/mcp-route.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "mcp-route.test.ts reports 0 failed"
+          ],
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Execute PRD .pan/drafts/PAN-4945.md WI-11: replace the 401 line in src/dashboard/server/routes/mcp.ts with the block shown there, importing issuerFor from ./mcp-oauth.js; update the module header's check list."
+        },
+        "items": [
+          {
+            "id": "mcp-challenge.ac1",
+            "title": "When POST /mcp has no credential and Host localhost:3011, it returns 401 with WWW-Authenticate: Bearer resource_metadata=\"http://localhost:3011/.well-known/oauth-protected-resource/mcp\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-challenge.ac2",
+            "title": "When Host is evil.example, the 401 contains no WWW-Authenticate header",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-challenge.ac3",
+            "title": "An OAuth access token passes tools/list, and the same token after vi.setSystemTime past expiresAt returns 401 with the WWW-Authenticate header",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-oauth",
+        "title": "Add the pan mcp oauth CLI verbs",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T01:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-4945",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/cli/commands/mcp-oauth.ts",
+            "src/cli/commands/mcp.ts",
+            "packages/contracts/src/composer-commands.generated.ts",
+            "tests/unit/cli/mcp-oauth.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/cli/mcp-oauth.test.ts tests/unit/cli/mcp.test.ts",
+            "npm run build:cli && npm run lint:slash-commands"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "mcp-oauth.test.ts and mcp.test.ts report 0 failed",
+            "lint:slash-commands prints '✓ composer-command manifest matches the CLI registry'"
+          ],
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Execute PRD .pan/drafts/PAN-4945.md WI-12 (D-13): create src/cli/commands/mcp-oauth.ts with runners for issue, list, revoke, pending, approve, deny and registerMcpOAuthCommands; register the oauth group from registerMcpCommands in src/cli/commands/mcp.ts with lazy imports only; then run npm run build:cli && npm run generate:slash-commands and commit packages/contracts/src/composer-commands.generated.ts."
+        },
+        "items": [
+          {
+            "id": "cli-oauth.ac1",
+            "title": "pan mcp oauth issue --name n --level message sends { name, level } to /api/mcp-oauth/issue and prints both tokens and 'These tokens are shown once. Store them in your client now.'; --level admin exits 1 without calling the dashboard",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-oauth.ac2",
+            "title": "pan mcp oauth approve kqzt-mwrb --level operate finds approval code KQZT-MWRB in the approvals list and sends { decision: 'approve', level: 'operate' } to /api/mcp-oauth/approvals/<id>; an unknown code prints 'No waiting sign-in has code NOPE-NOPE.' and exits 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-oauth.ac3",
+            "title": "pan mcp oauth revoke maps a 404 to 'No active sign-in <id>.' and exit 1, and a DashboardUnreachableError prints 'The dashboard is not running. Start it with pan up.' and exits 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-oauth.ac4",
+            "title": "packages/contracts/src/composer-commands.generated.ts contains rows for pan mcp oauth and its six verbs, and npm run lint:slash-commands passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "oauth-acceptance",
+        "title": "Prove the full sign-in with the MCP SDK client (epic AC-16)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T01:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-4945",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "test",
+          "requiresInspection": false,
+          "parallelSafeReason": "Writes one new test file no other item touches; runs after every route item by blocks edges.",
+          "files_scope": [
+            "src/dashboard/server/__tests__/mcp-oauth-acceptance.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/mcp-oauth-acceptance.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "mcp-oauth-acceptance.test.ts reports 0 failed",
+            "typecheck completes without errors",
+            "npm run lint exits 0"
+          ],
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Execute PRD .pan/drafts/PAN-4945.md WI-13: create src/dashboard/server/__tests__/mcp-oauth-acceptance.test.ts that drives the SDK's own client helpers (discoverOAuthProtectedResourceMetadata, discoverAuthorizationServerMetadata, registerClient, startAuthorization, exchangeAuthorization, refreshAuthorization) through a fetchFn that dispatches into one app built from the remote gate, the /mcp route, the public OAuth routes and the operator routes, following steps 1-10. Read checkpoint CP-A first."
+        },
+        "items": [
+          {
+            "id": "oauth-acceptance.ac1",
+            "title": "Given an SDK client with no token, POST /mcp returns 401 whose WWW-Authenticate resource_metadata URL leads the SDK discovery to authorization server http://localhost:3011 without a resource-mismatch error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "oauth-acceptance.ac2",
+            "title": "The SDK client registers, opens the authorize URL with scope 'read message operate approve' and no state, the operator approval list shows requestedLevel read, and after approval at level operate exchangeAuthorization returns tokens whose tools/list returns send_message and no answer_permission",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "oauth-acceptance.ac3",
+            "title": "refreshAuthorization returns a new access and refresh token and the old access token then receives 401 on /mcp",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "oauth-acceptance.ac4",
+            "title": "Reusing the first refresh token rejects with invalid_grant and afterwards the newest access token receives 401 and the newest refresh token is refused",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "oauth-acceptance.ac5",
+            "title": "When Date is set past a fresh sign-in's expiresAt, POST /mcp with its access token returns 401 with WWW-Authenticate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "oauth-docs",
+        "title": "Document OAuth sign-ins in configuration/mcp.mdx and docs/DASHBOARD-AUTH.md",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T01:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-4945",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "docs",
+          "requiresInspection": false,
+          "files_scope": [
+            "configuration/mcp.mdx",
+            "docs/DASHBOARD-AUTH.md"
+          ],
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n 'Sign in with OAuth' configuration/mcp.mdx",
+            "grep -n 'OAuth sign-ins for /mcp' docs/DASHBOARD-AUTH.md"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "grep prints the new mcp.mdx heading line",
+            "grep prints the new DASHBOARD-AUTH.md heading line"
+          ],
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Execute PRD .pan/drafts/PAN-4945.md WI-14: add '## Sign in with OAuth' to configuration/mcp.mdx (discovery URL, four-step flow, D-3 level table, token lifetimes and rotation, approval expiry and restart behavior, the six CLI verbs with examples, where the endpoints answer and that Funnel gets 404) and extend '## Revoking'; add '### OAuth sign-ins for /mcp (PAN-4945)' after the Agent tokens subsection of docs/DASHBOARD-AUTH.md, add the WWW-Authenticate header to the /mcp subsection, and change the sweep bullet's 'other records are never pruned' sentence as stated."
+        },
+        "items": [
+          {
+            "id": "oauth-docs.ac1",
+            "title": "configuration/mcp.mdx contains a 'Sign in with OAuth' section that shows the four levels (Read only, Can message, Can operate, Can approve) with their scopes and an example for each pan mcp oauth verb",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "oauth-docs.ac2",
+            "title": "configuration/mcp.mdx '## Revoking' contains pan mcp oauth revoke and states that revoking an OAuth access token under Settings → Access Tokens ends its sign-in at the next refresh",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "oauth-docs.ac3",
+            "title": "docs/DASHBOARD-AUTH.md contains 'OAuth sign-ins for /mcp (PAN-4945)' covering the record fields, the issuer allowlist, the root-only /api/mcp-oauth routes and the downgrade note, and its /mcp subsection names the WWW-Authenticate header",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "oauth-docs.ac4",
+            "title": "npm run lint:docs passes with the new sections",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "oauth-records",
+        "to": "oauth-service-authorize",
+        "type": "blocks"
+      },
+      {
+        "from": "oauth-records",
+        "to": "mcp-challenge",
+        "type": "blocks"
+      },
+      {
+        "from": "oauth-flow",
+        "to": "oauth-store",
+        "type": "blocks"
+      },
+      {
+        "from": "oauth-flow",
+        "to": "oauth-service-authorize",
+        "type": "blocks"
+      },
+      {
+        "from": "oauth-store",
+        "to": "oauth-service-authorize",
+        "type": "blocks"
+      },
+      {
+        "from": "oauth-service-authorize",
+        "to": "oauth-service-refresh",
+        "type": "blocks"
+      },
+      {
+        "from": "oauth-service-refresh",
+        "to": "oauth-service-admin",
+        "type": "blocks"
+      },
+      {
+        "from": "oauth-service-authorize",
+        "to": "routes-discovery-register",
+        "type": "blocks"
+      },
+      {
+        "from": "routes-discovery-register",
+        "to": "routes-authorize",
+        "type": "blocks"
+      },
+      {
+        "from": "routes-authorize",
+        "to": "routes-token-revoke",
+        "type": "blocks"
+      },
+      {
+        "from": "oauth-service-refresh",
+        "to": "routes-token-revoke",
+        "type": "blocks"
+      },
+      {
+        "from": "routes-token-revoke",
+        "to": "routes-admin",
+        "type": "blocks"
+      },
+      {
+        "from": "oauth-service-admin",
+        "to": "routes-admin",
+        "type": "blocks"
+      },
+      {
+        "from": "routes-discovery-register",
+        "to": "mcp-challenge",
+        "type": "blocks"
+      },
+      {
+        "from": "routes-token-revoke",
+        "to": "oauth-acceptance",
+        "type": "blocks"
+      },
+      {
+        "from": "routes-admin",
+        "to": "oauth-acceptance",
+        "type": "blocks"
+      },
+      {
+        "from": "oauth-service-authorize",
+        "to": "oauth-service-admin",
+        "type": "blocks"
+      },
+      {
+        "from": "routes-discovery-register",
+        "to": "routes-token-revoke",
+        "type": "blocks"
+      },
+      {
+        "from": "routes-discovery-register",
+        "to": "routes-admin",
+        "type": "blocks"
+      },
+      {
+        "from": "routes-authorize",
+        "to": "routes-admin",
+        "type": "blocks"
+      },
+      {
+        "from": "mcp-challenge",
+        "to": "oauth-acceptance",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
