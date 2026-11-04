@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4955",
   "created": "2026-11-04T14:23:26.498Z",
-  "updated": "2026-11-04T14:56:36.653Z",
+  "updated": "2026-11-04T14:56:50.992Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -108,6 +108,10 @@
     "mcp-docs.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T14:56:36.652Z"
+    },
+    "mcp-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:56:50.991Z"
     }
   }
 }
