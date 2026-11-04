@@ -184,6 +184,24 @@
   padding: 4px 8px;
 }
 
+/* PAN-4946 — the sign-in code and access-level select of an MCP sign-in card. */
+.approvalCode {
+  margin: 0;
+  font-family: var(--font-mono), 'SF Mono', 'SFMono-Regular', Consolas, monospace;
+  font-size: 20px;
+  letter-spacing: 0.08em;
+}
+
+.levelSelect {
+  font-family: var(--font-mono), 'SF Mono', 'SFMono-Regular', Consolas, monospace;
+  font-size: 12px;
+  color: var(--foreground);
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+}
+
 .count {
   display: inline-flex;
   align-items: center;

@@ -89,6 +89,51 @@ export const ANYWHERE_TRIGGERS_QUERY_KEY = ['anywhere-triggers'] as const;
 /** The default scopes of an MCP token (PAN-4649 D-4649-3); mirrors MCP_DEFAULT_SCOPES in src/lib/mcp/server.ts. */
 export const MCP_DEFAULT_SCOPES = ['read:state', 'read:conversations', 'operate'] as const;
 
+/** An MCP OAuth sign-in's access level (PAN-4946); mirrors OAUTH_LEVELS in src/lib/mcp/oauth-flow.ts. */
+export const MCP_OAUTH_LEVELS = ['read', 'message', 'operate', 'approve'] as const;
+export type McpOAuthLevel = (typeof MCP_OAUTH_LEVELS)[number];
+
+/** Mirrors LEVEL_LABELS in src/lib/mcp/oauth-flow.ts. */
+export const MCP_OAUTH_LEVEL_LABELS: Readonly<Record<McpOAuthLevel, string>> = {
+  read: 'Read only',
+  message: 'Can message',
+  operate: 'Can operate',
+  approve: 'Can approve',
+};
+
+export function isMcpOAuthLevel(value: unknown): value is McpOAuthLevel {
+  return (MCP_OAUTH_LEVELS as readonly unknown[]).includes(value);
+}
+
+/** Mirrors `PendingApprovalView` in src/lib/mcp/oauth-service.ts. */
+export interface McpSignInApproval {
+  id: string;
+  clientId: string;
+  clientName: string;
+  redirectHost: string;
+  requestedLevel: string;
+  approvalCode: string;
+  createdAt: string;
+  expiresAt: string;
+}
+
+/** Mirrors `SignInView` in src/lib/mcp/oauth-service.ts. */
+export interface McpSignIn {
+  familyId: string;
+  clientId: string;
+  clientName: string;
+  level: string;
+  scopes: string[];
+  createdAt: string;
+  lastUsedAt: string | null;
+  accessExpiresAt: string | null;
+  refreshExpiresAt: string;
+  headless: boolean;
+}
+
+export const MCP_OAUTH_APPROVALS_QUERY_KEY = ['mcp-oauth-approvals'] as const;
+export const MCP_SIGN_INS_QUERY_KEY = ['mcp-oauth-sign-ins'] as const;
+
 export interface CreatedAccessToken {
   token: string;
   record: { id: string; name: string; scopes: string[] };
@@ -159,6 +204,23 @@ export async function loadEnvironment(): Promise<EnvironmentDescriptor> {
 export function pairingExpiresInText(expiresAt: number): string {
   const minutes = Math.max(1, Math.round((expiresAt - Date.now()) / 60_000));
   return `Expires in ${minutes} minute${minutes === 1 ? '' : 's'} · works once`;
+}
+
+/**
+ * A future timestamp as "in N minute(s)" / "in N hour(s)" / "in N day(s)", or
+ * "expired" once past (PAN-4946 review — `formatRelativeTime` is "ago"-only
+ * and reads every future timestamp as "just now").
+ */
+export function expiresInText(expiresAt: string, now: Date = new Date()): string {
+  const diffMs = new Date(expiresAt).getTime() - now.getTime();
+  if (diffMs <= 0) return 'expired';
+  const minutes = Math.round(diffMs / 60_000);
+  if (minutes < 1) return 'in under a minute';
+  if (minutes < 60) return `in ${minutes} minute${minutes === 1 ? '' : 's'}`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `in ${hours} hour${hours === 1 ? '' : 's'}`;
+  const days = Math.round(hours / 24);
+  return `in ${days} day${days === 1 ? '' : 's'}`;
 }
 
 export async function issuePairingLink(): Promise<ApiResult<PairingLinkBody>> {
@@ -273,4 +335,42 @@ export async function loadTriggers(): Promise<TriggersList> {
   const result = await fetchTriggers();
   if (!isOk(result)) throw new Error(apiError(result));
   return { ...result.body, triggers: result.body.triggers ?? [] };
+}
+
+/** Query function for `MCP_OAUTH_APPROVALS_QUERY_KEY`: sign-ins waiting for a decision, or `[]` on any failure. */
+export async function fetchMcpSignInApprovals(signal?: AbortSignal): Promise<McpSignInApproval[]> {
+  try {
+    const result = await readResult<{ approvals: McpSignInApproval[] }>(await fetch('/api/mcp-oauth/approvals', { signal }));
+    return isOk(result) ? result.body.approvals ?? [] : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Approve or deny a pending MCP sign-in; `level` is required to approve and is never sent to deny. */
+export async function decideMcpSignIn(
+  id: string,
+  decision: 'approve' | 'deny',
+  level?: McpOAuthLevel,
+): Promise<ApiResult<{ status: 'approved' | 'denied' }>> {
+  return readResult(await fetch(`/api/mcp-oauth/approvals/${encodeURIComponent(id)}`, {
+    method: 'POST',
+    headers: await dashboardMutationJsonHeaders(),
+    body: JSON.stringify(decision === 'approve' ? { decision, level } : { decision }),
+  }));
+}
+
+/** Query function for `MCP_SIGN_INS_QUERY_KEY`: active MCP sign-ins; a 403 throws `AccessTokensForbiddenError`. */
+export async function loadMcpSignIns(): Promise<McpSignIn[]> {
+  const result = await readResult<{ signIns: McpSignIn[] }>(await fetch('/api/mcp-oauth/sign-ins'));
+  if (result.status === 403) throw new AccessTokensForbiddenError(apiError(result));
+  if (!isOk(result)) throw new Error(apiError(result));
+  return result.body.signIns ?? [];
+}
+
+export async function revokeMcpSignIn(familyId: string): Promise<ApiResult<{ revoked: true }>> {
+  return readResult(await fetch(`/api/mcp-oauth/sign-ins/${encodeURIComponent(familyId)}`, {
+    method: 'DELETE',
+    headers: await dashboardMutationJsonHeaders(),
+  }));
 }

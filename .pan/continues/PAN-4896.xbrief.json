@@ -1,0 +1,67 @@
+{
+  "version": "1",
+  "issueId": "PAN-4896",
+  "created": "2026-11-04T05:35:39.263Z",
+  "updated": "2026-11-04T05:54:00.670Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "gate-pan2804-warning-linux": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4896",
+      "claimedAt": "2026-11-04T05:35:39.263Z",
+      "doneAt": "2026-11-04T05:44:07.136Z"
+    },
+    "test-darwin-no-warning": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4896",
+      "claimedAt": "2026-11-04T05:44:17.981Z",
+      "doneAt": "2026-11-04T05:46:40.331Z"
+    },
+    "docs-d10-darwin-spawn": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4896",
+      "claimedAt": "2026-11-04T05:46:47.468Z",
+      "doneAt": "2026-11-04T05:49:16.209Z"
+    },
+    "gate-pan2804-warning-linux.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:51:53.051Z"
+    },
+    "gate-pan2804-warning-linux.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:52:10.221Z"
+    },
+    "gate-pan2804-warning-linux.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:52:25.754Z"
+    },
+    "test-darwin-no-warning.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:52:40.197Z"
+    },
+    "test-darwin-no-warning.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:52:54.266Z"
+    },
+    "test-darwin-no-warning.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:53:09.415Z"
+    },
+    "test-darwin-no-warning.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:53:27.550Z"
+    },
+    "docs-d10-darwin-spawn.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:53:44.137Z"
+    },
+    "docs-d10-darwin-spawn.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:54:00.670Z"
+    }
+  }
+}
