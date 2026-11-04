@@ -61,6 +61,7 @@ src/components/Settings/anywhere/__tests__/DirectoryPanel.test.tsx
 src/components/Settings/anywhere/__tests__/FleetVersionsPanel.test.tsx
 src/components/Settings/anywhere/__tests__/MachinesPanel.load.test.tsx
 src/components/Settings/anywhere/__tests__/MachinesPanel.test.tsx
+src/components/Settings/anywhere/__tests__/McpSignInsList.test.tsx
 src/components/Settings/anywhere/__tests__/McpUrlDialog.test.tsx
 src/components/Settings/anywhere/__tests__/PairDeviceDialog.test.tsx
 src/components/Settings/anywhere/__tests__/PairedPhonesList.test.tsx
@@ -71,6 +72,7 @@ src/components/Settings/anywhere/__tests__/TriggersPanel.test.tsx
 src/components/Settings/anywhere/__tests__/TailscalePeersPanel.test.tsx
 src/components/Settings/anywhere/__tests__/TailscalePhoneQr.test.tsx
 src/components/Settings/anywhere/__tests__/TailscaleSetupDialog.test.tsx
+src/components/Settings/anywhere/__tests__/mcpOAuthApi.test.ts
 src/components/Settings/sections/__tests__/AccessTokensSection.test.tsx
 src/components/Settings/sections/__tests__/AutoSettleIdleRow.test.tsx
 src/components/Settings/sections/__tests__/AutoSettleOnMergeRow.test.tsx
@@ -88,6 +90,7 @@ src/components/__tests__/DecisionsPanel.test.tsx
 src/components/__tests__/DegradedModeBanner.test.tsx
 src/components/__tests__/GitHubQuotaPill.test.tsx
 src/components/__tests__/GitHubRateLimitBanner.test.tsx
+src/components/__tests__/McpSignInCard.test.tsx
 src/components/__tests__/PanOpenInPicker.remote.test.tsx
 src/components/__tests__/Sidebar.workspacePullRequest.test.tsx
 src/components/__tests__/palette-anywhere-actions.test.ts

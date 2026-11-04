@@ -1324,6 +1324,17 @@ it sorts into Waiting. A held-only row has one **Open** button that navigates to
 `/conv/<name>`, where the held handoff view offers Start; it has no Answer
 button, because there is no dialog to reopen.
 
+**Needs you lists MCP sign-ins (PAN-4946).** `useDecisions.ts` polls
+`GET /api/mcp-oauth/approvals` every 5 s (`fetchMcpSignInApprovals`,
+`src/components/Settings/anywhere/anywhereApi.ts`), but only when
+`GET /api/anywhere/status` reports `viewer.kind` of `root-session` or
+`internal-token` — a paired device or another machine never requests the
+approvals route. Each pending approval becomes a blocking `mcpSignIn`
+decision carrying the `McpSignInApproval` record; `DecisionsPanel` renders it
+as `McpSignInCard` (approval code, a level select defaulting to the requested
+level, Approve/Deny) instead of the generic Answer button, and
+`MobileNeedsYou` shows "Approve on the desktop" for it.
+
 **All shows transitions.** A conversation card is dated by a lifecycle fact:
 `endedAt` when the conversation ended, otherwise `createdAt`, labelled `ended` or
 `started`. It is never dated by transcript activity (`lastActivityAt`), which

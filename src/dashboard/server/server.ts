@@ -62,6 +62,7 @@ import { selfLanesRouteLayer } from './routes/self-lanes.js'
 import { selfWorkersRouteLayer } from './routes/self-workers.js'
 import { selfWorkflowRouteLayer } from './routes/self-workflow.js'
 import { selfRequestsRouteLayer } from './routes/self-requests.js'
+import { selfMemoryRouteLayer } from './routes/self-memory.js'
 import { agentRequestsRouteLayer } from './routes/agent-requests.js'
 import { lanesRouteLayer } from './routes/lanes.js'
 import { workspacesRouteLayer } from './routes/workspaces.js'
@@ -390,6 +391,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   selfLanesRouteLayer,
   selfWorkflowRouteLayer,
   selfRequestsRouteLayer,
+  selfMemoryRouteLayer,
   agentRequestsRouteLayer,
   lanesRouteLayer,
   workspacesRouteLayer,

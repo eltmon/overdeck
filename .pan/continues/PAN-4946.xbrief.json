@@ -1,0 +1,209 @@
+{
+  "version": "1",
+  "issueId": "PAN-4946",
+  "created": "2026-11-04T04:35:38.458Z",
+  "updated": "2026-11-04T05:59:50.392Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-04T05:31Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-04T05:31:34.339Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-04T05:32Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-11-04T05:32:40.115Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-04T05:37Z] coderabbit → FINDINGS — seq 3",
+      "timestamp": "2026-11-04T05:38:00.575Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-04T05:49:03.074Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-04T05:58Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-04T05:58:18.374Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-04T05:58Z] ci-monitor → FAILED — seq 2",
+      "timestamp": "2026-11-04T05:58:41.442Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-04T05:59Z] review-agent → CHANGES-REQUESTED — seq 3",
+      "timestamp": "2026-11-04T05:59:50.392Z"
+    }
+  ],
+  "items": {
+    "oauth-client-api": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4946",
+      "claimedAt": "2026-11-04T04:35:38.458Z",
+      "doneAt": "2026-11-04T04:42:06.393Z"
+    },
+    "signin-feed": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4946",
+      "claimedAt": "2026-11-04T04:42:15.941Z",
+      "doneAt": "2026-11-04T04:50:58.630Z"
+    },
+    "signin-card": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4946",
+      "claimedAt": "2026-11-04T04:51:07.749Z",
+      "doneAt": "2026-11-04T04:56:19.192Z"
+    },
+    "agent-token-fold": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4946",
+      "claimedAt": "2026-11-04T04:56:30.044Z",
+      "doneAt": "2026-11-04T05:00:45.988Z"
+    },
+    "signins-list": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4946",
+      "claimedAt": "2026-11-04T05:00:54.802Z",
+      "doneAt": "2026-11-04T05:05:13.103Z"
+    },
+    "signin-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4946",
+      "claimedAt": "2026-11-04T05:05:22.504Z",
+      "doneAt": "2026-11-04T05:16:23.676Z"
+    },
+    "oauth-client-api.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:19:35.842Z"
+    },
+    "oauth-client-api.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:19:50.494Z"
+    },
+    "oauth-client-api.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:20:05.685Z"
+    },
+    "oauth-client-api.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:20:21.585Z"
+    },
+    "signin-feed.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:20:40.810Z"
+    },
+    "signin-feed.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:20:55.847Z"
+    },
+    "signin-feed.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:21:11.170Z"
+    },
+    "signin-feed.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:21:25.695Z"
+    },
+    "signin-card.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:21:41.868Z"
+    },
+    "signin-card.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:21:56.635Z"
+    },
+    "signin-card.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:22:11.518Z"
+    },
+    "signin-card.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:22:26.675Z"
+    },
+    "signin-card.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:22:41.090Z"
+    },
+    "agent-token-fold.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:22:59.810Z"
+    },
+    "agent-token-fold.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:23:14.950Z"
+    },
+    "agent-token-fold.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:23:29.256Z"
+    },
+    "signins-list.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:23:44.093Z"
+    },
+    "signins-list.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:23:59.386Z"
+    },
+    "signins-list.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:24:15.114Z"
+    },
+    "signins-list.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:24:30.416Z"
+    },
+    "signins-list.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:24:45.838Z"
+    },
+    "signin-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:25:00.319Z"
+    },
+    "signin-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:25:15.771Z"
+    },
+    "signin-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:25:31.904Z"
+    },
+    "signin-docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:25:47.115Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-04T05:58:18Z",
+      "markdownBody": "# CI Failure Feedback for PAN-4946\n\nPull request: https://github.com/eltmon/overdeck/pull/4986 (head `e6182f25`)\n\nSource: check_run:test-shard (4/4)\n\n## Failing checks (1)\n\n### test-shard (4/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/126414156525/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/41781547754/job/126414156525  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/e2e/issue-tree.spec.ts\u001b[2m > \u001b[22mthe issue tree is the issue workspace\u001b[2m > \u001b[22mrenders a Herdr-spawned reviewer as the Review row with its model tag\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/e2e/issue-tree.spec.ts\u001b[2m > \u001b[22mthe issue tree is the issue workspace\u001b[2m > \u001b[22mrenders a Herdr-spawned reviewer as the Review row with its model tag\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected +0 to be 1 // Object.is equality\u001b[39m\n\n\u001b[32m- Expected\u001b[39m\n\u001b[31m+ Received\u001b[39m\n\n\u001b[32m- 1\u001b[39m\n\u001b[31m+ 0\u001b[39m\n\n\u001b[36m \u001b[2m❯\u001b[22m tests/e2e/issue-tree.spec.ts:\u001b[2m303:55\u001b[22m\u001b[39m\n    \u001b[90m301|\u001b[39m\n    \u001b[90m302|\u001b[39m     \u001b[35mconst\u001b[39m tree \u001b[33m=\u001b[39m page\u001b[33m.\u001b[39m\u001b[34mlocator\u001b[39m(\u001b[32m'[aria-label=\"Issue tree\"]'\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m303|\u001b[39m     \u001b[35mawait\u001b[39m expect\u001b[33m.\u001b[39m\u001b[34mpoll\u001b[39m(() \u001b[33m=>\u001b[39m tree\u001b[33m.\u001b[39m\u001b[34mcount\u001b[39m()\u001b[33m,\u001b[39m renderPoll)\u001b[33m.\u001b[39m\u001b[34mtoBe\u001b[39m(\u001b[34m1\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m   |\u001b[39m                                                       \u001b[31m^\u001b[39m\n    \u001b[90m304|\u001b[39m     await expect.poll(() => tree.innerText(), renderPoll).toMatch(/Rev…\n    \u001b[90m305|\u001b[39m\n\n\u001b[31m\u001b[1mCaused by: Error\u001b[22m: Matcher did not succeed in time.\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m tests/e2e/issue-tree.spec.ts:\u001b[2m303:5\u001b[22m\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/22]⎯\u001b[22m\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/e2e/issue-tree.spec.ts\u001b[2m > \u001b[22mthe issue tree is the issue workspace\u001b[2m > \u001b[22mtakes its rows from the pane inventory alone\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/e2e/issue-tree.spec.ts\u001b[2m > \u001b[22mthe issue tree is the issue workspace\u001b[2m > \u001b[22mtakes its rows from the pane inventory alone\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected +0 to be 1 // Object.is equality\u001b[39m\n\n\u001b[32m- Expected\u001b[39m\n\u001b[31m+ Received\u001b[39m\n\n\u001b[32m- 1\u001b[39m\n\u001b[31\n…\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m3 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m596 passed\u001b[39m\u001b[22m\u001b[90m (599)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    },
+    {
+      "seq": 2,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-04T05:58:41Z",
+      "markdownBody": "# CI Failure Feedback for PAN-4946\n\nPull request: https://github.com/eltmon/overdeck/pull/4986 (head `e6182f25`)\n\nSource: check_suite\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-shard (4/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/126414156525/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/41781547754/job/126414156525  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/e2e/issue-tree.spec.ts\u001b[2m > \u001b[22mthe issue tree is the issue workspace\u001b[2m > \u001b[22mrenders a Herdr-spawned reviewer as the Review row with its model tag\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/e2e/issue-tree.spec.ts\u001b[2m > \u001b[22mthe issue tree is the issue workspace\u001b[2m > \u001b[22mrenders a Herdr-spawned reviewer as the Review row with its model tag\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected +0 to be 1 // Object.is equality\u001b[39m\n\n\u001b[32m- Expected\u001b[39m\n\u001b[31m+ Received\u001b[39m\n\n\u001b[32m- 1\u001b[39m\n\u001b[31m+ 0\u001b[39m\n\n\u001b[36m \u001b[2m❯\u001b[22m tests/e2e/issue-tree.spec.ts:\u001b[2m303:55\u001b[22m\u001b[39m\n    \u001b[90m301|\u001b[39m\n    \u001b[90m302|\u001b[39m     \u001b[35mconst\u001b[39m tree \u001b[33m=\u001b[39m page\u001b[33m.\u001b[39m\u001b[34mlocator\u001b[39m(\u001b[32m'[aria-label=\"Issue tree\"]'\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m303|\u001b[39m     \u001b[35mawait\u001b[39m expect\u001b[33m.\u001b[39m\u001b[34mpoll\u001b[39m(() \u001b[33m=>\u001b[39m tree\u001b[33m.\u001b[39m\u001b[34mcount\u001b[39m()\u001b[33m,\u001b[39m renderPoll)\u001b[33m.\u001b[39m\u001b[34mtoBe\u001b[39m(\u001b[34m1\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m   |\u001b[39m                                                       \u001b[31m^\u001b[39m\n    \u001b[90m304|\u001b[39m     await expect.poll(() => tree.innerText(), renderPoll).toMatch(/Rev…\n    \u001b[90m305|\u001b[39m\n\n\u001b[31m\u001b[1mCaused by: Error\u001b[22m: Matcher did not succeed in time.\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m tests/e2e/issue-tree.spec.ts:\u001b[2m303:5\u001b[22m\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/22]⎯\u001b[22m\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/e2e/issue-tree.spec.ts\u001b[2m > \u001b[22mthe issue tree is the issue workspace\u001b[2m > \u001b[22mtakes its rows from the pane inventory alone\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/e2e/issue-tree.spec.ts\u001b[2m > \u001b[22mthe issue tree is the issue workspace\u001b[2m > \u001b[22mtakes its rows from the pane inventory alone\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected +0 to be 1 // Object.is equality\u001b[39m\n\n\u001b[32m- Expected\u001b[39m\n\u001b[31m+ Received\u001b[39m\n\n\u001b[32m- 1\u001b[39m\n\u001b[31\n…\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m3 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m596 passed\u001b[39m\u001b[22m\u001b[90m (599)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    },
+    {
+      "seq": 3,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-11-04T05:59:50Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-4946\n\n# Review — PAN-4946\n## Verdict: CHANGES REQUESTED — `useDecisions` reads `anywhereStatus?.viewer.kind` without guarding `viewer`; a status body without `viewer` crashes the app, and CI test-shard (4/4) is red on 3 e2e specs\n\n## Context\n- Run ID: agent-pan-4946-review-e6182f25\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4946/.pan/review/agent-pan-4946-review-e6182f25/context.json\n- Branch / workspace: feature/pan-4946 / /home/eltmon/Projects/overdeck/workspaces/feature-pan-4946\n- PR: https://github.com/eltmon/overdeck/pull/4986\n- HEAD reviewed: e6182f25746709c29d6e9184dd5844f358af775b\n- Base / prior cycle SHA: merge-base 3cc640b3c7e; prior run agent-pan-4946-review-f40a3427 at f40a34271e6. That run never signalled a verdict, because the branch moved while it was in progress. This cycle re-read the full diff from the merge-base and then the delta f40a342..e6182f2 (commit 285573068e3, \"address CodeRabbit findings\", plus a main merge that only touches `.pan/backlog/sequence.md`).\n- Working tree: clean apart from `.pan/continues/PAN-4946.xbrief.json`, which is planning state and has no code impact.\n\n## Blocking Findings\n### [correctness] Missing optional chain on `viewer` crashes every page that mounts `useDecisions` — `src/dashboard/frontend/src/lib/useDecisions.ts:370`\n- Severity: ! (MUST)\n- Classification / requirement scope: implementation defect; in_pr_scope. PRD WI-2 step 4 specified `const viewerKind = anywhereStatus?.viewer?.kind;`, but the code writes `anywhereStatus?.viewer.kind`.\n- Trigger and changed-code connection: this PR adds a `useQuery({ queryKey: ANYWHERE_STATUS_QUERY_KEY, queryFn: loadAnywhereStatus })` to `useDecisions()`. `loadAnywhereStatus` returns any 2xx body as-is. When that body has no `viewer` field, line 370 evaluates `undefined.kind` during render. `useDecisions` is mounted app-wide (AppChrome, SessionFeedSidebar/DecisionsPanel, DecisionsIndicator, NeedsYouStrip, ConversationDock, …), so the throw takes down the whole route, not just the Needs-you panel.\n- Expected / observed / impact: expected a missing or partial status to fail closed (no MCP rows) per D-5 and H-1 (\"the approvals query then stays disabled. That is the intended failure mode\"). Observed: `TypeError: Cannot read properties of undefined (reading 'kind')`, and nothing renders. The e2e specs `tests/e2e/merge-train.spec.ts`, `tests/e2e/issue-tree.spec.ts` and `tests/e2e/styleguide-conformance.spec.ts` stub unknown `/api/*` paths with 200 `{}`, so all 11 of their tests now fail. This turns the PR's CI test job red. The production server always sends `viewer: { kind }` (`buildAnywhereStatus`), so the operator-visible crash needs a status body without that field. Even so, the PR's own head fails a required CI job, and the spec called for the guard.\n- Evidence: CI run on e6182f2, job `test-shard (4/4)`: \"Test Files 3 failed | 596 passed\", \"Tests 11 failed\", every failure a render poll of `expected +0 to be 1` / `expected 0 to be greater than 0`. Local reproduction at HEAD: `npx vitest run tests/e2e/merge-train.spec.ts` gave 2/2 failures, with Vite reporting `[Unhandled error] TypeError: Cannot read properties of undefined (reading 'kind')` at `useDecisions.ts:370`. The latest main CI run (22769ffffe, in this branch's base) was green, so the regression comes from this PR.\n- Fix: `const viewerKind = anywhereStatus?.viewer?.kind; const canSeeMcpSignIns = viewerKind === 'root-session' || viewerKind === 'internal-token';` as the PRD wrote it. Add a `useDecisions.test.ts` case that seeds `['anywhere-status']` with `{}` and asserts no throw and no `mcpSignIn` row. Then confirm `tests/e2e/merge-train.spec.ts` passes. The e2e stubs need no change.\n- Why the prior cycle missed it: run f40a3427 ran only frontend-package tests that seed `['anywhere-status']` with a full `viewer` object. The root `tests/e2e` specs were outside that focused set, and CI for f40a342 was cancelled before it finished.\n\n### Resolved since the prior cycle (verified at this HEAD)\n- **[correctness] \"expires just now\" on every card and sign-in row (fixed).** At f40a342, `McpSignInCard` used `lib/formatRelativeTime` for `approval.expiresAt`, and `McpSignInsList` used `lib/dashboard-utils.formatRelativeTime` for `refreshExpiresAt`. Both formatters handle past dates only: `diffSec < 5` returns \"just now\" in one, and `diffMs < 0` returns \"just now\" in the other. So every pending card said \"expires just now\" for its whole 10-minute life, and every active sign-in said \"expires just now\" for a 90-day refresh window. This was a spec defect: PRD WI-3 step 2 and WI-5 step 3 prescribed those formatters. It would have failed the \"expires\" field of FR-4 and AC-5. Commit 285573068e3 adds `expiresInText` (`anywhereApi.ts`), which formats \"in N minutes/hours/days\", \"in under a minute\" and \"expired\", and uses it in both places. The card passes `useNow()` to it, so the countdown ticks. The list re-renders on its 5-second refetch. I traced the rounding at the boundaries: 59.6 min becomes \"in 1 hour\", and under 30 s becomes \"in under a minute\". Both are correct.\n- **[security/UX] Cached approvals could surface after the viewer stopped being root (fixed).** `useDecisions` now pushes `mcpSignInDecisions` only when `canSeeMcpSignIns` is true, and the flag is in the memo deps. A new test in `useDecisions.test.ts` seeds approvals with a `device` viewer and asserts no `mcpSignIn` row. The impact was always limited to display, because the server root check (`mcp-oauth-admin.ts`) rejects a non-root decide.\n- **[docs] mcp.mdx claimed a paired phone shows \"Approve on the desktop\" (fixed).** A paired device is a `device` viewer, so the approvals query is disabled and it never gets the row. The doc now says a paired device never receives the pending sign-in, and that \"Approve on the desktop\" shows only on this machine's own session in its mobile layout.\n\n## Non-blocking Findings\n- `~` **No unit test for `expiresInText`** (validation gap, in_pr_scope). The new formatter in `anywhereApi.ts` carries the fix above, but no test exercises it. `mcpOAuthApi.test.ts`, `McpSignInCard.test.tsx` and `McpSignInsList.test.tsx` don't assert the expires text. A short table test (past → \"expired\", 20 s → \"in under a minute\", 10 min, 3 h, 90 d) would lock it in.\n- `?` **Spec note: FR-6 vs D-5** (specification defect, already reconciled in the docs). FR-6 says \"the phone Needs-you screen shows an MCP sign-in row\". D-5 and NFR-7 gate the feed to root viewers, so FR-6 holds only for this machine's own session in the mobile layout. The code follows D-5, which is the right call. FR-6 should be read, or amended in the PRD, as \"the root viewer's mobile layout\".\n- `?` **Pre-existing test failure, not in CI subset** (pre_existing). `src/lib/__tests__/useDecisions-permission.test.ts` fails 4/5 on the `test-setup.ts` unmocked-fetch guard. On the base it already fails on `GET /api/agent-requests` (PAN-4941; the query sits at base `useDecisions.ts:333`). This PR adds `GET /api/anywhere/status` to the same list. The file isn't in `scripts/frontend-test-subset.txt`, so CI doesn't run it. The fix is to seed `['agent-requests']` and `['anywhere-status']` in its `renderWithRows`. That is out of this PR's scope.\n- `?` **Automated stub-UI flag is a false positive.** The flagged `useState(false)` at `McpSignInCard.tsx:35` is `sending`, which `decide()` sets true and clears in `finally`. It's not unwired tab or mode state.\n- **Accepted by PRD (H-4):** the Sign-ins list renders twice on the Settings page, once under Access Tokens and once under Anywhere. Both share `MCP_SIGN_INS_QUERY_KEY`, so they fetch once and invalidate together.\n\n## Coverage\n\n### Changed-file ledger\n| File | Status |\n|---|---|\n| components/Settings/anywhere/AccessTokensPanel.tsx | Reviewed. The extracted `renderToken` is unchanged markup; own and agent partition; toggle has `aria-expanded`; empty wording keyed on both lists empty; McpSignInsList mounted in `mt-4`. |\n| components/Settings/sections/AccessTokensSection.tsx | Reviewed. `tokenRow` is unchanged markup; agent rows appended only when expanded; toggle sits below the table; empty row needs `tokens` loaded; McpSignInsList mounted in `mt-6` before the dialog. |\n| components/Settings/sections/accessTokensShared.ts | Reviewed. Optional fields only declare data `toPublic` already sends (no hash, no plaintext); `partitionAgentTokens` keys on `agentId` alone, so OAuth `oauthClientId` tokens stay in the own list (non-goal 5 respected). |\n| components/Settings/anywhere/McpSignInsList.tsx | Reviewed. 5 s poll, `retry: false`; loading, forbidden, error and empty states; headless chip; level label falls back to the raw value; confirm before revoke; toast on failure; invalidates sign-ins and access-tokens (D-10); expires uses `expiresInText`. |\n| components/Settings/anywhere/anywhereApi.ts | Reviewed. Level mirror and labels match the PRD glossary; views mirror `PendingApprovalView`/`SignInView` (no token fields); ids `encodeURIComponent`; mutations use `dashboardMutationJsonHeaders`; deny omits `level`; approvals fetch fails to `[]`; sign-ins 403 → `AccessTokensForbiddenError`; `expiresInText` added. |\n| components/McpSignInCard.tsx | Reviewed. Hooks run before the null return; level default per D-8; Approve sends the level and Deny sends none; error text from server; catch covers header and network throws; always invalidates (D-7, no optimistic hide). |\n| components/DecisionsPanel.tsx | Reviewed. `mcpSignIn` checked before `agentRequest`; distinct key prefix. |\n| components/mobile/MobileNeedsYou.tsx | Reviewed. `ReadOnlyAction` returns \"Approve on the desktop\" before the source branches. |\n| components/styles/decisions.module.css | Reviewed. Two classes, mono token, no decorative color (NFR-5). |\n| lib/pendingInput.ts | Reviewed. Kind and label added; `PendingInputSource` untouched (non-goal 6). |\n| lib/useDecisions.ts | Reviewed. Status query (`staleTime` 60 s, `retry: false`) on the shared key; approvals query enabled only for `root-session`/`internal-token`; render gated on the same flag; memo deps complete. The server always returns `viewer: { kind }` (`routes/anywhere` `buildAnywhereStatus`), but any status body without `viewer` makes `anywhereStatus?.viewer.kind` throw (blocking finding). |\n| scripts/frontend-test-subset.txt | Reviewed. The 3 new test files are listed in sorted position (NFR-6). |\n| __tests__ (mcpOAuthApi, McpSignInsList, AccessTokensPanel, AccessTokensSection, McpSignInCard, DecisionsPanel, MobileNeedsYou, useDecisions) | Reviewed and run (see Verification). |\n| configuration/mcp.mdx, configuration/remote-access.mdx, docs/DASHBOARD-ARCHITECTURE.md, .overdeck/context/codebase/architecture.md | Reviewed. Accurate to the code at HEAD; one `last-verified` line kept. |\n| .pan/drafts/PAN-4946.md, .pan/continues/*.xbrief.json, .pan/specs xBRIEF, .pan/backlog/sequence.md | Not applicable. Planning artifacts; read the PRD for requirements. |\n\n### Dimensions\n- **Correctness:** traced the feed gate, the card's decide path including its error and finally branches, revoke invalidation, partition and toggle, and both expiry formatters at the boundaries. One blocker: the unguarded `viewer.kind` read (above).\n- **Security:** no token, refresh token or verifier reaches the browser. The new record fields are already served by `toPublic`, and the sign-in and approval views carry none. The approval code is public by design. CSRF headers are on every mutation. The root gate is UX only, and the server's root check is the boundary (NFR-7). The `MCP_OAUTH_LEVEL_LABELS[level]` lookup takes server-controlled input and has no harmful operation behind it.\n- **Performance:** adds one status fetch (60 s stale, shared key) per `useDecisions` consumer tree and one 5 s approvals poll for root viewers only, plus one 5 s sign-ins poll while Settings is open. All are small, bounded and in line with the existing panels.\n- **Requirements/UX:** see the matrix below. Loading, error, empty and forbidden states exist. Non-goals 1–7 all hold: frontend and docs only, no notifications, no level editing, OAuth tokens not hidden, source not widened.\n\n### Acceptance criteria\n| AC | Status | Evidence |\n|---|---|---|\n| AC-1 (WI-1) | Met | `mcpOAuthApi.test.ts` passes; covers method, path and body, `[]` on 403 and on rejection, `AccessTokensForbiddenError`; listed in the subset file. |\n| AC-2 (WI-2) | Met in unit tests; regression blocks |  `useDecisions.test.ts` covers the root row (blocking, label), the device viewer never fetching approvals, and the cached-rows drop; `MobileNeedsYou.test.tsx` covers \"Approve on the desktop\". |\n| AC-3 (WI-3) | Met | `McpSignInCard.test.tsx` covers the sentence, host, code, warning, level default, approve and deny bodies, the 409 alert, and DecisionsPanel rendering the card; listed in the subset file. |\n| AC-4 (WI-4) | Met | AccessTokensPanel and AccessTokensSection tests cover the collapsed toggle with N=2 including a revoked token, expanding, and no toggle when N=0. |\n| AC-5 (WI-5) | Met | `McpSignInsList.test.tsx` covers the list, headless chip, confirm leading to one DELETE, cancel sending none, 403, and empty; AccessTokensSection mount test; expires now renders correctly (`expiresInText`). |\n| AC-6 (WI-6) | Met | Doc text reviewed; CI `lint` and lint groups passed on e6182f2. |\n| Epic AC-17 | Unverified | End-to-end UAT belongs to the test/UAT role. |\n\n## Verification\n- Focused frontend tests at HEAD e6182f2 (`cd src/dashboard/frontend && npx vitest run --configLoader runner …`): mcpOAuthApi, McpSignInsList, AccessTokensPanel, AccessTokensSection, McpSignInCard, DecisionsPanel, MobileNeedsYou, useDecisions, useDecisions.fleet and AgentRequestCard all ran: **10 files, 102 tests passed**.\n- Frontend `npx tsc --noEmit -p tsconfig.json`: no diagnostics.\n- `useDecisions-permission.test.ts`: 4/5 fail on a pre-existing unmocked-fetch guard, and the file is not in the CI subset (see Non-blocking).\n- CI for e6182f2: lint groups (core/effect/skills/state), lint, build (22), test-e2e, test-shard 1/4, 2/4 and 3/4, mobile-android, smoke and the prompt-trailer gate all **passed**. **test-shard (4/4) FAILED**: 3 e2e spec files and 11 tests, caused by the blocking finding (reproduced locally with `npx vitest run tests/e2e/merge-train.spec.ts`). Non-blocking flake lane still running. The full suite was not run locally.\n- `npm run lint:effect-diagnostics` re-run at e6182f2: passed (227 known findings; none new).\n- CI-subset tests that seed the decision query keys (`setQueryData(['agent-requests'|'fleet-needs-you'|'conv-ask-user-question'])`): only `useDecisions.test.ts` is in the subset, and it passes.\n\n## Scope Note\nNone.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4946/.pan/review/agent-pan-4946-review-e6182f25/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-4946 -m \"Fixed review issues\"`"
+    }
+  ],
+  "agentModel": "claude-opus-5-5"
+}

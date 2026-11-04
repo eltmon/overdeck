@@ -27,6 +27,13 @@ import { fetchWithTimeout } from './apiFetch';
 import { formatIssueRef } from './issueLabel';
 import type { PendingPaneChoice } from './paneChoice';
 import type { TerminalPendingPermission } from '../components/TerminalPermissionDialog';
+import {
+  ANYWHERE_STATUS_QUERY_KEY,
+  MCP_OAUTH_APPROVALS_QUERY_KEY,
+  fetchMcpSignInApprovals,
+  loadAnywhereStatus,
+  type McpSignInApproval,
+} from '../components/Settings/anywhere/anywhereApi';
 
 /** A conversation with an open blocking surface, as served by the REST door. */
 export interface ConversationPendingInputRow {
@@ -124,6 +131,8 @@ export interface Decision {
   remote?: boolean;
   /** PAN-4941 — set on an agent request row; DecisionsPanel renders AgentRequestCard for it. */
   agentRequest?: { id: string; kind: 'secret'; name: string; prompt: string; agentId: string; expiresAt: string };
+  /** PAN-4946 — set on an MCP OAuth sign-in waiting for a decision. */
+  mcpSignIn?: McpSignInApproval;
 }
 
 /**
@@ -152,6 +161,8 @@ const BLOCKING_KINDS = new Set([
   'paneQuestion',
   // PAN-4941 — the agent is parked in secret_wait until the operator answers.
   'secretRequest',
+  // PAN-4946 — an MCP client cannot proceed until its sign-in is approved or denied.
+  'mcpSignIn',
 ]);
 
 export function isBlockingDecision(kinds: ReadonlyArray<string>): boolean {
@@ -200,6 +211,19 @@ export function agentRequestDecisions(rows: ReadonlyArray<AgentRequestRow>): Dec
     });
   }
   return out;
+}
+
+/** PAN-4946 — pending MCP OAuth sign-ins as blocking decisions, one row per approval. */
+export function mcpSignInDecisions(rows: ReadonlyArray<McpSignInApproval>): Decision[] {
+  return rows.map((row) => ({
+    id: row.id,
+    source: 'agent',
+    label: row.clientName,
+    kinds: ['mcpSignIn'],
+    since: row.createdAt,
+    blocking: true,
+    mcpSignIn: row,
+  }));
 }
 
 /** PAN-4651 D-4651-15 — `GET /api/fleet/needs-you`: what waits on the operator on each online linked machine. */
@@ -335,6 +359,22 @@ export function useDecisions(): Decision[] {
     refetchInterval: 5000,
   });
 
+  // PAN-4946 — only a root viewer (this machine's own session or the internal
+  // token) can decide an MCP sign-in; a paired device never polls for one.
+  const { data: anywhereStatus } = useQuery({
+    queryKey: ANYWHERE_STATUS_QUERY_KEY,
+    queryFn: loadAnywhereStatus,
+    staleTime: 60_000,
+    retry: false,
+  });
+  const canSeeMcpSignIns = anywhereStatus?.viewer?.kind === 'root-session' || anywhereStatus?.viewer?.kind === 'internal-token';
+  const { data: mcpSignInApprovals = [] } = useQuery({
+    queryKey: MCP_OAUTH_APPROVALS_QUERY_KEY,
+    queryFn: ({ signal }) => fetchMcpSignInApprovals(signal),
+    refetchInterval: 5000,
+    enabled: canSeeMcpSignIns,
+  });
+
   return useMemo(() => {
     const out: Decision[] = [...fleetDecisions(fleetMachines)];
 
@@ -383,6 +423,12 @@ export function useDecisions(): Decision[] {
     }
 
     out.push(...agentRequestDecisions(Array.isArray(agentRequestRows) ? agentRequestRows : []));
+    // PAN-4946 review — a disabled query still returns its last cached rows
+    // (`enabled: false` only stops refetching), so a viewer that just dropped
+    // from root to device could otherwise still see a stale approval's detail.
+    if (canSeeMcpSignIns) {
+      out.push(...mcpSignInDecisions(Array.isArray(mcpSignInApprovals) ? mcpSignInApprovals : []));
+    }
 
     // Blocking first, then oldest first — the longest-stalled agent is the one
     // costing the most.
@@ -392,5 +438,5 @@ export function useDecisions(): Decision[] {
       return a.since.localeCompare(b.since);
     });
     return out;
-  }, [agentSubjects, convRows, fleetMachines, agentRequestRows, titleByIssueId]);
+  }, [agentSubjects, convRows, fleetMachines, agentRequestRows, mcpSignInApprovals, canSeeMcpSignIns, titleByIssueId]);
 }

@@ -273,6 +273,13 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   raw prompt or even 3-5 expanded terms return ~0 FTS hits; prompt-time injection
   must search in OR mode. Expansion calls share `recordHealth` with extraction, so
   `extractions_attempted` also counts expansion calls.
+- **`pan memory` reads and writes different fact stores from a workspace** (found
+  planning PAN-4940) — `add`/`edit`/`retire` write the cwd checkout, but `show`,
+  `list` and the facts `search` prints read the primary checkout unless `--here`
+  (`resolveFactTarget`, `src/cli/commands/memory-facts.ts`). Plain `search` omits
+  facts from `--json` and searches observations of project `overdeck`
+  (`DEFAULT_PROJECT_ID`, `src/lib/memory/cli.ts`) whatever the cwd; PAN-4940 adds
+  `--facts` for a cwd-scoped `{ facts, observations }` envelope.
 
 - **Hygiene-scheduler module state lives in the deacon child, not the dashboard**
   — `startHygieneScheduler()` runs from `cloister/service.ts`, which only
@@ -725,4 +732,4 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   advertise `mcpCapabilities: { http, sse }` too. The ACP host's `mcpServers` field
   (`src/lib/acp/session-runtime.ts`) carries the `overdeck` server read from the host's `--mcp-config`
   (PAN-4934); before that it was always `[]`.
-<!-- last-verified: 2026-11-04 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4930, PAN-4931, PAN-4932, PAN-4934) -->
+<!-- last-verified: 2026-11-04 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4930, PAN-4931, PAN-4932, PAN-4934, PAN-4944, PAN-4482, PAN-4970, PAN-4940) -->

@@ -1,5 +1,6 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
+import type { MemoryObservation } from '@overdeck/contracts';
 import {
   createResetMarker,
   generateDailySummary,
@@ -15,9 +16,11 @@ import {
   type MemoryDoctorResult,
 } from '../../lib/memory/cli.js';
 import { backfillMemoryFromTranscripts } from '../../lib/memory/backfill.js';
-import { printMatchingFacts, registerMemoryFactCommands } from './memory-facts.js';
+import { findMatchingFacts, printMatchingFacts, registerMemoryFactCommands } from './memory-facts.js';
+import type { MemoryFact } from '../../lib/memory/facts/store.js';
 import { registerMemorySyncCommand } from './memory-sync.js';
 import { resolveContainedPinPath, verifyPinPathContainment } from '../../lib/memory/pin-path.js';
+import { resolveProjectKeyForCwdAsync } from '../../lib/projects.js';
 import { getProjectByKey, getWorkspaceById, listPinnedDocs, listWorkspacesForPath } from '../../lib/workspaces/resolver.js';
 import { pinDoc, unpinDoc } from '../../lib/workspaces/writer.js';
 import type { PinScope, ProjectRow } from '../../lib/workspaces/types.js';
@@ -35,9 +38,35 @@ export interface MemorySearchCommandOptions {
   includeArchived?: boolean;
   limit?: number;
   json?: boolean;
+  facts?: boolean;
+}
+
+/** `--facts --json` fact entry (D-3): no body — the agent reads `file` when it needs the text. */
+function toFactMatch(fact: MemoryFact) {
+  return { scope: fact.scope, type: fact.type, id: fact.id, title: fact.title, description: fact.description, tags: fact.tags, file: fact.file };
+}
+
+/** `--facts --json` observation entry (D-3): short form, no narrative/tokens/session/run/offset/model. */
+function toObservationMatch({ observation, score }: { observation: MemoryObservation; score: number }) {
+  return {
+    score,
+    id: observation.id,
+    timestamp: observation.timestamp,
+    projectId: observation.projectId,
+    workspaceId: observation.workspaceId,
+    issueId: observation.issueId,
+    actionStatus: observation.actionStatus,
+    summary: observation.summary,
+    files: observation.files,
+  };
 }
 
 export async function memorySearchCommand(query: string, options: MemorySearchCommandOptions): Promise<void> {
+  if (options.facts && !options.json) {
+    console.error(chalk.red('--facts needs --json'));
+    return exitCli(1);
+  }
+
   let targetPath: string | undefined;
   if (options.target !== undefined) {
     if (options.workspace || options.issue || options.global) {
@@ -46,6 +75,14 @@ export async function memorySearchCommand(query: string, options: MemorySearchCo
     }
     targetPath = options.target === true ? process.cwd() : options.target;
     if (listWorkspacesForPath(targetPath).length === 0) {
+      if (options.facts) {
+        const matched = findMatchingFacts(query, options.project !== undefined ? { project: options.project } : { here: true });
+        console.log(JSON.stringify({
+          facts: [...matched.project, ...matched.operator, ...matched.machine].map(toFactMatch),
+          observations: [],
+        }));
+        return;
+      }
       console.log(chalk.yellow(`No workspaces target ${targetPath}.`));
       return;
     }
@@ -53,13 +90,32 @@ export async function memorySearchCommand(query: string, options: MemorySearchCo
 
   if (!options.json) printMatchingFacts(query, { project: options.project });
 
+  const noScopeFlag = options.project === undefined && !options.workspace && !options.issue && !options.global && targetPath === undefined;
+  let searchOptions: MemorySearchCommandOptions & { targetPath?: string } = { ...options, targetPath };
+  if (options.facts && noScopeFlag) {
+    const cwdProject = await resolveProjectKeyForCwdAsync(process.cwd());
+    searchOptions = cwdProject !== null
+      ? { ...options, targetPath, project: cwdProject }
+      : { ...options, targetPath, global: true };
+  }
+
   let results: Awaited<ReturnType<typeof searchMemory>>;
   try {
-    results = await searchMemory(query, { ...options, targetPath });
+    results = await searchMemory(query, searchOptions);
   } catch (err) {
     console.error(chalk.red(err instanceof Error ? err.message : String(err)));
     return exitCli(1);
   }
+
+  if (options.facts) {
+    const matched = findMatchingFacts(query, options.project !== undefined ? { project: options.project } : { here: true });
+    console.log(JSON.stringify({
+      facts: [...matched.project, ...matched.operator, ...matched.machine].map(toFactMatch),
+      observations: results.map(toObservationMatch),
+    }));
+    return;
+  }
+
   if (options.json) {
     console.log(JSON.stringify(results, null, 2));
     return;
@@ -273,6 +329,7 @@ export function createMemoryCommand(): Command {
     .option('--target [path]', 'Search all workspaces whose path targets a directory (bare flag = cwd); mutually exclusive with --workspace/--issue/--global')
     .option('--include-archived', 'Include observations hidden by reset markers')
     .option('--limit <n>', 'Maximum results', parseInt)
+    .option('--facts', 'With --json: also return matching curated facts from this checkout, the operator and the machine store, scope the search to the current project, and print one line { facts, observations }')
     .option('--json', 'Output JSON')
     .action(memorySearchCommand);
 

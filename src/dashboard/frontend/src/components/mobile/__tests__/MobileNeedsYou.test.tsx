@@ -153,6 +153,30 @@ describe('MobileNeedsYou', () => {
     expect(screen.queryByRole('button', { name: 'Open' })).not.toBeInTheDocument();
   });
 
+  it('PAN-4946: shows "Approve on the desktop" and no Open for an MCP sign-in', () => {
+    decisions = [{
+      id: 'appr-1',
+      source: 'agent',
+      label: 'Claude Desktop',
+      kinds: ['mcpSignIn'],
+      since: '2026-11-04T00:00:00.000Z',
+      blocking: true,
+      mcpSignIn: {
+        id: 'appr-1',
+        clientId: 'odc_123',
+        clientName: 'Claude Desktop',
+        redirectHost: 'localhost',
+        requestedLevel: 'operate',
+        approvalCode: 'ABCDE',
+        createdAt: '2026-11-04T00:00:00.000Z',
+        expiresAt: '2026-11-04T00:10:00.000Z',
+      },
+    }];
+    render(<MobileNeedsYou subjectId={null} />);
+    expect(screen.getByText('Approve on the desktop')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Open' })).not.toBeInTheDocument();
+  });
+
   it('shows the server error under the card and un-marks the question', async () => {
     decisions = [auq('a1', 'agent', 't1', ['Yes'])];
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: 'boom' }), { status: 500 })));
