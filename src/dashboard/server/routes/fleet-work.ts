@@ -34,8 +34,10 @@
  *
  * The actor a forwarded call carries: `operator` for the browser and operator
  * CLIs, `{ agentId }` for an agent sender (`x-overdeck-sender`), and for an
- * `odk_` token credential `operator` with a ceiling of the token's scopes
- * (D-4651-17), derived from the resolved credential, never from a header.
+ * `odk_` token credential a ceiling of the token's scopes (D-4651-17) with the
+ * actor `{ agentId }` for an agent-kind agent token (PAN-4927 D-9) and
+ * `operator` for any other token, derived from the resolved credential, never
+ * from a header.
  */
 import type { LoadSample } from '@overdeck/contracts';
 import { Effect, Layer } from 'effect';
@@ -54,7 +56,7 @@ import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js'
 import { getProjectSync, resolveProjectFromIssue } from '../../../lib/projects.js';
 import { channelOfRequest } from '../channel-peer.js';
 import { jsonResponse } from '../http-helpers.js';
-import { actorForSender, SENDER_HEADER } from '../linked-conversation-proxy.js';
+import { actorForSender, SENDER_HEADER, tokenLinkActor } from '../linked-conversation-proxy.js';
 import type { FlySpawn } from '../services/fleet-fly-target.js';
 import { defaultFleetTargetDeps, type FleetTarget, type FleetTargetDeps, placeAuto, resolveTargetMachine } from '../services/fleet-target.js';
 import { currentLinkedConversationsSync } from '../services/linked-conversations-sync.js';
@@ -97,12 +99,14 @@ export interface FleetCaller {
   ceiling?: AccessTokenScope[];
   /** The caller holds an admin credential (PAN-4743 D-4743-4): may create a Fly machine. */
   mayCreateFly?: boolean;
+  /** The caller presented an odk_ token (PAN-4938 D-10); only the issue-start route reads it. */
+  viaToken?: boolean;
 }
 
 export function fleetCaller(credential: DashboardCredential | null, sender: string | undefined): FleetCaller | null {
   const mayCreateFly = credential !== null && credentialScopes(credential).includes('admin');
   if (credential?.kind === 'token') {
-    return { actor: 'operator', ceiling: credentialScopes(credential).filter((scope): scope is AccessTokenScope => scope !== 'admin') as AccessTokenScope[], mayCreateFly };
+    return { actor: tokenLinkActor(credential), ceiling: credentialScopes(credential).filter((scope): scope is AccessTokenScope => scope !== 'admin') as AccessTokenScope[], mayCreateFly, viaToken: true };
   }
   const actor = actorForSender(sender);
   return actor === null ? null : { actor, mayCreateFly };

@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import type { MachineLink } from '../../../lib/anywhere/link-store.js';
-import { type FleetWorkerDeps, handleFleetIssueStart, handleFleetWorker, handleFleetWorkerStop } from '../routes/fleet-work.js';
+import { fleetCaller, type FleetWorkerDeps, handleFleetIssueStart, handleFleetWorker, handleFleetWorkerStop } from '../routes/fleet-work.js';
 import { readJsonResponse } from '../routes/machines-work.js';
 import type { FleetTarget } from '../services/fleet-target.js';
 
@@ -95,5 +95,20 @@ describe('POST /api/fleet/workers (D-4651-5)', () => {
     const dIssueStart = deps(REMOTE, { status: 200, json: { issueId: 'PAN-9', agentId: 'agent-pan-9' } });
     await handleFleetIssueStart('PAN-9', { machine: 'fly' }, { actor: 'operator' }, dIssueStart);
     expect(dIssueStart.resolveTarget).toHaveBeenCalledWith('fly', 'github.com/eltmon/overdeck', []);
+  });
+});
+
+describe('fleetCaller (PAN-4938 D-9, D-10)', () => {
+  it('an agent-kind token acts as its agent; a plain token as the operator; both carry viaToken', () => {
+    expect(fleetCaller({ kind: 'token', tokenId: 'k', scopes: ['operate'], agentId: 'agent-pan-1', agentKind: 'agent', role: 'work' }, undefined))
+      .toMatchObject({ actor: { agentId: 'agent-pan-1' }, ceiling: ['operate'], viaToken: true });
+    expect(fleetCaller({ kind: 'token', tokenId: 'k', scopes: ['operate'] }, undefined))
+      .toMatchObject({ actor: 'operator', ceiling: ['operate'], viaToken: true });
+  });
+
+  it('no credential with an operator sender carries no viaToken', () => {
+    const caller = fleetCaller(null, 'conv-operator-123');
+    expect(caller).toEqual({ actor: 'operator', mayCreateFly: false });
+    expect(caller).not.toHaveProperty('viaToken');
   });
 });
