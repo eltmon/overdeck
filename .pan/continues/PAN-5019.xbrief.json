@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5019",
   "created": "2026-11-04T13:12:00.752Z",
-  "updated": "2026-11-04T14:37:12.077Z",
+  "updated": "2026-11-04T14:37:24.548Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -148,6 +148,10 @@
     "exchange-prefs.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T14:37:12.076Z"
+    },
+    "exchange-prefs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:37:24.548Z"
     }
   }
 }
