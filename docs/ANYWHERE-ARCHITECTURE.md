@@ -679,7 +679,9 @@ service, lingering, then one pairing link (`.pan/drafts/PAN-4656.md`).
 - **D-10 macOS.** `src/lib/launchd.ts` writes `~/Library/LaunchAgents/ai.overdeck.supervisor.plist`
   (`RunAtLoad`, `KeepAlive`) and bootstraps it into `gui/<uid>`, falling back to
   `user/<uid>`; a changed plist is booted out first. The agent starts at login only. `pan up`
-  on a Mac with the agent loaded does not start a second supervisor. macOS 15+'s Local
+  on a Mac with the agent loaded does not start a second supervisor. The dashboard server
+  itself runs as a plain detached child of the supervisor: only Linux starts it in a `systemd-run` transient unit,
+  so macOS prints no PAN-2804 systemd warning (PAN-4896). macOS 15+'s Local
   Network privacy then applies to that launch agent (PAN-4897): the link supervisor
   (`src/dashboard/server/services/link-supervisor.ts`) names the denial only when every LAN
   `tcp://` route failed with `EHOSTUNREACH` (classified by `src/lib/anywhere/local-network.ts`)

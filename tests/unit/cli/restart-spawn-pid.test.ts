@@ -120,4 +120,31 @@ describe('dashboard spawn pid handles', () => {
 
     await expect(handle.pid!()).resolves.toBeNull();
   });
+
+  it('does not attempt systemd-run or warn on darwin (PAN-4896)', async () => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin');
+    processMocks.execFileSync.mockClear();
+    const bundle = createDashboardBundleFixture();
+    processMocks.spawn.mockReturnValue({ pid: 4321, unref: vi.fn() });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const handle = spawnDashboardDetached(config, bundle);
+
+    expect(processMocks.execFileSync.mock.calls.some((call) => call[0] === 'systemd-run')).toBe(false);
+    expect(warn.mock.calls.some((call) => String(call[0]).includes('PAN-2804'))).toBe(false);
+    await expect(handle.pid!()).resolves.toBe(4321);
+  });
+
+  it('warns once on linux when systemd-run fails (PAN-2804)', async () => {
+    const bundle = createDashboardBundleFixture();
+    processMocks.execFileSync.mockImplementation(() => { throw new Error('systemd unavailable'); });
+    processMocks.spawn.mockReturnValue({ pid: 4321, unref: vi.fn() });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    spawnDashboardDetached(config, bundle);
+
+    const pan2804Warnings = warn.mock.calls.filter((call) =>
+      String(call[0]).includes('could not start the dashboard via systemd-run'));
+    expect(pan2804Warnings).toHaveLength(1);
+  });
 });
