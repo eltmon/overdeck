@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4938",
   "created": "2026-11-04T03:39:16.629Z",
-  "updated": "2026-11-04T04:41:15.777Z",
+  "updated": "2026-11-04T04:41:32.185Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -274,6 +274,10 @@
     "docs-delegation.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T04:41:15.777Z"
+    },
+    "docs-delegation.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:41:32.184Z"
     }
   }
 }
