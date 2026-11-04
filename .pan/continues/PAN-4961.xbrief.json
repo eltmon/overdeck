@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4961",
   "created": "2026-11-03T23:57:34.038Z",
-  "updated": "2026-11-04T00:12:18.905Z",
+  "updated": "2026-11-04T00:12:33.454Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -78,6 +78,10 @@
     "create-admission.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T00:12:18.905Z"
+    },
+    "create-admission.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T00:12:33.454Z"
     }
   }
 }
