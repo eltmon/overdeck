@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-04T10:16:17.030086Z · model: claude-opus-5-5 · open: 869_
+_Last sequenced: 2026-11-04T10:16:57.388135Z · model: claude-opus-5-5 · open: 868_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -21,7 +21,6 @@ _Last sequenced: 2026-11-04T10:16:17.030086Z · model: claude-opus-5-5 · open: 
 | 14 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
 | 15 | PAN-4551 | L | high | ok |  |  | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
 | 16 | PAN-4671 | M | high | ok |  |  | CodeRabbit comments posted after the reviewer snapshot merge unseen; deliver late ones to the work agent at merge. Needs handoff. |
-| 17 | PAN-4674 | S | high | ok |  |  | Operator can't remove a configured crew (Fable expert) in Settings tiered execution; removal or model change doesn't persist |
 | 19 | PAN-4675 | S | critical | ok |  |  | One transient gh label timeout aborts post-merge lifecycle; merge door replies Already merged, so the issue can never close. |
 | 20 | PAN-4705 | S | high | ok |  |  | quality-gate-admission test leaks a poller past afterEach rmSync; unhandled ENOENT fails unrelated PR CI shards. |
 | 21 | PAN-4746 | S | high | ok |  |  | CI test shard flakes on ENOTEMPTY: afterEach rmSync races an unawaited snapshot write; reds unrelated PRs (seen on #4745). |
@@ -941,10 +940,6 @@ Moves 705 importing files off a four-month-old beta onto the supported line, whi
 
 New substrate fix to the merge door that closes the gap which let PAN-4672's findings merge unreviewed; advisory-only with a clear design and ACs, but TENET-10 requires a supervised handoff.
 
-### PAN-4674 (rank 17)
-
-New operator-reported substrate bug: tiered-execution crew removal and model changes do not persist, so the operator cannot route the expert difficulty to Opus 5.5. Clear repro steps, file pointers, and testable ACs; ranked beside the other fresh operator-reported substrate fixes.
-
 ### PAN-4675 (rank 19)
 
 New this pass. addLabel in merge-agent.ts uses Effect.promise, so one gh network timeout becomes a defect that skips pausing agents and stopping the stack, and the merge door then refuses re-runs with Already merged. PAN-4299 is stuck half-closed right now, and pan close refuses on DoD row 5. Substrate bug with clear AC, so it slots into the free rank 19 beside the other merge and close-out fixes; it overlaps PAN-3557 (label retry), and fixing either should consult the other.
@@ -1197,6 +1192,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 
 New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.
 
+### PAN-4213 (rank 82)
+
+Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066 merged, so these seven follow-ups now harden code that is on main. Items 2 and 5 are real merge-path correctness hazards: a success status can sit on a head that never landed, and git reset --keep can move an agent commit off its branch. Each item names its file, so the work is well defined and is now startable.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1204,10 +1203,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-04T10:16:17.030086Z",
+  "generatedAt": "2026-11-04T10:16:57.388135Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 869,
+  "openCount": 868,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -1388,19 +1387,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "dependsOn": [],
       "why": "CodeRabbit comments posted after the reviewer snapshot merge unseen; deliver late ones to the work agent at merge. Needs handoff.",
       "rationale": "New substrate fix to the merge door that closes the gap which let PAN-4672's findings merge unreviewed; advisory-only with a clear design and ACs, but TENET-10 requires a supervised handoff.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4674",
-      "rank": 17,
-      "size": "S",
-      "importance": "high",
-      "score": 72,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Operator can't remove a configured crew (Fable expert) in Settings tiered execution; removal or model change doesn't persist",
-      "rationale": "New operator-reported substrate bug: tiered-execution crew removal and model changes do not persist, so the operator cannot route the expert difficulty to Opus 5.5. Clear repro steps, file pointers, and testable ACs; ranked beside the other fresh operator-reported substrate fixes.",
       "gate": "auto",
       "planning": "auto"
     },
