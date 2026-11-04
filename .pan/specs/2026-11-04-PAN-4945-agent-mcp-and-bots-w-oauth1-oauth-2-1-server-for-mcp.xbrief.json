@@ -4,17 +4,17 @@
     "created": "2026-11-04T01:30:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4945: Agent MCP and bots (W-OAUTH1): OAuth 2.1 server for /mcp",
-    "updated": "2026-11-04T01:21:14.573Z"
+    "updated": "2026-11-04T01:22:23.216Z"
   },
   "plan": {
     "id": "pan-4945",
     "title": "Agent MCP and bots (W-OAUTH1): OAuth 2.1 server for /mcp",
-    "status": "proposed",
+    "status": "running",
     "uid": "b83262e3-a865-46f3-a93a-ce5b05f78291",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-04T01:30:00Z",
-    "updated": "2026-11-04T01:21:14.573Z",
+    "updated": "2026-11-04T01:22:23.216Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4945",
@@ -1241,5 +1241,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
