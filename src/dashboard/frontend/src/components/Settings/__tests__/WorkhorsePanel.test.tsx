@@ -83,8 +83,8 @@ describe('WorkhorsePanel', () => {
     expect(screen.getByText('Strongest, costly — plan/review default')).toBeInTheDocument();
     expect(screen.getByText('Balanced default')).toBeInTheDocument();
     expect(screen.getByText('Fast & cheap — universal inspect')).toBeInTheDocument();
-    expect(screen.getAllByText('Anthropic > Claude Opus 4.7').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Kimi > Kimi K2.6 Flash').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Claude Opus 4.7').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Kimi K2.6 Flash').length).toBeGreaterThan(0);
     expect(screen.getAllByRole('alert')[0]).toHaveTextContent('Anthropic is not configured');
   });
 

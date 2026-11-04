@@ -1,0 +1,160 @@
+{
+  "version": "1",
+  "issueId": "PAN-4935",
+  "created": "2026-11-04T08:09:37.402Z",
+  "updated": "2026-11-04T09:47:41.579Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-04T09:40Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-04T09:40:14.280Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-04T09:47Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-11-04T09:47:41.579Z"
+    }
+  ],
+  "items": {
+    "instructions-text": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4935",
+      "claimedAt": "2026-11-04T09:41:35.014Z",
+      "doneAt": "2026-11-04T08:24:30.861Z"
+    },
+    "mcp-gate-leaf": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4935",
+      "claimedAt": "2026-11-04T08:25:07.343Z",
+      "doneAt": "2026-11-04T08:35:55.519Z"
+    },
+    "launch-context-block": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4935",
+      "claimedAt": "2026-11-04T08:35:59.857Z",
+      "doneAt": "2026-11-04T08:46:52.447Z"
+    },
+    "acp-context-block": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4935",
+      "claimedAt": "2026-11-04T08:46:56.265Z",
+      "doneAt": "2026-11-04T08:58:23.798Z"
+    },
+    "muse-context-block": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4935",
+      "claimedAt": "2026-11-04T08:58:28.165Z",
+      "doneAt": "2026-11-04T09:08:21.950Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4935",
+      "claimedAt": "2026-11-04T09:08:26.658Z",
+      "doneAt": "2026-11-04T09:17:53.428Z"
+    },
+    "instructions-text.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:19:42.703Z"
+    },
+    "instructions-text.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:19:55.548Z"
+    },
+    "instructions-text.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:20:09.147Z"
+    },
+    "instructions-text.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:20:23.626Z"
+    },
+    "mcp-gate-leaf.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:20:42.403Z"
+    },
+    "mcp-gate-leaf.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:20:57.472Z"
+    },
+    "mcp-gate-leaf.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:21:12.762Z"
+    },
+    "launch-context-block.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:21:29.731Z"
+    },
+    "launch-context-block.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:21:43.603Z"
+    },
+    "launch-context-block.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:21:56.909Z"
+    },
+    "launch-context-block.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:22:11.063Z"
+    },
+    "acp-context-block.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:22:28.384Z"
+    },
+    "acp-context-block.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:22:42.278Z"
+    },
+    "acp-context-block.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:22:56.146Z"
+    },
+    "acp-context-block.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:23:10.445Z"
+    },
+    "muse-context-block.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:23:27.329Z"
+    },
+    "muse-context-block.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:23:41.453Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:23:54.188Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:24:07.357Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:24:19.744Z"
+    },
+    "docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:24:31.937Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-04T09:40:14Z",
+      "markdownBody": "# CI Failure Feedback for PAN-4935\n\nPull request: https://github.com/eltmon/overdeck/pull/4997 (head `3713aec5`)\n\nSource: check_run:test-shard (3/4)\n\n## Failing checks (1)\n\n### test-shard (3/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/126502308685/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/41808761649/job/126502308685  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/overdeck/__tests__/conversation-resume-clear-chain.test.ts\u001b[2m > \u001b[22mhandleConversationResume clear-chain redirect\u001b[2m > \u001b[22mresumes the chain head once, using its claudeSessionId, and marks only the head active\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/overdeck/__tests__/conversation-resume-clear-chain.test.ts\u001b[2m > \u001b[22mhandleConversationResume clear-chain redirect\u001b[2m > \u001b[22mresumes the chain head once, using its claudeSessionId, and marks only the head active\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected [] to have a length of 1 but got +0\u001b[39m\n\n\u001b[32m- Expected\u001b[39m\n\u001b[31m+ Received\u001b[39m\n\n\u001b[32m- 1\u001b[39m\n\u001b[31m+ 0\u001b[39m\n\n\u001b[36m \u001b[2m❯\u001b[22m src/lib/overdeck/__tests__/conversation-resume-clear-chain.test.ts:\u001b[2m188:32\u001b[22m\u001b[39m\n    \u001b[90m186|\u001b[39m     const payload = decodeJsonResponse(response as unknown as { body: …\n    \u001b[90m187|\u001b[39m\n    \u001b[90m188|\u001b[39m     \u001b[34mexpect\u001b[39m(createSessionCalls)\u001b[33m.\u001b[39m\u001b[34mtoHaveLength\u001b[39m(\u001b[34m1\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m   |\u001b[39m                                \u001b[31m^\u001b[39m\n    \u001b[90m189|\u001b[39m     \u001b[34mexpect\u001b[39m(createSessionCalls[\u001b[34m0\u001b[39m]\u001b[33m?.\u001b[39msession)\u001b[33m.\u001b[39m\u001b[34mtoBe\u001b[39m(\u001b[32m'conv-resume-p'\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m190|\u001b[39m     \u001b[35mconst\u001b[39m launcher \u001b[33m=\u001b[39m \u001b[34mlauncherFor\u001b[39m(\u001b[32m'conv-resume-p'\u001b[39m)\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯\u001b[22m\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/overdeck/__tests__/conversation-resume-clear-chain.test.ts\u001b[2m > \u001b[22mPAN-4640 resume cause override\u001b[2m > \u001b[22muses the injected resume cause\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/overdeck/__tests__/conversation-resume-clear-chain.test.ts\u001b[2m > \u001b[22mPAN-4640 resume cause override\u001b[2m > \u001b[22muses the injected resume cause\n\u001b[31m\u001b[1mAssertionError\u001b[\n…\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m602 passed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[33m1 skipped\u001b[39m\u001b[90m (604)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-11-04T09:47:41Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-4935\n\n# Review — PAN-4935\n## Verdict: CHANGES REQUESTED — the CI test job is red on the PR head (shards 2/4 and 3/4); the cause is the new uncaught `overdeckMcpEnabledFor` call in `claudeSystemPromptFiles`\n\n## Context\n- Run ID: agent-pan-4935-review-3713aec5\n- Manifest: .pan/review/agent-pan-4935-review-3713aec5/context.json\n- Branch / workspace: feature/pan-4935 / workspaces/feature-pan-4935\n- PR: https://github.com/eltmon/overdeck/pull/4997\n- HEAD reviewed: 3713aec5f64ef7699c69e3000b1464a2e51a7f07\n- Base: b3353b52c77 (merge-base with origin/main; main since then has only state/backlog commits)\n- Prior cycle SHA: none\n\n## Blocking Findings\n\n### [correctness] Red CI test job: the new gate call in `claudeSystemPromptFiles` is uncaught, unlike the injection side (NFR-5) — `src/lib/context-layers/launch-sources.ts:33`\n- Severity: ! MUST\n- Classification / requirement scope: implementation defect; in_pr_scope (fails explicit NFR-5; causes a red CI test job)\n- Trigger and changed-code connection: This PR adds `await overdeckMcpEnabledFor(...)` to three launch-context builders:\n  `claudeSystemPromptFiles` (`launch-sources.ts:33`), `getAcpLauncherFields` (`runtime-command.ts:148`) and\n  `materializeMuseContext` (`muse-context.ts:27`, unaffected in practice because Muse short-circuits before reading config).\n  For claude-code, codex, acp and opencode, the gate calls `loadConfigNoMigration()`. Its documentation\n  (`src/lib/config-yaml/load.ts:309-312`) says it \"Rejects on a parse error or on an I/O failure reading either config file\".\n  The injection path calls the same gate inside a try/catch and never throws (`agent-injection.ts:93-103`: \"never throws\",\n  logs `overdeck MCP skipped`). The new context-path calls have no catch.\n- Expected / observed / impact:\n  - Expected (PRD NFR-5): \"Fail safe: when the flag is absent or any check fails, the launch gets the CLI block, never a promise of tools it may not have.\"\n  - Observed: a rejection propagates out of `claudeSystemPromptFiles` / `getAcpLauncherFields` and fails the launch.\n  - Product impact (unconfirmed hypothesis): when `loadConfigNoMigration` rejects (malformed or unreadable `config.yaml`),\n    injection on `main` only skips MCP with a warning, but with this PR the context assembly rejects and the launch fails.\n    `render.ts:24-25` catches its own `loadConfigSync` error, so the render path does not fail first. I did not verify whether\n    another launch step already fails on a broken config, so this impact may be narrower than stated. The red CI job carries\n    the finding.\n  - CI impact: the PR's CI test job is red. `test-shard (2/4)` fails 12+ tests in\n    `src/dashboard/server/routes/__tests__/conversations-supervisor.test.ts`, and `test-shard (3/4)` fails 3 tests in\n    `src/lib/overdeck/__tests__/conversation-resume-clear-chain.test.ts`. Both files mock `config-yaml.js` without\n    `loadConfigNoMigration`. On main, the only gate call was inside the catching injection helper, so these tests logged\n    `[agent-injection] overdeck MCP skipped …` and passed. Now the uncaught call in `claudeSystemPromptFiles` fails the\n    spawn or resume.\n- Evidence:\n  - CI run 41808761649, job 126502308487 (shard 2). Stack: `overdeckMcpEnabledFor src/lib/mcp/overdeck-mcp-gate.ts:19:17` ←\n    `claudeSystemPromptFiles src/lib/context-layers/launch-sources.ts:33:102`. Log: `[conversations] background spawn failed for conv-…:\n    [vitest] No \"loadConfigNoMigration\" export is defined on the \"../../../../lib/config-yaml.js\" mock`.\n  - Job 126502308685 (shard 3): `[conversations] resume conversation failed: [vitest] No \"loadConfigNoMigration\" export …`,\n    then `AssertionError: expected [] to have a length of 1` at `conversation-resume-clear-chain.test.ts:188`.\n  - The aggregate `test` check is failing as well. The latest `main` CI (c2d4622f) is green, so this is not a pre-existing failure.\n  - Limitation: on this host the two files pass locally (also with `--experimental.fsModuleCache=false`, `CI=true`, a clean\n    `env -i` HOME and `--configLoader runner`). I could not explain why the local run does not hit the uncaught path. The CI\n    stack trace is the authoritative evidence, and the NFR-5 gap is clear from static reading of the code.\n- Fix (author's choice; (a) is recommended):\n  - (a) Make the context-side decision fail-safe, as NFR-5 requires. Use `await overdeckMcpEnabledFor(h).catch(() => false)`\n    at launch-sources.ts:33 and runtime-command.ts:148 (optionally muse-context.ts:27 for symmetry). Do not add a second\n    exported gate variant (no twin). A rejection then gives the CLI block, which matches the injection side: there, the same\n    rejection skips the server. Add one test to `launch-sources-tools-block.test.ts` where `loadConfigNoMigration` rejects\n    and the shared file contains `## Overdeck commands`. This fix also clears both CI failures.\n  - (b) Add `loadConfigNoMigration` to the partial `config-yaml.js` mocks in `conversations-supervisor.test.ts:56` and\n    `conversation-resume-clear-chain.test.ts:46`. This turns CI green, but on its own it leaves the asymmetry: the context side\n    can still throw where injection never does, so NFR-5 stays unmet and the next partial mock fails the same way.\n  - Either way, rerun the two failing files and confirm that CI shards 2 and 3 are green.\n\n## Non-blocking Findings\n\n- `?` MAY — **Conversation launches without a conversation row are told about tools they lack.** In `conversation-runtime.ts:591/776`, `tokenRow` is null for non-bare launches whose tmux session has no conversation row. Injection is then skipped, but the gate is true, so the context gets the MCP block. This is the same class as the accepted hazard H-1 (failed mint), and the block keeps `pan` as the fallback. I did not establish how often a non-bare conversation launches without a row. Advisory only.\n- `~` SHOULD (housekeeping) — `.overdeck/context/codebase/concerns.md` collapses several stacked `last-verified` comments into one union line. The union appears complete for the IDs removed. Harmless.\n- Spec note: D-1/H-1 knowingly accept the mismatch between the gate and the mint result. This is consistent with the non-goals, so it is not raised here.\n\n## Coverage\n\n### Changed-file ledger\n| File | Status |\n| --- | --- |\n| src/lib/agents/spawn-prep.ts | Reviewed — in-place `await`, line count 1,124 = base |\n| src/lib/agents/spawn.ts | Reviewed — in-place `await`, 1,088 = base |\n| src/lib/mcp/agent-injection.ts | Reviewed — functions moved, re-exported; unused `loadConfigNoMigration` import removed; `getHarnessBehavior` still used |\n| src/lib/planning/spawn-planning-session.ts | Reviewed — in-place `await`, 744 = base; context harness = injection harness (`effectiveHarness`) |\n| src/lib/overdeck/conversation-runtime.ts | Reviewed — `Awaited<ReturnType<…>>`, spread of awaited value; 1,190 = base |\n| src/lib/agents/runtime-command.ts | Reviewed — async `getAcpLauncherFields`; 976 lines (≤ 1,000) — **blocking finding site** |\n| src/lib/context-layers/launch-sources.ts | Reviewed — **blocking finding site** |\n| src/lib/context-layers/materialize.ts | Reviewed — options type, tools block last, `-mcp`/`-cli` file key |\n| src/lib/acp/context.ts | Reviewed — passes opts through |\n| src/lib/mcp/agent-instructions.ts | Reviewed — no imports; text matches PRD W-1 verbatim |\n| src/lib/mcp/overdeck-mcp-gate.ts | Reviewed — verbatim move; leaf imports only |\n| src/lib/runtimes/muse-context.ts | Reviewed — block before role file; muse capability false ⇒ no config read |\n| src/lib/agents/__tests__/acp-launcher-tools-block.test.ts | Reviewed |\n| src/lib/agents/__tests__/runtime-command-effort.test.ts | Reviewed — made async |\n| tests/lib/context-layers/materialize.test.ts | Reviewed |\n| tests/unit/lib/context-layers/launch-sources-tools-block.test.ts | Reviewed |\n| tests/unit/lib/mcp/agent-instructions.test.ts | Reviewed |\n| tests/unit/lib/runtimes/muse-context.test.ts | Reviewed |\n| configuration/mcp.mdx | Reviewed — \"What the agent is told\" subsection |\n| configuration/harnesses.mdx | Reviewed — link to subsection |\n| configuration/context-layers.mdx | Reviewed — Kimi artifact `-cli.md`, sentence + link |\n| docs/CONTEXT-LAYERS.md | Reviewed — inventory row |\n| .pan/drafts/pan-4927.md | Reviewed — Revision 2 C-1..C-4 |\n| .pan/drafts/PAN-4935.md | Reviewed (spec) |\n| .pan/continues/PAN-4935.xbrief.json, .pan/specs/…xbrief.json | Not applicable — planning artifacts |\n| .overdeck/context/codebase/architecture.md, concerns.md | Reviewed — context notes |\n\n### Dimensions\n- **Correctness:** One blocker (above). Callers pass consistent harnesses: each `claudeSystemPromptFiles`, `getAcpLauncherFields` and `materializeMuseContext` call uses the same harness as its `prepare*OverdeckMcp` sibling (spawn.ts, spawn-prep.ts, recovery.ts, messaging.ts, spawn-planning-session.ts, conversation-runtime.ts). ACP host launches do get the server (`OVERDECK_MCP_JSON_LAUNCH_KINDS` includes `acp-host`, `launcher-generator.ts:887`), so the MCP block in `acp-context.md` is accurate. `AcpRuntime.spawnAgent` and prime-agent default to the CLI block, as D-2 requires. No reader depends on the old shared-file name.\n- **Security:** No new trust boundary. The block text tells agents never to request secrets or pairing codes in chat. No secrets in the files.\n- **Performance:** One cached `loadConfigNoMigration` (mtime cache) per launch-context build. Negligible.\n- **Requirements/UX:** See the AC matrix. The docs cover every agent kind and both blocks.\n\n### Acceptance criteria\n| AC | Status | Evidence |\n| --- | --- | --- |\n| AC-1 | Met | agent-instructions.test.ts passes; text ≤ 1,500; names checked against `ALL_TOOLS` |\n| AC-2 | Met | gate in leaf module, re-exported; agent-injection tests pass unchanged; `lint:circular` passed (65 baselined, no new) |\n| AC-3 | Met (happy path) | launch-sources-tools-block.test.ts passes (claude-code/codex `-mcp.md`, kimi CLI, Docker/`mcp.agents:false` CLI) |\n| AC-4 | Met | async; acp-launcher-tools-block.test.ts passes; four god files have the same line counts as base; runtime-command.ts 976 |\n| AC-5 | Met | muse-context.test.ts passes |\n| AC-6 | Met | docs diffs verified |\n| NFR-5 | **Unmet** | gate rejection is not caught on the context side (blocking finding) |\n\n## Verification\n- `gh pr checks 4997` (HEAD 3713aec5): `test-shard (2/4)` FAIL, `test-shard (3/4)` FAIL, aggregate `test` FAIL; shards 1 and 4, build (22), lint-group (core/state/skills/effect), clean-install smoke and `overdeck/test` (typecheck+lint) pass. The failures trace to this change (stack frames above).\n- Focused local tests (pass): `npx vitest run tests/unit/lib/mcp/agent-instructions.test.ts tests/lib/context-layers/materialize.test.ts tests/unit/lib/context-layers/launch-sources-tools-block.test.ts tests/unit/lib/context-layers/prime-agent.test.ts src/lib/agents/__tests__/acp-launcher-tools-block.test.ts src/lib/agents/__tests__/runtime-command-effort.test.ts tests/unit/lib/runtimes/muse-context.test.ts tests/unit/lib/mcp/agent-injection.test.ts tests/unit/lib/mcp/agent-injection-launch.test.ts` → 9 files / 63 tests passed. Adjacent: kimi-context-envelope, conversation-runtime-prime, prime-agent-spawn, messaging-ollama-preflight → 14 passed.\n- `npm run lint:effect-diagnostics` → passed (227 known, none new). `npm run lint:circular` → passed.\n- Full suite not run (per the role rules); CI is authoritative.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4935/.pan/review/agent-pan-4935-review-3713aec5/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-4935 -m \"Fixed review issues\"`"
+    }
+  ]
+}

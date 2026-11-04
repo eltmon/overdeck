@@ -140,10 +140,10 @@ describe('RolesPanel', () => {
       /Effort applies the next time the Flywheel starts; a paused Flywheel resumes at the effort it started with\./,
     )).toBeInTheDocument();
     expect(screen.getAllByText('Expensive (claude-opus-4-7)').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Anthropic > Claude Opus 4.7').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Kimi > Kimi K2.6 Flash').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('MiMo > MiMo VL').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Alibaba DashScope > Qwen3 Max').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Claude Opus 4.7').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Kimi K2.6 Flash').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('MiMo VL').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Qwen3 Max').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Default: Workhorse: Expensive')[0]).toHaveAttribute(
       'title',
       'Workhorse: Expensive = claude-opus-4-7',

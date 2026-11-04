@@ -586,6 +586,30 @@ describe('deacon-lite', () => {
       expect(observer).toHaveBeenCalledWith(expect.objectContaining({ error: null }));
     });
 
+    it('joins a patrol already in flight instead of starting an overlapping one (PAN-5001)', async () => {
+      mocks.listAgentStates.mockReturnValue([]);
+      mocks.liveAgentInventory.mockResolvedValue(inventory([]));
+      let finishReap: () => void = () => {};
+      mocks.reconcileClosedIssueAgents.mockImplementationOnce(
+        () => new Promise<string[]>((resolve) => { finishReap = () => resolve([]); }),
+      );
+      const observer = vi.fn();
+      setPatrolRunObserver(observer);
+
+      const first = runDeaconLitePatrol();
+      const second = runDeaconLitePatrol();
+      await vi.waitFor(() => expect(mocks.reconcileClosedIssueAgents).toHaveBeenCalledTimes(1));
+      expect(second).toBe(first);
+      finishReap();
+      await Promise.all([first, second]);
+
+      expect(mocks.reconcileClosedIssueAgents).toHaveBeenCalledTimes(1);
+      expect(observer).toHaveBeenCalledTimes(1);
+
+      await runDeaconLitePatrol();
+      expect(mocks.reconcileClosedIssueAgents).toHaveBeenCalledTimes(2);
+    });
+
     it('swallows a throwing observer and still resolves and stamps lastRunAt', async () => {
       mocks.listAgentStates.mockReturnValue([]);
       mocks.liveAgentInventory.mockResolvedValue(inventory([]));

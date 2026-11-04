@@ -360,6 +360,31 @@ describe('forgeApprovalAtHead', () => {
     ]), noLogins)).toBe(false);
   });
 
+  // PAN-4702: PR #4699 as GitHub listed it, sorted by a skewed `submittedAt`.
+  it('a stale approval of an older commit with a future timestamp does not hide the approval of the head', async () => {
+    const bot = { author: { login: 'overdeck-agent', __typename: 'Bot' }, authorAssociation: 'CONTRIBUTOR' };
+    expect(await forgeApprovalAtHead(facts, atHead([
+      { ...bot, state: 'APPROVED', commit: { oid: HEAD }, databaseId: 5727374168, submittedAt: '2026-11-01T09:27:27Z' },
+      { ...bot, state: 'APPROVED', commit: { oid: OLDER }, databaseId: 5727284578, submittedAt: '2026-11-01T09:55:07Z' },
+    ]), liveLogins)).toBe(true);
+  });
+
+  it('ranks verdicts on the head by review id, not by submittedAt: a later CHANGES_REQUESTED still blocks', async () => {
+    expect(await forgeApprovalAtHead(facts, atHead([
+      { state: 'CHANGES_REQUESTED', commit: { oid: HEAD }, databaseId: 5727400000, submittedAt: '2026-11-01T09:20:00Z' },
+      { state: 'APPROVED', commit: { oid: HEAD }, databaseId: 5727374168, submittedAt: '2026-11-01T09:55:07Z' },
+    ]), noLogins)).toBe(false);
+  });
+
+  it('a dismissal or changes request on the head outranks an approval of an older commit', async () => {
+    for (const state of ['DISMISSED', 'CHANGES_REQUESTED']) {
+      expect(await forgeApprovalAtHead(facts, atHead([
+        { state, commit: { oid: HEAD }, databaseId: 1, submittedAt: '2026-11-01T09:00:00Z' },
+        { state: 'APPROVED', commit: { oid: OLDER }, databaseId: 2, submittedAt: '2026-11-01T10:00:00Z' },
+      ]), noLogins)).toBe(false);
+    }
+  });
+
   it('a later dismissal withdraws the approval; a later COMMENTED review does not', async () => {
     expect(await forgeApprovalAtHead(facts, atHead([
       { state: 'DISMISSED', commit: { oid: HEAD }, submittedAt: '2026-09-24T10:00:00Z' },

@@ -99,4 +99,33 @@ describe('updateContinueState write hardening (PAN-4225)', () => {
     });
     expect(result.feedback).toHaveLength(1);
   });
+
+  // PAN-4690: writeContinueState always stamps a fresh `updated`, so a no-op
+  // mutation used to rewrite the tracked file and dirty the workspace.
+  it('ac5: a mutation that changes nothing leaves the file byte-identical', () => {
+    mkdirSync(join(TEST_DIR, '.pan', 'continues'), { recursive: true });
+    const seeded = `${JSON.stringify({
+      version: '1',
+      issueId,
+      created: '2026-01-01T00:00:00.000Z',
+      updated: '2026-01-01T00:00:00.000Z',
+      gitState: {},
+      decisions: [],
+      hazards: [],
+      resumePoint: null,
+      sessionHistory: [],
+      feedback: [],
+    }, null, 2)}\n`;
+    writeFileSync(filePath(), seeded, 'utf-8');
+
+    const result = updateContinueState(TEST_DIR, issueId, (state) => ({ ...state, feedback: [] }));
+
+    expect(readFileSync(filePath(), 'utf-8')).toBe(seeded);
+    expect(result.updated).toBe('2026-01-01T00:00:00.000Z');
+
+    updateContinueState(TEST_DIR, issueId, (state) => ({ ...state, hazards: [{ id: 'H1', summary: 'real change' }] }));
+    const onDisk = JSON.parse(readFileSync(filePath(), 'utf-8')) as ContinueState;
+    expect(onDisk.hazards).toEqual([{ id: 'H1', summary: 'real change' }]);
+    expect(onDisk.updated).not.toBe('2026-01-01T00:00:00.000Z');
+  });
 });

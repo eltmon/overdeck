@@ -199,7 +199,7 @@ export interface ContinueState {
   /** Agent model for the most recent / current session. */
   agentModel?: string;
   sessionHistory: ContinueSessionEntry[];
-  /** Pending specialist feedback for the work agent. Cleared at the start of each review cycle. */
+  /** Specialist feedback history across cycles. The current cycle lives in the workspace feedback mirror (PAN-4690). */
   feedback?: ContinueFeedbackEntry[];
   /** Advisory scope prediction drift recorded at pan done. */
   scopeDrift?: ScopeDriftRecord;
@@ -281,6 +281,12 @@ export function updateContinueState(
     }
   }
   const next = mutate(current);
+  // PAN-4690: a mutation that changes nothing must not touch the file —
+  // writeContinueState always stamps a fresh `updated`, so writing anyway
+  // dirties the tracked continue file and trips the dirty-tree gates.
+  if (existsSync(path) && JSON.stringify({ ...next, updated: current.updated }) === JSON.stringify(current)) {
+    return current;
+  }
   writeContinueState(planHome, issueId, next);
   return next;
 }

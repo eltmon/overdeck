@@ -55,4 +55,19 @@ describe('materializeMuseContext', () => {
     expect(rendered).not.toContain('## Project memory');
     expect(rendered).not.toContain('## Operator memory');
   });
+
+  it('writes the CLI block, never the MCP block (PAN-4935 W-5)', async () => {
+    const path = await materializeMuseContext('agent-pan-3957', workspace);
+    const rendered = readFileSync(path, 'utf8');
+    expect(rendered).toContain('## Overdeck commands');
+    expect(rendered).not.toContain('## Overdeck tools');
+  });
+
+  it('puts the role text after the CLI block', async () => {
+    const roleFile = join(overdeckHome, 'role.md');
+    writeFileSync(roleFile, '# Role\n\nBe helpful.', 'utf8');
+    const path = await materializeMuseContext('agent-pan-3957', workspace, roleFile);
+    const rendered = readFileSync(path, 'utf8');
+    expect(rendered.indexOf('## Overdeck commands')).toBeLessThan(rendered.indexOf('# Role'));
+  });
 });
