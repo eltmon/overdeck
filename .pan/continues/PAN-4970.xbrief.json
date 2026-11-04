@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4970",
   "created": "2026-11-04T00:20:58.327Z",
-  "updated": "2026-11-04T01:51:37.118Z",
+  "updated": "2026-11-04T01:51:52.183Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -126,6 +126,10 @@
     "reconciler-wiring.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T01:51:37.118Z"
+    },
+    "queue-owner-flag.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:51:52.183Z"
     }
   }
 }
