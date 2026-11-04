@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4942",
   "created": "2026-11-04T05:29:28.990Z",
-  "updated": "2026-11-04T06:28:11.001Z",
+  "updated": "2026-11-04T06:28:25.063Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -188,6 +188,10 @@
     "docs-link-machine.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T06:28:11.000Z"
+    },
+    "docs-link-machine.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:28:25.063Z"
     }
   }
 }
