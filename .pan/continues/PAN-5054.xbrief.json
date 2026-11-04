@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5054",
   "created": "2026-11-04T19:57:03.624Z",
-  "updated": "2026-11-04T20:16:28.790Z",
+  "updated": "2026-11-04T20:16:41.462Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -48,6 +48,10 @@
     "acceptance-note.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T20:16:28.790Z"
+    },
+    "acceptance-note.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T20:16:41.462Z"
     }
   }
 }
