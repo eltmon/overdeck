@@ -3,8 +3,10 @@
  * questions an agent asks the operator through the dashboard, and the 0600
  * file a delivered secret becomes.
  *
- * One store holds every request kind (`secret` now, `machine-link` in
- * W-LINK1). A request is held in memory only: a dashboard restart forgets
+ * One store holds every request kind: `secret` (W-SEC1) and `machine-link`
+ * (W-LINK1, PAN-4942). A machine-link request asks the operator to link a
+ * machine; it lasts 24 hours and ends `linked` with the new machine's
+ * environment id and label. A request is held in memory only: a dashboard restart forgets
  * every request, and a request that left `pending` is dropped one hour after
  * it ended. The owner directory is captured when the request is made and is
  * never part of a view, so no read route can answer it. Expiry is lazy: every
@@ -47,7 +49,13 @@ export interface AgentRequestView {
   expiresAt: string;
   status: AgentRequestStatus;
   endedAt: string | null;
-  result?: { file?: string };
+  result?: AgentRequestResult;
+}
+
+/** What a request ended with: the delivered secret's file, or the linked machine (W-LINK1). */
+export interface AgentRequestResult {
+  file?: string;
+  machine?: { environmentId: string; label: string };
 }
 
 export const AGENT_REQUEST_PENDING_LIMIT = 20;
@@ -57,12 +65,19 @@ export const SECRET_REQUEST_MAX_TIMEOUT_MS = 60 * 60_000;
 export const ENDED_REQUEST_TTL_MS = 60 * 60_000;
 export const SECRET_NAME_PATTERN = /^[A-Z][A-Z0-9_]{0,63}$/;
 export const SECRET_VALUE_MAX_BYTES = 65_536;
+export const MACHINE_LINK_REQUEST_TIMEOUT_MS = 24 * 60 * 60_000;
+export const MACHINE_LINK_HINT_MAX_LENGTH = 200;
 
 export interface AgentRequests {
   /** D-6: an existing pending request of the same agent and name is answered with created: false. */
   createSecret(
     caller: SelfCaller,
     input: { name: string; prompt: string; timeoutMs: number; label: string },
+  ): { ok: true; created: boolean; request: AgentRequestView } | { ok: false; code: 'too-many-requests' };
+  /** W-LINK1 D-2: an existing pending machine-link request of the same owner and hint (trimmed, case-insensitive) is answered with created: false. */
+  createMachineLink(
+    caller: SelfCaller,
+    input: { hint: string; label: string },
   ): { ok: true; created: boolean; request: AgentRequestView } | { ok: false; code: 'too-many-requests' };
   /** The caller's own request, or null (unknown, not the caller's). */
   getForCaller(id: string, caller: SelfCaller): AgentRequestView | null;
@@ -73,7 +88,7 @@ export interface AgentRequests {
   /** For the answer routes: the held request with its owner directory, or null. */
   getForAnswer(id: string): { view: AgentRequestView; ownerDir: string } | null;
   /** pending → status; resolves waiters. False when the request is unknown or no longer pending. */
-  settle(id: string, status: Exclude<AgentRequestStatus, 'pending'>, result?: { file?: string }): boolean;
+  settle(id: string, status: Exclude<AgentRequestStatus, 'pending'>, result?: AgentRequestResult): boolean;
 }
 
 interface HeldRequest {
@@ -98,7 +113,9 @@ function ownerKeyOf(caller: Pick<SelfCaller, 'agentId' | 'agentKind'>): string {
 }
 
 function copyView(view: AgentRequestView): AgentRequestView {
-  return view.result ? { ...view, result: { ...view.result } } : { ...view };
+  return view.result
+    ? { ...view, result: { ...view.result, ...(view.result.machine ? { machine: { ...view.result.machine } } : {}) } }
+    : { ...view };
 }
 
 export function createAgentRequests(deps: { now?: () => number; newId?: () => string } = {}): AgentRequests {
@@ -106,12 +123,12 @@ export function createAgentRequests(deps: { now?: () => number; newId?: () => st
   const newId = deps.newId ?? (() => randomBytes(16).toString('hex'));
   const records = new Map<string, HeldRequest>();
 
-  function settleHeld(record: HeldRequest, status: Exclude<AgentRequestStatus, 'pending'>, result?: { file?: string }): void {
+  function settleHeld(record: HeldRequest, status: Exclude<AgentRequestStatus, 'pending'>, result?: AgentRequestResult): void {
     const endedAtMs = now();
     record.endedAtMs = endedAtMs;
     record.view.status = status;
     record.view.endedAt = new Date(endedAtMs).toISOString();
-    if (result) record.view.result = { ...result };
+    if (result) record.view.result = { ...result, ...(result.machine ? { machine: { ...result.machine } } : {}) };
     record.settle();
   }
 
@@ -139,6 +156,33 @@ export function createAgentRequests(deps: { now?: () => number; newId?: () => st
     return record && record.ownerKey === ownerKeyOf(caller) ? record : null;
   }
 
+  function insert(
+    caller: SelfCaller,
+    fields: Pick<AgentRequestView, 'kind' | 'name' | 'prompt' | 'hint'>,
+    timeoutMs: number,
+    label: string,
+  ): AgentRequestView {
+    const createdAtMs = now();
+    const expiresAtMs = createdAtMs + timeoutMs;
+    let settle: () => void = () => undefined;
+    const settled = new Promise<void>((resolve) => {
+      settle = resolve;
+    });
+    const view: AgentRequestView = {
+      id: newId(),
+      agentId: caller.agentId,
+      agentKind: caller.agentKind,
+      label,
+      ...fields,
+      createdAt: new Date(createdAtMs).toISOString(),
+      expiresAt: new Date(expiresAtMs).toISOString(),
+      status: 'pending',
+      endedAt: null,
+    };
+    records.set(view.id, { view, ownerKey: ownerKeyOf(caller), ownerDir: agentRequestOwnerDir(caller), expiresAtMs, endedAtMs: null, settled, settle });
+    return copyView(view);
+  }
+
   return {
     createSecret(caller, input) {
       refresh();
@@ -152,28 +196,26 @@ export function createAgentRequests(deps: { now?: () => number; newId?: () => st
         pendingOfOwner += 1;
       }
       if (pendingOfOwner >= AGENT_REQUEST_PENDING_LIMIT) return { ok: false, code: 'too-many-requests' };
+      const request = insert(caller, { kind: 'secret', name: input.name, prompt: input.prompt }, input.timeoutMs, input.label);
+      return { ok: true, created: true, request };
+    },
 
-      const createdAtMs = now();
-      const expiresAtMs = createdAtMs + input.timeoutMs;
-      let settle: () => void = () => undefined;
-      const settled = new Promise<void>((resolve) => {
-        settle = resolve;
-      });
-      const view: AgentRequestView = {
-        id: newId(),
-        kind: 'secret',
-        agentId: caller.agentId,
-        agentKind: caller.agentKind,
-        label: input.label,
-        name: input.name,
-        prompt: input.prompt,
-        createdAt: new Date(createdAtMs).toISOString(),
-        expiresAt: new Date(expiresAtMs).toISOString(),
-        status: 'pending',
-        endedAt: null,
-      };
-      records.set(view.id, { view, ownerKey, ownerDir: agentRequestOwnerDir(caller), expiresAtMs, endedAtMs: null, settled, settle });
-      return { ok: true, created: true, request: copyView(view) };
+    createMachineLink(caller, input) {
+      refresh();
+      const ownerKey = ownerKeyOf(caller);
+      const hint = input.hint.trim();
+      const hintKey = hint.toLowerCase();
+      let pendingOfOwner = 0;
+      for (const record of records.values()) {
+        if (record.ownerKey !== ownerKey || record.view.status !== 'pending') continue;
+        if (record.view.kind === 'machine-link' && record.view.hint?.trim().toLowerCase() === hintKey) {
+          return { ok: true, created: false, request: copyView(record.view) };
+        }
+        pendingOfOwner += 1;
+      }
+      if (pendingOfOwner >= AGENT_REQUEST_PENDING_LIMIT) return { ok: false, code: 'too-many-requests' };
+      const request = insert(caller, { kind: 'machine-link', hint }, MACHINE_LINK_REQUEST_TIMEOUT_MS, input.label);
+      return { ok: true, created: true, request };
     },
 
     getForCaller(id, caller) {

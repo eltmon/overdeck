@@ -23,6 +23,8 @@ export type PendingInputKind =
   | 'heldKickoff'
   /** PAN-4941 — an agent asked the operator for a secret (request_secret). */
   | 'secretRequest'
+  /** PAN-4942 — an agent asked the operator to link a machine (link_machine). */
+  | 'machineLink'
   /** PAN-4946 — an MCP client is waiting on an OAuth sign-in approval decision. */
   | 'mcpSignIn';
 
@@ -39,6 +41,7 @@ export const PENDING_INPUT_KIND_LABEL: Record<string, string> = {
   paneQuestion: 'Question in terminal — answer the agent',
   heldKickoff: 'Held handoff — kickoff not sent',
   secretRequest: 'Secret requested',
+  machineLink: 'Machine link requested',
   mcpSignIn: 'MCP sign-in waiting',
 };
 
