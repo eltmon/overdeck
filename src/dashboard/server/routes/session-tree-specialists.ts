@@ -1,7 +1,7 @@
 import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import type { AgentSnapshot, SessionNode, SessionNodePresence } from '@overdeck/contracts';
+import { presenceForPaneState, type AgentSnapshot, type SessionNode, type SessionNodePresence } from '@overdeck/contracts';
 
 import {
   getAgentDir,
@@ -94,8 +94,10 @@ export async function buildSpecialistSessionNodes(
     const jsonlPath = await resolveJsonlPath(reviewSessionName, workspacePath);
     const awaitingInput = awaitingInputFromProjection(reviewSessionName, agentSnapshotsById);
     const snapshot = agentSnapshotsById?.get(reviewSessionName);
+    // PAN-5011: Herdr 'done' is a finished turn, not an exit — read it through
+    // presenceForPaneState rather than defaulting every non-idle pane to 'active'.
     const presence: SessionNodePresence = reviewIsLive
-      ? (reviewPane?.state === 'idle' ? 'idle' : 'active')
+      ? (reviewPane ? presenceForPaneState(reviewPane.state) : 'active')
       : 'ended';
 
     sections.push({
@@ -155,7 +157,7 @@ export async function buildSpecialistSessionNodes(
       status: normalizeAgentStatus(
         testIsLive ? 'running' : derived?.pr?.checks === 'green' ? 'passed' : 'failed',
       ),
-      presence: testIsLive ? (testPane?.state === 'idle' ? 'idle' : 'active') : 'ended',
+      presence: testIsLive ? (testPane ? presenceForPaneState(testPane.state) : 'active') : 'ended',
       awaitingInput: awaitingInput !== undefined ? awaitingInput !== null : testPane?.state === 'blocked',
       awaitingInputPrompt: awaitingInput?.prompt,
       awaitingInputReason: awaitingInput?.reason,

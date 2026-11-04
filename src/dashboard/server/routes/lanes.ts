@@ -8,7 +8,8 @@
  *   `machine` (label, environment id or `auto`, with optional `needs`) runs the
  *   lane on a linked machine through its lane work door, acting as the caller
  *   (`x-overdeck-sender`); a request that arrived through a secure channel may
- *   not place a lane on another machine (403 `no-chained-hops`).
+ *   not place a lane on another machine (403 `no-chained-hops`). The result's
+ *   `placement` explains an Auto pick, on this machine too (PAN-5006).
  * - `GET /api/lanes?run=&parent=&key=&role=` → `{ generatedAt, lanes }`.
  * - `GET /api/lanes/:name` → one LaneView (a local lane, or a stand-in for a
  *   lane on another machine), or 404 when the name is not a lane.
@@ -25,7 +26,7 @@ import { HttpRouter, HttpServerRequest, type HttpServerResponse } from 'effect/u
 
 import { listFlyMachines } from '../../../lib/anywhere/fly/machine-store.js';
 import type { MachineLink } from '../../../lib/anywhere/link-store.js';
-import { launchLane, type LaneLaunchDeps, type RemoteLaneTarget } from '../../../lib/lanes/launch.js';
+import { launchLane, type LaneLaunchDeps, type LocalLanePlacement, type RemoteLaneTarget } from '../../../lib/lanes/launch.js';
 import { LaneReapError, reapLane } from '../../../lib/lanes/reap.js';
 import { markRemoteLaneArchived, readRemoteLane } from '../../../lib/lanes/remote-lanes.js';
 import { LaneLaunchError, type LaneLaunchRequest } from '../../../lib/lanes/types.js';
@@ -155,12 +156,12 @@ export async function handleRemoteLaneReap(
 const LANE_ERROR_STATUSES: ReadonlySet<number> = new Set([400, 403, 404, 409, 429, 503]);
 const laneStatus = (status: number): LaneLaunchError['status'] => (LANE_ERROR_STATUSES.has(status) ? status : 500) as LaneLaunchError['status'];
 
-/** PAN-4638 WI-5: resolves a lane's machine for `launchLane`; null = this machine. */
+/** PAN-4638 WI-5: resolves a lane's machine for `launchLane`; null or a LocalLanePlacement = this machine. */
 export function laneMachineResolver(
   context: { viaChannel: boolean; caller: FleetCaller },
   deps: LaneRouteDeps,
 ): NonNullable<LaneLaunchDeps['resolveMachine']> {
-  return async (machine, needs, projectKey): Promise<RemoteLaneTarget | null> => {
+  return async (machine, needs, projectKey): Promise<RemoteLaneTarget | LocalLanePlacement | null> => {
     // D-4638-12: no chained hops, the same rule as the fleet routes.
     if (context.viaChannel) {
       throw new LaneLaunchError(403, 'a linked machine cannot place a lane on another machine through this one', 'no-chained-hops');
@@ -171,7 +172,9 @@ export function laneMachineResolver(
       const body = target.body as { code?: unknown; error?: unknown };
       throw new LaneLaunchError(laneStatus(target.status), String(body.error ?? `HTTP ${target.status}`), typeof body.code === 'string' ? body.code : undefined);
     }
-    if (target.self) return null;
+    if (target.self) {
+      return target.reason === null ? null : { self: true, label: target.label, reason: target.reason, rejections: [...(target.rejections ?? [])] };
+    }
     if (gitOrigin === null) {
       throw new LaneLaunchError(409, `${projectKey} has no github_repo or gitlab_repo, so ${target.label} cannot find it`, 'project-has-no-origin');
     }
@@ -181,6 +184,7 @@ export function laneMachineResolver(
       label: target.label,
       reason: target.reason,
       isFly: (await deps.flyEnvironmentIds()).includes(target.environmentId),
+      rejections: [...(target.rejections ?? [])],
       launch: async (spec) => {
         const answer = await postWorkDoor(deps, link, '/api/machines/work/lanes', { ...spec, gitOrigin }, context.caller);
         if (answer.status === 201) return { status: 201, body: (answer.json ?? {}) as Record<string, unknown> };

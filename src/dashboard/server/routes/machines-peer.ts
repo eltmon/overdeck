@@ -17,6 +17,7 @@ import { MACHINE_ACCESS_LEVELS, type MachineAccess } from '../../../lib/access-t
 import { listMachineProjects } from '../../../lib/anywhere/project-origin.js';
 import { sharedConversations, type SharedConversationsDeps } from '../../../lib/anywhere/shared-conversations.js';
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
+import { captureLinkApproved, captureLinkFailed } from '../../../lib/telemetry/anywhere.js';
 import { type ChannelMarker, channelOfRequest } from '../channel-peer.js';
 import { hasConnectorIntent } from '../connector-pairing.js';
 import { endStreamOnDeviceRevocation } from '../device-connections.js';
@@ -94,10 +95,15 @@ export async function handleMachinesExchange(
       reverse: body.reverse,
     });
   } catch (error) {
-    if (error instanceof GrantMachineLinkError) return jsonResponse({ error: error.message }, { status: 400 });
+    if (error instanceof GrantMachineLinkError) {
+      // PAN-5016 D-6: the approver cannot tell a pasted pairing link from SSH or Fly.
+      captureLinkFailed('pairing_code', 'approver', 'grant_refused');
+      return jsonResponse({ error: error.message }, { status: 400 });
+    }
     throw error;
   }
   const { token, record, reverseLinkId } = granted;
+  captureLinkApproved('pairing_code', 'approver');
 
   emitActivityEntry({
     source: 'dashboard',

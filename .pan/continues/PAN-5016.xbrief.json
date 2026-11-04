@@ -1,0 +1,213 @@
+{
+  "version": "1",
+  "issueId": "PAN-5016",
+  "created": "2026-11-04T13:28:40.332Z",
+  "updated": "2026-11-04T14:04:14.331Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "schema": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5016",
+      "claimedAt": "2026-11-04T13:28:40.332Z",
+      "doneAt": "2026-11-04T13:33:11.994Z"
+    },
+    "helper": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5016",
+      "claimedAt": "2026-11-04T13:33:17.540Z",
+      "doneAt": "2026-11-04T13:34:53.781Z"
+    },
+    "link-requester": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5016",
+      "claimedAt": "2026-11-04T13:34:58.282Z",
+      "doneAt": "2026-11-04T13:36:16.711Z"
+    },
+    "link-approver-pairing": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5016",
+      "claimedAt": "2026-11-04T13:36:20.840Z",
+      "doneAt": "2026-11-04T13:37:21.419Z"
+    },
+    "link-directory-approval": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5016",
+      "claimedAt": "2026-11-04T13:37:25.040Z",
+      "doneAt": "2026-11-04T13:38:55.223Z"
+    },
+    "phone-paired": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5016",
+      "claimedAt": "2026-11-04T13:38:59.027Z",
+      "doneAt": "2026-11-04T13:40:06.937Z"
+    },
+    "channel-open": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5016",
+      "claimedAt": "2026-11-04T13:40:11.042Z",
+      "doneAt": "2026-11-04T13:42:25.061Z"
+    },
+    "relay-usage": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5016",
+      "claimedAt": "2026-11-04T13:42:28.786Z",
+      "doneAt": "2026-11-04T13:43:17.088Z"
+    },
+    "phone-removed": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5016",
+      "claimedAt": "2026-11-04T13:43:40.472Z",
+      "doneAt": "2026-11-04T13:43:58.275Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5016",
+      "claimedAt": "2026-11-04T13:44:02.441Z",
+      "doneAt": "2026-11-04T13:44:49.403Z"
+    },
+    "schema.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:55:28.170Z"
+    },
+    "schema.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:55:44.536Z"
+    },
+    "schema.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:56:01.054Z"
+    },
+    "schema.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:56:15.726Z"
+    },
+    "helper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:56:29.243Z"
+    },
+    "helper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:56:42.383Z"
+    },
+    "helper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:56:55.390Z"
+    },
+    "helper.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:57:09.053Z"
+    },
+    "link-requester.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:57:22.213Z"
+    },
+    "link-requester.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:57:37.013Z"
+    },
+    "link-requester.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:57:51.993Z"
+    },
+    "link-approver-pairing.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:58:09.460Z"
+    },
+    "link-approver-pairing.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:58:25.765Z"
+    },
+    "link-approver-pairing.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:58:40.651Z"
+    },
+    "link-directory-approval.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:58:55.090Z"
+    },
+    "link-directory-approval.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:59:09.723Z"
+    },
+    "link-directory-approval.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:59:23.709Z"
+    },
+    "link-directory-approval.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:59:38.176Z"
+    },
+    "phone-paired.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:59:54.020Z"
+    },
+    "phone-paired.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:00:10.229Z"
+    },
+    "phone-paired.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:00:26.503Z"
+    },
+    "phone-removed.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:00:42.907Z"
+    },
+    "phone-removed.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:00:59.133Z"
+    },
+    "phone-removed.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:01:16.255Z"
+    },
+    "channel-open.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:01:32.136Z"
+    },
+    "channel-open.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:01:47.906Z"
+    },
+    "channel-open.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:02:03.607Z"
+    },
+    "channel-open.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:02:20.399Z"
+    },
+    "relay-usage.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:02:36.509Z"
+    },
+    "relay-usage.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:02:53.113Z"
+    },
+    "relay-usage.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:03:08.117Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:03:26.322Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:03:42.836Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:03:58.457Z"
+    },
+    "docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:04:14.330Z"
+    }
+  }
+}

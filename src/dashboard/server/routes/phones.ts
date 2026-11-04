@@ -27,6 +27,7 @@ import {
 } from '../../../lib/access-tokens.js';
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
 import { setPhoneNotificationPreferences } from '../../../lib/push/phone-preferences-store.js';
+import { capturePhonePaired, capturePhoneRemoved } from '../../../lib/telemetry/anywhere.js';
 import { closeChannelsForPeer } from '../channel-listener.js';
 import { type ChannelMarker, channelOfRequest } from '../channel-peer.js';
 import { hasConnectorIntent } from '../connector-pairing.js';
@@ -107,6 +108,7 @@ export async function handlePhonesExchange(
 
   const replaced = listActiveRecordsOfKind('phone').filter((other) => other.clientId === body.clientId && other.id !== record.id);
   for (const other of replaced) await revokeAccessToken(other.id);
+  capturePhonePaired(replaced.length > 0);
 
   let notificationPreferencesStored = false;
   if (body.notificationPreferences) {
@@ -149,6 +151,7 @@ export async function handlePhonesSelfRevoke(credential: DashboardCredential | n
   }
   const revoked = await revokeAccessToken(credential.tokenId);
   closeDeviceConnections(credential.tokenId);
+  capturePhoneRemoved('phone');
   if (revoked?.phoneKey) closeChannelsForPeer(revoked.phoneKey);
   emitActivityEntry({
     source: 'dashboard',
