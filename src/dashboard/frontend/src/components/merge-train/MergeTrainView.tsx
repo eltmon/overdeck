@@ -48,6 +48,8 @@ export interface MergeTrainQueueItem {
   mergeOrder: number;
   conflictsWith: string[];
   batchGroup?: 'batch' | 'serialize';
+  /** PAN-4970: the per-PR auto-merge scheduler owns this item, not a batch. Undefined = batch-owned (an older server). */
+  mergesPerPr?: boolean;
 }
 
 export interface UatGenerationMember {
@@ -624,6 +626,8 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
               visibleGenerations.find((g) => g.status === 'ready') ??
               visibleGenerations.find((g) => g.status === 'superseded');
             const featureCount = section.queue.length;
+            // PAN-4970: how many ready features merge through the per-PR auto-merge train.
+            const perPrCount = section.queue.filter((q) => q.mergesPerPr === true).length;
             const batchCount = visibleGenerations.filter((g) => g.status !== 'assembling').length;
             const promotedPendingCount = visibleGenerations.filter((g) => g.status === 'promoted').length;
             const uatOpen = expandedUat[section.projectKey] ?? true;
@@ -665,7 +669,7 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
                       assemblingNow={assemblingNow}
                       lastAssemblyFailed={lastAssemblyFailed}
                     />
-                    {lastAssemblyFailed && canRetryAssembly({ featureCount, holdsForUat: section.holdsForUat }) && (
+                    {lastAssemblyFailed && canRetryAssembly({ featureCount, holdsForUat: section.holdsForUat, perPrCount }) && (
                       <div className="px-1 pb-1">
                         <button
                           type="button"

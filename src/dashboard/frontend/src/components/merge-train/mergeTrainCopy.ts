@@ -63,9 +63,20 @@ export function mergeRowConfirmCopy(input: {
  * Whether a forced reassembly can build a batch from this ready set. One
  * unheld feature merges directly — the reconciler returns `single-feature`
  * even when forced — so Retry is offered only for 2+ features or a held one.
+ * PAN-4970: every ready feature merging through the per-PR auto-merge train
+ * has no batch path at all, so Retry is never offered for that set either.
  */
-export function canRetryAssembly(input: { featureCount: number; holdsForUat?: boolean }): boolean {
+export function canRetryAssembly(input: { featureCount: number; holdsForUat?: boolean; perPrCount?: number }): boolean {
+  if (input.perPrCount === input.featureCount && input.featureCount > 0) return false;
   return input.featureCount >= 2 || (input.featureCount === 1 && input.holdsForUat !== false);
+}
+
+/**
+ * PAN-4970: every ready feature in this section merges one at a time through
+ * the per-PR auto-merge scheduler, so no test batch assembles for them.
+ */
+export function perPrTrainLine(count: number, projectName: string): string {
+  return ` ${projectName} merges ${count === 1 ? 'it' : 'them'} one at a time through auto-merge (each waits a 5-minute cooldown), so no test batch assembles. Issues labelled hold-for-uat still batch.`;
 }
 
 /**

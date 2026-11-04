@@ -1063,6 +1063,64 @@ describe('PAN-4970 promote refusal', () => {
   });
 });
 
+// ── PAN-4970 ──────────────────────────────────────────────────────────────────
+describe('PAN-4970 per-PR copy', () => {
+  const allPerPr = PAN_QUEUE.map((q) => ({ ...q, mergesPerPr: true }));
+
+  it('renders the per-PR line, not "A test batch assembles", when every ready feature merges per-PR', async () => {
+    mockFetch(twoProjectResponses({
+      '/api/merge-train/queues': [
+        { projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, queue: allPerPr },
+        { projectKey: 'myn', projectName: 'Mind Your Now', enabled: true, queue: MIN_QUEUE },
+      ],
+      '/api/merge-train/generations': [
+        { projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, generations: [] },
+        { projectKey: 'myn', projectName: 'Mind Your Now', enabled: true, generations: [MIN_READY_GEN] },
+      ],
+    }));
+    renderView();
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy());
+
+    const line = screen.getByTestId('merge-train-per-pr-overdeck');
+    expect(line.textContent).toContain('one at a time through auto-merge');
+    expect(screen.getByTestId('merge-train-project-overdeck').textContent).not.toContain('A test batch assembles');
+  });
+
+  it('offers no retry-assembly button for an all-per-PR queue, even with a failed generation', async () => {
+    mockFetch(twoProjectResponses({
+      '/api/merge-train/queues': [
+        { projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, queue: allPerPr },
+        { projectKey: 'myn', projectName: 'Mind Your Now', enabled: true, queue: MIN_QUEUE },
+      ],
+      '/api/merge-train/generations': [
+        { projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, generations: [{ ...PAN_READY_GEN, name: 'uat/pan-failed-0610', status: 'failed' }] },
+        { projectKey: 'myn', projectName: 'Mind Your Now', enabled: true, generations: [MIN_READY_GEN] },
+      ],
+    }));
+    renderView();
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy());
+
+    expect(screen.queryByTestId('merge-train-retry-assembly-overdeck')).toBeNull();
+  });
+
+  it('does not render the per-PR line when only some queue items merge per-PR', async () => {
+    mockFetch(twoProjectResponses({
+      '/api/merge-train/queues': [
+        { projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, queue: [{ ...PAN_QUEUE[0]!, mergesPerPr: true }, { ...PAN_QUEUE[1]!, mergesPerPr: false }] },
+        { projectKey: 'myn', projectName: 'Mind Your Now', enabled: true, queue: MIN_QUEUE },
+      ],
+      '/api/merge-train/generations': [
+        { projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, generations: [] },
+        { projectKey: 'myn', projectName: 'Mind Your Now', enabled: true, generations: [MIN_READY_GEN] },
+      ],
+    }));
+    renderView();
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy());
+
+    expect(screen.queryByTestId('merge-train-per-pr-overdeck')).toBeNull();
+  });
+});
+
 // ── Pure join ─────────────────────────────────────────────────────────────────
 describe('mergeTrainSections', () => {
   it('joins queues and generations on projectKey', () => {

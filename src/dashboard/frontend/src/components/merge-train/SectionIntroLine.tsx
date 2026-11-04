@@ -9,10 +9,10 @@
  * Prop types are structural (not imported from MergeTrainView.tsx) so this
  * file never imports the view back — the view imports this component.
  */
-import { ASSEMBLING_LINE, NO_BATCH_YET_LINE, SINGLE_FEATURE_READY_LINE, assemblyFailedLine, formatFailedAt, shortName } from './mergeTrainCopy';
+import { ASSEMBLING_LINE, NO_BATCH_YET_LINE, SINGLE_FEATURE_READY_LINE, assemblyFailedLine, formatFailedAt, perPrTrainLine, shortName } from './mergeTrainCopy';
 
 export interface SectionIntroLineProps {
-  section: { projectKey: string; holdsForUat?: boolean };
+  section: { projectKey: string; projectName: string; holdsForUat?: boolean; queue: Array<{ mergesPerPr?: boolean }> };
   featureCount: number;
   promotedPendingCount: number;
   /** Only checked for presence — the ready/superseded batch currently shown, if any. */
@@ -29,10 +29,15 @@ export function SectionIntroLine({
   assemblingNow,
   lastAssemblyFailed,
 }: SectionIntroLineProps) {
+  // PAN-4970: every ready feature here merges through the per-PR auto-merge
+  // train, so no batch will ever assemble for this exact set.
+  const perPrCount = section.queue.filter((q) => q.mergesPerPr === true).length;
   return (
     <p className="px-1 pb-1 text-[11px] leading-snug text-muted-foreground">
       {featureCount === 0 && promotedPendingCount > 0 ? (
         <><span className="font-semibold text-foreground">{promotedPendingCount} promoted batch{promotedPendingCount === 1 ? '' : 'es'}</span> await{promotedPendingCount === 1 ? 's' : ''} version ship. Supply the version below to satisfy each member&apos;s ship row.</>
+      ) : perPrCount === featureCount && featureCount > 0 && !currentBatch && !assemblingNow ? (
+        <><span className="font-semibold text-foreground">{featureCount} feature{featureCount === 1 ? '' : 's'}</span> passed review &amp; tests.<span data-testid={`merge-train-per-pr-${section.projectKey}`}>{perPrTrainLine(featureCount, section.projectName)}</span></>
       ) : featureCount === 1 && !currentBatch && !assemblingNow && section.holdsForUat === false ? (
         <span data-testid={`merge-train-single-feature-${section.projectKey}`}>{SINGLE_FEATURE_READY_LINE}</span>
       ) : (
