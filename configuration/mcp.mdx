@@ -59,6 +59,8 @@ agent tokens.
 | `wait_job` | Waits up to 50 s for a job another tool started. Answers `done` with the exit code and output, or `running` with `next`, the call to make again. Never poll or sleep; jobs are forgotten when the dashboard restarts. | `read:state` (agent tokens only) |
 | `request_secret` | Asks the operator for a secret, such as an API key, by an environment-variable-style `name` and a short `prompt`; answers a `requestId` and `next`, the `secret_wait` call to make. | `tell` (agent tokens only) |
 | `secret_wait` | Waits up to 50 s for the operator's answer. Answers `pending` with `next`, `delivered` with `file` (the path of the secret, never the value), `declined` or `expired`. | `read:state` (agent tokens only) |
+| `memory_add` | Records a curated memory fact by running `pan memory add` in the agent's checkout: `id`, `type` (`feedback`, `project`, `reference`, `user`), a one-line `description`, optional `title`, `body`, `tags` and `store` (`project` by default, `user` for type `user`, or `machine`). A project fact is written uncommitted, so the agent commits `.overdeck/memory/<id>.md`. | `tell` (agent tokens only) |
+| `memory_search` | Searches memory by running `pan memory search --facts`: up to 5 matching facts from the agent's checkout, the operator store and the machine store, each with its file path, then observations from the agent's project (`limit` 1-20, default 10). | `read:state` (agent tokens only) |
 
 Agent-only tools call routes under `/api/self/`, which refuse any token that
 is not an agent token.
@@ -86,6 +88,17 @@ of asking in chat, so the value never enters its transcript.
   or the dashboard log. The agent reads the file straight into the program
   that needs it, for example `KEY="$(cat <file>)" some-command`, and never
   prints it.
+
+### Memory
+
+Both `memory_add` and `memory_search` run `pan memory` for the calling agent
+in its own checkout and answer `done` with the result, or `running` with
+`next`, like the other job tools. A non-zero exit code means `pan` refused
+(an existing id, secret-like text, a home-directory path); `stderr` says why.
+
+A project fact lands in the agent's own checkout, so `pan memory list --here`
+run there shows it at once, while the primary checkout shows it only after
+the agent's branch merges. See [Project memory](/configuration/memory).
 
 A tool the token's scopes hide answers `Unknown tool <name>`. A route can
 still refuse a listed tool, for example a linked machine's ceiling, with
