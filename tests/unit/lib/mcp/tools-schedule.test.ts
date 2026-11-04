@@ -45,3 +45,50 @@ describe('MCP schedule tools: schedule_message (PAN-4927 WI-2)', () => {
     expect(api.calls).toEqual([]);
   });
 });
+
+describe('MCP schedule tools: schedule_recurring (PAN-4927 WI-3)', () => {
+  it('schedule_recurring posts only the given fields', async () => {
+    const api = fakeApi({ 'POST /api/conversations/conv-a/schedules': { status: 201, json: { id: 1 } } });
+    const client = await connectClient(api, SCOPES, false, SCHEDULE_TOOLS);
+    const result = await callTool(client, 'schedule_recurring', { conversation: 'conv-a', prompt: 'check in', cron: '0 9 * * 1-5' });
+    expect(result.isError).toBeFalsy();
+    expect(api.calls).toEqual([{ method: 'POST', path: '/api/conversations/conv-a/schedules', body: { prompt: 'check in', cron: '0 9 * * 1-5' } }]);
+  });
+
+  it('schedule_recurring passes timeZone and enabled when given', async () => {
+    const api = fakeApi({ 'POST /api/conversations/conv-a/schedules': { status: 201, json: { id: 2 } } });
+    const client = await connectClient(api, SCOPES, false, SCHEDULE_TOOLS);
+    await callTool(client, 'schedule_recurring', {
+      conversation: 'conv-a',
+      prompt: 'check in',
+      cron: '0 21 * * *',
+      timeZone: 'America/New_York',
+      enabled: false,
+    });
+    expect(api.calls).toEqual([
+      {
+        method: 'POST',
+        path: '/api/conversations/conv-a/schedules',
+        body: { prompt: 'check in', cron: '0 21 * * *', timeZone: 'America/New_York', enabled: false },
+      },
+    ]);
+  });
+
+  it('a 409 agent-conversation answer is a tool error', async () => {
+    const api = fakeApi({
+      'POST /api/conversations/conv-a/schedules': { status: 409, json: { error: 'agent conversations cannot be scheduled' } },
+    });
+    const client = await connectClient(api, SCOPES, false, SCHEDULE_TOOLS);
+    const result = await callTool(client, 'schedule_recurring', { conversation: 'conv-a', prompt: 'check in', cron: '0 9 * * *' });
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toContain('agent conversations cannot be scheduled');
+  });
+
+  it('enabled: "yes" is a tool error and sends no request', async () => {
+    const api = fakeApi({});
+    const client = await connectClient(api, SCOPES, false, SCHEDULE_TOOLS);
+    const result = await callTool(client, 'schedule_recurring', { conversation: 'conv-a', prompt: 'check in', cron: '0 9 * * *', enabled: 'yes' });
+    expect(result.isError).toBe(true);
+    expect(api.calls).toEqual([]);
+  });
+});

@@ -1,5 +1,5 @@
 /** The schedule tools of the Overdeck MCP server (PAN-4927 W-SCHED1, FR-5): one-shot scheduled messages (PAN-4641) and recurring schedules (PAN-4640). Each proxies the conversation's existing routes; the route-scope table judges each call. A one-shot message has no time: the server sends it after the conversation's usage limit resets, or at once when it is not limited. */
-import { errorResult, requiredString, routeResult, type ArgResult, type OverdeckTool } from './tool.js';
+import { errorResult, optionalString, requiredString, routeResult, type ArgResult, type OverdeckTool } from './tool.js';
 
 function conversationPath(name: string): string {
   return `/api/conversations/${encodeURIComponent(name)}`;
@@ -42,4 +42,41 @@ const scheduleMessage: OverdeckTool = {
   },
 };
 
-export const SCHEDULE_TOOLS: readonly OverdeckTool[] = [scheduleMessage];
+const scheduleRecurring: OverdeckTool = {
+  name: 'schedule_recurring',
+  description:
+    'Create a recurring schedule that sends a stored prompt to a conversation on a 5-field cron (minute hour day-of-month month day-of-week), for example `0 9 * * 1-5` for weekdays at 09:00. Runs must be at least 15 minutes apart. Agent conversations and Session Vault copies cannot be scheduled; at most 20 schedules per conversation.',
+  scope: 'tell',
+  audience: 'any',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      conversation: CONVERSATION_PROPERTY,
+      prompt: { type: 'string', description: 'The stored prompt to send on each run.' },
+      cron: { type: 'string', description: 'A 5-field cron expression, for example 0 9 * * 1-5.' },
+      timeZone: { type: 'string', description: "An IANA time zone such as America/New_York; omit for the Overdeck machine's zone." },
+      enabled: { type: 'boolean', description: 'false creates the schedule paused; default true.' },
+    },
+    required: ['conversation', 'prompt', 'cron'],
+  },
+  async run(args, ctx) {
+    const conversation = requiredString(args, 'conversation');
+    if (!conversation.ok) return conversation.error;
+    const prompt = requiredString(args, 'prompt');
+    if (!prompt.ok) return prompt.error;
+    const cron = requiredString(args, 'cron');
+    if (!cron.ok) return cron.error;
+    const timeZone = optionalString(args, 'timeZone');
+    if (!timeZone.ok) return timeZone.error;
+    const body: Record<string, unknown> = { prompt: prompt.value, cron: cron.value };
+    if (timeZone.value !== undefined) body['timeZone'] = timeZone.value;
+    if (args['enabled'] !== undefined) {
+      if (typeof args['enabled'] !== 'boolean') return errorResult('enabled must be a boolean');
+      body['enabled'] = args['enabled'];
+    }
+    const path = `${conversationPath(conversation.value)}/schedules`;
+    return routeResult(await ctx.api.request('POST', path, body));
+  },
+};
+
+export const SCHEDULE_TOOLS: readonly OverdeckTool[] = [scheduleMessage, scheduleRecurring];
