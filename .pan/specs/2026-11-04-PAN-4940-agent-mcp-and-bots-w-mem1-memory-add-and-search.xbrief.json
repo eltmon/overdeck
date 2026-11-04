@@ -4,17 +4,17 @@
     "created": "2026-11-04T04:21:06Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4940: Agent MCP and bots (W-MEM1): Memory add and search",
-    "updated": "2026-11-04T04:26:35.312Z"
+    "updated": "2026-11-04T04:27:44.971Z"
   },
   "plan": {
     "id": "pan-4940",
     "title": "Agent MCP and bots (W-MEM1): Memory add and search",
-    "status": "proposed",
+    "status": "running",
     "uid": "35fa413f-13e1-4cbc-b5a3-7067f21bc055",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-04T04:21:06Z",
-    "updated": "2026-11-04T04:26:35.312Z",
+    "updated": "2026-11-04T04:27:44.971Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4940",
@@ -477,5 +477,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
