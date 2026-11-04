@@ -1,6 +1,14 @@
 import { beforeAll, describe, expect, it } from 'vitest';
-import { APNS_TOPIC, ApnsTokenCache, apnsBody, sendApns } from '../../../../../services/connect/src/push/apns.ts';
-import type { ApnsConfig, PushRegistration } from '../../../../../services/connect/src/push/config.ts';
+import {
+  APNS_LIVE_ACTIVITY_TOPIC,
+  APNS_TOPIC,
+  ApnsTokenCache,
+  apnsActivityBody,
+  apnsBody,
+  sendApns,
+  sendApnsActivity,
+} from '../../../../../services/connect/src/push/apns.ts';
+import type { ActivityPushRequest, ApnsConfig, PushRegistration } from '../../../../../services/connect/src/push/config.ts';
 import { base64UrlToBytes } from '../../../../../services/connect/src/push/jwt.ts';
 
 const T0_SECONDS = 2_700 * 1_000_000;
@@ -145,5 +153,63 @@ describe('sendApns (PAN-4830 WI-4)', () => {
     );
     expect(result).toEqual({ kind: 'failed', detail: 'bad_key' });
     expect(calls).toHaveLength(0);
+  });
+});
+
+describe('sendApnsActivity (PAN-4839 WI-3)', () => {
+  const opts = (fetchFn: typeof fetch) => ({ config, fetch: fetchFn, now: () => T0 + 1_500, tokens: new ApnsTokenCache() });
+  const activity = (over: Partial<ActivityPushRequest> = {}): ActivityPushRequest => ({
+    token: TOKEN,
+    apsEnvironment: 'production',
+    needsYou: 3,
+    running: 2,
+    priority: 'high',
+    ...over,
+  });
+  const timestamp = T0_SECONDS + 1;
+
+  it('sends exactly the timing fields and the two counts', async () => {
+    const { fetchFn, calls } = stubFetch(() => new Response(null, { status: 200 }));
+    expect(await sendApnsActivity(activity(), opts(fetchFn))).toEqual({ kind: 'delivered' });
+    const body = JSON.parse(calls[0].body);
+    expect(body).toEqual({ aps: { timestamp, event: 'update', 'content-state': { needsYou: 3, running: 2 }, 'stale-date': timestamp + 600 } });
+    expect(body).toEqual(apnsActivityBody(3, 2, T0 + 1_500));
+    expect(Object.keys(body.aps['content-state'])).toEqual(['needsYou', 'running']);
+  });
+
+  it('sends the liveactivity headers with priority 10 and no collapse id', async () => {
+    const { fetchFn, calls } = stubFetch(() => new Response(null, { status: 200 }));
+    await sendApnsActivity(activity(), opts(fetchFn));
+    expect(calls[0].url).toBe(`https://api.push.apple.com/3/device/${TOKEN}`);
+    const jwt = await new ApnsTokenCache().get(config, T0);
+    expect(Object.fromEntries(calls[0].headers)).toEqual({
+      authorization: `bearer ${jwt}`,
+      'apns-push-type': 'liveactivity',
+      'apns-topic': APNS_LIVE_ACTIVITY_TOPIC,
+      'apns-priority': '10',
+      'apns-expiration': String(timestamp + 600),
+      'content-type': 'application/json',
+    });
+    expect(APNS_LIVE_ACTIVITY_TOPIC).toBe('ai.overdeck.app.push-type.liveactivity');
+    expect(calls[0].headers.has('apns-collapse-id')).toBe(false);
+  });
+
+  it('uses priority 5 for a refresh and the sandbox host for a sandbox token', async () => {
+    const { fetchFn, calls } = stubFetch(() => new Response(null, { status: 200 }));
+    await sendApnsActivity(activity({ priority: 'normal', apsEnvironment: 'sandbox' }), opts(fetchFn));
+    expect(calls[0].url).toBe(`https://api.sandbox.push.apple.com/3/device/${TOKEN}`);
+    expect(calls[0].headers.get('apns-priority')).toBe('5');
+  });
+
+  it('maps 410 to gone, 503 to retryable and 403 to failed', async () => {
+    expect(await sendApnsActivity(activity(), opts(stubFetch(() => new Response(null, { status: 410 })).fetchFn))).toEqual({ kind: 'gone' });
+    expect(await sendApnsActivity(activity(), opts(stubFetch(() => new Response(null, { status: 503 })).fetchFn))).toEqual({
+      kind: 'retryable',
+      detail: 'apns_503',
+    });
+    expect(await sendApnsActivity(activity(), opts(stubFetch(() => new Response(null, { status: 403 })).fetchFn))).toEqual({
+      kind: 'failed',
+      detail: 'apns_403',
+    });
   });
 });

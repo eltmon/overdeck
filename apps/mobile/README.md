@@ -14,11 +14,13 @@ Design: [PAN-4837 PRD](../../.pan/drafts/PAN-4837.md) (this app) and the epic
 | --- | --- |
 | `src/main.tsx` | Entry. Sets `__OVERDECK_NATIVE__`, installs the channel shims, then loads the shell (D-3). |
 | `src/shell/` | The app's own screens and logic: sign-in (`signIn.ts`), the directory and dial policy (`directory.ts`, `connection.ts`, `relayMeter.ts`), pairing (`pairing.ts`), the machine list, pair, settings, removed-machine and machine views, sign-out, and the foreground resume path (`lifecycle.ts`). |
-| `src/native/` | The `OverdeckKeys` plugin bridge (`keys.ts`), its `localStorage` stand-in for a desktop browser (`keys-web.ts`), and push registration (`push.ts`). |
+| `src/native/` | The `OverdeckKeys` plugin bridge (`keys.ts`), its `localStorage` stand-in for a desktop browser (`keys-web.ts`), push registration (`push.ts`), and the `OverdeckLiveActivity` bridge (`liveActivity.ts`, PAN-4839). |
 | `android/` | The Capacitor Android project. App code is in `app/src/main/java/ai/overdeck/app/` (`OverdeckKeysPlugin`, `SecureStore`). |
-| `ios/` | The Capacitor iOS project (Swift Package Manager). App code is in `ios/App/App/` (`OverdeckKeysPlugin.swift`, `MainViewController.swift`, `App.entitlements`). |
+| `ios/` | The Capacitor iOS project (Swift Package Manager). App code is in `ios/App/App/` (`OverdeckKeysPlugin.swift`, `OverdeckLiveActivityPlugin.swift`, `MainViewController.swift`, `App.entitlements`). |
 | `ios/OverdeckPush/` | A local Swift package used by the app and the extension: it opens the sealed push payload (swift-sodium), rewrites the notification content, and holds the Keychain code (`KeychainStore`, `PushKeys`). Tests: `swift test` on the rig. |
 | `ios/App/NotificationService/` | The Notification Service Extension (`ai.overdeck.app.NotificationService`). It decrypts each needs-you notification before iOS shows it. |
+| `ios/App/Shared/` | `OverdeckActivityAttributes.swift`: the Live Activity's two counts, compiled into both the app and the widget extension (PAN-4839). |
+| `ios/App/OverdeckWidgets/` | The widget extension (`ai.overdeck.app.widgets`) that draws the Live Activity on the lock screen and in the Dynamic Island. `ios/scripts/add-widgets-target.rb` adds it to `App.xcodeproj` (already done; run it again only to repair the target). |
 
 The app imports the dashboard frontend by relative path. `vite.config.ts` dedupes React and
 React Query, maps `@overdeck/contracts` to its source, and gives the channel browser stand-ins for
@@ -91,6 +93,11 @@ address comes from DHCP). The rig needs no bun or Node.
    `DEVELOPMENT_TEAM=<team> -allowProvisioningUpdates` instead of `CODE_SIGN_IDENTITY=-`. A Debug
    build logs its push public key. Read it with
    `xcrun simctl spawn $U log show --last 2m --predicate 'eventMessage CONTAINS "OverdeckKeys"'`.
+
+   To see the Live Activity without signing in, launch a Debug build with
+   `xcrun simctl launch $U ai.overdeck.app -overdeckLiveActivityDemo 3,2`: it starts a local card with
+   those counts, and iOS asks once whether to allow Live Activities from Overdeck. Release builds
+   ignore the argument.
 4. Run the Swift package tests with `cd ~/overdeck-mobile/apps/mobile/ios/OverdeckPush && swift test`.
 5. To deliver a test notification, seal one to the logged key on this host:
    `node tests/fixtures/phone-push/seal-apns.mjs --key <hex> --title 'Agent asks: deploy now?' --body 'Test' > push.apns`.
@@ -100,6 +107,10 @@ address comes from DHCP). The rig needs no bun or Node.
    Extension, so the banner shows the placeholder. Decryption is checked by `swift test` and on a
    device (`ACCEPTANCE.md`, "PAN-4838 iOS notifications").
 6. When you are done, run `xcrun simctl delete $U`.
+
+`ios/scripts/add-widgets-target.rb` needs the `xcodeproj` gem 1.28 or later
+(`gem install --user-install xcodeproj`): older versions cannot read the project's local Swift
+package reference. It is idempotent and prints "already present" when nothing is missing.
 
 ## Environment variables
 
@@ -113,7 +124,9 @@ These are read at build time.
 
 ## Keys and secrets
 
-`OverdeckKeys` is the only native code. It has a Swift version and a Java version.
+`OverdeckKeys` is the only native code on both platforms. It has a Swift version and a Java version.
+iOS also has the Live Activity plugin and widget extension (PAN-4839). The widget extension needs its
+own App ID, `ai.overdeck.app.widgets`, which PAN-4841 registers with the store setup.
 
 - **Client id:** a lowercase UUID v4 per install. It is the directory `clientId`, the account
   `environment_id` and the machine `clientId`.
@@ -175,7 +188,6 @@ check requires it.
 ## What it cannot do yet
 
 - Push notifications on Android: PAN-4840.
-- The Live Activity: PAN-4839.
 - Store setup and release builds: PAN-4841.
 - Reaching machines that are linked through the paired one: PAN-4887.
 - Admin-only actions such as settings, the model picker, archive, share and voice. The phone token

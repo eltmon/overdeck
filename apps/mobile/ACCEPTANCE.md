@@ -142,3 +142,39 @@ iOS 26.5, deleted afterwards.
   notification shows the question's title within 10 s, that tapping it opens the Needs-you card,
   and that `npx wrangler tail overdeck-connect --format json` shows no title text. Those steps
   are in the [PAN-4841 comment](https://github.com/eltmon/overdeck/issues/4841#issuecomment-6615975677).
+
+## Live Activity (PAN-4839)
+
+Evidence for PRD WI-11. The Simulator run checks that the widget extension builds, embeds and draws
+the counts. The device run (AC-12) needs the production APNs secrets and is handed to PAN-4841.
+
+### Simulator run
+
+**Result: card drawn on the lock screen; Dynamic Island not captured.**
+
+- **Date:** 2026-11-03.
+- **Rig:** Edwards-MacBook-Air, macOS 26.6.2, Xcode 26.6. Simulator `iPhone 17 Pro`, iOS 26.5,
+  created for this run and deleted after it.
+- **Build:** Debug, `-scheme App -sdk iphonesimulator CODE_SIGN_IDENTITY=-`: `** BUILD SUCCEEDED **`,
+  with `OverdeckWidgets.appex` under `App.app/PlugIns/`. No compiler warnings in the new Swift files.
+- **Launch:** `xcrun simctl launch $U ai.overdeck.app -overdeckLiveActivityDemo 3,2`, a local card with
+  no push (D-15). Then Settings opened over it, and the Simulator was locked with `osascript`
+  (Simulator → Device → Lock). Locking the Simulator can be scripted.
+
+| Step | Evidence | Result |
+| --- | --- | --- |
+| Lock screen | The card reads "Overdeck · 3 need you · 2 running", under iOS's first-run prompt "Allow Live Activities from Overdeck?". | [12](acceptance/12-live-activity-lock.png) — pass |
+| Dynamic Island | The island stayed empty with the app in the background. iOS shows a card in the island only after the user answers the first-run prompt with Allow. Two scripted clicks on Allow were tried: a System Events click, and a CGEvent click at the button's position in the Simulator's screen view. After the second, Device → Home unlocked the Simulator with Settings in front, and the island was still empty. Whether the click missed or the Simulator does not draw the card in the island is not known. | not captured |
+
+Deviation from the PRD: `acceptance/11-live-activity-island.png` is not committed, because no screenshot
+showed the card in the island. The `acceptance.ac1` plan item is cancelled for this reason; the device
+run in PAN-4841 can capture the island. To capture it in the Simulator by hand, tap **Allow** on the lock screen in the Simulator
+window, unlock, open another app, and run `xcrun simctl io $U screenshot 11-live-activity-island.png`.
+
+### Device checkpoint (AC-12, D-16)
+
+**Not run: APNs secrets unset (PAN-4841).** On 2026-11-03, `GET https://connect.overdeck.ai/healthz`
+answered `{"ok":true,"configured":true,"turn":true,"apns":false,"fcm":false}`. The AC-12 timing,
+the widget App ID `ai.overdeck.app.widgets` and the reuse of the existing APNs key are handed to
+PAN-4841's TestFlight run:
+https://github.com/eltmon/overdeck/issues/4841#issuecomment-6616154481

@@ -3,7 +3,8 @@
 // plus the constants and user-facing strings both sides share. PAN-4823 W-CON1 adds the phone app's
 // client role (`ClientToDirectoryFrame` / `DirectoryToClientFrame`) and the sealed `push` /
 // `push-result` frames; the directory serves them from W-CON2 (client role) and W-CON3 (push).
-// `PhonePushPayload` is the plaintext a machine seals into `push` (PAN-4843).
+// `PhonePushPayload` is the plaintext a machine seals into `push` (PAN-4843). PAN-4839 adds the
+// counts-only Live Activity: `push-activity` (machine) and `activity-register` / `activity-unregister` (phone).
 //
 // Runtime-import-free (like sharing.ts): the connect Worker imports this file by relative path, so it
 // may only `import type`. The dashboard's `GET /api/directory` view schemas live in connect-view.ts.
@@ -40,6 +41,16 @@ export const PUSH_SEALED_MAX_CHARS = 3_072
  * grows by 4/3, so 2,256 bytes seal to exactly `PUSH_SEALED_MAX_CHARS` characters.
  */
 export const PUSH_PLAINTEXT_MAX_BYTES = 2_256
+/** Live Activity (PAN-4839, OD-1): the most either count may be. */
+export const ACTIVITY_COUNT_MAX = 9_999
+/** A machine's report counts toward a phone's card this long; also the APNs `stale-date` offset. */
+export const ACTIVITY_STALE_MS = 600_000
+/** The directory re-pushes unchanged counts at most this often, so the stale date moves ahead. */
+export const ACTIVITY_REFRESH_MS = 240_000
+/** Live Activity pushes per account per minute, counted apart from alert pushes (NFR-1). */
+export const ACTIVITY_PUSH_RATE_PER_MINUTE = 60
+/** The whole content of the Live Activity (OD-1): two counts and nothing else. */
+export interface LiveActivityCounts { readonly needsYou: number; readonly running: number }
 
 export const FREE_MACHINE_LIMIT_MESSAGE = "The free account includes 3 machines"
 export const NO_DIRECT_PATH_MESSAGE = "No direct path; install Tailscale or use the relay plan"
@@ -174,6 +185,8 @@ export type MachineToDirectoryFrame =
     /** 32 lowercase hex: the first 32 hex characters of sha256(notification tag). */
     readonly collapseId: string
   }
+  /** One machine's counts for one phone's Live Activity (PAN-4839). Integers 0..ACTIVITY_COUNT_MAX; no answer frame. */
+  | { readonly type: "push-activity"; readonly to: string; readonly needsYou: number; readonly running: number }
 
 /** Directory → machine. */
 export type DirectoryToMachineFrame =
@@ -266,6 +279,9 @@ export type ClientToDirectoryFrame =
   /** `token` is at most 4096 characters; `apsEnvironment` is sent by iOS only. */
   | { readonly type: "push-register"; readonly platform: PhonePlatform; readonly token: string; readonly apsEnvironment?: ApsEnvironment }
   | { readonly type: "push-unregister" }
+  /** An activity push token (iOS only); same token rule as `push-register`. iOS without `apsEnvironment` is production. */
+  | { readonly type: "activity-register"; readonly token: string; readonly apsEnvironment?: ApsEnvironment }
+  | { readonly type: "activity-unregister" }
   | { readonly type: "forget-client" }
 
 /** Directory → phone. Clients reuse the machine frames below; they never get approvals or inbox frames. */

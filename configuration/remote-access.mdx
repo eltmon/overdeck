@@ -250,8 +250,8 @@ The scopes:
 | --- | --- |
 | `read:events` | The live event stream (`GET /events/stream`) and `GET /events/version`. |
 | `read:state` | Issue, agent, agent-directory, Flywheel and pipeline reads. |
-| `read:conversations` | Conversation lists, one conversation, its messages and its summary, and conversation search. |
-| `tell` | Sending a message to an agent or a conversation. |
+| `read:conversations` | Conversation lists, one conversation, its messages and its summary, conversation search, and a conversation's scheduled messages and schedules. |
+| `tell` | Sending a message to an agent or a conversation, and creating, changing and deleting a conversation's scheduled messages and schedules. |
 | `operate` | Everything `tell` allows, plus terminal WebSockets (`/ws/terminal`) and starting a conversation or a worker. |
 | `approve` | Answering blocking prompts: permission prompts, menus, pi asks, Codex approvals, plan approvals and agent questions. Off unless you add it. |
 | `admin` | Everything, like a paired device. |

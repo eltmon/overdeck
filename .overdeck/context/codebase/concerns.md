@@ -648,6 +648,8 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   `setLocalDescription` waits for gathering. Passing Cloudflare's list as-is (UDP first) makes the relay
   route miss its 10 s budget on UDP-blocked networks. The relay route's list goes through
   `relayIceServers` (`src/lib/anywhere/channel/relay-ice-servers.ts`: TLS 443 first, no STUN) on both ends.
+  The Shared Sessions host hub (`src/dashboard/server/sharing/peer-hub.ts`) does not reorder: it passes the
+  share Worker's TURN list to werift as-is, so its relay path has the same UDP-blocked exposure.
 - **Fly VMs and SSH hosts must run home's exact `pan` version from npm** (PAN-4882) —
   `provisionFlyMachine` (`src/lib/anywhere/fly/provision.ts`) runs `npm install -g @overdeck/core@<home
   version>` and throws `version-mismatch` when that fails; the SSH-machine add answers 409
@@ -669,6 +671,7 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   use the PID as data, but none were audited.
 <!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4931, PAN-4944) -->
 <!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4925) -->
+<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917) -->
 <!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4931) -->
 <!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4929) -->
 - **The access-token snapshot is per process** (PAN-4930 planning) — `verifyAccessToken` and
@@ -678,3 +681,4 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   `listAccessTokens()`. `verifyAccessToken` also writes `lastUsedAt`, and `mutate` serializes writes only
   within one process, so a CLI write and a dashboard `lastUsedAt` write can lose each other.
 <!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4930) -->
+<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4482) -->

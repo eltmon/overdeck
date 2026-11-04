@@ -14,6 +14,7 @@ import { runServer } from './server.js';
 import { startSharedIssueService, getSharedIssueService } from './services/issue-service-singleton.js';
 import { startAgentEnrichmentService, stopAgentEnrichmentService } from './services/agent-enrichment-service.js';
 import { startNeedsYouPushService, stopNeedsYouPushService } from './services/needs-you-push-service.js';
+import { startLiveActivityService, stopLiveActivityService } from './services/live-activity-service.js';
 import { conversationReadDependencies } from './routes/conversations.js';
 import { getConversationsPendingInputFeed } from '../../lib/overdeck/conversation-reads.js';
 import { startResourceRefreshTriggers } from './services/resource-refresh-triggers.js';
@@ -277,6 +278,7 @@ console.log(`[overdeck] AgentEnrichmentService started${isPeerDashboard ? ' (pee
 // a peer dashboard would send every notification twice.
 if (!isPeerDashboard) {
   startNeedsYouPushService({ readConversationFeed: () => getConversationsPendingInputFeed(conversationReadDependencies) });
+  startLiveActivityService();
 }
 
 // Enable demand-driven agent output capture. The poller starts only while an
@@ -773,6 +775,7 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   stopResourceRefreshServices();
   stopAgentEnrichmentService();
   stopNeedsYouPushService();
+  stopLiveActivityService();
   stopAgentOutputService();
   stopConversationLifecycleService();
   stopCodexPluginImporter();

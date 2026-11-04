@@ -75,6 +75,33 @@ describe('signOut', () => {
     ]);
   });
 
+  it('ends the Live Activity after forget-client and before revoking the device (PAN-4839)', async () => {
+    const calls: string[] = [];
+    await signOut(
+      deps(calls, {
+        endLiveActivity: async () => {
+          calls.push('end live activity');
+        },
+      }),
+    );
+    expect(calls.slice(3, 6)).toEqual(['forget-client', 'end live activity', 'DELETE /v1/devices/dev-1']);
+  });
+
+  it('logs a failing endLiveActivity and still revokes the device (PAN-4839)', async () => {
+    const calls: string[] = [];
+    const log = vi.fn();
+    await signOut(
+      deps(calls, {
+        log,
+        endLiveActivity: async () => {
+          throw new Error('ActivityKit unavailable');
+        },
+      }),
+    );
+    expect(log).toHaveBeenCalledWith('end live activity', expect.any(Error));
+    expect(calls).toContain('DELETE /v1/devices/dev-1');
+  });
+
   it('abandons a machine that never answers after 5 s and runs the rest', async () => {
     const calls: string[] = [];
     const log = vi.fn();

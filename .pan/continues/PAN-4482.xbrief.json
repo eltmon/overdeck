@@ -1,0 +1,191 @@
+{
+  "version": "1",
+  "issueId": "PAN-4482",
+  "created": "2026-11-03T23:55:28.272Z",
+  "updated": "2026-11-04T00:37:26.220Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "share-worker-harness": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4482",
+      "claimedAt": "2026-11-03T23:55:28.272Z",
+      "doneAt": "2026-11-03T23:57:38.545Z"
+    },
+    "signaling-capture": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4482",
+      "claimedAt": "2026-11-03T23:57:48.253Z",
+      "doneAt": "2026-11-03T23:59:48.533Z"
+    },
+    "signaling-privacy-e2e": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4482",
+      "claimedAt": "2026-11-03T23:59:56.757Z",
+      "doneAt": "2026-11-04T00:03:16.161Z"
+    },
+    "loopback-viewer-ice-config": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4482",
+      "claimedAt": "2026-11-04T00:03:21.696Z",
+      "doneAt": "2026-11-04T00:08:23.472Z"
+    },
+    "ice-candidate-classifier": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4482",
+      "claimedAt": "2026-11-04T00:08:37.041Z",
+      "doneAt": "2026-11-04T00:09:00.968Z"
+    },
+    "forced-turn-checkpoint": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4482",
+      "claimedAt": "2026-11-04T00:09:08.316Z",
+      "doneAt": "2026-11-04T00:11:07.122Z"
+    },
+    "rate-limit-integration": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4482",
+      "claimedAt": "2026-11-04T00:11:12.585Z",
+      "doneAt": "2026-11-04T00:11:54.599Z"
+    },
+    "docs-verification": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4482",
+      "claimedAt": "2026-11-04T00:12:00.283Z",
+      "doneAt": "2026-11-04T00:12:45.442Z"
+    },
+    "acceptance-sweep": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4482",
+      "claimedAt": "2026-11-04T00:12:54.414Z",
+      "doneAt": "2026-11-04T00:15:54.424Z"
+    },
+    "share-worker-harness.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T00:27:52.787Z"
+    },
+    "share-worker-harness.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T00:28:44.788Z"
+    },
+    "share-worker-harness.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T00:29:02.292Z"
+    },
+    "signaling-capture.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T00:29:21.365Z"
+    },
+    "signaling-capture.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T00:29:39.681Z"
+    },
+    "signaling-capture.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T00:29:59.749Z"
+    },
+    "signaling-capture.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T00:30:20.818Z"
+    },
+    "signaling-privacy-e2e.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T00:30:41.921Z"
+    },
+    "signaling-privacy-e2e.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T00:31:03.449Z"
+    },
+    "signaling-privacy-e2e.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T00:31:23.147Z"
+    },
+    "signaling-privacy-e2e.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T00:31:43.406Z"
+    },
+    "loopback-viewer-ice-config.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T00:32:02.194Z"
+    },
+    "loopback-viewer-ice-config.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T00:32:20.070Z"
+    },
+    "loopback-viewer-ice-config.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T00:32:37.561Z"
+    },
+    "ice-candidate-classifier.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T00:32:54.228Z"
+    },
+    "ice-candidate-classifier.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T00:33:10.535Z"
+    },
+    "forced-turn-checkpoint.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T00:33:26.653Z"
+    },
+    "forced-turn-checkpoint.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T00:33:44.123Z"
+    },
+    "forced-turn-checkpoint.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T00:34:00.752Z"
+    },
+    "forced-turn-checkpoint.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T00:34:16.884Z"
+    },
+    "rate-limit-integration.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T00:34:33.446Z"
+    },
+    "rate-limit-integration.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T00:34:50.551Z"
+    },
+    "rate-limit-integration.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T00:35:08.341Z"
+    },
+    "docs-verification.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T00:35:28.066Z"
+    },
+    "docs-verification.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T00:35:45.446Z"
+    },
+    "docs-verification.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T00:36:02.276Z"
+    },
+    "docs-verification.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T00:36:19.226Z"
+    },
+    "acceptance-sweep.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T00:36:37.404Z"
+    },
+    "acceptance-sweep.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T00:36:53.540Z"
+    },
+    "acceptance-sweep.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T00:37:09.704Z"
+    },
+    "acceptance-sweep.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T00:37:26.220Z"
+    }
+  }
+}

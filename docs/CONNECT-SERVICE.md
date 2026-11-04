@@ -19,7 +19,8 @@ The overdeck.ai directory, the WebRTC introduction, the relay add-on's credentia
 | `src/client-state.ts` | Pure reducer for phone clients: registration, the 5-client cap, phone signalling, forget |
 | `src/ice-relay.ts` | The `ice-servers` and `relay-usage` answers shared by both reducers |
 | `src/push-state.ts` | Pure push decisions: registration, the `push` checks and rate limit, the `push-result` for a delivery outcome |
-| `src/push/` | Push I/O: `config.ts` (secrets, shared types), `jwt.ts` (base64url, PEM, JWS input), `http.ts` (2 s fetch timeout), `apns.ts`, `fcm.ts`, `deliver.ts` (provider choice, one retry) |
+| `src/activity-state.ts` | Pure Live Activity decisions (PAN-4839): activity registration, machine reports, the summed push, its rate limit and outcomes |
+| `src/push/` | Push I/O: `config.ts` (secrets, shared types), `jwt.ts` (base64url, PEM, JWS input), `http.ts` (2 s fetch timeout), `apns.ts`, `fcm.ts`, `deliver.ts` (provider choice, one retry; `deliverActivity` for Live Activity updates) |
 | `src/directory.ts` | Durable Object glue: sockets, alarm, effects in order persist → register → send → close |
 | `src/directory-store.ts` | SQLite schema, the `clients` upserts and the load that rebuilds the reducer state at wake-up |
 | `src/relay-meter.ts`, `src/turn.ts` | Monthly relay usage; Cloudflare Realtime TURN credentials (600 s TTL) |
@@ -55,6 +56,18 @@ The wire protocol is `packages/contracts/src/connect.ts` (runtime-import-free so
 - **Answer.** Delivered ⇒ `push-result { ok: true }`; a dead token ⇒ `no_registration`; any other failure, including an unconfigured provider ⇒ `delivery_failed`.
 - **Logs** carry only the frame type, ids and a short outcome (`delivered`, `gone`, `not_configured`, `failed_apns_503`, …), never a token, the sealed payload, a JWT, an access token or a key.
 
+## Live Activity (PAN-4839)
+
+The iPhone app's Live Activity shows two counts: how many items need the operator and how many agents are running. iOS draws it from the APNs push with no app code in between, so the push cannot be end-to-end encrypted (OD-1). The counts are the only phone data that reaches APNs in plain text.
+
+- **Frames.** A phone sends `activity-register { token, apsEnvironment? }` (same token rule as `push-register`; iOS without `apsEnvironment` is `production`) and `activity-unregister {}`. A machine sends `push-activity { to, needsYou, running }` for each phone it is paired with: `to` is the phone's `clientId`, and each count is an integer from 0 to 9,999 (`ACTIVITY_COUNT_MAX`). `push-activity` has no answer frame. An Android phone's `activity-register` answers `error bad_frame` ("live activities are iOS only").
+- **Storage.** `client_activities` (one row per phone: the token, `aps_environment`, and the sum last pushed with its time) and `activity_reports` (one row per phone and machine: the last counts and when they arrived). The rate window is the `meta` row `activity_window`. `forget-client` deletes the phone's rows in both tables; a machine's `forget` deletes that machine's reports. New tables, because `clients` cannot gain columns.
+- **Summing.** The card shows the sum of the phone's fresh reports, one per machine. A report is fresh for 10 minutes (`ACTIVITY_STALE_MS`). A report is stored even while the phone has no registration, so `activity-register` pushes the current sum at once.
+- **When to push.** After each report or registration: no fresh report ⇒ nothing; no registration ⇒ log `no_registration`; a sum that differs from the last push (or the first push after a register) ⇒ push at priority 10; the same sum 4 minutes (`ACTIVITY_REFRESH_MS`) after the last push ⇒ push at priority 5, which moves the stale date ahead; otherwise log `unchanged`. Each count in the sum is capped at 9,999.
+- **APNs.** `POST https://api.push.apple.com/3/device/<token>` (`api.sandbox.push.apple.com` for `sandbox`) with `apns-push-type: liveactivity`, `apns-topic: ai.overdeck.app.push-type.liveactivity`, `apns-priority` 10 or 5, `apns-expiration` = the stale date, and no collapse id. The body is exactly `{"aps":{"timestamp":<seconds>,"event":"update","content-state":{"needsYou":N,"running":M},"stale-date":<timestamp + 600>}}`. It uses the same `.p8` key and provider token as alert push.
+- **Dead tokens and failures.** A dead-token answer (as for alert push) clears the registration only if the phone still holds that token. Any other failure, or an unconfigured APNs, forgets the last pushed sum, so the next report pushes again. A 5xx or network error is retried once after 2 s.
+- **Logs** carry the frame type, the client id, the machine's environment id for `push-activity`, and an outcome (`pushed`, `refreshed`, `unchanged`, `no_registration`, `rate_limited`, `delivered`, `gone`, `failed_apns_503`, …). Never a token.
+
 ## Endpoints
 
 | Method | Path | Auth | Answer |
@@ -86,6 +99,7 @@ The page revokes a machine's device token before calling `/remove-machine`, so a
 - **Inbox:** bodies up to 256 KiB, 200 pending events per inbox, 64 MiB of sealed bytes per account, 120 events per minute per inbox (`INBOX_LIMIT`), 24-hour hold.
 - **Connects:** 30 directory upgrades per minute per device (`CONNECT_LIMIT`).
 - **Push:** 30 pushes per account per UTC minute (`rate_limited` after that).
+- **Live Activity:** 60 pushes per account per UTC minute (`ACTIVITY_PUSH_RATE_PER_MINUTE`), counted apart from alert pushes; a push over the limit is logged `rate_limited` and skipped.
 
 ## Configuration
 
@@ -129,3 +143,5 @@ An older deployed directory refuses `hello-client` with `platform: node` as `bad
 7. Smoke test: `node scripts/anywhere/smoke-hosted.mjs` exits 0 (both Workers' `/healthz`, plus one account device-code start), and on a signed-in machine `pan machines directory` lists it `online` within a minute.
 8. Run the two live checks of D-2356-21 on real machines: two machines on different networks without Tailscale link by approval and reach each other over `rtc://`; with UDP blocked on both, a relay-plan account links over `rtc+turn://` and the card shows **Using relay**. To block UDP, run these rules with both `iptables` and `ip6tables`; they drop all UDP except DNS on port 53: `-A OUTPUT -p udp --dport 53 -j ACCEPT`, `-A INPUT -p udp --sport 53 -j ACCEPT`, `-A OUTPUT -p udp -j DROP`, `-A INPUT -p udp -j DROP`. Start the server with `DEBUG=werift*`. When the relay picks the right TURN URL, its `iceOptions` log line shows `turnTransport: 'tls'` and port 443.
 9. Rollback: `npx wrangler rollback` returns to the previous Worker version.
+
+Deploy the directory before machines that send `push-activity` (PAN-4839). An older directory answers that frame with `error bad_frame`.

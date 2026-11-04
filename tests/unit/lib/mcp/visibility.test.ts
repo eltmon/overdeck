@@ -31,7 +31,7 @@ describe('MCP tool visibility (PAN-4927 W-MCP1)', () => {
     const { tools } = await client.listTools();
     expect(tools.map((tool) => tool.name)).not.toContain('answer_question');
     expect(tools.map((tool) => tool.name)).not.toContain('answer_permission');
-    expect(tools).toHaveLength(8);
+    expect(tools).toHaveLength(13);
   });
 
   it('adding approve lists every tool in ALL_TOOLS order', async () => {

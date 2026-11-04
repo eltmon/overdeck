@@ -134,6 +134,26 @@ title and text. If it cannot (for example before the first unlock after a
 restart), the notification reads **Overdeck · Something needs you**. Turn
 notifications on or off in the app's Settings.
 
+### Live Activity (iPhone)
+
+On iOS 16.2 and later, the Overdeck app shows a Live Activity on the lock
+screen and in the Dynamic Island, such as `3 need you · 2 running`. The first
+number counts the items that need you; the second counts the running agents.
+With several paired machines, the card shows their sum.
+
+iOS draws the card from a push without running the app, so its content cannot be
+end-to-end encrypted. Apple and overdeck.ai see these two numbers and nothing
+else: no titles, no conversation text, no machine names.
+
+- The card is on by default. Turn it off in the app's Settings → Live Activity.
+  If iOS Settings does not allow Live Activities for Overdeck, the app tells you
+  to turn them on there.
+- Your machine sends the counts whenever it is connected to overdeck.ai, even
+  when notifications are off.
+- The card dims when it has had no update for 10 minutes.
+- iOS ends a Live Activity after at most 8 hours. The card comes back the next
+  time you open the app.
+
 ## Optional: ntfy
 
 [ntfy](https://ntfy.sh) is a simple publish-subscribe notification service.

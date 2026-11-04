@@ -13,6 +13,7 @@ import {
   FREE_MACHINE_LIMIT_MESSAGE,
 } from '../../../packages/contracts/src/connect.ts';
 import type {
+  ApsEnvironment,
   ClientPlatform,
   ConnectErrorCode,
   ConnectPlan,
@@ -23,6 +24,8 @@ import type {
   MachineToDirectoryFrame,
   PushUrgency,
 } from '../../../packages/contracts/src/connect.ts';
+import { pushActivityAnswer, withoutMachineReports } from './activity-state.ts';
+import type { ActivityRegistration, ActivityReport } from './activity-state.ts';
 import { iceServersAnswer, relayUsageAnswer } from './ice-relay.ts';
 import { pushAnswer } from './push-state.ts';
 import type { PushWindow } from './push-state.ts';
@@ -59,6 +62,8 @@ export interface ClientRow {
   readonly lastSeenAt: number;
   /** The phone's APNs or FCM token (PAN-4830); written only by `push-register` and `push-unregister`. */
   readonly push: PushRegistration | null;
+  /** The phone's Live Activity token (PAN-4839); written only by `activity-register`, `activity-unregister` and outcomes. */
+  readonly activity: ActivityRegistration | null;
 }
 
 /** A pending approval request (D-2356-9): a row of the `approvals` table. */
@@ -85,6 +90,10 @@ export interface DirectoryState {
   readonly relay: RelayUsage | null;
   /** This UTC minute's accepted pushes (PAN-4830 D-8), persisted as the `meta` row `push_window`. */
   readonly pushWindow: PushWindow | null;
+  /** Each machine's last Live Activity counts per phone (PAN-4839 D-3). */
+  readonly activityReports: readonly ActivityReport[];
+  /** This UTC minute's Live Activity pushes, apart from `pushWindow` (meta row `activity_window`). */
+  readonly activityWindow: PushWindow | null;
 }
 
 export const MAX_PENDING_APPROVALS_PER_MACHINE = 1;
@@ -180,6 +189,20 @@ export type DirectoryEffect =
     readonly urgency: PushUrgency;
     readonly collapseId: string;
   }
+  /** Live Activity (PAN-4839): store or clear a phone's activity registration, a report, and the rate window. */
+  | { readonly kind: 'put-client-activity'; readonly clientId: string; readonly registration: ActivityRegistration | null }
+  | { readonly kind: 'put-activity-report'; readonly report: ActivityReport }
+  | { readonly kind: 'put-activity-window'; readonly window: PushWindow }
+  /** Send one Live Activity update to APNs, then feed the outcome back through `reduceActivityOutcome`. */
+  | {
+    readonly kind: 'deliver-activity';
+    readonly clientId: string;
+    readonly token: string;
+    readonly apsEnvironment: ApsEnvironment;
+    readonly needsYou: number;
+    readonly running: number;
+    readonly priority: 'high' | 'normal';
+  }
   | { readonly kind: 'send'; readonly to: Target; readonly frame: DirectoryToMachineFrame | DirectoryToClientFrame }
   | { readonly kind: 'close'; readonly to: Target; readonly code: number; readonly reason: string }
   | {
@@ -196,7 +219,16 @@ export interface ReduceResult {
   readonly effects: DirectoryEffect[];
 }
 
-export const EMPTY_DIRECTORY: DirectoryState = { plan: null, machines: [], clients: [], approvals: [], relay: null, pushWindow: null };
+export const EMPTY_DIRECTORY: DirectoryState = {
+  plan: null,
+  machines: [],
+  clients: [],
+  approvals: [],
+  relay: null,
+  pushWindow: null,
+  activityReports: [],
+  activityWindow: null,
+};
 
 export function toDirectoryMachines(machines: readonly MachineRow[], online: ReadonlySet<string>): DirectoryMachine[] {
   return machines.map((row) => ({
@@ -382,6 +414,7 @@ function frame(state: DirectoryState, event: Extract<DirectoryEvent, { kind: 'fr
         ...state,
         machines: state.machines.filter((m) => m.environmentId !== target),
         approvals: state.approvals.filter((r) => !dropped.includes(r)),
+        activityReports: withoutMachineReports(state, target),
       };
       const online = withOnline(ctx.online, self === target ? null : self, target);
       return {
@@ -518,6 +551,8 @@ function frame(state: DirectoryState, event: Extract<DirectoryEvent, { kind: 'fr
     }
     case 'push':
       return pushAnswer(state, f, ctx, self);
+    case 'push-activity':
+      return pushActivityAnswer(state, f, ctx, self);
   }
 }
 
@@ -538,6 +573,7 @@ function removeMachine(state: DirectoryState, event: Extract<DirectoryEvent, { k
     ...state,
     machines: state.machines.filter((m) => m.environmentId !== target),
     approvals: state.approvals.filter((r) => !dropped.includes(r)),
+    activityReports: withoutMachineReports(state, target),
   };
   return {
     state: next,
