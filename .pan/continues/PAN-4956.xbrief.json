@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4956",
   "created": "2026-11-04T09:00:33.744Z",
-  "updated": "2026-11-04T09:10:26.127Z",
+  "updated": "2026-11-04T09:10:30.679Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-4956",
       "claimedAt": "2026-11-04T09:07:13.929Z",
       "doneAt": "2026-11-04T09:10:26.127Z"
+    },
+    "py-example": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4956",
+      "claimedAt": "2026-11-04T09:10:30.679Z"
     }
   }
 }
