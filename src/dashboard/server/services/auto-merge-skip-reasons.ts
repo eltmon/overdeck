@@ -9,6 +9,10 @@
  *
  * A reason is logged only when it changes for that issue, so a PR that stays
  * unscheduled does not log every tick.
+ *
+ * PAN-5036: a skip can name a whole project (`scope: 'project'`, with the
+ * project key as `issueId`), for a pass that could not read its PR listing.
+ * It logs when it appears and again when it clears.
  */
 
 export interface NotScheduledAutoMerge {
@@ -19,6 +23,8 @@ export interface NotScheduledAutoMerge {
   head?: string;
   /** ISO time this reason was first seen for this issue and head. */
   at: string;
+  /** PAN-5036: the whole project was skipped; `issueId` carries the project key. */
+  scope?: 'project';
 }
 
 export interface SchedulerOutcomeLike {
@@ -29,6 +35,7 @@ export interface SchedulerOutcomeLike {
   head?: string;
   /** Skipped only because an auto-merge row is already pending or merging. */
   alreadyScheduled?: boolean;
+  scope?: 'project';
 }
 
 const latestSkips = new Map<string, NotScheduledAutoMerge>();
@@ -45,23 +52,30 @@ export function recordSchedulerOutcomes(
   const log = deps.log ?? console.log;
   const seen = new Set<string>();
   for (const outcome of outcomes) {
-    const issueId = outcome.issueId.toUpperCase();
     if (outcome.scheduled || outcome.alreadyScheduled) continue;
-    seen.add(issueId);
+    const project = outcome.scope === 'project';
+    const issueId = project ? outcome.projectKey : outcome.issueId.toUpperCase();
+    const key = project ? `project:${issueId}` : issueId;
+    seen.add(key);
     const reason = outcome.reason ?? 'not scheduled';
-    const previous = latestSkips.get(issueId);
+    const previous = latestSkips.get(key);
     if (previous && previous.reason === reason && previous.head === outcome.head) continue;
-    latestSkips.set(issueId, {
+    latestSkips.set(key, {
       issueId,
       projectKey: outcome.projectKey,
       reason,
       ...(outcome.head ? { head: outcome.head } : {}),
       at: new Date(now()).toISOString(),
+      ...(project ? { scope: 'project' as const } : {}),
     });
-    log(`[auto-merge-scheduler] ${issueId} not scheduled: ${reason}`);
+    log(project
+      ? `[auto-merge-scheduler] project ${issueId}: nothing scheduled: ${reason}`
+      : `[auto-merge-scheduler] ${issueId} not scheduled: ${reason}`);
   }
-  for (const issueId of [...latestSkips.keys()]) {
-    if (!seen.has(issueId)) latestSkips.delete(issueId);
+  for (const [key, skip] of [...latestSkips.entries()]) {
+    if (seen.has(key)) continue;
+    latestSkips.delete(key);
+    if (skip.scope === 'project') log(`[auto-merge-scheduler] project ${skip.issueId}: cleared "${skip.reason}"`);
   }
 }
 

@@ -30,6 +30,13 @@
  *
  * GitLab projects are skipped with a log line: their MRs are not listed here.
  *
+ * PAN-5036: the pass never schedules nothing silently. The listing is read
+ * with `readRepoPullRequests`, so a failed forge read (`null`) is told apart
+ * from "no PRs": the project gets a "PR listing unavailable" skip reason. An
+ * open gate-linked PR the listing rules out (checks not green, or conflicting)
+ * is still walked through the free checks above, then skipped with a reason
+ * naming its head instead of vanishing from `notScheduled`.
+ *
  * PAN-4772: when the gate refuses a PR whose approval is stale (approved at an
  * older head), the pass re-requests review once per head
  * (`stale-approval-rereview.ts`). Every completed pass's skip reasons are kept
@@ -41,7 +48,7 @@ import { resolve } from 'node:path';
 import type { ProjectConfig } from '../../../lib/projects.js';
 import type { PendingAutoMerge } from '../../../lib/overdeck/merge-sync.js';
 import type { MergeReadiness, PrFacts } from '../../../lib/cloister/pr-facts.js';
-import type { listRepoPullRequests } from './derived-issue-state.js';
+import type { GhPrRow } from '../../../lib/overdeck/derived-issue-state.js';
 import { recordSchedulerOutcomes } from './auto-merge-skip-reasons.js';
 import type { StaleApprovalFacts } from './stale-approval-rereview.js';
 
@@ -49,15 +56,36 @@ type DoorResult = { status: number; body: unknown };
 type GateAnswer = MergeReadiness & { facts: Pick<PrFacts, 'url' | 'headSha'> & StaleApprovalFacts };
 /** The re-arm rule, asked again with the latest row inside the insert transaction. */
 type CanSchedule = (latest: PendingAutoMerge) => boolean;
-type ListedPr = Awaited<ReturnType<typeof listRepoPullRequests>>[number];
+
+/** An open gate-linked PR the listing ruled out, and why (PAN-5036). */
+export interface DroppedScheduleCandidate {
+  issueId: string;
+  /** The PR head the listing judged, when it carried one. */
+  head?: string;
+  reason: string;
+}
+
+/** One project's listing, read for scheduling. */
+export interface ScheduleCandidates {
+  /** Issues with an open, green, non-conflicting PR the merge gate can link. */
+  candidates: readonly string[];
+  dropped: readonly DroppedScheduleCandidate[];
+}
+
+/** PAN-5036: the project-level skip reason when the forge read failed. */
+export const PR_LISTING_UNAVAILABLE_REASON =
+  'PR listing unavailable: the forge read failed, so no PR in this project can be scheduled until it answers';
 
 export interface AutoMergeSchedulerDeps {
   listProjects?: () => Array<{ key: string; config: ProjectConfig }>;
   isTrainEnabledForProject?: (config: ProjectConfig) => boolean;
   /** The project's forge; GitLab projects are skipped. */
   forgeOf?: (projectPath: string) => 'github' | 'gitlab';
-  /** Issues with an open, green PR the merge gate can link; {@link listScheduleCandidates} by default. */
-  listCandidates?: (projectPath: string) => Promise<readonly string[]>;
+  /**
+   * The project's candidates and the PRs its listing ruled out, or null when
+   * the listing could not be read; {@link listScheduleCandidates} by default.
+   */
+  listCandidates?: (projectPath: string) => Promise<ScheduleCandidates | null>;
   /** The door's forge-free policy check; `autoMergePolicyRefusal` by default. */
   policyRefusal?: (issueId: string) => DoorResult | null;
   /** PAN-4820: the Deft human-merge hold; `deftAutoMergeHold` by default. */
@@ -95,6 +123,8 @@ export interface AutoMergeScheduleOutcome {
   head?: string;
   /** Skipped only because a pending or merging row already exists. */
   alreadyScheduled?: boolean;
+  /** PAN-5036: the whole project was skipped; `issueId` carries the project key. */
+  scope?: 'project';
 }
 
 function errorMessage(error: unknown): string {
@@ -118,23 +148,38 @@ export function issueIdFromGateBranch(branch: string | undefined): string | null
  * branch whose checks are green and that do not conflict. Approval is NOT read
  * here: the listing carries only the forge's `reviewDecision`, which is empty
  * without branch protection. The merge gate reads the verdict marker comments.
+ *
+ * PAN-5036: null when the listing could not be read, never an empty list; an
+ * open gate-linked PR ruled out by the listing is returned in `dropped` with
+ * the head it judged.
  */
 export async function listScheduleCandidates(
   projectPath: string,
-  deps: { listPullRequests?: (projectPath: string) => Promise<readonly ListedPr[]> } = {},
-): Promise<string[]> {
-  const { listRepoPullRequests: listPrs, toChecksState } = await import('./derived-issue-state.js');
-  const rows = await (deps.listPullRequests ?? listPrs)(projectPath);
+  deps: { listPullRequests?: (projectPath: string) => Promise<readonly GhPrRow[] | null> } = {},
+): Promise<ScheduleCandidates | null> {
+  const { readRepoPullRequests, toChecksState } = await import('./derived-issue-state.js');
+  const rows = await (deps.listPullRequests ?? readRepoPullRequests)(projectPath);
+  if (!rows) return null;
   const candidates = new Set<string>();
+  const dropped = new Map<string, DroppedScheduleCandidate>();
   for (const row of rows) {
     if ((row.state ?? '').toUpperCase() !== 'OPEN' || row.mergedAt || row.isDraft) continue;
     const issueId = issueIdFromGateBranch(row.headRefName);
     if (!issueId) continue;
-    if (toChecksState(row.statusCheckRollup) !== 'green') continue;
-    if (row.mergeable === 'CONFLICTING') continue;
+    const head = row.headRefOid ?? undefined;
+    const at = head ? ` at ${head.slice(0, 8)}` : '';
+    const checks = toChecksState(row.statusCheckRollup);
+    const reason = checks !== 'green' ? `checks ${checks} in the PR listing${at}`
+      : row.mergeable === 'CONFLICTING' ? `PR conflicts with its base in the PR listing${at}`
+      : null;
+    if (reason) {
+      dropped.set(issueId, { issueId, ...(head ? { head } : {}), reason });
+      continue;
+    }
     candidates.add(issueId);
   }
-  return [...candidates];
+  for (const issueId of candidates) dropped.delete(issueId);
+  return { candidates: [...candidates], dropped: [...dropped.values()] };
 }
 
 async function defaultForgeOf(): Promise<(projectPath: string) => 'github' | 'gitlab'> {
@@ -215,7 +260,7 @@ export async function scheduleReadyAutoMerges(deps: AutoMergeSchedulerDeps = {})
     if (!isTrainEnabledForProject(config)) continue;
     const projectPath = resolve(config.path);
 
-    let candidates: readonly string[];
+    let listing: ScheduleCandidates | null;
     try {
       if (forgeOf(projectPath) === 'gitlab') {
         if (!gitlabSkipsLogged.has(key)) {
@@ -224,13 +269,18 @@ export async function scheduleReadyAutoMerges(deps: AutoMergeSchedulerDeps = {})
         }
         continue;
       }
-      candidates = await listCandidates(projectPath);
+      listing = await listCandidates(projectPath);
     } catch (error) {
       log(`[auto-merge-scheduler] candidates for ${key} failed: ${errorMessage(error)}`);
       continue;
     }
+    if (!listing) {
+      outcomes.push({ projectKey: key, issueId: key, scope: 'project', scheduled: false, reason: PR_LISTING_UNAVAILABLE_REASON });
+      continue;
+    }
+    const dropped = new Map(listing.dropped.map((entry) => [entry.issueId.toUpperCase(), entry]));
 
-    for (const rawIssueId of candidates) {
+    for (const rawIssueId of [...listing.candidates, ...dropped.keys()]) {
       if (!isCurrent()) return outcomes;
       const issueId = rawIssueId.toUpperCase();
       let head: string | undefined;
@@ -255,6 +305,13 @@ export async function scheduleReadyAutoMerges(deps: AutoMergeSchedulerDeps = {})
         }
         if (latest?.status === 'cancelled') {
           skip('auto-merge cancelled by the operator; re-schedule it to resume');
+          continue;
+        }
+        // PAN-5036: ruled out by the listing; say so with the head it judged.
+        const ruledOut = dropped.get(issueId);
+        if (ruledOut) {
+          head = ruledOut.head;
+          skip(ruledOut.reason);
           continue;
         }
 
