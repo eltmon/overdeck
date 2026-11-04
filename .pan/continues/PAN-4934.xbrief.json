@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4934",
   "created": "2026-11-04T02:59:33.455Z",
-  "updated": "2026-11-04T03:04:31.684Z",
+  "updated": "2026-11-04T03:05:41.351Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-11-04T03:04:28.141Z"
     },
     "acp-injection-guard": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4934",
-      "claimedAt": "2026-11-04T03:04:31.684Z"
+      "claimedAt": "2026-11-04T03:04:31.684Z",
+      "doneAt": "2026-11-04T03:05:41.350Z"
     }
   }
 }
