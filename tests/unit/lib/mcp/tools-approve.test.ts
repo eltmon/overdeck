@@ -19,7 +19,7 @@ import { callTool, connectClient, fakeApi, resultJson, resultText } from './harn
 const APPROVER = ['approve', 'tell', 'read:conversations'];
 
 describe('MCP approval tools (PAN-4649 W-7)', () => {
-  it('the approval tools close the list, making twenty-two tools in all', () => {
+  it('the approval tools close the shared list, making twenty-four tools in all with the self tools', () => {
     expect(APPROVE_TOOLS.map((tool) => tool.name)).toEqual([
       'list_pending_input', 'answer_question', 'answer_permission',
       'answer_pane_choice', 'answer_codex_approval', 'answer_pi_ask', 'answer_plan',
@@ -32,7 +32,7 @@ describe('MCP approval tools (PAN-4649 W-7)', () => {
       'list_pending_input', 'answer_question', 'answer_permission',
       'answer_pane_choice', 'answer_codex_approval', 'answer_pi_ask', 'answer_plan',
       'answer_agent_plan', 'answer_agent_permission',
-      'wait_job',
+      'wait_job', 'request_secret', 'secret_wait',
     ]);
   });
 

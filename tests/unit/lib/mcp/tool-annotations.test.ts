@@ -26,6 +26,8 @@ const SINGLE_ROUTE_PATHS: Record<string, { method: string; path: string }> = {
   answer_agent_plan: { method: 'POST', path: '/api/agents/agent-pan-1/plan-action' },
   answer_agent_permission: { method: 'POST', path: '/api/agents/agent-pan-1/permissions/req-1/respond' },
   wait_job: { method: 'GET', path: '/api/self/jobs/abc/wait' },
+  request_secret: { method: 'POST', path: '/api/self/secret-requests' },
+  secret_wait: { method: 'GET', path: '/api/self/secret-requests/abc/wait' },
 };
 
 describe('MCP tool annotations (PAN-4927 W-MCP1)', () => {

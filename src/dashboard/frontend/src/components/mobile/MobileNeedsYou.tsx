@@ -143,6 +143,8 @@ function QuestionCard({ decision, pending, error, onError }: {
 }
 
 function ReadOnlyAction({ decision }: { decision: Decision }) {
+  // PAN-4941 — a secret request is answered only on this machine's own desktop dashboard.
+  if (decision.agentRequest) return <p className="px-4 pb-3 text-xs text-muted-foreground">Answer on the desktop</p>;
   if (decision.source === 'conversation') {
     return (
       <div className="px-4 pb-3">
