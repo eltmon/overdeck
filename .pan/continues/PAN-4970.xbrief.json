@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4970",
   "created": "2026-11-04T00:20:58.327Z",
-  "updated": "2026-11-04T00:43:34.057Z",
+  "updated": "2026-11-04T00:44:26.599Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-4970",
       "claimedAt": "2026-11-04T00:36:39.630Z",
       "doneAt": "2026-11-04T00:43:34.056Z"
+    },
+    "reconciler-wiring": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4970",
+      "claimedAt": "2026-11-04T00:44:26.599Z"
     }
   }
 }
