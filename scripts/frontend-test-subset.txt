@@ -92,6 +92,7 @@ src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx
 src/components/Settings/sections/__tests__/tiered-crews.test.ts
 src/components/Stage/HomePane/Launcher.test.tsx
 src/components/Stage/cockpit/IssueMissionControl.render-count.test.tsx
+src/components/Stage/cockpit/IssueTreeLane.test.ts
 src/components/Stage/launcherFocusStore.test.ts
 src/components/Stage/panes/EditorPane.test.tsx
 src/components/XTerminal.test.tsx

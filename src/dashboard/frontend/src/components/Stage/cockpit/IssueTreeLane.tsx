@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
-import type { ProjectSessionTree, SessionNode } from '@overdeck/contracts'
+import { presenceForPaneState, type ProjectSessionTree, type SessionNode } from '@overdeck/contracts'
 import { type ProjectFeature } from '../../CommandDeck/ProjectTree/ProjectNode'
 import { useIssueActions } from '../../IssueActionMenu/useIssueActions'
 import { useActivityQuery } from '../../CommandDeck/ZoneCOverviewTabs/queries'
@@ -28,19 +28,18 @@ const PANE_ROLE_TO_SESSION_TYPE: Record<BackendPane['role'], SessionNode['type']
   conversation: null,
 }
 
-/** The backend owns pane state; this is the only place it becomes a row status. */
+/**
+ * The backend owns pane state; this is the only place it becomes a row
+ * status. PAN-5011: Herdr `done` is a finished turn, not an exit — only
+ * `exited` (via presenceForPaneState) ends the row.
+ */
 function paneStatus(state: BackendPane['state']): { status: SessionNode['status']; presence: SessionNode['presence'] } {
-  switch (state) {
-    case 'working': return { status: 'running', presence: 'active' }
-    case 'blocked': return { status: 'running', presence: 'active' }
-    case 'idle': return { status: 'running', presence: 'idle' }
-    case 'done': return { status: 'stopped', presence: 'ended' }
-    case 'exited': return { status: 'stopped', presence: 'ended' }
-    default: return { status: 'unknown', presence: 'ended' }
-  }
+  const presence = presenceForPaneState(state)
+  if (presence === 'ended') return { status: 'stopped', presence }
+  return { status: state === 'unknown' ? 'unknown' : 'running', presence }
 }
 
-function paneToSession(pane: BackendPane): SessionNode | null {
+export function paneToSession(pane: BackendPane): SessionNode | null {
   const type = PANE_ROLE_TO_SESSION_TYPE[pane.role]
   if (!type) return null
   const { status, presence } = paneStatus(pane.state)
