@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5016",
   "created": "2026-11-04T13:28:40.332Z",
-  "updated": "2026-11-04T14:02:03.608Z",
+  "updated": "2026-11-04T14:02:20.399Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -176,6 +176,10 @@
     "channel-open.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T14:02:03.607Z"
+    },
+    "channel-open.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:02:20.399Z"
     }
   }
 }
