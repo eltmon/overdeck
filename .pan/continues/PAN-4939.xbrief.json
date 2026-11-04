@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4939",
   "created": "2026-11-04T00:21:28.043Z",
-  "updated": "2026-11-04T00:49:01.201Z",
+  "updated": "2026-11-04T00:50:18.206Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -40,9 +40,10 @@
       "doneAt": "2026-11-04T00:48:56.421Z"
     },
     "delete-scheduled-tool": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4939",
-      "claimedAt": "2026-11-04T00:49:01.201Z"
+      "claimedAt": "2026-11-04T00:49:01.201Z",
+      "doneAt": "2026-11-04T00:50:18.205Z"
     }
   }
 }
