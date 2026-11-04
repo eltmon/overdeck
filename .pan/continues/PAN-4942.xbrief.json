@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4942",
   "created": "2026-11-04T05:29:28.990Z",
-  "updated": "2026-11-04T06:23:32.954Z",
+  "updated": "2026-11-04T06:23:48.401Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -112,6 +112,10 @@
     "operator-linked-route.ac4": {
       "status": "completed",
       "doneAt": "2026-11-04T06:23:32.954Z"
+    },
+    "operator-linked-route.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:23:48.401Z"
     }
   }
 }
