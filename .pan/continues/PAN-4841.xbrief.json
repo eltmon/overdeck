@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4841",
   "created": "2026-11-04T10:01:07.580Z",
-  "updated": "2026-11-04T11:02:56.272Z",
+  "updated": "2026-11-04T11:03:04.331Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -68,6 +68,11 @@
       "claimedBy": "agent-pan-4841",
       "claimedAt": "2026-11-04T10:28:55.486Z",
       "doneAt": "2026-11-04T11:02:56.272Z"
+    },
+    "rel-directory-push-secrets": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4841",
+      "claimedAt": "2026-11-04T11:03:04.331Z"
     }
   }
 }
