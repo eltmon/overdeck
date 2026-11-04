@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5042",
   "created": "2026-11-04T17:47:47.339Z",
-  "updated": "2026-11-04T18:39:18.515Z",
+  "updated": "2026-11-04T18:43:34.697Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,9 +52,10 @@
       "doneAt": "2026-11-04T18:39:05.701Z"
     },
     "pr-sync-keeps-checks": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5042",
-      "claimedAt": "2026-11-04T18:39:18.515Z"
+      "claimedAt": "2026-11-04T18:39:18.515Z",
+      "doneAt": "2026-11-04T18:43:34.696Z"
     }
   }
 }
