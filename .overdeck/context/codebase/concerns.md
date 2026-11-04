@@ -667,6 +667,4 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   missing from the `✓ root <file>` list. Spy `process.kill` in any test whose code under test
   signals a fixture PID. 39 test files carry literal PIDs without a `process.kill` spy; most only
   use the PID as data, but none were audited.
-<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4925) -->
-<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4931) -->
-<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4929) -->
+<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4931, PAN-4944) -->
