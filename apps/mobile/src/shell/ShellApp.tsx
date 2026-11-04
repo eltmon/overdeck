@@ -13,6 +13,8 @@ import { installResumeHandler } from './lifecycle';
 import { createLiveActivityController, type LiveActivityController, liveActivityEnabled, setLiveActivityEnabled } from './liveActivity';
 import { MachinesScreen } from './MachinesScreen';
 import { MachineView } from './MachineView';
+import { markSynced, readNotificationPrefs } from './notificationPrefs';
+import { createPrefsSync, type PrefsSync, putPrefsOver } from './notificationPrefsSync';
 import { installNotificationTap } from './notificationTap';
 import { PairScreen } from './PairScreen';
 import { pairMachine } from './pairing';
@@ -37,6 +39,8 @@ interface Services {
   liveActivity: LiveActivityController;
   /** Push registration, iOS only (PAN-4838 D-9). */
   push: PushController | null;
+  /** Notification-prefs sync to every paired machine, iOS only (PAN-5019 WI-8). */
+  prefsSync: PrefsSync | null;
 }
 
 const errorText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
@@ -165,8 +169,15 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
     const connection = createConnection({ directory, meter });
     const platform = shellPlatform();
     const push = pushSupported() ? startPush({ directory: directory.client, platform }) : null;
+    const prefsSync = pushSupported()
+      ? createPrefsSync({
+        directory: directory.client,
+        paired: () => useShellStore.getState().machines,
+        send: putPrefsOver(connection),
+      })
+      : null;
     const liveActivity = createLiveActivityController({ plugin: OverdeckLiveActivity, directory: directory.client, platform });
-    setServices({ directory, connection, push, liveActivity });
+    setServices({ directory, connection, push, liveActivity, prefsSync });
     void directory.client.start();
     void liveActivity.refresh();
     // The operator may change the iOS permission in iOS Settings while the app is in the background,
@@ -190,6 +201,7 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
     return () => {
       uninstallResume();
       push?.stop();
+      prefsSync?.stop();
       liveActivity.dispose();
       meter.stop();
       directory.client.stop();
@@ -214,6 +226,8 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
         connection: services.connection,
         identity,
         phoneLabel: account.label,
+        notificationPreferences: readNotificationPrefs,
+        onPreferencesStored: markSynced,
       });
     },
     [services, identity, account],
