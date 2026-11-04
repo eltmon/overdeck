@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5041",
   "created": "2026-11-04T17:22:54.161Z",
-  "updated": "2026-11-04T18:16:19.324Z",
+  "updated": "2026-11-04T18:16:37.350Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -140,6 +140,10 @@
     "wi6-ios-plugin.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T18:16:19.324Z"
+    },
+    "wi6-ios-plugin.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:16:37.350Z"
     }
   }
 }
