@@ -366,3 +366,12 @@ export async function removeCodexPluginCaches(
   }
   return removed;
 }
+
+/**
+ * PAN-4941 — delete an agent's or conversation's delivered secrets: only the
+ * `secrets/` child of `ownerDir` (`<agent dir>` or `<conversation dir>`), never
+ * the owner directory or its transcripts. A missing directory is not an error.
+ */
+export async function removeAgentSecretsDir(ownerDir: string): Promise<void> {
+  await rm(join(ownerDir, 'secrets'), { recursive: true, force: true });
+}

@@ -13,7 +13,7 @@
  * name the agent id and token id, never the token.
  */
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, rename, rm, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import {
@@ -25,6 +25,7 @@ import {
 } from '../access-tokens.js';
 import { getAgentDir, getAgentState } from '../agents/agent-state-read.js';
 import { normalizeAgentId } from '../agents/identity.js';
+import { removeAgentSecretsDir } from '../agents/state-dir-removal.js';
 import type { Role } from '../agents/role.js';
 
 export const AGENT_TOKEN_FILE = 'mcp-token';
@@ -141,7 +142,7 @@ export async function revokeAgentMcpTokens(agentId: string, opts: { agentKind?: 
       await unlink(agentMcpTokenPath(dir)).catch((error: NodeJS.ErrnoException) => {
         if (error.code !== 'ENOENT') throw error;
       });
-      await rm(join(dir, 'secrets'), { recursive: true, force: true });
+      await removeAgentSecretsDir(dir);
     }
     return revoked.length;
   } catch (error) {

@@ -16,6 +16,7 @@ vi.mock('../../paths.js', async (importOriginal) => {
 import {
   listAgentStateFilesForRemoval,
   pruneAgentStateDir,
+  removeAgentSecretsDir,
   removeAgentStateDir,
   removeCodexPluginCaches,
 } from '../state-dir-removal.js';
@@ -248,5 +249,29 @@ describe('removeCodexPluginCaches (PAN-4727)', () => {
   it('returns nothing when the agents root is missing and rejects path-like names', async () => {
     expect(await removeCodexPluginCaches('overdeck-packs', 'gstack', join(tempRoot, 'missing'))).toEqual([]);
     await expect(removeCodexPluginCaches('overdeck-packs', '../x', tempRoot)).rejects.toThrow(/invalid name/);
+  });
+});
+
+describe('removeAgentSecretsDir (PAN-4941)', () => {
+  it('deletes only the secrets child and keeps the transcript beside it', async () => {
+    mkdirSync(join(agentDir, 'secrets'));
+    writeFileSync(join(agentDir, 'secrets', 'OPENAI_API_KEY'), 'v');
+    writeFileSync(join(agentDir, 'session.jsonl'), '{}\n');
+    await removeAgentSecretsDir(agentDir);
+    expect(existsSync(join(agentDir, 'secrets'))).toBe(false);
+    expect(readFileSync(join(agentDir, 'session.jsonl'), 'utf8')).toBe('{}\n');
+  });
+
+  it('removes a secrets symlink without following it', async () => {
+    writeFileSync(join(outsideDir, 'keep'), 'outside');
+    symlinkSync(outsideDir, join(agentDir, 'secrets'));
+    await removeAgentSecretsDir(agentDir);
+    expect(existsSync(join(agentDir, 'secrets'))).toBe(false);
+    expect(readFileSync(join(outsideDir, 'keep'), 'utf8')).toBe('outside');
+  });
+
+  it('is not an error when there is no secrets directory', async () => {
+    await expect(removeAgentSecretsDir(agentDir)).resolves.toBeUndefined();
+    await expect(removeAgentSecretsDir(join(tempRoot, 'missing'))).resolves.toBeUndefined();
   });
 });
