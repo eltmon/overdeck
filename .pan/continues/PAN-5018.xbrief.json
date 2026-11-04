@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5018",
   "created": "2026-11-04T13:12:52.932Z",
-  "updated": "2026-11-04T15:10:38.398Z",
+  "updated": "2026-11-04T15:10:54.649Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -148,6 +148,10 @@
     "directory-client-transition-logging.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T15:10:38.397Z"
+    },
+    "directory-client-transition-logging.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:10:54.649Z"
     }
   }
 }
