@@ -72,4 +72,16 @@ describe('MCP delegation tools (PAN-4938 W-DEL1)', () => {
     const tool = DELEGATE_TOOLS.find((candidate) => candidate.name === 'task_wait')!;
     expect(tool.scope).toBe(requiredScopeFor('GET', '/api/self/workers/x/wait'));
   });
+
+  it('list_workers and task_status call their routes and need their scopes', async () => {
+    const api = fakeApi({
+      'GET /api/self/workers': { status: 200, json: { workers: [] } },
+      'GET /api/self/workers/agent-pan-1-worker-1': { status: 200, json: { id: 'agent-pan-1-worker-1', state: 'running' } },
+    });
+    const client = await connectClient(api, SCOPES, true);
+    expect(resultJson(await callTool(client, 'list_workers'))).toEqual({ workers: [] });
+    expect(resultJson(await callTool(client, 'task_status', { workerId: 'agent-pan-1-worker-1' }))).toEqual({ id: 'agent-pan-1-worker-1', state: 'running' });
+    expect(DELEGATE_TOOLS.find((tool) => tool.name === 'list_workers')!.scope).toBe(requiredScopeFor('GET', '/api/self/workers'));
+    expect(DELEGATE_TOOLS.find((tool) => tool.name === 'task_status')!.scope).toBe(requiredScopeFor('GET', '/api/self/workers/x'));
+  });
 });

@@ -15,6 +15,10 @@
  *   `idle-without-report`) with the last assistant message, or `running` with
  *   `next`. The startup grace is what remains of 60 s since the worker's
  *   launch, so a worker that died before this chunk began is judged at once.
+ * - `GET /api/self/workers` (`read:state`, D-6) → `{ workers }`: the caller's
+ *   local workers and stand-ins, each a `SelfWorkerEntry` with live state,
+ *   idle age and the newest report's seq, time and status (no body).
+ * - `GET /api/self/workers/:id` (`read:state`, D-6) → one `SelfWorkerEntry`.
  *
  * Ownership (D-3): a worker is the caller's when its `worker.json` or its
  * stand-in `remote.json` names `workerParentOf(caller)` as parent
@@ -29,9 +33,12 @@
 import { Effect, Layer, Option } from 'effect';
 import { HttpRouter, HttpServerRequest, type HttpServerResponse } from 'effect/unstable/http';
 
+import { idleAgeMs, isAlive, isConfirmedDead, type LivenessVerdict } from '../../../lib/agents/liveness.js';
 import { readWorkerFacts } from '../../../lib/agents/worker/facts.js';
 import { isWorkerId } from '../../../lib/agents/worker/ids.js';
-import { readRemoteStandIn, type RemoteStandIn } from '../../../lib/agents/worker/remote-standin.js';
+import { listWorkers } from '../../../lib/agents/worker/list.js';
+import { listRemoteStandIns, readRemoteStandIn, type RemoteStandIn } from '../../../lib/agents/worker/remote-standin.js';
+import { latestWorkerReport, type WorkerReport, type WorkerReportStatus } from '../../../lib/agents/worker/report.js';
 import { WAIT_STARTUP_GRACE_MS, waitForWorkerReport, type WaitOptions, type WaitOutcome } from '../../../lib/agents/worker/wait.js';
 import { waitForAnyWorker } from '../../../lib/agents/worker/wait-any.js';
 
@@ -174,6 +181,64 @@ export async function handleSelfWorkerWait(
   }
 }
 
+export interface SelfWorkerEntry {
+  id: string;
+  issueId: string;
+  name: string | null;
+  startedAt: string;
+  remote: { environmentId: string; label: string } | null;
+  state: 'running' | 'exited' | 'stopped' | 'unknown';
+  idleAgeMs: number | null;
+  latestReport: { seq: number; at: string; status: WorkerReportStatus } | null;
+}
+
+export interface SelfWorkerReadDeps extends OwnedWorkerDeps {
+  caller?: SelfCallerDeps;
+  listWorkers?: typeof listWorkers;
+  listStandIns?: typeof listRemoteStandIns;
+  isAlive?: (id: string) => Promise<LivenessVerdict>;
+  idleAgeMs?: (id: string) => number | null;
+  latestReport?: (id: string) => Promise<WorkerReport | null>;
+}
+
+/** One worker's entry: a local worker's state from the liveness oracle, a stand-in's from `remote.json`. */
+async function entryOf(owned: OwnedWorker, deps: SelfWorkerReadDeps): Promise<SelfWorkerEntry> {
+  const report = await (deps.latestReport ?? latestWorkerReport)(owned.id);
+  const latest = report ? { seq: report.seq, at: report.at, status: report.status } : null;
+  const base = { id: owned.id, issueId: owned.issueId, name: owned.name, startedAt: owned.launchedAt, latestReport: latest };
+  if (owned.remote) {
+    return { ...base, remote: { environmentId: owned.remote.environmentId, label: owned.remote.label }, state: owned.remote.state, idleAgeMs: owned.remote.idleAgeMs };
+  }
+  const verdict = await (deps.isAlive ?? ((id: string) => isAlive(id)))(owned.id);
+  const state = verdict.alive ? 'running' : isConfirmedDead(verdict) ? 'exited' : 'unknown';
+  return { ...base, remote: null, state, idleAgeMs: (deps.idleAgeMs ?? ((id: string) => idleAgeMs(id)))(owned.id) };
+}
+
+/** `GET /api/self/workers`. */
+export async function handleSelfWorkerList(credential: DashboardCredential | null, deps: SelfWorkerReadDeps = {}): Promise<SelfRouteResult> {
+  const resolved = selfCallerFromCredential(credential, deps.caller);
+  if (!resolved.ok) return { status: resolved.status, body: resolved.body };
+  const { caller } = resolved;
+  const owned: OwnedWorker[] = [];
+  for (const listing of await (deps.listWorkers ?? listWorkers)({ parentId: workerParentOf(caller) })) {
+    if (listing.facts) owned.push({ id: listing.id, issueId: listing.facts.issueId, name: listing.facts.name, launchedAt: listing.facts.startedAt, remote: null });
+  }
+  for (const { localId, standIn } of await (deps.listStandIns ?? listRemoteStandIns)()) {
+    if (sameParent(standIn.parentId, caller)) owned.push({ id: localId, issueId: standIn.issueId, name: null, launchedAt: standIn.createdAt, remote: standIn });
+  }
+  owned.sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+  return { status: 200, body: { workers: await Promise.all(owned.map((worker) => entryOf(worker, deps))) } };
+}
+
+/** `GET /api/self/workers/:id`. */
+export async function handleSelfWorkerGet(credential: DashboardCredential | null, id: string, deps: SelfWorkerReadDeps = {}): Promise<SelfRouteResult> {
+  const resolved = selfCallerFromCredential(credential, deps.caller);
+  if (!resolved.ok) return { status: resolved.status, body: resolved.body };
+  const owned = await ownedWorker(id, resolved.caller, deps);
+  if (!owned) return { status: 404, body: UNKNOWN_WORKER };
+  return { status: 200, body: await entryOf(owned, deps) };
+}
+
 export function makeSelfWorkersRouteLayer() {
   const startSelfWorkerRoute = HttpRouter.add(
     'POST',
@@ -204,7 +269,30 @@ export function makeSelfWorkersRouteLayer() {
     })),
   );
 
-  return Layer.mergeAll(startSelfWorkerRoute, waitSelfWorkerRoute);
+  const listSelfWorkersRoute = HttpRouter.add(
+    'GET',
+    '/api/self/workers',
+    httpHandler(Effect.gen(function* () {
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      const credential = resolveRequestCredential(request);
+      const result = yield* Effect.promise(() => handleSelfWorkerList(credential));
+      return jsonResponse(result.body, { status: result.status });
+    })),
+  );
+
+  const getSelfWorkerRoute = HttpRouter.add(
+    'GET',
+    '/api/self/workers/:id',
+    httpHandler(Effect.gen(function* () {
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      const params = yield* HttpRouter.params;
+      const credential = resolveRequestCredential(request);
+      const result = yield* Effect.promise(() => handleSelfWorkerGet(credential, params['id'] ?? ''));
+      return jsonResponse(result.body, { status: result.status });
+    })),
+  );
+
+  return Layer.mergeAll(startSelfWorkerRoute, waitSelfWorkerRoute, listSelfWorkersRoute, getSelfWorkerRoute);
 }
 
 export const selfWorkersRouteLayer = makeSelfWorkersRouteLayer();

@@ -5,6 +5,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { WorkerFacts } from '../../../lib/agents/worker/facts.js';
+import type { WorkerListing } from '../../../lib/agents/worker/list.js';
 import type { RemoteStandIn } from '../../../lib/agents/worker/remote-standin.js';
 import type { WorkerReport } from '../../../lib/agents/worker/report.js';
 import { type WaitOptions, type WaitOutcome, waitForWorkerReport } from '../../../lib/agents/worker/wait.js';
@@ -13,7 +14,7 @@ import { jsonResponse } from '../http-helpers.js';
 import type { SelfCallerDeps } from '../self-caller.js';
 import type { DashboardCredential } from '../routes/dashboard-auth.js';
 import type { FleetCaller } from '../routes/fleet-work.js';
-import { handleSelfWorkerStart, handleSelfWorkerWait, NO_ISSUE, ownedWorker, UNKNOWN_WORKER, workerParentOf } from '../routes/self-workers.js';
+import { handleSelfWorkerGet, handleSelfWorkerList, handleSelfWorkerStart, handleSelfWorkerWait, NO_ISSUE, ownedWorker, UNKNOWN_WORKER, workerParentOf } from '../routes/self-workers.js';
 
 const AGENT_TOKEN: DashboardCredential = { kind: 'token', tokenId: 't', scopes: ['operate', 'read:state'], agentId: 'agent-pan-1', agentKind: 'agent', role: 'work' };
 const CONVERSATION_TOKEN: DashboardCredential = { kind: 'token', tokenId: 't', scopes: ['operate'], agentId: 'abc', agentKind: 'conversation', role: 'conversation' };
@@ -200,5 +201,49 @@ describe('GET /api/self/workers/:id/wait (PAN-4938 D-3, D-5)', () => {
       await vi.advanceTimersByTimeAsync(10_000);
       expect(await pending).toEqual({ status: 200, body: { status: 'done', workerId: MINE, report: REPORT } });
     });
+  });
+});
+
+describe('GET /api/self/workers and /api/self/workers/:id (PAN-4938 D-6)', () => {
+  const OTHER = 'agent-pan-7-worker-1';
+  function readDeps() {
+    const launched = new Date(NOW - 60_000).toISOString();
+    return {
+      ...ownership(launched),
+      // listWorkers filters by parent itself; the stub honours the filter like the real one.
+      listWorkers: async (filter: { parentId?: string } = {}): Promise<WorkerListing[]> => [
+        { id: MINE, facts: facts(MINE, 'agent-pan-1', launched), latestReport: REPORT },
+        { id: OTHER, facts: facts(OTHER, 'agent-pan-7', launched), latestReport: null },
+      ].filter((listing) => listing.facts.parentId.toLowerCase() === filter.parentId?.toLowerCase()),
+      listStandIns: async () => [
+        { localId: REMOTE, standIn: { ...standIn('agent-pan-1', launched), idleAgeMs: 4_000 } },
+        { localId: 'agent-pan-7-worker-2', standIn: standIn('agent-pan-7', launched) },
+      ],
+      isAlive: async (): Promise<{ alive: false; reason: 'no-session' }> => ({ alive: false, reason: 'no-session' }),
+      idleAgeMs: () => null,
+      latestReport: async (id: string) => (id === MINE ? REPORT : null),
+    };
+  }
+
+  it('the list holds the caller\'s local worker and stand-in only, with an exited local state and no report body', async () => {
+    const result = await handleSelfWorkerList(AGENT_TOKEN, readDeps());
+    expect(result.status).toBe(200);
+    const workers = (result.body as { workers: Array<Record<string, unknown>> }).workers;
+    expect(workers.map((worker) => worker.id)).toEqual([MINE, REMOTE]);
+    expect(workers[0]).toEqual({
+      id: MINE, issueId: 'PAN-1', name: null, startedAt: new Date(NOW - 60_000).toISOString(), remote: null, state: 'exited', idleAgeMs: null,
+      latestReport: { seq: 1, at: REPORT.at, status: 'done' },
+    });
+    expect(workers[0]!['latestReport']).not.toHaveProperty('body');
+    expect(workers[1]).toMatchObject({ id: REMOTE, remote: { environmentId: 'env-desk', label: 'desk' }, state: 'running', idleAgeMs: 4_000, latestReport: null });
+  });
+
+  it('GET one worker answers its entry, and 404 for another parent\'s worker', async () => {
+    expect((await handleSelfWorkerGet(AGENT_TOKEN, MINE, readDeps())).body).toMatchObject({ id: MINE, state: 'exited' });
+    expect(await handleSelfWorkerGet(AGENT_TOKEN, THEIRS, readDeps())).toEqual({ status: 404, body: UNKNOWN_WORKER });
+  });
+
+  it('a plain token is refused 403', async () => {
+    expect((await handleSelfWorkerList({ kind: 'token', tokenId: 't', scopes: ['read:state'] }, readDeps())).status).toBe(403);
   });
 });

@@ -57,4 +57,32 @@ const taskWait: OverdeckTool = {
   },
 };
 
-export const DELEGATE_TOOLS: readonly OverdeckTool[] = [delegateTask, taskWait];
+const listWorkers: OverdeckTool = {
+  name: 'list_workers',
+  description: 'List your workers, on this machine or another, with their state, idle time and newest report (seq, time and status).',
+  scope: 'read:state',
+  audience: 'agent',
+  inputSchema: { type: 'object', properties: {} },
+  async run(_args, ctx) {
+    return routeResult(await ctx.api.request('GET', '/api/self/workers'));
+  },
+};
+
+const taskStatus: OverdeckTool = {
+  name: 'task_status',
+  description: 'One of your workers: its state, idle time, where it runs and its newest report (seq, time and status). Read the report itself with task_wait.',
+  scope: 'read:state',
+  audience: 'agent',
+  inputSchema: {
+    type: 'object',
+    properties: { workerId: { type: 'string', description: 'The workerId delegate_task returned.' } },
+    required: ['workerId'],
+  },
+  async run(args, ctx) {
+    const workerId = requiredString(args, 'workerId');
+    if (!workerId.ok) return workerId.error;
+    return routeResult(await ctx.api.request('GET', `/api/self/workers/${encodeURIComponent(workerId.value)}`));
+  },
+};
+
+export const DELEGATE_TOOLS: readonly OverdeckTool[] = [delegateTask, taskWait, listWorkers, taskStatus];
