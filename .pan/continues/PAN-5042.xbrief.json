@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5042",
   "created": "2026-11-04T17:47:47.339Z",
-  "updated": "2026-11-04T19:08:16.262Z",
+  "updated": "2026-11-04T19:08:29.985Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -168,6 +168,10 @@
     "watch-unobserved-rows.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T19:08:16.262Z"
+    },
+    "watch-unobserved-rows.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:08:29.985Z"
     }
   }
 }
