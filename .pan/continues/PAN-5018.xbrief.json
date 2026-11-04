@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5018",
   "created": "2026-11-04T13:12:52.932Z",
-  "updated": "2026-11-04T15:07:31.498Z",
+  "updated": "2026-11-04T15:07:46.325Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -96,6 +96,10 @@
     "phone-debug-codes-and-evict.ac4": {
       "status": "completed",
       "doneAt": "2026-11-04T15:07:31.498Z"
+    },
+    "anywhere-debug-helper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:07:46.325Z"
     }
   }
 }
