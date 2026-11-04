@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5006",
   "created": "2026-11-04T12:27:52.516Z",
-  "updated": "2026-11-04T12:30:27.548Z",
+  "updated": "2026-11-04T12:30:33.670Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-5006",
       "claimedAt": "2026-11-04T12:27:52.516Z",
       "doneAt": "2026-11-04T12:30:27.548Z"
+    },
+    "lane-core-placement": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5006",
+      "claimedAt": "2026-11-04T12:30:33.670Z"
     }
   }
 }
