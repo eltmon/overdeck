@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5018",
   "created": "2026-11-04T13:12:52.932Z",
-  "updated": "2026-11-04T15:11:09.739Z",
+  "updated": "2026-11-04T15:11:23.355Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -156,6 +156,10 @@
     "directory-client-transition-logging.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T15:11:09.739Z"
+    },
+    "simulator-repro.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:11:23.355Z"
     }
   }
 }
