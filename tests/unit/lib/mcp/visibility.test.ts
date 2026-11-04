@@ -32,7 +32,9 @@ describe('MCP tool visibility (PAN-4927 W-MCP1)', () => {
     expect(tools.map((tool) => tool.name)).not.toContain('answer_question');
     expect(tools.map((tool) => tool.name)).not.toContain('answer_permission');
     expect(tools.map((tool) => tool.name)).not.toContain('wait_job');
-    expect(tools).toHaveLength(13);
+    expect(tools.map((tool) => tool.name)).toEqual(
+      ALL_TOOLS.filter((tool) => tool.audience === 'any' && tool.scope !== 'approve').map((tool) => tool.name),
+    );
   });
 
   it('adding approve lists every audience: any tool in ALL_TOOLS order', async () => {
@@ -44,7 +46,12 @@ describe('MCP tool visibility (PAN-4927 W-MCP1)', () => {
   it('a read:state agent token also sees wait_job, secret_wait and memory_search', async () => {
     const client = await connectClient(fakeApi({}), ['read:state'], true);
     const { tools } = await client.listTools();
-    expect(tools.map((tool) => tool.name)).toEqual(['list_machines', 'wait_job', 'secret_wait', 'memory_search']);
+    const names = tools.map((tool) => tool.name);
+    expect(names).toEqual(ALL_TOOLS.filter((tool) => tool.scope === 'read:state').map((tool) => tool.name));
+    expect(names).toContain('list_machines');
+    expect(names).toContain('wait_job');
+    expect(names).toContain('secret_wait');
+    expect(names).toContain('memory_search');
   });
 
   it('an audience: agent tool is hidden from a non-agent token and visible to an agent token', async () => {

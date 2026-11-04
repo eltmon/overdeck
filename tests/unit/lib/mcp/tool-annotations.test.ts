@@ -6,7 +6,11 @@ import { describe, expect, it } from 'vitest';
 
 import { requiredScopeFor } from '../../../../src/dashboard/server/route-scopes.js';
 import { ALL_TOOLS, hasAgentId } from '../../../../src/lib/mcp/server.js';
+import { APPROVE_TOOLS } from '../../../../src/lib/mcp/tools-approve.js';
+import { READ_TOOLS } from '../../../../src/lib/mcp/tools-read.js';
+import { SCHEDULE_TOOLS } from '../../../../src/lib/mcp/tools-schedule.js';
 import { SELF_TOOLS } from '../../../../src/lib/mcp/tools-self.js';
+import { WRITE_TOOLS } from '../../../../src/lib/mcp/tools-write.js';
 
 const SINGLE_ROUTE_PATHS: Record<string, { method: string; path: string }> = {
   list_machines: { method: 'GET', path: '/api/fleet/machines' },
@@ -26,6 +30,12 @@ const SINGLE_ROUTE_PATHS: Record<string, { method: string; path: string }> = {
   answer_agent_plan: { method: 'POST', path: '/api/agents/agent-pan-1/plan-action' },
   answer_agent_permission: { method: 'POST', path: '/api/agents/agent-pan-1/permissions/req-1/respond' },
   wait_job: { method: 'GET', path: '/api/self/jobs/abc/wait' },
+  task_claim: { method: 'POST', path: '/api/self/tasks/claim' },
+  task_done: { method: 'POST', path: '/api/self/tasks/done' },
+  task_block: { method: 'POST', path: '/api/self/tasks/block' },
+  done: { method: 'POST', path: '/api/self/done' },
+  handoff: { method: 'POST', path: '/api/self/handoff' },
+  worker_report: { method: 'POST', path: '/api/self/worker-report' },
   request_secret: { method: 'POST', path: '/api/self/secret-requests' },
   secret_wait: { method: 'GET', path: '/api/self/secret-requests/abc/wait' },
   memory_add: { method: 'POST', path: '/api/self/memory/facts' },
@@ -33,9 +43,12 @@ const SINGLE_ROUTE_PATHS: Record<string, { method: string; path: string }> = {
 };
 
 describe('MCP tool annotations (PAN-4927 W-MCP1)', () => {
-  it('every tool but SELF_TOOLS declares audience: any, and every SELF_TOOLS tool declares audience: agent', () => {
-    for (const tool of ALL_TOOLS) {
-      expect(tool.audience, tool.name).toBe(SELF_TOOLS.includes(tool) ? 'agent' : 'any');
+  it('every READ, WRITE, SCHEDULE and APPROVE tool declares audience: any, and every SELF_TOOLS tool declares audience: agent', () => {
+    for (const tool of [...READ_TOOLS, ...WRITE_TOOLS, ...SCHEDULE_TOOLS, ...APPROVE_TOOLS]) {
+      expect(tool.audience, tool.name).toBe('any');
+    }
+    for (const tool of SELF_TOOLS) {
+      expect(tool.audience, tool.name).toBe('agent');
     }
     expect(SELF_TOOLS.length).toBeGreaterThan(0);
   });

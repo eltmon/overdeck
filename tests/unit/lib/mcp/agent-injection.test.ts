@@ -38,6 +38,7 @@ import {
   overdeckMcpEnabledFor,
   overdeckStdioServer,
   prepareClaudeOverdeckMcp,
+  prepareCodexOverdeckMcp,
 } from '../../../../src/lib/mcp/agent-injection.js';
 
 let home: string;
@@ -63,7 +64,7 @@ afterEach(async () => {
 describe('overdeck MCP injection (PAN-4932 W-4)', () => {
   it('reads the overdeckMcp capability', () => {
     expect(harnessGetsOverdeckMcp('claude-code')).toBe(true);
-    expect(harnessGetsOverdeckMcp('codex')).toBe(false);
+    expect(harnessGetsOverdeckMcp('codex')).toBe(true);
     expect(harnessGetsOverdeckMcp('kimi-code')).toBe(false);
     expect(harnessGetsOverdeckMcp('acp')).toBe(true);
     expect(harnessGetsOverdeckMcp('opencode')).toBe(true);
@@ -73,7 +74,7 @@ describe('overdeck MCP injection (PAN-4932 W-4)', () => {
     expect(await overdeckMcpEnabledFor('claude-code', {})).toBe(true);
     expect(await overdeckMcpEnabledFor('claude-code', { OVERDECK_DOCKER_WORKSPACE: '1' })).toBe(false);
     expect(await overdeckMcpEnabledFor('claude-code', { PAN_DOCKER: '1' })).toBe(false);
-    expect(await overdeckMcpEnabledFor('codex', {})).toBe(false);
+    expect(await overdeckMcpEnabledFor('codex', {})).toBe(true);
     mcpAgents.value = false;
     expect(await overdeckMcpEnabledFor('claude-code', {})).toBe(false);
   });
@@ -161,5 +162,56 @@ describe('overdeck MCP injection (PAN-4932 W-4)', () => {
     expect(conversationTokenRole({ laneRole: null }, 'uat', 'conv-x')).toBe('test');
     expect(conversationTokenRole({ laneRole: null }, 'conversation', 'conv-x')).toBe('conversation');
     expect(conversationTokenRole({ laneRole: null }, 'review', 'conv-x')).toBe('review');
+  });
+});
+
+describe('overdeck MCP injection for Codex (PAN-4933 W-INJ2)', () => {
+  it('returns { overdeck } with defaultToolsApprovalMode approve and a 0600 token file for an enabled codex agent', async () => {
+    const result = await prepareCodexOverdeckMcp({ agentId: 'agent-pan-9', agentKind: 'agent', role: 'work', harness: 'codex' });
+    const tokenFile = join(home, 'agents', 'agent-pan-9', 'mcp-token');
+
+    expect(Object.keys(result)).toEqual(['overdeck']);
+    expect(result.overdeck!.env.OVERDECK_MCP_TOKEN_FILE).toBe(tokenFile);
+    expect(result.overdeck!.defaultToolsApprovalMode).toBe('approve');
+    expect((await stat(tokenFile)).mode & 0o777).toBe(0o600);
+
+    const tokens = await listAccessTokens();
+    expect(tokens.filter((t) => t.role === 'work' && !t.revokedAt)).toHaveLength(1);
+  });
+
+  it('returns {} for claude-code/kimi-code owners, mcp.agents false, and Docker env, minting no new token', async () => {
+    expect(await prepareCodexOverdeckMcp({ agentId: 'agent-pan-1', agentKind: 'agent', role: 'work', harness: 'claude-code' })).toEqual({});
+    expect(await prepareCodexOverdeckMcp({ agentId: 'agent-pan-1', agentKind: 'agent', role: 'work', harness: 'kimi-code' })).toEqual({});
+
+    mcpAgents.value = false;
+    expect(await prepareCodexOverdeckMcp({ agentId: 'agent-pan-codex-1', agentKind: 'agent', role: 'work', harness: 'codex' })).toEqual({});
+    mcpAgents.value = true;
+
+    const previous = process.env.OVERDECK_DOCKER_WORKSPACE;
+    process.env.OVERDECK_DOCKER_WORKSPACE = '1';
+    try {
+      expect(await prepareCodexOverdeckMcp({ agentId: 'agent-pan-codex-2', agentKind: 'agent', role: 'work', harness: 'codex' })).toEqual({});
+    } finally {
+      if (previous === undefined) delete process.env.OVERDECK_DOCKER_WORKSPACE;
+      else process.env.OVERDECK_DOCKER_WORKSPACE = previous;
+    }
+    expect(await listAccessTokens()).toEqual([]);
+  });
+
+  it('degrades to {} with one warning naming the owner on a mint failure or a dir-less conversation', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    mintFailure.error = new Error('registry is corrupt');
+
+    expect(await prepareCodexOverdeckMcp({ agentId: 'agent-pan-codex-3', agentKind: 'agent', role: 'work', harness: 'codex' })).toEqual({});
+    expect(warn).toHaveBeenCalledTimes(1);
+    const message = String(warn.mock.calls[0]![0]);
+    expect(message).toContain('agent-pan-codex-3');
+    expect(message).not.toContain('odk_');
+
+    mintFailure.error = null;
+    warn.mockClear();
+    expect(await prepareCodexOverdeckMcp({ agentId: 'conv-codex-1', agentKind: 'conversation', role: 'conversation', harness: 'codex' })).toEqual({});
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0]![0])).toContain('conv-codex-1');
   });
 });

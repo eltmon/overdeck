@@ -219,10 +219,10 @@ does not list needs `admin` (D-6):
 | Scope | `METHOD path` |
 | --- | --- |
 | `read:events` | `GET /events/stream`, `GET /events/version`, RPC `pan.replayEvents` (PAN-4835) |
-| `read:state` | `GET /api/issues`, `GET /api/agents`, `GET /api/agent-directory`, `GET /api/flywheel/status`, `GET /api/pipeline/membership`, `GET /api/versions/self`, `GET /api/activity` (PAN-4835), RPC `pan.getSnapshot` (PAN-4835) |
+| `read:state` | `GET /api/issues`, `GET /api/agents`, `GET /api/agent-directory`, `GET /api/flywheel/status`, `GET /api/pipeline/membership`, `GET /api/versions/self`, `GET /api/activity` (PAN-4835), RPC `pan.getSnapshot` (PAN-4835), `GET /api/lanes`, `GET /api/lanes/:name`, `GET /api/self/workers`, `GET /api/self/workers/:id`, `GET /api/self/workers/:id/wait`, `POST /api/self/lanes/wait` (PAN-4938) |
 | `read:conversations` | `GET /api/conversations`, `GET /api/conversations/:id`, `GET /api/conversations/:name/messages`, `GET /api/conversations/:name/about`, `GET /api/palette/search`, `GET /api/conversations/pending-input` (explicit row, PAN-4835), `GET /api/needs-you` (PAN-4944) |
-| `tell` | `POST /api/agents/:id/message`, `POST /api/agents/:id/tell`, `POST /api/conversations/:name/message`, `POST /api/conversations/:name/delete-image` (the undo of `upload-image`, PAN-4835), `PUT /api/phones/self/push-key`, `DELETE /api/phones/self` (PAN-4835) |
-| `operate` | WebSocket `/ws/terminal` (`WS_TERMINAL_SCOPE`), `POST /api/conversations`, `POST /api/workers`, `POST /api/versions/self/update`, `DELETE /api/versions/self/update` |
+| `tell` | `POST /api/agents/:id/message`, `POST /api/agents/:id/tell`, `POST /api/conversations/:name/message`, `POST /api/conversations/:name/delete-image` (the undo of `upload-image`, PAN-4835), `PUT /api/phones/self/push-key`, `DELETE /api/phones/self` (PAN-4835), `POST /api/self/lanes/report` (PAN-4938) |
+| `operate` | WebSocket `/ws/terminal` (`WS_TERMINAL_SCOPE`), `POST /api/conversations`, `POST /api/workers`, `POST /api/versions/self/update`, `DELETE /api/versions/self/update`, `POST /api/self/workers`, `POST /api/self/lanes` (PAN-4938) |
 | `approve` | `POST /api/conversations/:id/permission`, `POST /api/conversations/:id/pane-choice`, `POST /api/conversations/:id/pi-ask-answer`, `POST /api/conversations/:id/codex-approval`, `POST /api/conversations/:name/plan-action`, `POST /api/agents/:id/answer-question`, `POST /api/agents/:id/plan-action`, `POST /api/agents/:id/permissions/:requestId/respond` |
 | `admin` | everything else, including `/ws/rpc`, `/ws/voice`, `/ws/autopreso` |
 
@@ -291,8 +291,10 @@ closed set of `pan` commands (`services/self-job-argv.ts`), with argv built
 only from validated pieces, so caller text never lands before the verb's
 fixed prefix or as a flag. It runs through `execFile` in the agent's
 workspace, or the conversation's `cwd`, with only that agent's identity
-variables: `OVERDECK_AGENT_ID` for an agent, `OVERDECK_CONVERSATION` (the tmux
-session, not the name) for a conversation, plus `OVERDECK_ISSUE_ID` and
+variables: `OVERDECK_AGENT_ID` for an agent; for a conversation, both
+`OVERDECK_CONVERSATION` and `OVERDECK_AGENT_ID` set to its tmux session (not
+its name), as its own launcher exports them, so `pan handoff self` and
+`pan task claim` resolve to it, plus `OVERDECK_ISSUE_ID` and
 `OVERDECK_DASHBOARD_URL`. Identity variables the dashboard inherited, and any
 MCP token, are removed. A job times out after 15 minutes and keeps the last
 16 KiB of stdout and of stderr. Only its owner can read it; another agent's
@@ -304,9 +306,47 @@ A wait blocks at most 50 s (`timeoutMs` 1–50,000, default 50,000; anything
 else is **400** `bad-timeout`) and returns early when the job ends. It answers
 `{ "status": "done", … }` with the exit code and output, or
 `{ "status": "running", …, "next": { "tool": "wait_job", "arguments": { "jobId" } } }`,
-the call to make again. The accepted risk: a job runs `pan` with the
-dashboard user's rights, so the closed verb set, the argv builder and the
-token-only caller are the boundary.
+the call to make again.
+
+The workflow routes (PAN-4927 W-SELF2): `POST /api/self/tasks/claim`,
+`/tasks/done`, `/tasks/block`, `/handoff`, `/worker-report` need `tell`;
+`POST /api/self/done` needs `operate`, so review, test and ship tokens get the
+gate's 403 `missingScope: operate`. Each takes the issue from the agent's
+state, never the body; a caller without an issue gets **409** `no-issue` on
+the task and done routes; `worker-report` answers **403** `not-a-worker` to
+any caller that is not a worker agent; a bad body is **400** `bad-body` or
+`bad-request`; a bad id is **400** `bad-job-arg`; a full job store is **429**
+`too-many-jobs`. Each starts a job, waits up to 50 s and answers 200 with the
+job answer. `handoff` never passes `--cwd` or `--allow-primary`, so the new
+conversation inherits the caller's cwd.
+
+The accepted risk: a job runs `pan` with the dashboard user's rights, so the
+closed verb set, the argv builder and the token-only caller are the boundary.
+
+PAN-4938 (W-DEL1) adds seven self routes for delegation and lanes
+(`routes/self-workers.ts`, `routes/self-lanes.ts`):
+
+| Route | Scope | What it does |
+| --- | --- | --- |
+| `POST /api/self/workers` | `operate` | Starts a worker on the caller's issue with the caller as parent (an agent's id, a conversation's `conv-<name>`); body `issueId` and `parentId` are ignored. **409** `no-issue` for a caller without an issue. |
+| `GET /api/self/workers` | `read:state` | The caller's workers, local and stand-ins for workers on linked machines. |
+| `GET /api/self/workers/:id` | `read:state` | One of the caller's workers. |
+| `GET /api/self/workers/:id/wait` | `read:state` | Waits at most 50 s for the worker's report (`afterSeq`, `timeoutMs`); answers `done`, `ended` or `running` with `next`. The startup grace counts from the worker's launch. |
+| `POST /api/self/lanes` | `operate` | Launches a lane with the calling conversation as parent; body `parent` and `force` are dropped. **409** `not-a-conversation` for an agent. |
+| `POST /api/self/lanes/wait` | `read:state` | Waits at most 50 s for the next report of `run`'s lanes or the caller's lanes. **409** `not-a-conversation` for an agent without `run`; **400** `bad-cursor`. |
+| `POST /api/self/lanes/report` | `tell` | Files the lane's report through a `lane-report` job. **409** `not-a-lane` unless the caller is a lane conversation. |
+
+A worker belongs to the caller when its `worker.json` or stand-in `remote.json`
+names the caller's parent id; another agent's worker gets **404**
+`{ "code": "unknown-worker" }`, like an unknown id.
+
+`POST /api/fleet/issues/:id/start` starts an issue on this machine only for an
+`odk_` token caller (the MCP `start_issue` tool), through
+`spawnIssueAgentForRoute`, the Start button's gates; every other caller still
+gets **400** `use-local-start`, because the CLI starts locally itself. When a
+token's call is forwarded to a linked machine, an agent-kind agent token is
+forwarded with actor `{ agentId }` (PAN-4927 D-9); any other token goes as the
+operator, and every token carries its scopes as the ceiling.
 
 Secret requests (PAN-4941, W-SEC1) are self routes too.
 `POST /api/self/secret-requests` (`tell`) takes `{ name, prompt, timeoutMs? }`:
