@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4840",
   "created": "2026-11-03T20:58:06.302Z",
-  "updated": "2026-11-04T18:57:44.304Z",
+  "updated": "2026-11-04T18:57:57.488Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -177,6 +177,9 @@
       "status": "cancelled"
     },
     "ci-android-unit-tests.ac2": {
+      "status": "cancelled"
+    },
+    "device-acceptance.ac4": {
       "status": "cancelled"
     }
   }
