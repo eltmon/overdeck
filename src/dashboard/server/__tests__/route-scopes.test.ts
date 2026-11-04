@@ -56,4 +56,14 @@ describe('route-scope table (PAN-2351)', () => {
     expect(requiredScopeFor('POST', '/api/workers/register')).toBe('admin');
     expect(requiredScopeFor('PUT', '/api/settings')).toBe('admin');
   });
+
+  it('maps the recurring-schedule routes (PAN-4927 W-SCHED1)', () => {
+    expect(requiredScopeFor('GET', '/api/conversations/conv-a/schedules')).toBe('read:conversations');
+    expect(requiredScopeFor('POST', '/api/conversations/conv-a/schedules')).toBe('tell');
+    expect(requiredScopeFor('PATCH', '/api/conversations/conv-a/schedules/3')).toBe('tell');
+    expect(requiredScopeFor('DELETE', '/api/conversations/conv-a/schedules/3')).toBe('tell');
+    expect(requiredScopeFor('POST', '/api/conversations/@desk/conv-a/schedules')).toBe('tell');
+    expect(requiredScopeFor('PUT', '/api/conversations/conv-a/schedules/3')).toBe('admin');
+    expect(requiredScopeFor('DELETE', '/api/conversations/conv-a/schedules')).toBe('admin');
+  });
 });
