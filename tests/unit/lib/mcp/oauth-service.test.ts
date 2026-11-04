@@ -354,3 +354,35 @@ describe('refresh rotation and revocation (D-8, D-9)', () => {
     await expect(service.revokeFamily('0'.repeat(32))).resolves.toBe(false);
   });
 });
+
+describe('headless issue and the sign-in list (D-12)', () => {
+  it('issues a headless sign-in whose access token carries tell and not operate', async () => {
+    const issued = await service.issueHeadless('xAI', 'message');
+    expect(issued).toMatchObject({ ok: true, body: { level: 'message', expires_in: 2_592_000 } });
+    const body = (issued as { body: { clientId: string; familyId: string; access_token: string; refresh_token: string } }).body;
+    const verified = registry.verifyAccessToken(body.access_token);
+    expect(verified.ok).toBe(true);
+    const scopes = (verified as { record: { scopes: string[] } }).record.scopes;
+    expect(scopes).toContain('tell');
+    expect(scopes).not.toContain('operate');
+
+    const signIns = await service.listSignIns();
+    expect(signIns).toMatchObject([{ familyId: body.familyId, clientId: body.clientId, clientName: 'xAI', level: 'message', headless: true, refreshExpiresAt: expect.any(String), accessExpiresAt: expect.any(String) }]);
+    await expect(service.refresh(refreshForm(body.clientId, body.refresh_token))).resolves.toMatchObject({ ok: true });
+
+    await expect(service.authorize(authorizeParams(body.clientId, { redirect_uri: REDIRECT }))).resolves.toMatchObject({ kind: 'error-page' });
+    await expect(service.revokeFamily(body.familyId)).resolves.toBe(true);
+    await expect(service.listSignIns()).resolves.toEqual([]);
+  });
+
+  it('lists a browser sign-in as not headless', async () => {
+    await signIn('read');
+    await expect(service.listSignIns()).resolves.toMatchObject([{ clientName: 'Claude Desktop', level: 'read', headless: false }]);
+  });
+
+  it('refuses an empty name and an unknown level with 400', async () => {
+    await expect(service.issueHeadless('', 'read')).resolves.toMatchObject({ ok: false, status: 400 });
+    await expect(service.issueHeadless('x', 'admin')).resolves.toMatchObject({ ok: false, status: 400 });
+    await expect(service.issueHeadless('x'.repeat(101), 'read')).resolves.toMatchObject({ ok: false, status: 400 });
+  });
+});

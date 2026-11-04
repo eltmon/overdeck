@@ -75,6 +75,21 @@ export interface PendingApprovalView {
   createdAt: string;
   expiresAt: string;
 }
+export interface SignInView {
+  familyId: string;
+  clientId: string;
+  clientName: string;
+  level: OAuthLevel;
+  scopes: string[];
+  createdAt: string;
+  lastUsedAt: string | null;
+  accessExpiresAt: string | null;
+  refreshExpiresAt: string;
+  headless: boolean;
+}
+export type IssueResult =
+  | { ok: true; body: { clientId: string; familyId: string; level: OAuthLevel; access_token: string; refresh_token: string; expires_in: number } }
+  | { ok: false; status: 400 | 500; error: string };
 export type DecideResult = { ok: true; status: 'approved' | 'denied' } | { ok: false; status: 400 | 404 | 409; error: string };
 
 export interface McpOAuthService {
@@ -90,6 +105,10 @@ export interface McpOAuthService {
   revokeToken(token: string): Promise<void>;
   /** D-9: false when no active sign-in has that id. */
   revokeFamily(familyId: string): Promise<boolean>;
+  /** D-12: a headless client plus an approved sign-in at once, for callers that cannot open a browser. */
+  issueHeadless(name: unknown, level: unknown): Promise<IssueResult>;
+  /** D-12: active sign-ins (not revoked, refresh not expired), joined with their current access token. */
+  listSignIns(): Promise<SignInView[]>;
 }
 
 const MAX_CLIENTS = 50;
@@ -97,6 +116,7 @@ const MAX_PENDING_APPROVALS = 20;
 const APPROVAL_GRACE_MS = 60_000;
 const CODE_REUSE_WINDOW_MS = 10 * 60_000;
 const MAX_TOKEN_NAME = 200;
+const TOO_MANY_CLIENTS = 'too many registered clients; revoke unused sign-ins';
 const INVALID_LINK = 'This sign-in link is not valid. Start the sign-in again from your app.';
 const UNAVAILABLE = 'Overdeck could not read its sign-in records. Try again later.';
 
@@ -247,38 +267,33 @@ export function createMcpOAuthService(deps: Partial<McpOAuthServiceDeps> = {}): 
     };
   }
 
+  /** Store a new client under the D-4 cap: evict the oldest client with no family, or false when every client has one. */
+  function addClient(at: number, fields: Pick<OAuthClientRecord, 'name' | 'redirectUris' | 'headless'>): Promise<OAuthClientRecord | null> {
+    const client: OAuthClientRecord = { clientId: `${CLIENT_ID_PREFIX}${randomBytes(16).toString('hex')}`, ...fields, createdAt: iso(at), lastUsedAt: null };
+    return mutateMcpOAuthData(at, (data) => {
+      let clients = data.clients;
+      if (clients.length >= MAX_CLIENTS) {
+        const withFamily = new Set(data.families.map((family) => family.clientId));
+        const evict = clients.filter((c) => !withFamily.has(c.clientId)).sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))[0];
+        if (!evict) return { data, result: null, write: false };
+        clients = clients.filter((c) => c.clientId !== evict.clientId);
+      }
+      return { data: { ...data, clients: [...clients, client] }, result: client };
+    });
+  }
+
   async function registerClient(body: unknown): Promise<RegisterResult> {
     const checked = validateRegistration(body);
     if (!checked.ok) return { ok: false, status: 400, body: oauthErrorBody(checked.error, checked.description) };
     const at = now();
-    const client: OAuthClientRecord = {
-      clientId: `${CLIENT_ID_PREFIX}${randomBytes(16).toString('hex')}`,
-      name: checked.name,
-      redirectUris: checked.redirectUris,
-      createdAt: iso(at),
-      lastUsedAt: null,
-    };
-    let added: boolean;
+    let client: OAuthClientRecord | null;
     try {
-      added = await mutateMcpOAuthData(at, (data) => {
-        let clients = data.clients;
-        if (clients.length >= MAX_CLIENTS) {
-          const withFamily = new Set(data.families.map((family) => family.clientId));
-          const evict = clients
-            .filter((c) => !withFamily.has(c.clientId))
-            .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))[0];
-          if (!evict) return { data, result: false, write: false };
-          clients = clients.filter((c) => c.clientId !== evict.clientId);
-        }
-        return { data: { ...data, clients: [...clients, client] }, result: true };
-      });
+      client = await addClient(at, { name: checked.name, redirectUris: checked.redirectUris });
     } catch (error) {
       logFailure(error);
       return { ok: false, status: 500, body: oauthErrorBody('server_error') };
     }
-    if (!added) {
-      return { ok: false, status: 400, body: oauthErrorBody('invalid_client_metadata', 'too many registered clients; revoke unused sign-ins') };
-    }
+    if (!client) return { ok: false, status: 400, body: oauthErrorBody('invalid_client_metadata', TOO_MANY_CLIENTS) };
     return {
       ok: true,
       body: {
@@ -519,7 +534,51 @@ export function createMcpOAuthService(deps: Partial<McpOAuthServiceDeps> = {}): 
     return serialized(() => endFamily(familyId));
   }
 
-  return { registerClient, authorize, approvalStatus, listApprovals, decideApproval, exchangeCode, refresh, revokeToken, revokeFamily };
+  async function issueHeadless(name: unknown, level: unknown): Promise<IssueResult> {
+    const trimmed = typeof name === 'string' ? name.trim() : '';
+    if (trimmed === '' || trimmed.length > 100) return { ok: false, status: 400, error: 'name must be 1 to 100 characters' };
+    if (!isOAuthLevel(level)) return { ok: false, status: 400, error: 'level must be read, message, operate or approve' };
+    const at = now();
+    let client: OAuthClientRecord | null;
+    try {
+      client = await addClient(at, { name: trimmed, redirectUris: [], headless: true });
+    } catch (error) {
+      logFailure(error);
+      return { ok: false, status: 500, error: 'server_error' };
+    }
+    if (!client) return { ok: false, status: 400, error: TOO_MANY_CLIENTS };
+    const minted = await mintFamily(client, level, at);
+    if (!minted.ok) return { ok: false, status: 500, error: 'server_error' };
+    const { access_token, refresh_token, expires_in } = minted.body;
+    return { ok: true, body: { clientId: client.clientId, familyId: minted.familyId!, level, access_token, refresh_token, expires_in } };
+  }
+
+  async function listSignIns(): Promise<SignInView[]> {
+    const at = now();
+    const [data, records] = await Promise.all([readMcpOAuthData(at), listAccessTokens()]);
+    const tokens = new Map(records.map((record) => [record.id, record]));
+    const clients = new Map(data.clients.map((client) => [client.clientId, client]));
+    return data.families
+      .filter((family) => family.revokedAt === undefined && Date.parse(family.refreshExpiresAt) > at)
+      .map((family) => {
+        const client = clients.get(family.clientId);
+        const token = tokens.get(family.accessTokenId);
+        return {
+          familyId: family.familyId,
+          clientId: family.clientId,
+          clientName: client?.name ?? family.clientId,
+          level: family.level,
+          scopes: [...family.scopes],
+          createdAt: family.createdAt,
+          lastUsedAt: token?.lastUsedAt ?? null,
+          accessExpiresAt: token?.expiresAt ?? null,
+          refreshExpiresAt: family.refreshExpiresAt,
+          headless: client?.headless === true,
+        };
+      });
+  }
+
+  return { registerClient, authorize, approvalStatus, listApprovals, decideApproval, exchangeCode, refresh, revokeToken, revokeFamily, issueHeadless, listSignIns };
 }
 
 export const mcpOAuthService: McpOAuthService = createMcpOAuthService();
