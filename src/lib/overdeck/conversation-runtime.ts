@@ -37,6 +37,7 @@ import { cpuClassForConversation } from '../terminal-backends/cpu-class.js';
 import type { AgentPaneRef, TerminalBackend, TerminalBackendName } from '../terminal-backends/types.js';
 import { normalizeHarnessName, type AgentRole } from '@overdeck/contracts';
 import { conversationStateDir, readConversationPaneRole, writeConversationPaneRole } from './conversation-pane-role.js';
+import { revokeAgentMcpTokens } from '../mcp/agent-token.js';
 import { validateCwdContainment } from './cwd-containment.js';
 import { conversationWriteRefusal } from './conversation-release.js';
 import { closeConversationPane, conversationHarnessAlive, conversationSessionAlive, waitForConversationSession } from './conversation-liveness.js';
@@ -198,6 +199,7 @@ export async function stopConversationRuntime(conv: Conversation, name: string):
     const msg = error instanceof Error ? error.message : String(error);
     console.warn(`[conversations] failed to cleanup runtime processes for ${name}: ${msg}`);
   }
+  await revokeAgentMcpTokens(name, { agentKind: 'conversation', dir: conversationStateDir(conv.tmuxSession) }); // PAN-4927; never throws
 }
 // Canonical model-id shape lives in model-validation.ts — it permits the
 // square-bracket context suffix (e.g. `k3[1m]`) that a local copy of this

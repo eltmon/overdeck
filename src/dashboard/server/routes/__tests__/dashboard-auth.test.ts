@@ -23,6 +23,7 @@ import {
   peerIsLocalContainerNetwork,
   rejectUnauthorizedDashboardRequest,
   rejectUnauthorizedDashboardSessionMintRequest,
+  resolveDashboardCredential,
 } from '../dashboard-auth.js';
 
 /** Build a minimal IPv4 NetworkInterfaceInfo for an injected interface map. */
@@ -322,6 +323,18 @@ describe('per-route scope check (PAN-2351)', () => {
       expect(await bodyOf(response)).toEqual({ error: 'insufficient_scope', missingScope: 'admin' });
     }
     expect(rejectUnauthorizedDashboardRequest(routeRequest('GET', '/events/stream', headers))).toBeNull();
+  });
+
+  it('resolves a Bearer agent token to a credential naming its agent (PAN-4930)', async () => {
+    const agent = await createAccessToken({ name: 'agent:work:agent-pan-4930', scopes: ['tell'], kind: 'token', agentId: 'agent-pan-4930', agentKind: 'agent', role: 'work' });
+    const plain = await createAccessToken({ name: 'plain', scopes: ['tell'], kind: 'token' });
+
+    expect(resolveDashboardCredential({ authorization: `Bearer ${agent.token}` })).toEqual({
+      kind: 'token', tokenId: agent.record.id, scopes: ['tell'], agentId: 'agent-pan-4930', agentKind: 'agent', role: 'work',
+    });
+    const plainCredential = resolveDashboardCredential({ authorization: `Bearer ${plain.token}` });
+    expect(plainCredential).toEqual({ kind: 'token', tokenId: plain.record.id, scopes: ['tell'] });
+    expect(plainCredential).not.toHaveProperty('agentId');
   });
 
   it('passes root credentials on every route', () => {
