@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4841",
   "created": "2026-11-04T10:01:07.580Z",
-  "updated": "2026-11-04T17:32:46.697Z",
+  "updated": "2026-11-04T17:32:59.960Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -158,6 +158,10 @@
     "rel-android-build-script.ac4": {
       "status": "completed",
       "doneAt": "2026-11-04T17:32:46.697Z"
+    },
+    "rel-ios-privacy-manifest.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:32:59.960Z"
     }
   }
 }
