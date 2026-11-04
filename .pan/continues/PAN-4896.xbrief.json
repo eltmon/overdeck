@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4896",
   "created": "2026-11-04T05:35:39.263Z",
-  "updated": "2026-11-04T05:53:09.415Z",
+  "updated": "2026-11-04T05:53:27.550Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,6 +50,10 @@
     "test-darwin-no-warning.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T05:53:09.415Z"
+    },
+    "test-darwin-no-warning.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:53:27.550Z"
     }
   }
 }
