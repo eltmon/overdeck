@@ -56,6 +56,15 @@ PR branch itself and its CI run a duplicate, so that feature merges on its own
 global require-UAT setting when the project sets no default) keeps a batch when
 it is the only one ready, because that batch is the stack you test on.
 
+**Each ready feature has one merge path (PAN-4970).** With auto-merge on, a
+feature joins a batch only when auto-merge will not merge it on its own:
+features held for UAT, Deft human-merge features, features whose auto-merge
+was cancelled by the operator or failed at the current PR head, and — with
+auto-merge off entirely, the `OVERDECK_DISABLE_AUTO_MERGE` kill switch set,
+or the project on GitLab or spanning several repos — every ready feature.
+Everything else merges one at a time through auto-merge instead, and no
+batch assembles for it.
+
 **When no tested batch exists, merge from the row.** While a batch is still
 assembling, while a lone feature merges directly, or after an assembly failed,
 each ready feature on the Flywheel's UAT batches card has its own **Merge**
