@@ -16,13 +16,13 @@ const FRONTEND = (id: string) => `overdeck-feature-${id}-frontend-1`;
 function makeDeps(over: Partial<IdleStackReaperDeps> & {
   containers?: string[];
   composeContainers?: { name: string; composeProject?: string }[];
-  sessions?: string[];
+  sessions?: string[] | null;
 }): { deps: Partial<IdleStackReaperDeps>; stopped: string[][] } {
   const stopped: string[][] = [];
   const deps: Partial<IdleStackReaperDeps> = {
     listContainerNames: async () => over.containers ?? [],
     listComposeContainers: async () => over.composeContainers ?? [],
-    listSessions: async () => over.sessions ?? [],
+    listLiveAgentIds: async () => over.sessions ?? [],
     stopContainers: async (names) => { stopped.push(names); },
     now: over.now ?? (() => 1_000_000),
     graceMs: over.graceMs ?? 10_000,
@@ -51,7 +51,7 @@ describe('reconcileIdleWorkspaceStacks (PAN-1817)', () => {
     const deps: Partial<IdleStackReaperDeps> = {
       listContainerNames: async () => [SERVER('pan-9002'), FRONTEND('pan-9002')],
       listComposeContainers: async () => [],
-      listSessions: async () => [],
+      listLiveAgentIds: async () => [],
       stopContainers: async (names) => { stopped.push(names); },
       now: () => nowMs,
       graceMs: 10_000,
@@ -68,13 +68,13 @@ describe('reconcileIdleWorkspaceStacks (PAN-1817)', () => {
     expect(stopped[0].sort()).toEqual([FRONTEND('pan-9002'), SERVER('pan-9002')].sort());
   });
 
-  it('NEVER reaps a workspace with a live tmux session for the issue', async () => {
+  it('NEVER reaps a workspace with a live agent pane for the issue', async () => {
     let nowMs = 1_000_000;
     const stopped: string[][] = [];
     const deps: Partial<IdleStackReaperDeps> = {
       listContainerNames: async () => [SERVER('pan-9003'), FRONTEND('pan-9003')],
       listComposeContainers: async () => [],
-      listSessions: async () => ['agent-pan-9003-review'], // active review convoy
+      listLiveAgentIds: async () => ['agent-pan-9003-review'], // active review convoy
       stopContainers: async (names) => { stopped.push(names); },
       now: () => nowMs,
       graceMs: 10_000,
@@ -92,7 +92,7 @@ describe('reconcileIdleWorkspaceStacks (PAN-1817)', () => {
     const deps: Partial<IdleStackReaperDeps> = {
       listContainerNames: async () => [SERVER('pan-9004')],
       listComposeContainers: async () => [],
-      listSessions: async () => sessions,
+      listLiveAgentIds: async () => sessions,
       stopContainers: async (names) => { stopped.push(names); },
       now: () => nowMs,
       graceMs: 10_000,
@@ -114,7 +114,7 @@ describe('reconcileIdleWorkspaceStacks (PAN-1817)', () => {
     const deps: Partial<IdleStackReaperDeps> = {
       listContainerNames: async () => [SERVER('pan-9005')],
       listComposeContainers: async () => [],
-      listSessions: async () => [],
+      listLiveAgentIds: async () => [],
       stopContainers: async (names) => { stopped.push(names); },
       now: () => nowMs,
       graceMs: 1,
@@ -134,7 +134,7 @@ describe('reconcileIdleWorkspaceStacks (PAN-1817)', () => {
         `some-unrelated-container`,
       ],
       listComposeContainers: async () => [],
-      listSessions: async () => [],
+      listLiveAgentIds: async () => [],
       stopContainers: async (names) => { stopped.push(names); },
       now: () => nowMs,
       graceMs: 1,
@@ -154,7 +154,7 @@ describe('reconcileIdleWorkspaceStacks (PAN-1817)', () => {
     const deps: Partial<IdleStackReaperDeps> = {
       listContainerNames: async () => ['myn-feature-min-901-server-1', 'myn-feature-min-901-frontend-1'],
       listComposeContainers: async () => [],
-      listSessions: async () => [],
+      listLiveAgentIds: async () => [],
       stopContainers: async (names) => { stopped.push(names); },
       now: () => nowMs,
       graceMs: 10_000,
@@ -178,7 +178,7 @@ describe('reconcileIdleWorkspaceStacks (PAN-1817)', () => {
         'myn-feature-min-901-frontend-1',
       ],
       listComposeContainers: async () => [],
-      listSessions: async () => [],
+      listLiveAgentIds: async () => [],
       stopContainers: async (names) => { stopped.push(names); },
       now: () => nowMs,
       graceMs: 10_000,
@@ -204,7 +204,7 @@ describe('reconcileIdleWorkspaceStacks (PAN-1817)', () => {
         'my-company-feature-min-901-frontend-1',
       ],
       listComposeContainers: async () => [],
-      listSessions: async () => [],
+      listLiveAgentIds: async () => [],
       stopContainers: async (names) => { stopped.push(names); },
       now: () => nowMs,
       graceMs: 10_000,
@@ -229,7 +229,7 @@ describe('reconcileIdleWorkspaceStacks (PAN-1817)', () => {
         'my_company-feature-min-901-frontend-1',
       ],
       listComposeContainers: async () => [],
-      listSessions: async () => [],
+      listLiveAgentIds: async () => [],
       stopContainers: async (names) => { stopped.push(names); },
       now: () => nowMs,
       graceMs: 10_000,
@@ -261,7 +261,7 @@ describe('reconcileIdleWorkspaceStacks — full-stack tier (2026-07-25 container
         { name: MYN(project, 'fe'), composeProject: project },
         { name: MYN(project, 'postgres'), composeProject: project },
       ],
-      listSessions: async () => [],
+      listLiveAgentIds: async () => [],
       stopContainers: async (names) => { stopped.push(names); },
       now: () => 1_000_000,
       graceMs: 1,
@@ -284,7 +284,7 @@ describe('reconcileIdleWorkspaceStacks — full-stack tier (2026-07-25 container
         { name: MYN(project, 'redis'), composeProject: project },
         { name: MYN(project, 'dev'), composeProject: project },
       ],
-      listSessions: async () => [],
+      listLiveAgentIds: async () => [],
       stopContainers: async (names) => { stopped.push(names); },
       now: () => nowMs,
       graceMs: 1,
@@ -301,14 +301,14 @@ describe('reconcileIdleWorkspaceStacks — full-stack tier (2026-07-25 container
     ].sort());
   });
 
-  it('NEVER full-reaps a project with a live tmux session for the issue', async () => {
+  it('NEVER full-reaps a project with a live agent pane for the issue', async () => {
     let nowMs = 1_000_000;
     const stopped: string[][] = [];
     const project = 'myn-feature-min-898';
     const deps: Partial<IdleStackReaperDeps> = {
       listContainerNames: async () => [],
       listComposeContainers: async () => [{ name: MYN(project, 'fe'), composeProject: project }],
-      listSessions: async () => ['agent-min-898-review'],
+      listLiveAgentIds: async () => ['agent-min-898-review'],
       stopContainers: async (names) => { stopped.push(names); },
       now: () => nowMs,
       graceMs: 1,
@@ -330,7 +330,7 @@ describe('reconcileIdleWorkspaceStacks — full-stack tier (2026-07-25 container
         { name: 'traefik', composeProject: 'panopticon-traefik' },
         { name: 'myn-main-fe-1', composeProject: 'myn-main' }, // not a feature stack
       ],
-      listSessions: async () => [],
+      listLiveAgentIds: async () => [],
       stopContainers: async (names) => { stopped.push(names); },
       now: () => nowMs,
       graceMs: 1,
@@ -349,7 +349,7 @@ describe('reconcileIdleWorkspaceStacks — full-stack tier (2026-07-25 container
     const deps: Partial<IdleStackReaperDeps> = {
       listContainerNames: async () => [],
       listComposeContainers: async () => [{ name: MYN(project, 'dev'), composeProject: project }],
-      listSessions: async () => [],
+      listLiveAgentIds: async () => [],
       stopContainers: async (names) => { stopped.push(names); },
       now: () => nowMs,
       graceMs: 1,
