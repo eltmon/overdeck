@@ -610,6 +610,27 @@ The plugin reads `summary` and `allow_answers` from `settings`; `mcp_allowlist`
 grants it the `overdeck` server. See `integrations/hermes/README.md` for the
 `/overdeck` commands.
 
+**OpenClaw.** The OpenClaw plugin lives in [`integrations/openclaw/`](https://github.com/eltmon/overdeck/tree/main/integrations/openclaw).
+The Overdeck tools come from OpenClaw's own MCP client, so the server entry
+needs `transport: "streamable-http"`: OpenClaw defaults to `sse`, which
+Overdeck does not serve. The plugin adds a needs-you summary to agent turns,
+at most every 5 minutes, and two chat tools, `overdeck_pending` and
+`overdeck_answer`. Answering stays off until you set `allowAnswers: true`, and
+the connector also needs `approve` access. OpenClaw 2026.10.10 blocks the
+summary hook for plugins it does not bundle, so also add
+`hooks: { allowConversationAccess: true }` to `plugins.entries.overdeck`
+(see the package README). The connector config:
+
+```json5
+// openclaw config
+mcp: { servers: { overdeck: {
+  url: "http://127.0.0.1:7466/mcp",
+  transport: "streamable-http",   // the default is "sse", which Overdeck does not serve
+  headers: { Authorization: "Bearer ${OVERDECK_CONNECTOR_LOCAL_TOKEN}" },
+} } },
+plugins: { entries: { overdeck: { config: { localToken: "${OVERDECK_CONNECTOR_LOCAL_TOKEN}" } } } },
+```
+
 **Grok Build.** The Grok Build plugin lives in
 [`integrations/grok-build/`](https://github.com/eltmon/overdeck/tree/main/integrations/grok-build).
 Install it with `grok plugin install eltmon/overdeck#integrations/grok-build --trust`

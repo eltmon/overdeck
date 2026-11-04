@@ -1,0 +1,251 @@
+{
+  "version": "1",
+  "issueId": "PAN-4954",
+  "created": "2026-11-04T14:48:01.762Z",
+  "updated": "2026-11-04T15:18:25.916Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "scaffold": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4954",
+      "claimedAt": "2026-11-04T14:48:01.762Z",
+      "doneAt": "2026-11-04T14:49:47.928Z"
+    },
+    "config": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4954",
+      "claimedAt": "2026-11-04T14:50:30.819Z",
+      "doneAt": "2026-11-04T14:51:02.105Z"
+    },
+    "schema": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4954",
+      "claimedAt": "2026-11-04T14:51:13.663Z",
+      "doneAt": "2026-11-04T14:51:35.195Z"
+    },
+    "mcp-client": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4954",
+      "claimedAt": "2026-11-04T14:51:36.348Z",
+      "doneAt": "2026-11-04T14:52:44.241Z"
+    },
+    "pending": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4954",
+      "claimedAt": "2026-11-04T14:52:45.252Z",
+      "doneAt": "2026-11-04T14:54:49.973Z"
+    },
+    "answer": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4954",
+      "claimedAt": "2026-11-04T14:55:13.006Z",
+      "doneAt": "2026-11-04T14:55:58.880Z"
+    },
+    "tools": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4954",
+      "claimedAt": "2026-11-04T14:56:16.411Z",
+      "doneAt": "2026-11-04T14:57:06.876Z"
+    },
+    "summary": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4954",
+      "claimedAt": "2026-11-04T14:57:07.985Z",
+      "doneAt": "2026-11-04T14:58:14.211Z"
+    },
+    "entry": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4954",
+      "claimedAt": "2026-11-04T14:58:35.237Z",
+      "doneAt": "2026-11-04T14:58:57.079Z"
+    },
+    "readme": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:01:05.746Z"
+    },
+    "docs-mcp": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4954",
+      "claimedAt": "2026-11-04T15:01:09.932Z",
+      "doneAt": "2026-11-04T15:01:41.196Z"
+    },
+    "cp7": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4954",
+      "claimedAt": "2026-11-04T15:02:40.269Z",
+      "doneAt": "2026-11-04T15:06:38.227Z"
+    },
+    "scaffold.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:08:29.306Z"
+    },
+    "scaffold.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:08:42.670Z"
+    },
+    "scaffold.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:08:56.356Z"
+    },
+    "config.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:09:09.925Z"
+    },
+    "config.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:09:23.533Z"
+    },
+    "config.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:09:36.480Z"
+    },
+    "mcp-client.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:09:50.246Z"
+    },
+    "mcp-client.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:10:05.604Z"
+    },
+    "mcp-client.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:10:20.739Z"
+    },
+    "schema.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:10:36.049Z"
+    },
+    "schema.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:10:51.668Z"
+    },
+    "pending.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:11:08.363Z"
+    },
+    "pending.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:11:21.971Z"
+    },
+    "pending.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:11:34.940Z"
+    },
+    "pending.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:11:47.560Z"
+    },
+    "pending.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:12:00.376Z"
+    },
+    "answer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:12:13.416Z"
+    },
+    "answer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:12:26.398Z"
+    },
+    "answer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:12:40.095Z"
+    },
+    "answer.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:12:53.201Z"
+    },
+    "tools.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:13:06.510Z"
+    },
+    "tools.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:13:19.459Z"
+    },
+    "tools.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:13:32.149Z"
+    },
+    "tools.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:13:44.732Z"
+    },
+    "summary.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:14:00.253Z"
+    },
+    "summary.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:14:14.565Z"
+    },
+    "summary.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:14:27.674Z"
+    },
+    "summary.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:14:42.145Z"
+    },
+    "entry.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:14:56.928Z"
+    },
+    "entry.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:15:13.012Z"
+    },
+    "entry.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:15:30.194Z"
+    },
+    "entry.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:15:46.615Z"
+    },
+    "readme.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:16:03.704Z"
+    },
+    "readme.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:16:19.140Z"
+    },
+    "readme.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:16:34.181Z"
+    },
+    "readme.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:16:50.594Z"
+    },
+    "docs-mcp.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:17:07.387Z"
+    },
+    "docs-mcp.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:17:22.550Z"
+    },
+    "docs-mcp.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:17:37.939Z"
+    },
+    "cp7.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:17:53.737Z"
+    },
+    "cp7.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:18:10.149Z"
+    },
+    "cp7.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:18:25.915Z"
+    }
+  }
+}

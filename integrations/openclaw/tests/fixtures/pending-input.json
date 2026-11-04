@@ -1,0 +1,135 @@
+{
+  "machines": [
+    {
+      "environmentId": "local",
+      "label": "this machine",
+      "conversations": [
+        {
+          "name": "conv-alpha",
+          "title": "Fix the login bug",
+          "issueId": "PAN-101",
+          "harness": "claude-code",
+          "pendingPermission": { "signature": "sig-alpha-1", "answerable": true, "agentLabel": "main", "toolName": "Bash", "header": "rm -rf build" },
+          "pendingAskUserQuestion": {
+            "toolUseId": "toolu_alpha_ask",
+            "askedAt": "2026-11-04T10:00:00.000Z",
+            "questions": [{ "question": "Which database should I use?", "header": "Database", "options": [{ "label": "SQLite" }, { "label": "Postgres", "description": "Server database" }] }]
+          }
+        },
+        {
+          "name": "conv-pi",
+          "title": "Pi session",
+          "issueId": null,
+          "harness": "ohmypi",
+          "pendingAskUserQuestion": {
+            "toolUseId": "pi_ask_1",
+            "askedAt": "2026-11-04T10:01:00.000Z",
+            "questions": [{ "question": "Keep the old API?", "options": [{ "label": "Yes" }, { "label": "No" }] }]
+          }
+        },
+        {
+          "name": "conv-codex",
+          "title": "Codex refactor",
+          "issueId": null,
+          "harness": "codex",
+          "pendingAskUserQuestion": {
+            "toolUseId": "codex-approval:call_77",
+            "askedAt": "2026-11-04T10:02:00.000Z",
+            "questions": [{ "question": "Run npm install?", "options": [{ "label": "Yes" }, { "label": "Yes, and don't ask again" }, { "label": "No" }] }]
+          }
+        },
+        {
+          "name": "conv-two",
+          "title": "",
+          "issueId": null,
+          "harness": "claude-code",
+          "pendingAskUserQuestion": {
+            "toolUseId": "toolu_two",
+            "askedAt": "2026-11-04T10:03:00.000Z",
+            "questions": [
+              { "question": "First question?", "options": [{ "label": "A" }] },
+              { "question": "Second question?", "options": [{ "label": "B" }] }
+            ]
+          }
+        },
+        {
+          "name": "conv-plan",
+          "title": "Plan the cache",
+          "issueId": null,
+          "harness": "claude-code",
+          "pendingProposedPlan": { "toolUseId": "toolu_plan", "askedAt": "2026-11-04T10:04:00.000Z", "plan": "# Plan\n\n1. Add a cache\n2. Test it" }
+        },
+        {
+          "name": "conv-pane",
+          "title": "Menu session",
+          "issueId": null,
+          "harness": "claude-code",
+          "pendingPaneChoice": {
+            "signature": "pane-sig-1",
+            "title": "Resume which session?",
+            "contextLines": [],
+            "options": [{ "number": 1, "label": "Latest", "recommended": true }, { "number": 2, "label": "Older", "recommended": false }],
+            "selectedIndex": 0,
+            "footerHint": "Enter to confirm",
+            "confidence": "high"
+          }
+        },
+        {
+          "name": "conv-held",
+          "title": "Held handoff",
+          "issueId": null,
+          "harness": "claude-code",
+          "heldKickoff": { "since": "2026-11-04T09:00:00.000Z" }
+        },
+        {
+          "name": "conv-opencode",
+          "title": "OpenCode session",
+          "issueId": null,
+          "harness": "opencode",
+          "pendingAskUserQuestion": {
+            "toolUseId": "oc_ask_1",
+            "askedAt": "2026-11-04T10:05:00.000Z",
+            "questions": [{ "question": "Continue?", "options": [{ "label": "Yes" }] }]
+          }
+        },
+        "not a row"
+      ],
+      "agents": [
+        {
+          "id": "agent-pan-202",
+          "issueId": "PAN-202",
+          "pendingInputKinds": ["askUserQuestion", "permissionRequest", "exitPlanMode", "sessionResume"],
+          "pendingAskUserQuestion": {
+            "toolUseId": "toolu_agent_ask",
+            "askedAt": "2026-11-04T10:06:00.000Z",
+            "questions": [{ "question": "Split the module?", "options": [{ "label": "Split" }, { "label": "Keep" }] }]
+          },
+          "permissionRequests": [
+            { "requestId": "req-1", "toolName": "Write", "description": "Write src/a.ts", "inputPreview": "...", "createdAt": "2026-11-04T10:07:00.000Z" },
+            { "requestId": "req-2", "toolName": "Bash", "description": "npm test", "inputPreview": "...", "createdAt": "2026-11-04T10:08:00.000Z" }
+          ]
+        }
+      ]
+    },
+    {
+      "environmentId": "env-1",
+      "label": "Mac rig",
+      "conversations": [
+        {
+          "name": "@env-1/conv-remote",
+          "title": "Remote session",
+          "issueId": null,
+          "harness": "claude-code",
+          "pendingAskUserQuestion": {
+            "toolUseId": "toolu_remote",
+            "askedAt": "2026-11-04T10:09:00.000Z",
+            "questions": [{ "question": "Deploy now?", "options": [{ "label": "Deploy" }, { "label": "Wait" }] }]
+          }
+        }
+      ],
+      "agents": [
+        { "id": "@env-1/agent-pan-303", "issueId": "PAN-303", "remote": true, "pendingInputKinds": ["exitPlanMode"] }
+      ]
+    }
+  ]
+}
