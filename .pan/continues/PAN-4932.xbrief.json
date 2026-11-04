@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4932",
   "created": "2026-11-04T01:06:56.441Z",
-  "updated": "2026-11-04T01:16:45.829Z",
+  "updated": "2026-11-04T01:21:22.491Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,9 +46,10 @@
       "doneAt": "2026-11-04T01:16:44.735Z"
     },
     "work-agent-builder-wiring": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4932",
-      "claimedAt": "2026-11-04T01:16:45.829Z"
+      "claimedAt": "2026-11-04T01:16:45.829Z",
+      "doneAt": "2026-11-04T01:21:22.490Z"
     }
   }
 }
