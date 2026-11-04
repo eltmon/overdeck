@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4938",
   "created": "2026-11-04T03:39:16.629Z",
-  "updated": "2026-11-04T04:09:58.683Z",
+  "updated": "2026-11-04T04:09:59.837Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,6 +80,11 @@
       "claimedBy": "agent-pan-4938",
       "claimedAt": "2026-11-04T04:07:46.342Z",
       "doneAt": "2026-11-04T04:09:58.683Z"
+    },
+    "docs-delegation": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4938",
+      "claimedAt": "2026-11-04T04:09:59.837Z"
     }
   }
 }
