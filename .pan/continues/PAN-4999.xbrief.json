@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4999",
   "created": "2026-11-04T10:07:26.830Z",
-  "updated": "2026-11-04T10:29:16.023Z",
+  "updated": "2026-11-04T10:29:44.799Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -72,6 +72,10 @@
     "docs-bare-name-form.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T10:29:16.023Z"
+    },
+    "docs-bare-name-form.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:29:44.798Z"
     }
   }
 }
