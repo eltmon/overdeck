@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-4961",
   "created": "2026-11-03T23:57:34.038Z",
-  "updated": "2026-11-04T00:38:14.073Z",
+  "updated": "2026-11-04T01:20:29.491Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-04T01:20Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-04T01:20:29.491Z"
+    }
+  ],
   "items": {
     "floor-ledger": {
       "status": "completed",
@@ -229,5 +235,14 @@
       "status": "completed",
       "doneAt": "2026-11-04T00:38:14.072Z"
     }
-  }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-04T01:20:29Z",
+      "markdownBody": "# CodeRabbit findings for PAN-4961 (PR #4973)\n\nCodeRabbit posted 4 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4462463988 · .pan/drafts/PAN-4961.md:132 [Minor]: Remove the concurrent safety bound.\n  https://github.com/eltmon/overdeck/pull/4973#discussion_r4462463988\n- Thread 4462464000 · src/dashboard/server/routes/agents/spawn-issue.ts:495 [Major]: Account for space reclaimed by stack teardown.\n  https://github.com/eltmon/overdeck/pull/4973#discussion_r4462464000\n- Thread 4462464005 · src/lib/overdeck/planning-promotion.ts:534 [Major]: Keep disk-low handoffs pending until space returns.\n  https://github.com/eltmon/overdeck/pull/4973#discussion_r4462464005\n- Thread 4462464009 · sync-sources/skills/pan-flywheel/SKILL.md:197 [Minor]: Handle reservation-ledger failures separately.\n  https://github.com/eltmon/overdeck/pull/4973#discussion_r4462464009\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/4973/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-4961`.\n   If you only replied, you are done.\n5. If PR #4973 has already merged when you read this, nothing more lands on it: open a follow-up issue\n   for the findings you agree with instead of pushing."
+    }
+  ]
 }
