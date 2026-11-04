@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4961",
   "created": "2026-11-03T23:57:34.038Z",
-  "updated": "2026-11-04T00:27:38.658Z",
+  "updated": "2026-11-04T00:27:56.358Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -158,6 +158,10 @@
       "claimedBy": "agent-pan-4961",
       "claimedAt": "2026-11-04T00:25:04.691Z",
       "doneAt": "2026-11-04T00:27:38.658Z"
+    },
+    "cli-start-disk-hold.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T00:27:56.357Z"
     }
   }
 }
