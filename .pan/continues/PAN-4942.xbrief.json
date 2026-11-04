@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4942",
   "created": "2026-11-04T05:29:28.990Z",
-  "updated": "2026-11-04T06:26:33.259Z",
+  "updated": "2026-11-04T06:26:47.677Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -160,6 +160,10 @@
     "machine-link-card.ac5": {
       "status": "completed",
       "doneAt": "2026-11-04T06:26:33.259Z"
+    },
+    "dialog-resolves-request.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:26:47.676Z"
     }
   }
 }
