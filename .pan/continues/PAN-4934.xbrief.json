@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4934",
   "created": "2026-11-04T02:59:33.455Z",
-  "updated": "2026-11-04T03:37:51.046Z",
+  "updated": "2026-11-04T03:38:06.794Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -66,6 +66,10 @@
     "acp-cp3-live-check.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T03:37:51.046Z"
+    },
+    "acp-cp3-live-check.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:38:06.794Z"
     }
   }
 }
