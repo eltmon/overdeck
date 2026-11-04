@@ -4,17 +4,17 @@
     "created": "2026-11-04T00:20:04Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4944: Agent MCP and bots (W-APPR1): Approvals for every harness and a fleet-wide pending list",
-    "updated": "2026-11-04T00:23:36.736Z"
+    "updated": "2026-11-04T00:24:41.120Z"
   },
   "plan": {
     "id": "pan-4944",
     "title": "Agent MCP and bots (W-APPR1): Approvals for every harness and a fleet-wide pending list",
-    "status": "proposed",
+    "status": "running",
     "uid": "925714d8-c75e-4529-a0e6-6391545bf62e",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-04T00:20:04Z",
-    "updated": "2026-11-04T00:23:36.736Z",
+    "updated": "2026-11-04T00:24:41.120Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4944",
@@ -578,5 +578,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
