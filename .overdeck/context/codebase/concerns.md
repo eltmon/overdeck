@@ -731,6 +731,14 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   (`agent-pan-<n>`) has none, and `agent-pan-<n>-review` appears only once review starts. Anything keyed
   on "the agent's own conversation" (PR links, the PR sync sweep, `getConversationByName(agentId)`) finds
   nothing for a work agent; PR watches therefore carry their own key and baseline.
+- **Phone-app releases need the operator's sign-ins and the Mac rig (PAN-4841)** — store builds
+  come from `apps/mobile/scripts/build-android.sh` (upload key in `~/.overdeck/secrets/`, never in
+  the repo) and `apps/mobile/scripts/build-ios-on-rig.sh`. iOS archives and uploads run on the Mac
+  rig inside a console Terminal session (`open -a Terminal <file>.command`), because SSH sessions
+  cannot unlock the login keychain for codesign; the upload uses the Xcode Apple ID session, not
+  App Store Connect API keys. `connect.overdeck.ai/healthz` `apns:true`/`fcm:true` only means the
+  secrets parse; a delivered push is the proof. Steps and store facts: `apps/mobile/RELEASE.md`.
+<!-- last-verified: 2026-11-04 -->
 
 - **Launch-context tools block keys on the MCP gate** (PAN-4935 planning) — the managed launch context ends with
   an "Overdeck tools" (MCP) or "Overdeck commands" (`pan`) block chosen by `overdeckMcpEnabledFor`, the same gate
@@ -768,5 +776,4 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   `done` is a finished turn with the harness alive, never an exit; only `exited` (or no pane) ends a session. Other
   code still treating `done` as not-live: PAN-4666 (Flywheel `paneIsLive`), PAN-5013 (derived issue state, parked
   route, read-model `activityForPaneState`).
-<!-- last-verified: 2026-11-04 -->
 <!-- last-verified: 2026-11-04 -->
