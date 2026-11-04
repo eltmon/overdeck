@@ -62,9 +62,9 @@ export interface MergePathOwnerDeps {
   deftHold?: (issueId: string) => Promise<string | null>;
   /**
    * The issue's current open PR, for the rule-8 head comparison. Defaults to
-   * a lookup in the cached `listRepoPullRequests(projectPath)` listing: the
-   * open row whose `headRefName` is `feature/<id lower>`, or null when there
-   * is none.
+   * a lookup in the cached `readOpenRepoPullRequests(projectPath)` listing
+   * (PAN-5042): the open row whose `headRefName` is `feature/<id lower>`, or
+   * null when there is none.
    */
   prOf?: (issueId: string, projectPath: string) => Promise<Pick<PrFacts, 'url' | 'headSha'> | null>;
 }
@@ -83,9 +83,9 @@ async function defaultPrOf(
   issueId: string,
   projectPath: string,
 ): Promise<Pick<PrFacts, 'url' | 'headSha'> | null> {
-  const { listRepoPullRequests } = await import('./derived-issue-state.js');
+  const { readOpenRepoPullRequests } = await import('./derived-issue-state.js');
   const branch = `feature/${issueId.toLowerCase()}`;
-  const rows = await listRepoPullRequests(projectPath);
+  const rows = (await readOpenRepoPullRequests(projectPath)) ?? [];
   const row = rows.find((r) => (r.state ?? '').toUpperCase() === 'OPEN' && r.headRefName === branch);
   return row ? { url: row.url ?? null, headSha: row.headRefOid ?? null } : null;
 }
