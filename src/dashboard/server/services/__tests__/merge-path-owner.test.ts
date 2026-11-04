@@ -1,11 +1,22 @@
 /**
  * PAN-4970: the one merge-path owner per ready feature. Every dependency is
  * injected — no `vi.mock` — so each test drives exactly the rule it names.
+ * The exception is the "default prOf" describe block (PAN-5042): those tests
+ * exercise rule 8's *default* dependency, the dynamic import of the server
+ * adapter, so they mock it instead of injecting `prOf`.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { ProjectConfig } from '../../../../lib/projects.js';
 import type { PendingAutoMerge, PendingAutoMergeStatus } from '../../../../lib/overdeck/merge-sync.js';
 import { mergePathOwner, perPrTrainActiveForProject, type MergePathOwnerDeps } from '../merge-path-owner.js';
+
+const derivedIssueStateMocks = vi.hoisted(() => ({
+  readOpenRepoPullRequests: vi.fn(),
+}));
+vi.mock('../derived-issue-state.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../derived-issue-state.js')>();
+  return { ...actual, readOpenRepoPullRequests: derivedIssueStateMocks.readOpenRepoPullRequests };
+});
 
 const PROJECT_PATH = '/repos/overdeck';
 const ISSUE_ID = 'PAN-4970';
@@ -196,6 +207,27 @@ describe('mergePathOwner', () => {
       }),
     );
     expect(seen).toEqual([ISSUE_ID, ISSUE_ID, ISSUE_ID]);
+  });
+});
+
+describe('mergePathOwner default prOf (PAN-5042)', () => {
+  it('reads the open listing and resolves the PR by headRefName (ac1)', async () => {
+    derivedIssueStateMocks.readOpenRepoPullRequests.mockResolvedValue([
+      { number: 9, state: 'OPEN', headRefName: 'feature/pan-9', url: 'u', headRefOid: 'abc' },
+    ]);
+    const d = deps({ latestAutoMerge: () => row('failed', { headSha: 'old-sha', prUrl: 'u' }) });
+    delete d.prOf;
+
+    await expect(mergePathOwner('PAN-9', PROJECT_PATH, GITHUB_MONOREPO, d)).resolves.toBe('per-pr');
+    expect(derivedIssueStateMocks.readOpenRepoPullRequests).toHaveBeenCalledWith(PROJECT_PATH);
+  });
+
+  it('returns batch, never throws, when the open listing read fails (ac2)', async () => {
+    derivedIssueStateMocks.readOpenRepoPullRequests.mockResolvedValue(null);
+    const d = deps({ latestAutoMerge: () => row('failed', { headSha: 'old-sha' }) });
+    delete d.prOf;
+
+    await expect(mergePathOwner(ISSUE_ID, PROJECT_PATH, GITHUB_MONOREPO, d)).resolves.toBe('batch');
   });
 });
 

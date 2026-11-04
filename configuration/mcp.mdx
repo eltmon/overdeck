@@ -1,6 +1,6 @@
 ---
 title: "MCP server"
-description: Drive this machine's Overdeck from another tool over the Model Context Protocol, with a scoped, revocable token
+description: Overdeck's MCP server: the tools every managed agent gets, and scoped, revocable access for outside tools and bots
 ---
 
 # MCP server
@@ -10,9 +10,11 @@ Desktop, another agent harness, a chat bot) can list conversations, read one,
 send a message, start a conversation or a worker, and answer prompts that wait
 on you. It reaches this machine and the machines it is linked to (see Fleet reach).
 
-This is separate from the Channels bridge (`overdeck-bridge`), which delivers
-messages into one running agent. The MCP server is a control surface for
-outside tools.
+Every agent Overdeck launches on Claude Code, Codex, `acp` or `opencode` gets
+this server with its own token (see [Agents get these tools](#agents-get-these-tools)),
+and outside tools and bots reach it with a token you create. It is separate
+from the Channels bridge (`overdeck-bridge`), which delivers messages into one
+running agent.
 
 Every tool calls an existing dashboard route with the token the client
 presents, so a tool can do only what that token's scopes allow on that route.
@@ -76,16 +78,16 @@ agent tokens.
 | `link_machine_wait` | Waits up to 50 s. Answers `pending` with `next`, `linked` with `machine` (`environmentId` and `label`), `declined` or `expired`. | `read:state` (agent tokens only) |
 | `memory_add` | Records a curated memory fact by running `pan memory add` in the agent's checkout: `id`, `type` (`feedback`, `project`, `reference`, `user`), a one-line `description`, optional `title`, `body`, `tags` and `store` (`project` by default, `user` for type `user`, or `machine`). A project fact is written uncommitted, so the agent commits `.overdeck/memory/<id>.md`. | `tell` (agent tokens only) |
 | `memory_search` | Searches memory by running `pan memory search --facts`: up to 5 matching facts from the agent's checkout, the operator store and the machine store, each with its file path, then observations from the agent's project (`limit` 1-20, default 10). | `read:state` (agent tokens only) |
-| `delegate_task` | Starts a worker on your own issue to do `task`, here or on `machine`; you are its parent. Optional `harness`, `model`, `effort`, `readOnly`, `name`, `needs`. A caller without an issue gets `delegate_task needs an issue; use start_conversation`. | `operate` |
-| `task_wait` | Waits up to 50 s for one of your workers to report. Answers `done` with the report, `ended` when it stopped without one (with its last message), or `running` with `next`. Pass `afterSeq` for the report after the one you consumed. | `read:state` |
-| `task_status` | One of your workers: state, idle time, where it runs and its newest report's seq, time and status. Your workers only, including ones on linked machines. | `read:state` |
-| `list_workers` | Every worker you started, on this machine or linked ones, with the same fields as `task_status`. | `read:state` |
-| `task_cancel` | Stops one of your workers, on this machine or another. Its reports so far stay readable. | `operate` |
-| `lane_start` | Launches a gauntlet lane (`role`, `brief`, with `key` or `for`, and optional `run`, `project`, `model`, `harness`, `effort`, `title`, `branch`, `from`, `at`, `machine`, `needs`, `reuse`, `replace`). Conversations only: the lane's parent is the calling conversation. | `operate` |
-| `lane_status` | Reads one lane by name. | `read:state` |
-| `lane_stop` | Stops one lane, here or on the machine it runs on. | `operate` |
-| `lane_wait` | Waits up to 50 s for the next report of any lane you launched, or of `run`. Answers `done` with the report and a cursor, or `running`; pass the cursor as `after` for the next report. Stopped lanes that never reported come back as `warnings`. | `read:state` |
-| `lane_report` | Files this lane's report (`report`, optional `status`, `verdict`, `defects`). Lane conversations only. | `tell` |
+| `delegate_task` | Starts a worker on your own issue to do `task`, here or on `machine`; you are its parent. Optional `harness`, `model`, `effort`, `readOnly`, `name`, `needs`. A caller without an issue gets `delegate_task needs an issue; use start_conversation`. | `operate` (agent tokens only) |
+| `task_wait` | Waits up to 50 s for one of your workers to report. Answers `done` with the report, `ended` when it stopped without one (with its last message), or `running` with `next`. Pass `afterSeq` for the report after the one you consumed. | `read:state` (agent tokens only) |
+| `task_status` | One of your workers: state, idle time, where it runs and its newest report's seq, time and status. Your workers only, including ones on linked machines. | `read:state` (agent tokens only) |
+| `list_workers` | Every worker you started, on this machine or linked ones, with the same fields as `task_status`. | `read:state` (agent tokens only) |
+| `task_cancel` | Stops one of your workers, on this machine or another. Its reports so far stay readable. | `operate` (agent tokens only) |
+| `lane_start` | Launches a gauntlet lane (`role`, `brief`, with `key` or `for`, and optional `run`, `project`, `model`, `harness`, `effort`, `title`, `branch`, `from`, `at`, `machine`, `needs`, `reuse`, `replace`). Conversations only: the lane's parent is the calling conversation. | `operate` (agent tokens only) |
+| `lane_status` | Reads one lane by name. | `read:state` (agent tokens only) |
+| `lane_stop` | Stops one lane, here or on the machine it runs on. | `operate` (agent tokens only) |
+| `lane_wait` | Waits up to 50 s for the next report of any lane you launched, or of `run`. Answers `done` with the report and a cursor, or `running`; pass the cursor as `after` for the next report. Stopped lanes that never reported come back as `warnings`. | `read:state` (agent tokens only) |
+| `lane_report` | Files this lane's report (`report`, optional `status`, `verdict`, `defects`). Lane conversations only. | `tell` (agent tokens only) |
 
 A worker or lane wait returns within 50 s; call its `next` again instead of polling.
 
@@ -555,184 +557,14 @@ Both token lists fold one access token per running agent under a collapsed
 **Show agent tokens (N)** toggle, so a fleet of agents doesn't bury your own
 tokens; click it to reveal and revoke an individual agent's token.
 
-## Connect a bot
+## Bots
 
-Give an outside MCP client — Hermes, OpenClaw, Grok Build, Grok Bot, or a script
-calling the xAI API — scoped, revocable access to this machine. Open **Connect a
-bot** from **Settings → Anywhere → Bots**, or from the command palette.
-
-The dialog picks a reach by platform:
-
-| Platform | Reaches |
-| --- | --- |
-| Hermes, OpenClaw | Overdeck connector (default), Tailscale |
-| Grok Build | This computer (default), Overdeck connector, Tailscale |
-| Grok Bot, xAI API | Public MCP |
-
-Access defaults to `read:state`, `read:conversations` and `tell`; `read:state`
-is always on. `operate` and `approve` are off by default. A bot never gets
-`admin`, `forward`, `read:settings` or `read:costs`, regardless of what is
-ticked.
-
-Each reach produces a different setup:
-
-- **Overdeck connector** — a pairing string that works once, within 10
-  minutes, plus the commands that pair and run the connector:
-  `npx -y @overdeck/core@<version> mcp connector login`, `... pair <string>`
-  and `... serve`.
-- **Tailscale, This computer** — an access token, shown once. The config
-  snippet never carries it: it goes only into the one-time "Token setup"
-  field, kept out of the config through `OVERDECK_MCP_TOKEN` or
-  `OVERDECK_MCP_TOKEN_FILE`.
-- **Public MCP** — the public URL plus, for the xAI API, the
-  `pan mcp oauth issue` command that mints its token.
-
-The Hermes connector config, for example:
-
-```yaml
-# ~/.hermes/config.yaml — connector route (default)
-mcp_servers:
-  overdeck:
-    url: "http://127.0.0.1:7466/mcp"
-    headers:
-      Authorization: "Bearer ${OVERDECK_CONNECTOR_LOCAL_TOKEN}"
-plugins:
-  enabled: [overdeck]
-  entries:
-    overdeck:
-      mcp_allowlist: ["overdeck"]
-      settings:
-        summary: true
-        allow_answers: false
-```
-
-The plugin reads `summary` and `allow_answers` from `settings`; `mcp_allowlist`
-grants it the `overdeck` server. See `integrations/hermes/README.md` for the
-`/overdeck` commands.
-
-**OpenClaw.** The OpenClaw plugin lives in [`integrations/openclaw/`](https://github.com/eltmon/overdeck/tree/main/integrations/openclaw).
-The Overdeck tools come from OpenClaw's own MCP client, so the server entry
-needs `transport: "streamable-http"`: OpenClaw defaults to `sse`, which
-Overdeck does not serve. The plugin adds a needs-you summary to agent turns,
-at most every 5 minutes, and two chat tools, `overdeck_pending` and
-`overdeck_answer`. Answering stays off until you set `allowAnswers: true`, and
-the connector also needs `approve` access. OpenClaw 2026.10.10 blocks the
-summary hook for plugins it does not bundle, so also add
-`hooks: { allowConversationAccess: true }` to `plugins.entries.overdeck`
-(see the package README). The connector config:
-
-```json5
-// openclaw config
-mcp: { servers: { overdeck: {
-  url: "http://127.0.0.1:7466/mcp",
-  transport: "streamable-http",   // the default is "sse", which Overdeck does not serve
-  headers: { Authorization: "Bearer ${OVERDECK_CONNECTOR_LOCAL_TOKEN}" },
-} } },
-plugins: { entries: { overdeck: { config: { localToken: "${OVERDECK_CONNECTOR_LOCAL_TOKEN}" } } } },
-```
-
-**Grok Build.** The Grok Build plugin lives in
-[`integrations/grok-build/`](https://github.com/eltmon/overdeck/tree/main/integrations/grok-build).
-Install it with `grok plugin install eltmon/overdeck#integrations/grok-build --trust`
-and `grok plugin enable overdeck`. Its MCP server script runs the paired
-connector when `~/.overdeck-connector/pairing.json` exists, and otherwise
-`pan mcp serve` with the token file from "This computer". Ask
-`/overdeck pending` to list prompts that wait for you; on a computer with
-Overdeck installed, type `/overdeck:overdeck pending`, because Overdeck's own
-`overdeck` skill has the same name.
-
-**Remove** in the Bots panel revokes a connector at once.
-
-## Run the Overdeck connector
-
-The Overdeck connector runs on the computer where the bot runs. It pairs once
-with one Overdeck machine and serves that machine's MCP tools to the bot on
-`http://127.0.0.1:7466/mcp` (or stdio). Every tool call travels to the machine
-over an encrypted secure channel inside a WebRTC connection, so the bot needs
-no Tailscale and no public address.
-
-It needs Node 22.16 or later, and you must sign it in with the overdeck.ai
-account the machine uses. On a computer without Overdeck, run each command as
-`npx -y @overdeck/core@<version> mcp connector <command>`; "Connect a bot"
-shows the exact version.
-
-| Command | What it does |
-| --- | --- |
-| `pan mcp connector login [--account-url <url>] [--directory-url <url>]` | Signs the connector in to overdeck.ai with the device flow: open the URL it prints and enter the code. |
-| `pan mcp connector pair '<pairing string>' [--label <name>]` | Pairs with the machine named in the string from "Connect a bot". `--label` names the connector on the machine (default: the host name). |
-| `pan mcp connector serve [--port <port>] [--stdio] [--label <name>]` | Serves the tools on `127.0.0.1:<port>` (default 7466) until stopped, or one stdio session with `--stdio`. |
-| `pan mcp connector status [--port <port>]` | Prints the account, the paired machine, its scopes and the live route of a running `serve`. It never prints a token. |
-| `pan mcp connector logout` | Removes the connector from the machine and overdeck.ai, then deletes its files. |
-
-### The connector home
-
-All connector state lives in `$OVERDECK_CONNECTOR_HOME`, default
-`~/.overdeck-connector`, mode 0700. It holds four files, each mode 0600:
-`account.json` (the overdeck.ai sign-in), `identity.json` (the connector id and
-its keys), `pairing.json` (the paired machine and its connector token) and
-`local-token`. The connector never reads or writes `~/.overdeck`, so it can run
-on an Overdeck machine without touching that machine's sign-in or keys. A file
-that other users can read is refused with a `chmod 600` hint.
-
-`login` fixes the account and directory URLs for every later command. The
-directory URL comes from `--directory-url`, else `OVERDECK_CONNECTOR_DIRECTORY_URL`,
-else `https://connect.overdeck.ai`; the account URL from `--account-url`, else
-`OVERDECK_ACCOUNT_URL`, else `https://account.overdeck.ai`.
-
-### The local endpoint
-
-`serve` binds `127.0.0.1` only. A bot sends `Authorization: Bearer <local token>`
-with every `POST /mcp`; the token is the content of `local-token`, and a
-missing or wrong token gets 401. Keep it out of chat and config files:
-
-```bash
-export OVERDECK_CONNECTOR_LOCAL_TOKEN="$(cat "${OVERDECK_CONNECTOR_HOME:-$HOME/.overdeck-connector}/local-token")"
-curl -s http://127.0.0.1:7466/mcp \
-  -H "Authorization: Bearer $OVERDECK_CONNECTOR_LOCAL_TOKEN" \
-  -H 'Content-Type: application/json' \
-  -H 'Accept: application/json, text/event-stream' \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
-```
-
-`/mcp` is stateless JSON: each request gets its own MCP session. Bodies over
-4 MiB get 413, and `GET` or `DELETE` on `/mcp` get 405. `GET /healthz` needs no
-token and answers `{ "ok": true, "machine": "<label>", "route": "direct" }`;
-`route` is `direct`, `relay` or `down`, and `ok` is false when it is `down`.
-
-### Routes and reconnects
-
-The connector tries a direct WebRTC path first. It falls back to the TURN relay
-only when the account has the relay plan and this month's relay allowance is not
-used up; it reports its relay bytes to overdeck.ai. With no direct path and no
-relay, tool calls fail with `No direct path to <machine>. Use the relay plan, or
-the Tailscale route in the README.` After a lost connection it tries again after
-1 s, doubling up to 60 s, and at once when overdeck.ai shows the machine online
-again. A tool call made while the connection is down returns an error; the bot
-can retry it.
-
-### What a connector can reach
-
-A connector reaches only the machine it paired with. Its tool list has no
-`list_machines`, and `start_conversation`, `start_worker` and `start_issue`
-have no `machine` or `needs` argument: they start work on the paired machine,
-when the connector holds `operate`. The machine refuses any other target with
-403 `connector-local-only`. `search_conversations` returns only the paired
-machine's matches, and `list_pending_input` shows only the paired machine's
-input, with a `fleetError` in place of its linked machines. To reach a second machine, run a second connector with its own
-`OVERDECK_CONNECTOR_HOME`.
-
-### Re-pairing and logout
-
-Pairing again (for example with new scopes) replaces the connector's token on
-the machine and keeps `local-token`, so the bot's config keeps working. Restart
-`serve` after a re-pair: it reads `pairing.json` only when it starts.
-
-`logout` does four steps in order: it removes the connector from the machine
-(`DELETE /api/connectors/self`), removes it from the overdeck.ai directory,
-revokes its overdeck.ai sign-in, and deletes the four files. A step that fails
-prints one line and the next step still runs; the files are always deleted. If
-the machine was unreachable, remove the connector there under **Settings →
-Anywhere → Bots**.
+Hermes, OpenClaw, Grok Build, Grok Bot and the xAI API reach this server
+through **Connect a bot** in Settings → Anywhere → Bots. A self-hosted bot uses
+the Overdeck connector or Tailscale; a hosted bot uses Public MCP above. See
+[Connect a bot](/configuration/bots) for each platform's setup and
+[Run the Overdeck connector](/configuration/bots#run-the-overdeck-connector)
+for the connector. Every `pan mcp` command is in [`pan mcp`](/cli/mcp).
 
 ## Fleet reach
 

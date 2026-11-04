@@ -143,9 +143,11 @@ MCP server. Its scopes come from `AGENT_TOKEN_SCOPES` in
 | `work`, `worker`, `plan`, `strike`, `sequencer`, `knowledge`, `flywheel` | `read:events`, `read:state`, `read:conversations`, `tell`, `operate` |
 | `review`, `test`, `ship` | `read:events`, `read:state`, `read:conversations`, `tell` |
 | `conversation` | `read:events`, `read:state`, `read:conversations`, `tell`, `operate`, `approve` |
+| a lane conversation (`pan lane start`) | the `worker` scopes |
+| the Flywheel conversation | the `flywheel` scopes |
 
 An agent token never holds `admin`, `forward`, `read:settings` or `read:costs`.
-Only conversations get `approve`. See "Agent tokens (PAN-4927)" in
+Only operator conversations get `approve`; `conversationTokenRole` in `src/lib/mcp/agent-injection.ts` gives a lane conversation the `worker` role and the Flywheel conversation the `flywheel` role. See "Agent tokens (PAN-4927)" in
 `docs/DASHBOARD-AUTH.md` for minting, revocation and the sweep.
 
 ### 2. Overdeck pipeline agent — `agents/pan-*-agent.md`

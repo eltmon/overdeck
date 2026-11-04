@@ -1088,7 +1088,19 @@ A harness that declares `overdeckMcp` gets the `overdeck` MCP server at launch
 same harness's launch context ends with the "Overdeck tools" block; every
 other harness gets "Overdeck commands" with the `pan` equivalents instead (see
 [What the agent is told](/configuration/mcp#what-the-agent-is-told)).
-Claude Code 2.1.293 was checked against what the launcher emits:
+
+| Harness | At launch it gets |
+| --- | --- |
+| `claude-code`, `codex`, `acp`, `opencode` | The `overdeck` MCP server and the "Overdeck tools" block |
+| `kimi-code`, `ohmypi`, `muse`, `prime-agent` | The "Overdeck commands" block, with the `pan` command for each tool |
+
+Any harness gets the "Overdeck commands" block instead of the server when it
+runs in a Docker workspace (`OVERDECK_DOCKER_WORKSPACE=1` or `PAN_DOCKER=1`),
+because the container has no `pan` and cannot read the token file, and every
+harness does when `mcp.agents` is `false` in `config.yaml`. The rule is
+`src/lib/mcp/overdeck-mcp-gate.ts`.
+
+The CP-1 live check: Claude Code 2.1.293 was checked against what the launcher emits:
 
 - Two `--mcp-config=` flags load together, so the Channels bridge and
   `overdeck` both start.
@@ -1100,7 +1112,7 @@ Claude Code 2.1.293 was checked against what the launcher emits:
   another tool name, so Overdeck always emits the equals form
   (`--allowedTools=mcp__overdeck`, `--mcp-config=<path>`).
 
-Codex CLI 0.159.0 was checked separately, because Codex has no CLI allow-list
+The CP-2 live check: Codex CLI 0.159.0 was checked separately, because Codex has no CLI allow-list
 flag and Overdeck's MCP tools carry no `readOnlyHint` annotations:
 
 - Under `approval_policy = "never"`, a model-initiated call to an un-annotated
@@ -1112,6 +1124,10 @@ flag and Overdeck's MCP tools carry no `readOnlyHint` annotations:
 - An invalid value in that key is not silently dropped: Codex refuses to load
   the whole config and the agent never starts.
 - An unrelated unknown key elsewhere in the same table is ignored.
+- Both Codex launch modes (work agents and conversations) wrote
+  `[mcp_servers.overdeck]` with that key, and a model-initiated `overdeck` tool
+  call completed with no approval prompt. The `-c mcp_servers.overdeck.*`
+  command-line fallback was not needed and is not built.
 
 **ACP harnesses (PAN-4934).** The launcher passes `--mcp-config <file>` to the
 ACP host. The host reads the same `overdeck-mcp.json` and sends its server as

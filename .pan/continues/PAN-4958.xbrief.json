@@ -1,0 +1,251 @@
+{
+  "version": "1",
+  "issueId": "PAN-4958",
+  "created": "2026-11-04T18:35:00.768Z",
+  "updated": "2026-11-04T19:08:32.110Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "cli-mcp-page": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4958",
+      "claimedAt": "2026-11-04T18:35:00.768Z",
+      "doneAt": "2026-11-04T18:36:10.575Z"
+    },
+    "bots-page": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4958",
+      "claimedAt": "2026-11-04T18:36:19.449Z",
+      "doneAt": "2026-11-04T18:37:13.872Z"
+    },
+    "mcp-intro": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4958",
+      "claimedAt": "2026-11-04T18:37:19.757Z",
+      "doneAt": "2026-11-04T18:37:52.148Z"
+    },
+    "cli-token": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4958",
+      "claimedAt": "2026-11-04T18:37:58.113Z",
+      "doneAt": "2026-11-04T18:38:30.458Z"
+    },
+    "harnesses-matrix": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4958",
+      "claimedAt": "2026-11-04T18:38:35.664Z",
+      "doneAt": "2026-11-04T18:39:01.519Z"
+    },
+    "auth-oauth-constants": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4958",
+      "claimedAt": "2026-11-04T18:39:07.440Z",
+      "doneAt": "2026-11-04T18:39:45.200Z"
+    },
+    "roles-scope-rows": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4958",
+      "claimedAt": "2026-11-04T18:39:46.345Z",
+      "doneAt": "2026-11-04T18:40:08.415Z"
+    },
+    "connect-service-clients": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4958",
+      "claimedAt": "2026-11-04T18:40:09.573Z",
+      "doneAt": "2026-11-04T18:40:31.245Z"
+    },
+    "public-mcp-tailscale": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4958",
+      "claimedAt": "2026-11-04T18:40:38.222Z",
+      "doneAt": "2026-11-04T18:41:09.936Z"
+    },
+    "anywhere-bots": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4958",
+      "claimedAt": "2026-11-04T18:41:11.086Z",
+      "doneAt": "2026-11-04T18:41:34.179Z"
+    },
+    "pan4649-note": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4958",
+      "claimedAt": "2026-11-04T18:41:39.770Z",
+      "doneAt": "2026-11-04T18:42:06.826Z"
+    },
+    "claude-md-invariant": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4958",
+      "claimedAt": "2026-11-04T18:42:08.058Z",
+      "doneAt": "2026-11-04T18:42:34.642Z"
+    },
+    "signins-header": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4958",
+      "claimedAt": "2026-11-04T18:42:35.732Z",
+      "doneAt": "2026-11-04T18:47:53.659Z"
+    },
+    "cli-mcp-page.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:58:11.846Z"
+    },
+    "cli-mcp-page.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:58:25.805Z"
+    },
+    "cli-mcp-page.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:58:41.022Z"
+    },
+    "cli-mcp-page.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:58:56.594Z"
+    },
+    "bots-page.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:59:11.973Z"
+    },
+    "bots-page.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:59:27.872Z"
+    },
+    "bots-page.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:59:43.541Z"
+    },
+    "bots-page.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:59:59.519Z"
+    },
+    "bots-page.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:00:16.059Z"
+    },
+    "mcp-intro.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:00:32.221Z"
+    },
+    "mcp-intro.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:00:47.658Z"
+    },
+    "mcp-intro.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:01:03.062Z"
+    },
+    "cli-token.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:01:17.919Z"
+    },
+    "cli-token.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:01:32.254Z"
+    },
+    "cli-token.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:01:47.640Z"
+    },
+    "cli-token.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:02:05.651Z"
+    },
+    "harnesses-matrix.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:02:22.233Z"
+    },
+    "harnesses-matrix.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:02:37.071Z"
+    },
+    "harnesses-matrix.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:02:51.894Z"
+    },
+    "auth-oauth-constants.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:03:07.022Z"
+    },
+    "auth-oauth-constants.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:03:22.298Z"
+    },
+    "auth-oauth-constants.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:03:37.937Z"
+    },
+    "roles-scope-rows.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:03:53.055Z"
+    },
+    "roles-scope-rows.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:04:10.476Z"
+    },
+    "roles-scope-rows.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:04:28.142Z"
+    },
+    "connect-service-clients.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:04:47.021Z"
+    },
+    "connect-service-clients.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:05:05.898Z"
+    },
+    "public-mcp-tailscale.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:05:24.538Z"
+    },
+    "public-mcp-tailscale.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:05:39.682Z"
+    },
+    "public-mcp-tailscale.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:05:56.137Z"
+    },
+    "anywhere-bots.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:06:15.028Z"
+    },
+    "anywhere-bots.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:06:29.974Z"
+    },
+    "anywhere-bots.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:06:44.392Z"
+    },
+    "pan4649-note.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:07:00.111Z"
+    },
+    "pan4649-note.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:07:15.856Z"
+    },
+    "claude-md-invariant.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:07:31.826Z"
+    },
+    "claude-md-invariant.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:07:48.047Z"
+    },
+    "signins-header.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:08:03.215Z"
+    },
+    "signins-header.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:08:17.728Z"
+    },
+    "signins-header.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:08:32.109Z"
+    }
+  }
+}

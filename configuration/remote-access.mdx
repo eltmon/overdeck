@@ -315,6 +315,16 @@ These routes answer without a credential:
 that variable is set, so an external consumer such as a TTS sidecar keeps
 working. A `read:events` scoped token works there too, set or not. The dashboard's static page files stay public.
 
+## What the internet can reach
+
+Nothing, unless you publish it. Two opt-in features use Tailscale Funnel on
+port 8443: [webhook triggers](/configuration/triggers) (`POST /hooks/*`) and
+[Public MCP](/configuration/mcp#public-mcp-for-hosted-bots) (`/mcp`,
+`/.well-known/*` and `/oauth/mcp/*`, off by default). A Funnel request never
+counts as this machine, can never mint a dashboard session, and gets 404 on
+every other path. Over Funnel, `/mcp` accepts only OAuth sign-ins you approved,
+with rate limits.
+
 ## Local reverse proxies: `require_token_mint`
 
 A local reverse proxy (Tailscale Serve, cloudflared, a Traefik route) connects
