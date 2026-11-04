@@ -4,6 +4,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { resolveClaimantId } from '../../../lib/xbrief/claim-check.js';
 import type { SelfCaller } from '../self-caller.js';
 import { buildSelfJobArgv, SelfJobArgError } from '../services/self-job-argv.js';
 import {
@@ -192,11 +193,16 @@ describe('self jobs', () => {
     it('gives a conversation caller its tmux session, not its name', () => {
       const env = selfJobEnv(conversation, base);
       expect(env.OVERDECK_CONVERSATION).toBe('conv-abc');
-      expect(env).not.toHaveProperty('OVERDECK_AGENT_ID');
+      expect(env.OVERDECK_AGENT_ID).toBe('conv-abc');
       expect(env).not.toHaveProperty('OVERDECK_ISSUE_ID');
       expect(env).not.toHaveProperty('OVERDECK_CLAIM_ID');
       expect(env).not.toHaveProperty('OVERDECK_MCP_TOKEN');
       expect(env.OVERDECK_DASHBOARD_URL).toBe('http://127.0.0.1:4011');
+    });
+
+    it('resolves the claimant to the caller, not the inherited claim id', () => {
+      expect(resolveClaimantId(selfJobEnv(conversation, base))).toBe('conv-abc');
+      expect(resolveClaimantId(selfJobEnv(agent, base))).toBe('agent-pan-1');
     });
 
     it('prefers API_PORT and defaults to 3011', () => {
