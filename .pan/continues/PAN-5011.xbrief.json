@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5011",
   "created": "2026-11-04T11:42:07.971Z",
-  "updated": "2026-11-04T12:38:15.912Z",
+  "updated": "2026-11-04T12:38:26.873Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,11 @@
       "claimedBy": "agent-pan-5011",
       "claimedAt": "2026-11-04T12:28:36.221Z",
       "doneAt": "2026-11-04T12:38:15.912Z"
+    },
+    "cockpit-pane-identity": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5011",
+      "claimedAt": "2026-11-04T12:38:26.873Z"
     }
   }
 }
