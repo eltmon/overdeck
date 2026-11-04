@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5006",
   "created": "2026-11-04T12:27:52.516Z",
-  "updated": "2026-11-04T12:39:27.092Z",
+  "updated": "2026-11-04T12:39:31.198Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-5006",
       "claimedAt": "2026-11-04T12:36:39.915Z",
       "doneAt": "2026-11-04T12:39:27.092Z"
+    },
+    "cli-auto-reason": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5006",
+      "claimedAt": "2026-11-04T12:39:31.198Z"
     }
   }
 }
