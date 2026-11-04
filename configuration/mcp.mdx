@@ -260,6 +260,64 @@ through the dashboard fails its next request at once. A token revoked by
 another process (for example `pan token revoke` while the dashboard is
 unreachable) fails within 5 seconds, when the dashboard rereads its token list.
 
+## Connect a bot
+
+Give an outside MCP client — Hermes, OpenClaw, Grok Build, Grok Bot, or a script
+calling the xAI API — scoped, revocable access to this machine. Open **Connect a
+bot** from **Settings → Anywhere → Bots**, or from the command palette.
+
+The dialog picks a reach by platform:
+
+| Platform | Reaches |
+| --- | --- |
+| Hermes, OpenClaw | Overdeck connector (default), Tailscale |
+| Grok Build | This computer (default), Overdeck connector, Tailscale |
+| Grok Bot, xAI API | Public MCP |
+
+Access defaults to `read:state`, `read:conversations` and `tell`; `read:state`
+is always on. `operate` and `approve` are off by default. A bot never gets
+`admin`, `forward`, `read:settings` or `read:costs`, regardless of what is
+ticked.
+
+Each reach produces a different setup:
+
+- **Overdeck connector** — a pairing string that works once, within 10
+  minutes, plus the commands that pair and run the connector:
+  `npx -y @overdeck/core@<version> mcp connector login`, `... pair <string>`
+  and `... serve`.
+- **Tailscale, This computer** — an access token, shown once. The config
+  snippet never carries it: it goes only into the one-time "Token setup"
+  field, kept out of the config through `OVERDECK_MCP_TOKEN` or
+  `OVERDECK_MCP_TOKEN_FILE`.
+- **Public MCP** — the public URL plus, for the xAI API, the
+  `pan mcp oauth issue` command that mints its token.
+
+The Hermes connector config, for example:
+
+```yaml
+# ~/.hermes/config.yaml — connector route (default)
+mcp_servers:
+  overdeck:
+    url: "http://127.0.0.1:7466/mcp"
+    headers:
+      Authorization: "Bearer ${OVERDECK_CONNECTOR_LOCAL_TOKEN}"
+plugins:
+  enabled: [overdeck]
+  entries:
+    overdeck:
+      mcp_allowlist: ["overdeck"]
+      summary: true
+      allow_answers: false
+```
+
+**Remove** in the Bots panel revokes a connector at once.
+
+<Info>
+The `pan mcp connector` commands and the public `/mcp` route ship separately
+(PAN-4950, PAN-4947); until then, the connector and public reaches show their
+setup text but nothing serves it yet.
+</Info>
+
 ## Fleet reach
 
 One MCP URL reaches every machine this one is linked to (see
