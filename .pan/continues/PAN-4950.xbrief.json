@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4950",
   "created": "2026-11-04T10:02:21.153Z",
-  "updated": "2026-11-04T11:27:01.214Z",
+  "updated": "2026-11-04T11:27:13.771Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -256,6 +256,10 @@
     "conn-cli.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T11:27:01.214Z"
+    },
+    "conn-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T11:27:13.771Z"
     }
   }
 }
