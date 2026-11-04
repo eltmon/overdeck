@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-04T08:14:00.832223Z · model: claude-opus-5-5 · open: 870_
+_Last sequenced: 2026-11-04T08:15:05.552352Z · model: claude-opus-5-5 · open: 869_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -417,8 +417,7 @@ _Last sequenced: 2026-11-04T08:14:00.832223Z · model: claude-opus-5-5 · open: 
 | 416 | PAN-3016 | M | medium | ok |  |  | Operator ask: every view should be URL-addressable; cockpit tabs, stage panes and several drawers are still local state. |
 | 417 | PAN-3890 | S | medium | ok |  |  | opencode provider stream errors (rate limit) are invisible in the feed and never retried; first message dies silently |
 | 418 | PAN-3822 | L | medium | ok |  |  | PRD landed (12 items, FR-1..14): link PRs to conversations via branch detection + explicit override; unblocks PAN-3920 |
-| 419 | PAN-4943 | S | medium | ok |  |  | Link and watch pull requests from an agent via MCP tools; W-SELF1 closed, now unblocked. |
-| 420 | PAN-4935 | M | medium | ok |  | PAN-4943 | Instruction blocks and no-MCP fallback; only W-PR1 (PAN-4943, in review) remains before it can start. |
+| 420 | PAN-4935 | M | medium | ok |  |  | Instruction blocks and no-MCP fallback; only W-PR1 (PAN-4943, in review) remains before it can start. |
 | 421 | PAN-1673 | S | medium | ok |  |  | Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
 | 422 | PAN-1669 | S | medium | ok |  |  | restart-with-model doesn't emit a live event |
 | 423 | PAN-1668 | S | medium | ok |  |  | right-click 'restart with <model>' carries model only, never harness |
@@ -1205,10 +1204,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-04T08:14:00.832223Z",
+  "generatedAt": "2026-11-04T08:15:05.552352Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 870,
+  "openCount": 869,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -6398,28 +6397,13 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
-      "issue": "PAN-4943",
-      "rank": 419,
-      "size": "S",
-      "importance": "medium",
-      "score": 43,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Link and watch pull requests from an agent via MCP tools; W-SELF1 closed, now unblocked.",
-      "rationale": "Its only dependency, W-SELF1 (PAN-4936), closed as completed, so this child is now workable and moves up from the tail into the slot band W-SELF1 held.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4935",
       "rank": 420,
       "size": "M",
       "importance": "medium",
       "score": 45,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4943"
-      ],
+      "dependsOn": [],
       "why": "Instruction blocks and no-MCP fallback; only W-PR1 (PAN-4943, in review) remains before it can start.",
       "rationale": "Dependency PAN-4942 (W-LINK1 link_machine) closed as completed, leaving only in-review PAN-4943, so it moves from the tail into the freed slot right after it.",
       "gate": "auto",
@@ -13227,13 +13211,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
     },
     {
       "from": "PAN-4927",
-      "to": "PAN-4943",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4927",
       "to": "PAN-4950",
       "type": "contains",
       "source": "github-ref",
@@ -13299,13 +13276,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "from": "PAN-4927",
       "to": "PAN-4956",
       "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4943",
-      "to": "PAN-4935",
-      "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
     },
