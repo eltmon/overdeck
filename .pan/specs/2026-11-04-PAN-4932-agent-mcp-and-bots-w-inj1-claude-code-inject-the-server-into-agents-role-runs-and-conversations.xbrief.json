@@ -4,17 +4,17 @@
     "created": "2026-11-04T00:59:42Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4932: Agent MCP and bots (W-INJ1): Claude Code: inject the server into agents, role runs and conversations",
-    "updated": "2026-11-04T01:05:22.730Z"
+    "updated": "2026-11-04T01:06:41.268Z"
   },
   "plan": {
     "id": "pan-4932",
     "title": "Agent MCP and bots (W-INJ1): Claude Code: inject the server into agents, role runs and conversations",
-    "status": "proposed",
+    "status": "running",
     "uid": "7d2a064e-a27e-4830-8a6f-9440c49d2e6b",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-04T00:59:42Z",
-    "updated": "2026-11-04T01:05:22.730Z",
+    "updated": "2026-11-04T01:06:41.268Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4932",
@@ -987,5 +987,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
