@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4932",
   "created": "2026-11-04T01:06:56.441Z",
-  "updated": "2026-11-04T01:13:04.730Z",
+  "updated": "2026-11-04T01:15:25.774Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-11-04T01:13:03.184Z"
     },
     "agent-injection-module": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4932",
-      "claimedAt": "2026-11-04T01:13:04.730Z"
+      "claimedAt": "2026-11-04T01:13:04.730Z",
+      "doneAt": "2026-11-04T01:15:25.774Z"
     }
   }
 }
