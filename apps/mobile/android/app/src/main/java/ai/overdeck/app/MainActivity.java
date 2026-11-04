@@ -13,6 +13,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         // App-local plugins register before the bridge starts in super.onCreate.
         registerPlugin(OverdeckKeysPlugin.class);
+        registerPlugin(OverdeckPushPlugin.class);
         registerPlugin(OverdeckAppearancePlugin.class);
         // PAN-5041: the stored appearance applies before the bridge creates the WebView.
         AppCompatDelegate.setDefaultNightMode(OverdeckAppearancePlugin.nightMode(OverdeckAppearancePlugin.stored(this)));

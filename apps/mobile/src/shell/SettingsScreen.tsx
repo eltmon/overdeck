@@ -1,5 +1,10 @@
-/** Settings (PAN-4837 C-8): the account, notifications (PAN-4838 FR-4, PAN-5019 WI-9), paired machines, the Live Activity switch (PAN-4839), the app version and sign out. */
-import { PHONE_NOTIFICATION_CATEGORIES, type PhoneNotificationCategory, type PhoneNotificationPreferences } from '@overdeck/contracts';
+/** Settings (PAN-4837 C-8): the account, notifications (PAN-4838 FR-4, PAN-4840 FR-9, PAN-5019 WI-9), paired machines, the Live Activity switch (PAN-4839), the app version and sign out. */
+import {
+  PHONE_NOTIFICATION_CATEGORIES,
+  type PhoneNotificationCategory,
+  type PhoneNotificationPreferences,
+  type PhonePlatform,
+} from '@overdeck/contracts';
 import { useState } from 'react';
 
 import type { PushPermission } from '../native/push';
@@ -23,6 +28,8 @@ export interface LiveActivitySetting {
 export interface NotificationsSetting {
   enabled: boolean;
   permission: PushPermission;
+  /** Which system Settings path the denied hint names. */
+  platform: PhonePlatform;
   onChange(on: boolean): void;
   prefs: PhoneNotificationPreferences;
   onPause(choice: PauseChoice): void;
@@ -126,9 +133,7 @@ export function SettingsScreen({
             <span className="text-muted-foreground">{notifications.enabled ? 'On' : 'Off'}</span>
           </button>
           <p className="text-xs text-muted-foreground">
-            {notifications.permission === 'denied'
-              ? 'Notifications are off for Overdeck in iOS Settings. Open Settings → Notifications → Overdeck to turn them on.'
-              : 'Needs-you alerts from your paired machines. Their text is end-to-end encrypted; only this phone can read it.'}
+            {notificationsHint(notifications)}
           </p>
           <NotificationPrefsSection notifications={notifications} />
         </div>
@@ -165,6 +170,16 @@ export function SettingsScreen({
       </button>
     </section>
   );
+}
+
+function notificationsHint({ permission, platform }: NotificationsSetting): string {
+  if (permission === 'unavailable') return 'Not set up in this build.';
+  if (permission === 'denied') {
+    return platform === 'android'
+      ? 'Off. Turn them on in Android Settings → Apps → Overdeck → Notifications.'
+      : 'Notifications are off for Overdeck in iOS Settings. Open Settings → Notifications → Overdeck to turn them on.';
+  }
+  return 'Needs-you alerts from your paired machines. Their text is end-to-end encrypted; only this phone can read it.';
 }
 
 function NotificationPrefsSection({ notifications }: { notifications: NotificationsSetting }) {

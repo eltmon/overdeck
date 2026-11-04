@@ -5,11 +5,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   NOTIFICATIONS_PREF_KEY,
+  PUSH_ASKED_KEY,
   PUSH_TOKEN_KEY,
   type PushDeps,
   type PushDirectory,
   pushSupported,
   startPush,
+  unregisterPush,
 } from '../push';
 
 const TOKEN = 'a1b2c3d4'.repeat(8);
@@ -79,9 +81,9 @@ beforeEach(() => {
 });
 
 describe('pushSupported', () => {
-  it('is true on iOS only', () => {
+  it('is true on iOS and Android only', () => {
     expect(pushSupported('ios')).toBe(true);
-    expect(pushSupported('android')).toBe(false);
+    expect(pushSupported('android')).toBe(true);
     expect(pushSupported('web')).toBe(false);
   });
 });
@@ -105,6 +107,8 @@ describe('startPush', () => {
     expect(asked.calls).toEqual(['addListener:registration', 'addListener:registrationError', 'checkPermissions', 'requestPermissions', 'register']);
     expect(control.permission).toBe('granted');
 
+    // A separate install: it has not asked yet.
+    localStorage.removeItem(PUSH_ASKED_KEY);
     const denied = fakePlugin('prompt-with-rationale', 'denied');
     const deniedControl = startPush({ directory: fakeDirectory().directory, platform: 'ios', plugin: denied.plugin, keys, log: () => {} });
     await settle();
@@ -247,5 +251,125 @@ describe('startPush', () => {
     directory.set('online');
     await settle();
     expect(sent).toEqual([]);
+  });
+});
+
+describe('startPush on Android (PAN-4840)', () => {
+  const firebase = (configured: boolean) => ({ status: vi.fn(async () => ({ configured })) });
+
+  it('never asks or registers without a Firebase config, and reports unavailable', async () => {
+    const fake = fakePlugin('prompt');
+    const { directory, sent } = fakeDirectory('online');
+    const push = startPush({ directory, platform: 'android', plugin: fake.plugin, keys, overdeckPush: firebase(false), log: () => {} });
+    await settle();
+    expect(push.permission).toBe('unavailable');
+    expect(fake.plugin.checkPermissions).not.toHaveBeenCalled();
+    expect(fake.plugin.register).not.toHaveBeenCalled();
+    expect(sent).toEqual([]);
+    expect(keys.pushEnvironment).not.toHaveBeenCalled();
+  });
+
+  it('asks on first start after sign-in, registers when granted and sends the FCM token without apsEnvironment', async () => {
+    const fake = fakePlugin('prompt', 'granted');
+    const { directory, sent } = fakeDirectory('online');
+    const push = startPush({ directory, platform: 'android', plugin: fake.plugin, keys, overdeckPush: firebase(true), log: () => {} });
+    await settle();
+    expect(fake.plugin.requestPermissions).toHaveBeenCalledTimes(1);
+    expect(fake.plugin.register).toHaveBeenCalledTimes(1);
+    expect(push.permission).toBe('granted');
+    fake.emit('registration', { value: TOKEN });
+    await settle();
+    expect(sent).toEqual([{ type: 'push-register', platform: 'android', token: TOKEN }]);
+  });
+
+  it('asks on its own only once per sign-in; a dismissed dialog does not return on the next start', async () => {
+    const first = fakePlugin('prompt', 'prompt');
+    startPush({ directory: fakeDirectory('online').directory, platform: 'android', plugin: first.plugin, keys, overdeckPush: firebase(true), log: () => {} });
+    await settle();
+    expect(first.plugin.requestPermissions).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem(PUSH_ASKED_KEY)).toBe('1');
+
+    // The next page load (a machine switch reloads the page) still sees `prompt`.
+    const second = fakePlugin('prompt', 'prompt');
+    const push = startPush({ directory: fakeDirectory('online').directory, platform: 'android', plugin: second.plugin, keys, overdeckPush: firebase(true), log: () => {} });
+    await settle();
+    expect(second.plugin.requestPermissions).not.toHaveBeenCalled();
+    expect(push.permission).toBe('prompt');
+
+    // The Notifications switch always asks.
+    await push.enable();
+    expect(second.plugin.requestPermissions).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not register when Android says denied', async () => {
+    const fake = fakePlugin('prompt', 'denied');
+    const { directory } = fakeDirectory('online');
+    const push = startPush({ directory, platform: 'android', plugin: fake.plugin, keys, overdeckPush: firebase(true), log: () => {} });
+    await settle();
+    expect(fake.plugin.requestPermissions).toHaveBeenCalledTimes(1);
+    expect(fake.plugin.register).not.toHaveBeenCalled();
+    expect(push.permission).toBe('denied');
+  });
+
+  it('sends one push-register per change into online and one per new token', async () => {
+    const fake = fakePlugin();
+    const { directory, sent } = fakeDirectory('connecting');
+    startPush({ directory, platform: 'android', plugin: fake.plugin, keys, overdeckPush: firebase(true), log: () => {} });
+    await settle();
+    fake.emit('registration', { value: TOKEN });
+    await settle();
+    expect(sent).toEqual([]);
+
+    const frame = { type: 'push-register', platform: 'android', token: TOKEN };
+    directory.set('online');
+    await settle();
+    expect(sent).toEqual([frame]);
+
+    // A machine-list update repeats the unchanged state.
+    directory.set('online');
+    await settle();
+    expect(sent).toHaveLength(1);
+
+    directory.set('connecting');
+    directory.set('online');
+    await settle();
+    expect(sent).toEqual([frame, frame]);
+
+    const next = 'f9e8d7c6'.repeat(8);
+    fake.emit('registration', { value: next });
+    await settle();
+    expect(sent).toEqual([frame, frame, { type: 'push-register', platform: 'android', token: next }]);
+  });
+
+  it('treats a failing status call as unavailable', async () => {
+    const fake = fakePlugin();
+    const { directory } = fakeDirectory('online');
+    const overdeckPush = { status: vi.fn(async () => Promise.reject(new Error('not implemented'))) };
+    const push = startPush({ directory, platform: 'android', plugin: fake.plugin, keys, overdeckPush, log: () => {} });
+    await settle();
+    expect(push.permission).toBe('unavailable');
+    expect(fake.plugin.register).not.toHaveBeenCalled();
+  });
+});
+
+describe('unregisterPush (PAN-4840 FR-10)', () => {
+  const unregisterPlugin = () => ({ unregister: vi.fn(async () => undefined) });
+
+  it('deletes the FCM token on a configured Android build', async () => {
+    const plugin = unregisterPlugin();
+    await unregisterPush('android', { plugin, overdeckPush: { status: async () => ({ configured: true }) } });
+    expect(plugin.unregister).toHaveBeenCalledTimes(1);
+  });
+
+  it('does nothing on iOS or without a Firebase config', async () => {
+    const plugin = unregisterPlugin();
+    await unregisterPush('ios', { plugin, overdeckPush: { status: async () => ({ configured: true }) } });
+    await unregisterPush('android', { plugin, overdeckPush: { status: async () => ({ configured: false }) } });
+    expect(plugin.unregister).not.toHaveBeenCalled();
+  });
+
+  it('swallows an unregister failure', async () => {
+    const plugin = { unregister: vi.fn(async () => Promise.reject(new Error('no token'))) };
+    await expect(unregisterPush('android', { plugin, overdeckPush: { status: async () => ({ configured: true }) } })).resolves.toBeUndefined();
   });
 });

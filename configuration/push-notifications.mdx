@@ -192,6 +192,34 @@ else: no titles, no conversation text, no machine names.
 - iOS ends a Live Activity after at most 8 hours. The card comes back the next
   time you open the app.
 
+### On Android
+
+- **Permission.** On Android 13 and later, the app asks for notification
+  permission once, on the first launch after you sign in. If you decline or
+  dismiss the dialog, the app still works; it just does not notify you.
+- **Channels.** Notifications arrive on two channels. **Needs you** carries
+  questions, approvals and failures, at high importance. **Updates** carries
+  finished work, summaries and test notifications, at default importance. You
+  can change each one in Android Settings.
+- **Encryption.** The phone opens each notification with its own key, so Google
+  cannot read its content. Firebase Cloud Messaging still sees delivery
+  metadata, such as this phone's registration token, the message priority and
+  when it was sent.
+- **When a notification cannot be opened**, the phone shows
+  "Overdeck — Something needs you" instead.
+- **Tapping a notification** opens the machine and the screen it came from. A
+  notification from a machine this phone is no longer paired with opens the
+  machine list. A notification tapped while signed out waits until you sign in.
+  Sign-out removes this phone's pairings, so it then opens the machine list
+  unless you have paired that machine again.
+- **Force stop** in Android Settings blocks notifications until you open the app
+  again. Swiping the app away does not.
+- **Turning them back on.** The app's Settings screen has a **Notifications**
+  switch. Turning it on asks Android again when Android still allows it. When
+  you blocked notifications, Settings says "Off. Turn them on in Android
+  Settings → Apps → Overdeck → Notifications." Open that screen to allow them.
+  A build without a Firebase configuration says "Not set up in this build."
+
 ## Optional: ntfy
 
 [ntfy](https://ntfy.sh) is a simple publish-subscribe notification service.

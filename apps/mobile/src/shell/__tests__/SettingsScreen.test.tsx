@@ -11,6 +11,7 @@ function notificationsSetting(overrides: Partial<NotificationsSetting> = {}): No
   return {
     enabled: true,
     permission: 'granted',
+    platform: 'ios',
     onChange: vi.fn(),
     prefs: { v: 1, pause: null, muted: [] },
     onPause: vi.fn(),
@@ -93,6 +94,18 @@ describe('SettingsScreen notifications (PAN-4838 WI-9)', () => {
     expect(
       screen.getByText('Notifications are off for Overdeck in iOS Settings. Open Settings → Notifications → Overdeck to turn them on.'),
     ).toBeTruthy();
+  });
+});
+
+describe('SettingsScreen notifications on Android (PAN-4840 FR-9)', () => {
+  it('says where to turn notifications on in Android Settings when permission is denied', () => {
+    renderSettings(notificationsSetting({ permission: 'denied', platform: 'android' }));
+    expect(screen.getByText('Off. Turn them on in Android Settings → Apps → Overdeck → Notifications.')).toBeTruthy();
+  });
+
+  it('says the build has no push set up when Firebase is missing', () => {
+    renderSettings(notificationsSetting({ permission: 'unavailable', platform: 'android' }));
+    expect(screen.getByText('Not set up in this build.')).toBeTruthy();
   });
 });
 

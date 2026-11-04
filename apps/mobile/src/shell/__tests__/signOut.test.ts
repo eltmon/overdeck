@@ -37,6 +37,9 @@ function deps(calls: string[], overrides: Partial<SignOutDeps> = {}): SignOutDep
     deleteDevice: async (account) => {
       calls.push(`DELETE /v1/devices/${account.deviceId}`);
     },
+    unregisterPush: async () => {
+      calls.push('push token');
+    },
     resetKeys: async () => {
       calls.push('reset');
     },
@@ -66,6 +69,7 @@ describe('signOut', () => {
     expect(calls).toEqual([
       'phones/self desk',
       'phones/self laptop',
+      'push token',
       'push-unregister',
       'forget-client',
       'DELETE /v1/devices/dev-1',
@@ -79,6 +83,8 @@ describe('signOut', () => {
     const calls: string[] = [];
     await signOut(
       deps(calls, {
+        // iOS: no FCM token step.
+        unregisterPush: undefined,
         endLiveActivity: async () => {
           calls.push('end live activity');
         },
@@ -125,6 +131,7 @@ describe('signOut', () => {
     expect(log).toHaveBeenCalledWith('remove from desk', expect.any(Error));
     expect(calls.slice(1)).toEqual([
       'phones/self laptop',
+      'push token',
       'push-unregister',
       'forget-client',
       'DELETE /v1/devices/dev-1',
@@ -141,6 +148,27 @@ describe('signOut', () => {
     expect(directory.send).not.toHaveBeenCalled();
     expect(calls).not.toContain('push-unregister');
     expect(calls).toContain('reset');
+  });
+
+  it('deletes the push token even when the directory is not online', async () => {
+    const calls: string[] = [];
+    await signOut(deps(calls, { directory: { state: 'connecting', send: () => false } }));
+    expect(calls).toContain('push token');
+  });
+
+  it('keeps going when deleting the push token fails', async () => {
+    const calls: string[] = [];
+    const log = vi.fn();
+    await signOut(deps(calls, { log, unregisterPush: async () => Promise.reject(new Error('no firebase')) }));
+    expect(log).toHaveBeenCalledWith('push token', expect.any(Error));
+    expect(calls.slice(2)).toEqual([
+      'push-unregister',
+      'forget-client',
+      'DELETE /v1/devices/dev-1',
+      'reset',
+      'localStorage.clear',
+      'reload',
+    ]);
   });
 
   it('keeps going when a step throws', async () => {

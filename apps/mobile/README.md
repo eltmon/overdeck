@@ -15,7 +15,7 @@ Design: [PAN-4837 PRD](../../.pan/drafts/PAN-4837.md) (this app) and the epic
 | `src/main.tsx` | Entry. Sets `__OVERDECK_NATIVE__`, installs the channel shims, then loads the shell (D-3). |
 | `src/shell/` | The app's own screens and logic: sign-in (`signIn.ts`), the directory and dial policy (`directory.ts`, `connection.ts`, `relayMeter.ts`), pairing (`pairing.ts`), the machine list, pair, settings, removed-machine and machine views, sign-out, the foreground resume path (`lifecycle.ts`), and the System/Light/Dark appearance setting and controller (`appearance.ts`, PAN-5041). |
 | `src/native/` | The `OverdeckKeys` plugin bridge (`keys.ts`), its `localStorage` stand-in for a desktop browser (`keys-web.ts`), push registration (`push.ts`), the `OverdeckLiveActivity` bridge (`liveActivity.ts`, PAN-4839), and the `OverdeckAppearance` bridge (`appearance.ts`, PAN-5041). |
-| `android/` | The Capacitor Android project. App code is in `app/src/main/java/ai/overdeck/app/` (`OverdeckKeysPlugin`, `SecureStore`, `OverdeckAppearancePlugin`). |
+| `android/` | The Capacitor Android project. App code is in `app/src/main/java/ai/overdeck/app/` (`OverdeckKeysPlugin`, `SecureStore`, `OverdeckAppearancePlugin`, and the push path: `OverdeckMessagingService`, `PushHandler`, `PushNotice`, `PushNotifier`, `SealedBox`, `OverdeckPushPlugin`). |
 | `ios/` | The Capacitor iOS project (Swift Package Manager). App code is in `ios/App/App/` (`OverdeckKeysPlugin.swift`, `OverdeckLiveActivityPlugin.swift`, `OverdeckAppearancePlugin.swift`, `MainViewController.swift`, `App.entitlements`). |
 | `ios/OverdeckPush/` | A local Swift package used by the app and the extension: it opens the sealed push payload (swift-sodium), rewrites the notification content, and holds the Keychain code (`KeychainStore`, `PushKeys`). Tests: `swift test` on the rig. |
 | `ios/App/NotificationService/` | The Notification Service Extension (`ai.overdeck.app.NotificationService`). It decrypts each needs-you notification before iOS shows it. |
@@ -131,7 +131,8 @@ These are read at build time.
 
 ## Keys and secrets
 
-`OverdeckKeys` is the only native code on both platforms. It has a Swift version and a Java version.
+`OverdeckKeys` holds every key and secret. It has a Swift version and a Java version. Android also
+has the push path (see "Push notifications (Android)").
 iOS also has the Live Activity plugin and widget extension (PAN-4839). The widget extension needs its
 own App ID, `ai.overdeck.app.widgets`, registered in checklist step A1 of `RELEASE.md`.
 
@@ -184,8 +185,34 @@ own App ID, `ai.overdeck.app.widgets`, registered in checklist step A1 of `RELEA
   also from a cold launch. A machine that is not paired opens the machine list. Only same-origin
   `/m` paths are followed. The cold-launch tap is not yet verified on a device; it is first
   checked on the PAN-4841 TestFlight install (`ACCEPTANCE.md`, "PAN-4838 iOS notifications").
-- **Android:** push is gated to iOS (`pushSupported()`). Android needs Firebase first, which is
-  PAN-4840.
+- **Android:** see "Push notifications (Android)" below.
+
+## Push notifications (Android)
+
+The machine seals each notification to the phone's push key, and the directory forwards it to FCM
+as a data-only message `{ "s": "<sealed>" }`. Android does not display a data-only message; it
+wakes `OverdeckMessagingService`, also when the app is closed (not after Force stop). The service
+reads the push key pair from `SecureStore`, opens the payload with `crypto_box_seal_open`
+(`SealedBox`), validates it (`PushNotice`), and posts it on the `needs-you` or `updates` channel
+(`PushNotifier`). A payload that does not open posts the placeholder "Overdeck — Something needs
+you"; a push after sign-out posts nothing. A tap opens `ai.overdeck.app:/open#v=1&e=&p=&t=`, which
+`src/shell/notificationLink.ts` turns into the machine and its `/m` screen.
+
+- **One messaging service.** `@capacitor/push-notifications` supplies the permission prompt and the
+  FCM token, but its own `MessagingService` only forwards messages to JavaScript and cannot post
+  while the app is closed. The manifest removes it with `tools:node="remove"`, and
+  `OverdeckMessagingService` passes new tokens to the plugin (`PushNotificationsPlugin.onNewToken`).
+- **`google-services.json`.** The google-services Gradle plugin applies only when
+  `android/app/google-services.json` exists. Without it the app builds and runs, and Settings shows
+  "Not set up in this build": `OverdeckPush.status()` reports no Firebase app, so JavaScript never
+  calls the plugin's `register()`, which would crash.
+- **Registration.** `src/native/push.ts` sends `push-register { platform: 'android', token }` each
+  time the directory socket comes online and whenever the token changes. Sign-out deletes the token.
+- **Fixture.** `node tests/fixtures/phone-push/generate.mjs` (from the repo root) regenerates
+  `tests/fixtures/phone-push/sealed-question.json` (beside the iOS `sealed-push.json`), a payload
+  sealed by `sodium-native`. `SealedBoxTest` opens it with `lazysodium-java`.
+- **JVM tests.** `cd apps/mobile/android && ./gradlew testDebugUnitTest` runs `SealedBoxTest` (plain
+  JUnit) and `PushNoticeTest` and `PushHandlerTest` (Robolectric).
 
 ## Appearance
 
@@ -208,7 +235,7 @@ cd apps/mobile/android && ./gradlew testDebugUnitTest assembleDebug
 ```
 
 The root `npm test` does not run these tests. The CI job `mobile-android` runs the app tests, the
-web build, the Capacitor sync and `assembleDebug`, and uploads the `app-debug` APK. The `test`
+web build, the Capacitor sync, `testDebugUnitTest` and `assembleDebug`, and uploads the `app-debug` APK. The `test`
 check requires it.
 
 ## Release
@@ -219,7 +246,6 @@ iOS builds are archived and uploaded on the Mac rig.
 
 ## What it cannot do yet
 
-- Push notifications on Android: PAN-4840.
 - App Store review (beyond TestFlight) needs in-app account deletion.
 - Reaching machines that are linked through the paired one: PAN-4887.
 - Admin-only actions such as settings, the model picker, archive, share and voice. The phone token

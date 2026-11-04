@@ -1,0 +1,220 @@
+{
+  "version": "1",
+  "issueId": "PAN-4840",
+  "created": "2026-11-03T20:58:06.302Z",
+  "updated": "2026-11-04T19:38:23.864Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-04T19:13Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-11-04T19:13:30.276Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-04T19:32:58.251Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-04T19:38Z] coderabbit → FINDINGS — seq 2",
+      "timestamp": "2026-11-04T19:38:23.863Z"
+    }
+  ],
+  "items": {
+    "fixture": {
+      "status": "completed",
+      "doneAt": "2026-11-03T20:58:06.302Z"
+    },
+    "push-handler": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4840",
+      "claimedAt": "2026-11-03T20:58:12.998Z",
+      "doneAt": "2026-11-03T21:05:15.828Z"
+    },
+    "messaging-service": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4840",
+      "claimedAt": "2026-11-03T21:05:31.119Z",
+      "doneAt": "2026-11-03T21:07:20.038Z"
+    },
+    "push-status-plugin": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4840",
+      "claimedAt": "2026-11-03T21:07:24.771Z",
+      "doneAt": "2026-11-03T21:08:02.557Z"
+    },
+    "ci-android-unit-tests": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4840",
+      "claimedAt": "2026-11-03T21:08:08.184Z",
+      "doneAt": "2026-11-03T21:08:41.270Z"
+    },
+    "js-push-registration": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4840",
+      "claimedAt": "2026-11-03T21:08:42.882Z",
+      "doneAt": "2026-11-03T21:11:08.184Z"
+    },
+    "notification-tap-routing": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4840",
+      "claimedAt": "2026-11-03T21:11:12.896Z",
+      "doneAt": "2026-11-03T21:13:01.904Z"
+    },
+    "settings-notifications-row": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4840",
+      "claimedAt": "2026-11-03T21:13:07.081Z",
+      "doneAt": "2026-11-03T21:14:07.189Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4840",
+      "claimedAt": "2026-11-03T21:14:17.694Z",
+      "doneAt": "2026-11-03T21:15:04.896Z"
+    },
+    "device-acceptance": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4840",
+      "claimedAt": "2026-11-04T18:32:20.194Z",
+      "doneAt": "2026-11-04T18:32:37.109Z"
+    },
+    "fixture.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:50:31.806Z"
+    },
+    "fixture.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:50:46.761Z"
+    },
+    "push-handler.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:51:01.611Z"
+    },
+    "push-handler.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:51:16.320Z"
+    },
+    "push-handler.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:51:30.916Z"
+    },
+    "push-handler.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:51:45.640Z"
+    },
+    "messaging-service.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:52:00.253Z"
+    },
+    "messaging-service.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:52:17.105Z"
+    },
+    "messaging-service.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:52:31.546Z"
+    },
+    "push-status-plugin.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:52:46.593Z"
+    },
+    "push-status-plugin.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:53:01.458Z"
+    },
+    "js-push-registration.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:53:15.437Z"
+    },
+    "js-push-registration.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:53:29.786Z"
+    },
+    "js-push-registration.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:53:44.316Z"
+    },
+    "js-push-registration.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:53:58.522Z"
+    },
+    "notification-tap-routing.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:54:13.008Z"
+    },
+    "notification-tap-routing.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:54:27.563Z"
+    },
+    "notification-tap-routing.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:54:42.465Z"
+    },
+    "settings-notifications-row.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:54:58.289Z"
+    },
+    "ci-android-unit-tests.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:55:15.987Z"
+    },
+    "device-acceptance.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:55:33.304Z"
+    },
+    "device-acceptance.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:55:50.467Z"
+    },
+    "device-acceptance.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:56:07.161Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:56:24.005Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:56:40.684Z"
+    },
+    "messaging-service.ac1": {
+      "status": "cancelled"
+    },
+    "js-push-registration.ac4": {
+      "status": "cancelled"
+    },
+    "settings-notifications-row.ac2": {
+      "status": "cancelled"
+    },
+    "ci-android-unit-tests.ac2": {
+      "status": "cancelled"
+    },
+    "device-acceptance.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:30:30.652Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-11-04T19:13:30Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-4840\n\n# Review — PAN-4840\n## Verdict: CHANGES REQUESTED — a warm notification tap after a cold notification launch reloads into the older notification's screen (FR-6)\n\n## Context\n- Run ID: agent-pan-4840-review-83a2a949\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4840/.pan/review/agent-pan-4840-review-83a2a949/context.json\n- Branch / workspace: feature/pan-4840 / /home/eltmon/Projects/overdeck/workspaces/feature-pan-4840\n- PR: https://github.com/eltmon/overdeck/pull/5051\n- HEAD reviewed: 83a2a949fbcf35feb234d0dd9198376757540640\n- Base / prior cycle SHA: merge-base 270251d5f772e4d3d82dce46dbf9a87d43ca1bd5 (origin/main, PAN-5041); no prior review cycle\n- Spec: `.pan/drafts/PAN-4840.md` (FR-1..FR-11, NFR-1..NFR-6, AC-1..AC-10). The manifest's `acceptanceCriteria` list was empty, so the PRD's AC section and the xBRIEF item ACs were used.\n\n## Blocking Findings\n\n### [correctness] Warm notification tap is followed by a replay of the cold-launch notification — `apps/mobile/src/shell/ShellApp.tsx:129`\n- Severity: ! (MUST)\n- Classification / requirement scope: implementation defect; in_pr_scope. The PR routes the new notification link through the pre-existing single-slot `takeLaunchUrl` guard. The guard cannot hold both the process's cold-launch URL and a later warm URL.\n- Trigger and changed-code connection:\n  1. The user taps notification A while the app is closed. `MainActivity` starts with intent data A. Capacitor sets `Bridge.intentUri` once, at bridge creation (`node_modules/.bun/@capacitor+android@8.6.0/.../com/getcapacitor/Bridge.java`, line 229: `this.intentUri = intent.getData();`). `Bridge.onNewIntent` (line 1312) never updates it, and `AppPlugin.getLaunchUrl()` returns `bridge.getIntentUri()`. So `App.getLaunchUrl()` answers A for the life of the process.\n  2. Boot (`ShellApp.tsx`, line 129) calls `takeLaunchUrl(A)` and stores A, then `handleUrl(A)` navigates to A's path, which reloads the page. The reload skips A. This part is correct.\n  3. The user backgrounds the app and taps notification B. The `appUrlOpen` listener (line 138) calls `takeLaunchUrl(B)`, which overwrites the slot with B, and navigates to B's path. The page reloads.\n  4. On that reload, boot calls `getLaunchUrl()` and gets A again. The slot holds B, so `takeLaunchUrl(A)` returns true, and `handleUrl(A)` sets `pendingOpen` for A. The effect at line 156 calls `navigate(A.path)`. The user leaves B's screen and lands on A's screen. One more reload stores A and stops, so there is no loop, only a one-time misroute.\n- Expected / observed / impact: FR-6 says a tap opens the paired machine `e` at path `p`, and AC-6 says the valid link opens `/m?…` once. Observed: a cold tap on question 1, then a warm tap on question 2, ends on question 1's screen (it may already be answered), or on another machine if A and B came from different machines. Cold tap, background, next tap is the main notification journey, so this is a demonstrated user-visible failure of an explicit in-scope FR. A warm pair link after a cold notification launch has the same root cause, because pairing navigates and reloads; that is not counted as a second finding.\n- Evidence:\n  - Static trace above (Capacitor 8.6.0 source in this workspace's `node_modules`).\n  - Runtime reproduction with the real `ShellApp` and the existing `ShellApp.test.tsx` harness (cold `launchUrl` = A, remount to simulate each reload, warm `appUrlOpen` = B). `navigate` calls: after A's reload `[\"/m?subject=a\"]`; after the warm tap `[\"/m?subject=a\"],[\"/m?subject=b\"]`; after B's reload `[\"/m?subject=a\"],[\"/m?subject=b\"],[\"/m?subject=a\"]`. The last call is the misroute.\n  - Why the device run did not show it: in `apps/mobile/ACCEPTANCE.md` rows 5a and 5b the cold link and the warm link point to the same conversation (`/m?subject=20261104-8903`, different `t`). The replay landed on the same screen and looked like a no-op. Row 5c started from a manual launch with no launch URL. Row 5b's statement that \"the guard skipped both\" replays of the cold link conflicts with the code: the first replay after the warm tap is handled, not skipped. The row does confirm the sticky half of the mechanism (\"`getLaunchUrl()` returned the older cold-launch link\").\n  - Limitation: not reproduced on the emulator with two different subjects. The Capacitor source and the component-level run together are conclusive for the JS path.\n- Fix: remember the process's cold-launch URL apart from later warm URLs. For example, write the `getLaunchUrl()` answer to its own session key the first time it is handled, and skip it on later boots whatever warm URLs arrive. Warm `appUrlOpen` URLs keep using the existing slot (iOS still needs that, per the comment at `ShellApp.tsx`, line 134). A bounded set of handled URLs in `sessionStorage` would also work. Add a `ShellApp.test.tsx` case: cold A, warm B, remount, and assert that `navigate` was called exactly twice and last with B's path. Correct ACCEPTANCE.md row 5b when it is re-run with two different subjects.\n\n## Non-blocking Findings\n\n- **~ [requirements/docs] The docs describe a Settings \"Turn on\" button that does not exist** — `configuration/push-notifications.mdx`, \"On Android\", last bullet: \"`On`, `Off`, `Not set up in this build`, or a **Turn on** button when Android can still ask.\" The merged design reuses main's Notifications switch plus a hint (`SettingsScreen.tsx`, `notificationsHint`), and the author cancelled `settings-notifications-row.ac2` as superseded. Fix: describe the switch and the three hint texts the code renders (`Off. Turn them on in Android Settings → Apps → Overdeck → Notifications.` and `Not set up in this build.`).\n- **Spec defect, AC met in substance: AC-3 \"exactly one MESSAGING_EVENT service\".** Firebase's own fallback `FirebaseMessagingService` (priority -500) always stays in the merged manifest. The author cancelled `messaging-service.ac1` for that reason. The plugin's `MessagingService` is removed (`tools:node=\"remove\"`, asserted in `native-config.test.ts`). The app-closed `OverdeckPush: POSTED` log in ACCEPTANCE row 3a proves that our service receives the message. The PRD's AC-3 wording should be corrected; no code change is needed.\n- **? [requirements] A notification link before sign-in waits for sign-in.** FR-6 says such a link opens the machine list. The code parks it in `pendingOpen` and routes it after sign-in, the same way `pendingPairLink` works; an unpaired machine still falls back to the list. This is arguably better; note it as a spec deviation.\n- **? [UX] The Android permission re-prompt runs on every page reload while the state is `prompt`.** `startPush` runs on every `ShellApp` mount, and every machine switch is a full reload. If the user dismisses the Android 13+ dialog without choosing, the app asks again on each reload until Android stops offering it. FR-7 says \"on the first launch after sign-in\". The behaviour is shared with iOS, where the OS asks only once. A device check after a dismissal would establish the impact.\n- **? [robustness] Two exception paths in the service are uncaught.** `SecureStore.get` can throw an unchecked `IllegalArgumentException` from `Base64.decode` on corrupted preferences. A stored key of valid hex but the wrong length reaches `cryptoBoxSealOpen` unchecked. Both values are written only by `OverdeckKeysPlugin.ensureKeys`, so neither is attacker-controlled or reachable today. Catch `RuntimeException` in the key source and check the key lengths (32 bytes each) to make the placeholder path total.\n- **Pre-existing (documented by the author):** in debug builds, Capacitor's bridge logging writes plugin return values to logcat, including the FCM token and the account token. Release builds do not log the bridge. This PR does not introduce it, and `OverdeckMessagingService` logs only the outcome name (NFR-1 met for new code).\n- **Process note:** the PRD named the cold-launch replay as checkpoint CP-3 and accepted \"the guard prevents a loop\" as the fallback. The guard prevents a loop, but not this single misroute; see the blocker.\n\n## Coverage\n\n### Changed-file ledger\n| File | Status |\n| --- | --- |\n| apps/mobile/src/shell/ShellApp.tsx | reviewed (blocker) |\n| apps/mobile/src/shell/notificationLink.ts | reviewed: prefix, `v`, UUID `e`, required `t`, same-origin `/m` check via `new URL`; traversal, `//host` and absolute URLs rejected |\n| apps/mobile/src/shell/SettingsScreen.tsx | reviewed: `notificationsHint`, platform prop |\n| apps/mobile/src/shell/signOut.ts | reviewed: `push token` step before `push-unregister`, regardless of directory state, failure isolated |\n| apps/mobile/src/native/push.ts | reviewed: `configured` gate before `checkPermissions`/`register` (NFR-2), Android frame without `apsEnvironment`, `unregisterPush` |\n| apps/mobile/android/.../OverdeckMessagingService.java | reviewed |\n| apps/mobile/android/.../PushHandler.java | reviewed: outcome order matches FR-5 |\n| apps/mobile/android/.../PushNotice.java | reviewed: validation, channel map matches `webPushUrgency`, `URLEncoder.encode(String,String)` (NFR-3) |\n| apps/mobile/android/.../PushNotifier.java | reviewed: SDK 26 guard, immutable PendingIntent, explicit `MainActivity` component, tag + id 1, `SecurityException` caught |\n| apps/mobile/android/.../SealedBox.java | reviewed |\n| apps/mobile/android/.../OverdeckPushPlugin.java | reviewed |\n| apps/mobile/android/.../Hex.java, OverdeckKeysPlugin.java, MainActivity.java | reviewed |\n| apps/mobile/android/app/src/main/AndroidManifest.xml | reviewed: `tools` ns, remove node, non-exported service, `POST_NOTIFICATIONS` |\n| apps/mobile/android/app/build.gradle, variables.gradle | reviewed: firebase-messaging 25.0.1, test deps, fixture resource dir resolves to repo `tests/fixtures/phone-push` |\n| apps/mobile/android/app/src/main/res/drawable/ic_stat_overdeck.xml | reviewed |\n| .github/workflows/ci.yml | reviewed: `testDebugUnitTest` step in `mobile-android` |\n| tests/fixtures/phone-push/generate.mjs, sealed-question.json | reviewed |\n| apps/mobile/android/app/src/test/.../SealedBoxTest.java, HexTest.java | reviewed |\n| apps/mobile/android/app/src/test/.../PushHandlerTest.java, PushNoticeTest.java | reviewed by test names against the PRD's case list; bodies not read in full; CI ran them green |\n| apps/mobile/src/native/__tests__/push.test.ts, src/shell/__tests__/*.test.ts(x), src/__tests__/native-config.test.ts | reviewed |\n| configuration/push-notifications.mdx | reviewed (advisory: Turn on button) |\n| apps/mobile/README.md, apps/mobile/ACCEPTANCE.md | reviewed (ACCEPTANCE row 5b inaccurate, see blocker) |\n| apps/mobile/acceptance/13–18 *.png | not applicable: binary screenshot evidence |\n| .pan/drafts/PAN-4840.md, .pan/specs/…xbrief.json, .pan/continues/PAN-4840.xbrief.json | not applicable: planning artifacts (the PRD was read as the spec) |\n\n### Dimensions\n- **Correctness:** one blocker (cold/warm launch-URL replay). The decrypt, parse and post path, the token lifecycle, sign-out ordering and the Firebase-less gate are correct.\n- **Security:** the payload is opened only on the phone. The open link is validated on both sides; a third-party app could craft a deep link, but it can only reach a paired machine's same-origin `/m?…` path. The PendingIntent is immutable with an explicit component, and the service is not exported. Logging is outcome-only. No present vulnerability.\n- **Performance:** the handler does bounded work per push on FCM's worker thread (NFR-6). There are no new loops or listeners beyond the bounded set, and `startPush` cleans up on stop.\n- **Requirements/UX:** see the AC matrix below. FR-6 fails for the cold-then-warm sequence; there is a docs mismatch on FR-9.\n\n### AC-to-evidence matrix\n| AC | Status | Evidence |\n| --- | --- | --- |\n| AC-1 fixture | met | `sealed-question.json` (64-hex keys, payload, sealed, tampered); `generate.mjs` writes it |\n| AC-2 JVM tests | met | CI `mobile-android` \"Android unit tests\" step: `:app:testDebugUnitTest`, BUILD SUCCESSFUL on HEAD |\n| AC-3 manifest | met in substance; spec wording wrong | plugin service removed, ours bound; Firebase fallback service remains (spec defect) |\n| AC-4 plugin registered | met | `MainActivity.registerPlugin(OverdeckPushPlugin.class)`; assembleDebug green on CI |\n| AC-5 JS registration | met (merged `startPush` design) | `push.test.ts` Android cases; `signOut.test.ts` order |\n| AC-6 tap routing | **unmet** for cold-then-warm taps | blocker above; single-tap cases met by `notificationLink.test.ts` and `ShellApp.test.tsx` |\n| AC-7 settings states | partially met (row replaced by main's switch, by design) | `SettingsScreen.test.tsx` Android denied and unavailable texts; no Turn on button (docs advisory) |\n| AC-8 CI runs unit tests | met | CI job log for run 41893082190 |\n| AC-9 device AC-13 | met for cold tap; warm tap routed but unverified for distinct notifications | ACCEPTANCE rows 3a, 3b, 4, 5a; 5b/5c do not exercise distinct cold and warm links |\n| AC-10 docs | met with one inaccuracy | \"On Android\" subsection, README section; Turn on button text |\n\n## Verification\n- CI run 41893082190 on HEAD 83a2a949: `mobile-android` **pass** (215 app Vitest tests, `./gradlew testDebugUnitTest` BUILD SUCCESSFUL, `assembleDebug`). `lint-group (core/state/skills)`, `integrations`, clean install + smoke **pass**. `test-shard (1–4/4)`, `test-e2e`, `build (22)` and `lint-group (effect)` were **pending** when reviewed, so they are unverified, not green. `overdeck/test` (verification gate: typecheck + lint) passed.\n- `npm run lint:effect-diagnostics`: not applicable. `apps/mobile` is in no diagnostic lane (`scripts/lint-effect-diagnostics.sh` lanes: root, dashboard-server, contracts, effect-acp), and the changed TS imports no Effect.\n- Probe: `npx vitest run` on a throwaway test built from the `ShellApp.test.tsx` harness reproduced the a → b → a navigate sequence. I created the file temporarily under `apps/mobile/src/shell/__tests__/` because Vitest's include globs do not reach the scratchpad, then deleted it. `git status` is clean. Results were written to the session scratchpad (`probe.txt`).\n- Full test suite not run (per role).\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4840/.pan/review/agent-pan-4840-review-83a2a949/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-4840 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 2,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-04T19:38:23Z",
+      "markdownBody": "# CodeRabbit findings for PAN-4840 (PR #5051)\n\nCodeRabbit posted 3 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4472397512 · apps/mobile/src/shell/ShellApp.tsx:79 [Minor]: Pin the first handled URL so eviction cannot re-enable the cold-link replay.\n  https://github.com/eltmon/overdeck/pull/5051#discussion_r4472397512\n- Thread 4472397567 · configuration/push-notifications.mdx:205 [Minor]: Qualify the Google privacy claim.\n  https://github.com/eltmon/overdeck/pull/5051#discussion_r4472397567\n- Thread 4472397580 · configuration/push-notifications.mdx:211 [Minor]: Describe the unpaired outcome after sign-out.\n  https://github.com/eltmon/overdeck/pull/5051#discussion_r4472397580\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5051/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-4840`.\n   If you only replied, you are done.\n5. If PR #5051 has already merged when you read this, nothing more lands on it: open a follow-up issue\n   for the findings you agree with instead of pushing."
+    }
+  ],
+  "agentModel": "claude-opus-5-5"
+}

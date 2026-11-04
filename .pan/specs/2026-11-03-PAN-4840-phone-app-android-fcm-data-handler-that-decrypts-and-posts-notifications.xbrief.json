@@ -1,0 +1,836 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-03T20:46:37Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4840: Phone app (Android): FCM data handler that decrypts and posts notifications",
+    "updated": "2026-11-03T20:57:06.476Z"
+  },
+  "plan": {
+    "id": "pan-4840",
+    "title": "Phone app (Android): FCM data handler that decrypts and posts notifications",
+    "status": "running",
+    "uid": "abc3a9a5-dad0-41ae-9e12-e1ffa22200ef",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-03T20:46:37Z",
+    "updated": "2026-11-03T20:57:06.476Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4840",
+        "label": "PAN-4840",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4823",
+        "label": "PAN-4823 epic (W-AND1, AC-13)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4840.md",
+        "label": "PRD",
+        "type": "document"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4841",
+        "label": "PAN-4841 Firebase/FCM setup (prerequisite for device-acceptance)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4838",
+        "label": "PAN-4838 iOS sibling (shares push.ts and the fixture)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "phone-app",
+      "android",
+      "fcm",
+      "push",
+      "anywhere",
+      "capacitor"
+    ],
+    "metadata": {
+      "sizeJustification": "One end-to-end Android feature inside apps/mobile: the FCM service, its decrypt-and-post handler, the JS registration that feeds it a token, and the tap routing that consumes its link are one user-visible behaviour (epic AC-13) and cannot be accepted separately. The file count is high because Java keeps one class per file and the Capacitor sync regenerates two Gradle files; subsystems stay at five (apps/mobile, tests/fixtures, bun.lock, .github/workflows, configuration).",
+      "canonicalFilename": "2026-11-03-PAN-4840-phone-app-android-fcm-data-handler-that-decrypts-and-posts-notifications.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The Overdeck phone app on Android cannot show notifications. The machine already seals each needs-you notification to the phone's push key (PAN-4843) and the directory already forwards it to FCM as a data-only message {s: <sealed>} (PAN-4830), but the app has no FirebaseMessagingService, no FCM token registration, no notification permission request and no tap routing, so nothing reaches the operator when the app is closed.",
+      "Proposal": "Add a Java OverdeckMessagingService that is the only MESSAGING_EVENT service (the @capacitor/push-notifications service is removed with tools:node=\"remove\"), opens the sealed payload with lazysodium and the Keystore-wrapped push key from SecureStore, and posts it on the needs-you or updates channel with a tap link ai.overdeck.app:/open#v=1&e=&p=&t=. Keep @capacitor/push-notifications for the permission and token; a small OverdeckPush plugin reports whether Firebase is configured so JS never calls a crashing register(). JS sends push-register on each online transition, routes the open link to the paired machine, and Settings shows the notification state. Decrypt, parse and posting are covered by JVM (JUnit + Robolectric) tests that CI runs; google-services.json and the emulator AC-13 run follow once PAN-4841 creates the Firebase project.",
+      "NonGoals": "- iOS push, the Notification Service Extension and apsEnvironment (PAN-4838)\n- The iOS Live Activity (PAN-4839)\n- Creating the Firebase project, FCM service account, directory secrets, upload keystore or store listings (PAN-4841)\n- Calling PUT /api/phones/self/push-key from Android; the push key never rotates\n- An in-app notifications on/off switch; the Android system setting is the switch\n- Suppressing the system notification while the app is in the foreground, or an in-app toast\n- Notification action buttons, grouping or summary notifications, per-machine channels, custom sounds\n- Fixing Android Force stop blocking FCM (documented only)\n- Direct-boot delivery before first unlock\n- Any change to services/connect, src/lib/push, or packages/contracts\n- Adding Kotlin to the Android project\n- Logging notification titles, bodies, tokens or keys anywhere"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Write the Android code in Java (OverdeckMessagingService.java), not Kotlin as the epic names it.",
+        "rationale": "All existing Android app code is Java and the project has no Kotlin Gradle plugin; adding a toolchain for one class is scope creep with CI risk."
+      },
+      {
+        "summary": "Keep @capacitor/push-notifications for permission and token, remove its MessagingService from the merged manifest, and forward onNewToken to PushNotificationsPlugin.onNewToken.",
+        "rationale": "Two services bound to MESSAGING_EVENT resolve arbitrarily and only ours posts when the app is closed; the plugin is still the shared JS API PAN-4838 uses on iOS."
+      },
+      {
+        "summary": "Post a placeholder ('Overdeck' / 'Something needs you') when a push cannot be opened; post nothing when the push keys are absent (signed out).",
+        "rationale": "Matches the iOS placeholder behaviour in the epic (D-5) and avoids high-priority FCM messages with no visible result; a signed-out phone has no reason to show anything."
+      },
+      {
+        "summary": "Add an OverdeckPush Android plugin whose status() reports whether a FirebaseApp exists, and call register() only when it does.",
+        "rationale": "PushNotificationsPlugin.register() calls FirebaseMessaging.getInstance() and crashes the app when google-services.json is absent, which is the state until PAN-4841 finishes."
+      },
+      {
+        "summary": "Resend push-register on every transition of the directory socket to online instead of tracking a last-sent token.",
+        "rationale": "The directory update is idempotent and resending heals a registration it cleared after a dead token; no extra state to persist."
+      },
+      {
+        "summary": "Settings shows notification state with a Turn on button when Android can still prompt, and no in-app switch.",
+        "rationale": "Epic hazard H-4 asks Settings to show how to turn notifications on; the system setting is the authoritative switch."
+      },
+      {
+        "summary": "Own the shared fixture tests/fixtures/phone-push/ here and keep src/native/push.ts platform-neutral with an iOS stub branch.",
+        "rationale": "PAN-4838 names the same paths and is planned concurrently; whichever lands second extends rather than re-creates."
+      },
+      {
+        "summary": "Gate the final device-acceptance item on PAN-4841 (healthz fcm:true and a committed google-services.json) and signal the flywheel if it is missing, instead of pulling operator console actions into this plan.",
+        "rationale": "Creating a Firebase project needs the operator's Google account; the issue body says google-services.json comes from that setup (W-REL1)."
+      },
+      {
+        "summary": "Test real crypto with lazysodium-java in plain JUnit and posting under Robolectric, with an androidTest fallback (CP-1).",
+        "rationale": "lazysodium-android ships only Android ABI natives, so a JVM test needs the desktop twin; Robolectric's ShadowNotificationManager makes posting checkable in CI without an emulator."
+      }
+    ],
+    "items": [
+      {
+        "id": "fixture",
+        "title": "Shared sodium-native sealed-payload fixture in tests/fixtures/phone-push",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T20:46:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4840",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/fixtures/phone-push/generate.mjs",
+            "tests/fixtures/phone-push/sealed-question.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node tests/fixtures/phone-push/generate.mjs",
+            "node -e \"const f=require('./tests/fixtures/phone-push/sealed-question.json'); if(!/^[0-9a-f]{64}$/.test(f.publicKeyHex)||!/^[0-9a-f]{64}$/.test(f.secretKeyHex)||!f.sealedBase64||!f.tamperedBase64) process.exit(1)\""
+          ],
+          "expected_outputs": [
+            "generate.mjs exits 0 and rewrites sealed-question.json",
+            "the shape check exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Write tests/fixtures/phone-push/generate.mjs (Node 22 ESM, sodium-native via createRequire): crypto_box_keypair, seal the exact PhonePushPayload given in the PRD with crypto_box_seal, and write sealed-question.json with publicKeyHex, secretKeyHex, payload, sealedBase64 and tamperedBase64 (last byte XOR 0x01). Run it once and commit both files. If PAN-4838 already created this folder on main, add this file beside its contents instead of replacing them."
+        },
+        "items": [
+          {
+            "id": "fixture.ac1",
+            "title": "Given the repo root, when `node tests/fixtures/phone-push/generate.mjs` runs, then it exits 0 and writes sealed-question.json containing 64-hex publicKeyHex and secretKeyHex, the payload object, sealedBase64 and tamperedBase64",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fixture.ac2",
+            "title": "Given the committed sealed-question.json, when its payload is read, then it returns kind `question`, machine `e91ffda1-431a-483d-a6e4-a72079516ea4` and url `/m?subject=pan-4840-conv`, and sealedBase64 decodes to exactly 48 bytes more than the UTF-8 JSON of that payload",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "push-handler",
+        "title": "Java decrypt, parse and post path (SealedBox, PushNotice, PushNotifier, PushHandler) with JVM tests",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T20:46:37Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4840",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/android/app/src/main/java/ai/overdeck/app/SealedBox.java",
+            "apps/mobile/android/app/src/main/java/ai/overdeck/app/PushNotice.java",
+            "apps/mobile/android/app/src/main/java/ai/overdeck/app/PushNotifier.java",
+            "apps/mobile/android/app/src/main/java/ai/overdeck/app/PushHandler.java",
+            "apps/mobile/android/app/src/main/res/drawable/ic_stat_overdeck.xml",
+            "apps/mobile/android/app/build.gradle",
+            "apps/mobile/android/app/src/test/java/ai/overdeck/app/SealedBoxTest.java",
+            "apps/mobile/android/app/src/test/java/ai/overdeck/app/PushNoticeTest.java",
+            "apps/mobile/android/app/src/test/java/ai/overdeck/app/PushHandlerTest.java"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd apps/mobile/android && JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ANDROID_HOME=$HOME/Android/Sdk ./gradlew testDebugUnitTest --tests 'ai.overdeck.app.*'"
+          ],
+          "expected_outputs": [
+            "BUILD SUCCESSFUL with SealedBoxTest, PushNoticeTest and PushHandlerTest passing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-3",
+            "NFR-4"
+          ],
+          "parallelSafeReason": "New Java files only, plus test-only additions to app/build.gradle; the messaging-service item that also edits build.gradle is ordered after it by a blocks edge."
+        },
+        "narrative": {
+          "Action": "PRD WI-2, steps 1-7, with the exact class shapes, constants, open-link format (URLEncoder.encode(s, \"UTF-8\")), channel mapping (question/approval/failed -> needs-you, else updates), notification tag `<machine>:<tag>` with id 1, placeholder rules and Gradle test dependencies (robolectric 4.15.1, lazysodium-java 5.1.0, jna 5.14.0 jar, includeAndroidResources, fixture folder on the test resources path). Only API 24-safe calls in app code (android.util.Base64, no java.time). Apply checkpoint CP-1 if lazysodium-java cannot load on the unit-test classpath."
+        },
+        "items": [
+          {
+            "id": "push-handler.ac1",
+            "title": "Given the sodium-native fixture, when SealedBoxTest runs under `./gradlew testDebugUnitTest`, then SealedBox.open returns the fixture plaintext for sealedBase64 and returns null for tamperedBase64, for a fresh key pair and for a 10-byte input",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-handler.ac2",
+            "title": "PushNoticeTest passes: question/approval/failed map to channel needs-you and finished/summary/test to updates; v=2, a non-UUID machine, an unknown kind, an empty tag and url https://evil.example/m each return null; openLink produces exactly `ai.overdeck.app:/open#v=1&e=e91ffda1-431a-483d-a6e4-a72079516ea4&p=%2Fm%3Fsubject%3Da+b%26x%3D1&t=2026-11-03T20%3A00%3A00.000Z`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-handler.ac3",
+            "title": "PushHandlerTest (Robolectric) shows a valid push posts its title and body on needs-you with content-intent data equal to the open link, and a second push with the same tag replaces the first so one notification remains",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-handler.ac4",
+            "title": "PushHandlerTest shows a failed open posts the generic `Overdeck` / `Something needs you` notification on needs-you for a high-priority message and on updates otherwise, a null key source returns SIGNED_OUT and posts nothing, and a null `s` returns NO_PAYLOAD",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "messaging-service",
+        "title": "OverdeckMessagingService owns MESSAGING_EVENT; add @capacitor/push-notifications, firebase-messaging and POST_NOTIFICATIONS",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T20:46:37Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "infra",
+          "issueLabel": "pan-4840",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "push-status-plugin",
+            "js-push-registration",
+            "device-acceptance"
+          ],
+          "files_scope": [
+            "apps/mobile/package.json",
+            "bun.lock",
+            "apps/mobile/android/variables.gradle",
+            "apps/mobile/android/app/build.gradle",
+            "apps/mobile/android/app/capacitor.build.gradle",
+            "apps/mobile/android/capacitor.settings.gradle",
+            "apps/mobile/android/app/src/main/AndroidManifest.xml",
+            "apps/mobile/android/app/src/main/java/ai/overdeck/app/OverdeckMessagingService.java",
+            "apps/mobile/android/app/src/main/java/ai/overdeck/app/OverdeckKeysPlugin.java",
+            "apps/mobile/android/app/src/main/java/ai/overdeck/app/Hex.java",
+            "apps/mobile/android/app/src/test/java/ai/overdeck/app/HexTest.java",
+            "apps/mobile/src/__tests__/native-config.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix apps/mobile test -- native-config",
+            "cd apps/mobile/android && JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ANDROID_HOME=$HOME/Android/Sdk ./gradlew testDebugUnitTest assembleDebug",
+            "grep -c 'com.google.firebase.MESSAGING_EVENT' $(find apps/mobile/android/app/build/intermediates -name AndroidManifest.xml -path '*merged_manifest*debug*' | head -1)"
+          ],
+          "expected_outputs": [
+            "native-config tests pass",
+            "BUILD SUCCESSFUL without google-services.json",
+            "the merged manifest grep prints 1 and contains ai.overdeck.app.OverdeckMessagingService but not com.capacitorjs.plugins.pushnotifications.MessagingService"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-7",
+            "NFR-2",
+            "NFR-6"
+          ],
+          "parallelSafeReason": "Runs after push-handler (blocks edge on the shared app/build.gradle); no other item touches the manifest, the Gradle variables or the Capacitor sync files."
+        },
+        "narrative": {
+          "Action": "PRD WI-3 steps 1-7. Add @capacitor/push-notifications ^8.1.2, run bun install, the mobile web build and `npm --prefix apps/mobile run cap:sync -- android`, and commit the regenerated capacitor.build.gradle / capacitor.settings.gradle and bun.lock. Set firebaseMessagingVersion = '25.0.1' in variables.gradle and add firebase-messaging to app/build.gradle. In AndroidManifest.xml add xmlns:tools, POST_NOTIFICATIONS, `<service android:name=\"com.capacitorjs.plugins.pushnotifications.MessagingService\" tools:node=\"remove\" />` and our exported=false OverdeckMessagingService with the MESSAGING_EVENT filter. Make OverdeckKeysPlugin.PUSH_PUBLIC_KEY / PUSH_SECRET_KEY package-private, add Hex.decode, write OverdeckMessagingService exactly as in the PRD (delegates to PushHandler.handle with RemoteMessage.getOriginalPriority() == PRIORITY_HIGH; onNewToken calls PushNotificationsPlugin.onNewToken). Run checkpoint CP-2 on the merged manifest."
+        },
+        "items": [
+          {
+            "id": "messaging-service.ac1",
+            "title": "Given `./gradlew assembleDebug` with no google-services.json, when it finishes, then it exits 0 and the merged debug manifest declares exactly one service for com.google.firebase.MESSAGING_EVENT, ai.overdeck.app.OverdeckMessagingService, and no com.capacitorjs.plugins.pushnotifications.MessagingService",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "messaging-service.ac2",
+            "title": "native-config.test.ts asserts the source manifest contains android.permission.POST_NOTIFICATIONS, tools:node=\"remove\" on the plugin's MessagingService, and .OverdeckMessagingService with the MESSAGING_EVENT action, and the test passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "messaging-service.ac3",
+            "title": "OverdeckMessagingService.onNewToken calls PushNotificationsPlugin.onNewToken(token) and onMessageReceived passes data key `s`, the original-priority-high flag and a SecureStore-backed key source to PushHandler.handle, logging only the Outcome name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "messaging-service.ac4",
+            "title": "HexTest shows Hex.decode(Hex.encode(bytes)) returns the same bytes and Hex.decode rejects an odd-length or non-hex string with IllegalArgumentException; after cap sync, capacitor.build.gradle includes project(':capacitor-push-notifications') and apps/mobile/package.json lists @capacitor/push-notifications",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "push-status-plugin",
+        "title": "OverdeckPush Android plugin reporting whether Firebase is configured",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T20:46:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4840",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/android/app/src/main/java/ai/overdeck/app/OverdeckPushPlugin.java",
+            "apps/mobile/android/app/src/main/java/ai/overdeck/app/MainActivity.java"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd apps/mobile/android && JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ANDROID_HOME=$HOME/Android/Sdk ./gradlew assembleDebug"
+          ],
+          "expected_outputs": [
+            "BUILD SUCCESSFUL"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-2",
+            "FR-3"
+          ],
+          "acJustification": "A one-method plugin plus one registration line; two criteria cover the behaviour and the wiring."
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Create OverdeckPushPlugin (@CapacitorPlugin(name = \"OverdeckPush\")) with load() calling PushNotifier.ensureChannels(getContext()) and status() resolving { configured: !FirebaseApp.getApps(getContext()).isEmpty() }. Register it in MainActivity.onCreate before super.onCreate, next to OverdeckKeysPlugin."
+        },
+        "items": [
+          {
+            "id": "push-status-plugin.ac1",
+            "title": "OverdeckPushPlugin.status() resolves `{ configured: false }` when no FirebaseApp exists and `{ configured: true }` when one does, computed from FirebaseApp.getApps(getContext())",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-status-plugin.ac2",
+            "title": "MainActivity.onCreate registers OverdeckPushPlugin before super.onCreate and the plugin's load() creates the needs-you and updates channels; `./gradlew assembleDebug` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "js-push-registration",
+        "title": "src/native/push.ts: permission, FCM token and push-register on each online transition; sign-out deletes the token",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T20:46:37Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4840",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/src/native/push.ts",
+            "apps/mobile/src/native/__tests__/push.test.ts",
+            "apps/mobile/src/shell/ShellApp.tsx",
+            "apps/mobile/src/shell/signOut.ts",
+            "apps/mobile/src/shell/__tests__/signOut.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix apps/mobile test -- push signOut",
+            "npm run typecheck:mobile"
+          ],
+          "expected_outputs": [
+            "push.test.ts and signOut.test.ts pass",
+            "typecheck:mobile completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "FR-10",
+            "NFR-2",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5 steps 1-4. Export OverdeckPush (registerPlugin with a web stub returning configured:false), pushState, requestPush, startPushRegistration(client) and unregisterPush from apps/mobile/src/native/push.ts with the exact state rules (iOS -> unavailable with `// iOS: PAN-4838`; not configured -> unavailable; receive granted/denied/else -> on/off/prompt). startPushRegistration requests permission once when prompt, registers only when on, and sends `{ type: 'push-register', platform: 'android', token }` once per transition to online and again on a new token. Wire it in ShellApp with a pushEpoch-keyed effect after the services effect. Add unregisterPush to SignOutDeps as step `push token` before push-unregister. If PAN-4838 already created push.ts on main, extend it keeping these export names."
+        },
+        "items": [
+          {
+            "id": "js-push-registration.ac1",
+            "title": "Given OverdeckPush.status() resolves configured:false, when startPushRegistration runs, then PushNotifications.register is never called and no frame is sent (push.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "js-push-registration.ac2",
+            "title": "Given permission `prompt`, startPushRegistration calls requestPermissions exactly once; given `denied`, it does not call register (push.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "js-push-registration.ac3",
+            "title": "Given a token that arrives while the directory is connecting, when the state changes to online, then exactly one push-register {platform:'android', token} is sent; a repeated online notification sends nothing more; connecting then online again sends it again; a new token while online sends one frame with the new token (push.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "js-push-registration.ac4",
+            "title": "On the iOS platform pushState() resolves 'unavailable', and the stop function returned by startPushRegistration removes its listeners so a later registration event sends nothing (push.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "js-push-registration.ac5",
+            "title": "signOut.test.ts records the `push token` step before `push-unregister`, and a rejecting unregisterPush still lets the later steps run",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "notification-tap-routing",
+        "title": "Parse the ai.overdeck.app:/open link and open the paired machine's screen from ShellApp",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T20:46:37Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4840",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/src/shell/notificationLink.ts",
+            "apps/mobile/src/shell/__tests__/notificationLink.test.ts",
+            "apps/mobile/src/shell/ShellApp.tsx",
+            "apps/mobile/src/shell/__tests__/ShellApp.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix apps/mobile test -- notificationLink ShellApp",
+            "npm run typecheck:mobile"
+          ],
+          "expected_outputs": [
+            "notificationLink.test.ts and ShellApp.test.tsx pass",
+            "typecheck:mobile completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6 steps 1-3. Add notificationLink.ts with NOTIFICATION_LINK_PREFIX = 'ai.overdeck.app:/open#' and parseNotificationLink (v=1, e matches PHONE_PAIR_ENVIRONMENT_ID_RE, p resolves against https://app.invalid to the same origin with pathname /m, t present; path = '/m' + search). In ShellApp add pendingOpen state, a notification branch at the top of handleUrl that goes through takeLaunchUrl, the cold-launch call-site change from the PRD, and an effect that opens a paired machine with setCurrentMachineId + navigate(path) or shows the machine list otherwise. Run checkpoint CP-3 during device-acceptance."
+        },
+        "items": [
+          {
+            "id": "notification-tap-routing.ac1",
+            "title": "parseNotificationLink returns { environmentId: 'e91ffda1-431a-483d-a6e4-a72079516ea4', path: '/m?subject=a%20b&x=1' } for the exact link PushNoticeTest asserts, and returns null for v=2, a bad e, p=https://evil.example/m, p=//evil.example/m and p=/settings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "notification-tap-routing.ac2",
+            "title": "Given a signed-in shell with paired machine e1, when appUrlOpen delivers a valid open link for e1, then navigate is called once with the link's /m path and e1 becomes the current machine; the same link delivered again does not call navigate (ShellApp.test.tsx)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "notification-tap-routing.ac3",
+            "title": "A link for an unpaired machine renders the machine list without calling navigate, and a link received while signed out calls neither navigate nor setCurrentMachineId (ShellApp.test.tsx)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-notifications-row",
+        "title": "Settings shows notification state with a Turn on button",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T20:46:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4840",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/src/shell/SettingsScreen.tsx",
+            "apps/mobile/src/shell/__tests__/SettingsScreen.test.tsx",
+            "apps/mobile/src/shell/ShellApp.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix apps/mobile test -- SettingsScreen",
+            "npm run typecheck:mobile"
+          ],
+          "expected_outputs": [
+            "SettingsScreen.test.tsx passes",
+            "typecheck:mobile completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ],
+          "acJustification": "One presentational row; the state texts and the button are the whole observable surface."
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Add props notifications: PushState | null and onTurnOnNotifications to SettingsScreen and render the data-component=\"settings-notifications\" block with the exact texts: on -> `On`; off -> `Off. Turn them on in Android Settings → Apps → Overdeck → Notifications.`; unavailable -> `Not set up in this build.`; prompt -> a `Turn on` button. In ShellApp load pushState() when the settings view opens and, on Turn on, call requestPush(), store the result and bump pushEpoch to restart registration."
+        },
+        "items": [
+          {
+            "id": "settings-notifications-row.ac1",
+            "title": "SettingsScreen.test.tsx renders `On`, `Off. Turn them on in Android Settings → Apps → Overdeck → Notifications.` and `Not set up in this build.` for the on, off and unavailable states, and renders nothing in the block for null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-notifications-row.ac2",
+            "title": "For the prompt state SettingsScreen renders a `Turn on` button, and clicking it calls onTurnOnNotifications exactly once (SettingsScreen.test.tsx)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-android-unit-tests",
+        "title": "CI mobile-android job runs ./gradlew testDebugUnitTest",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T20:46:37Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "infra",
+          "issueLabel": "pan-4840",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".github/workflows/ci.yml"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'testDebugUnitTest --no-daemon' .github/workflows/ci.yml"
+          ],
+          "expected_outputs": [
+            "one match inside the mobile-android job, before the Assemble the debug APK step"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-4"
+          ],
+          "acJustification": "A single workflow step; presence and a passing run are the two observable facts."
+        },
+        "narrative": {
+          "Action": "PRD WI-8. In .github/workflows/ci.yml job mobile-android, after `Sync Capacitor (Android)` and before `Assemble the debug APK`, add a step `Android unit tests` with working-directory apps/mobile/android running `./gradlew testDebugUnitTest --no-daemon`. Push the workflow change over SSH (git@github.com:eltmon/overdeck.git); the gh OAuth token lacks the workflow scope."
+        },
+        "items": [
+          {
+            "id": "ci-android-unit-tests.ac1",
+            "title": ".github/workflows/ci.yml job mobile-android contains a step `Android unit tests` with working-directory apps/mobile/android that runs `./gradlew testDebugUnitTest --no-daemon` before `Assemble the debug APK`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-android-unit-tests.ac2",
+            "title": "On the PR's CI run, the mobile-android job's `Android unit tests` step exits 0 and its log shows the ai.overdeck.app unit tests ran",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "device-acceptance",
+        "title": "Commit google-services.json and run epic AC-13 on the Android emulator (gated on PAN-4841)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T20:46:37Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4840",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/android/app/google-services.json",
+            "apps/mobile/ACCEPTANCE.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "curl -s https://connect.overdeck.ai/healthz",
+            "grep -q '\"package_name\": \"ai.overdeck.app\"' apps/mobile/android/app/google-services.json",
+            "grep -n 'AC-13' apps/mobile/ACCEPTANCE.md"
+          ],
+          "expected_outputs": [
+            "healthz JSON contains \"fcm\":true",
+            "google-services.json names package ai.overdeck.app",
+            "ACCEPTANCE.md has an AC-13 section with PASS and evidence"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-6",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. Precondition CP-4: healthz reports fcm:true and a google-services.json for ai.overdeck.app exists from PAN-4841. If not, finish every other item, run `pan tell flywheel-orchestrator \"PAN-4840: WI-9 (AC-13 device run) waits on PAN-4841 steps 2 and 5 — Firebase project, google-services.json, FCM directory secrets; healthz fcm:<value>\"`, leave this item pending and do not run pan done; never fabricate the file or evidence. Otherwise commit the file, install the debug build on the galaxyA16 emulator, sign in, pair, accept the prompt, swipe the app away, send a test push and a desktop AskUserQuestion, check `adb shell dumpsys notification --noredact`, check the directory log has no title text, tap (cold and warm, CP-3), and record the evidence in apps/mobile/ACCEPTANCE.md. Readiness is sequential because it needs the shared emulator and this machine's live dashboard."
+        },
+        "items": [
+          {
+            "id": "device-acceptance.ac1",
+            "title": "apps/mobile/android/app/google-services.json is committed with package_name ai.overdeck.app, and `./gradlew assembleDebug` then generates a values.xml containing google_app_id under app/build/generated/res/processDebugGoogleServices",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "device-acceptance.ac2",
+            "title": "Given the app swiped away on the galaxyA16 emulator after sign-in and pairing, when a desktop conversation asks an AskUserQuestion, then within 10 s `adb shell dumpsys notification --noredact` shows an ai.overdeck.app notification on channel needs-you with the real question title",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "device-acceptance.ac3",
+            "title": "The directory log captured for those pushes contains no occurrence of the question title, or ACCEPTANCE.md records that wrangler tail was unavailable and cites deliver.ts logging only outcomes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "device-acceptance.ac4",
+            "title": "Tapping the notification, with the app closed and again with it open, opens that machine's Needs-you screen with the question card once and no reload loop; apps/mobile/ACCEPTANCE.md records date, commit, emulator, timings and screenshots for AC-13",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document Android notifications in push-notifications.mdx and apps/mobile/README.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T20:46:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4840",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/push-notifications.mdx",
+            "apps/mobile/README.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '### On Android' configuration/push-notifications.mdx",
+            "grep -n 'cannot do yet' -A4 apps/mobile/README.md",
+            "grep -n 'OverdeckMessagingService' apps/mobile/README.md"
+          ],
+          "expected_outputs": [
+            "the On Android heading is found under The Overdeck app",
+            "the cannot-do-yet push line names PAN-4838 and not PAN-4840",
+            "README names OverdeckMessagingService"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-9",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. In configuration/push-notifications.mdx under `## The Overdeck app`, add `### On Android` with: the permission prompt after sign-in on Android 13+, the Needs you and Updates channels and which kinds go where, that only the phone can open the payload, the placeholder text, that a tap opens the source machine and screen, the Force stop caveat, and how to turn notifications back on (Android Settings → Apps → Overdeck → Notifications; the app's Settings shows the state). In apps/mobile/README.md list the new Java classes in Layout, add a `Push notifications (Android)` section (data-only FCM path, why the plugin's MessagingService is removed, google-services.json and the no-Firebase behaviour, the fixture generator, ./gradlew testDebugUnitTest), note CI now runs testDebugUnitTest, and drop PAN-4840 from the `What it cannot do yet` push line."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "Given configuration/push-notifications.mdx, when the page renders, then a `### On Android` subsection under `## The Overdeck app` names the Needs you and Updates channels, the Android 13+ permission prompt, the generic `Overdeck — Something needs you` fallback, tap-to-open and the Force stop caveat",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "Given apps/mobile/README.md, when it renders, then a `Push notifications (Android)` section names OverdeckMessagingService, the removed plugin MessagingService, google-services.json and `./gradlew testDebugUnitTest`, and the `What it cannot do yet` push line names PAN-4838 only",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "fixture",
+        "to": "push-handler",
+        "type": "blocks"
+      },
+      {
+        "from": "push-handler",
+        "to": "messaging-service",
+        "type": "blocks"
+      },
+      {
+        "from": "messaging-service",
+        "to": "push-status-plugin",
+        "type": "blocks"
+      },
+      {
+        "from": "messaging-service",
+        "to": "js-push-registration",
+        "type": "blocks"
+      },
+      {
+        "from": "push-status-plugin",
+        "to": "js-push-registration",
+        "type": "blocks"
+      },
+      {
+        "from": "js-push-registration",
+        "to": "notification-tap-routing",
+        "type": "blocks"
+      },
+      {
+        "from": "notification-tap-routing",
+        "to": "settings-notifications-row",
+        "type": "blocks"
+      },
+      {
+        "from": "push-handler",
+        "to": "ci-android-unit-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "messaging-service",
+        "to": "device-acceptance",
+        "type": "blocks"
+      },
+      {
+        "from": "js-push-registration",
+        "to": "device-acceptance",
+        "type": "blocks"
+      },
+      {
+        "from": "notification-tap-routing",
+        "to": "device-acceptance",
+        "type": "blocks"
+      },
+      {
+        "from": "settings-notifications-row",
+        "to": "device-acceptance",
+        "type": "blocks"
+      },
+      {
+        "from": "settings-notifications-row",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "notification-tap-routing",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "js-push-registration",
+        "to": "settings-notifications-row",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

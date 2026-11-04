@@ -1,12 +1,15 @@
 /**
- * Push registration (PAN-4838 FR-1, FR-2, FR-4, D-8 to D-11): asks iOS for notification permission,
- * keeps the latest APNs token, and tells the directory with `push-register` whenever it has a new
- * token or its socket comes online. The Notifications switch turns the directory registration off
- * with `push-unregister`; the APNs registration itself is never undone (D-11).
+ * Push registration (PAN-4838 FR-1, FR-2, FR-4, D-8 to D-11; Android PAN-4840 FR-7, FR-8, FR-10):
+ * asks for notification permission, keeps the latest APNs or FCM token, and tells the directory
+ * with `push-register` whenever it has a new token or its socket comes online. The Notifications
+ * switch turns the directory registration off with `push-unregister`; the APNs registration itself
+ * is never undone (D-11). On Android, `register()` runs only when the `OverdeckPush` plugin reports
+ * a Firebase config, because the push plugin's `register()` crashes a build without
+ * `google-services.json` (PAN-4840 D-5), and sign-out deletes the FCM token (`unregisterPush`).
  *
  * The token is not secret (D-10) but is never logged (NFR-2).
  */
-import { Capacitor, type PermissionState, type PluginListenerHandle } from '@capacitor/core';
+import { Capacitor, type PermissionState, type PluginListenerHandle, registerPlugin } from '@capacitor/core';
 import { PushNotifications, type PushNotificationsPlugin } from '@capacitor/push-notifications';
 import type { DirectoryWebState } from '@overdeck/anywhere-channel/web';
 import type { ApsEnvironment, ClientToDirectoryFrame, PhonePlatform } from '@overdeck/contracts';
@@ -16,14 +19,26 @@ import { OverdeckKeys, type OverdeckKeysPlugin } from './keys';
 
 export const PUSH_TOKEN_KEY = 'overdeck.pushToken';
 export const NOTIFICATIONS_PREF_KEY = 'overdeck.notifications';
-export type PushPermission = 'granted' | 'denied' | 'prompt' | 'unknown';
+/** Set once the app has asked for permission on its own; sign-out clears it (PAN-4840 FR-7). */
+export const PUSH_ASKED_KEY = 'overdeck.pushAsked';
+/** `unavailable`: an Android build without a Firebase config (PAN-4840 NFR-2). */
+export type PushPermission = 'granted' | 'denied' | 'prompt' | 'unknown' | 'unavailable';
+
+export interface OverdeckPushPlugin {
+  /** Android only: whether this build has a Firebase app (PAN-4840 D-5). */
+  status(): Promise<{ configured: boolean }>;
+}
+
+export const OverdeckPush = registerPlugin<OverdeckPushPlugin>('OverdeckPush', {
+  web: () => Promise.resolve({ status: async () => ({ configured: false }) }),
+});
 
 /** The directory's `push-register` token rule (services/connect/src/protocol.ts `PUSH_TOKEN_RE`, ≤ 4,096). */
 const TOKEN_RE = /^[0-9A-Za-z:_.-]{1,4096}$/;
 
-/** iOS only in PAN-4838; PAN-4840 adds Android once Firebase is configured (D-9). */
+/** iOS (PAN-4838) and Android (PAN-4840); an Android build without Firebase reports `unavailable`. */
 export function pushSupported(platform: string = Capacitor.getPlatform()): boolean {
-  return platform === 'ios';
+  return platform === 'ios' || platform === 'android';
 }
 
 function readStorage(key: string): string | null {
@@ -69,6 +84,8 @@ export interface PushDeps {
   platform: PhonePlatform;
   plugin?: Pick<PushNotificationsPlugin, 'checkPermissions' | 'requestPermissions' | 'register' | 'addListener'>;
   keys?: Pick<OverdeckKeysPlugin, 'pushEnvironment'>;
+  /** Android only: the Firebase-config check. */
+  overdeckPush?: OverdeckPushPlugin;
   log?: (message: string, error?: unknown) => void;
 }
 
@@ -82,6 +99,7 @@ export function startPush({
   platform,
   plugin = PushNotifications,
   keys = OverdeckKeys,
+  overdeckPush = OverdeckPush,
   log = (message, error) => console.warn(`[push] ${message}`, error ?? ''),
 }: PushDeps): PushController {
   let permission: PushPermission = 'unknown';
@@ -105,6 +123,18 @@ export function startPush({
         )
       : Promise.resolve(undefined);
 
+  // One call per start; iOS always has APNs, Android needs a Firebase app (PAN-4840 D-5).
+  const configured: Promise<boolean> =
+    platform === 'android'
+      ? overdeckPush.status().then(
+          (result) => result.configured,
+          (error: unknown) => {
+            log('push status unavailable', error);
+            return false;
+          },
+        )
+      : Promise.resolve(true);
+
   /** R5: a register with the stored token, only when enabled and online. */
   const sendRegister = async () => {
     const environment = await apsEnvironment;
@@ -118,10 +148,24 @@ export function startPush({
     });
   };
 
-  /** R2: check, ask once while iOS says `prompt`, and register when granted. */
-  const refreshPermission = async () => {
+  /**
+   * R2: check, and register when granted. Startup asks while the OS says `prompt` only if the app
+   * has not asked since sign-in, so a dismissed Android dialog does not return on every reload
+   * (PAN-4840 FR-7); the Notifications switch always asks.
+   */
+  const refreshPermission = async (ask: 'once' | 'always') => {
+    if (!(await configured)) {
+      if (stopped) return;
+      permission = 'unavailable';
+      notify();
+      return;
+    }
     let status = await plugin.checkPermissions();
-    if (status.receive === 'prompt' || status.receive === 'prompt-with-rationale') status = await plugin.requestPermissions();
+    const canAsk = ask === 'always' || readStorage(PUSH_ASKED_KEY) === null;
+    if (canAsk && (status.receive === 'prompt' || status.receive === 'prompt-with-rationale')) {
+      writeStorage(PUSH_ASKED_KEY, '1');
+      status = await plugin.requestPermissions();
+    }
     if (stopped) return;
     permission = toPermission(status.receive);
     notify();
@@ -160,7 +204,7 @@ export function startPush({
         return;
       }
       handles.push(...added);
-      if (enabled) await refreshPermission();
+      if (enabled) await refreshPermission('once');
     } catch (error) {
       log('push setup failed', error);
     }
@@ -184,7 +228,7 @@ export function startPush({
       enabled = true;
       writeStorage(NOTIFICATIONS_PREF_KEY, null);
       try {
-        await refreshPermission();
+        await refreshPermission('always');
       } catch (error) {
         log('push permission failed', error);
       }
@@ -216,4 +260,24 @@ export function usePushState(controller: PushController | null): { enabled: bool
   const enabled = useSyncExternalStore(subscribe, () => controller?.enabled ?? false);
   const permission = useSyncExternalStore(subscribe, () => controller?.permission ?? 'unknown');
   return controller ? { enabled, permission } : null;
+}
+
+/**
+ * Sign-out (PAN-4840 FR-10): deletes the FCM token on Android so the old token stops reaching this
+ * install. iOS keeps its APNs registration (D-11). Errors are swallowed; the key pair sign-out
+ * deletes makes a late push post nothing anyway.
+ */
+export async function unregisterPush(
+  platform: PhonePlatform,
+  {
+    plugin = PushNotifications,
+    overdeckPush = OverdeckPush,
+  }: { plugin?: Pick<PushNotificationsPlugin, 'unregister'>; overdeckPush?: OverdeckPushPlugin } = {},
+): Promise<void> {
+  if (platform !== 'android') return;
+  try {
+    if ((await overdeckPush.status()).configured) await plugin.unregister();
+  } catch {
+    // Best effort.
+  }
 }

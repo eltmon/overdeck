@@ -320,6 +320,10 @@ jobs:
       - name: Sync Capacitor (Android)
         run: npm --prefix apps/mobile run cap:sync -- android
 
+      - name: Android unit tests
+        working-directory: apps/mobile/android
+        run: ./gradlew testDebugUnitTest --no-daemon
+
       - name: Assemble the debug APK
         working-directory: apps/mobile/android
         run: ./gradlew assembleDebug --no-daemon

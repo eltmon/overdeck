@@ -41,6 +41,8 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+    testOptions { unitTests { includeAndroidResources = true } }
+    sourceSets { test { resources.srcDirs += ["$rootDir/../../../tests/fixtures/phone-push"] } }
 }
 
 repositories {
@@ -57,7 +59,11 @@ dependencies {
     implementation project(':capacitor-android')
     implementation 'com.goterl:lazysodium-android:5.1.0@aar'
     implementation 'net.java.dev.jna:jna:5.14.0@aar'
+    implementation "com.google.firebase:firebase-messaging:$firebaseMessagingVersion"
     testImplementation "junit:junit:$junitVersion"
+    testImplementation 'org.robolectric:robolectric:4.15.1'
+    testImplementation 'com.goterl:lazysodium-java:5.1.0'
+    testImplementation 'net.java.dev.jna:jna:5.14.0'
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')

@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from '
 
 import { type DeviceIdentity, loadIdentity } from '../native/keys';
 import { type LiveActivityStatus, OverdeckLiveActivity } from '../native/liveActivity';
-import { type PushController, pushSupported, startPush, usePushState } from '../native/push';
+import { type PushController, pushSupported, startPush, unregisterPush, usePushState } from '../native/push';
 import { defaultAppearanceDeps, installAppearance, useAppearance, writeAppearance } from './appearance';
 import { type Connection, createConnection } from './connection';
 import { createDirectory, type ShellDirectory } from './directory';
@@ -14,6 +14,7 @@ import { installResumeHandler } from './lifecycle';
 import { createLiveActivityController, type LiveActivityController, liveActivityEnabled, setLiveActivityEnabled } from './liveActivity';
 import { MachinesScreen } from './MachinesScreen';
 import { MachineView } from './MachineView';
+import { NOTIFICATION_LINK_PREFIX, type NotificationOpen, parseNotificationLink } from './notificationLink';
 import { markSynced, pauseFor, readNotificationPrefs, useNotificationPrefs, writeNotificationPrefs, type PauseChoice } from './notificationPrefs';
 import { createPrefsSync, type PrefsSync, putPrefsOver } from './notificationPrefsSync';
 import { installNotificationTap } from './notificationTap';
@@ -38,27 +39,48 @@ interface Services {
   directory: ShellDirectory;
   connection: Connection;
   liveActivity: LiveActivityController;
-  /** Push registration, iOS only (PAN-4838 D-9). */
+  /** Push registration on iOS (PAN-4838) and Android (PAN-4840). */
   push: PushController | null;
-  /** Notification-prefs sync to every paired machine, iOS only (PAN-5019 WI-8). */
+  /** Notification-prefs sync to every paired machine (PAN-5019 WI-8), wherever push is supported. */
   prefsSync: PrefsSync | null;
 }
 
 const errorText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
 /**
- * The launch URL already handled in this WebView. Switching machines reloads the page (C-7), and
- * on Android `App.getLaunchUrl()` keeps answering the activity's original launch intent, and on iOS
- * it answers with the last URL that opened the app, even one delivered by `appUrlOpen` while it ran.
- * Without this a pair link would reopen the pair screen with a used code after each reload. Session
- * storage survives a reload and is empty in a new app process.
+ * The URLs already handled in this WebView, newest last. Switching machines reloads the page (C-7),
+ * and on Android `App.getLaunchUrl()` keeps answering the activity's original launch intent, and on
+ * iOS it answers with the last URL that opened the app, even one delivered by `appUrlOpen` while it
+ * ran. Without this a pair link would reopen the pair screen with a used code after each reload, and
+ * an Android cold-launch notification link would replay over a later warm tap's screen (PAN-4840):
+ * one slot cannot hold both the cold launch URL and a warm one, so handled URLs are kept: the first,
+ * which on Android is the cold launch URL, plus the newest 19. Session storage survives a reload and is
+ * empty in a new app process.
  */
 const LAUNCH_URL_KEY = 'overdeck.launchUrlHandled';
+const HANDLED_URLS_MAX = 20;
 
+function readHandledUrls(): string[] {
+  const raw = sessionStorage.getItem(LAUNCH_URL_KEY);
+  if (raw === null) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed.filter((u): u is string => typeof u === 'string');
+  } catch {
+    // A value written by an older build: one URL.
+  }
+  return [raw];
+}
+
+/** True the first time `url` is seen in this app process; records it either way. */
 function takeLaunchUrl(url: string): boolean {
   try {
-    if (sessionStorage.getItem(LAUNCH_URL_KEY) === url) return false;
-    sessionStorage.setItem(LAUNCH_URL_KEY, url);
+    const handled = readHandledUrls();
+    if (handled.includes(url)) return false;
+    // Keep the first entry: on Android it is the cold-launch URL getLaunchUrl() keeps answering.
+    const next = [...handled, url];
+    if (next.length > HANDLED_URLS_MAX) next.splice(1, next.length - HANDLED_URLS_MAX);
+    sessionStorage.setItem(LAUNCH_URL_KEY, JSON.stringify(next));
   } catch {
     // Storage unavailable: handle the URL.
   }
@@ -81,6 +103,8 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
   const [services, setServices] = useState<Services | null>(null);
   /** A pair link that arrived before sign-in; it opens the pair screen once signed in. */
   const [pendingPairLink, setPendingPairLink] = useState<string | null>(null);
+  /** An Android notification tap (PAN-4840 FR-6); it opens its machine once signed in. */
+  const [pendingOpen, setPendingOpen] = useState<NotificationOpen | null>(null);
   const account = useShellStore((s) => s.account);
   const paired = useShellStore((s) => s.machines);
   const setAccount = useShellStore((s) => s.setAccount);
@@ -91,6 +115,12 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
 
   const handleUrl = useCallback(
     async (url: string) => {
+      // Callers pass a notification link only the first time this app process sees it. An
+      // unparseable link matches no paired machine and shows the machine list.
+      if (url.startsWith(NOTIFICATION_LINK_PREFIX)) {
+        setPendingOpen(parseNotificationLink(url) ?? { environmentId: '', path: '' });
+        return;
+      }
       if (url.startsWith(PHONE_PAIR_LINK_PREFIX)) {
         setPendingPairLink(url);
         return;
@@ -125,7 +155,8 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
     // Record a URL that arrives while running as handled too: iOS answers getLaunchUrl() with it
     // after the next reload, which would reopen the pair screen with a used code.
     const listener = App.addListener('appUrlOpen', ({ url }) => {
-      takeLaunchUrl(url);
+      // Each notification link is unique by its timestamp, so a repeat is a replay: skip it.
+      if (!takeLaunchUrl(url) && url.startsWith(NOTIFICATION_LINK_PREFIX)) return;
       void handleUrl(url);
     });
     return () => {
@@ -143,6 +174,19 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
     setPendingPairLink(null);
   }, [account, pendingPairLink]);
 
+  useEffect(() => {
+    if (account === null || pendingOpen === null) return;
+    setPendingOpen(null);
+    if (paired.some((m) => m.environmentId === pendingOpen.environmentId)) {
+      setCurrentMachineId(pendingOpen.environmentId);
+      navigate(pendingOpen.path);
+    } else {
+      setCurrentMachineId(null);
+      if (location.pathname !== '/') history.replaceState(null, '', '/');
+      setView({ kind: 'machines' });
+    }
+  }, [account, pendingOpen, paired, navigate]);
+
   // After boot, so the plugin's retained cold-launch tap finds the paired machines in the store (FR-8).
   const booted = boot.kind === 'ready';
   // The default `navigate` is a new function each render; the listener reads the latest one.
@@ -151,7 +195,8 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
     navigateRef.current = navigate;
   }, [navigate]);
   useEffect(() => {
-    if (!booted || !pushSupported()) return;
+    // iOS only: Android notifications are posted by OverdeckMessagingService and arrive as an open link.
+    if (!booted || !pushSupported() || shellPlatform() !== 'ios') return;
     return installNotificationTap({
       paired: () => useShellStore.getState().machines,
       signedIn: () => useShellStore.getState().account !== null,
@@ -317,6 +362,7 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
         removeSelf: services ? removeSelfOver(services.connection) : () => Promise.reject(new Error('no connection')),
         directory: services?.directory.client ?? null,
         deleteDevice: (record) => deleteAccountDevice(record),
+        unregisterPush: shellPlatform() === 'android' ? () => unregisterPush('android') : undefined,
         endLiveActivity: shellPlatform() === 'ios' ? () => OverdeckLiveActivity.end() : undefined,
         resetKeys: resetAllKeys,
         clearStorage: () => localStorage.clear(),
@@ -412,6 +458,7 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
             push && pushState
               ? {
                 ...pushState,
+                platform: shellPlatform(),
                 onChange: (on) => (on ? void push.enable() : push.disable()),
                 prefs,
                 onPause,

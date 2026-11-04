@@ -89,7 +89,7 @@ vi.mock('../MachineView', async () => {
 });
 
 import ShellApp from '../ShellApp';
-import { CURRENT_MACHINE_KEY, readMachines, useShellStore, writeAccount, writeMachines } from '../store';
+import { CURRENT_MACHINE_KEY, readMachines, removeAccount, useShellStore, writeAccount, writeMachines } from '../store';
 import type { PairedMachine } from '../types';
 
 const PAIR_LINK = buildPhonePairLink({
@@ -241,6 +241,111 @@ describe('ShellApp Live Activity (PAN-4839 WI-10)', () => {
     expect(screen.queryByText('Live Activity')).toBeNull();
     expect(harness.liveActivity.status).not.toHaveBeenCalled();
     expect(harness.liveActivity.start).not.toHaveBeenCalled();
+  });
+});
+
+describe('ShellApp notification taps', () => {
+  const OTHER = 'e91ffda1-431a-483d-a6e4-a72079516ea4';
+  const openLink = (environmentId: string, t: string) =>
+    `ai.overdeck.app:/open#v=1&e=${environmentId}&p=%2Fm%3Fsubject%3Dpan-4840-conv&t=${t}`;
+  const tap = async (url: string) =>
+    act(async () => {
+      for (const listener of harness.urlListeners) listener({ url });
+    });
+
+  beforeEach(() => {
+    localStorage.removeItem(CURRENT_MACHINE_KEY);
+    history.replaceState(null, '', '/');
+  });
+
+  it('opens the paired machine at the notification path, once per link', async () => {
+    const navigate = vi.fn();
+    render(<ShellApp navigate={navigate} />);
+    await screen.findByText('Machines');
+    await tap(openLink(MACHINE.environmentId, '1'));
+    expect(navigate).toHaveBeenCalledWith('/m?subject=pan-4840-conv');
+    expect(localStorage.getItem(CURRENT_MACHINE_KEY)).toBe(MACHINE.environmentId);
+    await tap(openLink(MACHINE.environmentId, '1'));
+    expect(navigate).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the machine list for a machine this phone is not paired with', async () => {
+    const navigate = vi.fn();
+    render(<ShellApp navigate={navigate} />);
+    await screen.findByText('Machines');
+    await tap(openLink(OTHER, '2'));
+    expect(navigate).not.toHaveBeenCalled();
+    expect(screen.getByText('Machines')).toBeTruthy();
+    expect(localStorage.getItem(CURRENT_MACHINE_KEY)).toBeNull();
+  });
+
+  it('opens the paired machine from a cold launch', async () => {
+    const navigate = vi.fn();
+    harness.launchUrl = openLink(MACHINE.environmentId, '3');
+    render(<ShellApp navigate={navigate} />);
+    await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith('/m?subject=pan-4840-conv'));
+    expect(navigate).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not replay the cold-launch link over a later warm tap after the reload', async () => {
+    const link = (subject: string, t: string) =>
+      `ai.overdeck.app:/open#v=1&e=${MACHINE.environmentId}&p=%2Fm%3Fsubject%3D${subject}&t=${t}`;
+    const navigate = vi.fn();
+    // Android keeps answering getLaunchUrl() with the cold-launch link for the whole process.
+    harness.launchUrl = link('a', '5');
+    const cold = render(<ShellApp navigate={navigate} />);
+    await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith('/m?subject=a'));
+    cold.unmount(); // The navigate reload.
+
+    harness.urlListeners.length = 0;
+    const afterCold = render(<ShellApp navigate={navigate} />);
+    await screen.findByText('Machines');
+    await tap(link('b', '6'));
+    expect(navigate).toHaveBeenLastCalledWith('/m?subject=b');
+    afterCold.unmount(); // The warm tap's reload.
+
+    render(<ShellApp navigate={navigate} />);
+    await screen.findByText('Machines');
+    // Let boot finish handling getLaunchUrl() before asserting nothing more navigated.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    expect(navigate.mock.calls).toEqual([['/m?subject=a'], ['/m?subject=b']]);
+  });
+
+  it('still skips the cold-launch link after more than 20 warm taps', async () => {
+    const link = (subject: string, t: string) =>
+      `ai.overdeck.app:/open#v=1&e=${MACHINE.environmentId}&p=%2Fm%3Fsubject%3D${subject}&t=${t}`;
+    const navigate = vi.fn();
+    harness.launchUrl = link('cold', '0');
+    const cold = render(<ShellApp navigate={navigate} />);
+    await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith('/m?subject=cold'));
+    cold.unmount();
+
+    harness.urlListeners.length = 0;
+    const warm = render(<ShellApp navigate={navigate} />);
+    await screen.findByText('Machines');
+    for (let i = 1; i <= 21; i++) await tap(link(`w${i}`, String(i)));
+    expect(navigate).toHaveBeenLastCalledWith('/m?subject=w21');
+    warm.unmount();
+
+    render(<ShellApp navigate={navigate} />);
+    await screen.findByText('Machines');
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    expect(navigate).toHaveBeenLastCalledWith('/m?subject=w21');
+    expect(navigate).toHaveBeenCalledTimes(22);
+  });
+
+  it('does nothing while signed out', async () => {
+    await removeAccount();
+    const navigate = vi.fn();
+    render(<ShellApp navigate={navigate} />);
+    await screen.findByText('Sign in');
+    await tap(openLink(MACHINE.environmentId, '4'));
+    expect(navigate).not.toHaveBeenCalled();
+    expect(localStorage.getItem(CURRENT_MACHINE_KEY)).toBeNull();
   });
 });
 
