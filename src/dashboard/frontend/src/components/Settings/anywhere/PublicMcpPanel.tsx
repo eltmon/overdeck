@@ -52,7 +52,7 @@ export function PublicMcpPanel() {
   };
 
   return (
-    <div data-component="anywhere-public-mcp-panel">
+    <div data-component="public-mcp-panel">
       <h3 className="text-sm font-medium text-foreground mb-2">Public MCP for hosted bots</h3>
       {isLoading ? (
         <p className="text-xs text-muted-foreground px-4 py-3">Loading public MCP…</p>
