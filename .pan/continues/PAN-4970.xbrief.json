@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4970",
   "created": "2026-11-04T00:20:58.327Z",
-  "updated": "2026-11-04T01:50:23.749Z",
+  "updated": "2026-11-04T01:50:41.517Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -110,6 +110,10 @@
     "promote-fast-refusal.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T01:50:23.748Z"
+    },
+    "promote-fast-refusal.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:50:41.517Z"
     }
   }
 }
