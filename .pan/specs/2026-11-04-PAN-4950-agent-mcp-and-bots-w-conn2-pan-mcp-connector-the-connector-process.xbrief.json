@@ -4,17 +4,17 @@
     "created": "2026-11-04T09:53:26.175Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4950: Agent MCP and bots (W-CONN2): pan mcp connector: the connector process",
-    "updated": "2026-11-04T10:00:01.499Z"
+    "updated": "2026-11-04T10:01:45.177Z"
   },
   "plan": {
     "id": "pan-4950",
     "title": "Agent MCP and bots (W-CONN2): pan mcp connector: the connector process",
-    "status": "proposed",
+    "status": "running",
     "uid": "04594c68-857e-417a-896a-744ad49bcfab",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-04T09:53:26.175Z",
-    "updated": "2026-11-04T10:00:01.499Z",
+    "updated": "2026-11-04T10:01:45.177Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4950",
@@ -1052,5 +1052,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
