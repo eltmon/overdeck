@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5018",
   "created": "2026-11-04T13:12:52.932Z",
-  "updated": "2026-11-04T15:09:38.828Z",
+  "updated": "2026-11-04T15:09:52.507Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -132,6 +132,10 @@
     "listener-refusal-logging.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T15:09:38.828Z"
+    },
+    "rtc-transport-offer-logging.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:09:52.507Z"
     }
   }
 }
