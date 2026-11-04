@@ -15,7 +15,6 @@ const SINGLE_ROUTE_PATHS: Record<string, { method: string; path: string }> = {
   send_message: { method: 'POST', path: '/api/conversations/conv-a/message' },
   start_conversation: { method: 'POST', path: '/api/fleet/conversations' },
   start_worker: { method: 'POST', path: '/api/fleet/workers' },
-  list_pending_input: { method: 'GET', path: '/api/conversations/pending-input' },
   answer_permission: { method: 'POST', path: '/api/conversations/conv-a/permission' },
   answer_pane_choice: { method: 'POST', path: '/api/conversations/conv-a/pane-choice' },
   answer_codex_approval: { method: 'POST', path: '/api/conversations/conv-a/codex-approval' },
@@ -44,6 +43,14 @@ describe('MCP tool annotations (PAN-4927 W-MCP1)', () => {
     const tool = ALL_TOOLS.find((t) => t.name === 'answer_question');
     expect(tool).toBeDefined();
     expect(tool!.scope).toBe('approve');
+  });
+
+  it('list_pending_input needs read:conversations, matching both GET /api/needs-you and GET /api/fleet/needs-you', () => {
+    const tool = ALL_TOOLS.find((t) => t.name === 'list_pending_input');
+    expect(tool).toBeDefined();
+    expect(tool!.scope).toBe('read:conversations');
+    expect(requiredScopeFor('GET', '/api/needs-you')).toBe(tool!.scope);
+    expect(requiredScopeFor('GET', '/api/fleet/needs-you')).toBe(tool!.scope);
   });
 
   it('hasAgentId is true only for a non-empty string agentId', () => {

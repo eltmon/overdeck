@@ -34,10 +34,50 @@ describe('MCP approval tools (PAN-4649 W-7)', () => {
     ]);
   });
 
-  it('list_pending_input passes the pending-input feed through', async () => {
-    const api = fakeApi({ 'GET /api/conversations/pending-input': { status: 200, json: [{ name: 'conv-a', pendingInputKinds: ['askUserQuestion'] }] } });
+  it('list_pending_input merges this machine and one linked machine, renaming the linked rows', async () => {
+    const api = fakeApi({
+      'GET /api/needs-you': { status: 200, json: { conversations: [{ name: 'conv-a' }], agents: [{ id: 'agent-pan-1', pendingInputKinds: ['askUserQuestion'] }] } },
+      'GET /api/fleet/needs-you': {
+        status: 200,
+        json: { machines: [{ environmentId: 'env-lap-2', label: 'laptop', conversations: [{ name: 'conv-z' }], agents: [{ id: 'agent-pan-9' }] }] },
+      },
+    });
     const client = await connectClient(api, APPROVER);
-    expect(resultJson(await callTool(client, 'list_pending_input'))).toEqual([{ name: 'conv-a', pendingInputKinds: ['askUserQuestion'] }]);
+    expect(resultJson(await callTool(client, 'list_pending_input'))).toEqual({
+      machines: [
+        { environmentId: null, label: 'this machine', conversations: [{ name: 'conv-a' }], agents: [{ id: 'agent-pan-1', pendingInputKinds: ['askUserQuestion'] }] },
+        { environmentId: 'env-lap-2', label: 'laptop', conversations: [{ name: '@env-lap-2/conv-z' }], agents: [{ id: '@env-lap-2/agent-pan-9', remote: true }] },
+      ],
+    });
+  });
+
+  it('list_pending_input keeps the local entry and sets fleetError on a fleet 503', async () => {
+    const api = fakeApi({
+      'GET /api/needs-you': { status: 200, json: { conversations: [], agents: [] } },
+      'GET /api/fleet/needs-you': { status: 503, json: { error: 'fleet down' } },
+    });
+    const client = await connectClient(api, APPROVER);
+    const result = resultJson(await callTool(client, 'list_pending_input')) as { machines: unknown[]; fleetError: string };
+    expect(result.machines).toEqual([{ environmentId: null, label: 'this machine', conversations: [], agents: [] }]);
+    expect(result.fleetError).toBe('HTTP 503: fleet down');
+  });
+
+  it('list_pending_input sets fleetError to the error message when the fleet request throws', async () => {
+    const api = fakeApi({ 'GET /api/needs-you': { status: 200, json: { conversations: [], agents: [] } } });
+    const throwingApi = { ...api, request: ((method: string, path: string, body?: unknown) => (
+      path === '/api/fleet/needs-you' ? Promise.reject(new Error('network down')) : api.request(method as 'GET', path, body)
+    )) as typeof api.request };
+    const client = await connectClient(throwingApi, APPROVER);
+    const result = resultJson(await callTool(client, 'list_pending_input')) as { fleetError: string };
+    expect(result.fleetError).toBe('network down');
+  });
+
+  it('list_pending_input is a tool error when the local feed answers 500', async () => {
+    const api = fakeApi({ 'GET /api/needs-you': { status: 500, json: { error: 'the Needs-You feed could not be built' } } });
+    const client = await connectClient(api, APPROVER);
+    const result = await callTool(client, 'list_pending_input');
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toBe('HTTP 500: the Needs-You feed could not be built');
   });
 
   it('answer_question without approve is hidden, so tools/call answers like an unknown tool', async () => {

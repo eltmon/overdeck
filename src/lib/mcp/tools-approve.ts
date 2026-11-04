@@ -15,7 +15,7 @@
 import { getHarnessBehavior, normalizeHarnessName } from '@overdeck/contracts';
 
 import { scopeSatisfies } from '../access-tokens.js';
-import { errorResult, isOk, optionalInteger, optionalString, requiredString, routeErrorResult, routeResult, type ArgResult, type OverdeckTool } from './tool.js';
+import { errorResult, isOk, jsonResult, optionalInteger, optionalString, requiredString, routeErrorResult, routeResult, type ArgResult, type OverdeckTool } from './tool.js';
 
 const PERMISSION_CHOICES = ['allow-once', 'allow-always', 'deny'] as const;
 
@@ -82,14 +82,60 @@ function stringArray(value: unknown): string[] | null {
   return Array.isArray(value) && value.every((entry) => typeof entry === 'string') ? (value as string[]) : null;
 }
 
+function arrayOr(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+interface PendingInputMachine {
+  environmentId: string | null;
+  label: string;
+  conversations: unknown[];
+  agents: unknown[];
+}
+
 const listPendingInput: OverdeckTool = {
   name: 'list_pending_input',
-  description: 'List conversations waiting on input: questions, permission prompts, plan approvals and menus.',
+  description:
+    'List what waits on input on this machine and every online linked machine: conversations (questions, permission prompts, plan approvals, menus) and agents (questions, plan approvals, permission requests). A linked conversation is named @<environment-id>/<name>; pass that name to the answer tools. Linked agents carry remote: true and are answered on their own machine.',
   scope: 'read:conversations',
   audience: 'any',
   inputSchema: { type: 'object', properties: {} },
   async run(_args, ctx) {
-    return routeResult(await ctx.api.request('GET', '/api/conversations/pending-input'));
+    const [local, fleet] = await Promise.all([
+      ctx.api.request('GET', '/api/needs-you'),
+      ctx.api.request('GET', '/api/fleet/needs-you').catch((error: unknown) => (error instanceof Error ? error : new Error(String(error)))),
+    ]);
+    if (!isOk(local)) return routeErrorResult(local);
+    const localJson = local.json && typeof local.json === 'object' ? (local.json as Record<string, unknown>) : {};
+    const machines: PendingInputMachine[] = [
+      { environmentId: null, label: 'this machine', conversations: arrayOr(localJson['conversations']), agents: arrayOr(localJson['agents']) },
+    ];
+
+    let fleetError: string | undefined;
+    if (fleet instanceof Error) {
+      fleetError = fleet.message;
+    } else if (!isOk(fleet)) {
+      const block = routeErrorResult(fleet).content[0];
+      fleetError = block && block.type === 'text' ? block.text : 'request failed';
+    } else {
+      const fleetJson = fleet.json && typeof fleet.json === 'object' ? (fleet.json as Record<string, unknown>) : {};
+      for (const entry of arrayOr(fleetJson['machines'])) {
+        if (!entry || typeof entry !== 'object') continue;
+        const { environmentId, label, conversations, agents } = entry as Record<string, unknown>;
+        machines.push({
+          environmentId: typeof environmentId === 'string' ? environmentId : null,
+          label: typeof label === 'string' ? label : String(environmentId),
+          conversations: arrayOr(conversations).map((c) =>
+            c && typeof c === 'object' ? { ...c, name: `@${String(environmentId)}/${String((c as Record<string, unknown>)['name'])}` } : c,
+          ),
+          agents: arrayOr(agents).map((a) =>
+            a && typeof a === 'object' ? { ...a, id: `@${String(environmentId)}/${String((a as Record<string, unknown>)['id'])}`, remote: true } : a,
+          ),
+        });
+      }
+    }
+
+    return jsonResult({ machines, ...(fleetError ? { fleetError } : {}) });
   },
 };
 
