@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5054",
   "created": "2026-11-04T19:57:03.624Z",
-  "updated": "2026-11-04T20:17:06.221Z",
+  "updated": "2026-11-04T20:17:18.305Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -60,6 +60,10 @@
     "gitattributes-no-union-comment.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T20:17:06.221Z"
+    },
+    "gitattributes-no-union-comment.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T20:17:18.305Z"
     }
   }
 }
