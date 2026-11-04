@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4939",
   "created": "2026-11-04T00:21:28.043Z",
-  "updated": "2026-11-04T00:41:55.905Z",
+  "updated": "2026-11-04T00:42:25.946Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-4939",
       "claimedAt": "2026-11-04T00:29:18.568Z",
       "doneAt": "2026-11-04T00:41:55.905Z"
+    },
+    "schedule-message-tool": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4939",
+      "claimedAt": "2026-11-04T00:42:25.946Z"
     }
   }
 }
