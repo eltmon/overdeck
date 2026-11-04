@@ -15,7 +15,7 @@ import { getWorkspaceStackHealth } from '../workspace/stack-health.js';
 import { resolveIssueStackDiskHold } from '../workspace/disk-cost.js';
 import { getPrFacts } from '../cloister/pr-facts.js';
 import { generateLauncherScript } from '../launcher-generator.js';
-import { prepareClaudeOverdeckMcp } from '../mcp/agent-injection.js';
+import { prepareClaudeOverdeckMcp, prepareCodexOverdeckMcp } from '../mcp/agent-injection.js';
 import { getProviderForModel, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
 import type { ModelId } from '../settings.js';
 import { requireModelOverride } from '../model-validation.js';
@@ -736,7 +736,7 @@ export async function buildAgentLaunchConfig(opts: {
     ? await getOhmypiLauncherFields(opts.agentId, model, opts.effort)
     : {};
   const codexLauncherFields = behavior.usesCodexHome
-    ? getCodexLauncherFields(opts.agentId, model, opts.workspace, launchRole, opts.effort)
+    ? getCodexLauncherFields(opts.agentId, model, opts.workspace, launchRole, opts.effort, await prepareCodexOverdeckMcp({ agentId: opts.agentId, agentKind: 'agent', role: launchRole, harness: opts.harness ?? 'claude-code' }))
     : {};
   const museLauncherFields = opts.harness === 'muse' ? await getMuseLauncherFields({
     agentId: opts.agentId, model, workspace: opts.workspace, role: launchRole, effort: opts.effort,

@@ -17,7 +17,7 @@ import { getClaudeAuthStatus } from '../claude-auth.js';
 import { materializeAcpContextFile } from '../acp/context.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { hostLabel, hostLaunchErrorFile, hostSessionIdFile, hostSocketPath, hostTokenFile, type HostTransport } from '../runtimes/host-transport.js';
-import { initCodexHome } from '../runtimes/codex.js';
+import { initCodexHome, type CodexMcpServerDef } from '../runtimes/codex.js';
 import { createOhmypiFifo, ohmypiFifoPaths, OhmypiNotReady, writeOhmypiCommandSync } from '../runtimes/ohmypi-fifo.js';
 import { piFifoPaths, PiNotReady, writePiCommand } from '../runtimes/pi-fifo.js';
 import type { RuntimeName } from '../runtimes/types.js';
@@ -172,7 +172,7 @@ export function getKimiCodeLauncherFields(model: string, effort?: string): {
   };
 }
 
-export function getCodexLauncherFields(agentId: string, model: string, workspacePath?: string, role?: Role, effort?: string): {
+export function getCodexLauncherFields(agentId: string, model: string, workspacePath?: string, role?: Role, effort?: string, overdeckMcpServers: Record<string, CodexMcpServerDef> = {}): {
   harness: 'codex';
   codexMode: 'app-server' | 'work-tui';
   codexEffort: string;
@@ -198,7 +198,7 @@ export function getCodexLauncherFields(agentId: string, model: string, workspace
     approvalPolicy,
     sandboxMode,
     approvalsReviewer,
-    mcpServers: role ? parseRoleMcpServers(roleAgentDefinitionPath(role)) : undefined,
+    mcpServers: { ...(role ? parseRoleMcpServers(roleAgentDefinitionPath(role)) : {}), ...overdeckMcpServers },
   });
   return {
     harness: 'codex',

@@ -1,0 +1,136 @@
+{
+  "version": "1",
+  "issueId": "PAN-4933",
+  "created": "2026-11-04T03:01:37.295Z",
+  "updated": "2026-11-04T03:55:02.986Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "codex-approval-mode-writer": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4933",
+      "claimedAt": "2026-11-04T03:01:37.295Z",
+      "doneAt": "2026-11-04T03:03:51.523Z"
+    },
+    "codex-overdeck-helper": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4933",
+      "claimedAt": "2026-11-04T03:04:23.094Z",
+      "doneAt": "2026-11-04T03:17:19.330Z"
+    },
+    "codex-launcher-fields-param": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4933",
+      "claimedAt": "2026-11-04T03:17:27.434Z",
+      "doneAt": "2026-11-04T03:19:18.242Z"
+    },
+    "codex-work-and-role-sites": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4933",
+      "claimedAt": "2026-11-04T03:19:30.605Z",
+      "doneAt": "2026-11-04T03:25:00.966Z"
+    },
+    "codex-relaunch-sites": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4933",
+      "claimedAt": "2026-11-04T03:25:04.919Z",
+      "doneAt": "2026-11-04T03:27:18.089Z"
+    },
+    "codex-conversation-site": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4933",
+      "claimedAt": "2026-11-04T03:27:23.679Z",
+      "doneAt": "2026-11-04T03:31:22.352Z"
+    },
+    "codex-mcp-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4933",
+      "claimedAt": "2026-11-04T03:31:27.496Z",
+      "doneAt": "2026-11-04T03:33:40.134Z"
+    },
+    "codex-approval-mode-writer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:45:51.803Z"
+    },
+    "codex-approval-mode-writer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:46:08.823Z"
+    },
+    "codex-approval-mode-writer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:46:25.367Z"
+    },
+    "codex-overdeck-helper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:46:45.746Z"
+    },
+    "codex-overdeck-helper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:47:02.352Z"
+    },
+    "codex-overdeck-helper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:47:22.086Z"
+    },
+    "codex-overdeck-helper.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:47:39.188Z"
+    },
+    "codex-launcher-fields-param.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:47:56.441Z"
+    },
+    "codex-launcher-fields-param.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:48:13.753Z"
+    },
+    "codex-work-and-role-sites.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:48:35.359Z"
+    },
+    "codex-work-and-role-sites.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:48:56.260Z"
+    },
+    "codex-work-and-role-sites.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:49:16.114Z"
+    },
+    "codex-relaunch-sites.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:49:35.494Z"
+    },
+    "codex-relaunch-sites.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:49:54.167Z"
+    },
+    "codex-conversation-site.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:50:15.303Z"
+    },
+    "codex-conversation-site.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:50:34.822Z"
+    },
+    "codex-conversation-site.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:50:53.770Z"
+    },
+    "codex-mcp-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:51:13.549Z"
+    },
+    "codex-mcp-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:51:32.364Z"
+    },
+    "codex-mcp-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:51:49.458Z"
+    }
+  },
+  "feedback": []
+}

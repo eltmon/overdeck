@@ -38,7 +38,7 @@ import type { AgentPaneRef, TerminalBackend, TerminalBackendName } from '../term
 import { normalizeHarnessName, type AgentRole } from '@overdeck/contracts';
 import { conversationStateDir, readConversationPaneRole, writeConversationPaneRole } from './conversation-pane-role.js';
 import { revokeAgentMcpTokens } from '../mcp/agent-token.js';
-import { conversationTokenRole, prepareClaudeOverdeckMcp } from '../mcp/agent-injection.js';
+import { conversationTokenRole, prepareClaudeOverdeckMcp, prepareCodexOverdeckMcp } from '../mcp/agent-injection.js';
 import { validateCwdContainment } from './cwd-containment.js';
 import { conversationWriteRefusal } from './conversation-release.js';
 import { closeConversationPane, conversationHarnessAlive, conversationSessionAlive, waitForConversationSession } from './conversation-liveness.js';
@@ -585,6 +585,10 @@ export async function spawnConversationSession(
   await mkdir(stateDir, { recursive: true });
   if (launch.role) await writeConversationPaneRole(tmuxSession, launch.role);
   const role: AgentRole = launch.role ?? await readConversationPaneRole(tmuxSession);
+  // PAN-4932: the overdeck MCP server, owned by the conversation row (D-4, D-6, D-7).
+  // Resolved here (ahead of the Codex branch below) so both it and the later
+  // Claude Code overdeckMcp spread share one row read.
+  const tokenRow = bareContext ? null : getConversationByTmuxSession(tmuxSession);
   clearReadySignal(tmuxSession);
   const launcherScript = join(stateDir, 'launcher.sh');
   const permissionFlags = getClaudePermissionFlagsString();
@@ -696,6 +700,7 @@ export async function spawnConversationSession(
         approvalPolicy: codexApprovalPolicy,
         sandboxMode: codexSandboxMode,
         approvalsReviewer: codexApprovalsReviewer,
+        mcpServers: tokenRow ? await prepareCodexOverdeckMcp({ agentId: tokenRow.name, agentKind: 'conversation', role: conversationTokenRole(tokenRow, role, tmuxSession), harness, dir: stateDir }) : undefined,
       });
       const resumeSessionId = resume
         ? await resolveCodexRolloutPath(tmuxSession, { agentsDirOverride: join(getOverdeckHome(), 'agents') })
@@ -768,8 +773,6 @@ export async function spawnConversationSession(
     writeBridgeToken(tmuxSession);
     await writeChannelsBridgeMcpConfig(channelsBridgeMcpConfig, tmuxSession);
   }
-  // PAN-4932: the overdeck MCP server, owned by the conversation row (D-4, D-6, D-7).
-  const tokenRow = bareContext ? null : getConversationByTmuxSession(tmuxSession);
   const overdeckMcp = tokenRow
     ? await prepareClaudeOverdeckMcp({ agentId: tokenRow.name, agentKind: 'conversation', role: conversationTokenRole(tokenRow, role, tmuxSession), harness, dir: stateDir })
     : {};

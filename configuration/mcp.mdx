@@ -57,8 +57,20 @@ agent tokens.
 | Tool | What it does | Scope the token needs |
 | --- | --- | --- |
 | `wait_job` | Waits up to 50 s for a job another tool started. Answers `done` with the exit code and output, or `running` with `next`, the call to make again. Never poll or sleep; jobs are forgotten when the dashboard restarts. | `read:state` (agent tokens only) |
+| `task_claim` | Claims a checklist item of the agent's issue (`pan task claim`). | `tell` (agent tokens only) |
+| `task_done` | Marks a checklist item done once its `Item:` commit is pushed (`pan task done`). | `tell` (agent tokens only) |
+| `task_block` | Marks a checklist item blocked, optionally on issues or PRs (`on`), and wakes the agent when they merge (`pan task block`). | `tell` (agent tokens only) |
+| `done` | Signals the issue's work is complete: push, PR, tracker In Review, review started (`pan done`). | `operate` (agent tokens only) |
+| `handoff` | Hands the conversation off to a new one with a `focus` and optional `title` (`pan handoff self`). Not for work agents, which have no conversation. | `tell` (agent tokens only) |
+| `worker_report` | Records a worker's report with `status` `done`, `blocked` or `failed` (`pan worker report`). Workers only. | `tell` (agent tokens only) |
 | `request_secret` | Asks the operator for a secret, such as an API key, by an environment-variable-style `name` and a short `prompt`; answers a `requestId` and `next`, the `secret_wait` call to make. | `tell` (agent tokens only) |
 | `secret_wait` | Waits up to 50 s for the operator's answer. Answers `pending` with `next`, `delivered` with `file` (the path of the secret, never the value), `declined` or `expired`. | `read:state` (agent tokens only) |
+
+Each workflow tool runs the `pan` command for the calling agent, on that
+agent's issue, and waits up to 50 s. It answers `done` with the exit code and
+output, or `running` with `next`, a `wait_job` call to make again. A non-zero
+exit code means `pan` refused; stderr says why. Review, test and ship agents
+lack `operate`, so `done` is hidden from them.
 
 Agent-only tools call routes under `/api/self/`, which refuse any token that
 is not an agent token.
@@ -245,10 +257,10 @@ does not trust gets 400. A Tailscale Funnel request gets 404.
 
 ## Agents get these tools
 
-Every Claude Code, Kimi Code ACP (`acp`) and OpenCode (`opencode`) agent that
-Overdeck launches on this machine starts with the `overdeck` server: work agents, role runs (plan, review, test, ship, worker and
-the others), planning sessions and conversations. You do not create a token for
-them.
+Every Claude Code, Codex, Kimi Code ACP (`acp`) and OpenCode (`opencode`) agent
+that Overdeck launches on this machine starts with the `overdeck` server: work
+agents, role runs (plan, review, test, ship, worker and the others), planning
+sessions and conversations. You do not create a token for them.
 
 Each agent holds its own agent token. It sits in `mcp-token` (mode 0600), next
 to `overdeck-mcp.json`, in `~/.overdeck/agents/<id>/` for an agent or
@@ -264,6 +276,18 @@ An ACP agent gets the same `overdeck-mcp.json`. The launcher passes
 `--mcp-config <file>` to the ACP host, which sends the server to the agent in
 `session/new` and `session/load`. The ACP host approves the agent's permission
 requests itself, so no allow-list is needed.
+
+A Codex agent gets the server differently: Codex has no CLI flag for an
+MCP allow-list, so instead of a launcher flag it gets an
+`[mcp_servers.overdeck]` table written directly into
+`~/.overdeck/agents/<id>/codex-home-v2/config.toml` (or
+`~/.overdeck/agents/conv-<name>/codex-home-v2/config.toml` for a
+conversation), alongside any MCP servers the role itself declares. The table
+names only the token file in its `env`, never the token. It also carries
+`default_tools_approval_mode = "approve"`, because Overdeck's MCP tools carry
+no `readOnlyHint` annotations — without that key, Codex refuses every
+model-initiated call with "MCP tool call requires approval, but approval
+policy is never" under `approval_policy = "never"`.
 
 The token's scopes follow the agent's role:
 
@@ -287,7 +311,7 @@ mcp:
 
 These launches get no server: Docker workspaces (`OVERDECK_DOCKER_WORKSPACE=1`
 or `PAN_DOCKER=1`), bare conversations, Fly machines, and harnesses other than
-Claude Code, `acp` and `opencode` (Codex follows). When the token cannot be
+Claude Code, Codex, `acp` and `opencode`. When the token cannot be
 minted or the config cannot be written, the agent starts without the server and
 the log shows one `[agent-injection] overdeck MCP skipped for <id>: <reason>`
 warning. The agent can still reach Overdeck through `pan`.

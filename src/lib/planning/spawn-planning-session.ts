@@ -44,7 +44,7 @@ import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { launchAndCaptureManagedKimiSession } from '../runtimes/kimi-code.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { generateLauncherScript } from '../launcher-generator.js';
-import { prepareClaudeOverdeckMcp } from '../mcp/agent-injection.js';
+import { prepareClaudeOverdeckMcp, prepareCodexOverdeckMcp } from '../mcp/agent-injection.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { ensureWorkspacePanDir, getWorkspacePanPaths, writeWorkspaceContext } from '../pan-dir/index.js';
 import { resolvePlanningDraftPath } from '../pan-dir/drafts.js';
@@ -565,7 +565,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
       ? await getOhmypiLauncherFields(sessionName, planningModel, resolvedEffort.effort)
       : {};
     const codexLauncherFields = behavior.usesCodexHome
-      ? getCodexLauncherFields(sessionName, planningModel, workspacePath, 'plan', resolvedEffort.effort)
+      ? getCodexLauncherFields(sessionName, planningModel, workspacePath, 'plan', resolvedEffort.effort, await prepareCodexOverdeckMcp({ agentId: sessionName, agentKind: 'agent', role: 'plan', harness: effectiveHarness }))
       : {};
     const acpLauncherFields = behavior.launchCommandKind === 'acp-host'
       ? getAcpLauncherFields(

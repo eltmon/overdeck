@@ -127,6 +127,13 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   // PAN-4927 W-SELF1: self routes; the handler also requires an agent token (D-10).
   { method: 'GET', path: '/api/self/jobs/:id', scope: 'read:state' },
   { method: 'GET', path: '/api/self/jobs/:id/wait', scope: 'read:state' },
+  // PAN-4927 W-SELF2: agent workflow routes; the handler also requires an agent token (D-10).
+  { method: 'POST', path: '/api/self/tasks/claim', scope: 'tell' },
+  { method: 'POST', path: '/api/self/tasks/done', scope: 'tell' },
+  { method: 'POST', path: '/api/self/tasks/block', scope: 'tell' },
+  { method: 'POST', path: '/api/self/done', scope: 'operate' },
+  { method: 'POST', path: '/api/self/handoff', scope: 'tell' },
+  { method: 'POST', path: '/api/self/worker-report', scope: 'tell' },
   // PAN-4927 W-SEC1: secret requests; the handler also requires an agent token (D-10).
   { method: 'POST', path: '/api/self/secret-requests', scope: 'tell' },
   { method: 'GET', path: '/api/self/secret-requests/:id/wait', scope: 'read:state' },
