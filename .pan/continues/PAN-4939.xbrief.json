@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4939",
   "created": "2026-11-04T00:21:28.043Z",
-  "updated": "2026-11-04T01:09:49.345Z",
+  "updated": "2026-11-04T01:10:08.919Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -64,6 +64,10 @@
     "schedule-route-scopes.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T01:09:49.345Z"
+    },
+    "schedule-route-scopes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:10:08.918Z"
     }
   }
 }
