@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5018",
   "created": "2026-11-04T13:12:52.932Z",
-  "updated": "2026-11-04T15:10:23.169Z",
+  "updated": "2026-11-04T15:10:38.398Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -144,6 +144,10 @@
     "rtc-transport-offer-logging.ac4": {
       "status": "completed",
       "doneAt": "2026-11-04T15:10:23.168Z"
+    },
+    "directory-client-transition-logging.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:10:38.397Z"
     }
   }
 }
