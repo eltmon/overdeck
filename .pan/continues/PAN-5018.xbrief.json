@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5018",
+  "created": "2026-11-04T13:12:52.932Z",
+  "updated": "2026-11-04T13:12:52.932Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "phone-dial-logging": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5018",
+      "claimedAt": "2026-11-04T13:12:52.932Z"
+    }
+  }
+}
