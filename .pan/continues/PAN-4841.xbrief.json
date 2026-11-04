@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4841",
   "created": "2026-11-04T10:01:07.580Z",
-  "updated": "2026-11-04T17:38:26.487Z",
+  "updated": "2026-11-04T17:38:39.700Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -262,6 +262,10 @@
     "rel-first-testflight-build.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T17:38:26.487Z"
+    },
+    "rel-first-testflight-build.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:38:39.699Z"
     }
   }
 }
