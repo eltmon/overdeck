@@ -18,6 +18,7 @@
  *   token and root session may revoke any.
  *
  * No pairing response is cacheable, and none ever contains the internal token.
+ * A code issued for an Overdeck connector never pairs a browser (PAN-4927 W-CONN1).
  */
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
@@ -26,6 +27,7 @@ import { createAccessToken, listAccessTokens, revokeAccessToken, type PublicAcce
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
 import { closeChannelsForPeer } from '../channel-listener.js';
+import { isConnectorCode } from '../connector-pairing.js';
 import { closeDeviceConnections } from '../device-connections.js';
 import { jsonResponse } from '../http-helpers.js';
 import {
@@ -119,6 +121,13 @@ const exchangePairingCredentialRoute = HttpRouter.add(
     // before the credential is consumed, so the code survives for an HTTPS retry.
     if (delivery === 'cookie' && isRemotePlainHttpBrowser(request)) {
       return noStore(jsonResponse({ error: 'use-https' }, { status: 403 }));
+    }
+
+    // PAN-4927 W-CONN1: a connector's code must never pair a browser as an admin device. Checked before
+    // the code is consumed, so a mistaken paste still lets the connector pair.
+    if (isConnectorCode(credential)) {
+      recordPairingExchangeFailure();
+      return noStore(jsonResponse({ error: 'this pairing code is for an Overdeck connector; run pan mcp connector pair with it', code: 'connector-code' }, { status: 403 }));
     }
 
     const outcome = consumePairingCredential(credential);

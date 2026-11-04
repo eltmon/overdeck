@@ -48,6 +48,15 @@ defend, and what they do not. User-facing guide:
   resolved shape is `{ kind: 'phone', tokenId, clientId, phoneKey, scopes }`.
   Carries `PHONE_TOKEN_SCOPES` (eight scopes, never `admin` or `forward`).
   See "Phone credentials (PAN-4835)" below.
+- **Connector credential** (PAN-4927) — an Overdeck connector's `odk_<64 hex>`
+  token: a `kind: 'connector'` record bound to the connector's link key
+  (`connectorKey`) and its directory client id (`clientId`), minted by
+  `POST /api/connectors/exchange`. It authenticates only from `Authorization:
+  Bearer odk_…` inside a link-mode channel whose handshake proved
+  `connectorKey`; the resolved shape is
+  `{ kind: 'connector', tokenId, clientId, connectorKey, scopes }`. Carries
+  only scopes from `CONNECTOR_SCOPE_CHOICES`. See "Connector credentials
+  (PAN-4927 W-CONN1)" below.
 - **Agent token** (PAN-4927) — a managed agent's or conversation's own
   `odk_<64 hex>` token; see "Agent tokens (PAN-4927)" below.
 - **CSRF token** — an HMAC token returned by the session mint and sent back on
@@ -62,10 +71,14 @@ request arrived on (`channelOfRequest`, `channel-peer.ts`) or `null`. It returns
 `{ kind: 'internal-token' }`, `{ kind: 'root-session' }`,
 `{ kind: 'device', deviceId, scopes }`, `{ kind: 'token', tokenId, scopes }`,
 `{ kind: 'machine', tokenId, machineKey, environmentId, access, scopes }`,
-`{ kind: 'phone', tokenId, clientId, phoneKey, scopes }`, or `null`, in that
-precedence. A `machine` record needs `channel.mode === 'link'` and
+`{ kind: 'phone', tokenId, clientId, phoneKey, scopes }`,
+`{ kind: 'connector', tokenId, clientId, connectorKey, scopes }`, or `null`, in
+that precedence. A `machine` record needs `channel.mode === 'link'` and
 `channel.remoteKeyHex === record.machineKey`; a `phone` record (PAN-4835)
-needs the same channel mode and `channel.remoteKeyHex === record.phoneKey`.
+needs the same channel mode and `channel.remoteKeyHex === record.phoneKey`; a
+`connector` record (PAN-4927) needs the same channel mode and
+`channel.remoteKeyHex === record.connectorKey`, and its scopes are filtered to
+`CONNECTOR_SCOPE_CHOICES`.
 Channel requests are never
 loopback peers (`remoteAddress` is `link:<key>`), so the session mint answers
 401 to them and the remote request gate treats them as remote. The `odk_` value is read from the
@@ -534,7 +547,7 @@ registry corrupt, exactly like an incomplete `machine` record (H-1).
   channel whose `remoteKeyHex` equals the record's `phoneKey`; it resolves to
   `null` in a pairing or approval channel, in a link channel opened by another
   key, and on a plain socket (FR-3). `findActiveChannelTokenByKey(keyHex)`
-  returns the active `machine` or `phone` record pinned to a key, and
+  returns the active `machine`, `phone` or `connector` record pinned to a key, and
   `server.ts` wires it into `isPinnedPeer`, so the link-mode handshake accepts
   a phone's key the same way it accepts a machine's.
 - **No CSRF, no Origin.** A phone credential is header-borne and channel-
@@ -574,6 +587,77 @@ registry corrupt, exactly like an incomplete `machine` record (H-1).
   data. `GET /api/fleet/needs-you`, the `/api/conversations/@<env>/...`
   linked-conversation proxy and the `/ws/linked/:env/rpc` upgrade all still
   refuse every channel caller (the no-chained-hops rule), phone included.
+
+## Connector credentials (PAN-4927 W-CONN1)
+
+`routes/connectors.ts` and `connector-pairing.ts` serve the machine side of a
+self-hosted bot. The bot runs an Overdeck connector (`pan mcp connector`),
+which pairs once with one machine and then reaches it only through a link-mode
+secure channel.
+
+- **Record.** A `kind: 'connector'` access-token record carries `connectorKey`
+  (the connector's link public key, 64 lowercase hex) and `clientId` (its
+  directory client id, a UUID v4), and no machine, phone, push or agent field.
+  `createAccessToken` mints one only with scopes from
+  `CONNECTOR_SCOPE_CHOICES` — `read:state, read:conversations, tell, operate,
+  approve` — so a connector never holds `admin`, `forward`, `read:settings`,
+  `read:costs` or `read:events`. `BOT_DEFAULT_SCOPES` (`read:state,
+  read:conversations, tell`) is what "Connect a bot" starts with. A connector
+  record missing either field makes the registry corrupt.
+- **Channel binding.** A connector credential resolves to
+  `{ kind: 'connector', tokenId, clientId, connectorKey, scopes }` only inside
+  a link-mode channel whose `remoteKeyHex` equals `connectorKey`; a plain socket, a pairing
+  or approval channel, and a link channel from another key all resolve to
+  `null`. The resolver filters the record's scopes to
+  `CONNECTOR_SCOPE_CHOICES` again, so a hand-edited record with `admin` still
+  grants nothing outside the set. `findActiveChannelTokenByKey` returns an
+  active connector record, which is what lets the connector's link handshake
+  through `isPinnedPeer`.
+- **No CSRF, no Origin.** The bearer rides a Noise-authenticated channel, so a
+  connector credential joins the skip list in
+  `rejectUnsafeDashboardMutationRequest`, like a phone's.
+- **`POST /api/connectors/pairing`** (root only: the internal token or the root
+  session; an `admin` device or token gets 403) takes `{ name, scopes? }`.
+  `name` is 1-64 characters; missing `scopes` means `BOT_DEFAULT_SCOPES`;
+  present `scopes` must be distinct values from `CONNECTOR_SCOPE_CHOICES`.
+  `read:state` is always added, so every connector can call
+  `DELETE /api/connectors/self`. The route issues an ordinary `odp_` pairing
+  code, stores the intent `{ name, scopes, expiresAt }` by the code's pairingId
+  for 10 minutes, and returns `{ pairingString, expiresAt }` with
+  `Cache-Control: no-store`.
+- **`POST /api/connectors/exchange`** is reachable only through a pairing-mode
+  channel (`PAIRING_CHANNEL_ALLOWLIST`; 401 everywhere else). It takes the
+  intent of the channel's pairingId first, so any outcome burns it, and answers
+  403 `not-a-connector-code` when there is none. It then parses
+  `{ v: 1, clientId, label }` (400 on error), answers 409 `link-key-in-use` for
+  a key already bound to an active record, mints the connector record with the
+  intent's name and scopes, revokes an older active connector with the same
+  `clientId`, and returns `{ v: 1, token, tokenId, scopes, descriptor }` with
+  `Cache-Control: no-store`.
+- **`GET /api/connectors`** (root only) lists active connectors as
+  `{ id, name, scopes, clientId, createdAt, lastUsedAt }`, with no key
+  material or hash. **`DELETE /api/connectors/:id`** (root only) revokes one
+  (404 for an unknown id). **`DELETE /api/connectors/self`** is the
+  connector's own logout: the scope table admits it with `read:state`, and the
+  handler requires a `connector` credential. The `:id` route hands `self` to
+  the same handler.
+- **Cross-refusal.** A code issued for a connector must never pair anything
+  else, because the browser exchange would make it an `admin` device.
+  `POST /api/pairing/exchange` refuses it with 403 `connector-code` before
+  consuming it, so a mistaken paste still lets the connector pair; the refusal
+  counts as one failed exchange. `POST /api/machines/exchange` and
+  `POST /api/phones/exchange` refuse it the same way, but their handshake has
+  already consumed the code, so the operator issues a new one. An expired
+  intent still marks its code until it is pruned one TTL later.
+- **Revocation.** Revoking a connector record, by any process, closes its
+  channels (`registerRevocationClosers`) and its `/ws/rpc` and SSE connections
+  (`revocableCredentialId`). The operator and self revoke routes also close
+  them at once.
+- **`capabilities.connector`** on `GET /api/environment` tells a connector the
+  machine supports it; an older server omits it.
+- **Downgrade cost.** A `connector` record makes an older Overdeck read the
+  registry as corrupt and refuse every token until the record is removed,
+  exactly as `machine` and `phone` records do.
 
 ## Remote request gate
 
