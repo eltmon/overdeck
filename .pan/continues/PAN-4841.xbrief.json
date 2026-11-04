@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4841",
   "created": "2026-11-04T10:01:07.580Z",
-  "updated": "2026-11-04T17:35:08.667Z",
+  "updated": "2026-11-04T17:35:22.793Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -202,6 +202,10 @@
     "rel-ios-rig-script.ac4": {
       "status": "completed",
       "doneAt": "2026-11-04T17:35:08.666Z"
+    },
+    "rel-privacy-policy.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:35:22.793Z"
     }
   }
 }
