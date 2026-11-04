@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4885",
   "created": "2026-11-04T10:36:33.533Z",
-  "updated": "2026-11-04T10:46:27.604Z",
+  "updated": "2026-11-04T10:46:40.523Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-4885",
       "claimedAt": "2026-11-04T10:40:46.061Z",
       "doneAt": "2026-11-04T10:46:27.604Z"
+    },
+    "docs-two-budgets": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4885",
+      "claimedAt": "2026-11-04T10:46:40.523Z"
     }
   }
 }
