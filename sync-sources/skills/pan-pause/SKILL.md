@@ -26,7 +26,7 @@ pan pause PAN-123
 pan pause PAN-123 --reason "investigating bad loop"
 ```
 
-`<id>` also accepts a full agent ID, `conv/<n>` or `conv:<n>`, and a dashboard URL such as `https://overdeck.localhost/conv/2972`.
+`<id>` also accepts a full agent ID, a conversation name such as `20260928-7563`, `conv/<n>` or `conv:<n>`, and a dashboard URL such as `https://overdeck.localhost/conv/2972`.
 
 ## What It Does
 

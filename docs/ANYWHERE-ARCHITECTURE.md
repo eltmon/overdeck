@@ -220,6 +220,13 @@ channel, when it dies with `ECONNRESET` or `EPIPE` on a reused channel before an
 byte arrives. Every other method, and any request that already got a response, is never
 resent.
 
+Opening a channel to a link has two budgets. A `connecting` link gets `LINK_WAIT_MS` (2.5 s) to come
+online, and an `offline`, `revoked` or `unsupported` link fails at once. The open itself (transport
+connect plus handshake) to an online link gets `LINK_OPEN_MS` (10 s): over the public Fly route, TLS to
+the edge, the `fly-force-instance-id` pin and the handshake missed 2.5 s often enough that two of three
+worker starts failed against an online link (PAN-4885). Callers that need a shorter bound pass their own
+signal; fleet search and usage keep 2.5 s per machine that way.
+
 No new port is opened. `installChannelListener` (`src/dashboard/server/channel-listener.ts`)
 is installed in the `NodeHttpServer.make` factory and reads the first byte of every
 connection on the dashboard port: `0x00` is a channel, anything else goes to the HTTP
@@ -1268,3 +1275,10 @@ until this lands. Fallback per the plan: the two-machine smoke on this branch (t
 servers, A as home and B as the laptop) passed `lane-remote`, `lane-report`, `lane-nest`
 and `lane-reap`. The three-machine check (laptop rig and a Fly machine) runs after release
 and `pan reload`, tracked in #4760.
+
+Live check, 2026-11-04 (build `65e3b1adf86`, 0.73.1 on all three machines): passed. Three builders on the
+desktop; critics on a Fly machine (`add-fly`) and the laptop rig each judged a builder's pushed head and
+reported PASS; `--machine auto` chose the Fly machine by CPU pressure, `--needs macos` the laptop and
+`--needs docker` the desktop. All 8 lanes were listed under the orchestrator in `pan lane list` and the
+Command Deck. The tree shows no report badges for remote lanes (#5005), and Auto prints no reason when it
+picks this machine (#5006). Evidence: `.pan/uat/pan-4638/check-1-three-machine-gauntlet.md`.

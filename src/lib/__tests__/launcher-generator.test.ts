@@ -87,6 +87,16 @@ describe('generateLauncherScript', () => {
     expect(script).toContain(`export OVERDECK_HOME='${alternateHome}'`);
   });
 
+  it('omits CLAUDE_CODE_TMPDIR from remote launchers (PAN-4998)', () => {
+    const script = generateLauncherScript({ ...DEFAULT_CONFIG, spawnMode: 'remote' });
+    expect(script).not.toContain('CLAUDE_CODE_TMPDIR');
+  });
+
+  it('exports CLAUDE_CODE_TMPDIR for a non-remote codex launcher (PAN-4998)', () => {
+    const script = generateLauncherScript({ ...DEFAULT_CONFIG, harness: 'codex' });
+    expect(script).toContain(`export CLAUDE_CODE_TMPDIR='${tempHome}/tmp'`);
+  });
+
   it('work agent spawn (basic)', () => {
     const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
@@ -98,6 +108,7 @@ describe('generateLauncherScript', () => {
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
       export OVERDECK_HOME='<OVERDECK_HOME>'
+      mkdir -p '<OVERDECK_HOME>/tmp' && chmod 700 '<OVERDECK_HOME>/tmp' && export CLAUDE_CODE_TMPDIR='<OVERDECK_HOME>/tmp'
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
       if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
@@ -123,6 +134,7 @@ describe('generateLauncherScript', () => {
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
       export OVERDECK_HOME='<OVERDECK_HOME>'
+      mkdir -p '<OVERDECK_HOME>/tmp' && chmod 700 '<OVERDECK_HOME>/tmp' && export CLAUDE_CODE_TMPDIR='<OVERDECK_HOME>/tmp'
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
       if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
@@ -153,6 +165,7 @@ describe('generateLauncherScript', () => {
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
       export OVERDECK_HOME='<OVERDECK_HOME>'
+      mkdir -p '<OVERDECK_HOME>/tmp' && chmod 700 '<OVERDECK_HOME>/tmp' && export CLAUDE_CODE_TMPDIR='<OVERDECK_HOME>/tmp'
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
       if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
@@ -312,6 +325,7 @@ describe('generateLauncherScript', () => {
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
       export OVERDECK_HOME='<OVERDECK_HOME>'
+      mkdir -p '<OVERDECK_HOME>/tmp' && chmod 700 '<OVERDECK_HOME>/tmp' && export CLAUDE_CODE_TMPDIR='<OVERDECK_HOME>/tmp'
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
       export TERM=xterm-256color
@@ -638,6 +652,7 @@ describe('generateLauncherScript', () => {
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
       export OVERDECK_HOME='<OVERDECK_HOME>'
+      mkdir -p '<OVERDECK_HOME>/tmp' && chmod 700 '<OVERDECK_HOME>/tmp' && export CLAUDE_CODE_TMPDIR='<OVERDECK_HOME>/tmp'
       set -o pipefail
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
@@ -1023,6 +1038,7 @@ describe('generateLauncherScript', () => {
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
       export OVERDECK_HOME='<OVERDECK_HOME>'
+      mkdir -p '<OVERDECK_HOME>/tmp' && chmod 700 '<OVERDECK_HOME>/tmp' && export CLAUDE_CODE_TMPDIR='<OVERDECK_HOME>/tmp'
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
       if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project' --plugin-link '<OVERDECK_HOME>/launch/sess-xyz/skill-packs')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
@@ -1063,6 +1079,7 @@ describe('generateLauncherScript', () => {
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
       export OVERDECK_HOME='<OVERDECK_HOME>'
+      mkdir -p '<OVERDECK_HOME>/tmp' && chmod 700 '<OVERDECK_HOME>/tmp' && export CLAUDE_CODE_TMPDIR='<OVERDECK_HOME>/tmp'
       set -o pipefail
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
@@ -1098,6 +1115,7 @@ describe('generateLauncherScript', () => {
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
       export OVERDECK_HOME='<OVERDECK_HOME>'
+      mkdir -p '<OVERDECK_HOME>/tmp' && chmod 700 '<OVERDECK_HOME>/tmp' && export CLAUDE_CODE_TMPDIR='<OVERDECK_HOME>/tmp'
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
       export TERM=xterm-256color
@@ -1155,6 +1173,7 @@ describe('generateLauncherScript', () => {
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
       export OVERDECK_HOME='<OVERDECK_HOME>'
+      mkdir -p '<OVERDECK_HOME>/tmp' && chmod 700 '<OVERDECK_HOME>/tmp' && export CLAUDE_CODE_TMPDIR='<OVERDECK_HOME>/tmp'
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
       export TERM=xterm-256color
@@ -1232,6 +1251,7 @@ describe('generateLauncherScript', () => {
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
       export OVERDECK_HOME='<OVERDECK_HOME>'
+      mkdir -p '<OVERDECK_HOME>/tmp' && chmod 700 '<OVERDECK_HOME>/tmp' && export CLAUDE_CODE_TMPDIR='<OVERDECK_HOME>/tmp'
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
       if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
@@ -1258,6 +1278,7 @@ describe('generateLauncherScript', () => {
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
       export OVERDECK_HOME='<OVERDECK_HOME>'
+      mkdir -p '<OVERDECK_HOME>/tmp' && chmod 700 '<OVERDECK_HOME>/tmp' && export CLAUDE_CODE_TMPDIR='<OVERDECK_HOME>/tmp'
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
       if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
@@ -1302,6 +1323,7 @@ describe('generateLauncherScript', () => {
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
       export OVERDECK_HOME='<OVERDECK_HOME>'
+      mkdir -p '<OVERDECK_HOME>/tmp' && chmod 700 '<OVERDECK_HOME>/tmp' && export CLAUDE_CODE_TMPDIR='<OVERDECK_HOME>/tmp'
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
       if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
@@ -1653,6 +1675,7 @@ describe('generateLauncherWrapper', () => {
           'export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"',
           'unset TMUX TMUX_PANE STY',
           `export OVERDECK_HOME='${tempHome}'`,
+          `mkdir -p '${tempHome}/tmp' && chmod 700 '${tempHome}/tmp' && export CLAUDE_CODE_TMPDIR='${tempHome}/tmp'`,
           'command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"',
           'export SKIP_DOCS_INDEX=1',
           `if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project' --plugin-link '${tempHome}/launch/sess-abc/skill-packs')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi`,
@@ -2146,10 +2169,12 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
         kimiCodeYolo: true,
         promptFile: '/workspace/project/.pan/init-prompt.txt',
       });
-      expect(script).not.toMatch(/--session\b/);
-      expect(script).not.toMatch(/--work-dir/);
-      expect(script).not.toMatch(/(^|\s)-p(\s|$)/);
-      expect(script).not.toMatch(/--print/);
+      const execLine = script.split('\n').find((line) => line.startsWith('exec kimi'));
+      expect(execLine).toBeDefined();
+      expect(execLine).not.toMatch(/--session\b/);
+      expect(execLine).not.toMatch(/--work-dir/);
+      expect(execLine).not.toMatch(/(^|\s)-p(\s|$)/);
+      expect(execLine).not.toMatch(/--print/);
     });
 
     it('resumes a captured session id via -S (PAN-1837)', () => {

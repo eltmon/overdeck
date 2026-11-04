@@ -1,14 +1,19 @@
 /**
  * Shared agent-target resolution for pan tell/pause/unpause/untroubled/kill
- * (PAN-4465). Accepts issue IDs, qualified agent IDs, bare numerics, and
- * conversation forms (`conv/<n>`, `conv:<n>`, a dashboard `/conv/<n>` URL).
+ * (PAN-4465). Accepts issue IDs, qualified agent IDs, bare numerics,
+ * conversation forms (`conv/<n>`, `conv:<n>`, a dashboard `/conv/<n>` URL),
+ * and bare conversation names (PAN-4999) — e.g. `20260928-7563` resolves
+ * through the conversation table before falling back to an issue ID.
  *
  * Deliberately outside src/lib/agents/identity.ts: that module is an import-
  * cycle leaf, and conversations.ts pulls in dashboard/server/event-store.js.
  */
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import chalk from 'chalk';
 import { isQualifiedAgentId, resolveAgentTarget } from '../lib/agents.js';
 import { listBareNumericIssueMatches, resolveIssueId } from '../lib/issue-id.js';
+import { AGENTS_DIR } from '../lib/paths.js';
 
 export interface AgentTargetCandidate {
   /** What the operator would type to pick this one: `PAN-2972` or `conv/2972`. */
@@ -28,12 +33,30 @@ export type AgentTargetFailure = Exclude<AgentTargetResolution, { kind: 'agent' 
 export const ACCEPTED_TARGET_FORMS: readonly string[] = [
   'issue ID       PAN-1148 (a bare 1148 works when it is unambiguous)',
   'agent ID       agent-pan-1148, strike-pan-1723, conv-20260928-7563',
-  'conversation   conv/2972, conv:2972, or a dashboard URL such as https://overdeck.localhost/conv/2972',
+  'conversation   its name 20260928-7563, conv/2972, conv:2972, or a dashboard URL such as https://overdeck.localhost/conv/2972',
   'bare number    an issue agent if one exists, else that conversation; both → this list',
 ];
 
 const CONV_URL = /^https?:\/\/[^/]+\/conv\/([^/?#]+)\/?(?:[?#].*)?$/i;
 const CONV_PREFIX = /^conv[/:](.+)$/i;
+
+const STANDARD_ISSUE_ID_SHAPE = /^[A-Za-z]+-\d+$/;
+// Mirrors the Rally prefixes parseIssueId (../lib/issue-id.js) recognizes
+// (Feature/User Story/Defect/Task/Test Case). Kept local rather than
+// imported: issue-id.js is fully replaced (not importOriginal) by several
+// command test files' vi.mock, so importing a new export from it there
+// would break every one of those mocks.
+const RALLY_ISSUE_ID_SHAPE = /^(?:F|US|DE|TA|TC)\d+$/i;
+
+/**
+ * True for standard (`PAN-1148`) and Rally-style (`F29698`, `US12345`,
+ * `DE118304`, `TA4567`) issue ID shapes — the forms `resolveIssueId` already
+ * canonicalizes. Rally IDs have no dash, so a plain `PREFIX-NUMBER` regex
+ * would miss them and route them into the conversation-name lookup.
+ */
+function isIssueShaped(input: string): boolean {
+  return STANDARD_ISSUE_ID_SHAPE.test(input) || RALLY_ISSUE_ID_SHAPE.test(input);
+}
 
 interface ConversationLookupRow {
   id: number;
@@ -102,7 +125,45 @@ async function resolveBareDigits(input: string): Promise<AgentTargetResolution> 
   return { kind: 'unresolved', input, reason: `no issue agent or conversation matches ${input}` };
 }
 
-/** Resolves a CLI target string to an agent, an issue (caller decides fan-out), or a failure (FR-1…FR-5). */
+/**
+ * Resolves a name-shaped target (not a bare numeric, not a `PREFIX-NUMBER`
+ * issue ID) through the conversation table before falling back to the issue
+ * fallback that previously handled every non-digit input unconditionally
+ * (PAN-4999). A vault-origin conversation row is treated as no row.
+ */
+async function resolveNameShaped(input: string): Promise<AgentTargetResolution> {
+  const issueId = resolveIssueId(input);
+  const agentId = resolveAgentTarget(issueId);
+  const agentExists = agentId !== null && existsSync(join(AGENTS_DIR, agentId));
+  const lookup = await lookupConversation(input);
+  const row = lookup.ok && lookup.row && lookup.row.origin !== 'vault' ? lookup.row : null;
+
+  if (row && agentExists && agentId) {
+    return {
+      kind: 'ambiguous',
+      input,
+      candidates: [{ explicitForm: agentId, label: `agent ${agentId}` }, conversationCandidate(row)],
+    };
+  }
+  if (row) return { kind: 'agent', agentId: row.tmuxSession, via: 'conversation' };
+  if (agentExists) return { kind: 'issue', issueId };
+
+  const agentLabel = agentId ?? `agent-${issueId.toLowerCase()}`;
+  if (!lookup.ok) {
+    return { kind: 'unresolved', input, reason: `conversation lookup failed: ${lookup.message}; no agent ${agentLabel}` };
+  }
+  return { kind: 'unresolved', input, reason: `no conversation named ${input} and no agent ${agentLabel}` };
+}
+
+/**
+ * Resolves a CLI target string to an agent, an issue (caller decides
+ * fan-out), or a failure (FR-1…FR-5). Besides issue IDs (standard
+ * `PREFIX-NUMBER` or Rally-style `F29698`), qualified agent IDs, bare
+ * numerics and explicit `conv/…` forms, a bare name that isn't shaped like
+ * either issue form (e.g. a conversation name like `20260928-7563`)
+ * resolves through the conversation table before falling back to the issue
+ * ID it would otherwise have been treated as (PAN-4999).
+ */
 export async function resolveCliAgentTarget(input: string): Promise<AgentTargetResolution> {
   const urlMatch = input.match(CONV_URL);
   if (urlMatch) return resolveExplicitConversationForm(decodeURIComponent(urlMatch[1]), input);
@@ -114,7 +175,8 @@ export async function resolveCliAgentTarget(input: string): Promise<AgentTargetR
 
   if (/^\d+$/.test(input)) return resolveBareDigits(input);
 
-  return { kind: 'issue', issueId: resolveIssueId(input) };
+  if (isIssueShaped(input)) return { kind: 'issue', issueId: resolveIssueId(input) };
+  return resolveNameShaped(input);
 }
 
 /** For tell/pause/unpause/untroubled: collapses an `issue` result to its one agent (FR-6). */

@@ -1,3 +1,4 @@
+import { agentTmpdirLauncherLine } from './agent-tmpdir.js';
 import { museDataHome } from './runtimes/storage/muse.js';
 import { prepareClaudeContext } from './launcher-context.js';
 import { dirname, join } from 'node:path';
@@ -327,8 +328,9 @@ export function generateLauncherScript(config: LauncherConfig): string {
   lines.push('export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"');
   lines.push('unset TMUX TMUX_PANE STY');
   // Remote launchers run on Fly VMs where the spawning host's home is invalid.
+  // PAN-4998: keep Claude Code's scratch out of /tmp, which a reboot empties.
   if (config.spawnMode !== 'remote') {
-    lines.push(`export OVERDECK_HOME=${shellQuote(getOverdeckHome())}`);
+    lines.push(`export OVERDECK_HOME=${shellQuote(getOverdeckHome())}`, agentTmpdirLauncherLine());
   }
 
   // Pipefail

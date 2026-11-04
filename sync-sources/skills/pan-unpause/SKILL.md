@@ -25,7 +25,7 @@ pan unpause <issue-id>
 pan unpause PAN-123
 ```
 
-`<id>` also accepts a full agent ID, `conv/<n>` or `conv:<n>`, and a dashboard URL such as `https://overdeck.localhost/conv/2972`.
+`<id>` also accepts a full agent ID, a conversation name such as `20260928-7563`, `conv/<n>` or `conv:<n>`, and a dashboard URL such as `https://overdeck.localhost/conv/2972`.
 
 ## What It Does
 

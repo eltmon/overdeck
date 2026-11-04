@@ -562,6 +562,26 @@ run in the deacon child yet
 waits for the next request. [PAN-4622](https://github.com/eltmon/overdeck/issues/4622)
 tracks closing this window.
 
+### Review dispatch touches neither the stack nor tracked files (PAN-4690)
+
+After verification passes, review dispatch keeps the window in which a
+dashboard restart can strand it short, and it leaves the workspace in a state
+from which `recoverUndispatchedReviews` can re-request the review:
+
+- **No stack gate for review.** `assertWorkspaceStackHealthyForSpawn`
+  (`agents/spawn-prep.ts`) returns at once for the `review` role, after the
+  missing-workspace check. Review reads only the committed diff, so it never
+  checks stack health, never rebuilds the stack, and runs on the host. Before
+  this, review dispatch could tear the stack down and run `docker compose up -d
+  --build` before spawning. A restart in that window killed the rebuild and the
+  spawn together, and left the containers in `Created`. Other non-`work` roles
+  keep the bounded rebuild with host fallback.
+- **No uncommitted tracked writes.** Dispatch clears only the gitignored
+  feedback mirror, never the continue file's `feedback[]`, and a no-op
+  continue-file update writes nothing (see [XBRIEF.md](XBRIEF.md)). Otherwise
+  the dirty-tree gate refuses the dispatched review and every deacon-lite
+  re-request of it.
+
 ## Verification artifacts (FR-8)
 
 Each verification run writes an immutable artifact named by run time and

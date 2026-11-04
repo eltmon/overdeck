@@ -1,0 +1,259 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T10:32:48Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4885: Anywhere re-run (PAN-4882): AC-4 pan worker run to an online Fly link fails on the 2.5 s secure-channel budget",
+    "updated": "2026-11-04T10:36:06.810Z"
+  },
+  "plan": {
+    "id": "pan-4885",
+    "title": "Anywhere re-run (PAN-4882): AC-4 pan worker run to an online Fly link fails on the 2.5 s secure-channel budget",
+    "status": "running",
+    "uid": "55350787-93eb-4726-a7bc-4a1549f93b81",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-04T10:32:48Z",
+    "updated": "2026-11-04T10:36:06.810Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4885",
+        "label": "PAN-4885",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4885.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "anywhere",
+      "machine-links",
+      "secure-channel",
+      "fly",
+      "timeouts"
+    ],
+    "narratives": {
+      "Problem": "openLinkSocket (src/lib/anywhere/link-client.ts) uses LINK_WAIT_MS (2.5 s) both as the wait for a connecting link and as openChannel's timeoutMs for the handshake to an already-online link. Over the public Fly route (TLS to the Fly edge, the fly-force-instance-id pin, then Noise IK) the open misses 2.5 s often enough that two of three `pan worker run --machine fly-…` starts failed with 'Secure channel to wss://pan-workspaces.fly.dev/ws/link?fly-instance=… did not open within 2500 ms' while the link was online with a fresh heartbeat.",
+      "Proposal": "Add export const LINK_OPEN_MS = 10_000 to link-client.ts and pass it as openChannel's timeoutMs in openLinkSocket; keep LINK_WAIT_MS (2.5 s) as the connecting wait only. Rewrite the module header so it states both budgets. Prove both budgets with a new fake-timer test file that mocks openChannel and delegates to the real withDeadline. Document the two budgets in docs/ANYWHERE-ARCHITECTURE.md and add a troubleshooting bullet to configuration/linked-machines.mdx. Full detail, before/after snippets and named tests in .pan/drafts/PAN-4885.md.",
+      "NonGoals": "- No retry of a failed channel open; the existing GET/HEAD/OPTIONS stale-channel resend stays unchanged.\n- No change to LINK_WAIT_MS or to the connecting-wait behavior (waitOnline still gets 2.5 s; afterWait message unchanged).\n- No change to the link supervisor's 2.5 s probe budget in src/dashboard/server/services/link-supervisor.ts.\n- No change inside packages/anywhere-channel/ (DEFAULT_OPEN_TIMEOUT_MS, withDeadline, error text).\n- No change to Fly routing (fly-force-instance-id, FLY_INSTANCE_PARAM) or WORK_DOOR_TIMEOUT_MS.\n- No change to fleet callers' own 2.5 s AbortSignal bounds (fleet-awareness, fleet-usage, machines-fleet).\n- No edits to src/lib/anywhere/__tests__/link-client.test.ts and no edit to the dated 2026-11-03 entry in docs/ANYWHERE-RELEASE-CHECKLIST.md.\n- No live Fly re-run is required to merge."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Chose a separate, larger open budget (LINK_OPEN_MS = 10 s) for an online link over one retry of the open.",
+        "rationale": "The issue offered both without a default. The evidence shows two consecutive failures 22 s apart, then a success: a slow window lasting tens of seconds. A retry fired 2.5 s into the same window would likely fail again; a longer budget lets the slow open finish. 10 s equals the channel package's own DEFAULT_OPEN_TIMEOUT_MS and fits inside the 30 s WORK_DOOR_TIMEOUT_MS."
+      },
+      {
+        "summary": "LINK_OPEN_MS is a literal in link-client.ts, not an import of DEFAULT_OPEN_TIMEOUT_MS.",
+        "rationale": "It is a policy of the link client; importing the package default would move it silently if the package changes."
+      },
+      {
+        "summary": "Callers without a signal (ws-linked, port-forwards) now wait up to 10 s on an online-but-dead link.",
+        "rationale": "Accepted tradeoff: the supervisor marks such a link offline within 20 s, after which calls fail at once; callers needing a shorter bound already pass a signal."
+      }
+    ],
+    "items": [
+      {
+        "id": "link-open-budget",
+        "title": "Add LINK_OPEN_MS (10 s) and pass it as openLinkSocket's channel-open timeout",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T10:32:48Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4885",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/anywhere/link-client.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "grep -n 'timeoutMs: LINK_OPEN_MS' src/lib/anywhere/link-client.ts",
+            "grep -c 'timeoutMs: LINK_WAIT_MS' src/lib/anywhere/link-client.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "one match inside openLinkSocket",
+            "count 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 exactly. In src/lib/anywhere/link-client.ts: (1) rewrite the module header lines 14-17 to the 'After' text in the PRD (states LINK_WAIT_MS for the connecting wait and LINK_OPEN_MS for the open, cites PAN-4885, says callers needing a shorter bound pass a signal); (2) after `export const LINK_WAIT_MS = 2_500;` add the documented `export const LINK_OPEN_MS = 10_000;`; (3) in openLinkSocket change `timeoutMs: LINK_WAIT_MS,` to `timeoutMs: LINK_OPEN_MS,`; (4) update the openLinkSocket doc comment as in the PRD. Do not touch waitOnline(…, LINK_WAIT_MS) calls, afterWait, or linkFetch/linkForward comments about the 2.5 s connecting wait. No change in packages/anywhere-channel/."
+        },
+        "items": [
+          {
+            "id": "link-open-budget.ac1",
+            "title": "Given src/lib/anywhere/link-client.ts, when grepped, then `timeoutMs: LINK_OPEN_MS` appears once inside openLinkSocket, `timeoutMs: LINK_WAIT_MS` returns no match, and both `export const LINK_OPEN_MS = 10_000;` and `export const LINK_WAIT_MS = 2_500;` exist",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "link-open-budget.ac2",
+            "title": "Given the module header of link-client.ts, when read, then it no longer contains 'No user-facing call waits more than 2.5 s' and names both LINK_WAIT_MS (connecting wait) and LINK_OPEN_MS (open budget)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "link-open-budget.ac3",
+            "title": "Given the change, when `npm run typecheck` runs, then it exits 0 and `git diff --stat origin/main -- packages/anywhere-channel` produces no output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "link-open-budget-tests",
+        "title": "Fake-timer tests proving the 10 s open budget and the 2.5 s connecting wait",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T10:32:48Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4885",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/anywhere/__tests__/link-open-budget.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/anywhere/__tests__/link-open-budget.test.ts src/lib/anywhere/__tests__/link-client.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "link-open-budget.test.ts passes with its five named tests",
+            "link-client.test.ts still passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. Create src/lib/anywhere/__tests__/link-open-budget.test.ts. vi.mock('../channel/open.js') keeping the original exports but replacing openChannel with vi.fn(). Use vi.useFakeTimers() in beforeEach and vi.useRealTimers() + mockReset + _resetLinkClientForTests() in afterEach. For behavioral cases make the mock call the real withDeadline from '@overdeck/anywhere-channel' with a run that resolves a duplexPair end after N ms via setTimeout, so the deadline decides under fake timers with no real I/O. Write the five named tests from the PRD: (1) online link → openChannel called with timeoutMs LINK_OPEN_MS (and LINK_OPEN_MS===10_000, LINK_WAIT_MS===2_500); (2) a 3 s open resolves; (3) an open pending at LINK_OPEN_MS rejects with ChannelOpenError code 'timeout' and message ending 'did not open within 10000 ms' (attach the rejection handler before advancing timers); (4) connecting link: waitOnline receives LINK_WAIT_MS and the open receives LINK_OPEN_MS; waitOnline false → LinkUnavailableError 'machine-unreachable' and openChannel never called; (5) offline link → 'machine-offline', openChannel never called. Do not edit link-client.test.ts. No source-file grepping, no skipIf/.only, no real net/ws sockets."
+        },
+        "items": [
+          {
+            "id": "link-open-budget-tests.ac1",
+            "title": "Given an online link whose mocked open takes 3 000 ms under fake timers, when openLinkSocket runs and timers advance 3 000 ms, then the promise resolves with the channel",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "link-open-budget-tests.ac2",
+            "title": "Given an online link whose open never completes, when timers advance LINK_OPEN_MS, then openLinkSocket rejects with ChannelOpenError code 'timeout' and a message ending 'did not open within 10000 ms'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "link-open-budget-tests.ac3",
+            "title": "Given a connecting link, when openLinkSocket runs, then waitOnline receives LINK_WAIT_MS and, if it returns false, the call rejects with LinkUnavailableError 'machine-unreachable' without calling openChannel; if it returns true, openChannel receives timeoutMs LINK_OPEN_MS",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "link-open-budget-tests.ac4",
+            "title": "Given the new file and the unchanged link-client.test.ts, when `npx vitest run src/lib/anywhere/__tests__/link-open-budget.test.ts src/lib/anywhere/__tests__/link-client.test.ts` runs, then both files pass and the new file uses vi.useFakeTimers with no real net or ws socket",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-two-budgets",
+        "title": "Document the connecting wait vs open budget in the architecture doc and linked-machines troubleshooting",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T10:32:48Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4885",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ANYWHERE-ARCHITECTURE.md",
+            "configuration/linked-machines.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'LINK_OPEN_MS' docs/ANYWHERE-ARCHITECTURE.md",
+            "grep -n 'did not open within 10000 ms' configuration/linked-machines.mdx"
+          ],
+          "expected_outputs": [
+            "a match in the 'One session per connection; the same port' section",
+            "one troubleshooting bullet match"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. (1) In docs/ANYWHERE-ARCHITECTURE.md, section 'One session per connection; the same port (D-4645-3, D-4645-4)', after the paragraph ending 'Every other method, and any request that already got a response, is never resent.', add the PRD's paragraph naming LINK_WAIT_MS (2.5 s connecting wait), LINK_OPEN_MS (10 s open budget to an online link), the Fly-route reason with PAN-4885, and that callers needing a shorter bound pass a signal (fleet search and usage keep 2.5 s). (2) In configuration/linked-machines.mdx troubleshooting list, after the 'closed the connection before proving the pinned machine key' bullet, add the PRD's bullet for '\"Secure channel to … did not open within 10000 ms\" while the machine shows Online'. Leave docs/ANYWHERE-RELEASE-CHECKLIST.md unchanged."
+        },
+        "items": [
+          {
+            "id": "docs-two-budgets.ac1",
+            "title": "Given docs/ANYWHERE-ARCHITECTURE.md, when the 'One session per connection; the same port' section is read, then it contains a paragraph that names LINK_WAIT_MS as the 2.5 s connecting wait, LINK_OPEN_MS as the 10 s open budget for an online link, and cites PAN-4885",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-two-budgets.ac2",
+            "title": "Given configuration/linked-machines.mdx, when the troubleshooting list is read, then it contains a bullet quoting 'did not open within 10000 ms' for a machine that shows Online and tells the reader to run the command again and check the machine's routes if it repeats",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "link-open-budget",
+        "to": "link-open-budget-tests",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-04-PAN-4885-anywhere-re-run-pan-4882-ac-4-pan-worker-run-to-an-online-fly-link-fails-on-the-2-5-s-secure-channel-budget.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

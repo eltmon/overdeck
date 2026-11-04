@@ -32,6 +32,11 @@ describe('readBundledRules', () => {
     );
   });
 
+  it('includes no-tmp-scratch with scope universal (PAN-4998)', () => {
+    const rules = readBundledRules();
+    expect(rules.find((r) => r.name === 'no-tmp-scratch')?.scope).toBe('universal');
+  });
+
   it('classifies no-destructive-requests universal and no-execsync-server dev', () => {
     const rules = readBundledRules();
     expect(rules.find((r) => r.name === 'no-destructive-requests')?.scope).toBe('universal');
@@ -59,6 +64,11 @@ describe('renderBundledRules', () => {
   it('folds the ste-writing rule by default', () => {
     const out = renderBundledRules('claude-code', false);
     expect(out).toContain('ASD-STE100');
+  });
+
+  it('includes the no-tmp-scratch rule text (PAN-4998)', () => {
+    const out = renderBundledRules('claude-code', false);
+    expect(out).toContain('Keep files you may need later out of');
   });
 
   it('omits a rule named in the disabled set', () => {
