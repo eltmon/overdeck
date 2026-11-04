@@ -25,6 +25,7 @@ const {
   createAccessToken,
   PHONE_TOKEN_SCOPES,
   revokeAccessToken,
+  listAccessTokens,
   listActiveRecordsOfKind,
   verifyAccessToken,
 } = await import('../../../lib/access-tokens.js');
@@ -250,6 +251,7 @@ describe('POST /api/connectors/exchange (PAN-4949 D-8, D-17)', () => {
     const second = await read(await handleConnectorsExchange(exchangeBody(), await connectorPairingMarker('c2'.repeat(32))));
     expect(second.status).toBe(200);
     expect(verifyAccessToken(first.json.token as string)).toEqual({ ok: false });
+    expect((await listAccessTokens()).find((record) => record.id === first.json.tokenId)?.revokedAt).toEqual(expect.any(String));
     expect(listActiveRecordsOfKind('connector').map((record) => record.id)).toEqual([second.json.tokenId]);
   });
 

@@ -154,5 +154,6 @@ describe('other exchanges refuse a connector code (PAN-4949 D-10)', () => {
   it('a plain code still pairs a browser', async () => {
     const plain = await browserExchange(issuePairingCredential().credential);
     expect(plain.status).toBe(200);
+    expect((await listAccessTokens()).filter((record) => (record.kind ?? 'device') === 'device')).toHaveLength(1);
   });
 });
