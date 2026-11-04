@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5054",
   "created": "2026-11-04T19:57:03.624Z",
-  "updated": "2026-11-04T20:00:50.075Z",
+  "updated": "2026-11-04T20:00:53.718Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,11 @@
       "claimedBy": "agent-pan-5054",
       "claimedAt": "2026-11-04T20:00:18.932Z",
       "doneAt": "2026-11-04T20:00:50.075Z"
+    },
+    "conventions-map-note": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5054",
+      "claimedAt": "2026-11-04T20:00:53.717Z"
     }
   }
 }
