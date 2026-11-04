@@ -15,7 +15,7 @@
  * `pan-mobile-expanded-projects`.
  */
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { parseLinkedConversationName } from '@overdeck/contracts';
 import { ConversationPanel } from '../chat/ConversationPanel';
 import type { Conversation } from '../CommandDeck/ConversationList';
@@ -42,6 +42,20 @@ async function fetchProjectList(): Promise<RegisteredProjectLite[]> {
   return body as RegisteredProjectLite[];
 }
 
+/** Starts a conversation in `projectKey` with the machine's default model/harness. */
+async function createProjectConversation(projectKey: string): Promise<Conversation> {
+  const res = await fetchWithTimeout('/api/conversations', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ projectKey }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({})) as { error?: string };
+    throw new Error(body.error || `Failed to start a conversation: ${res.status}`);
+  }
+  return (await res.json()) as Conversation;
+}
+
 function ConversationListView({ onOpen }: { onOpen: (id: string) => void }) {
   const { data, isLoading, isError } = useQuery({
     queryKey: ['mobile-conversations'],
@@ -53,6 +67,10 @@ function ConversationListView({ onOpen }: { onOpen: (id: string) => void }) {
     staleTime: 60_000,
   });
   const [expanded, setExpanded] = useState(readExpandedProjects);
+  const [pendingKey, setPendingKey] = useState<string | null>(null);
+  const [failed, setFailed] = useState<{ key: string; message: string } | null>(null);
+  const queryClient = useQueryClient();
+  const createMutation = useMutation({ mutationFn: createProjectConversation });
 
   if (isLoading || projectsQuery.isLoading) return <p className="px-4 py-6 text-sm text-muted-foreground">Loading conversations…</p>;
   if (isError) return <p className="px-4 py-6 text-sm text-muted-foreground">Couldn’t load conversations.</p>;
@@ -67,6 +85,22 @@ function ConversationListView({ onOpen }: { onOpen: (id: string) => void }) {
       else next.add(key);
       writeExpandedProjects(next);
       return next;
+    });
+  }
+
+  function handleCreate(key: string) {
+    setFailed(null);
+    setPendingKey(key);
+    createMutation.mutate(key, {
+      onSuccess: async (created) => {
+        setPendingKey(null);
+        await queryClient.invalidateQueries({ queryKey: ['mobile-conversations'] });
+        onOpen(conversationRouteKey(created));
+      },
+      onError: (error) => {
+        setPendingKey(null);
+        setFailed({ key, message: error instanceof Error ? error.message : String(error) });
+      },
     });
   }
 
@@ -90,8 +124,21 @@ function ConversationListView({ onOpen }: { onOpen: (id: string) => void }) {
                 <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{group.label}</span>
                 <span className="shrink-0 text-xs text-muted-foreground">{group.rows.length}</span>
               </button>
-              {/* project-create adds the + "start a conversation here" button next to this toggle. */}
+              {group.canCreate ? (
+                <button
+                  type="button"
+                  aria-label={`New conversation in ${group.label}`}
+                  disabled={pendingKey === group.key}
+                  onClick={() => handleCreate(group.key)}
+                  className="min-h-11 min-w-11 px-3 text-lg text-foreground"
+                >
+                  +
+                </button>
+              ) : null}
             </div>
+            {failed?.key === group.key ? (
+              <p role="alert" className="px-4 pb-2 text-xs text-destructive">Couldn’t start a conversation: {failed.message}</p>
+            ) : null}
             {isOpen ? (
               group.rows.length === 0 ? (
                 <p id={listId} className="px-4 py-3 text-sm text-muted-foreground">No conversations in this project.</p>

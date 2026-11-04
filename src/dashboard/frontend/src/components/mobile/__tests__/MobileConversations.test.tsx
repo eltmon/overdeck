@@ -33,8 +33,13 @@ function stubFetch(conversations: unknown[], registeredProjects: unknown[] | 'er
   }));
 }
 
+/** The group header toggle, never the sibling "New conversation in <label>" + button. */
+async function findGroupHeader(label: string) {
+  return screen.findByRole('button', { name: (accessibleName) => accessibleName.trim().startsWith(label) });
+}
+
 async function expandGroup(label: string) {
-  fireEvent.click(await screen.findByRole('button', { name: new RegExp(label) }));
+  fireEvent.click(await findGroupHeader(label));
   return screen.findByRole('list', { name: label });
 }
 
@@ -90,7 +95,7 @@ describe('MobileConversations', () => {
   it('renders every group collapsed on first load', async () => {
     stubFetch([row(1, 'Seven', '2026-11-01T00:00:00.000Z')], [{ key: 'alpha', name: 'Alpha', path: '/p/alpha' }]);
     renderWithQuery(<MobileConversations conversationId={null} onOpen={() => {}} onBack={() => {}} />);
-    const header = await screen.findByRole('button', { name: /Alpha/ });
+    const header = await findGroupHeader('Alpha');
     expect(header).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByRole('button', { name: /Seven/ })).not.toBeInTheDocument();
   });
@@ -125,6 +130,57 @@ describe('MobileConversations', () => {
     renderWithQuery(<MobileConversations conversationId={null} onOpen={() => {}} onBack={() => {}} />);
     const list = await expandGroup('alpha');
     expect(list).toHaveTextContent('Keyed');
+  });
+
+  it('+ posts { projectKey } and opens the created conversation', async () => {
+    const created = { id: 9, name: 'conv-9', title: 'New', issueId: null, createdAt: '2026-11-01T00:00:00.000Z', lastAttachedAt: null, projectKey: 'alpha' };
+    const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes('/api/registered-projects')) return new Response(JSON.stringify([{ key: 'alpha', name: 'Alpha', path: '/p/alpha' }]), { status: 200 });
+      if (url === '/api/conversations' && init?.method === 'POST') return new Response(JSON.stringify(created), { status: 200 });
+      return new Response(JSON.stringify([]), { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const onOpen = vi.fn();
+    renderWithQuery(<MobileConversations conversationId={null} onOpen={onOpen} onBack={() => {}} />);
+    const plusButton = await screen.findByRole('button', { name: 'New conversation in Alpha' });
+    const header = await findGroupHeader('Alpha');
+    expect(header).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(plusButton);
+    await vi.waitFor(() => expect(onOpen).toHaveBeenCalled());
+    const postCall = fetchMock.mock.calls.find((call) => String(call[0]) === '/api/conversations' && (call[1] as RequestInit | undefined)?.method === 'POST');
+    expect(postCall).toBeDefined();
+    expect((postCall![1] as RequestInit).body).toBe(JSON.stringify({ projectKey: 'alpha' }));
+    expect(onOpen).toHaveBeenCalledWith('9');
+    expect(header).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('shows the server error inline when the create fails', async () => {
+    const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes('/api/registered-projects')) return new Response(JSON.stringify([{ key: 'alpha', name: 'Alpha', path: '/p/alpha' }]), { status: 200 });
+      if (url === '/api/conversations' && init?.method === 'POST') return new Response(JSON.stringify({ error: 'Unknown project' }), { status: 400 });
+      return new Response(JSON.stringify([]), { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const onOpen = vi.fn();
+    renderWithQuery(<MobileConversations conversationId={null} onOpen={onOpen} onBack={() => {}} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'New conversation in Alpha' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Unknown project');
+    expect(onOpen).not.toHaveBeenCalled();
+  });
+
+  it('shows no + on No project or in fallback mode', async () => {
+    stubFetch([row(1, 'Outside', '2026-11-01T00:00:00.000Z')]);
+    const { unmount } = renderWithQuery(<MobileConversations conversationId={null} onOpen={() => {}} onBack={() => {}} />);
+    await screen.findByRole('button', { name: /No project/ });
+    expect(screen.queryByRole('button', { name: /^New conversation in/ })).not.toBeInTheDocument();
+    unmount();
+
+    stubFetch([row(2, 'Keyed', '2026-11-01T00:00:00.000Z', { projectKey: 'alpha' })], 'error');
+    renderWithQuery(<MobileConversations conversationId={null} onOpen={() => {}} onBack={() => {}} />);
+    await screen.findByRole('button', { name: /^alpha/ });
+    expect(screen.queryByRole('button', { name: /^New conversation in/ })).not.toBeInTheDocument();
   });
 
   it('fetches the conversation and renders the panel with a Back control', async () => {
