@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4960",
   "created": "2026-11-04T10:12:59.940Z",
-  "updated": "2026-11-04T10:56:12.490Z",
+  "updated": "2026-11-04T10:56:45.693Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -84,6 +84,10 @@
     "directory-recheck.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T10:56:12.490Z"
+    },
+    "account-view-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:56:45.693Z"
     }
   }
 }
