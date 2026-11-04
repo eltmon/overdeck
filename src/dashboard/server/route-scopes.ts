@@ -124,6 +124,9 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   // PAN-4651 WI-5: a linked machine follows (and stops) a worker it delegated here.
   { method: 'GET', path: '/api/workers/:id/status', scope: 'read:state' },
   { method: 'POST', path: '/api/workers/:id/stop', scope: 'operate' },
+  // PAN-4927 W-SELF1: self routes; the handler also requires an agent token (D-10).
+  { method: 'GET', path: '/api/self/jobs/:id', scope: 'read:state' },
+  { method: 'GET', path: '/api/self/jobs/:id/wait', scope: 'read:state' },
   // PAN-4650 WI-9: the owner's half of Pull here (a linked machine's operator only, checked by the routes).
   { method: 'POST', path: '/api/conversations/:name/release', scope: 'operate' },
   { method: 'GET', path: '/api/conversations/:name/release/transfer/:transferId', scope: 'operate' },

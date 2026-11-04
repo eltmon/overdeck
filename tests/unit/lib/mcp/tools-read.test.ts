@@ -15,7 +15,7 @@ describe('MCP read tools (PAN-4649 W-5)', () => {
     expect(READ_TOOLS.map((tool) => tool.name)).toEqual(['list_machines', 'list_conversations', 'search_conversations', 'read_conversation']);
     const client = await connectClient(fakeApi({}), [...SCOPES, 'approve']);
     const { tools } = await client.listTools();
-    expect(tools.map((tool) => tool.name)).toEqual(ALL_TOOLS.map((tool) => tool.name));
+    expect(tools.map((tool) => tool.name)).toEqual(ALL_TOOLS.filter((tool) => tool.audience === 'any').map((tool) => tool.name));
     expect(tools.slice(0, READ_TOOLS.length).map((tool) => tool.name)).toEqual(READ_TOOLS.map((tool) => tool.name));
   });
 

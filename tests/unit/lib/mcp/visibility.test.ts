@@ -31,13 +31,20 @@ describe('MCP tool visibility (PAN-4927 W-MCP1)', () => {
     const { tools } = await client.listTools();
     expect(tools.map((tool) => tool.name)).not.toContain('answer_question');
     expect(tools.map((tool) => tool.name)).not.toContain('answer_permission');
+    expect(tools.map((tool) => tool.name)).not.toContain('wait_job');
     expect(tools).toHaveLength(13);
   });
 
-  it('adding approve lists every tool in ALL_TOOLS order', async () => {
+  it('adding approve lists every audience: any tool in ALL_TOOLS order', async () => {
     const client = await connectClient(fakeApi({}), ['read:state', 'read:conversations', 'operate', 'approve']);
     const { tools } = await client.listTools();
-    expect(tools.map((tool) => tool.name)).toEqual(ALL_TOOLS.map((tool) => tool.name));
+    expect(tools.map((tool) => tool.name)).toEqual(ALL_TOOLS.filter((tool) => tool.audience === 'any').map((tool) => tool.name));
+  });
+
+  it('a read:state agent token also sees wait_job', async () => {
+    const client = await connectClient(fakeApi({}), ['read:state'], true);
+    const { tools } = await client.listTools();
+    expect(tools.map((tool) => tool.name)).toEqual(['list_machines', 'wait_job']);
   });
 
   it('an audience: agent tool is hidden from a non-agent token and visible to an agent token', async () => {
