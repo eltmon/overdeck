@@ -129,6 +129,7 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'GET', path: '/api/self/jobs/:id/wait', scope: 'read:state' },
   // PAN-4938 (W-DEL1): delegation self routes; handlers also require an agent token (D-10).
   { method: 'POST', path: '/api/self/workers', scope: 'operate' },
+  { method: 'GET', path: '/api/self/workers/:id/wait', scope: 'read:state' },
   // PAN-4650 WI-9: the owner's half of Pull here (a linked machine's operator only, checked by the routes).
   { method: 'POST', path: '/api/conversations/:name/release', scope: 'operate' },
   { method: 'GET', path: '/api/conversations/:name/release/transfer/:transferId', scope: 'operate' },

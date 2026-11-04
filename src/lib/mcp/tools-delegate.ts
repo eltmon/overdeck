@@ -4,7 +4,7 @@
  * agent token; the tools never send either.
  */
 import { MACHINE_PROPERTY, NEEDS_PROPERTY } from './tools-write.js';
-import { type OverdeckTool, requiredString, routeResult } from './tool.js';
+import { optionalInteger, type OverdeckTool, requiredString, routeResult, WAIT_CHUNK_MS } from './tool.js';
 
 const delegateTask: OverdeckTool = {
   name: 'delegate_task',
@@ -33,4 +33,28 @@ const delegateTask: OverdeckTool = {
   },
 };
 
-export const DELEGATE_TOOLS: readonly OverdeckTool[] = [delegateTask];
+const taskWait: OverdeckTool = {
+  name: 'task_wait',
+  description:
+    'Wait up to 50 s for one of your workers to report. Answers done with the report, ended when it stopped without one, or running with next: call next again. Never sleep or poll. Pass afterSeq (the seq you consumed) for its next report.',
+  scope: 'read:state',
+  audience: 'agent',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      workerId: { type: 'string', description: 'The workerId delegate_task returned.' },
+      afterSeq: { type: 'integer', minimum: 0, description: 'The seq of the last report you consumed; omit for the newest report.' },
+    },
+    required: ['workerId'],
+  },
+  async run(args, ctx) {
+    const workerId = requiredString(args, 'workerId');
+    if (!workerId.ok) return workerId.error;
+    const afterSeq = optionalInteger(args, 'afterSeq', 0, 999_999_999, undefined);
+    if (!afterSeq.ok) return afterSeq.error;
+    const query = `timeoutMs=${WAIT_CHUNK_MS}${afterSeq.value !== undefined ? `&afterSeq=${afterSeq.value}` : ''}`;
+    return routeResult(await ctx.api.request('GET', `/api/self/workers/${encodeURIComponent(workerId.value)}/wait?${query}`));
+  },
+};
+
+export const DELEGATE_TOOLS: readonly OverdeckTool[] = [delegateTask, taskWait];

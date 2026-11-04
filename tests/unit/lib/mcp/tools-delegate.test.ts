@@ -51,4 +51,25 @@ describe('MCP delegation tools (PAN-4938 W-DEL1)', () => {
     const tool = DELEGATE_TOOLS.find((candidate) => candidate.name === 'delegate_task')!;
     expect(tool.scope).toBe(requiredScopeFor('POST', '/api/self/workers'));
   });
+
+  it('task_wait calls the wait route with and without afterSeq and passes running through', async () => {
+    const running = { status: 'running', workerId: 'agent-pan-1-worker-1', next: { tool: 'task_wait', arguments: { workerId: 'agent-pan-1-worker-1' } } };
+    const api = fakeApi({
+      'GET /api/self/workers/agent-pan-1-worker-1/wait?timeoutMs=50000': { status: 200, json: running },
+      'GET /api/self/workers/agent-pan-1-worker-1/wait?timeoutMs=50000&afterSeq=2': { status: 200, json: { status: 'done' } },
+    });
+    const client = await connectClient(api, SCOPES, true);
+    expect(resultJson(await callTool(client, 'task_wait', { workerId: 'agent-pan-1-worker-1' }))).toEqual(running);
+    expect(resultJson(await callTool(client, 'task_wait', { workerId: 'agent-pan-1-worker-1', afterSeq: 2 }))).toEqual({ status: 'done' });
+    expect(api.calls.map((call) => call.path)).toEqual([
+      '/api/self/workers/agent-pan-1-worker-1/wait?timeoutMs=50000',
+      '/api/self/workers/agent-pan-1-worker-1/wait?timeoutMs=50000&afterSeq=2',
+    ]);
+    expect((await callTool(client, 'task_wait', { workerId: 'agent-pan-1-worker-1', afterSeq: -1 })).isError).toBe(true);
+  });
+
+  it('task_wait needs the wait route\'s scope', () => {
+    const tool = DELEGATE_TOOLS.find((candidate) => candidate.name === 'task_wait')!;
+    expect(tool.scope).toBe(requiredScopeFor('GET', '/api/self/workers/x/wait'));
+  });
 });

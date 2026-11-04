@@ -2,13 +2,18 @@
  * PAN-4938 (PAN-4927 W-DEL1): the self worker routes take the worker's issue
  * and parent from the agent token, never the body.
  */
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import type { WorkerFacts } from '../../../lib/agents/worker/facts.js';
+import type { RemoteStandIn } from '../../../lib/agents/worker/remote-standin.js';
+import type { WorkerReport } from '../../../lib/agents/worker/report.js';
+import { type WaitOptions, type WaitOutcome, waitForWorkerReport } from '../../../lib/agents/worker/wait.js';
 
 import { jsonResponse } from '../http-helpers.js';
 import type { SelfCallerDeps } from '../self-caller.js';
 import type { DashboardCredential } from '../routes/dashboard-auth.js';
 import type { FleetCaller } from '../routes/fleet-work.js';
-import { handleSelfWorkerStart, NO_ISSUE, workerParentOf } from '../routes/self-workers.js';
+import { handleSelfWorkerStart, handleSelfWorkerWait, NO_ISSUE, ownedWorker, UNKNOWN_WORKER, workerParentOf } from '../routes/self-workers.js';
 
 const AGENT_TOKEN: DashboardCredential = { kind: 'token', tokenId: 't', scopes: ['operate', 'read:state'], agentId: 'agent-pan-1', agentKind: 'agent', role: 'work' };
 const CONVERSATION_TOKEN: DashboardCredential = { kind: 'token', tokenId: 't', scopes: ['operate'], agentId: 'abc', agentKind: 'conversation', role: 'conversation' };
@@ -82,5 +87,118 @@ describe('POST /api/self/workers (PAN-4938 D-1, D-2)', () => {
     expect(workerParentOf({ agentId: 'agent-pan-1', agentKind: 'agent', role: 'work', cwd: '/w', issueId: 'PAN-1', tmuxSession: null })).toBe('agent-pan-1');
     expect(workerParentOf({ agentId: 'abc', agentKind: 'conversation', role: null, cwd: '/p', issueId: null, tmuxSession: 'conv-abc' })).toBe('conv-abc');
     expect(workerParentOf({ agentId: 'abc', agentKind: 'conversation', role: null, cwd: '/p', issueId: null, tmuxSession: null })).toBe('conv-abc');
+  });
+});
+
+const NOW = Date.parse('2026-11-03T12:00:00.000Z');
+const MINE = 'agent-pan-1-worker-1';
+const THEIRS = 'agent-pan-1-worker-2';
+const REMOTE = 'agent-pan-1-worker-3';
+
+function facts(id: string, parentId: string, startedAt: string): WorkerFacts {
+  return { id, issueId: 'PAN-1', parentId, readOnly: false, cwd: '/w', branch: null, name: null, startedAt };
+}
+
+function standIn(parentId: string, createdAt: string): RemoteStandIn {
+  return {
+    v: 1, environmentId: 'env-desk', label: 'desk', remoteId: 'agent-pan-1-worker-9', parentId, issueId: 'PAN-1', createdAt,
+    state: 'running', lastSeq: 0, lastSeenAt: null, lastAssistantMessage: null, idleAgeMs: null, unreachableSince: null,
+  };
+}
+
+function ownership(launchedAt = new Date(NOW - 5 * 60_000).toISOString()) {
+  return {
+    caller: callerDeps(),
+    readFacts: async (id: string) => (id === MINE ? facts(MINE, 'AGENT-PAN-1', launchedAt) : id === THEIRS ? facts(THEIRS, 'agent-pan-7', launchedAt) : null),
+    readStandIn: async (id: string) => (id === REMOTE ? standIn('agent-pan-1', launchedAt) : null),
+    now: () => NOW,
+  };
+}
+
+const REPORT: WorkerReport = { seq: 1, at: '2026-11-03T12:00:10.000Z', status: 'done', body: 'All green.' };
+
+describe('GET /api/self/workers/:id/wait (PAN-4938 D-3, D-5)', () => {
+  it('another parent\'s worker and an unknown id both answer 404 unknown-worker', async () => {
+    const wait = vi.fn();
+    for (const id of [THEIRS, 'agent-pan-1-worker-77', 'not-a-worker']) {
+      expect(await handleSelfWorkerWait(AGENT_TOKEN, id, null, null, undefined, { ...ownership(), wait })).toEqual({ status: 404, body: UNKNOWN_WORKER });
+    }
+    expect(wait).not.toHaveBeenCalled();
+  });
+
+  it('a stand-in whose remote.json names the caller is owned; parent ids compare case-insensitively', async () => {
+    const deps = ownership();
+    const caller = { agentId: 'agent-pan-1', agentKind: 'agent' as const, role: 'work', cwd: '/w', issueId: 'PAN-1', tmuxSession: null };
+    expect(await ownedWorker(REMOTE, caller, deps)).toMatchObject({ id: REMOTE, remote: { environmentId: 'env-desk' } });
+    expect(await ownedWorker(MINE, caller, deps)).toMatchObject({ id: MINE, remote: null });
+  });
+
+  it('timeoutMs above 50000 and a malformed afterSeq are 400', async () => {
+    expect(await handleSelfWorkerWait(AGENT_TOKEN, MINE, null, '50001', undefined, ownership())).toMatchObject({ status: 400, body: { code: 'bad-timeout' } });
+    expect(await handleSelfWorkerWait(AGENT_TOKEN, MINE, '-1', null, undefined, ownership())).toMatchObject({ status: 400, body: { code: 'bad-after-seq' } });
+  });
+
+  it('passes a timeout of at most 50 s and a startup grace measured from the worker launch', async () => {
+    const wait = vi.fn(async (_id: string, _options: WaitOptions): Promise<WaitOutcome> => ({ kind: 'timeout' }));
+    await handleSelfWorkerWait(AGENT_TOKEN, MINE, null, null, undefined, { ...ownership(), wait });
+    expect(wait.mock.calls[0]![1]).toMatchObject({ timeoutMs: 50_000, startupGraceMs: 0 });
+    await handleSelfWorkerWait(AGENT_TOKEN, MINE, null, '2000', undefined, { ...ownership(new Date(NOW - 10_000).toISOString()), wait });
+    expect(wait.mock.calls[1]![1]).toMatchObject({ timeoutMs: 2_000, startupGraceMs: 50_000 });
+  });
+
+  it('a timeout answers running with next, carrying afterSeq when one was given', async () => {
+    const wait = async (): Promise<WaitOutcome> => ({ kind: 'timeout' });
+    expect(await handleSelfWorkerWait(AGENT_TOKEN, MINE, '3', null, undefined, { ...ownership(), wait })).toEqual({
+      status: 200,
+      body: { status: 'running', workerId: MINE, next: { tool: 'task_wait', arguments: { workerId: MINE, afterSeq: 3 } } },
+    });
+    expect((await handleSelfWorkerWait(AGENT_TOKEN, MINE, null, null, undefined, { ...ownership(), wait })).body)
+      .toMatchObject({ next: { arguments: { workerId: MINE } } });
+  });
+
+  describe('with the real waitForWorkerReport', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(NOW);
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    function realWait(fakes: { reports: () => WorkerReport[]; alive: () => boolean }) {
+      return (id: string, options: WaitOptions) => waitForWorkerReport(id, options, {
+        listReports: async () => fakes.reports(),
+        isAlive: async () => (fakes.alive() ? { alive: true, paneAlive: true } : { alive: false, reason: 'no-session' }),
+        idleAgeMs: () => 0,
+        fetchLastAssistantMessage: async () => 'I stopped.',
+        resolveTranscriptPath: async () => null,
+      });
+    }
+
+    it('a worker launched 5 minutes ago that is dead without a report answers ended at once', async () => {
+      const deps = { ...ownership(), now: () => Date.now(), wait: realWait({ reports: () => [], alive: () => false }) };
+      const result = await handleSelfWorkerWait(AGENT_TOKEN, MINE, null, null, undefined, deps);
+      expect(result).toEqual({
+        status: 200,
+        body: { status: 'ended', workerId: MINE, kind: 'exited-without-report', lastAssistantMessage: 'I stopped.', transcriptPath: null },
+      });
+    });
+
+    it('a live worker without a report answers running after one 50 s chunk', async () => {
+      const deps = { ...ownership(), now: () => Date.now(), wait: realWait({ reports: () => [], alive: () => true }) };
+      let settled = false;
+      const pending = handleSelfWorkerWait(AGENT_TOKEN, MINE, null, null, undefined, deps).then((result) => { settled = true; return result; });
+      await vi.advanceTimersByTimeAsync(49_000);
+      expect(settled).toBe(false);
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect((await pending).body).toMatchObject({ status: 'running', workerId: MINE });
+    });
+
+    it('a report appearing at 10 s answers done', async () => {
+      const deps = { ...ownership(), now: () => Date.now(), wait: realWait({ reports: () => (Date.now() >= NOW + 10_000 ? [REPORT] : []), alive: () => true }) };
+      const pending = handleSelfWorkerWait(AGENT_TOKEN, MINE, null, null, undefined, deps);
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(await pending).toEqual({ status: 200, body: { status: 'done', workerId: MINE, report: REPORT } });
+    });
   });
 });
