@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4840",
   "created": "2026-11-03T20:58:06.302Z",
-  "updated": "2026-11-04T18:57:00.972Z",
+  "updated": "2026-11-04T18:57:17.547Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -168,6 +168,9 @@
       "doneAt": "2026-11-04T18:56:40.684Z"
     },
     "messaging-service.ac1": {
+      "status": "cancelled"
+    },
+    "js-push-registration.ac4": {
       "status": "cancelled"
     }
   }
