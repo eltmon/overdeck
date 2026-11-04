@@ -66,7 +66,7 @@ export interface HarnessCapabilities {
   readonly askAnswerDelivery: HarnessAskAnswerDelivery
   /** A conversation may be started on a Fly machine (pan machines add-fly): Claude Code (PAN-4652) and Codex (PAN-4296). */
   readonly runsOnFlyMachine: boolean
-  /** Launches get the `overdeck` MCP server with a per-agent token (PAN-4927 D-13). Claude Code only until W-INJ2/W-INJ3 wire Codex and ACP. */
+  /** Launches get the `overdeck` MCP server with a per-agent token (PAN-4927 D-13). Claude Code and Codex (PAN-4933 W-INJ2) until W-INJ3 wires the ACP harnesses. */
   readonly overdeckMcp: boolean
 }
 
@@ -167,7 +167,7 @@ export const CODEX_CAPABILITIES: HarnessCapabilities = {
   answersQuestionByMessage: false,
   askAnswerDelivery: "codex-approval",
   runsOnFlyMachine: true,
-  overdeckMcp: false,
+  overdeckMcp: true,
 }
 
 export const ACP_CAPABILITIES: HarnessCapabilities = {
