@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4942",
   "created": "2026-11-04T05:29:28.990Z",
-  "updated": "2026-11-04T06:22:14.731Z",
+  "updated": "2026-11-04T06:22:29.740Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -92,6 +92,10 @@
     "self-machine-link-routes.ac4": {
       "status": "completed",
       "doneAt": "2026-11-04T06:22:14.730Z"
+    },
+    "self-machine-link-routes.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:22:29.740Z"
     }
   }
 }
