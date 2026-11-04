@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4939",
   "created": "2026-11-04T00:21:28.043Z",
-  "updated": "2026-11-04T01:14:24.399Z",
+  "updated": "2026-11-04T01:14:41.325Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -124,6 +124,10 @@
     "update-scheduled-tool.ac4": {
       "status": "completed",
       "doneAt": "2026-11-04T01:14:24.398Z"
+    },
+    "delete-scheduled-tool.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:14:41.325Z"
     }
   }
 }
