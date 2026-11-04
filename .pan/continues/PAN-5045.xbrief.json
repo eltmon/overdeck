@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5045",
   "created": "2026-11-04T18:04:56.381Z",
-  "updated": "2026-11-04T18:49:50.030Z",
+  "updated": "2026-11-04T18:50:03.644Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,6 +52,10 @@
     "scope-row.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T18:49:50.030Z"
+    },
+    "scope-row.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:50:03.644Z"
     }
   }
 }
