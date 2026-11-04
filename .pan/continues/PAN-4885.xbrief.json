@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4885",
   "created": "2026-11-04T10:36:33.533Z",
-  "updated": "2026-11-04T10:50:35.121Z",
+  "updated": "2026-11-04T10:51:32.021Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,10 @@
     "link-open-budget.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T10:50:35.121Z"
+    },
+    "link-open-budget.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:51:32.021Z"
     }
   }
 }
