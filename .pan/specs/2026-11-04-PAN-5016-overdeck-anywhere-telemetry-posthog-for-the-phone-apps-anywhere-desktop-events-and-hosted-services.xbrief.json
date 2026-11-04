@@ -4,17 +4,17 @@
     "created": "2026-11-04T12:32:30Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5016: Overdeck Anywhere telemetry: PostHog for the phone apps, Anywhere desktop events and hosted services",
-    "updated": "2026-11-04T12:38:08.676Z"
+    "updated": "2026-11-04T13:28:26.701Z"
   },
   "plan": {
     "id": "pan-5016",
     "title": "Overdeck Anywhere telemetry: PostHog for the phone apps, Anywhere desktop events and hosted services",
-    "status": "proposed",
+    "status": "running",
     "uid": "5782d43b-1c94-4998-8c7b-0e5d2a01f3cc",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-04T12:32:30Z",
-    "updated": "2026-11-04T12:38:08.676Z",
+    "updated": "2026-11-04T13:28:26.701Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5016",
@@ -800,5 +800,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
