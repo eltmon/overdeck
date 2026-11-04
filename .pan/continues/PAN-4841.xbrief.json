@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4841",
   "created": "2026-11-04T10:01:07.580Z",
-  "updated": "2026-11-04T17:30:16.729Z",
+  "updated": "2026-11-04T17:30:32.268Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -114,6 +114,10 @@
     "rel-operator-checklist.ac4": {
       "status": "completed",
       "doneAt": "2026-11-04T17:30:16.729Z"
+    },
+    "rel-operator-checklist.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:30:32.268Z"
     }
   }
 }
