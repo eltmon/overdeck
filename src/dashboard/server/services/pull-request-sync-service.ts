@@ -161,6 +161,13 @@ interface SweepContext {
   readonly openBefore: ReadonlyMap<string, ReadonlySet<string>>;
   /** PAN-4943: PR key → snapshot read this pass, reused by the watch pass so a covered key costs no extra read. */
   readonly snapshots: Map<string, PullRequestSnapshot>;
+  /**
+   * PAN-5042: keys whose `ctx.snapshots` entry came from a row with no
+   * `statusCheckRollup` (the closed listing, or a carried-forward checks
+   * guess). The watch pass re-reads these instead of trusting the listing's
+   * guessed checks for a PR nothing else tracks.
+   */
+  readonly unobserved: Set<string>;
 }
 
 function openLinksByKey(links: ReadonlyMap<string, readonly PullRequestLink[]>): Map<string, Set<string>> {
@@ -197,6 +204,7 @@ function applySnapshot(link: PullRequestLink, row: GhPrRow, ctx: SweepContext): 
   lastReadAt.set(keyString(link), ctx.now);
   const snapshot = snapshotFromGhRow(row, ctx.syncedAt, link.snapshot);
   ctx.snapshots.set(keyString(link), snapshot);
+  if (row.statusCheckRollup === undefined) ctx.unobserved.add(keyString(link));
   const changed = setPullRequestLinkSnapshot(link, snapshot);
   // Only an observed open → merged/closed transition counts (a first read of an
   // already-finished PR does not), so auto-settle can't fire on a fresh link.
@@ -283,6 +291,7 @@ async function syncProject(
     const entry = { key, row };
     byKey.set(keyString(key), entry);
     ctx.snapshots.set(keyString(key), snapshotFromGhRow(row, ctx.syncedAt));
+    if (row.statusCheckRollup === undefined) ctx.unobserved.add(keyString(key));
     if (row.headRefName) {
       const list = byHead.get(row.headRefName) ?? [];
       list.push(entry);
@@ -410,12 +419,19 @@ async function runWatchPass(
   if (keys.length === 0) return;
   for (const key of keys) {
     const id = keyString(key);
-    if (ctx.snapshots.has(id)) continue;
+    // PAN-5042: a snapshot the listing covered but could not observe checks
+    // for (the closed listing, or a carried-forward guess) still gets one
+    // `gh pr view` here — nothing else re-reads a watched PR with no link.
+    if (ctx.snapshots.has(id) && !ctx.unobserved.has(id)) continue;
     const repo = `${key.host}/${key.repository}`;
-    if (repoInBackoff(repo, ctx.now)) continue;
+    if (repoInBackoff(repo, ctx.now)) {
+      if (ctx.unobserved.has(id)) ctx.snapshots.delete(id);
+      continue;
+    }
     const row = await readPullRequest(key);
     if (!row) {
       if (!userGraphqlPaused()) recordRepoFailure(repo, ctx.now);
+      if (ctx.unobserved.has(id)) ctx.snapshots.delete(id);
       continue;
     }
     repoFailures.delete(repo);
@@ -485,6 +501,7 @@ export async function runPullRequestSyncOnce(
     now, syncedAt: new Date(now).toISOString(), changedNames: new Set(), handled: new Set(), prFinished: new Set(),
     openBefore: openLinksByKey(listPullRequestLinksForConversations(conversations.map((conversation) => conversation.name))),
     snapshots: new Map(),
+    unobserved: new Set(),
   };
   const groups = new Map<string, { project: ProjectConfig; conversations: PullRequestSyncConversation[] }>();
   for (const conversation of conversations) {
