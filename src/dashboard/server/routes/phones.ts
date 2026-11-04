@@ -8,13 +8,15 @@
  * earlier active phone record with the same `clientId` (D-2). A code issued
  * for an Overdeck connector is refused (PAN-4927 W-CONN1).
  *
- * `DELETE /api/phones/self` and `PUT /api/phones/self/push-key` are the
- * phone's own self-service routes: the scope table admits them with `tell`,
- * and the handler then requires a `phone` credential (D-9).
+ * `DELETE /api/phones/self`, `PUT /api/phones/self/push-key` and
+ * `PUT /api/phones/self/notification-preferences` are the phone's own
+ * self-service routes: the scope table admits them with `tell`, and the
+ * handler then requires a `phone` credential (D-9).
  */
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest, type HttpServerResponse } from 'effect/unstable/http';
 
+import { parsePhoneNotificationPreferences } from '@overdeck/contracts';
 import {
   createAccessToken,
   findActiveChannelTokenByKey,
@@ -24,6 +26,7 @@ import {
   setPhonePushKey,
 } from '../../../lib/access-tokens.js';
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
+import { setPhoneNotificationPreferences } from '../../../lib/push/phone-preferences-store.js';
 import { closeChannelsForPeer } from '../channel-listener.js';
 import { type ChannelMarker, channelOfRequest } from '../channel-peer.js';
 import { hasConnectorIntent } from '../connector-pairing.js';
@@ -179,4 +182,36 @@ const pushKeyRoute = HttpRouter.add(
   }),
 );
 
-export const phonesRouteLayer = Layer.mergeAll(exchangeRoute, selfRevokeRoute, pushKeyRoute);
+/** The calling phone replaces its own notification preferences. Exactly a phone credential may call this. */
+export async function handlePhonesNotificationPreferences(
+  credential: DashboardCredential | null,
+  bodyText: string,
+): Promise<HttpServerResponse.HttpServerResponse> {
+  if (credential?.kind !== 'phone') {
+    return jsonResponse({ error: 'only a paired phone may set its notification preferences' }, { status: 403 });
+  }
+  let value: unknown;
+  try {
+    value = bodyText ? JSON.parse(bodyText) : null;
+  } catch {
+    return jsonResponse({ error: 'body is not JSON' }, { status: 400 });
+  }
+  const prefs = parsePhoneNotificationPreferences(value);
+  if (!prefs) return jsonResponse({ error: 'invalid notification preferences' }, { status: 400 });
+  await setPhoneNotificationPreferences(credential.clientId, prefs);
+  return jsonResponse({ ok: true });
+}
+
+const notificationPreferencesRoute = HttpRouter.add(
+  'PUT',
+  '/api/phones/self/notification-preferences',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+    const text = yield* request.text;
+    return yield* Effect.promise(() => handlePhonesNotificationPreferences(resolveRequestCredential(request), text));
+  }),
+);
+
+export const phonesRouteLayer = Layer.mergeAll(exchangeRoute, selfRevokeRoute, pushKeyRoute, notificationPreferencesRoute);
