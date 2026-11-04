@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4938",
   "created": "2026-11-04T03:39:16.629Z",
-  "updated": "2026-11-04T04:38:26.452Z",
+  "updated": "2026-11-04T04:38:42.721Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -234,6 +234,10 @@
     "lane-start-status-stop.ac4": {
       "status": "completed",
       "doneAt": "2026-11-04T04:38:26.452Z"
+    },
+    "lane-wait.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:38:42.720Z"
     }
   }
 }
