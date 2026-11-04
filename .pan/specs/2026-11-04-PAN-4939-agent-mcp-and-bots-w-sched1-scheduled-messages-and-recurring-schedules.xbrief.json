@@ -4,17 +4,17 @@
     "created": "2026-11-04T00:17:24Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4939: Agent MCP and bots (W-SCHED1): Scheduled messages and recurring schedules",
-    "updated": "2026-11-04T00:20:03.691Z"
+    "updated": "2026-11-04T00:21:13.339Z"
   },
   "plan": {
     "id": "pan-4939",
     "title": "Agent MCP and bots (W-SCHED1): Scheduled messages and recurring schedules",
-    "status": "proposed",
+    "status": "running",
     "uid": "f1ae4547-9b34-40f8-93f0-f6daeae6d96f",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-04T00:17:24Z",
-    "updated": "2026-11-04T00:20:03.691Z",
+    "updated": "2026-11-04T00:21:13.339Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4939",
@@ -653,5 +653,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
