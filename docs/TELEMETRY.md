@@ -102,6 +102,13 @@ the public contract and lists every allowed value.
 | `github_quota_sample` | `graphql_pipeline_membership=quota_points_bucket; rest_pipeline_membership=quota_points_bucket; graphql_pr_cache=quota_points_bucket; rest_pr_cache=quota_points_bucket; graphql_pr_sync=quota_points_bucket; rest_pr_sync=quota_points_bucket; graphql_ci_repair=quota_points_bucket; rest_ci_repair=quota_points_bucket; graphql_issue_poller=quota_points_bucket; rest_issue_poller=quota_points_bucket; graphql_close_out=quota_points_bucket; rest_close_out=quota_points_bucket; graphql_tracker_client=quota_points_bucket; rest_tracker_client=quota_points_bucket; graphql_app_rest=quota_points_bucket; rest_app_rest=quota_points_bucket; graphql_agent=quota_points_bucket; rest_agent=quota_points_bucket; graphql_other=quota_points_bucket; rest_other=quota_points_bucket; graphql_unattributed=quota_points_bucket; min_remaining_graphql=quota_remaining_bucket; min_remaining_rest=quota_remaining_bucket; primary_limit_errors=count_bucket; secondary_limit_errors=count_bucket` | Hourly: this install's GitHub API points per caller in the last hour, the lowest remaining GraphQL and REST budget, and refusals, all bucketed. |
 | `github_rate_limited` | `caller=github_caller; kind=rate_limit_kind; own_usage_low=boolean` | GitHub refused a call for a rate limit (at most one per 10 minutes per install). |
 | `instance_heartbeat` | `project_count=count_bucket; active_agent_count=count_bucket; dashboard_running=boolean` | At most once per 24 hours: this install is in use, and whether a dashboard sent it. |
+| `machine_link_started` | `method=link_method` | This machine started a machine link as the requester. |
+| `machine_link_approved` | `method=link_method; side=link_side` | A machine link completed on this machine's side. |
+| `machine_link_failed` | `method=link_method; side=link_side; reason=link_failure_reason` | A machine link failed on this machine's side. |
+| `phone_paired` | `replaced_previous=boolean` | A phone paired with this machine. |
+| `phone_removed` | `by=phone_removed_by` | A phone's pairing with this machine was revoked. |
+| `anywhere_channel_opened` | `route=channel_route; ok=boolean; error_class=channel_error_class` | The link supervisor's channel outcome for a linked machine changed (at most one per change per link). |
+| `relay_usage_sampled` | `bytes=relay_bytes_bucket` | At most hourly: bytes this machine relayed since the previous sample. |
 
 | Domain | Allowed values |
 | --- | --- |
@@ -109,6 +116,8 @@ the public contract and lists every allowed value.
 | `answer_type` | `custom`, `selection`, `note`, `selection+note` |
 | `auto_merge_variant` | `segmented`, `badge` |
 | `boolean` | `false`, `true` |
+| `channel_error_class` | `none`, `unreachable`, `identity_refused`, `unknown_peer`, `unsupported`, `no_relay_plan`, `descriptor_failed`, `wrong_machine`, `heartbeat_failed`, `revoked` |
+| `channel_route` | `lan`, `tailnet`, `ssh`, `public`, `direct`, `relay`, `stored` |
 | `cli_verb` | `abort`, `approve`, `backlog`, `backup`, `clean`, `context`, `destroy`, `dev`, `diff`, `doctor`, `done`, `down`, `edit`, `finalize`, `fork`, `handoff`, `health`, `init`, `issues`, `kill`, `list`, `migrate`, `mode`, `open`, `pause`, `pending`, `plan`, `project`, `projects`, `recover`, `reload`, `reopen`, `request`, `reset`, `restart`, `restore`, `resume`, `review`, `scope`, `serve`, `show`, `skills`, `spawn-reviewer`, `staffing`, `start`, `status`, `strike`, `sync`, `sync-main`, `tell`, `unarchive-conversation`, `unpause`, `untroubled`, `up`, `update`, `validate`, `wipe`, `write-sequence`, `other` |
 | `close_out_variant` | `card`, `inspector` |
 | `count_bucket` | `0`, `1-2`, `3-5`, `6-10`, `11+` |
@@ -119,13 +128,18 @@ the public contract and lists every allowed value.
 | `fork_kind` | `summary`, `handoff`, `plain` |
 | `github_caller` | `pipeline_membership`, `pr_cache`, `pr_sync`, `ci_repair`, `issue_poller`, `close_out`, `tracker_client`, `app_rest`, `quota_sampler`, `agent`, `pr_adoption`, `other` |
 | `harness` | `claude-code`, `ohmypi`, `codex`, `acp`, `kimi-code`, `opencode`, `muse`, `prime-agent` |
+| `link_failure_reason` | `bad_pairing_url`, `unreachable`, `pairing_refused`, `unsupported`, `identity_mismatch`, `exchange_failed`, `grant_refused`, `offline`, `approval_refused`, `approval_failed`, `other` |
+| `link_method` | `pairing_code`, `ssh`, `fly`, `directory_approval`, `other` |
+| `link_side` | `requester`, `approver` |
 | `merge_kind` | `pipeline` |
 | `model_family` | `claude`, `gpt`, `gemini`, `kimi`, `minimax`, `glm`, `mimo`, `other` |
+| `phone_removed_by` | `operator`, `phone` |
 | `pipeline_stage` | `work_done`, `review_passed`, `verification_passed`, `merged`, `closed_out` |
 | `project_mode` | `clone`, `existing`, `new` |
 | `quota_points_bucket` | `0`, `1-49`, `50-199`, `200-499`, `500-999`, `1000-2499`, `2500+` |
 | `quota_remaining_bucket` | `0`, `1-99`, `100-499`, `500-999`, `1000-2499`, `2500+`, `unknown` |
 | `rate_limit_kind` | `primary`, `secondary` |
+| `relay_bytes_bucket` | `under_1mb`, `1mb-9mb`, `10mb-99mb`, `100mb-999mb`, `1gb+` |
 
 Raw counts and timings are never sent; GitHub quota points and remaining
 values are sent only as the buckets above. Pipeline attribution is emitted only
