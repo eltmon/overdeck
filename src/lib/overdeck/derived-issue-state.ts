@@ -78,7 +78,7 @@ import { readOpenOperatorDecision } from '../cloister/operator-decision.js';
 import { isDeftPipelineIssue } from '../deft/issue-pipeline.js';
 import { deriveWorkStart, readWorkStartFacts, type WorkStartFacts } from './work-start-state.js';
 import { pipelineBranchFor, readPrOutsidePipeline } from './pr-outside-pipeline.js';
-import { type GhPrRow, listRepoPullRequests, PR_CACHE_TTL_MS } from './pr-listing.js';
+import { type GhPrRow, listRepoPullRequests, PR_CACHE_TTL_MS, readOpenRepoPullRequests } from './pr-listing.js';
 
 export {
   type GhPrRow,
@@ -87,6 +87,7 @@ export {
   listRepoPullRequestsStaleOk,
   PR_CACHE_TTL_MS,
   PR_LISTING_MAX_STALE_MS,
+  readOpenRepoPullRequests,
   readRepoPullRequests,
 } from './pr-listing.js';
 
@@ -765,7 +766,7 @@ export async function listReadyIssuesForProject(
   projectPath: string,
   deps: { readonly listPullRequests?: (projectPath: string) => Promise<readonly GhPrRow[]> } = {},
 ): Promise<ReadyIssue[]> {
-  const rows = await (deps.listPullRequests ?? listRepoPullRequests)(projectPath);
+  const rows = await (deps.listPullRequests ?? (async (p) => (await readOpenRepoPullRequests(p)) ?? []))(projectPath);
   const ready: ReadyIssue[] = [];
   for (const row of rows) {
     if (row.isDraft) continue;
@@ -794,7 +795,7 @@ export async function listOpenPullRequestsForProject(
   const gitlab = forgeForProject(projectPath) === 'gitlab';
   const rows = gitlab
     ? (await listRepoMergeRequests(projectPath)).map((row) => ({ branch: row.source_branch, draft: row.draft === true, pr: mrFromGlabRow(row) }))
-    : (await listRepoPullRequests(projectPath)).map((row) => ({ branch: row.headRefName, draft: row.isDraft === true, pr: prFromGhRow(row) }));
+    : ((await readOpenRepoPullRequests(projectPath)) ?? []).map((row) => ({ branch: row.headRefName, draft: row.isDraft === true, pr: prFromGhRow(row) }));
   const open: Array<{ issueId: string; pr: LoadedPr }> = [];
   for (const row of rows) {
     const issueId = issueIdFromBranch(row.branch);
