@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-04T05:47:24.975432Z · model: claude-opus-5-5 · open: 875_
+_Last sequenced: 2026-11-04T05:49:24.954635Z · model: claude-opus-5-5 · open: 874_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -395,7 +395,6 @@ _Last sequenced: 2026-11-04T05:47:24.975432Z · model: claude-opus-5-5 · open: 
 | 393 | PAN-3014 | XS | medium | ok |  |  | Background title/about spawns use --bare, which now skips credential reads, so every one fails 'Not logged in' with empty stderr. |
 | 394 | PAN-3944 | S | medium | needs-refinement |  |  | Main fix landed (host-backed targets skip Herdr agent.prompt); remaining: buffer bracketed paste in the app-server host, placeholder guard |
 | 395 | PAN-4208 | M | medium | ok |  |  | #4205 follow-ups: Effect-free config read for telemetry to hit <100ms pan --version; CI import test for lazy command targets |
-| 396 | PAN-4938 | M | medium | ok |  |  | Delegation, lanes, issue start and conversation stop/interrupt as MCP tools; W-SELF1 closed, now unblocked. |
 | 397 | PAN-3829 | L | medium | ok |  |  | Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main) |
 | 398 | PAN-2280 | M | medium | ok |  |  | Resumed conversations wedge without writing transcripts when dashboard is black-holed |
 | 399 | PAN-2197 | S | medium | ok |  |  | work agents skip `pan done` (manual push instead) |
@@ -878,7 +877,7 @@ _Last sequenced: 2026-11-04T05:47:24.975432Z · model: claude-opus-5-5 · open: 
 | 905 | PAN-4954 | M | medium | ok |  | PAN-4950 | integrations/openclaw/: OpenClaw plugin with its own revocable scoped token. |
 | 906 | PAN-4955 | S | medium | ok |  | PAN-4950 | integrations/grok-build/: Grok Build plugin with its own revocable scoped token. |
 | 907 | PAN-4956 | S | low | ok |  | PAN-4946, PAN-4947 | integrations/grok-bot/ and xAI API example; needs OAuth UI and public Funnel /mcp, not the connector. |
-| 908 | PAN-4935 | M | medium | ok |  | PAN-4938, PAN-4940, PAN-4942, PAN-4943 | Instruction blocks and no-MCP fallback; lands last in Part A since it documents every tool to agents. |
+| 908 | PAN-4935 | M | medium | ok |  | PAN-4940, PAN-4942, PAN-4943 | Instruction blocks and no-MCP fallback; lands last in Part A since it documents every tool to agents. |
 | 909 | PAN-4957 | S | low | ok |  | PAN-4953, PAN-4954, PAN-4955, PAN-4956 | CI for the four integration packages; lands after all integrations exist. |
 
 ## Rationale detail
@@ -1210,10 +1209,10 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-04T05:47:24.975432Z",
+  "generatedAt": "2026-11-04T05:49:24.954635Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 875,
+  "openCount": 874,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -6130,19 +6129,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "dependsOn": [],
       "why": "#4205 follow-ups: Effect-free config read for telemetry to hit <100ms pan --version; CI import test for lazy command targets",
       "rationale": "New issue (2026-09-25), filed from the #4205 review. #4205 cut pan --version from 560 to 180 ms but missed the PAN-4195 target of under 100 ms; item 1 closes that gap by keeping effect out of the telemetry config read. Item 2 adds CI coverage that lazy loading removed, so a broken import in tell/start/done fails CI instead of at run time. Scope is concrete with three numbered tasks, so condition is ok; placed just below PAN-4195 in a free slot among score-58 medium work.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4938",
-      "rank": 396,
-      "size": "M",
-      "importance": "medium",
-      "score": 50,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Delegation, lanes, issue start and conversation stop/interrupt as MCP tools; W-SELF1 closed, now unblocked.",
-      "rationale": "Its only dependency, W-SELF1 (PAN-4936), closed as completed, so this child is now workable and moves up from the tail into the slot band W-SELF1 held.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12100,13 +12086,12 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "score": 42,
       "condition": "ok",
       "dependsOn": [
-        "PAN-4938",
         "PAN-4940",
         "PAN-4942",
         "PAN-4943"
       ],
       "why": "Instruction blocks and no-MCP fallback; lands last in Part A since it documents every tool to agents.",
-      "rationale": "Dependency PAN-4937 (MCP checklist/done/handoff tools) merged, so it drops from dependsOn; rank unchanged while four siblings stay open.",
+      "rationale": "Dependency PAN-4938 (W-DEL1 delegation and lane MCP tools) closed as completed, so it drops from dependsOn; rank unchanged while three siblings stay open.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13301,13 +13286,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "from": "PAN-4927",
-      "to": "PAN-4938",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4927",
       "to": "PAN-4940",
       "type": "contains",
       "source": "github-ref",
@@ -13415,13 +13393,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "from": "PAN-4927",
       "to": "PAN-4956",
       "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4938",
-      "to": "PAN-4935",
-      "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
     },
