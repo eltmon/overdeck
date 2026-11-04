@@ -4,17 +4,17 @@
     "created": "2026-11-04T17:57:37Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5045: Phone app: group conversations by project, collapsed by default, with + to start a conversation in a project",
-    "updated": "2026-11-04T18:03:37.882Z"
+    "updated": "2026-11-04T18:04:37.132Z"
   },
   "plan": {
     "id": "pan-5045",
     "title": "Phone app: group conversations by project, collapsed by default, with + to start a conversation in a project",
-    "status": "proposed",
+    "status": "running",
     "uid": "dd2a167e-5b17-4506-92c3-0c064a198ade",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-04T17:57:37Z",
-    "updated": "2026-11-04T18:03:37.882Z",
+    "updated": "2026-11-04T18:04:37.132Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5045",
@@ -517,5 +517,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
