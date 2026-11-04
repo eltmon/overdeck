@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4949",
   "created": "2026-11-04T01:31:58.132Z",
-  "updated": "2026-11-04T02:38:31.329Z",
+  "updated": "2026-11-04T02:38:33.489Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,11 @@
       "claimedBy": "agent-pan-4949",
       "claimedAt": "2026-11-04T02:26:23.301Z",
       "doneAt": "2026-11-04T02:38:31.329Z"
+    },
+    "connector-code-refusal": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4949",
+      "claimedAt": "2026-11-04T02:38:33.488Z"
     }
   }
 }
