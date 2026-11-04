@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5015",
   "created": "2026-11-04T15:25:55.139Z",
-  "updated": "2026-11-04T15:29:50.129Z",
+  "updated": "2026-11-04T15:36:41.140Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,10 @@
       "claimedBy": "agent-pan-5015",
       "claimedAt": "2026-11-04T15:28:43.359Z",
       "doneAt": "2026-11-04T15:29:50.129Z"
+    },
+    "transient-regex.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:36:41.140Z"
     }
   }
 }
