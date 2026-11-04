@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4934",
   "created": "2026-11-04T02:59:33.455Z",
-  "updated": "2026-11-04T03:37:18.293Z",
+  "updated": "2026-11-04T03:37:35.124Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -58,6 +58,10 @@
     "acp-capability-flag.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T03:37:18.293Z"
+    },
+    "acp-capability-flag.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:37:35.124Z"
     }
   }
 }
