@@ -4,17 +4,17 @@
     "created": "2026-11-04T10:01:58Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4999: pan tell rejects a conversation's bare name; only the conv- prefixed name works",
-    "updated": "2026-11-04T10:05:07.466Z"
+    "updated": "2026-11-04T10:07:03.866Z"
   },
   "plan": {
     "id": "pan-4999",
     "title": "pan tell rejects a conversation's bare name; only the conv- prefixed name works",
-    "status": "proposed",
+    "status": "running",
     "uid": "8cec1150-0cdc-4b68-a5f0-a46881fd45b6",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-04T10:01:58Z",
-    "updated": "2026-11-04T10:05:07.466Z",
+    "updated": "2026-11-04T10:07:03.866Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4999",
@@ -360,5 +360,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
