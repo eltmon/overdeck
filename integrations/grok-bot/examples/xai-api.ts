@@ -85,7 +85,16 @@ async function main(): Promise<number> {
     return 1;
   }
 
-  const responseBody = await response.json();
+  const responseText = await response.text();
+  let responseBody: any;
+  try {
+    responseBody = JSON.parse(responseText);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(redact(`xAI API answered ${response.status} with invalid JSON: ${message}`, secrets));
+    return 1;
+  }
+
   const texts: string[] = [];
   for (const item of responseBody?.output ?? []) {
     for (const entry of item?.content ?? []) {

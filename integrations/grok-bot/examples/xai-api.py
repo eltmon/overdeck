@@ -95,7 +95,12 @@ def main():
         print(redact("Could not reach the xAI API: %s" % (error,), secrets), file=sys.stderr)
         return 1
 
-    response_body = json.loads(raw)
+    try:
+        response_body = json.loads(raw)
+    except ValueError as error:
+        print(redact("xAI API answered 200 with invalid JSON: %s" % (error,), secrets), file=sys.stderr)
+        return 1
+
     texts = []
     for item in response_body.get("output") or []:
         for entry in item.get("content") or []:

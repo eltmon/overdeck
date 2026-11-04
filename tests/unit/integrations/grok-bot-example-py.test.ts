@@ -110,6 +110,18 @@ describe('integrations/grok-bot examples/xai-api.py', () => {
     expect(error.stderr).not.toContain('xai-test-key');
   });
 
+  it('exits 1 with a clear message on invalid JSON in a 2xx answer', async () => {
+    nextResponse = { status: 200, body: 'not valid json {' };
+
+    const error = (await run(['List my Overdeck conversations.'], baseEnv()).catch((e) => e)) as {
+      code: number;
+      stderr: string;
+    };
+
+    expect(error.code).toBe(1);
+    expect(error.stderr).toContain('xAI API answered 200 with invalid JSON');
+  });
+
   it('exits 2 with no request when OVERDECK_MCP_TOKEN is unset', async () => {
     const env = baseEnv();
     delete (env as Record<string, string | undefined>).OVERDECK_MCP_TOKEN;

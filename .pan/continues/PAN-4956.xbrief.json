@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-4956",
   "created": "2026-11-04T09:00:33.744Z",
-  "updated": "2026-11-04T09:30:26.290Z",
+  "updated": "2026-11-04T09:39:01.848Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-04T09:39Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-04T09:39:01.848Z"
+    }
+  ],
   "items": {
     "snippet-fix": {
       "status": "completed",
@@ -125,5 +131,14 @@
       "status": "completed",
       "doneAt": "2026-11-04T09:30:26.290Z"
     }
-  }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-04T09:39:01Z",
+      "markdownBody": "# CodeRabbit findings for PAN-4956 (PR #4996)\n\nCodeRabbit posted 3 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4465994077 · integrations/grok-bot/examples/xai-api.py:98 [Minor]: Handle invalid JSON responses as API failures.\n  https://github.com/eltmon/overdeck/pull/4996#discussion_r4465994077\n- Thread 4465994115 · integrations/grok-bot/examples/xai-api.ts:88 [Minor]: Handle invalid JSON in successful responses.\n  https://github.com/eltmon/overdeck/pull/4996#discussion_r4465994115\n- Thread 4465994130 · integrations/grok-bot/README.md:113 [Major]: Document the `authorization` format as unresolved.\n  https://github.com/eltmon/overdeck/pull/4996#discussion_r4465994130\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/4996/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-4956`.\n   If you only replied, you are done.\n5. If PR #4996 has already merged when you read this, nothing more lands on it: open a follow-up issue\n   for the findings you agree with instead of pushing."
+    }
+  ]
 }

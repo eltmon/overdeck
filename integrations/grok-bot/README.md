@@ -108,9 +108,13 @@ python3 examples/xai-api.py "List my Overdeck conversations."
 `pan mcp oauth revoke <sign-in id>` on the old sign-in
 (`pan mcp oauth list` shows ids).
 
-**5. The `authorization` field** holds the bare access token, and xAI sends
-it in the `Authorization` header to the MCP server — see
-[`docs/verification.md`](docs/verification.md) for the live result.
+**5. The `authorization` field** holds the bare access token. xAI's docs
+describe it as "a token that will be set in the Authorization header,"
+matching OpenAI's Responses semantics, but whether xAI sends it bare or as
+`Bearer <token>` has not been verified live — see
+[`docs/verification.md`](docs/verification.md) (check CP-8c). If Overdeck
+logs a 401 for the MCP call, change this field to `Bearer <token>` in both
+examples and in `botSnippets.xaiExample`, then re-run.
 
 ## Access
 
