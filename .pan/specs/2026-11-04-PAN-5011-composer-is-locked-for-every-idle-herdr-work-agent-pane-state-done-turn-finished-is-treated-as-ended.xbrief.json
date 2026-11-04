@@ -1,0 +1,670 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T11:25:43Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5011: Composer is locked for every idle Herdr work agent: pane state 'done' (turn finished) is treated as 'ended'",
+    "updated": "2026-11-04T11:39:42.307Z"
+  },
+  "plan": {
+    "id": "pan-5011",
+    "title": "Composer is locked for every idle Herdr work agent: pane state 'done' (turn finished) is treated as 'ended'",
+    "status": "proposed",
+    "uid": "672f1a08-08d0-47e2-bfb0-fbf4296bc43f",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-04T11:25:43Z",
+    "updated": "2026-11-04T11:39:42.307Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5011",
+        "label": "PAN-5011",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "herdr",
+      "session-presence",
+      "composer",
+      "bug"
+    ],
+    "metadata": {
+      "sizeJustification": "One mapping fixed at every consumer in one PR: leaving any one consumer (session-tree work rows, activity-route rows, cockpit tree, specialist rows) on the old rule keeps the composer locked or the row mislabeled on that surface.",
+      "canonicalFilename": "2026-11-04-PAN-5011-composer-is-locked-for-every-idle-herdr-work-agent-pane-state-done-turn-finished-is-treated-as-ended.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The operator cannot type to an idle Herdr work agent: its Command Deck row reads presence 'ended', so SessionPanel builds sessionAlive=false and ComposerFooter disables the composer. Verified live on 2026-11-04: Herdr reported agent-pan-4841 as 'working' while GET /api/session-trees reported its work node presence 'ended'; every Herdr work node read 'ended'. Two causes: (1) work/planning/strike/knowledge rows in projects.ts:256 and command-deck.ts:331 call deriveSessionPresence with a tmux-only session-name set, which never holds Herdr panes, so it returns 'ended' on its first line; (2) pane-state mappings treat Herdr 'done' (turn finished, pane alive) as an exit: command-deck.ts nodeStatusFor (done -> ended), IssueTreeLane.paneStatus (done and unknown -> ended), and session-tree-specialists.ts (done -> active).",
+      "Proposal": "Add one shared presenceForPaneState(state) to packages/contracts/src/backend-pane.ts (working|blocked -> active, idle|done|unknown -> idle, exited -> ended). Make deriveSessionPresence pane-first: when the issue's backend pane for the agent exists, its state decides presence; otherwise the old tmux/runtime logic runs. Hoist getBackendPanesForIssue above the agent loops in projects.ts and command-deck.ts and pass the pane (indexPanesByAgentKey) in; a live pane also suppresses endedAt. Route nodeStatusFor, IssueTreeLane.paneStatus and the specialist-row presence through the helper. Add regression tests at each layer, including SessionPanel handing ConversationPanel sessionAlive=true for an idle session, and document the pane-state -> presence table.",
+      "NonGoals": "- Changing activityForPaneState in src/dashboard/server/services/agent-state-service.ts (read-model activity done -> stopped).\n- Changing pipeline/flywheel liveness: derived-issue-state.ts isLive, flywheel/derive-status.ts paneIsLive, routes/parked.ts live-pane filter.\n- Making the ws-rpc tmux presence poller Herdr-aware.\n- Any production change to SessionPanel.tsx, ComposerFooter.tsx or ConversationPanel.\n- Herdr-aware awaiting-input detection (detectAwaitingInputForAgent stays tmux-gated).\n- The synthesized tmux-only planning node in projects.ts.\n- Raising any file-size allowlist row; command-deck.ts must not grow past 1329 lines.\n- Updating the external OKF knowledge bundle (../overdeck-knowledge)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix the tmux-only work-row presence (deriveSessionPresence) in addition to the issue's nodeStatusFor fix.",
+        "rationale": "Live evidence shows every Herdr work node reads 'ended' even while Herdr reports it 'working'; the issue's suggested nodeStatusFor change only touches review/test/ship rows, so it alone would leave the operator's composer locked."
+      },
+      {
+        "summary": "Backend pane state is authoritative for presence whenever a pane exists (pane-first deriveSessionPresence).",
+        "rationale": "PAN-3917 D10 makes the terminal backend the owner of liveness; tmux hosts also yield panes from the inventory's tmux probe, and with no pane the old tmux branch runs unchanged."
+      },
+      {
+        "summary": "Map pane state 'unknown' to presence 'idle'.",
+        "rationale": "Herdr lists the pane, so it is alive; 'unknown' only means Herdr did not detect the harness (pi/codex). 'idle' keeps the composer open without claiming activity and matches nodeStatusFor's existing default."
+      },
+      {
+        "summary": "Put presenceForPaneState in packages/contracts/src/backend-pane.ts with an inline return union.",
+        "rationale": "Server and frontend both import contracts; types.ts already imports backend-pane.ts and lint:circular counts type-only imports, so importing SessionNodePresence back would add a refused cycle."
+      },
+      {
+        "summary": "Leave activityForPaneState and pipeline liveness helpers unchanged; follow-up filed as PAN-5013 (Flywheel copy is PAN-4666).",
+        "rationale": "They drive dispatch and read-model activity, not the composer; changing them alters Flywheel/pipeline behavior and needs its own review. No pane transition emits agent.status_changed 'stopped', so the corrected presence is not overwritten."
+      }
+    ],
+    "items": [
+      {
+        "id": "presence-helper",
+        "title": "Add presenceForPaneState to contracts backend-pane.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T11:25:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5011",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "pane-first-presence",
+            "activity-route-presence",
+            "cockpit-pane-status",
+            "specialist-presence"
+          ],
+          "files_scope": [
+            "packages/contracts/src/backend-pane.ts",
+            "packages/contracts/src/__tests__/backend-pane-presence.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner packages/contracts/src/__tests__/backend-pane-presence.test.ts",
+            "bun run --cwd packages/contracts build",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "backend-pane-presence.test.ts passes six cases",
+            "contracts build completes and dist exports presenceForPaneState",
+            "lint (including lint:circular) completes without new cycles"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W1. Append `export function presenceForPaneState(state: BackendPane[\"state\"]): \"active\" | \"idle\" | \"ended\"` to packages/contracts/src/backend-pane.ts after indexPanesByAgentKey: working|blocked -> \"active\", exited -> \"ended\", every other state (idle, done, unknown) -> \"idle\". Use the file's style (double quotes, no semicolons) and a doc comment citing PAN-5011 that says Herdr `done` is a finished turn, not an exit. Do NOT import SessionNodePresence from ./types (types.ts imports backend-pane.ts; lint:circular counts type imports). index.ts already re-exports ./backend-pane. Add packages/contracts/src/__tests__/backend-pane-presence.test.ts with one case per state."
+        },
+        "items": [
+          {
+            "id": "presence-helper.ac1",
+            "title": "Given pane state 'done' or 'unknown' or 'idle', presenceForPaneState returns 'idle' (asserted by backend-pane-presence.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "presence-helper.ac2",
+            "title": "Given 'working' or 'blocked' it returns 'active', and given 'exited' it returns 'ended' (asserted by backend-pane-presence.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "presence-helper.ac3",
+            "title": "backend-pane.ts adds no import from ./types, and npm run lint exits 0 with no new circular-import finding",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pane-first-presence",
+        "title": "Make deriveSessionPresence pane-first",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T11:25:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5011",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/session-presence.ts",
+            "tests/unit/dashboard/server/services/session-presence.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner tests/unit/dashboard/server/services/session-presence.test.ts",
+            "bun run --cwd packages/contracts build && npm run typecheck"
+          ],
+          "expected_outputs": [
+            "session-presence.test.ts passes four cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W2. Add an optional fourth parameter `pane?: BackendPane` to deriveSessionPresence in src/dashboard/server/services/session-presence.ts. First statement: `if (pane) return presenceForPaneState(pane.state);` (comment: PAN-5011, the backend pane owns liveness; on Herdr the tmux set never holds an agent). The rest of the function stays byte-identical. Import presenceForPaneState and type BackendPane from '@overdeck/contracts'. Update the function's doc comment. Add tests/unit/dashboard/server/services/session-presence.test.ts: done pane + empty tmux set -> 'idle'; working pane -> 'active'; exited pane -> 'ended'; no pane + empty tmux set -> 'ended'."
+        },
+        "items": [
+          {
+            "id": "pane-first-presence.ac1",
+            "title": "Given a pane in state 'done' and an empty tmux session set, deriveSessionPresence returns 'idle'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pane-first-presence.ac2",
+            "title": "Given no pane and an empty tmux session set, deriveSessionPresence still returns 'ended' (tmux-host fallback preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pane-first-presence.ac3",
+            "title": "Given an 'exited' pane it returns 'ended', and given a 'working' pane it returns 'active'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "session-tree-work-pane",
+        "title": "Pass each agent's backend pane into session-tree presence in projects.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T11:25:43Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5011",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/projects.ts",
+            "tests/unit/dashboard/server/routes/projects.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner tests/unit/dashboard/server/routes/projects.test.ts",
+            "bun run --cwd packages/contracts build && npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "projects.test.ts passes including the new done-pane and exited-pane cases",
+            "typecheck completes without errors",
+            "file-size guard passes (projects.ts at or under 1000 lines)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-6",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W3. In collectSessionTreeNodes (src/dashboard/server/routes/projects.ts): move the existing `const [treeDerived, treePanes] = await Promise.all([getDerivedIssueState(issueId), getBackendPanesForIssue(issueId)]);` (currently ~line 371) to just before the candidate loop (`for (const checkId of [...candidateSessionIds].sort(`, ~line 238) and delete the original; add `const panesByAgent = indexPanesByAgentKey(treePanes);` (import from '@overdeck/contracts'). In the loop: `const pane = panesByAgent.get(checkId);`, pass it as the 4th argument of deriveSessionPresence, add `const paneLive = pane !== undefined && pane.state !== 'exited';` and change sessionEnded to `!paneLive && (rtState?.state === 'suspended' || presence === 'ended' || (!!state.stoppedAt && !tmuxAlive))` (tmuxAlive unchanged). Leave the tmux-only synthesized planning node alone. In projects.test.ts add a partial vi.mock of src/dashboard/server/services/backend-inventory.js overriding only getBackendPanesForIssue (default async () => []), plus two cases: a registered work agent with a 'done' pane and empty tmux names -> work node presence 'idle' and endedAt undefined; same with an 'exited' pane -> presence 'ended'. Third case: a live 'done' pane while the mocked runtime state is { state: 'suspended' } and the agent state has a stoppedAt -> endedAt undefined."
+        },
+        "items": [
+          {
+            "id": "session-tree-work-pane.ac1",
+            "title": "Given a registered work agent whose backend pane is 'done' and no tmux session, the session-tree work node returns presence 'idle' and no endedAt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-tree-work-pane.ac2",
+            "title": "Given the same agent with an 'exited' pane, the work node returns presence 'ended'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-tree-work-pane.ac3",
+            "title": "Given a live 'done' pane while the runtime state is 'suspended' and the agent state has a stoppedAt, the work node returns endedAt undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-tree-work-pane.ac4",
+            "title": "The mocked getBackendPanesForIssue records exactly one call per collectSessionTreeNodes invocation, and the pre-existing projects.test.ts cases return the same presence values as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "activity-route-presence",
+        "title": "Activity route presence: pane-first work rows, live-pane preference, done-as-idle nodeStatusFor",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T11:25:43Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5011",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/command-deck.ts",
+            "tests/unit/dashboard/server/routes/command-deck.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner tests/unit/dashboard/server/routes/command-deck.test.ts",
+            "bun run --cwd packages/contracts build && npm run typecheck",
+            "bash scripts/lint-file-size.sh",
+            "wc -l src/dashboard/server/routes/command-deck.ts"
+          ],
+          "expected_outputs": [
+            "command-deck.test.ts passes including the new done/exited review-pane and done work-pane cases",
+            "typecheck completes without errors",
+            "file-size guard passes",
+            "command-deck.ts has at most 1329 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-6",
+            "FR-8",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "acJustification": "Five ACs: presence for done/exited specialist panes, the live-pane preference, the work-row case, and the file-size bound are distinct observable checks in one shared file."
+        },
+        "narrative": {
+          "Action": "PRD W4. In fetchActivityDataWithContext (src/dashboard/server/routes/command-deck.ts): hoist `const issuePanes = await getBackendPanesForIssue(issueId);` (~line 424) above the agent loop (`for (const checkId of [planningAgentId, agentId, ...` ~line 285) and add `const panesByAgent = indexPanesByAgentKey(issuePanes);`. Pass `panesByAgent.get(checkId)` as deriveSessionPresence's 4th argument (~line 331). Add `const paneLive = (panesByAgent.get(checkId)?.state ?? 'exited') !== 'exited';` and change sessionEnded (~line 351) to `!paneLive && (rtState?.state === 'suspended' || presence === 'ended' || (!!state.stoppedAt && !tmuxAlive))` (tmuxAlive unchanged). Change firstPaneWithRole (~line 426) to prefer a live pane: `issuePanes.find((pane) => pane.role === role && pane.state !== 'exited') ?? issuePanes.find((pane) => pane.role === role)`. Replace the nodeStatusFor switch with: `if (!pane || pane.state === 'exited') return { status: verdict ?? 'completed', presence: 'ended' };` then `return { status: 'running', presence: presenceForPaneState(pane.state) };` with a PAN-5011 comment. Net line change must be <= 0. In command-deck.test.ts: give the deriveSessionPresence mock (line 34) a 4th `pane` param that returns the helper's mapping when set; partial-mock backend-inventory.js getBackendPanesForIssue (default []); add cases: 'done' review pane -> review section status 'running' presence 'idle'; 'exited' review pane with approved PR -> presence 'ended' status 'completed'; 'done' work pane with empty tmux names -> work section presence 'idle' and endedAt undefined. Also add cases: 'done' work pane with mocked runtime state { state: 'suspended' } -> endedAt undefined; an 'exited' review pane listed before a 'done' review pane -> review section presence 'idle'. Keeping the three changes in one item is deliberate: they share command-deck.ts, whose net growth must be <= 0."
+        },
+        "items": [
+          {
+            "id": "activity-route-presence.ac1",
+            "title": "Given a review pane in state 'done', the activity route's review section returns status 'running' and presence 'idle'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "activity-route-presence.ac2",
+            "title": "Given a review pane in state 'exited' (or no pane) with an approved PR, the review section returns presence 'ended' and status 'completed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "activity-route-presence.ac3",
+            "title": "Given an 'exited' review pane listed before a live 'done' review pane, the review section returns presence 'idle' and status 'running'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "activity-route-presence.ac4",
+            "title": "Given a work pane in state 'done' and no tmux session, the work section returns presence 'idle' with endedAt undefined, also when the runtime state is 'suspended'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "activity-route-presence.ac5",
+            "title": "wc -l src/dashboard/server/routes/command-deck.ts reports 1329 or fewer lines and bash scripts/lint-file-size.sh exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cockpit-pane-status",
+        "title": "Cockpit IssueTreeLane maps done and unknown panes as live",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T11:25:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5011",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueTreeLane.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueTreeLane.test.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Stage/cockpit/IssueTreeLane.test.ts",
+            "node scripts/run-frontend-test-subset.mjs --dry-run"
+          ],
+          "expected_outputs": [
+            "IssueTreeLane.test.ts passes four cases",
+            "dry-run args list includes src/components/Stage/cockpit/IssueTreeLane.test.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W5. In src/dashboard/frontend/src/components/Stage/cockpit/IssueTreeLane.tsx replace paneStatus's switch with: `const presence = presenceForPaneState(state)`; `if (presence === 'ended') return { status: 'stopped', presence }`; `return { status: state === 'unknown' ? 'unknown' : 'running', presence }` (comment: PAN-5011, Herdr done is a finished turn, not an exit). Import presenceForPaneState from '@overdeck/contracts'. Add `export` to paneToSession. Create IssueTreeLane.test.ts in the same directory: work pane 'done' -> { status: 'running', presence: 'idle' }; 'unknown' -> presence 'idle'; 'exited' -> { status: 'stopped', presence: 'ended' }; role 'conversation' -> null. Add `src/components/Stage/cockpit/IssueTreeLane.test.ts` to scripts/frontend-test-subset.txt in sorted position (CI runs only listed frontend tests)."
+        },
+        "items": [
+          {
+            "id": "cockpit-pane-status.ac1",
+            "title": "Given a work pane in state 'done', paneToSession returns a SessionNode with status 'running' and presence 'idle'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cockpit-pane-status.ac2",
+            "title": "Given state 'unknown' it returns presence 'idle', and given 'exited' it returns status 'stopped' and presence 'ended'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cockpit-pane-status.ac3",
+            "title": "scripts/frontend-test-subset.txt lists src/components/Stage/cockpit/IssueTreeLane.test.ts, so node scripts/run-frontend-test-subset.mjs --dry-run emits it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cockpit-pane-identity",
+        "title": "Cockpit pane rows carry the agent id and hasJsonl",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T11:25:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5011",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueTreeLane.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueTreeLane.test.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Stage/cockpit/IssueTreeLane.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "IssueTreeLane.test.ts passes including the cockpitSessions cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W5b. Herdr pane ids (w1JA:p3) are backend handles, not agent ids, and cockpit pane rows have no hasJsonl, so SessionPanel never renders ConversationPanel (no composer) and would send to /api/agents/w1JA%3Ap3/message. Steps: (1) add `hasJsonl?: boolean;` to ActivitySection in src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts (the activity route already sends it). (2) In IssueTreeLane.tsx paneToSession use `sessionId: pane.agentId ?? pane.id`. (3) Extract the pane/section merge from the `sessions` useMemo into `export function cockpitSessions(panes: readonly BackendPane[], sections: readonly ActivitySection[]): SessionNode[]`: pane rows first, each enriched with `hasJsonl: true` when the activity section with the same sessionId has hasJsonl; then non-pane section types via toCockpitSession, exactly as today. The useMemo calls it and keeps its legacy-planning push. (4) Tests in IssueTreeLane.test.ts: pane { id: 'w1JA:p3', agentId: 'agent-pan-4841', role: 'work', state: 'done' } + section { type: 'work', sessionId: 'agent-pan-4841', hasJsonl: true } -> one work session with sessionId 'agent-pan-4841', hasJsonl true, presence 'idle'; a pane without agentId keeps sessionId = pane.id."
+        },
+        "items": [
+          {
+            "id": "cockpit-pane-identity.ac1",
+            "title": "Given a Herdr pane with id 'w1JA:p3' and agentId 'agent-pan-4841', paneToSession returns sessionId 'agent-pan-4841'; given a pane without agentId it returns sessionId equal to pane.id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cockpit-pane-identity.ac2",
+            "title": "Given that pane and an activity section { sessionId: 'agent-pan-4841', hasJsonl: true }, cockpitSessions returns exactly one work row with hasJsonl true and presence 'idle'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "specialist-presence",
+        "title": "Specialist session-tree rows take presence from presenceForPaneState",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T11:25:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5011",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/session-tree-specialists.ts",
+            "tests/unit/dashboard/server/routes/session-tree-specialists.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run --configLoader runner tests/unit/dashboard/server/routes/session-tree-specialists.test.ts",
+            "bun run --cwd packages/contracts build && npm run typecheck"
+          ],
+          "expected_outputs": [
+            "session-tree-specialists.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W6. In src/dashboard/server/routes/session-tree-specialists.ts change the review presence (~lines 97-99) to `reviewIsLive ? (reviewPane ? presenceForPaneState(reviewPane.state) : 'active') : 'ended'` and the test presence (~line 158) to `testIsLive ? (testPane ? presenceForPaneState(testPane.state) : 'active') : 'ended'`. Import presenceForPaneState from '@overdeck/contracts'. Create tests/unit/dashboard/server/routes/session-tree-specialists.test.ts calling buildSpecialistSessionNodes with mocks for src/lib/agents.js (getAgentState -> null), routes/jsonl-resolver.js (resolveJsonlPath -> null), routes/reviewer-tree.js (buildReviewerNodes and readSynthesisRounds -> []), src/lib/projects.js (resolveProjectFromIssueSync -> null) and any other import the module needs to load. Keep these cases in this new file, not projects.test.ts."
+        },
+        "items": [
+          {
+            "id": "specialist-presence.ac1",
+            "title": "Given a review pane in state 'done', buildSpecialistSessionNodes returns a review node with presence 'idle' (was 'active')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "specialist-presence.ac2",
+            "title": "Given a test pane in state 'working', the test node returns presence 'active'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sessionpanel-alive-test",
+        "title": "Regression test: SessionPanel hands ConversationPanel sessionAlive true for an idle session",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T11:25:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-5011",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/SessionView/SessionPanel.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/CommandDeck/SessionView/SessionPanel.test.tsx"
+          ],
+          "expected_outputs": [
+            "SessionPanel.test.tsx passes including the two new sessionAlive cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W7. Test-only; no production change to SessionPanel.tsx. In SessionPanel.test.tsx extend the ConversationPanel mock (line 38) to render `data-session-alive={String(conversation.sessionAlive)}` and `data-agent-id={agentId}` (props `{ conversation: { name: string; sessionAlive: boolean }; agentId?: string }`). Add cases: makeSession({ sessionId: 'agent-pan-4841', presence: 'idle', hasJsonl: true }) -> conversation-panel has data-session-alive 'true' and data-agent-id 'agent-pan-4841' (the composer's send target /api/agents/<agentId>/message); makeSession({ presence: 'ended', hasJsonl: true }) -> 'false'. Run the whole file; if every case passes, add `src/components/CommandDeck/SessionView/SessionPanel.test.tsx` to scripts/frontend-test-subset.txt in sorted position. If a pre-existing case also fails on unmodified main, leave it out of the list and say so in the PR body."
+        },
+        "items": [
+          {
+            "id": "sessionpanel-alive-test.ac1",
+            "title": "Given a SessionNode with sessionId 'agent-pan-4841', presence 'idle' and hasJsonl true, SessionPanel renders ConversationPanel with sessionAlive true and agentId 'agent-pan-4841'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sessionpanel-alive-test.ac2",
+            "title": "Given presence 'ended' and hasJsonl true, SessionPanel renders ConversationPanel with sessionAlive false (data-session-alive='false')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-presence-table",
+        "title": "Document the pane-state to session-presence mapping",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T11:25:43Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5011",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/TERMINAL-BACKENDS.md",
+            "docs/ISSUE-VIEW.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Pane state → session presence' docs/TERMINAL-BACKENDS.md",
+            "grep -n 'presenceForPaneState' docs/TERMINAL-BACKENDS.md",
+            "grep -n 'exited' docs/ISSUE-VIEW.md"
+          ],
+          "expected_outputs": [
+            "TERMINAL-BACKENDS.md has the new subsection heading",
+            "TERMINAL-BACKENDS.md names presenceForPaneState",
+            "ISSUE-VIEW.md Ended session outcomes section says only exited or a missing pane is ended"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W8. docs/TERMINAL-BACKENDS.md: after the intro table (Agent states row, line 14), add a subsection 'Pane state → session presence (PAN-5011)' with the table working|blocked -> active, idle|done|unknown -> idle, exited -> ended; say Herdr `done` is a finished turn at the prompt (not an exit) and `unknown` is a live pane Herdr does not detect; name presenceForPaneState in packages/contracts/src/backend-pane.ts as the only mapping and list its consumers (deriveSessionPresence, nodeStatusFor, IssueTreeLane.paneStatus, session-tree-specialists.ts). docs/ISSUE-VIEW.md 'Ended session outcomes (PAN-4290)': add one sentence that a session is ended only when its pane is exited or no pane exists; Herdr done/unknown panes are idle, keep their composer, and show no outcome."
+        },
+        "items": [
+          {
+            "id": "docs-presence-table.ac1",
+            "title": "docs/TERMINAL-BACKENDS.md renders a 'Pane state → session presence' table that maps done -> idle, unknown -> idle and exited -> ended and names presenceForPaneState",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-presence-table.ac2",
+            "title": "docs/ISSUE-VIEW.md's Ended session outcomes section states a session is ended only when its pane is exited or no pane exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "presence-helper",
+        "to": "pane-first-presence",
+        "type": "blocks"
+      },
+      {
+        "from": "presence-helper",
+        "to": "activity-route-presence",
+        "type": "blocks"
+      },
+      {
+        "from": "presence-helper",
+        "to": "cockpit-pane-status",
+        "type": "blocks"
+      },
+      {
+        "from": "presence-helper",
+        "to": "specialist-presence",
+        "type": "blocks"
+      },
+      {
+        "from": "pane-first-presence",
+        "to": "session-tree-work-pane",
+        "type": "blocks"
+      },
+      {
+        "from": "pane-first-presence",
+        "to": "activity-route-presence",
+        "type": "blocks"
+      },
+      {
+        "from": "cockpit-pane-status",
+        "to": "sessionpanel-alive-test",
+        "type": "blocks"
+      },
+      {
+        "from": "cockpit-pane-status",
+        "to": "cockpit-pane-identity",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
