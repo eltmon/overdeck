@@ -52,6 +52,40 @@ function sameSha(a: string, b: string): boolean {
 }
 
 /**
+ * PAN-5003: brings HEAD in `opts.cwd` up to `origin/<baseBranch>`.
+ *
+ * A branch that already merged main (conflict repair, `pan sync-main`) is
+ * caught up by merging main again. A rebase would drop its merge commits and
+ * replay the branch's own commits, so a conflict a merge commit resolved comes
+ * back (PR #4997), or its resolution is lost. A branch without merge commits
+ * is rebased. On a conflict the operation is aborted and the files returned.
+ */
+async function catchUpWithBase(
+  baseBranch: string,
+  opts: { cwd: string; encoding: 'utf-8'; timeout: number },
+): Promise<{ ok: true; how: 'merge' | 'rebase' } | { ok: false; conflictFiles: string[]; reason: string }> {
+  const { stdout: merges } = await execAsync(`git rev-list --merges --count origin/${baseBranch}..HEAD`, opts);
+  const how = parseInt(merges.trim(), 10) > 0 ? 'merge' : 'rebase';
+  try {
+    await execAsync(how === 'merge' ? `git merge --no-edit origin/${baseBranch}` : `git rebase origin/${baseBranch}`, opts);
+    return { ok: true, how };
+  } catch (err: any) {
+    let conflictFiles: string[] = [];
+    try {
+      const { stdout } = await execAsync('git diff --name-only --diff-filter=U', opts);
+      conflictFiles = stdout.trim().split('\n').filter(Boolean);
+    } catch { /* ignore */ }
+    try {
+      await execAsync(`git ${how} --abort`, opts);
+    } catch { /* may not be mid-operation */ }
+    const reason = conflictFiles.length > 0
+      ? `Rebase conflicts in: ${conflictFiles.join(', ')}`
+      : `Rebase failed: ${err.message?.slice(0, 200) || 'unknown error'}`;
+    return { ok: false, conflictFiles, reason };
+  }
+}
+
+/**
  * #4066 review: the automatic merge's rebase of its approved head.
  *
  * The rebase, and the read of the commit it produced, happen in a detached
@@ -113,23 +147,9 @@ async function rebaseApprovedHead(
     tempWorktree = worktree;
     const inTemp = { ...inWorkspace, cwd: worktree };
 
-    console.log(`${logPrefix} Rebasing approved head ${expectedHead.slice(0, 8)} onto origin/${baseBranch} in a server worktree...`);
-    try {
-      await execAsync(`git rebase origin/${baseBranch}`, inTemp);
-    } catch (rebaseErr: any) {
-      let conflictFiles: string[] = [];
-      try {
-        const { stdout } = await execAsync('git diff --name-only --diff-filter=U', inTemp);
-        conflictFiles = stdout.trim().split('\n').filter(Boolean);
-      } catch { /* ignore */ }
-      try {
-        await execAsync('git rebase --abort', inTemp);
-      } catch { /* the worktree is removed below either way */ }
-      const reason = conflictFiles.length > 0
-        ? `Rebase conflicts in: ${conflictFiles.join(', ')}`
-        : `Rebase failed: ${rebaseErr.message?.slice(0, 200) || 'unknown error'}`;
-      return { success: false, conflictFiles, reason };
-    }
+    console.log(`${logPrefix} Catching approved head ${expectedHead.slice(0, 8)} up with origin/${baseBranch} in a server worktree...`);
+    const caughtUp = await catchUpWithBase(baseBranch, inTemp);
+    if (!caughtUp.ok) return { success: false, conflictFiles: caughtUp.conflictFiles, reason: caughtUp.reason };
     const rebased = (await execAsync('git rev-parse HEAD', inTemp)).stdout.trim();
 
     // Local verification runs in the work agent's worktree: move it to the
@@ -241,38 +261,13 @@ async function rebaseFeatureBranchBody(
 
     console.log(`${logPrefix} ${behind} commits behind origin/${baseBranch}, rebasing...`);
 
-    // Step 4: Rebase onto base branch
-    try {
-      await execAsync(`git rebase origin/${baseBranch}`, execOpts);
-      console.log(`${logPrefix} Rebase successful`);
-    } catch (rebaseErr: any) {
-      // Rebase failed — likely conflicts
-      console.log(`${logPrefix} Rebase failed, checking for conflicts...`);
-
-      // Get conflict files
-      let conflictFiles: string[] = [];
-      try {
-        const { stdout: conflictOutput } = await execAsync(
-          'git diff --name-only --diff-filter=U 2>/dev/null || true',
-          execOpts,
-        );
-        conflictFiles = conflictOutput.trim().split('\n').filter(Boolean);
-      } catch { /* ignore */ }
-
-      // Abort the rebase
-      try {
-        await execAsync('git rebase --abort', execOpts);
-        console.log(`${logPrefix} Rebase aborted`);
-      } catch {
-        // May not be in rebase state
-      }
-
-      const reason = conflictFiles.length > 0
-        ? `Rebase conflicts in: ${conflictFiles.join(', ')}`
-        : `Rebase failed: ${rebaseErr.message?.slice(0, 200) || 'unknown error'}`;
-
-      return { success: false, conflictFiles, reason };
+    // Step 4: Rebase onto base branch (or merge it, for a branch that merged main)
+    const caughtUp = await catchUpWithBase(baseBranch, execOpts);
+    if (!caughtUp.ok) {
+      console.log(`${logPrefix} ${caughtUp.reason}`);
+      return { success: false, conflictFiles: caughtUp.conflictFiles, reason: caughtUp.reason };
     }
+    console.log(`${logPrefix} ${caughtUp.how === 'merge' ? 'Merge' : 'Rebase'} successful`);
 
     // Step 5: Push with --force-with-lease
     console.log(`${logPrefix} Pushing rebased branch...`);
