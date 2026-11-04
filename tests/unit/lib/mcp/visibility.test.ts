@@ -43,7 +43,7 @@ describe('MCP tool visibility (PAN-4927 W-MCP1)', () => {
     expect(tools.map((tool) => tool.name)).toEqual(ALL_TOOLS.filter((tool) => tool.audience === 'any').map((tool) => tool.name));
   });
 
-  it('a read:state agent token also sees wait_job and secret_wait', async () => {
+  it('a read:state agent token also sees wait_job, secret_wait and memory_search', async () => {
     const client = await connectClient(fakeApi({}), ['read:state'], true);
     const { tools } = await client.listTools();
     const names = tools.map((tool) => tool.name);
@@ -51,6 +51,7 @@ describe('MCP tool visibility (PAN-4927 W-MCP1)', () => {
     expect(names).toContain('list_machines');
     expect(names).toContain('wait_job');
     expect(names).toContain('secret_wait');
+    expect(names).toContain('memory_search');
   });
 
   it('an audience: agent tool is hidden from a non-agent token and visible to an agent token', async () => {

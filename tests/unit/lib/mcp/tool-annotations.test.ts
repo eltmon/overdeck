@@ -38,6 +38,8 @@ const SINGLE_ROUTE_PATHS: Record<string, { method: string; path: string }> = {
   worker_report: { method: 'POST', path: '/api/self/worker-report' },
   request_secret: { method: 'POST', path: '/api/self/secret-requests' },
   secret_wait: { method: 'GET', path: '/api/self/secret-requests/abc/wait' },
+  memory_add: { method: 'POST', path: '/api/self/memory/facts' },
+  memory_search: { method: 'POST', path: '/api/self/memory/search' },
 };
 
 describe('MCP tool annotations (PAN-4927 W-MCP1)', () => {

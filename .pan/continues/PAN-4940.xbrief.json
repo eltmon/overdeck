@@ -1,0 +1,115 @@
+{
+  "version": "1",
+  "issueId": "PAN-4940",
+  "created": "2026-11-04T04:28:29.563Z",
+  "updated": "2026-11-04T06:01:47.744Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "cli-search-facts": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4940",
+      "claimedAt": "2026-11-04T04:28:29.563Z",
+      "doneAt": "2026-11-04T04:55:15.091Z"
+    },
+    "mem-add-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4940",
+      "claimedAt": "2026-11-04T04:55:23.689Z",
+      "doneAt": "2026-11-04T05:13:13.630Z"
+    },
+    "mem-search-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4940",
+      "claimedAt": "2026-11-04T05:13:21.863Z",
+      "doneAt": "2026-11-04T05:26:08.948Z"
+    },
+    "mem-roundtrip-test": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4940",
+      "claimedAt": "2026-11-04T05:26:39.560Z",
+      "doneAt": "2026-11-04T05:41:26.960Z"
+    },
+    "mem-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4940",
+      "claimedAt": "2026-11-04T05:41:32.456Z",
+      "doneAt": "2026-11-04T05:55:08.293Z"
+    },
+    "cli-search-facts.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:56:41.898Z"
+    },
+    "cli-search-facts.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:56:57.196Z"
+    },
+    "cli-search-facts.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:57:11.930Z"
+    },
+    "cli-search-facts.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:57:27.678Z"
+    },
+    "cli-search-facts.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:57:43.506Z"
+    },
+    "mem-add-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:58:03.012Z"
+    },
+    "mem-add-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:58:18.081Z"
+    },
+    "mem-add-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:58:36.937Z"
+    },
+    "mem-add-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:58:53.786Z"
+    },
+    "mem-add-route.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:59:11.356Z"
+    },
+    "mem-search-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:59:30.547Z"
+    },
+    "mem-search-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:59:46.920Z"
+    },
+    "mem-search-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:00:04.287Z"
+    },
+    "mem-roundtrip-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:00:26.938Z"
+    },
+    "mem-roundtrip-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:00:45.915Z"
+    },
+    "mem-roundtrip-test.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:01:07.724Z"
+    },
+    "mem-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:01:29.075Z"
+    },
+    "mem-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:01:47.743Z"
+    }
+  }
+}
