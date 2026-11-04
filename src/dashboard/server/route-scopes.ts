@@ -201,6 +201,7 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   // (the handlers also require a phone credential).
   { method: 'GET', path: '/api/activity', scope: 'read:state' },
   { method: 'PUT', path: '/api/phones/self/push-key', scope: 'tell' },
+  { method: 'PUT', path: '/api/phones/self/notification-preferences', scope: 'tell' },
   { method: 'DELETE', path: '/api/phones/self', scope: 'tell' },
   // PAN-4927 W-CONN1: a connector's logout (the handler also requires a connector credential).
   { method: 'DELETE', path: '/api/connectors/self', scope: 'read:state' },

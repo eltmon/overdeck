@@ -472,6 +472,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/phones/exchange',                  kind: 'http', disposition: 'WRITE',       door: 'access-tokens.createAccessToken (phone) (PAN-4835, pairing channel only)' },
   { surface: 'DELETE /api/phones/self',                    kind: 'http', disposition: 'WRITE',       door: 'access-tokens.revokeAccessToken (own phone token) (PAN-4835)' },
   { surface: 'PUT /api/phones/self/push-key',               kind: 'http', disposition: 'WRITE',       door: 'access-tokens.setPhonePushKey (own phone token) (PAN-4835)' },
+  { surface: 'PUT /api/phones/self/notification-preferences', kind: 'http', disposition: 'WRITE',     door: 'push/phone-preferences-store.setPhoneNotificationPreferences (own phone clientId) (PAN-5019)' },
   { surface: 'POST /api/connectors/pairing',               kind: 'http', disposition: 'WRITE',       door: 'connector-pairing.issueConnectorPairing (PAN-4927 W-CONN1, root only)' },
   { surface: 'GET /api/connectors',                         kind: 'http', disposition: 'READ',        door: 'access-tokens.listAccessTokens (kind connector) (PAN-4927)' },
   { surface: 'DELETE /api/connectors/:id',                  kind: 'http', disposition: 'WRITE',       door: 'access-tokens.revokeAccessToken (connector) (PAN-4927)' },

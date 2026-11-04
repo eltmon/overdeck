@@ -2,11 +2,17 @@
  * PAN-2354: shared types for needs-you push. Types only — no runtime imports.
  * PAN-2080 adds Slack, email and TTS providers against `PushProvider`.
  */
+import type { PhoneNotificationCategory } from '@overdeck/contracts';
 
 export type NeedsYouKind = 'question' | 'approval' | 'finished' | 'failed' | 'summary' | 'test';
 
+/** What a phone's notification-type switches act on (PAN-5019 D-2); independent of `kind`. */
+export type NeedsYouCategory = PhoneNotificationCategory | 'summary' | 'test';
+
 export interface NeedsYouNotification {
   kind: NeedsYouKind;
+  /** What a phone's notification-type switches act on (PAN-5019 D-2). */
+  category: NeedsYouCategory;
   /** Stable dedup and replace key, e.g. `auq:toolu_01…`. */
   tag: string;
   /** Web Push title (may name the conversation). */
