@@ -1,11 +1,12 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-04T08:11:42.667515Z · model: claude-opus-5-5 · open: 869_
+_Last sequenced: 2026-11-04T08:25:24.898732Z · model: claude-opus-5-5 · open: 869_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4702 | S | critical | ok |  |  | Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs. |
+| 2 | PAN-4993 | S | critical | ok |  |  | Convergence gate reads 0→2 blockers after an approval as a regression and withholds review feedback; agent idles. Scope to last episode |
 | 4 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 5 | PAN-4553 | S | critical | ok |  |  | Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges. |
 | 6 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
@@ -416,8 +417,7 @@ _Last sequenced: 2026-11-04T08:11:42.667515Z · model: claude-opus-5-5 · open: 
 | 416 | PAN-3016 | M | medium | ok |  |  | Operator ask: every view should be URL-addressable; cockpit tabs, stage panes and several drawers are still local state. |
 | 417 | PAN-3890 | S | medium | ok |  |  | opencode provider stream errors (rate limit) are invisible in the feed and never retried; first message dies silently |
 | 418 | PAN-3822 | L | medium | ok |  |  | PRD landed (12 items, FR-1..14): link PRs to conversations via branch detection + explicit override; unblocks PAN-3920 |
-| 419 | PAN-4943 | S | medium | ok |  |  | Link and watch pull requests from an agent via MCP tools; W-SELF1 closed, now unblocked. |
-| 420 | PAN-4935 | M | medium | ok |  | PAN-4943 | Instruction blocks and no-MCP fallback; only W-PR1 (PAN-4943, in review) remains before it can start. |
+| 420 | PAN-4935 | M | medium | ok |  |  | Instruction blocks and no-MCP fallback; only W-PR1 (PAN-4943, in review) remains before it can start. |
 | 421 | PAN-1673 | S | medium | ok |  |  | Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
 | 422 | PAN-1669 | S | medium | ok |  |  | restart-with-model doesn't emit a live event |
 | 423 | PAN-1668 | S | medium | ok |  |  | right-click 'restart with <model>' carries model only, never harness |
@@ -881,6 +881,10 @@ _Last sequenced: 2026-11-04T08:11:42.667515Z · model: claude-opus-5-5 · open: 
 
 New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.
 
+### PAN-4993 (rank 2)
+
+New issue, placed in the open rank-2 slot. Any approved PR that is re-reviewed after a main merge and then blocks trips the reversal rule in evaluateReviewConvergence, so the work agent never receives the findings and the issue parks as needs-you; PAN-4947 is stuck on it right now. The fix is small and fully specified (evaluate only rounds after the last zero-blocker round, with named test series), and it unblocks review feedback delivery for the whole pipeline, so it ranks critical ahead of routine work.
+
 ### PAN-4636 (rank 4)
 
 New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.
@@ -1193,10 +1197,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 
 New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.
 
-### PAN-4213 (rank 82)
-
-Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066 merged, so these seven follow-ups now harden code that is on main. Items 2 and 5 are real merge-path correctness hazards: a success status can sit on a head that never landed, and git reset --keep can move an agent commit off its branch. Each item names its file, so the work is well defined and is now startable.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1204,7 +1204,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-04T08:11:42.667515Z",
+  "generatedAt": "2026-11-04T08:25:24.898732Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 869,
@@ -1219,6 +1219,19 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "dependsOn": [],
       "why": "Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs.",
       "rationale": "New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4993",
+      "rank": 2,
+      "size": "S",
+      "importance": "critical",
+      "score": 90,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Convergence gate reads 0→2 blockers after an approval as a regression and withholds review feedback; agent idles. Scope to last episode",
+      "rationale": "New issue, placed in the open rank-2 slot. Any approved PR that is re-reviewed after a main merge and then blocks trips the reversal rule in evaluateReviewConvergence, so the work agent never receives the findings and the issue parks as needs-you; PAN-4947 is stuck on it right now. The fix is small and fully specified (evaluate only rounds after the last zero-blocker round, with named test series), and it unblocks review feedback delivery for the whole pipeline, so it ranks critical ahead of routine work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6384,15 +6397,15 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-4943",
-      "rank": 419,
-      "size": "S",
+      "issue": "PAN-4935",
+      "rank": 420,
+      "size": "M",
       "importance": "medium",
-      "score": 43,
+      "score": 45,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Link and watch pull requests from an agent via MCP tools; W-SELF1 closed, now unblocked.",
-      "rationale": "Its only dependency, W-SELF1 (PAN-4936), closed as completed, so this child is now workable and moves up from the tail into the slot band W-SELF1 held.",
+      "why": "Instruction blocks and no-MCP fallback; only W-PR1 (PAN-4943, in review) remains before it can start.",
+      "rationale": "Dependency PAN-4942 (W-LINK1 link_machine) closed as completed, leaving only in-review PAN-4943, so it moves from the tail into the freed slot right after it.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12008,21 +12021,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-4935",
-      "rank": 420,
-      "size": "M",
-      "importance": "medium",
-      "score": 45,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4943"
-      ],
-      "why": "Instruction blocks and no-MCP fallback; only W-PR1 (PAN-4943, in review) remains before it can start.",
-      "rationale": "Dependency PAN-4942 (W-LINK1 link_machine) closed as completed, leaving only in-review PAN-4943, so it moves from the tail into the freed slot right after it.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4957",
       "rank": 909,
       "size": "S",
@@ -13213,13 +13211,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "from": "PAN-4927",
-      "to": "PAN-4943",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4927",
       "to": "PAN-4950",
       "type": "contains",
       "source": "github-ref",
@@ -13289,13 +13280,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "confidence": 1
     },
     {
-      "from": "PAN-4943",
-      "to": "PAN-4935",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4927",
       "to": "PAN-4935",
       "type": "contains",
@@ -13343,6 +13327,13 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-4993",
+      "to": "PAN-4947",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.7
     }
   ]
 }
