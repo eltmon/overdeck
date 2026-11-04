@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { chmod, mkdtemp, readdir, rm, stat, writeFile } from 'node:fs/promises';
-import { homedir, tmpdir } from 'node:os';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { generateStaticKeyPair } from '@overdeck/anywhere-channel';
@@ -58,8 +58,10 @@ describe('connectorHome', () => {
   });
 
   it('defaults to ~/.overdeck-connector', () => {
-    expect(connectorHome({})).toBe(join(homedir(), '.overdeck-connector'));
-    expect(connectorHome({ OVERDECK_CONNECTOR_HOME: '  ' })).toBe(join(homedir(), '.overdeck-connector'));
+    // beforeEach points HOME at a temp dir, and connectorHome follows HOME.
+    const expected = join(root, 'fake-user', '.overdeck-connector');
+    expect(connectorHome({})).toBe(expected);
+    expect(connectorHome({ OVERDECK_CONNECTOR_HOME: '  ' })).toBe(expected);
   });
 });
 
