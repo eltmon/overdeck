@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4958",
   "created": "2026-11-04T18:35:00.768Z",
-  "updated": "2026-11-04T19:00:16.060Z",
+  "updated": "2026-11-04T19:00:32.222Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -122,6 +122,10 @@
     "bots-page.ac5": {
       "status": "completed",
       "doneAt": "2026-11-04T19:00:16.059Z"
+    },
+    "mcp-intro.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:00:32.221Z"
     }
   }
 }
