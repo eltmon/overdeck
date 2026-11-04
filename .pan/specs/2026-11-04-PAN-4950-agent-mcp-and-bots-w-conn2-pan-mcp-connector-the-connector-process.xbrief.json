@@ -1,0 +1,1056 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T09:53:26.175Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4950: Agent MCP and bots (W-CONN2): pan mcp connector: the connector process",
+    "updated": "2026-11-04T10:00:01.499Z"
+  },
+  "plan": {
+    "id": "pan-4950",
+    "title": "Agent MCP and bots (W-CONN2): pan mcp connector: the connector process",
+    "status": "proposed",
+    "uid": "04594c68-857e-417a-896a-744ad49bcfab",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-04T09:53:26.175Z",
+    "updated": "2026-11-04T10:00:01.499Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4950",
+        "label": "PAN-4950",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4927",
+        "label": "PAN-4927 (epic)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4950.md",
+        "label": "PRD PAN-4950",
+        "type": "document"
+      },
+      {
+        "uri": ".pan/drafts/pan-4927.md",
+        "label": "Epic PRD (W-CONN2)",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "mcp",
+      "connector",
+      "anywhere",
+      "webrtc",
+      "cli",
+      "bots"
+    ],
+    "narratives": {
+      "Problem": "A self-hosted bot (Hermes, OpenClaw, Grok Build on another computer) has no way to reach an Overdeck machine's MCP tools without Tailscale. W-CONN1 shipped the connector credential and exchange on the machine and W-DIR1 taught the directory about node clients, but the connector process itself (pan mcp connector login|pair|serve|status|logout) does not exist, and configuration/mcp.mdx still says nothing serves it. Separately, the MCP start tools go only through /api/fleet/* routes that refuse every secure-channel caller, so the operate scope a bot can be granted would do nothing through a connector.",
+      "Proposal": "Add src/lib/mcp/connector/ (home, account, directory, dial, channel-api, pair, serve) and src/cli/commands/mcp-connector.ts. The connector keeps its own 0700 home (~/.overdeck-connector), signs in with the overdeck.ai device flow (environment_id = clientId), joins the directory as a platform 'node' client, dials the paired machine with the werift RtcTransport (direct first, TURN relay only when allowed, with relay metering), and reuses linkFetch through a connector LinkRouteSource that reports online only after a 15 s probe and reconnects with back-off 1 s to 60 s. serve hosts the shared MCP tool module on 127.0.0.1:7466/mcp (local odl_ token, per-request stateless transport) or stdio, with list_machines and the machine argument removed. On the machine, the three fleet spawn routes admit a connector credential for this-machine targets only (403 connector-local-only otherwise, before any side effect). Docs in configuration/mcp.mdx, docs/ANYWHERE-ARCHITECTURE.md and docs/DASHBOARD-AUTH.md describe the shipped connector.",
+      "NonGoals": "- Fleet reach through a connector: a connector reaches only its paired machine; list_machines stays hidden and fleet placement, worker stop and every fleet GET keep refusing channel callers.\n- No new dashboard HTTP route; route-scopes.ts and no-loss-matrix.ts are unchanged.\n- The connector never reads or writes ~/.overdeck (no readDirectoryUrl, no ensureMachineKey, no account store).\n- No slim connector package separate from @overdeck/core.\n- No directory deploy (CP-5) and no release or publish from this issue.\n- No configuration/bots.mdx or cli/mcp.mdx (W-DOC, PAN-4958 creates them).\n- No change to list_pending_input or search_conversations behaviour for connectors.\n- No change to the integration plugins (W-INT1 to W-INT4) or the Connect a bot UI (W-BOT1).\n- No token, key or local-token value is ever printed, logged, put in argv or returned by /healthz."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix the fleet spawn routes on the machine so a connector can start work on this machine (403 connector-local-only for any other target), instead of hiding the start tools from connectors.",
+        "rationale": "fleetWriteGate refuses every channel caller, so through a connector start_conversation, start_worker and start_issue fail even for this machine; hiding them would make the operate scope that W-BOT1 offers bots inert. A this-machine-only admission keeps the no-chained-hops rule and is about 30 lines with a test proving no side effect for refused targets."
+      },
+      {
+        "summary": "Reuse linkFetch with a connector LinkRouteSource instead of hand-writing the channel pool the epic describes.",
+        "rationale": "LinkAgent already provides the 4-channel pool with a 4 s idle close, link.invalid host and the stale-channel resend; a second copy would drift. Its 2.5 s dial bound is handled by reporting online only after a 15 s probe has warmed the peer connection."
+      },
+      {
+        "summary": "Meter relay bytes in the connector with a small copy of the phone's relay meter rather than moving the phone's module into packages/anywhere-channel.",
+        "rationale": "The directory counts relay bytes only from the initiator's relay-usage frames and the connector is the initiator; moving the phone module would touch apps/mobile and widen this issue for no behavioural gain."
+      },
+      {
+        "summary": "Serve /healthz without authentication, answering only { ok, machine, route }.",
+        "rationale": "status and container health checks need it without the local token; it carries no secret and no scope list."
+      },
+      {
+        "summary": "Use the connector's clientId as the device-flow environment_id and keep both service URLs (account and directory) in the connector's account.json, set at login.",
+        "rationale": "The phone app already signs in with environment_id = clientId; the dashboard's directory URL lives in ~/.overdeck/config.yaml, which the connector must not read."
+      },
+      {
+        "summary": "Generate a fresh link key on every pair and keep an existing valid local token across re-pairs.",
+        "rationale": "A fresh key avoids the exchange's 409 link-key-in-use; keeping the local token avoids breaking bot configs on re-pair. logout deletes both."
+      },
+      {
+        "summary": "Document the connector in configuration/mcp.mdx, docs/ANYWHERE-ARCHITECTURE.md and docs/DASHBOARD-AUTH.md in this issue; leave the new bots.mdx and cli/mcp.mdx pages to W-DOC.",
+        "rationale": "configuration/mcp.mdx currently says the connector ships in PAN-4950 and nothing serves it yet, and ANYWHERE-ARCHITECTURE says fleet routes refuse every channel caller; both become false with this change."
+      },
+      {
+        "summary": "Treat epic AC-21 (second computer, curl) and AC-22 (relay canary with tcpdump) as operator UAT steps, not xBRIEF criteria.",
+        "rationale": "Neither can run in CI; AC-22 also needs the CP-5 directory deploy. The integration test covers the tool-call-over-channel path mechanically."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "One feature (the connector process) whose 7 new lib modules, 1 CLI module and their tests are inseparable for AC-21, plus a ~30-line machine-side fix without which the operate scope is inert through a connector. The subsystem count is inflated because the quality lint counts each top-level doc file (configuration/mcp.mdx, docs/ANYWHERE-ARCHITECTURE.md, docs/DASHBOARD-AUTH.md) as its own subsystem; the code itself spans src/lib/mcp/connector, src/cli/commands and one dashboard route file.",
+      "canonicalFilename": "2026-11-04-PAN-4950-agent-mcp-and-bots-w-conn2-pan-mcp-connector-the-connector-process.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "conn-home",
+        "title": "home.ts: connector home directory, record files, identity and local token",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T09:53:26.175Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4950",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/mcp/connector/home.ts",
+            "tests/unit/lib/mcp/connector/home.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run tests/unit/lib/mcp/connector/home.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "home.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-1 exactly: connectorHome(env) (OVERDECK_CONNECTOR_HOME, default ~/.overdeck-connector), ensureHome (0700), writeSecretFile (temp file 0600 then rename), readAccount/readIdentity/readPairing (null on ENOENT, throw on malformed or group/other-readable files), ensureIdentity (clientId UUID v4, link and install X25519 pairs from generateStaticKeyPair, hex), replaceLinkKey, ensureLocalToken (odl_ + 64 hex, reused when valid), readLocalToken, removeConnectorFiles. Export the ConnectorAccount, ConnectorIdentity and ConnectorPairing types and DEFAULT_CONNECTOR_PORT = 7466. Async fs only; never touch ~/.overdeck."
+        },
+        "items": [
+          {
+            "id": "conn-home.ac1",
+            "title": "Given an empty temp home, when ensureIdentity and ensureLocalToken run, then the directory exists with mode 0700 and identity.json and local-token exist with mode 0600",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conn-home.ac2",
+            "title": "Given OVERDECK_CONNECTOR_HOME is set, when connectorHome(env) is called, then it returns that path; given it is unset, then it returns join(homedir(), '.overdeck-connector')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conn-home.ac3",
+            "title": "Given pairing.json has mode 0644, when readPairing runs, then it rejects with an error containing 'chmod 600'; given it holds malformed JSON, then it rejects with an error containing 'pan mcp connector logout'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conn-home.ac4",
+            "title": "Given a valid local-token file, when ensureLocalToken runs twice, then it returns the same odl_ value both times; given a malformed file, then it replaces it with a value matching /^odl_[0-9a-f]{64}$/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conn-home.ac5",
+            "title": "When removeConnectorFiles runs on a home with all four files and again on an empty home, then no file remains and neither call rejects",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conn-account",
+        "title": "account.ts: pan mcp connector login (device flow) and status",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T09:53:26.175Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4950",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/mcp/connector/account.ts",
+            "tests/unit/lib/mcp/connector/account.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run tests/unit/lib/mcp/connector/account.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "account.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-9",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-2: runConnectorLogin resolves the account URL with resolveBaseUrl and the directory URL with parseDirectoryUrl (flag > OVERDECK_CONNECTOR_DIRECTORY_URL > default), runs requestDeviceCode with environment_id = identity.clientId and platform = platformString(), polls with pollForToken, reads getMe, and writes account.json (AccountRecord fields plus directoryUrl). runConnectorStatus prints account, machine, scopes and the route from GET http://127.0.0.1:<port>/healthz (2 s abort) or 'route: not serving'. Never print token text. Tests use an injected fetch and fake timers for the poll interval."
+        },
+        "items": [
+          {
+            "id": "conn-account.ac1",
+            "title": "Given an injected fetch, when runConnectorLogin runs, then the POST to /oauth/device/code carries environment_id equal to identity.json's clientId and a platform matching /^(linux|darwin|win32)-(x64|arm64)$/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conn-account.ac2",
+            "title": "Given the token poll succeeds and OVERDECK_CONNECTOR_DIRECTORY_URL is https://connect.example, when login finishes, then it returns 0 and account.json (mode 0600) stores accessToken, deviceId, baseUrl and directoryUrl https://connect.example",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conn-account.ac3",
+            "title": "Given --directory-url http://example.com, when login runs, then it returns 1 before any fetch call; given the poll answers access_denied, then it returns 1 and writes no account.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conn-account.ac4",
+            "title": "Given no serve is listening, when runConnectorStatus runs, then it prints 'route: not serving' and returns 0; given healthz answers { route: 'relay' }, then it prints 'route: relay'; in both cases the output contains no odk_, odd_ or odl_ text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conn-directory",
+        "title": "directory.ts: DirectoryWebClient as a node client, online wait and same-account check",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T09:53:26.175Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4950",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/mcp/connector/directory.ts",
+            "tests/unit/lib/mcp/connector/directory.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run tests/unit/lib/mcp/connector/directory.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "directory.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-3: createConnectorDirectory builds a DirectoryWebClient from @overdeck/anywhere-channel/web with platform 'node', the account token as token(), clientId, the cleaned label, the install public key and appVersion, optionally an injected WebSocket class (CP-11 fallback: ws). waitDirectoryOnline resolves on 'online', rejects with directory.refusal on 'refused' and with 'Could not reach the overdeck.ai directory within 15 s' after 15_000 ms. machineInDirectory returns the two D-14 messages (machine absent from the account; machine offline)."
+        },
+        "items": [
+          {
+            "id": "conn-directory.ac1",
+            "title": "Given a fake WebSocket class, when the client starts, then the socket opens wss://connect.example/v1/directory with subprotocol overdeck.bearer.<accessToken> and the first frame sent is hello-client with platform 'node' and publicKeyHex equal to the install public key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conn-directory.ac2",
+            "title": "Given fake timers, when no welcome-client arrives within 15 s, then waitDirectoryOnline rejects with the 15 s message; when welcome-client arrives first, then it resolves",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conn-directory.ac3",
+            "title": "Given the socket closes with code 4013, when waitDirectoryOnline is pending, then it rejects with CONNECTOR_LIMIT_MESSAGE",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conn-directory.ac4",
+            "title": "Given a machines list without the environment id, when machineInDirectory runs, then it returns the 'does not include machine' message; given the machine is listed offline, then it returns '<label> is offline in the overdeck.ai directory.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conn-dial",
+        "title": "dial.ts: RtcTransport over the directory signalling port with relay metering",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T09:53:26.175Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4950",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/mcp/connector/dial.ts",
+            "tests/unit/lib/mcp/connector/dial.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run tests/unit/lib/mcp/connector/dial.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "dial.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "NFR-4",
+            "NFR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-4: connectorSignalingPort (signal frames with purpose 'link'; iceServers mapped to mutable urls), createRelayMeter (phone algorithm: 60 s interval, report on close, 1e9 per frame, keep unsent bytes when send returns false), and createConnectorRtc returning { transport, dialer, relayRefusal, stop }: RtcTransport whose incoming handler destroys the raw duplex, peer_offline error frames call abortSession, relay-status stopped destroys tracked relay channels and refuses later relay dials with RELAY_CAP_MESSAGE, and the dialer refuses when the directory is offline, the machine is not online, or the relay is refused. Accept an optional transport factory for tests."
+        },
+        "items": [
+          {
+            "id": "conn-dial.ac1",
+            "title": "When the signalling port sends, then the directory receives { type: 'signal', to, session, purpose: 'link', relay, data }; when a directory error frame { code: 'peer_offline', session } arrives, then transport.abortSession is called with that session",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conn-dial.ac2",
+            "title": "Given relayAllowed is false, when the dialer is called with rtc+turn://<id>, then it rejects with 'The relay needs the relay plan' and transport.dial is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conn-dial.ac3",
+            "title": "Given a relay-status frame with stopped: true, when it arrives, then every tracked relay raw duplex is destroyed and the next relay dial rejects with RELAY_CAP_MESSAGE",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conn-dial.ac4",
+            "title": "Given fake timers and a tracked relay raw that moved 2.5e9 bytes, when 60 s pass, then relay-usage frames of 1e9, 1e9 and 5e8 bytes are sent; given send returns false, then the bytes are kept and sent on the next report",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conn-channel-api",
+        "title": "channel-api.ts: ConnectorLink route source (probe, direct-then-relay, back-off) and DashboardApi over linkFetch",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T09:53:26.175Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4950",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "conn-pair",
+            "conn-logout",
+            "conn-serve",
+            "conn-integration"
+          ],
+          "files_scope": [
+            "src/lib/mcp/connector/channel-api.ts",
+            "tests/unit/lib/mcp/connector/channel-api.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run tests/unit/lib/mcp/connector/channel-api.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "channel-api.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-4",
+            "NFR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-5: class ConnectorLink implements LinkRouteSource (routeFor reports 'connecting' until a probe — openChannel on rtc://<env>, then rtc+turn://<env> only when relayRefusal() is null, timeoutMs 15_000 — succeeds; every probe after the first calls transport.close(env) first; failures back off min(1_000 x 2^n, 60_000) ms and reset on success; markLost flips to down and reconnects; directory machine-online updates trigger an immediate probe; health() and lastError()), noDirectPathMessage(label) with the exact D-4 sentence, and createConnectorDashboardApi(link) that calls linkFetch(env, path, { method, body (omitted for GET/DELETE, {} when undefined otherwise), signal, routeSource: link }), maps an invalid-json body to null, and marks the link lost on ChannelOpenError or LinkUnavailableError. Run checkpoint CP-6 (live connector dial from a separate OVERDECK_CONNECTOR_HOME) and record it in the PR description; fallback is the phone dialer with werift's RTCPeerConnection. Every test file using linkFetch calls _resetLinkClientForTests() and setRtcDialer(null) in afterEach, because linkFetch caches one LinkAgent per environment id with its first routeSource."
+        },
+        "items": [
+          {
+            "id": "conn-channel-api.ac1",
+            "title": "Given a fake openProbe that resolves, when connect() runs, then routeFor(env) changes from state 'connecting' with url null to state 'online' with url rtc://<env> and health().route is 'direct'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conn-channel-api.ac2",
+            "title": "Given the direct probe rejects and relayRefusal() is null, when connect() runs, then the url becomes rtc+turn://<env> with route 'relay'; given relayRefusal() returns a message, then route is 'down' and lastError() equals 'No direct path to <label>. Use the relay plan, or the Tailscale route in the README.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conn-channel-api.ac3",
+            "title": "Given fake timers and probes that keep failing, when time advances, then probe rounds start after 1 s, 2 s, 4 s and the delay never exceeds 60 s; after a success the next failure waits 1 s again; every round after the first calls transport.close(env) before probing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conn-channel-api.ac4",
+            "title": "When the DashboardApi sends DELETE, then no body is sent; when it sends POST with an undefined body, then the body is {}; when the response is non-JSON, then json is null; when linkFetch throws a ChannelOpenError, then the link's route becomes 'down' and the error message names the machine label",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conn-pair",
+        "title": "pair.ts: pan mcp connector pair (pairing channel, exchange, key checks, files)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T09:53:26.175Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4950",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/mcp/connector/pair.ts",
+            "tests/unit/lib/mcp/connector/pair.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run tests/unit/lib/mcp/connector/pair.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "pair.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1",
+            "NFR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-6: runConnectorPair parses the string with parseConnectorPairLink, requires account.json, starts the directory and checks the machine (D-14, D-15), registers the RTC dialer with setRtcDialer, generates a fresh link key, opens a pairing-mode channel on rtc:// then rtc+turn:// when allowed, refuses when channel.channel.remoteKeyHex or descriptor.machineKey (absent counts as mismatch) differs from k, posts { v: 1, clientId, label } to /api/connectors/exchange over channelAgent with a 15 s abort, maps 403/409 answers to the PRD sentences, and only on success writes the new link key, pairing.json and an ensured local-token, then prints the next steps without the token value. Inject directory, RTC and channel-opening deps for tests."
+        },
+        "items": [
+          {
+            "id": "conn-pair.ac1",
+            "title": "Given a string that parseConnectorPairLink rejects, when pair runs, then it returns 1 with the 'copy it again from Connect a bot' sentence and the home holds no pairing.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conn-pair.ac2",
+            "title": "Given the pairing channel's remoteKeyHex differs from k, or the descriptor has no machineKey, when pair runs, then it returns 1 with 'does not match the pairing string' and writes no pairing.json and no new link key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conn-pair.ac3",
+            "title": "Given the exchange answers 403 { code: 'not-a-connector-code' }, when pair runs, then it returns 1 with the 'not issued for a connector' sentence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conn-pair.ac4",
+            "title": "Given a successful exchange, when pair runs, then the server receives { v: 1, clientId, label }, pairing.json and local-token exist with mode 0600, identity.json holds the new link public key, a pre-existing valid local-token is unchanged, and stdout contains no odk_ or odl_ text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conn-pair.ac5",
+            "title": "Given the direct pairing dial fails and the relay is allowed, when pair runs, then it retries on rtc+turn://<e>; given the relay is refused, then it returns 1 with the 'No direct path' sentence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conn-logout",
+        "title": "pair.ts: pan mcp connector logout (self-revoke, forget-client, device revoke, delete files)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T09:53:26.175Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4950",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/mcp/connector/pair.ts",
+            "tests/unit/lib/mcp/connector/pair.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run tests/unit/lib/mcp/connector/pair.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "pair.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-7: runConnectorLogout, best effort in order — DELETE /api/connectors/self through createConnectorDashboardApi with a 5 s abort (a dropped connection after sending counts as success), forget-client when the directory is online, revokeDevice with a 5 s abort — then removeConnectorFiles and exit 0. Each failing step prints one stderr line. With no files it prints 'Not signed in.' and returns 0."
+        },
+        "items": [
+          {
+            "id": "conn-logout.ac1",
+            "title": "Given the directory is refused, the machine unreachable and revokeDevice rejects, when logout runs, then all four home files are deleted and it returns 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conn-logout.ac2",
+            "title": "Given a reachable fake machine, when logout runs, then it receives DELETE /api/connectors/self with Authorization: Bearer <connector token> and no body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conn-logout.ac3",
+            "title": "Given the directory is online, when logout runs, then a forget-client frame is sent; given it is offline, then no frame is sent; given an empty home, then it prints 'Not signed in.' and returns 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conn-serve",
+        "title": "serve.ts: loopback HTTP /mcp with the local token, /healthz, stdio, and the connector tool list",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T09:53:26.175Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4950",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/mcp/connector/serve.ts",
+            "tests/unit/lib/mcp/connector/serve.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run tests/unit/lib/mcp/connector/serve.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "serve.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-7",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "acJustification": "serve.ts carries three surfaces (HTTP endpoint, stdio, runConnectorServe wiring); the sixth criterion pins the wiring's missing-file and port-in-use exits, which no other item exercises."
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-8: connectorTools (drop list_machines; strip machine and needs from start_conversation, start_worker and start_issue schemas and refuse them with an error result), startConnectorHttp (listen 127.0.0.1 only; GET /healthz unauthenticated { ok, machine, route }; POST /mcp needs Authorization: Bearer <local token> compared with timingSafeEqual after a length check; 4 MiB body limit; fresh createOverdeckMcpServer({ api, scopes, isAgent: false }, connectorTools()) plus SDK Node StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true }) per request; 405 for other /mcp methods; 404 elsewhere), serveConnectorStdio (StdioServerTransport, stdout carries only JSON-RPC), and runConnectorServe (opts include label, the directory label) wiring home, directory, RTC (setRtcDialer), ConnectorLink and the API, with EADDRINUSE and missing-file hints, shutting down on SIGINT/SIGTERM or stdin end. The SDK transport answers 406 unless Accept lists both application/json and text/event-stream; every test request sends that header."
+        },
+        "items": [
+          {
+            "id": "conn-serve.ac1",
+            "title": "Given startConnectorHttp on port 0, when it listens, then server.address().address is '127.0.0.1'; when POST /mcp arrives without a bearer, with a wrong bearer, or with a bearer of a different length, then each answers 401",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conn-serve.ac2",
+            "title": "Given the right bearer and scopes read:state, read:conversations, tell, operate, when tools/list is called, then list_conversations is present, list_machines is absent, and start_conversation's inputSchema has no machine property",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conn-serve.ac3",
+            "title": "When tools/call start_conversation is sent with machine 'other', then the result has isError true and the fake DashboardApi records no call; when tools/call list_conversations is sent, then the API records GET /api/conversations?limit=50",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conn-serve.ac4",
+            "title": "When GET /healthz is sent without a bearer, then it answers 200 with exactly the keys ok, machine and route; when GET /mcp is sent, then it answers 405 with Allow: POST; when a 5 MiB body is posted, then it answers 413",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conn-serve.ac5",
+            "title": "Given stdio mode on a PassThrough pair, when tools/list is written to stdin, then stdout receives only JSON-RPC lines and the answer lists the connector tools",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conn-serve.ac6",
+            "title": "Given a home without pairing.json, when runConnectorServe runs, then it returns 1 with 'Pair first: pan mcp connector pair'; given the port is already bound, then it returns 1 with 'Port <port> is in use; pass --port'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conn-integration",
+        "title": "Integration test: a connector tool call crosses a real Noise link channel to a machine route",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T09:53:26.175Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4950",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/integration/mcp/connector-channel.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/integration/mcp/connector-channel.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "connector-channel.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-9 following tests/integration/anywhere/phone-channel.test.ts: installChannelListener with a pinned connector key, an http.Server recording method, url and authorization, an in-memory RTC dialer (duplexPair + acceptRawChannel) registered with setRtcDialer, a ConnectorLink and createConnectorDashboardApi feeding createOverdeckMcpServer(..., connectorTools()) over the SDK InMemoryTransport with an SDK Client. Reset the channel listener, link client and RTC dialer after each test."
+        },
+        "items": [
+          {
+            "id": "conn-integration.ac1",
+            "title": "Given the connector key is pinned, when the client calls list_conversations, then the result text contains conv-1 and the machine's HTTP server records GET /api/conversations?limit=50 with authorization 'Bearer <connector token>'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conn-integration.ac2",
+            "title": "Given isPinnedPeer returns false, when the client calls list_conversations, then the tool result has isError true and the link's health().route is 'down'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fleet-connector-local",
+        "title": "Fleet spawn routes admit a connector credential for this machine only",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T09:53:26.175Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4950",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "conn-serve",
+            "conn-docs"
+          ],
+          "files_scope": [
+            "src/dashboard/server/routes/fleet-work.ts",
+            "src/dashboard/server/__tests__/fleet-connector.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/dashboard/server/__tests__/fleet-connector.test.ts src/dashboard/server/__tests__/fleet-conversations.test.ts src/dashboard/server/__tests__/fleet-workers.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "fleet-connector.test.ts, fleet-conversations.test.ts and fleet-workers.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ],
+          "acJustification": "The fifth criterion tests the gate itself at the route level; the first four test the caller mapping and handlers with injected deps, which never exercise fleetSpawnGate."
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-10 in src/dashboard/server/routes/fleet-work.ts (budget +30 lines): FleetCaller gains localOnly; fleetCaller maps a connector credential to { actor: 'operator', ceiling: its scopes, mayCreateFly: false, viaToken: true, localOnly: true }; a new fleetSpawnGate admits a channel request whose credential kind is 'connector' and is used only by the conversations, workers and issue-start routes (placement, worker stop and machines keep their gates); a connectorLocalOnly helper answers 403 { code: 'connector-local-only' } right after target resolution in handleFleetConversation, handleFleetWorker (before deps.allocate) and handleFleetIssueStart when caller.localOnly and the target is not self. If rejectUnsafeDashboardMutationRequest refuses a connector channel request, use rejectUnauthorizedDashboardRequest for connector callers. This is a security boundary: keep the admission to these three routes and self targets. Prove the gate with a route-level test (PRD WI-10 'Route level'): mock only channelOfRequest to a link marker, seed a real connector record in a temp OVERDECK_HOME, and drive fleetWorkRouteLayer through HttpRouter.toHttpEffect."
+        },
+        "items": [
+          {
+            "id": "fleet-connector-local.ac1",
+            "title": "Given a connector credential, when fleetCaller runs, then it returns actor 'operator', viaToken true, localOnly true, mayCreateFly false and the credential's scopes as ceiling",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fleet-connector-local.ac2",
+            "title": "Given a connector caller and a self target, when handleFleetConversation runs, then createLocal is called and it answers 201; when handleFleetIssueStart runs with a self target, then deps.spawn is called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fleet-connector-local.ac3",
+            "title": "Given a connector caller and a remote target, when handleFleetConversation, handleFleetWorker or handleFleetIssueStart runs, then each answers 403 with code 'connector-local-only' and fetchPeer, createLocal and allocate are never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fleet-connector-local.ac4",
+            "title": "Given a token caller without localOnly and a remote target, when handleFleetConversation runs, then it still posts to the owner's work door as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fleet-connector-local.ac5",
+            "title": "Given channelOfRequest returns a link marker for key K and the registry holds a connector record for K, when POST /api/fleet/conversations is sent with body {} and that record's bearer through fleetWorkRouteLayer, then it answers 400 'message must be a string'; when a machine record's bearer for K is sent instead, then it answers 403 'a linked machine cannot use the fleet routes here'; when POST /api/fleet/placement is sent with the connector bearer, then it answers 403",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conn-cli",
+        "title": "CLI: register pan mcp connector login|pair|serve|status|logout with lazy imports",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T09:53:26.175Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4950",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/mcp-connector.ts",
+            "src/cli/commands/mcp.ts",
+            "tests/unit/cli/mcp-connector.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run tests/unit/cli/mcp-connector.test.ts tests/unit/cli/mcp.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "mcp-connector.test.ts and mcp.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-9",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-11: registerMcpConnectorCommands(mcp, appVersion) in src/cli/commands/mcp-connector.ts with the five subcommands and their flags (serve --port 1-65535 default 7466, --stdio, --label; status --port; login --account-url --directory-url; pair <pairingString> --label), each action lazy-importing its src/lib/mcp/connector module and finishing with exitCli. Only 'import type { Command }' is static. In src/cli/commands/mcp.ts add the import and call registerMcpConnectorCommands(mcp, () => program.version() ?? 'unknown') after registerMcpOAuthCommands, and update its header sentence about static imports."
+        },
+        "items": [
+          {
+            "id": "conn-cli.ac1",
+            "title": "Given a Commander program after registerMcpCommands, when the mcp connector command is inspected, then its subcommands are exactly login, pair, serve, status and logout",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conn-cli.ac2",
+            "title": "When serve is invoked with --port 0 or --port 70000, then the process exits 1 with '--port must be an integer from 1 to 65535' and no connector module is imported",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conn-cli.ac3",
+            "title": "When src/cli/commands/mcp-connector.ts is imported, then werift is not loaded (a vi.mock factory spy for werift is never called)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conn-docs",
+        "title": "Docs: Run the Overdeck connector, the connector process, and the connector fleet rule",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T09:53:26.175Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4950",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/mcp.mdx",
+            "docs/ANYWHERE-ARCHITECTURE.md",
+            "docs/DASHBOARD-AUTH.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint",
+            "grep -c 'nothing serves it yet' configuration/mcp.mdx || true"
+          ],
+          "expected_outputs": [
+            "lint (including lint:docs) completes without errors",
+            "grep prints 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-12: in configuration/mcp.mdx replace the <Info> box that says nothing serves the connector yet (keep only the public /mcp note) and add '## Run the Overdeck connector' covering requirements (Node 22.16+, same overdeck.ai account), the five commands with every flag, the connector home and its four files, OVERDECK_CONNECTOR_DIRECTORY_URL, the local endpoint and /healthz, routes and reconnect, what a connector can reach (paired machine only, start tools run there, list_pending_input shows fleetError for linked machines), restart serve after a re-pair, and logout's steps. In docs/ANYWHERE-ARCHITECTURE.md rewrite the 'One machine only' bullet for the connector fleet rule and add '## The connector process (PAN-4927 W-CONN2)'. In docs/DASHBOARD-AUTH.md add the connector fleet-spawn paragraph after the POST /api/fleet/issues/:id/start paragraph. Use the flag names and messages as implemented."
+        },
+        "items": [
+          {
+            "id": "conn-docs.ac1",
+            "title": "Given the change, when grep -c 'nothing serves it yet' configuration/mcp.mdx runs, then it prints 0, and configuration/mcp.mdx contains a '## Run the Overdeck connector' heading naming login, pair, serve, status and logout with --port, --stdio and --label and a curl example that sends Accept: application/json, text/event-stream",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conn-docs.ac2",
+            "title": "Given the change, when docs/ANYWHERE-ARCHITECTURE.md is read, then it contains a '## The connector process (PAN-4927 W-CONN2)' heading and its 'One machine only' bullet contains connector-local-only",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conn-docs.ac3",
+            "title": "Given the change, when docs/DASHBOARD-AUTH.md is read, then it contains the rule that a connector credential may call the three fleet spawn routes for a target on this machine and receives 403 connector-local-only otherwise; when npm run lint runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "conn-home",
+        "to": "conn-account",
+        "type": "blocks"
+      },
+      {
+        "from": "conn-home",
+        "to": "conn-directory",
+        "type": "blocks"
+      },
+      {
+        "from": "conn-home",
+        "to": "conn-channel-api",
+        "type": "blocks"
+      },
+      {
+        "from": "conn-dial",
+        "to": "conn-channel-api",
+        "type": "blocks"
+      },
+      {
+        "from": "conn-directory",
+        "to": "conn-pair",
+        "type": "blocks"
+      },
+      {
+        "from": "conn-dial",
+        "to": "conn-pair",
+        "type": "blocks"
+      },
+      {
+        "from": "conn-channel-api",
+        "to": "conn-pair",
+        "type": "blocks"
+      },
+      {
+        "from": "conn-pair",
+        "to": "conn-logout",
+        "type": "blocks"
+      },
+      {
+        "from": "conn-directory",
+        "to": "conn-serve",
+        "type": "blocks"
+      },
+      {
+        "from": "conn-channel-api",
+        "to": "conn-serve",
+        "type": "blocks"
+      },
+      {
+        "from": "conn-channel-api",
+        "to": "conn-integration",
+        "type": "blocks"
+      },
+      {
+        "from": "conn-serve",
+        "to": "conn-integration",
+        "type": "blocks"
+      },
+      {
+        "from": "conn-account",
+        "to": "conn-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "conn-logout",
+        "to": "conn-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "conn-serve",
+        "to": "conn-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "conn-cli",
+        "to": "conn-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "fleet-connector-local",
+        "to": "conn-docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
