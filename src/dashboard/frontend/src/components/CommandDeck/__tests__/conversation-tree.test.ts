@@ -115,6 +115,16 @@ describe('groupSummary', () => {
     expect(group?.descendants.find((node) => node.conv.id === 6)?.flattenedFrom).toBe(5);
     expect(groupSummary(group!)).toEqual({ lanes: 3, successors: 2, working: 2, needsYou: 1, reported: 2 });
   });
+
+  it('PAN-5005: counts a linked remote lane with a report as reported', () => {
+    const root = conv(1);
+    const local = lane(2, 1, 'a', { laneReport: { seq: 1, at: 'x', status: 'done' } });
+    const linked = lane(-1, 1, 'b', {
+      name: '@env-fly/c-fly', origin: 'linked', laneReport: { seq: 1, at: 'y', status: 'done' },
+    });
+    const [group] = buildConversationTree([root, local, linked]);
+    expect(groupSummary(group!)).toEqual({ lanes: 2, successors: 0, working: 0, needsYou: 0, reported: 2 });
+  });
 });
 
 describe('buildConversationTree critic link (PAN-4223 WI-22)', () => {
