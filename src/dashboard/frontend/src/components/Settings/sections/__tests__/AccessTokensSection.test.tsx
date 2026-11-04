@@ -56,8 +56,11 @@ function mockFetch(opts: {
   createError?: string;
   /** PAN-4645: what GET /api/anywhere/status answers (404 when omitted, as before). */
   anywhereStatus?: unknown;
+  /** PAN-4946: what GET /api/mcp-oauth/sign-ins answers (empty when omitted). */
+  signIns?: unknown[];
 } = {}) {
   const tokens = opts.tokens ?? [RECORD_A, RECORD_B];
+  const signIns = opts.signIns ?? [];
   global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = input.toString();
     if (url === '/api/access-tokens' && (!init || init.method === undefined)) {
@@ -87,6 +90,9 @@ function mockFetch(opts: {
     }
     if (url === '/api/anywhere/status' && opts.anywhereStatus !== undefined) {
       return new Response(JSON.stringify(opts.anywhereStatus), { status: 200 });
+    }
+    if (url === '/api/mcp-oauth/sign-ins' && (!init || init.method === undefined)) {
+      return new Response(JSON.stringify({ signIns }), { status: 200 });
     }
     return new Response('not found', { status: 404 });
   });
@@ -196,6 +202,28 @@ describe('AccessTokensSection', () => {
     renderSection();
 
     expect(await screen.findByText('No access tokens yet.')).toBeInTheDocument();
+  });
+
+  it('PAN-4946 ac4: renders a Sign-ins heading and the sign-in row returned by the route', async () => {
+    mockFetch({
+      signIns: [{
+        familyId: 'fam-1',
+        clientId: 'odc_1',
+        clientName: 'Claude Desktop',
+        level: 'operate',
+        scopes: ['read:state', 'operate'],
+        createdAt: '2026-10-01T00:00:00.000Z',
+        lastUsedAt: null,
+        accessExpiresAt: null,
+        refreshExpiresAt: '2026-12-01T00:00:00.000Z',
+        headless: false,
+      }],
+    });
+    renderSection();
+    await screen.findByText('ci-bot');
+
+    expect(screen.getByText('Sign-ins')).toBeInTheDocument();
+    expect(await screen.findByText('Claude Desktop')).toBeInTheDocument();
   });
 
   it('places an access-tokens nav entry right after remote', () => {

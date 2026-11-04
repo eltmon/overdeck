@@ -5,6 +5,7 @@ import { useConfirm } from '../../DialogProvider';
 import { dashboardMutationJsonHeaders, ensureDashboardSession } from '../../../lib/wsTransport';
 import { type SettingsConfig } from '../types';
 import { CreateAccessTokenDialog } from './CreateAccessTokenDialog';
+import { McpSignInsList } from '../anywhere/McpSignInsList';
 import { RequireTokenMintRow } from './RequireTokenMintRow';
 import {
   ACCESS_TOKENS_FORBIDDEN_EXPLANATION,
@@ -171,6 +172,10 @@ export function AccessTokensSection({ formData, onSettingsChange }: AccessTokens
           {showAgentTokens ? 'Hide' : 'Show'} agent tokens ({agent.length})
         </button>
       )}
+
+      <div className="mt-6">
+        <McpSignInsList />
+      </div>
 
       <CreateAccessTokenDialog
         open={createOpen}

@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { formatRelativeTime } from '../../../lib/dashboard-utils';
 import { useConfirm } from '../../DialogProvider';
 import { AccessTokensForbiddenError, partitionAgentTokens, type AccessTokenRecord } from '../sections/accessTokensShared';
+import { McpSignInsList } from './McpSignInsList';
 import {
   ANYWHERE_ACCESS_TOKENS_QUERY_KEY,
   apiError,
@@ -107,6 +108,9 @@ export function AccessTokensPanel() {
           )}
         </>
       )}
+      <div className="mt-4">
+        <McpSignInsList />
+      </div>
     </div>
   );
 }
