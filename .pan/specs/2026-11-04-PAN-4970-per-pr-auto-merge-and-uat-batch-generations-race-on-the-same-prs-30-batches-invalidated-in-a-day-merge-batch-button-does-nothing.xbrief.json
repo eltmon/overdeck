@@ -1,0 +1,732 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T00:08:35Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4970: Per-PR auto-merge and UAT batch generations race on the same PRs: 30 batches invalidated in a day, Merge batch button does nothing",
+    "updated": "2026-11-04T00:19:23.803Z"
+  },
+  "plan": {
+    "id": "pan-4970",
+    "title": "Per-PR auto-merge and UAT batch generations race on the same PRs: 30 batches invalidated in a day, Merge batch button does nothing",
+    "status": "proposed",
+    "uid": "00ab51d1-162d-4bb8-8a01-a95de6256f4f",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-04T00:08:35Z",
+    "updated": "2026-11-04T00:19:23.803Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4970",
+        "label": "PAN-4970",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "merge-train",
+      "auto-merge",
+      "uat",
+      "dashboard",
+      "frontend"
+    ],
+    "metadata": {
+      "sizeJustification": "Nine vertical items over one merge-ownership rule; 20 files across server services, lib/cloister, routes, frontend merge-train components and docs.",
+      "canonicalFilename": "2026-11-04-PAN-4970-per-pr-auto-merge-and-uat-batch-generations-race-on-the-same-prs-30-batches-invalidated-in-a-day-merge-batch-button-does-nothing.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Two merge paths act on the same ready PRs. The per-PR auto-merge scheduler (auto-merge-scheduler.ts) schedules every unheld, gate-approved PR, while the UAT batch reconciler (uat-reconciler.ts) batches every approved, green, mergeable PR whether or not it is held. In the Overdeck project nothing is held (global require_uat_before_merge=false), so every batch member is also auto-merged, the member leaves the ready set, and the batch is invalidated: 30 generations on 2026-11-03. The Merge batch button on an invalidated card returns 409 wrong-status only after slow per-member forge reads, and the operator saw no message.",
+      "Proposal": "Introduce one owner per ready feature: mergePathOwner (new services/merge-path-owner.ts) applies, first match wins: kill switch => batch; autoMergePolicyRefusal (held/closed/train off) => batch; Deft hold => batch; pending/merging row => per-pr; GitLab or polyrepo => batch; cancelled row => batch; failed/blocked row => per-pr only when latestAutoMergeAllowsSchedule says the scheduler can re-arm it for the current PR head; otherwise per-pr. It never writes pending_auto_merges. The reconciler takes it as an injected mergesPerPr dep and drops per-PR features before stale checks and assembly, invalidating any live batch that holds one with a distinct reason. The promote payload refuses a non-promotable generation before any forge read. The frontend toasts the reason and drops the stale card at once, and the queues payload marks per-PR items so the section says they merge one at a time instead of promising a batch. MergeTrainView.tsx is at the 1000-line ceiling, so an extraction item lands first. Docs state the one-owner rule.",
+      "NonGoals": "- Changing the auto-merge scheduler's skip logic or the auto-merge executor\n- Hiding the Merge batch button for superseded generations (PROMOTABLE includes superseded on purpose)\n- Storing an invalidation reason on the generation row\n- Changing listReadyIssuesForProject or its other callers\n- Per-row auto-merge badges on queue rows\n- Raising any entry in scripts/file-size-allowlist.txt\n- Reproducing the original no-toast report in a live browser session"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Partition by policy first and pending_auto_merges state second",
+        "rationale": "The scheduler and reconciler run on the same tick unordered; a state-only exclusion still assembles on tick N and invalidates on tick N+1. The policy rule is deterministic, and the pending-row check stays as a second guard for a feature scheduled before a hold-for-uat label."
+      },
+      {
+        "summary": "The per-PR train counts as active only for GitHub, single-repo projects with OVERDECK_DISABLE_AUTO_MERGE unset",
+        "rationale": "The scheduler skips GitLab projects and the kill switch, and its gh pr list in a polyrepo wrapper path yields no PRs. Assigning those features to per-pr would leave them with no merge path at all."
+      },
+      {
+        "summary": "Read labels through autoMergePolicyRefusal (cached tracker row), not issueHoldsForUat",
+        "rationale": "issueHoldsForUat runs one gh issue view per issue; calling it for every ready feature every 60 s costs N forge reads per tick and can disagree with the scheduler's cached read."
+      },
+      {
+        "summary": "Keep the Merge batch button for superseded generations",
+        "rationale": "The issue asks for ready-only, but uat-promote.ts PROMOTABLE deliberately includes superseded (an older subset stays testable and promotable). The button already never renders for invalidated, failed or assembling rows; the real defect is a stale card, fixed by the promote-failure item."
+      },
+      {
+        "summary": "Forced rebuild does not override per-PR ownership",
+        "rationale": "Force bypasses backoff and the live-match check, which are retry levers; ownership is policy, and batching a per-PR feature would restart the churn."
+      },
+      {
+        "summary": "Leave the scheduler unchanged",
+        "rationale": "It already refuses every feature the owner rule assigns to batch (the owner rule mirrors its skip order). A batch member that gains the auto-merge label is the operator's explicit choice and invalidates its batch once."
+      }
+    ],
+    "items": [
+      {
+        "id": "owner-rule",
+        "title": "Add mergePathOwner: one merge path owner per ready feature",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T00:08:35Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4970",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "reconciler-wiring",
+            "queue-owner-flag"
+          ],
+          "files_scope": [
+            "src/dashboard/server/services/merge-path-owner.ts",
+            "src/dashboard/server/services/__tests__/merge-path-owner.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/merge-path-owner.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "merge-path-owner.test.ts passes",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/services/merge-path-owner.ts exporting MergePathOwner ('per-pr' | 'batch'), MergePathOwnerDeps (env, forgeOf, latestAutoMerge, policyRefusal, deftHold, prOf), perPrTrainActiveForProject(projectPath, config, deps) and mergePathOwner(issueId, projectPath, config, deps), exactly as PRD item 1 and Decision 2 (revised after critique) specify. Rule order, first match wins: (1) env OVERDECK_DISABLE_AUTO_MERGE === '1' => batch; (2) autoMergePolicyRefusal(issueId) non-null => batch; (3) deftAutoMergeHold(issueId) non-null => batch; (4) newest getLatestAutoMerge row pending or merging => per-pr; (5) forgeForProject(projectPath) === 'gitlab' => batch; (6) config?.workspace?.type === 'polyrepo' => batch; (7) newest row cancelled => batch; (8) newest row failed or blocked => per-pr only when latestAutoMergeAllowsSchedule(row, { url, headSha }) from auto-merge-scheduler.ts is true for the current PR from prOf, else batch; (9) otherwise per-pr. prOf defaults to a lookup in the cached listRepoPullRequests(projectPath) listing (open row with headRefName feature/<id lower>, returning url and headRefOid). Defaults load through dynamic import (routes/merge-train.js must be dynamic). Upper-case the issue id. mergePathOwner calls perPrTrainActiveForProject for rules 1, 5, 6. The module never writes pending_auto_merges. Write merge-path-owner.test.ts with every dep injected, covering every rule and both handoff transitions."
+        },
+        "items": [
+          {
+            "id": "owner-rule.ac1",
+            "title": "Given an unheld feature in a GitHub monorepo with a newest pending or merging row, mergePathOwner returns 'per-pr', and returns 'per-pr' for the same row in a GitLab or polyrepo project",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "owner-rule.ac2",
+            "title": "Given a pending row, mergePathOwner returns 'batch' when OVERDECK_DISABLE_AUTO_MERGE is '1', returns 'per-pr' for the same row once the switch is unset, and returns 'batch' when policyRefusal returns a 412 or deftHold returns a reason",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "owner-rule.ac3",
+            "title": "Given no active row, mergePathOwner returns 'batch' for a GitLab forge, a polyrepo config, or a cancelled newest row, and returns 'per-pr' for a merged newest row or no row in an active GitHub monorepo",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "owner-rule.ac4",
+            "title": "Given a newest failed row, mergePathOwner returns 'batch' when its headSha equals the current PR head from prOf or the row has no headSha, and returns 'per-pr' when the PR head changed; a blocked row at the same head returns 'per-pr'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "owner-rule.ac5",
+            "title": "The module reaches routes/merge-train.js only through await import(), and npm run lint:circular exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reconciler-partition",
+        "title": "Drop per-PR-owned features from the UAT reconciler's ready set",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T00:08:35Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4970",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "reconciler-wiring"
+          ],
+          "files_scope": [
+            "src/lib/cloister/uat-reconciler.ts",
+            "tests/unit/lib/cloister/uat-reconciler.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/uat-reconciler.test.ts tests/unit/lib/cloister/uat-reconciler-unavailable.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "uat-reconciler.test.ts and uat-reconciler-unavailable.test.ts pass, including the new PAN-4970 describe block",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4"
+          ],
+          "acJustification": "Six criteria: the issue's scheduled-row case, all-per-PR, invalidation reason, mixed set, error handling from the plan critique, and unchanged legacy behavior are each separately observable."
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/uat-reconciler.ts add the optional dep mergesPerPr?(feature): boolean | Promise<boolean> to UatReconcilerDeps and perPr?: string[] to ReconcileResult. In tick(), partition the result of deps.getReadySet() into perPr ids and the batch-owned readySet before anchors, desiredIds, stale checks, single-feature, backoff and assembly (PRD item 2 step 3); a mergesPerPr that throws synchronously or rejects counts as false: wrap the await in try/catch (Promise.resolve(deps.mergesPerPr?.(f)).catch(...) is wrong because a synchronous throw escapes). Pass a perPrIds set into isStale and return '<ID> merges through the per-PR auto-merge train' before the 'left the ready queue' check. Log the per-PR set only when it changes per projectRoot. force does not skip the partition. Extend makeDeps in uat-reconciler.test.ts with mergesPerPr and add the PAN-4970 tests listed in PRD item 2."
+        },
+        "items": [
+          {
+            "id": "reconciler-partition.ac1",
+            "title": "Given ready features PAN-1 and PAN-2 where mergesPerPr returns true for PAN-1 (its scheduled pending_auto_merges row), reconcileUatGenerations assembles nothing, returns action 'single-feature', and reports perPr ['PAN-1']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconciler-partition.ac2",
+            "title": "Given every ready feature is per-PR, reconcileUatGenerations returns action 'idle' and assembles nothing, with and without { force: true }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconciler-partition.ac3",
+            "title": "Given a ready generation containing PAN-1 and mergesPerPr true for PAN-1, the generation's status becomes 'invalidated' and the log contains 'PAN-1 merges through the per-PR auto-merge train'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconciler-partition.ac4",
+            "title": "Given ready PAN-1, PAN-2, PAN-3 with only PAN-3 per-PR, exactly one assembly runs and its features are PAN-1 and PAN-2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconciler-partition.ac6",
+            "title": "Given mergesPerPr throws synchronously for PAN-1 (and, separately, returns a rejected promise for PAN-1), reconcileUatGenerations completes the tick and assembles one generation containing PAN-1 and PAN-2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconciler-partition.ac5",
+            "title": "With mergesPerPr omitted, reconcileUatGenerations returns the same action, invalidates the same generations and assembles the same features for every pre-existing scenario in uat-reconciler.test.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "promote-fast-refusal",
+        "title": "Refuse promoting a non-ready batch before any forge read",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T00:08:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4970",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/uat-promote.ts",
+            "tests/unit/lib/cloister/uat-promote.test.ts",
+            "src/dashboard/server/services/uat-train.ts",
+            "src/dashboard/server/services/__tests__/uat-train.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/uat-promote.test.ts tests/unit/lib/cloister/uat-promote-polyrepo.test.ts tests/unit/lib/cloister/uat-promote-ship.test.ts src/dashboard/server/services/__tests__/uat-train.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all four test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Export promoteStatusRefusal(name, gen, projectRoot?) from src/lib/cloister/uat-promote.ts returning the existing not-found and wrong-status results (same message text) or null, and use it in promoteUatGeneration in place of the two inline checks. In postUatGenerationPromotePayload (src/dashboard/server/services/uat-train.ts) read getUatGeneration(name) once at the top and return promoteStatusRefusal(name, current) before the memberStates loop. Add the uat-promote.test.ts cases and the uat-train.test.ts case from PRD item 4, and give the existing 'returns the exact promote result object unchanged' test a ready generation via mocks.getUatGeneration so it still reaches the mocked promoteUatGeneration."
+        },
+        "items": [
+          {
+            "id": "promote-fast-refusal.ac1",
+            "title": "promoteStatusRefusal returns reason 'wrong-status' for invalidated, failed, assembling and promoted generations, returns null for ready and superseded, and returns reason 'not-found' for an undefined generation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "promote-fast-refusal.ac2",
+            "title": "Given getUatGeneration returns an invalidated generation, postUatGenerationPromotePayload returns { success: false, reason: 'wrong-status' } and evaluateIssueMergeGate and promoteUatGeneration are never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "promote-fast-refusal.ac3",
+            "title": "promoteUatGeneration returns the same wrong-status message text as before ('<name> is <status> — only a ready or superseded batch can be merged to main'), as the existing uat-promote, uat-promote-polyrepo and uat-promote-ship tests assert",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reconciler-wiring",
+        "title": "Wire mergePathOwner into both UAT reconciler calls in uat-train.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T00:08:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4970",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/uat-train.ts",
+            "src/dashboard/server/services/__tests__/uat-train.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/uat-train.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "uat-train.test.ts passes including the new mergesPerPr wiring tests",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In runUatTrainReconcileForProject (src/dashboard/server/services/uat-train.ts), add mergesPerPr: async (feature) => (await mergePathOwner(feature.issueId, projectPath, projectConfig)) === 'per-pr' to both reconcileUatGenerations calls (polyrepo near line 202, monorepo near line 229). Import mergePathOwner from './merge-path-owner.js'. In uat-train.test.ts mock '../merge-path-owner.js' and assert the deps captured from mocks.reconcileUatGenerations answer mergesPerPr from mergePathOwner on both the monorepo and polyrepo routes."
+        },
+        "items": [
+          {
+            "id": "reconciler-wiring.ac1",
+            "title": "Given mergePathOwner resolves 'per-pr' for PAN-1, the mergesPerPr dep passed to reconcileUatGenerations on the monorepo route resolves true for PAN-1, and resolves false when mergePathOwner resolves 'batch'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconciler-wiring.ac2",
+            "title": "The polyrepo route passes a mergesPerPr dep that calls mergePathOwner with the polyrepo project config and the feature's issue id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "queue-owner-flag",
+        "title": "Mark per-PR-owned items in GET /api/merge-train/queues",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T00:08:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4970",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/merge-train.ts",
+            "src/dashboard/server/routes/__tests__/merge-train.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/merge-train.test.ts src/dashboard/server/routes/__tests__/merge-train-config-auto-merge.test.ts src/dashboard/server/routes/__tests__/merge-train-auto-merge-policy.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "the three merge-train route test files pass",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/merge-train.ts change MergeTrainQueueEntry.queue to Array<MergeQueueItem & { mergesPerPr: boolean }> with a PAN-4970 doc line. In queueEntryForProject, after computing the queue, load mergePathOwner with await import('../services/merge-path-owner.js') and map each item to { ...item, mergesPerPr: owner === 'per-pr' } via Promise.all; both return points return the mapped queue. Add a test in the 'GET /api/merge-train/queues (ac1)' describe that mocks the owner module and checks both flag values."
+        },
+        "items": [
+          {
+            "id": "queue-owner-flag.ac1",
+            "title": "Given mergePathOwner returns 'per-pr' for PAN-1 and 'batch' for PAN-2, GET /api/merge-train/queues returns PAN-1 with mergesPerPr true and PAN-2 with mergesPerPr false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "queue-owner-flag.ac2",
+            "title": "Given a disabled project or a project whose queue read failed, GET /api/merge-train/queues returns queue: [] and the existing holdsForUat value for it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fe-extract",
+        "title": "Extract API helpers and the section intro line out of MergeTrainView.tsx",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T00:08:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-4970",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/merge-train/MergeTrainView.tsx",
+            "src/dashboard/frontend/src/components/merge-train/mergeTrainApi.ts",
+            "src/dashboard/frontend/src/components/merge-train/SectionIntroLine.tsx",
+            "src/dashboard/frontend/src/components/merge-train/mergeTrainCopy.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/merge-train/__tests__/MergeTrainView.test.tsx",
+            "npm run typecheck:frontend",
+            "npm run lint:file-size",
+            "wc -l src/dashboard/frontend/src/components/merge-train/MergeTrainView.tsx"
+          ],
+          "expected_outputs": [
+            "MergeTrainView.test.tsx passes unchanged",
+            "frontend typecheck completes without errors",
+            "lint:file-size passes",
+            "MergeTrainView.tsx reports 975 lines or fewer"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "No behavior change. Move fetchJson, postJson and generationParam verbatim from MergeTrainView.tsx into a new mergeTrainApi.ts and import them back. Move the section intro <p className=\"px-1 pb-1 text-[11px] leading-snug text-muted-foreground\"> block into a new SectionIntroLine.tsx component with props { section, featureCount, promotedPendingCount, currentBatch, assemblingNow, lastAssemblyFailed }, keeping every data-testid. Move SINGLE_FEATURE_READY_LINE into mergeTrainCopy.ts and re-export it from MergeTrainView.tsx so existing importers compile. Do not edit scripts/file-size-allowlist.txt."
+        },
+        "items": [
+          {
+            "id": "fe-extract.ac1",
+            "title": "wc -l reports 975 lines or fewer for MergeTrainView.tsx and npm run lint:file-size exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-extract.ac2",
+            "title": "After the extraction the view renders every string and data-testid that the existing MergeTrainView.test.tsx asserts, with no assertion changed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-extract.ac3",
+            "title": "SINGLE_FEATURE_READY_LINE remains importable from MergeTrainView and npm run typecheck:frontend exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fe-promote-failure",
+        "title": "Toast the promote refusal reason and drop the stale batch card",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T00:08:35Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4970",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/merge-train/mergeTrainApi.ts",
+            "src/dashboard/frontend/src/components/merge-train/mergeTrainCopy.ts",
+            "src/dashboard/frontend/src/components/merge-train/MergeTrainView.tsx",
+            "src/dashboard/frontend/src/components/merge-train/__tests__/MergeTrainView.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/merge-train/__tests__/MergeTrainView.test.tsx",
+            "npm run typecheck:frontend",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "MergeTrainView.test.tsx passes including the PAN-4970 promote refusal tests",
+            "frontend typecheck completes without errors",
+            "lint:file-size passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In mergeTrainApi.ts make postJson throw MergeTrainRequestError (extends Error) carrying status and reason (payload.reason when it is a string), keeping the message as payload.error ?? payload.message ?? '<url> → <status>'. Add promoteFailureCopy(batchName, { message, reason }) to mergeTrainCopy.ts exactly as PRD item 7 shows (plain inputs only; mergeTrainCopy.ts must not import mergeTrainApi or the view). In MergeTrainView.tsx promoteMutation.onError(err, variables): read message and reason from the error (reason only when err instanceof MergeTrainRequestError), compute the copy, toast.error(copy.message, { duration: 10_000 }); when copy.dropCard, setQueryData on ['merge-train-generations'] to remove the generation named variables.name from every entry; then invalidate(). Extend mockFetch in MergeTrainView.test.tsx so a response can carry a non-200 status and so the GET generations response can change after the promote POST fires (a mutable response map or a call-sequence), and add the three tests from PRD item 7."
+        },
+        "items": [
+          {
+            "id": "fe-promote-failure.ac1",
+            "title": "Given the promote POST returns 409 with reason 'wrong-status' and message 'uat/pan-otter-0610 is invalidated — only a ready or superseded batch can be merged to main', clicking Merge batch (2) to main and confirming calls toast.error once with a string containing 'pan-otter-0610' and 'is invalidated'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-promote-failure.ac2",
+            "title": "Given the mocked GET /api/merge-train/generations returns pan-otter-0610 as invalidated once the promote POST has fired, after the refetch that follows the 409 resolves the pan-otter-0610 card and its Merge batch button are absent from the document",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-promote-failure.ac3",
+            "title": "Given the promote POST returns 500 with reason 'merge-failed', toast.error receives a message starting 'Batch pan-otter-0610 did not merge:' and the card is not removed by the error handler",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-promote-failure.ac4",
+            "title": "Given a generations payload containing only invalidated and failed generations, the view renders no 'Merge batch' button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fe-per-pr-copy",
+        "title": "Say when ready features merge one at a time through auto-merge",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T00:08:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4970",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/merge-train/MergeTrainView.tsx",
+            "src/dashboard/frontend/src/components/merge-train/SectionIntroLine.tsx",
+            "src/dashboard/frontend/src/components/merge-train/mergeTrainCopy.ts",
+            "src/dashboard/frontend/src/components/merge-train/__tests__/MergeTrainView.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/merge-train/__tests__/MergeTrainView.test.tsx",
+            "npm run typecheck:frontend",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "MergeTrainView.test.tsx passes including the per-PR copy tests",
+            "frontend typecheck completes without errors",
+            "lint:file-size passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Add mergesPerPr?: boolean to MergeTrainQueueItem in MergeTrainView.tsx. Add perPrTrainLine(count, projectName) to mergeTrainCopy.ts with the exact text in PRD item 8, and an optional perPrCount input to canRetryAssembly that returns false when perPrCount equals a non-zero featureCount. In SectionIntroLine.tsx, when every queue item has mergesPerPr === true and there is no current or assembling batch, render '<N> feature(s) passed review & tests.' followed by perPrTrainLine inside data-testid 'merge-train-per-pr-<projectKey>', ahead of the single-feature and NO_BATCH_YET_LINE branches. Pass perPrCount to canRetryAssembly in MergeTrainView.tsx. Add the two tests from PRD item 8."
+        },
+        "items": [
+          {
+            "id": "fe-per-pr-copy.ac1",
+            "title": "Given an overdeck queue of two items both with mergesPerPr true and no generations, the view renders merge-train-per-pr-overdeck containing 'one at a time through auto-merge' and does not render the text 'A test batch assembles'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-per-pr-copy.ac2",
+            "title": "Given that all-per-PR queue and a newest failed generation, the view renders no merge-train-retry-assembly-overdeck button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-per-pr-copy.ac3",
+            "title": "Given one item with mergesPerPr true and one with mergesPerPr false, the view does not render merge-train-per-pr-overdeck",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document the one-merge-path-per-feature rule",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T00:08:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4970",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/MERGE-WORKFLOW.md",
+            "configuration/auto-merge.mdx",
+            "features/merge-batches.mdx",
+            ".overdeck/context/codebase/concerns.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n 'PAN-4970' docs/MERGE-WORKFLOW.md configuration/auto-merge.mdx features/merge-batches.mdx .overdeck/context/codebase/concerns.md"
+          ],
+          "expected_outputs": [
+            "lint:docs passes",
+            "grep prints at least one PAN-4970 line from each of the four files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply the edits in PRD item 9. docs/MERGE-WORKFLOW.md: add the one-owner paragraph to the Scope note, the per-PR line and missing Retry button to 'Merging from the Flywheel UAT card' item 2, name mergePathOwner and the 'merges through the per-PR auto-merge train' invalidation reason in the reconciler paragraph, and state that a promote of a non-ready batch returns 409 wrong-status before any forge read. configuration/auto-merge.mdx: rewrite the 'Auto-merge vs. UAT batch trains' Note to say a feature auto-merge will merge never joins a batch. features/merge-batches.mdx: state which features are batched. concerns.md: add the 'One merge path per feature (PAN-4970)' bullet. Cite PAN-4970 in each file."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "docs/MERGE-WORKFLOW.md contains a PAN-4970 paragraph saying a ready feature the per-PR train owns (GitHub, single repo, kill switch unset, not held, or with a pending/merging auto-merge row) is never batched, and naming src/dashboard/server/services/merge-path-owner.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "The 'Auto-merge vs. UAT batch trains' Note in configuration/auto-merge.mdx contains a sentence listing every batch-owned case while auto-merge is on: held for UAT, Deft human merge, cancelled auto-merge, auto-merge failed at the current PR head, GitLab, multi-repo, and the kill switch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "features/merge-batches.mdx contains a PAN-4970 sentence listing the batched features: held, Deft human-merge, cancelled or failed-at-current-head auto-merge, and every ready feature when auto-merge is off, the kill switch is set, or the project uses GitLab or spans several repos",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac4",
+            "title": "docs/MERGE-WORKFLOW.md states that promoting a batch that is not ready or superseded returns 409 wrong-status before any forge read and the card shows the reason and disappears",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "owner-rule",
+        "to": "reconciler-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "reconciler-partition",
+        "to": "reconciler-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "promote-fast-refusal",
+        "to": "reconciler-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "owner-rule",
+        "to": "queue-owner-flag",
+        "type": "blocks"
+      },
+      {
+        "from": "fe-extract",
+        "to": "fe-promote-failure",
+        "type": "blocks"
+      },
+      {
+        "from": "fe-promote-failure",
+        "to": "fe-per-pr-copy",
+        "type": "blocks"
+      },
+      {
+        "from": "queue-owner-flag",
+        "to": "fe-per-pr-copy",
+        "type": "blocks"
+      },
+      {
+        "from": "fe-extract",
+        "to": "fe-per-pr-copy",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
