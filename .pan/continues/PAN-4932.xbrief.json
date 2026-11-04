@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4932",
   "created": "2026-11-04T01:06:56.441Z",
-  "updated": "2026-11-04T01:24:46.726Z",
+  "updated": "2026-11-04T01:26:49.389Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -58,9 +58,10 @@
       "doneAt": "2026-11-04T01:24:44.976Z"
     },
     "role-relaunch-wiring": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4932",
-      "claimedAt": "2026-11-04T01:24:46.726Z"
+      "claimedAt": "2026-11-04T01:24:46.726Z",
+      "doneAt": "2026-11-04T01:26:49.388Z"
     }
   }
 }
