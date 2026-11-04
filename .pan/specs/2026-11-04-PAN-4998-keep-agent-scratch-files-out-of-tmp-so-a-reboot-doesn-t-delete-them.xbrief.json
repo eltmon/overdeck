@@ -4,17 +4,17 @@
     "created": "2026-11-04T10:03:31Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4998: Keep agent scratch files out of /tmp so a reboot doesn't delete them",
-    "updated": "2026-11-04T10:10:02.235Z"
+    "updated": "2026-11-04T10:11:55.627Z"
   },
   "plan": {
     "id": "pan-4998",
     "title": "Keep agent scratch files out of /tmp so a reboot doesn't delete them",
-    "status": "proposed",
+    "status": "running",
     "uid": "13f04ccc-767c-4af6-9b19-83fc854de370",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-04T10:03:31Z",
-    "updated": "2026-11-04T10:10:02.235Z",
+    "updated": "2026-11-04T10:11:55.627Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4998",
@@ -538,5 +538,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
