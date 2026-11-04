@@ -25,7 +25,22 @@ vi.mock('../../../../../src/lib/environment-identity.js', () => ({
   readEnvironmentIdentity: async () => ({ v: 1, environmentId: 'env-laptop', label: 'laptop', createdAt: '2026-11-01T00:00:00.000Z' }),
 }));
 
+const { listRemoteLanes, laneFieldsByRun } = vi.hoisted(() => ({ listRemoteLanes: vi.fn(async () => []), laneFieldsByRun: vi.fn(async () => new Map()) }));
+vi.mock('../../../../../src/lib/lanes/remote-lanes.js', () => ({ listRemoteLanes }));
+vi.mock('../../../../../src/lib/lanes/lane-list-fields.js', () => ({ laneFieldsByRun }));
+
 const { getMergedConversationList } = await import('../../../../../src/dashboard/server/services/conversation-list-merged.js');
+
+const standIn = (overrides: Record<string, unknown> = {}) => ({
+  facts: {
+    v: 1, name: 'conv-x', environmentId: 'env-desk', label: 'desk', run: 'r1', key: '663', role: 'critic', iteration: 1,
+    parentName: 'orch', criticOfName: null, projectKey: 'ov', cwd: '/w', branch: null, at: null,
+    model: 'claude-opus-5-5', harness: 'claude-code', effort: 'high', title: 'conv-x', createdAt: '2026-11-01T10:00:00.000Z',
+  },
+  mirror: null,
+  archivedAt: null,
+  ...overrides,
+});
 
 describe('getMergedConversationList (PAN-4650 WI-4)', () => {
   beforeEach(() => vi.clearAllMocks());
@@ -44,5 +59,31 @@ describe('getMergedConversationList (PAN-4650 WI-4)', () => {
   it('adds linked rows to page 1 only', async () => {
     const rows = (await getMergedConversationList(500, 500, new URLSearchParams())) as Array<Record<string, unknown>>;
     expect(rows).toEqual(localRows);
+  });
+
+  it('PAN-5005: stamps lane list fields on a remote lane row', async () => {
+    listRemoteLanes.mockResolvedValueOnce([standIn()]);
+    laneFieldsByRun.mockResolvedValueOnce(new Map([['conv-x', {
+      laneReport: { seq: 1, at: '2026-11-04T12:00:00.000Z', status: 'done', verdict: 'PASS' },
+      laneIteration: 1,
+      laneVerdict: { value: 'PASS', defects: 0 },
+    }]]));
+
+    const rows = (await getMergedConversationList(500, 0, new URLSearchParams())) as Array<Record<string, unknown>>;
+
+    expect(rows.find((entry) => entry.name === '@env-desk/conv-x')).toMatchObject({
+      laneReport: { status: 'done' },
+      laneVerdict: { value: 'PASS', defects: 0 },
+    });
+    expect(laneFieldsByRun).toHaveBeenCalledTimes(1);
+    expect(laneFieldsByRun).toHaveBeenCalledWith(['r1']);
+  });
+
+  it('PAN-5005: no stand-ins, no lane-fields call', async () => {
+    listRemoteLanes.mockResolvedValueOnce([]);
+
+    await getMergedConversationList(500, 0, new URLSearchParams());
+
+    expect(laneFieldsByRun).not.toHaveBeenCalled();
   });
 });
