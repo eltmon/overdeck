@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5054",
   "created": "2026-11-04T19:57:03.624Z",
-  "updated": "2026-11-04T19:58:27.824Z",
+  "updated": "2026-11-04T19:58:32.115Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-5054",
       "claimedAt": "2026-11-04T19:57:58.068Z",
       "doneAt": "2026-11-04T19:58:27.824Z"
+    },
+    "evidence-merge-test": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5054",
+      "claimedAt": "2026-11-04T19:58:32.115Z"
     }
   }
 }
