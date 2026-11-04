@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4956",
   "created": "2026-11-04T09:00:33.744Z",
-  "updated": "2026-11-04T09:26:30.098Z",
+  "updated": "2026-11-04T09:26:48.933Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,10 @@
     "snippet-fix.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T09:26:30.097Z"
+    },
+    "manifest.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:26:48.933Z"
     }
   }
 }
