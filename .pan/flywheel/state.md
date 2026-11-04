@@ -629,3 +629,9 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
 
 - From about 10:35Z the operator holds every `pan reload` of home while conv hoff-pan-4638-live runs PAN-4638 then PAN-4886 against build 65e3b1adf86 (Fly VM in pan-workspaces plus the Mac rig). A reload mid-run drops the links and lanes. Do not deploy until the operator says the VMs are torn down; a later entry here records the lift.
 - Merged but held from deploy meanwhile: strike PRs #4678, #4679, #4698, #4707.
+
+## 2026-11-04 — PAN-5003: merge door rebases away merge-main resolutions
+
+- #4997 (PAN-4935) was approved, green and GitHub-CLEAN, but the automatic merge failed with "Rebase conflicts in .overdeck/context/codebase/architecture.md ... merge it by hand". Cause: conflict repair merges `main` into branches, while `src/lib/cloister/merge-rebase.ts` (line 246) runs a plain `git rebase origin/main` that replays the old commits and re-hits the conflict the merge commit had resolved. GitHub never shows CONFLICTING, so conflict repair never fires. Filed PAN-5003 (merge route, TENET-10, so it goes via handoff); the handoff is deferred until disk recovers above about 15 GB. Instance: hand squash-merged #4997.
+- Recognize it: `merge.failed` with "an automatic merge is rebased by the server only" on a PR whose `mergeStateStatus` is CLEAN. Hand-merge with `gh pr merge --squash` while PAN-5003 is open.
+- GitHub 5xx/GraphQL errors at about 10:15Z also swallowed a review verdict: the PAN-4956 reviewer's `pan admin specialists done review --status passed` failed twice on `gh pr review --approve`. The approval was for an older head and the PR had since conflicted, so the recovery was to tell the work agent to merge main and re-request review, not to replay the verdict. If this recurs, file a durable-verdict retry.
