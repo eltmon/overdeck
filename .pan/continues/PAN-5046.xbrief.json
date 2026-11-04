@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-5046",
   "created": "2026-11-04T18:10:57.891Z",
-  "updated": "2026-11-04T18:53:59.419Z",
+  "updated": "2026-11-04T19:19:14.699Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-04T19:19:14.699Z"
+    }
+  ],
   "items": {
     "dialer-ends-duplexes": {
       "status": "completed",
@@ -189,5 +195,6 @@
     "docs-network-change.ac4": {
       "status": "cancelled"
     }
-  }
+  },
+  "agentModel": "claude-opus-5-5"
 }
