@@ -6,6 +6,7 @@
  */
 
 import { createSettledTtlPromiseCache } from '../concurrency.js';
+import { GitHubQuotaPausedError, GitHubRateLimitedError } from '../github-quota/pause-gate.js';
 import { runGh } from '../github-quota/run-gh.js';
 import { prListingTtlMs, PR_CACHE_IDLE_TTL_MS, shouldListPullRequests } from './pr-cache-policy.js';
 
@@ -92,15 +93,77 @@ const lastOpenNumbers = new Map<string, ReadonlySet<number>>();
  */
 const closedGeneration = new Map<string, number>();
 
+const MAX_FAILURE_REASON_LENGTH = 200;
+
+function firstNonEmptyLine(text: string): string | undefined {
+  for (const line of text.split('\n')) {
+    const trimmed = line.trim();
+    if (trimmed.length > 0) return trimmed;
+  }
+  return undefined;
+}
+
+/** A failed PR listing's reason, in one line, for the `[pr-cache]` log (PAN-5042 FR-3). */
+export function describePrListingFailure(error: unknown): string {
+  let reason: string;
+  if (error instanceof GitHubQuotaPausedError) {
+    reason = `quota pause: ${error.message}`;
+  } else if (error instanceof GitHubRateLimitedError) {
+    reason = `rate limited: ${error.message}`;
+  } else {
+    const err = error as { code?: unknown; killed?: unknown; stderr?: unknown; message?: unknown } | null;
+    if (err?.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER') {
+      // Checked before `killed`: Node sets `killed` on this error too.
+      reason = 'output exceeded maxBuffer';
+    } else if (err?.killed === true) {
+      reason = 'timed out after 20s';
+    } else if (typeof err?.stderr === 'string' && firstNonEmptyLine(err.stderr)) {
+      reason = firstNonEmptyLine(err.stderr)!;
+    } else {
+      const message = typeof err?.message === 'string' ? err.message : String(error);
+      reason = firstNonEmptyLine(message) ?? message;
+    }
+  }
+  return reason.slice(0, MAX_FAILURE_REASON_LENGTH);
+}
+
+type PrListingKind = 'open' | 'closed';
+
+/** The last failure reason logged for a repo's open/closed read, so a repeat never re-logs. */
+const lastFailureLogged = new Map<string, string>();
+
+function failureKey(projectPath: string, listing: PrListingKind): string {
+  return `${projectPath}\0${listing}`;
+}
+
+function logPrListingFailure(projectPath: string, listing: PrListingKind, error: unknown): void {
+  const reason = describePrListingFailure(error);
+  const key = failureKey(projectPath, listing);
+  if (lastFailureLogged.get(key) === reason) return;
+  lastFailureLogged.set(key, reason);
+  console.warn(`[pr-cache] ${projectPath}: ${listing} PR listing failed: ${reason}`);
+}
+
+function logPrListingRecovery(projectPath: string, listing: PrListingKind): void {
+  const key = failureKey(projectPath, listing);
+  if (!lastFailureLogged.has(key)) return;
+  lastFailureLogged.delete(key);
+  console.log(`[pr-cache] ${projectPath}: ${listing} PR listing recovered`);
+}
+
 async function loadOpenPullRequests(projectPath: string): Promise<SettledListing | null> {
   try {
     // PAN-4291: no tracker means gh could never answer; a `git remote`
     // failure reads as failed too (never cached as a false "no remote"),
-    // landing in the catch below like a pause or refusal — "failed" (null),
-    // never "no PRs".
-    if (!(await shouldListPullRequests(projectPath))) return { rows: [], settledAt: Date.now() };
+    // landing in the catch below like a pause or refusal — "failed" (null,
+    // logged) — never "no PRs".
+    if (!(await shouldListPullRequests(projectPath))) {
+      logPrListingRecovery(projectPath, 'open');
+      return { rows: [], settledAt: Date.now() };
+    }
     // PAN-4264: metered as caller pr-cache; a pause or refusal lands in the
-    // catch below and reads as "failed" (null), never as "no PRs".
+    // catch below, is logged once per distinct reason, and reads as "failed"
+    // (null), never as "no PRs".
     const { stdout } = await runGh([
       'pr', 'list', '--state', 'open', '--limit', '100', '--json', GH_PR_FIELDS,
     ], { caller: 'pr-cache', cwd: projectPath, timeout: 20_000 });
@@ -115,8 +178,10 @@ async function loadOpenPullRequests(projectPath: string): Promise<SettledListing
       cachedClosedPullRequests.invalidate(projectPath);
     }
     lastOpenNumbers.set(projectPath, numbers);
+    logPrListingRecovery(projectPath, 'open');
     return { rows, settledAt: Date.now() };
-  } catch {
+  } catch (error) {
+    logPrListingFailure(projectPath, 'open', error);
     return null;
   }
 }
@@ -127,13 +192,18 @@ async function loadClosedPullRequests(projectPath: string): Promise<ClosedListin
   // checks for below.
   const generation = closedGeneration.get(projectPath) ?? 0;
   try {
-    if (!(await shouldListPullRequests(projectPath))) return { rows: [], settledAt: Date.now(), generation };
+    if (!(await shouldListPullRequests(projectPath))) {
+      logPrListingRecovery(projectPath, 'closed');
+      return { rows: [], settledAt: Date.now(), generation };
+    }
     const { stdout } = await runGh([
       'pr', 'list', '--state', 'closed', '--limit', '100', '--json', GH_CLOSED_PR_FIELDS,
     ], { caller: 'pr-cache', cwd: projectPath, timeout: 20_000 });
     const rows = JSON.parse(stdout || '[]') as GhPrRow[];
+    logPrListingRecovery(projectPath, 'closed');
     return { rows, settledAt: Date.now(), generation };
-  } catch {
+  } catch (error) {
+    logPrListingFailure(projectPath, 'closed', error);
     return null;
   }
 }
