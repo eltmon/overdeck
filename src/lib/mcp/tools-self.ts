@@ -227,7 +227,7 @@ const linkMachine: OverdeckTool = {
 const linkMachineWait: OverdeckTool = {
   name: 'link_machine_wait',
   description:
-    'Wait up to 50 s for the operator to link the machine a link_machine call asked for. Answers status "pending" with next: call next again, never sleep or poll. On "linked" it answers machine { environmentId, label }: pass the label as machine to start_worker or start_conversation. "declined" or "expired" means no machine was linked for you. An unknown request (HTTP 404) means the dashboard restarted: call link_machine again.',
+    'Wait up to 50 s for the operator to link the machine a link_machine call asked for. Answers status "pending" with next: call next again, never sleep or poll. On "linked" it answers machine { environmentId, label }: pass the label as machine to delegate_task, start_worker or start_conversation. "declined" or "expired" means no machine was linked for you. An unknown request (HTTP 404) means the dashboard restarted: call link_machine again.',
   scope: 'read:state',
   audience: 'agent',
   inputSchema: {
