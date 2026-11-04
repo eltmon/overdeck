@@ -1301,7 +1301,9 @@ origin, a 403 `no-chained-hops` for a secure-channel caller (D-4638-12), `isFly`
 Fly machine store, and the owner calls through `postWorkDoor` as the caller's actor
 (`x-overdeck-sender`, 30 s, 503 `machine-unreachable`), with refusals through
 `ownerRefusal`. The same resolver serves a `--reuse` whose newest lane ran elsewhere and
-`--replace` of a live lane on another machine.
+`--replace` of a live lane on another machine. An Auto pick of this machine resolves to a
+`LocalLanePlacement` (`self: true`, reason, rejections), never to `null`, so the result's
+`placement` explains it while `machine` stays `null` and home follows nothing (#5006).
 
 The owner doors live in `routes/machines-work-lanes.ts`, machine credential only:
 `POST /api/machines/work/lanes`, `GET /api/machines/work/lanes/:name/status?after=<seq>` and

@@ -18,6 +18,7 @@ interface Captured {
 
 const notification: NeedsYouNotification = {
   kind: 'question',
+  category: 'question',
   tag: 'auq:toolu_01',
   title: 'Question · Secret conversation title',
   publicTitle: 'Question · a conversation',

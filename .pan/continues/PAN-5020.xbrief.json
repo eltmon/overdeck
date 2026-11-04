@@ -1,0 +1,117 @@
+{
+  "version": "1",
+  "issueId": "PAN-5020",
+  "created": "2026-11-04T12:51:44.824Z",
+  "updated": "2026-11-04T13:12:26.793Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "w1-footers": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5020",
+      "claimedAt": "2026-11-04T12:51:44.824Z",
+      "doneAt": "2026-11-04T12:53:11.291Z"
+    },
+    "w5-lint": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5020",
+      "claimedAt": "2026-11-04T12:53:19.438Z",
+      "doneAt": "2026-11-04T12:55:11.932Z"
+    },
+    "w4-conflict-repair": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5020",
+      "claimedAt": "2026-11-04T12:55:16.627Z",
+      "doneAt": "2026-11-04T13:02:02.813Z"
+    },
+    "w2-plan-role": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5020",
+      "claimedAt": "2026-11-04T13:02:06.387Z",
+      "doneAt": "2026-11-04T13:02:50.877Z"
+    },
+    "w3-pan-map-skill": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5020",
+      "claimedAt": "2026-11-04T13:02:54.816Z",
+      "doneAt": "2026-11-04T13:04:40.223Z"
+    },
+    "w6-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5020",
+      "claimedAt": "2026-11-04T13:04:44.400Z",
+      "doneAt": "2026-11-04T13:05:39.669Z"
+    },
+    "w1-footers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:07:14.771Z"
+    },
+    "w1-footers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:07:32.069Z"
+    },
+    "w1-footers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:07:51.227Z"
+    },
+    "w2-plan-role.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:08:14.728Z"
+    },
+    "w2-plan-role.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:08:35.341Z"
+    },
+    "w2-plan-role.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:08:53.706Z"
+    },
+    "w3-pan-map-skill.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:09:11.002Z"
+    },
+    "w3-pan-map-skill.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:09:27.784Z"
+    },
+    "w4-conflict-repair.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:09:49.434Z"
+    },
+    "w4-conflict-repair.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:10:10.690Z"
+    },
+    "w4-conflict-repair.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:10:27.938Z"
+    },
+    "w5-lint.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:10:45.388Z"
+    },
+    "w5-lint.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:11:02.306Z"
+    },
+    "w5-lint.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:11:19.608Z"
+    },
+    "w5-lint.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:11:35.513Z"
+    },
+    "w6-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:12:09.393Z"
+    },
+    "w6-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:12:26.792Z"
+    }
+  }
+}

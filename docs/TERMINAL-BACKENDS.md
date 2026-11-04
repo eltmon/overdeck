@@ -17,6 +17,29 @@ Two adapters implement one contract:
 | Metadata tokens | `pane.report_metadata` | `unsupported` — the agent launch metadata is their source |
 | Native resume | `unsupported` — protocol 22 has no resume method | `unsupported` |
 
+## Pane state → session presence (PAN-5011)
+
+A pane's own `state` decides the dashboard's `active`/`idle`/`ended` session
+presence, which decides whether the composer is open:
+
+| Pane state | Presence |
+| --- | --- |
+| `working`, `blocked` | `active` |
+| `idle`, `done`, `unknown` | `idle` |
+| `exited` | `ended` |
+
+Herdr's `done` means the agent's turn finished and it is sitting at the
+prompt — the harness pane is still alive, so the composer must stay open; it
+is not an exit. `unknown` is a live pane whose harness Herdr could not
+identify, not a dead one. Only `exited` (or no pane at all) ends a session.
+
+`presenceForPaneState` in `packages/contracts/src/backend-pane.ts` is the one
+place this mapping lives. Its consumers: `deriveSessionPresence`
+(`src/dashboard/server/services/session-presence.ts`), `nodeStatusFor`
+(`src/dashboard/server/routes/command-deck.ts`), `IssueTreeLane.paneStatus`
+(`src/dashboard/frontend/src/components/Stage/cockpit/IssueTreeLane.tsx`), and
+`buildSpecialistSessionNodes` (`src/dashboard/server/routes/session-tree-specialists.ts`).
+
 ## The contract
 
 `src/lib/terminal-backends/types.ts` (W2) defines it; `packages/contracts/src/terminal-backend.ts`

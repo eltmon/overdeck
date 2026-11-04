@@ -282,3 +282,26 @@ build installed 14:48:39:
 | 14:52:3x–14:53:5x | Machine `kill -STOP` 75 s, then `kill -CONT` | "Nothing needs you.", no failure text | `directory silent for 85 s; reconnecting`, `directory online`, new offer `connected` |
 
 The step that failed before (open the machine, and resume) now links every time.
+
+## PAN-5019 notification preferences
+
+**Not run: needs a real iPhone and is blocked on link channels working after pairing
+([PAN-5018](https://github.com/eltmon/overdeck/issues/5018)); the pairing-time exchange path
+(WI-6) does not need a post-pairing link channel and is covered by the unit tests in
+`src/dashboard/server/__tests__/phones-routes.test.ts`.** Device steps for when PAN-5018 lands:
+
+1. **Pause suppresses a real event.** In the app's Settings, turn on **Pause notifications**. On
+   the paired desktop, raise a real needs-you event (an AskUserQuestion in a conversation — not
+   **Send test**, which deliberately bypasses pause per D-3). `npx wrangler tail overdeck-connect
+   --format json` shows no `push` frame for this phone's `clientId`, and no notification arrives.
+2. **Resume delivers the next event.** Turn **Pause notifications** off. Raise another AskUserQuestion.
+   The notification arrives.
+3. **A muted type is suppressed; others are not.** Turn off **Agent stopped responding**. Kill a
+   running agent's heartbeat. No notification arrives for it. Raise an AskUserQuestion (a different,
+   still-on type): its notification still arrives.
+4. **Settings survive a restart.** Force-quit and reopen the app. Pause state and muted types are
+   unchanged.
+5. **Settings survive a re-pair.** Forget the machine and pair it again with a fresh link from its
+   Settings → Anywhere (pair links are single-use).
+   Pause state and muted types are unchanged and still applied (the exchange carries the
+   phone's current prefs, so the machine does not need a separate sync pass to pick them up).

@@ -169,6 +169,13 @@ own App ID, `ai.overdeck.app.widgets`, which PAN-4841 registers with the store s
 - **Settings switch:** Settings → Notifications turns needs-you alerts off and on
   (`overdeck.notifications`). Off sends `push-unregister`; on registers again. When iOS
   permission is denied, Settings says how to turn it on in iOS Settings.
+- **Pause and types** (`src/shell/notificationPrefs.ts`, `notificationPrefsSync.ts`): a pause switch,
+  two timed pauses and six notification-type switches, held in `localStorage` as
+  `overdeck.notificationPrefs` (`{ revision, prefs }`). The exchange at pairing (`pairing.ts`) carries
+  the current prefs in its `notificationPreferences` field; every later change syncs over
+  `PUT /api/phones/self/notification-preferences` on a link channel, one machine at a time. Each
+  paired machine's sync state (`synced` / `pending` / `outdated` / `failed`) tracks in
+  `overdeck.notificationPrefsSynced`, surfaced in Settings as the lines under each unsynced machine.
 - **Decryption:** the directory sends Apple only the placeholder **Overdeck · Something needs
   you** and the sealed payload `s`. The Notification Service Extension opens `s` with the push key
   and shows the real title and text. If it cannot, for example before the first unlock after a

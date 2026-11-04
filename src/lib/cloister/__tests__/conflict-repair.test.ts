@@ -125,6 +125,8 @@ describe('buildConflictRepairPrompt', () => {
     expect(prompt).toContain('1. Run `pan sync-main PAN-1166` to merge origin/main into this branch (it does not push).');
     expect(prompt).toContain('5. Commit, push the branch, then run `pan review request PAN-1166`.');
     expect(prompt).toContain('never raise a cap');
+    expect(prompt).toContain('keep one line with the later date only, never issue ids');
+    expect(prompt).not.toContain('refresh the `<!-- last-verified: -->` date');
   });
 
   it('points at git merge-tree when the paths are unknown', () => {

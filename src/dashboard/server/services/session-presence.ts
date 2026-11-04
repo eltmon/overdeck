@@ -2,17 +2,25 @@ import { stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import type { SessionNodePresence } from '@overdeck/contracts';
+import { presenceForPaneState, type BackendPane, type SessionNodePresence } from '@overdeck/contracts';
 
 /**
  * Derive session presence from runtime state, tmux session existence, and recent activity.
  * Aligns route consumers on the same heartbeat and output.log freshness checks.
+ *
+ * PAN-5011: when the issue's backend pane for this agent is known, the pane
+ * owns liveness — on Herdr the tmux session set never holds an agent, so the
+ * tmux-only logic below would always read 'ended'. With no pane, the tmux
+ * logic runs unchanged (tmux hosts, or an agent with no live pane).
  */
 export async function deriveSessionPresence(
   agentId: string,
   rtState: { state: string } | null,
   tmuxSessionNames: Set<string>,
+  pane?: BackendPane,
 ): Promise<SessionNodePresence> {
+  if (pane) return presenceForPaneState(pane.state);
+
   const hasTmux = tmuxSessionNames.has(agentId);
   if (!hasTmux) return 'ended';
 

@@ -8,18 +8,25 @@
  * 2,900: 2,256 bytes seal to exactly `PUSH_SEALED_MAX_CHARS` base64 characters
  * (D-1). Logs carry only a clientId prefix, never the sealed body, a push key
  * or notification text (NFR-1).
+ *
+ * PAN-5019 D-1: each phone's own preferences are checked here, per phone,
+ * before sealing; a filtered phone is omitted from the outcomes rather than
+ * recorded as `skipped`.
  */
 import { createHash, randomBytes } from 'node:crypto';
 import {
+  notificationAllowed,
   PUSH_PLAINTEXT_MAX_BYTES,
   type DirectoryToMachineFrame,
   type MachineToDirectoryFrame,
+  type PhoneNotificationPreferences,
   type PhonePushPayload,
   type PushResultError,
 } from '@overdeck/contracts';
 import { listActiveRecordsOfKind } from '../access-tokens.js';
 import { sealTo } from '../anywhere/sealed-box.js';
 import { ensureEnvironmentIdentity } from '../environment-identity.js';
+import { loadPhoneNotificationPreferences } from './phone-preferences-store.js';
 import type { NeedsYouNotification, ProviderSendOutcome, PushProvider } from './types.js';
 import { webPushUrgency } from './webpush-provider.js';
 
@@ -43,6 +50,9 @@ export interface NativePushProviderDeps {
   listPhones?: () => Array<{ clientId: string; pushKey: string }>;
   environmentId?: () => Promise<string>;
   randomRequestId?: () => string;
+  /** A rejection is treated as an empty map (fail open, PAN-5019 NFR-1). */
+  readPreferences?: () => Promise<ReadonlyMap<string, PhoneNotificationPreferences>>;
+  now?: () => number;
 }
 
 type NativePhone = { clientId: string; pushKey: string };
@@ -123,6 +133,8 @@ export function createNativePushProvider(deps: NativePushProviderDeps): PushProv
   const listPhones = deps.listPhones ?? nativePushPhones;
   const environmentId = deps.environmentId ?? (async () => (await ensureEnvironmentIdentity()).environmentId);
   const randomRequestId = deps.randomRequestId ?? (() => randomBytes(16).toString('hex'));
+  const readPreferences = deps.readPreferences ?? loadPhoneNotificationPreferences;
+  const now = deps.now ?? Date.now;
 
   function sendOne(
     phone: NativePhone,
@@ -168,7 +180,11 @@ export function createNativePushProvider(deps: NativePushProviderDeps): PushProv
       return listPhones().length > 0 && (deps.directory()?.isOnline() ?? false);
     },
     async send(n) {
-      const phones = listPhones();
+      const all = listPhones();
+      if (all.length === 0) return [];
+      const prefs = await readPreferences().catch(() => new Map<string, PhoneNotificationPreferences>());
+      const nowMs = now();
+      const phones = all.filter((phone) => notificationAllowed(prefs.get(phone.clientId) ?? null, n.category, nowMs));
       if (phones.length === 0) return [];
       const payload = fitPhonePushPayload(buildPhonePushPayload(n, await environmentId()));
       if (!payload) {

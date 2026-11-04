@@ -32,13 +32,42 @@ vi.mock('../../../../../src/lib/agent-input-detection.js', () => ({
 }));
 
 vi.mock('../../../../../src/dashboard/server/services/session-presence.js', () => ({
-  deriveSessionPresence: vi.fn(async (_id: string, rtState: { state: string } | null, tmuxSessionNames: Set<string>) => {
+  // PAN-5011: 4th `pane` param — when set, it decides presence the way
+  // presenceForPaneState does, ahead of the tmux-only fallback below.
+  deriveSessionPresence: vi.fn(async (
+    _id: string,
+    rtState: { state: string } | null,
+    tmuxSessionNames: Set<string>,
+    pane?: { state: string },
+  ) => {
+    if (pane) {
+      if (pane.state === 'working' || pane.state === 'blocked') return 'active';
+      if (pane.state === 'exited') return 'ended';
+      return 'idle';
+    }
     if (!tmuxSessionNames.has(_id)) return 'ended';
     if (!rtState) return 'idle';
     if (rtState.state === 'active') return 'active';
     if (rtState.state === 'suspended') return 'suspended';
     return 'idle';
   }),
+}));
+
+// PAN-5011: fetchActivityDataWithContext now reads each agent's backend pane
+// and the issue's review PR state. Default to none/undefined so every
+// pre-existing test (which never seeded either) keeps its old behavior.
+const mockGetBackendPanesForIssue = vi.hoisted(() => vi.fn(async () => [] as unknown[]));
+vi.mock(import('../../../../../src/dashboard/server/services/backend-inventory.js'), async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    getBackendPanesForIssue: mockGetBackendPanesForIssue,
+  };
+});
+
+const mockGetDerivedIssueState = vi.hoisted(() => vi.fn(async () => ({}) as { pr?: { reviewState?: string } }));
+vi.mock('../../../../../src/dashboard/server/services/derived-issue-state.js', () => ({
+  getDerivedIssueState: mockGetDerivedIssueState,
 }));
 
 vi.mock('../../../../../src/dashboard/server/routes/jsonl-resolver.js', () => ({
@@ -321,6 +350,103 @@ describe('fetchActivityDataWithContext', () => {
       type: 'ship',
       hasJsonl: true,
     });
+  });
+
+  // PAN-5011: a backend pane in state 'done' is a finished turn with the
+  // harness still alive, never an exit — presence must read 'idle', not
+  // 'ended', so the composer stays open.
+  function reviewPane(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'w1:p1',
+      terminalId: 'term_review1',
+      issue: 'PAN-5011',
+      role: 'review',
+      harness: 'claude-code',
+      model: 'claude-sonnet-5',
+      state: 'done',
+      ...overrides,
+    };
+  }
+
+  it('reads a done review pane as status running, presence idle', async () => {
+    mockGetBackendPanesForIssue.mockResolvedValueOnce([reviewPane({ state: 'done' })]);
+
+    const result = await fetchActivityDataWithContext('PAN-5011', { tmuxSessionNames: new Set() });
+    const sections = (result as { sections: Array<{ sessionId: string; type: string; status: string; presence: string }> }).sections;
+    const review = sections.find((s) => s.type === 'review');
+
+    expect(review).toMatchObject({ status: 'running', presence: 'idle' });
+  });
+
+  it('reads an exited review pane with an approved PR as ended/completed', async () => {
+    mockGetBackendPanesForIssue.mockResolvedValueOnce([reviewPane({ state: 'exited' })]);
+    mockGetDerivedIssueState.mockResolvedValueOnce({ pr: { reviewState: 'approved' } });
+
+    const result = await fetchActivityDataWithContext('PAN-5011', { tmuxSessionNames: new Set() });
+    const sections = (result as { sections: Array<{ sessionId: string; type: string; status: string; presence: string }> }).sections;
+    const review = sections.find((s) => s.type === 'review');
+
+    expect(review).toMatchObject({ status: 'completed', presence: 'ended' });
+  });
+
+  it('prefers a live done review pane over a stale exited one for the same role', async () => {
+    mockGetBackendPanesForIssue.mockResolvedValueOnce([
+      reviewPane({ id: 'w1:p1', terminalId: 'term_old', state: 'exited' }),
+      reviewPane({ id: 'w1:p2', terminalId: 'term_new', state: 'done' }),
+    ]);
+
+    const result = await fetchActivityDataWithContext('PAN-5011', { tmuxSessionNames: new Set() });
+    const sections = (result as { sections: Array<{ sessionId: string; type: string; status: string; presence: string }> }).sections;
+    const review = sections.find((s) => s.type === 'review');
+
+    expect(review).toMatchObject({ status: 'running', presence: 'idle' });
+  });
+
+  it('reads a done work pane with no tmux session as idle with endedAt undefined', async () => {
+    const issueId = 'PAN-5011';
+    const agentId = 'agent-pan-5011';
+    mockAgentStates.set(agentId, {
+      id: agentId,
+      issueId,
+      role: 'work',
+      model: 'claude-sonnet-5',
+      status: 'stopped',
+      startedAt: '2026-01-01T00:00:00Z',
+    });
+    mockGetBackendPanesForIssue.mockResolvedValueOnce([
+      { id: 'w1:p3', agentId, issue: issueId, role: 'work', harness: 'claude-code', model: 'claude-sonnet-5', state: 'done' },
+    ]);
+
+    const result = await fetchActivityDataWithContext(issueId, { tmuxSessionNames: new Set() });
+    const section = (result as { sections: Array<{ sessionId: string; presence: string; endedAt?: string }> }).sections
+      .find((s) => s.sessionId === agentId);
+
+    expect(section?.presence).toBe('idle');
+    expect(section?.endedAt).toBeUndefined();
+  });
+
+  it('leaves endedAt undefined for a live done work pane even with a suspended runtime state', async () => {
+    const issueId = 'PAN-5011';
+    const agentId = 'agent-pan-5011';
+    mockAgentStates.set(agentId, {
+      id: agentId,
+      issueId,
+      role: 'work',
+      model: 'claude-sonnet-5',
+      status: 'stopped',
+      startedAt: '2026-01-01T00:00:00Z',
+      stoppedAt: '2026-01-01T02:30:00Z',
+    });
+    mockRuntimeStates.set(agentId, { state: 'suspended' });
+    mockGetBackendPanesForIssue.mockResolvedValueOnce([
+      { id: 'w1:p3', agentId, issue: issueId, role: 'work', harness: 'claude-code', model: 'claude-sonnet-5', state: 'done' },
+    ]);
+
+    const result = await fetchActivityDataWithContext(issueId, { tmuxSessionNames: new Set() });
+    const section = (result as { sections: Array<{ sessionId: string; endedAt?: string }> }).sections
+      .find((s) => s.sessionId === agentId);
+
+    expect(section?.endedAt).toBeUndefined();
   });
 });
 

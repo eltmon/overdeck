@@ -32,6 +32,16 @@ describe('hermesConfig', () => {
     expect(text).toContain(TAILSCALE_URL);
     expect(text).toContain('Bearer ${OVERDECK_MCP_TOKEN}');
   });
+
+  it('puts summary and allow_answers under settings', () => {
+    for (const text of [
+      hermesConfig({ reach: 'connector', url: CONNECTOR_LOCAL_URL }),
+      hermesConfig({ reach: 'tailscale', url: TAILSCALE_URL }),
+    ]) {
+      expect(text).toContain('      settings:\n        summary: true\n        allow_answers: false');
+      expect(text).not.toContain('\n      summary: true');
+    }
+  });
 });
 
 describe('openclawConfig', () => {

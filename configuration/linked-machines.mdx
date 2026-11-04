@@ -568,7 +568,9 @@ remote worker's reports exactly like a local worker's.
 ## Auto placement
 
 **Auto** (`--machine auto`) picks a machine for you and prints why, for example
-`Auto → desk (CPU pressure 3%, 41 GB free, 2 agents)`.
+`Auto → desk (CPU pressure 3%, 41 GB free, 2 agents)`. When Auto passed over other machines it
+adds a second line, for example `Passed over: laptop: no docker; desk: offline`. It prints both
+lines when it picks this machine too.
 
 1. Candidates are this machine and every online, visible linked machine.
 2. A machine is skipped when it is offline, has no project for the repository, lacks a
@@ -608,7 +610,9 @@ auto_fly = true
 `pan lane start --machine auto [--needs <tags>]` places a gauntlet lane the same way, so a
 loop's heavy critics can run on an idle laptop or Fly machine instead of the orchestrator's
 machine. The orchestrator keeps the run's rules and lists, waits on, stops and reaps the
-lane from its own machine. See [Lanes on other machines](/reference/lanes#lanes-on-other-machines).
+lane from its own machine. `--json` carries the same explanation as
+`placement: { label, reason, rejections }`; `machine` stays `null` for a lane Auto placed on
+this machine. See [Lanes on other machines](/reference/lanes#lanes-on-other-machines).
 
 ## Projects across machines
 

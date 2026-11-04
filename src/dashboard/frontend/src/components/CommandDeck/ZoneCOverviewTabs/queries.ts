@@ -75,6 +75,7 @@ export interface ActivitySection {
   roundMetadata?: ReviewerRoundMetadata;
   endedAt?: string | null;
   planningComplete?: boolean;
+  hasJsonl?: boolean;
   awaitingInput?: boolean;
   awaitingInputPrompt?: string;
   awaitingInputReason?: string;

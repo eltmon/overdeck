@@ -11,6 +11,8 @@
 import type { Duplex } from 'node:stream';
 import { RELAY_CAP_MESSAGE, type DirectoryToMachineFrame, type MachineToDirectoryFrame, type RelayStatus } from '@overdeck/contracts';
 
+import { relayUsageSampler } from '../../../lib/telemetry/anywhere.js';
+
 export const RELAY_REPORT_INTERVAL_MS = 60_000;
 /** The directory accepts at most 1e9 bytes per report. */
 export const MAX_REPORT_BYTES = 1_000_000_000;
@@ -38,7 +40,11 @@ export class RelayClient {
   private timer: NodeJS.Timeout | null = null;
   private readonly offs: Array<() => void> = [];
 
-  constructor(private readonly directory: RelayDirectory) {}
+  constructor(
+    private readonly directory: RelayDirectory,
+    /** PAN-5016 D-5: every reported byte count also feeds the hourly telemetry sampler. */
+    private readonly onRelayBytes: (bytes: number) => void = (bytes) => relayUsageSampler.record(bytes),
+  ) {}
 
   start(): void {
     this.offs.push(
@@ -91,6 +97,11 @@ export class RelayClient {
   }
 
   private send(bytes: number): void {
+    try {
+      this.onRelayBytes(bytes);
+    } catch {
+      // Telemetry never affects metering.
+    }
     for (let left = bytes; left > 0; left -= MAX_REPORT_BYTES) {
       this.directory.send({ type: 'relay-usage', bytes: Math.min(left, MAX_REPORT_BYTES) });
     }
