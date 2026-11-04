@@ -150,6 +150,32 @@ export async function handleSelfTaskBlock(
   return startSelfJobAnswer(jobs, caller, 'task-block', args, {}, signal);
 }
 
+/** H-6 (src/cli/index.ts:60-86): the pan CLI pre-parse strips a --yolo/--no-yolo element even after --. */
+const YOLO_FLAG_PATTERN = /^--(?:no-)?yolo(?:=|$)/;
+
+export async function handleSelfHandoff(
+  credential: DashboardCredential | null,
+  text: string,
+  signal?: AbortSignal,
+  deps: SelfWorkflowRouteDeps = {},
+): Promise<SelfRouteResult> {
+  const prepared = prelude(credential, text, deps);
+  if (!prepared.ok) return prepared.result;
+  const { caller, body, jobs } = prepared;
+  const focus = requiredBodyString(body, 'focus', 10_000);
+  if (!focus.ok) return focus.result;
+  if (YOLO_FLAG_PATTERN.test(focus.value)) return badRequest('focus must not start with --yolo or --no-yolo');
+  const title = body['title'];
+  let titleValue: string | undefined;
+  if (title !== undefined) {
+    const parsedTitle = requiredBodyString(body, 'title', 200);
+    if (!parsedTitle.ok) return parsedTitle.result;
+    titleValue = parsedTitle.value;
+  }
+  const args: SelfJobArg[] = [{ ref: 'self' }, ...(titleValue !== undefined ? [{ flag: 'title', value: titleValue }] : []), { rest: [focus.value] }];
+  return startSelfJobAnswer(jobs, caller, 'handoff', args, {}, signal);
+}
+
 export async function handleSelfDone(
   credential: DashboardCredential | null,
   text: string,
@@ -212,7 +238,19 @@ export function makeSelfWorkflowRouteLayer(deps: SelfWorkflowRouteDeps = {}) {
     })),
   );
 
-  return Layer.mergeAll(selfTaskClaimRoute, selfTaskDoneRoute, selfTaskBlockRoute, selfDoneRoute);
+  const selfHandoffRoute = HttpRouter.add(
+    'POST',
+    '/api/self/handoff',
+    httpHandler(Effect.gen(function* () {
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      const text = yield* request.text;
+      const credential = resolveRequestCredential(request);
+      const result = yield* Effect.promise((signal) => handleSelfHandoff(credential, text, signal, deps));
+      return jsonResponse(result.body, { status: result.status });
+    })),
+  );
+
+  return Layer.mergeAll(selfTaskClaimRoute, selfTaskDoneRoute, selfTaskBlockRoute, selfDoneRoute, selfHandoffRoute);
 }
 
 export const selfWorkflowRouteLayer = makeSelfWorkflowRouteLayer();

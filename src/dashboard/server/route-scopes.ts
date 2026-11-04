@@ -130,6 +130,7 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'POST', path: '/api/self/tasks/done', scope: 'tell' },
   { method: 'POST', path: '/api/self/tasks/block', scope: 'tell' },
   { method: 'POST', path: '/api/self/done', scope: 'operate' },
+  { method: 'POST', path: '/api/self/handoff', scope: 'tell' },
   // PAN-4650 WI-9: the owner's half of Pull here (a linked machine's operator only, checked by the routes).
   { method: 'POST', path: '/api/conversations/:name/release', scope: 'operate' },
   { method: 'GET', path: '/api/conversations/:name/release/transfer/:transferId', scope: 'operate' },

@@ -30,6 +30,7 @@ const { createSelfJobs } = await import('../services/self-jobs.js');
 const {
   badRequest,
   handleSelfDone,
+  handleSelfHandoff,
   handleSelfTaskBlock,
   handleSelfTaskClaim,
   handleSelfTaskDone,
@@ -50,6 +51,15 @@ const agentCredential = (agentId: string): DashboardCredential => ({
   agentId,
   agentKind: 'agent',
   role: 'work',
+});
+
+const conversationCredential = (name: string): DashboardCredential => ({
+  kind: 'token',
+  tokenId: `tok-${name}`,
+  scopes: ['tell'],
+  agentId: name,
+  agentKind: 'conversation',
+  role: 'conversation',
 });
 
 function controlledJobs() {
@@ -235,6 +245,73 @@ describe('handleSelfDone', () => {
   });
 });
 
+describe('handleSelfHandoff', () => {
+  it('builds argv handoff self --title=<title> -- <focus>', async () => {
+    const { jobs, recorded, finish } = controlledJobs();
+    const promise = handleSelfHandoff(agentCredential('agent-pan-1'), '{"focus":"Read .pan/brief.md","title":"Next step"}', undefined, { jobs, caller: callerDeps });
+    finish(0, { exitCode: 0, stdout: 'ok' });
+    const result = await promise;
+    expect(result.status).toBe(200);
+    expect(recorded[0]?.args.slice(1)).toEqual(['handoff', 'self', '--title=Next step', '--', 'Read .pan/brief.md']);
+  });
+
+  it('omits --title when absent', async () => {
+    const { jobs, recorded, finish } = controlledJobs();
+    const promise = handleSelfHandoff(agentCredential('agent-pan-1'), '{"focus":"Read .pan/brief.md"}', undefined, { jobs, caller: callerDeps });
+    finish(0, { exitCode: 0, stdout: 'ok' });
+    await promise;
+    expect(recorded[0]?.args.slice(1)).toEqual(['handoff', 'self', '--', 'Read .pan/brief.md']);
+  });
+
+  it('keeps a hostile focus and title each as one argv element, never read as a flag', async () => {
+    const { jobs, recorded, finish } = controlledJobs();
+    const promise = handleSelfHandoff(
+      agentCredential('agent-pan-1'),
+      JSON.stringify({ focus: '--cwd / --allow-primary', title: '--allow-primary' }),
+      undefined,
+      { jobs, caller: callerDeps },
+    );
+    finish(0, { exitCode: 0, stdout: 'ok' });
+    await promise;
+    const argv = recorded[0]!.args.slice(1);
+    expect(argv).toEqual(['handoff', 'self', '--title=--allow-primary', '--', '--cwd / --allow-primary']);
+    expect(argv.slice(0, -1)).not.toContain('--allow-primary');
+    expect(argv.slice(0, -1).some((element) => element.startsWith('--cwd'))).toBe(false);
+  });
+
+  it('refuses a 10,001-character focus and a blank title with 400 bad-request, starting no job', async () => {
+    const { jobs: jobsA, recorded: recordedA } = controlledJobs();
+    const tooLong = await handleSelfHandoff(agentCredential('agent-pan-1'), JSON.stringify({ focus: 'x'.repeat(10_001) }), undefined, { jobs: jobsA, caller: callerDeps });
+    expect(tooLong).toEqual({ status: 400, body: { error: 'focus must be at most 10000 characters', code: 'bad-request' } });
+    expect(recordedA).toEqual([]);
+
+    const { jobs: jobsB, recorded: recordedB } = controlledJobs();
+    const blankTitle = await handleSelfHandoff(agentCredential('agent-pan-1'), JSON.stringify({ focus: 'ok', title: '  ' }), undefined, { jobs: jobsB, caller: callerDeps });
+    expect(blankTitle).toEqual({ status: 400, body: { error: 'title is required and must be a non-empty string', code: 'bad-request' } });
+    expect(recordedB).toEqual([]);
+  });
+
+  it.each(['--yolo', '--no-yolo', '--yolo=true'])('refuses a focus of %s with 400 bad-request, starting no job', async (focus) => {
+    const { jobs, recorded } = controlledJobs();
+    const result = await handleSelfHandoff(agentCredential('agent-pan-1'), JSON.stringify({ focus }), undefined, { jobs, caller: callerDeps });
+    expect(result).toEqual({ status: 400, body: { error: 'focus must not start with --yolo or --no-yolo', code: 'bad-request' } });
+    expect(recorded).toEqual([]);
+  });
+
+  it('runs a conversation caller in its cwd with OVERDECK_AGENT_ID set to its tmux session', async () => {
+    const { jobs, recorded, finish } = controlledJobs();
+    const conversationDeps: SelfCallerDeps = {
+      getAgentState: () => null,
+      getConversationByName: (name) => (name === 'conv-abc' ? { cwd: '/home/u/proj', tmuxSession: 'conv-abc', issueId: null } : null),
+    };
+    const promise = handleSelfHandoff(conversationCredential('conv-abc'), '{"focus":"Read .pan/brief.md"}', undefined, { jobs, caller: conversationDeps });
+    finish(0, { exitCode: 0, stdout: 'ok' });
+    await promise;
+    expect(recorded[0]?.cwd).toBe('/home/u/proj');
+    expect(recorded[0]?.env.OVERDECK_AGENT_ID).toBe('conv-abc');
+  });
+});
+
 describe('waits', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -302,11 +379,12 @@ describe('self workflow routes through the gate', () => {
     expect(doneResponse.json).toMatchObject({ status: 'done', exitCode: 0, stdout: 'ok' });
   });
 
-  it('requires tell for all three task routes, and operate for done', () => {
+  it('requires tell for all three task routes and handoff, and operate for done', () => {
     expect(requiredScopeFor('POST', '/api/self/tasks/claim')).toBe('tell');
     expect(requiredScopeFor('POST', '/api/self/tasks/done')).toBe('tell');
     expect(requiredScopeFor('POST', '/api/self/tasks/block')).toBe('tell');
     expect(requiredScopeFor('POST', '/api/self/done')).toBe('operate');
+    expect(requiredScopeFor('POST', '/api/self/handoff')).toBe('tell');
   });
 
   it('refuses a review-role agent token with 403 missingScope operate on /api/self/done, and allows a work agent token', async () => {

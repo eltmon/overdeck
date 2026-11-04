@@ -9,7 +9,7 @@
  */
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
-import { errorResult, type McpToolContext, type OverdeckTool, requiredString, routeResult, WAIT_CHUNK_MS } from './tool.js';
+import { errorResult, type McpToolContext, optionalString, type OverdeckTool, requiredString, routeResult, WAIT_CHUNK_MS } from './tool.js';
 
 async function postSelf(ctx: McpToolContext, path: string, body: Record<string, unknown>): Promise<CallToolResult> {
   return routeResult(await ctx.api.request('POST', path, body));
@@ -106,4 +106,27 @@ const done: OverdeckTool = {
   },
 };
 
-export const SELF_TOOLS: readonly OverdeckTool[] = [waitJob, taskClaim, taskDone, taskBlock, done];
+const handoff: OverdeckTool = {
+  name: 'handoff',
+  description:
+    'Hand your conversation off to a new conversation that continues the work (runs pan handoff self). focus steers the new conversation; keep it short and point at a file for a long brief (at most 10,000 characters). Works from a conversation or a review, test or ship run; a work agent has no conversation and gets exitCode 1. Usually answers status "running": call next.',
+  scope: 'tell',
+  audience: 'agent',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      focus: { type: 'string', maxLength: 10_000, description: 'What the new conversation should do.' },
+      title: { type: 'string', maxLength: 200, description: 'The new conversation\'s name.' },
+    },
+    required: ['focus'],
+  },
+  async run(args, ctx) {
+    const focus = requiredString(args, 'focus');
+    if (!focus.ok) return focus.error;
+    const title = optionalString(args, 'title');
+    if (!title.ok) return title.error;
+    return postSelf(ctx, '/api/self/handoff', { focus: focus.value, ...(title.value !== undefined ? { title: title.value } : {}) });
+  },
+};
+
+export const SELF_TOOLS: readonly OverdeckTool[] = [waitJob, taskClaim, taskDone, taskBlock, done, handoff];

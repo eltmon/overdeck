@@ -168,3 +168,40 @@ describe('done (PAN-4927 W-SELF2)', () => {
     expect(api.calls).toEqual([{ method: 'POST', path: '/api/self/done', body: {} }]);
   });
 });
+
+describe('handoff (PAN-4927 W-SELF2)', () => {
+  const path = '/api/self/handoff';
+
+  it('is hidden from a non-agent token with tell and listed for an agent token with tell', async () => {
+    const api = fakeApi({});
+    const human = await connectClient(api, ['tell']);
+    expect((await human.listTools()).tools.map((tool) => tool.name)).not.toContain('handoff');
+    const call = await callTool(human, 'handoff', { focus: 'Read .pan/brief.md' });
+    expect(call.isError).toBe(true);
+    expect(resultText(call)).toBe('Unknown tool handoff');
+
+    const agent = await connectClient(api, ['tell'], true);
+    expect((await agent.listTools()).tools.map((tool) => tool.name)).toContain('handoff');
+  });
+
+  it('posts focus and title through when given, and omits title when absent', async () => {
+    const done = { status: 'done', jobId: 'j1', verb: 'handoff', exitCode: 0, stdout: '', stderr: '', error: null };
+    const api = fakeApi({ [`POST ${path}`]: { status: 200, json: done } });
+    const client = await connectClient(api, ['tell'], true);
+
+    await callTool(client, 'handoff', { focus: 'Read .pan/brief.md', title: 'Next step' });
+    expect(api.calls[0]).toEqual({ method: 'POST', path, body: { focus: 'Read .pan/brief.md', title: 'Next step' } });
+
+    await callTool(client, 'handoff', { focus: 'Read .pan/brief.md' });
+    expect(api.calls[1]).toEqual({ method: 'POST', path, body: { focus: 'Read .pan/brief.md' } });
+  });
+
+  it('requires focus', async () => {
+    const api = fakeApi({});
+    const client = await connectClient(api, ['tell'], true);
+    const missing = await callTool(client, 'handoff', {});
+    expect(missing.isError).toBe(true);
+    expect(resultText(missing)).toContain('focus');
+    expect(api.calls).toEqual([]);
+  });
+});
