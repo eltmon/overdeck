@@ -694,4 +694,10 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   "Input must be provided"); `--mcp-config <configs...>` is declared variadic the same way in `claude --help`. Launchers that end with `"$prompt"` must
   emit the equals form (`--allowedTools=mcp__overdeck`, `--mcp-config=<path>`) or put another flag
   between. Two equals-form `--mcp-config=` flags both load.
-<!-- last-verified: 2026-11-04 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4930, PAN-4931, PAN-4932) -->
+- **ACP agents spawn stdio MCP servers from `session/new` and `session/load`** (PAN-4934 planning probe) —
+  opencode 1.18.31 and kimi 2.0.2 both start a stdio `mcpServers` entry, pass its `env` array, keep the
+  inherited `PATH`/`HOME`, and call `initialize` then `tools/list`, on a new session and on a load. Both
+  advertise `mcpCapabilities: { http, sse }` too. The ACP host's `mcpServers` field
+  (`src/lib/acp/session-runtime.ts`) carries the `overdeck` server read from the host's `--mcp-config`
+  (PAN-4934); before that it was always `[]`.
+<!-- last-verified: 2026-11-04 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4930, PAN-4931, PAN-4932, PAN-4934) -->
