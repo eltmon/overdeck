@@ -41,7 +41,14 @@ const {
   handleSecretRequestWait,
   makeSelfRequestsRouteLayer,
 } = await import('../routes/self-requests.js');
-const { handleAgentRequestDecline, handleAgentRequestList, handleAgentRequestSecret, makeAgentRequestsRouteLayer } = await import('../routes/agent-requests.js');
+const {
+  handleAgentRequestDecline,
+  handleAgentRequestLinked,
+  handleAgentRequestList,
+  handleAgentRequestSecret,
+  makeAgentRequestsRouteLayer,
+} = await import('../routes/agent-requests.js');
+const { _resetLinkStoreForTests, _settleLinkStoreWritesForTests, markLinkRevoked, upsertLink } = await import('../../../lib/anywhere/link-store.js');
 
 const callerDeps: SelfCallerDeps = {
   getAgentState: (agentId) => (agentId === 'agent-pan-1' || agentId === 'agent-pan-2' ? { workspace: `/w/${agentId}`, issueId: 'PAN-1' } : null),
@@ -645,6 +652,170 @@ describe('operator agent request handlers', () => {
       expect(JSON.stringify(emitActivityEntryMock.mock.calls)).not.toContain(canary);
     } finally {
       for (const spy of spies) spy.mockRestore();
+    }
+  });
+});
+
+/** A store holding one pending machine-link request of agent-pan-1, and its id. */
+function storeWithLinkRequest(hint = 'my desk Mac') {
+  const requests = createAgentRequests();
+  const created = handleMachineLinkRequestCreate(agentCredential('agent-pan-1'), JSON.stringify({ hint }), { requests, caller: callerDeps });
+  return { requests, requestId: (created.body as { requestId: string }).requestId };
+}
+
+const deskLink = async (environmentId: string) => (environmentId === 'env-1' ? { environmentId: 'env-1', label: 'desk' } : null);
+const linkedBody = JSON.stringify({ environmentId: 'env-1' });
+
+describe('operator machine-link routes through the gate', () => {
+  it('refuses a token holding approve on /linked with insufficient_scope', async () => {
+    const { requests, requestId } = storeWithLinkRequest();
+    const app = Layer.mergeAll(remoteRequestGateLayer, makeAgentRequestsRouteLayer({ requests, hasActiveAgentToken: active, findActiveLink: deskLink }));
+    const approver = await createAccessToken({ name: 'bot', scopes: ['approve', 'read:conversations', 'tell', 'operate'], kind: 'token' });
+    const response = await send(app, 'POST', `/api/agent-requests/${requestId}/linked`, bearer(approver.token), linkedBody);
+    expect(response.status).toBe(403);
+    expect(response.json).toEqual({ error: 'insufficient_scope', missingScope: 'admin' });
+    expect(requests.getForAnswer(requestId)?.view.status).toBe('pending');
+    expect(requiredScopeFor('POST', '/api/agent-requests/x/linked')).toBe('admin');
+  });
+
+  it('lists a machine-link request with its hint', async () => {
+    const { requests, requestId } = storeWithLinkRequest();
+    const app = Layer.mergeAll(remoteRequestGateLayer, makeAgentRequestsRouteLayer({ requests, hasActiveAgentToken: active }));
+    const reader = await createAccessToken({ name: 'reader', scopes: ['read:conversations'], kind: 'token' });
+    const listed = await send(app, 'GET', '/api/agent-requests', bearer(reader.token));
+    const rows = (listed.json as { requests: Array<Record<string, unknown>> }).requests;
+    expect(Object.keys(rows[0]!).sort()).toEqual(['agentId', 'agentKind', 'createdAt', 'expiresAt', 'hint', 'id', 'kind', 'label']);
+    expect(rows[0]).toMatchObject({ id: requestId, kind: 'machine-link', hint: 'my desk Mac', label: 'agent-pan-1 · PAN-1' });
+  });
+});
+
+describe('operator machine-link handlers', () => {
+  it('refuses a device credential and an agent token on /linked with 403 root-only', async () => {
+    const { requests, requestId } = storeWithLinkRequest();
+    const rootOnly = { status: 403, body: { error: 'only the internal token or the root session can answer agent requests', code: 'root-only' } };
+    for (const credential of [null, agentCredential('agent-pan-1'), { kind: 'device', deviceId: 'd', scopes: ['approve'] }] as Array<DashboardCredential | null>) {
+      await expect(handleAgentRequestLinked(credential, requestId, linkedBody, { requests, hasActiveAgentToken: active, findActiveLink: deskLink })).resolves.toEqual(rootOnly);
+    }
+    expect(requests.getForAnswer(requestId)?.view.status).toBe('pending');
+  });
+
+  it.each([
+    ['a missing environmentId', {}],
+    ['an empty environmentId', { environmentId: '' }],
+    ['a number', { environmentId: 7 }],
+    ['a 201-character environmentId', { environmentId: 'e'.repeat(201) }],
+  ])('refuses %s with 400 bad-environment-id', async (_label, body) => {
+    const { requests, requestId } = storeWithLinkRequest();
+    await expect(handleAgentRequestLinked(ROOT, requestId, JSON.stringify(body), { requests, hasActiveAgentToken: active, findActiveLink: deskLink })).resolves.toEqual({
+      status: 400,
+      body: { error: 'environmentId must be a string of 1 to 200 characters', code: 'bad-environment-id' },
+    });
+  });
+
+  it('answers 400 unknown-machine for an environment id with no active link, and leaves the request pending', async () => {
+    const { requests, requestId } = storeWithLinkRequest();
+    await expect(handleAgentRequestLinked(ROOT, requestId, JSON.stringify({ environmentId: 'env-9' }), { requests, hasActiveAgentToken: active, findActiveLink: deskLink })).resolves.toEqual({
+      status: 400,
+      body: { error: 'no active link to that machine', code: 'unknown-machine' },
+    });
+    expect(requests.getForAnswer(requestId)?.view.status).toBe('pending');
+  });
+
+  it('finds only an active link by environment id in the link store by default', async () => {
+    _resetLinkStoreForTests();
+    try {
+      const base = { machineKey: 'a'.repeat(64), token: 'odk_test-link', access: 'operator' as const, routes: [] };
+      await upsertLink({ ...base, environmentId: 'env-active', label: 'desk' });
+      const { link: revoked } = await upsertLink({ ...base, environmentId: 'env-revoked', label: 'old box' });
+      await markLinkRevoked(revoked.id);
+      await _settleLinkStoreWritesForTests();
+
+      const first = storeWithLinkRequest();
+      // The label of a link is not its environment id, and a revoked link does not count.
+      for (const environmentId of ['desk', 'env-revoked']) {
+        await expect(handleAgentRequestLinked(ROOT, first.requestId, JSON.stringify({ environmentId }), { requests: first.requests, hasActiveAgentToken: active }))
+          .resolves.toMatchObject({ status: 400, body: { code: 'unknown-machine' } });
+      }
+      await expect(handleAgentRequestLinked(ROOT, first.requestId, JSON.stringify({ environmentId: 'env-active' }), { requests: first.requests, hasActiveAgentToken: active })).resolves.toEqual({
+        status: 200,
+        body: { requestId: first.requestId, status: 'linked', machine: { environmentId: 'env-active', label: 'desk' } },
+      });
+    } finally {
+      await _settleLinkStoreWritesForTests();
+      rmSync(join(home, 'machine-links.json'), { force: true });
+      _resetLinkStoreForTests();
+    }
+  });
+
+  it('answers 409 wrong-kind for a secret request id, and /secret answers 409 wrong-kind for a machine-link id', async () => {
+    const secret = storeWithRequest();
+    await expect(handleAgentRequestLinked(ROOT, secret.requestId, linkedBody, { requests: secret.requests, hasActiveAgentToken: active, findActiveLink: deskLink })).resolves.toEqual({
+      status: 409,
+      body: { error: 'request is not a machine-link request', code: 'wrong-kind' },
+    });
+    const link = storeWithLinkRequest();
+    await expect(handleAgentRequestSecret(ROOT, link.requestId, JSON.stringify({ value: 'v' }), { requests: link.requests, hasActiveAgentToken: active })).resolves.toEqual({
+      status: 409,
+      body: { error: 'request is not a secret request', code: 'wrong-kind' },
+    });
+  });
+
+  it('answers 409 agent-stopped for a stopped agent, and its wait answers expired', async () => {
+    const { requests, requestId } = storeWithLinkRequest();
+    await expect(handleAgentRequestLinked(ROOT, requestId, linkedBody, { requests, hasActiveAgentToken: async () => false, findActiveLink: deskLink })).resolves.toEqual({
+      status: 409,
+      body: { error: 'the agent stopped; its request expired', code: 'agent-stopped' },
+    });
+    await expect(handleMachineLinkRequestWait(agentCredential('agent-pan-1'), requestId, null, undefined, { requests, caller: callerDeps })).resolves.toEqual({
+      status: 200,
+      body: { requestId, status: 'expired' },
+    });
+  });
+
+  it('answers 409 not-pending when the request already ended', async () => {
+    const { requests, requestId } = storeWithLinkRequest();
+    requests.settle(requestId, 'declined');
+    await expect(handleAgentRequestLinked(ROOT, requestId, linkedBody, { requests, hasActiveAgentToken: active, findActiveLink: deskLink })).resolves.toEqual({
+      status: 409,
+      body: { error: 'request is declined', code: 'not-pending', status: 'declined' },
+    });
+  });
+
+  it('declines a machine-link request, and the wait answers declined', async () => {
+    const { requests, requestId } = storeWithLinkRequest();
+    expect(handleAgentRequestDecline(ROOT, requestId, { requests })).toEqual({ status: 200, body: { requestId, status: 'declined' } });
+    await expect(handleMachineLinkRequestWait(agentCredential('agent-pan-1'), requestId, null, undefined, { requests, caller: callerDeps })).resolves.toEqual({
+      status: 200,
+      body: { requestId, status: 'declined' },
+    });
+    expect(emitActivityEntryMock).toHaveBeenCalledWith({ source: 'dashboard', level: 'info', message: 'Machine link declined for agent-pan-1 · PAN-1' });
+  });
+
+  it('links end to end: the agent gets the link store label, and no pairing code or body label reaches it', async () => {
+    const requests = createAgentRequests();
+    const agentAnswers: unknown[] = [];
+    const created = handleMachineLinkRequestCreate(agentCredential('agent-pan-1'), validLinkAsk, { requests, caller: callerDeps });
+    agentAnswers.push(created);
+    expect(created.status).toBe(201);
+    const { requestId } = created.body as { requestId: string };
+
+    const listed = handleAgentRequestList({ requests });
+    expect((listed.body as { requests: Array<{ id: string; hint?: string }> }).requests).toMatchObject([{ id: requestId, hint: 'my desk Mac' }]);
+
+    const body = JSON.stringify({ environmentId: 'env-1', label: 'spoofed', pairingUrl: 'https://desk/#pair=odp_secret' });
+    const linked = await handleAgentRequestLinked(ROOT, requestId, body, { requests, hasActiveAgentToken: active, findActiveLink: deskLink });
+    expect(linked).toEqual({ status: 200, body: { requestId, status: 'linked', machine: { environmentId: 'env-1', label: 'desk' } } });
+    expect(emitActivityEntryMock).toHaveBeenCalledWith({ source: 'dashboard', level: 'info', message: 'Machine desk linked for agent-pan-1 · PAN-1' });
+
+    const waited = await handleMachineLinkRequestWait(agentCredential('agent-pan-1'), requestId, null, undefined, { requests, caller: callerDeps });
+    agentAnswers.push(waited);
+    expect(waited).toEqual({ status: 200, body: { requestId, status: 'linked', machine: { environmentId: 'env-1', label: 'desk' } } });
+
+    for (const answer of [...agentAnswers, requests.getForAnswer(requestId)?.view, emitActivityEntryMock.mock.calls]) {
+      const text = JSON.stringify(answer);
+      expect(text).not.toContain('odp_');
+      expect(text).not.toContain('pair=');
+      expect(text).not.toContain('spoofed');
     }
   });
 });
