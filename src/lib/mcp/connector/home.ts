@@ -104,7 +104,8 @@ async function readSecretFile(home: string, name: string): Promise<string | null
   }
   try {
     const { mode } = await handle.stat();
-    if ((mode & 0o077) !== 0) throw new Error(`${name} must be mode 0600: chmod 600 ${path}`);
+    // POSIX mode bits carry no meaning on Windows, where every regular file stats as 0o666 or 0o444.
+    if (process.platform !== 'win32' && (mode & 0o077) !== 0) throw new Error(`${name} must be mode 0600: chmod 600 ${path}`);
     return await handle.readFile('utf8');
   } finally {
     await handle.close();

@@ -208,12 +208,16 @@ function optionalStrings(body: Record<string, unknown>, keys: readonly string[])
 
 const machineOf = (target: Extract<FleetTarget, { ok: true }>) => ({ environmentId: target.environmentId, label: target.label, self: target.self });
 
-/** PAN-4950 D-5: a connector caller's refusal for a target that is not this machine, else null. */
+/** Resolution failures that only a target other than this machine produces. */
+const NON_LOCAL_FAILURES = new Set(['machine-offline', 'fly-unavailable', 'fly-needs-admin']);
+
+/** PAN-4950 D-5: a connector caller's refusal for a target that is not this machine, else null. Runs before resolution failures. */
 export function connectorLocalOnly(target: FleetTarget, caller: FleetCaller): HttpServerResponse.HttpServerResponse | null {
-  if (!caller.localOnly || !target.ok || target.self) return null;
+  if (!caller.localOnly || (target.ok && target.self)) return null;
+  if (!target.ok && !NON_LOCAL_FAILURES.has(String(target.body['code']))) return null;
   return jsonResponse({
     code: 'connector-local-only',
-    error: `An Overdeck connector reaches only the machine it paired with; run a second connector for ${target.label}.`,
+    error: `An Overdeck connector reaches only the machine it paired with; run a second connector for ${target.ok ? target.label : 'that machine'}.`,
   }, { status: 403 });
 }
 
@@ -233,9 +237,9 @@ export async function handleFleetConversation(raw: unknown, caller: FleetCaller,
 
   const spawn: FlySpawn = { projectKey: projectKey ?? null, harness: options.harness, model: options.model, mayCreate: caller.mayCreateFly === true };
   const target = await deps.resolveTarget(machine, gitOrigin, needs, spawn);
-  if (!target.ok) return jsonResponse(target.body, { status: target.status });
   const localOnly = connectorLocalOnly(target, caller);
   if (localOnly) return localOnly;
+  if (!target.ok) return jsonResponse(target.body, { status: target.status });
   const message = body['message'];
   if (target.self) {
     const created = await deps.createLocal({ ...options, message, ...(projectKey ? { projectKey } : {}) });
@@ -308,9 +312,9 @@ export async function handleFleetWorker(raw: unknown, caller: FleetCaller, deps:
   const gitOrigin = project?.gitOrigin ?? null;
 
   const target = await deps.resolveTarget(typeof machine === 'string' ? machine : undefined, gitOrigin, needs);
-  if (!target.ok) return jsonResponse(target.body, { status: target.status });
   const localOnly = connectorLocalOnly(target, caller);
   if (localOnly) return localOnly;
+  if (!target.ok) return jsonResponse(target.body, { status: target.status });
   if (target.self) {
     try {
       const { id } = await deps.startLocal({ ...parsed.value, parentId });
@@ -359,9 +363,9 @@ export function handleFleetIssueStart<R>(
     const project = yield* Effect.promise(() => deps.issueOrigin(issueId));
     if (!project) return jsonResponse({ code: 'unknown-project', error: `No project on this machine owns ${issueId}` }, { status: 404 });
     const target = yield* Effect.promise(() => deps.resolveTarget(machine, project.gitOrigin, needs));
-    if (!target.ok) return jsonResponse(target.body, { status: target.status });
     const localOnly = connectorLocalOnly(target, caller);
     if (localOnly) return localOnly;
+    if (!target.ok) return jsonResponse(target.body, { status: target.status });
     if (target.self) {
       if (!caller.viaToken) return jsonResponse({ code: 'use-local-start', error: `${issueId} would start on this machine; run pan start ${issueId} without --machine` }, { status: 400 });
       const response = yield* deps.spawn({ body: { issueId, ...options }, internalRequest: false });

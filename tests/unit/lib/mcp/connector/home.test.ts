@@ -98,6 +98,18 @@ describe('files and modes', () => {
     await expect(readPairing(home)).rejects.toThrow('chmod 600');
   });
 
+  it('skips the mode check on Windows, where mode bits carry no meaning', async () => {
+    await writePairing(home, PAIRING);
+    await chmod(join(home, 'pairing.json'), 0o644);
+    const platform = Object.getOwnPropertyDescriptor(process, 'platform');
+    Object.defineProperty(process, 'platform', { value: 'win32' });
+    try {
+      expect(await readPairing(home)).toEqual(PAIRING);
+    } finally {
+      if (platform) Object.defineProperty(process, 'platform', platform);
+    }
+  });
+
   it('refuses malformed pairing.json with the logout message', async () => {
     await writePairing(home, PAIRING);
     await writeFile(join(home, 'pairing.json'), '{not json', { mode: 0o600 });

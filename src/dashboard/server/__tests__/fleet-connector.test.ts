@@ -110,6 +110,24 @@ describe('fleet spawn handlers with a connector caller', () => {
     expect(remoteDeps.spawn).not.toHaveBeenCalled();
   });
 
+  it('answers connector-local-only for a resolution failure only another machine produces', async () => {
+    const offline: FleetTarget = { ok: false, status: 503, body: { code: 'machine-offline', error: 'desk is offline' } };
+    const answer = readJsonResponse(await handleFleetConversation({ message: 'hi', machine: 'desk' }, CONNECTOR, deps(offline)));
+    expect(answer).toEqual({
+      status: 403,
+      body: { code: 'connector-local-only', error: 'An Overdeck connector reaches only the machine it paired with; run a second connector for that machine.' },
+    });
+    const fly: FleetTarget = { ok: false, status: 400, body: { code: 'fly-unavailable', error: 'conversations only' } };
+    const worker = readJsonResponse(await handleFleetWorker({ machine: 'fly', issueId: 'PAN-9', prompt: 'Run it.' }, CONNECTOR, deps(fly)));
+    expect(worker.body).toMatchObject({ code: 'connector-local-only' });
+  });
+
+  it('keeps an unknown-machine answer for a connector', async () => {
+    const unknown: FleetTarget = { ok: false, status: 404, body: { code: 'unknown-machine', error: 'No linked machine is called nope' } };
+    const answer = readJsonResponse(await handleFleetConversation({ message: 'hi', machine: 'nope' }, CONNECTOR, deps(unknown)));
+    expect(answer).toEqual({ status: 404, body: { code: 'unknown-machine', error: 'No linked machine is called nope' } });
+  });
+
   it('still lets a token caller reach another machine', async () => {
     const d = deps(REMOTE);
     const answer = readJsonResponse(await handleFleetConversation({ message: 'hi', machine: 'desk' }, { actor: 'operator', viaToken: true }, d));
