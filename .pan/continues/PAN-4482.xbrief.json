@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4482",
   "created": "2026-11-03T23:55:28.272Z",
-  "updated": "2026-11-04T00:35:28.066Z",
+  "updated": "2026-11-04T00:35:45.446Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -158,6 +158,10 @@
     "docs-verification.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T00:35:28.066Z"
+    },
+    "docs-verification.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T00:35:45.446Z"
     }
   }
 }
