@@ -51,6 +51,7 @@ describe('MCP tool visibility (PAN-4927 W-MCP1)', () => {
     expect(names).toContain('list_machines');
     expect(names).toContain('wait_job');
     expect(names).toContain('secret_wait');
+    expect(names).toContain('list_pull_request_watches');
   });
 
   it('an audience: agent tool is hidden from a non-agent token and visible to an agent token', async () => {

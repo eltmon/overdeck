@@ -23,7 +23,7 @@ import { errorResult, type McpToolContext, type OverdeckTool } from './tool.js';
 import { APPROVE_TOOLS } from './tools-approve.js';
 import { DELEGATE_TOOLS } from './tools-delegate.js';
 import { LANE_TOOLS } from './tools-lanes.js';
-import { PR_LINK_TOOLS } from './tools-pr.js';
+import { PR_LINK_TOOLS, PR_WATCH_TOOLS } from './tools-pr.js';
 import { READ_TOOLS } from './tools-read.js';
 import { SCHEDULE_TOOLS } from './tools-schedule.js';
 import { SELF_TOOLS } from './tools-self.js';
@@ -40,7 +40,7 @@ const MCP_SERVER_VERSION = '0.0.0';
 export const MCP_DEFAULT_SCOPES = ['read:state', 'read:conversations', 'operate'] as const;
 
 /** Every tool, in tools/list order. Exported so tests compare against it. */
-export const ALL_TOOLS: readonly OverdeckTool[] = [...READ_TOOLS, ...WRITE_TOOLS, ...SCHEDULE_TOOLS, ...PR_LINK_TOOLS, ...APPROVE_TOOLS, ...SELF_TOOLS, ...DELEGATE_TOOLS, ...LANE_TOOLS];
+export const ALL_TOOLS: readonly OverdeckTool[] = [...READ_TOOLS, ...WRITE_TOOLS, ...SCHEDULE_TOOLS, ...PR_LINK_TOOLS, ...APPROVE_TOOLS, ...SELF_TOOLS, ...PR_WATCH_TOOLS, ...DELEGATE_TOOLS, ...LANE_TOOLS];
 
 /** The tools a caller may list and call: its scopes cover the tool's scope, and agent-only tools need an agent token (PAN-4927 D-14). */
 export function visibleTools(ctx: Pick<McpToolContext, 'scopes' | 'isAgent'>, tools: readonly OverdeckTool[] = ALL_TOOLS): OverdeckTool[] {

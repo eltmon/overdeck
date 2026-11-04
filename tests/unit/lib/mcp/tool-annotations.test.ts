@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { requiredScopeFor } from '../../../../src/dashboard/server/route-scopes.js';
 import { ALL_TOOLS, hasAgentId } from '../../../../src/lib/mcp/server.js';
 import { APPROVE_TOOLS } from '../../../../src/lib/mcp/tools-approve.js';
-import { PR_LINK_TOOLS } from '../../../../src/lib/mcp/tools-pr.js';
+import { PR_LINK_TOOLS, PR_WATCH_TOOLS } from '../../../../src/lib/mcp/tools-pr.js';
 import { READ_TOOLS } from '../../../../src/lib/mcp/tools-read.js';
 import { SCHEDULE_TOOLS } from '../../../../src/lib/mcp/tools-schedule.js';
 import { SELF_TOOLS } from '../../../../src/lib/mcp/tools-self.js';
@@ -40,14 +40,17 @@ const SINGLE_ROUTE_PATHS: Record<string, { method: string; path: string }> = {
   request_secret: { method: 'POST', path: '/api/self/secret-requests' },
   secret_wait: { method: 'GET', path: '/api/self/secret-requests/abc/wait' },
   link_pull_request: { method: 'POST', path: '/api/conversations/conv-a/pull-requests' },
+  watch_pull_request: { method: 'POST', path: '/api/self/pull-request-watches' },
+  list_pull_request_watches: { method: 'GET', path: '/api/self/pull-request-watches' },
+  unwatch_pull_request: { method: 'DELETE', path: '/api/self/pull-request-watches/abc' },
 };
 
 describe('MCP tool annotations (PAN-4927 W-MCP1)', () => {
-  it('every READ, WRITE, SCHEDULE and APPROVE tool declares audience: any, and every SELF_TOOLS tool declares audience: agent', () => {
+  it('every READ, WRITE, SCHEDULE and APPROVE tool declares audience: any, and every agent-only tool declares audience: agent', () => {
     for (const tool of [...READ_TOOLS, ...WRITE_TOOLS, ...SCHEDULE_TOOLS, ...PR_LINK_TOOLS, ...APPROVE_TOOLS]) {
       expect(tool.audience, tool.name).toBe('any');
     }
-    for (const tool of SELF_TOOLS) {
+    for (const tool of [...SELF_TOOLS, ...PR_WATCH_TOOLS]) {
       expect(tool.audience, tool.name).toBe('agent');
     }
     expect(SELF_TOOLS.length).toBeGreaterThan(0);
