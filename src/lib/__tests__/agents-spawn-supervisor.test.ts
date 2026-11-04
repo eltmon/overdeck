@@ -573,6 +573,27 @@ describe('spawnAgent PTY supervisor wiring', () => {
     },
   );
 
+  it('gives claude-code role runs the overdeck MCP server with one allow-list (PAN-4932)', async () => {
+    writeSupervisorArtifact();
+    const { spawnRun } = await import('../agents.js');
+
+    await spawnRun('PAN-1405', 'review', { workspace, model: 'claude-sonnet-4-6' });
+    await spawnRun('PAN-1405', 'worker', { workspace, model: 'claude-sonnet-4-6', agentId: 'agent-pan-1405-worker-9', registerConversation: false });
+
+    const reviewDir = join(tmpHome, 'agents', 'agent-pan-1405-review');
+    const review = readFileSync(join(reviewDir, 'launcher.sh'), 'utf8');
+    expect(review).toContain(`--mcp-config='${join(reviewDir, 'overdeck-mcp.json')}'`);
+    const allowLists = review.match(/--allowedTools[= ]'?[^ ]*/g) ?? [];
+    expect(allowLists).toHaveLength(1);
+    expect(allowLists[0]).toContain('mcp__overdeck');
+    expect(review).not.toContain('odk_');
+
+    const workerDir = join(tmpHome, 'agents', 'agent-pan-1405-worker-9');
+    const worker = readFileSync(join(workerDir, 'launcher.sh'), 'utf8');
+    expect(worker).toContain(`--mcp-config='${join(workerDir, 'overdeck-mcp.json')}'`);
+    expect(worker).toContain('--allowedTools=mcp__overdeck');
+  });
+
   it('persists provider-default harnesses from resolveHarness for OpenAI and Kimi work agents', async () => {
     writeSupervisorArtifact();
     process.env.KIMI_API_KEY = 'test-kimi-key';
