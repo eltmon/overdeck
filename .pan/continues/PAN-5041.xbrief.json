@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5041",
   "created": "2026-11-04T17:22:54.161Z",
-  "updated": "2026-11-04T17:29:40.221Z",
+  "updated": "2026-11-04T17:29:46.339Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-5041",
       "claimedAt": "2026-11-04T17:25:50.620Z",
       "doneAt": "2026-11-04T17:29:40.221Z"
+    },
+    "wi3-boot-script": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5041",
+      "claimedAt": "2026-11-04T17:29:46.339Z"
     }
   }
 }
