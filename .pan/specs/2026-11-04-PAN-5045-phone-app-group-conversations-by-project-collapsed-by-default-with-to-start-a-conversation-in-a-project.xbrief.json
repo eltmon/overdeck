@@ -1,0 +1,521 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T17:57:37Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5045: Phone app: group conversations by project, collapsed by default, with + to start a conversation in a project",
+    "updated": "2026-11-04T18:03:37.882Z"
+  },
+  "plan": {
+    "id": "pan-5045",
+    "title": "Phone app: group conversations by project, collapsed by default, with + to start a conversation in a project",
+    "status": "proposed",
+    "uid": "dd2a167e-5b17-4506-92c3-0c064a198ade",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-04T17:57:37Z",
+    "updated": "2026-11-04T18:03:37.882Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5045",
+        "label": "PAN-5045",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5045.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "mobile",
+      "phone-app",
+      "conversations",
+      "frontend",
+      "route-scopes"
+    ],
+    "narratives": {
+      "Problem": "The phone Conversations tab (MobileConversations.tsx, rendered by apps/mobile and the /m PWA) is one flat list with no project grouping and no way to start a conversation. The phone also cannot read the machine's project list: GET /api/registered-projects has no route-scope row, so a phone token (never admin) gets 403. 94% of live conversation rows have a null projectKey and are placed only by cwd inference, which needs project paths.",
+      "Proposal": "Add a read:state route-scope row for GET /api/registered-projects (precedent DASHBOARD-AUTH D-8). Add a pure helper (components/mobile/conversationGroups.ts) that groups rows with the desktop's resolveEffectiveProjectKey, one group per registered project plus No project last, with a projectKey-only fallback when the project list fails. MobileConversations renders collapsible project groups, all collapsed on first load, the expanded set persisted in localStorage key pan-mobile-expanded-projects. A + on each registered project's header POSTs { projectKey } to the existing POST /api/conversations and opens the created conversation. Prove it with a 390x844 Playwright spec on an isolated dashboard and update configuration/phone.mdx and docs/DASHBOARD-AUTH.md.",
+      "NonGoals": "- No desktop Command Deck, sidebar or ConversationList change; desktop behavior stays as it is.\n- No new HTTP route and no change to POST /api/conversations or GET /api/machines/projects handlers.\n- No model, harness or effort picker on the phone; the create body carries only projectKey and the machine's defaults apply.\n- No + on the No project group and no unscoped conversation create from the phone.\n- No + in fallback mode (project list unavailable).\n- No creating conversations on another machine; + creates only on the machine the phone is viewing.\n- No fleet Combine grouping of linked rows on the phone.\n- No per-machine split of the stored expanded set.\n- No change to the conversation view, Needs you or Pipeline tabs."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Give phones the project list by adding { GET /api/registered-projects, read:state } to ROUTE_SCOPES instead of widening the path-free GET /api/machines/projects.",
+        "rationale": "2048 of 2176 live rows have a null projectKey and are placed only by cwd inside a project path; a path-free list would put 94% of rows in No project. Paths are already derivable from conversation cwds under read:conversations, githubRepo is already gitOrigin under read:state, and DASHBOARD-AUTH D-8 is the precedent for scope rows that widen every holder of the scope."
+      },
+      {
+        "summary": "Group with the desktop's resolveEffectiveProjectKey, passing an explicit empty fleet index; unregistered keys go to No project.",
+        "rationale": "One resolver keeps phone and desktop groupings identical; the phone never loads the fleet index, so an explicit value keeps the result deterministic."
+      },
+      {
+        "summary": "Show every registered project as a group, including projects with no conversations.",
+        "rationale": "The + must be able to start the first conversation in a project."
+      },
+      {
+        "summary": "Sort project groups by label with localeCompare; No project last and only when it has rows.",
+        "rationale": "Matches the desktop groupProjects order and keeps headers stable while the list refetches."
+      },
+      {
+        "summary": "When the project list request fails, group by raw projectKey and hide every +.",
+        "rationale": "The phone app bundles its own frontend, so a new app against an older machine gets 403 insufficient_scope; the list must still render and an unchecked key must not be used to create."
+      },
+      {
+        "summary": "No + on the No project group.",
+        "rationale": "The issue asks for + by the project name; No project is not a project, and unscoped creation is out of scope."
+      },
+      {
+        "summary": "Create body is { projectKey } only; server errors render inline under the header.",
+        "rationale": "The phone has no model picker and the repo forbids hard-coded model fallbacks; the server applies its configured defaults or fails loudly."
+      },
+      {
+        "summary": "Persist the expanded set (not the collapsed set) in localStorage key pan-mobile-expanded-projects, try/catch guarded.",
+        "rationale": "The list unmounts on every tab switch and Back from a conversation, so in-memory state would re-collapse constantly; storing the expanded set makes new projects start collapsed with no special case."
+      },
+      {
+        "summary": "Prove the phone layout with a new Playwright spec modeled on tests/pan-2355-mobile.spec.ts and commit the PNGs under apps/mobile/acceptance/.",
+        "rationale": "The issue requires a phone-width screenshot attached to the PR; the existing spec already runs an isolated dashboard at 390x844."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Six small items across server route scopes, the phone frontend, a Playwright spec and docs; under the surface limits.",
+      "canonicalFilename": "2026-11-04-PAN-5045-phone-app-group-conversations-by-project-collapsed-by-default-with-to-start-a-conversation-in-a-project.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "scope-row",
+        "title": "Route-scope row: GET /api/registered-projects needs read:state",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T17:57:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5045",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/route-scopes.ts",
+            "src/dashboard/server/__tests__/route-scopes.test.ts",
+            "docs/DASHBOARD-AUTH.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner src/dashboard/server/__tests__/route-scopes.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "route-scopes.test.ts passes including the new registered-projects assertions",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In src/dashboard/server/route-scopes.ts, directly after the row { method: 'GET', path: '/api/pipeline/membership', scope: 'read:state' }, add the comment '// PAN-5045: the phone groups its conversation list by project with the desktop's resolver.' and the row { method: 'GET', path: '/api/registered-projects', scope: 'read:state' }. In src/dashboard/server/__tests__/route-scopes.test.ts, inside 'maps listed routes to their scope and everything else to admin', assert requiredScopeFor('GET', '/api/registered-projects') is 'read:state' and requiredScopeFor('POST', '/api/registered-projects') is 'admin'. In docs/DASHBOARD-AUTH.md, append `GET /api/registered-projects` (PAN-5045) to the read:state row of the scope table (line ~222), and after the paragraph starting 'The rows PAN-4835 added are not phone-exclusive (D-8)' add one sentence: the PAN-5045 row follows the same rule; it exposes project keys, names, paths, repos and tracker ids to every read:state holder, and paths were already derivable from conversation cwds under read:conversations. The route is already in the no-loss matrix (tests/unit/lib/overdeck/no-loss-matrix.ts line 601); do not edit the handler in routes/misc/meta.ts."
+        },
+        "items": [
+          {
+            "id": "scope-row.ac1",
+            "title": "Given a phone token, requiredScopeFor('GET', '/api/registered-projects') returns 'read:state' and requiredScopeFor('POST', '/api/registered-projects') returns 'admin'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scope-row.ac2",
+            "title": "route-scopes.test.ts passes, including the existing check that every ROUTE_SCOPES row exists in the no-loss matrix",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scope-row.ac3",
+            "title": "docs/DASHBOARD-AUTH.md read:state row contains `GET /api/registered-projects` (PAN-5045) and the D-8 paragraph is followed by a sentence naming the PAN-5045 row and its disclosure",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "group-helper",
+        "title": "Pure groupMobileConversations helper and expanded-set storage",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T17:57:37Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5045",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "grouped-list",
+            "project-create"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/components/mobile/conversationGroups.ts",
+            "src/dashboard/frontend/src/components/mobile/__tests__/conversationGroups.test.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/mobile/__tests__/conversationGroups.test.ts",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "conversationGroups.test.ts passes with the seven named tests",
+            "frontend typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-5",
+            "FR-7",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Create src/dashboard/frontend/src/components/mobile/conversationGroups.ts exporting: interface GroupableConversation { cwd?, projectKey?, origin?, gitOrigin?, createdAt: string, lastActivityAt?, lastAttachedAt?, archivedAt? }; interface MobileConversationGroup<Row> { key: string; label: string; canCreate: boolean; rows: Row[] }; const EXPANDED_PROJECTS_STORAGE_KEY = 'pan-mobile-expanded-projects'; recencyAt(row) = lastActivityAt ?? lastAttachedAt ?? createdAt; groupMobileConversations(rows, registeredProjects: readonly RegisteredProjectLite[] | null); readExpandedProjects(): Set<string>; writeExpandedProjects(keys). Import NO_PROJECT_KEY, NO_PROJECT_LABEL, resolveEffectiveProjectKey, FleetProjectIndex, RegisteredProjectLite from '../CommandDeck/projectsData' and define NO_FLEET = { combine: false, localKeyByOrigin: new Map() }. Rules: drop archived rows; normal mode (array) = one group per registered project (label name || key, canCreate true), each row's key = resolveEffectiveProjectKey(row, registeredProjects, NO_FLEET), null or unregistered key -> No project; fallback mode (null) = a group per distinct non-empty row.projectKey (label = key, canCreate false), null/empty -> No project; rows sorted by recencyAt descending; project groups sorted by a.label.localeCompare(b.label); No project ({ key: NO_PROJECT_KEY, label: NO_PROJECT_LABEL, canCreate: false }) appended last only when it has rows. Storage: readExpandedProjects returns new Set of the parsed array when localStorage.getItem(KEY) parses to an array of strings, else empty set, and any thrown error -> empty set; writeExpandedProjects sets JSON.stringify([...keys]) inside try/catch. Tests in __tests__/conversationGroups.test.ts with these exact names: 'groups by explicit projectKey and by cwd inside a project path', 'puts unregistered and null keys in No project, sorted last', 'returns an empty registered project as a group with no rows', 'sorts groups by label and rows newest first, hiding archived rows', 'falls back to raw projectKey groups with canCreate false when the project list is null', 'reads an empty set from missing, invalid or throwing storage', 'round-trips the expanded set through localStorage'. Do not import React here; it is pure logic. Add the line 'src/components/mobile/__tests__/conversationGroups.test.ts' to scripts/frontend-test-subset.txt in sorted (byte-order) position, directly after 'src/components/mobile/__tests__/MobilePipeline.test.tsx', so CI runs it (CI runs only the listed frontend tests, PAN-4697)."
+        },
+        "items": [
+          {
+            "id": "group-helper.ac1",
+            "title": "Given projects alpha (/p/alpha) and beta, groupMobileConversations returns a row with cwd /p/alpha/sub in alpha, a row with projectKey 'beta' in beta, and rows with cwd /elsewhere or projectKey 'ghost' in No project, which is the last group",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "group-helper.ac2",
+            "title": "Given registered projects with no matching rows, the helper returns a group for each with rows [] and canCreate true, sorted by label, and returns no No project group when every row matched",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "group-helper.ac3",
+            "title": "Given registeredProjects null, the helper returns one group per distinct projectKey labeled with the key and canCreate false, and rows without projectKey fall back to No project",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "group-helper.ac4",
+            "title": "readExpandedProjects returns an empty Set when the key is missing, holds invalid JSON, or localStorage.getItem throws; after writeExpandedProjects(new Set(['alpha'])) it returns a Set containing 'alpha'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "group-helper.ac5",
+            "title": "scripts/frontend-test-subset.txt contains the line src/components/mobile/__tests__/conversationGroups.test.ts, so CI runs the helper tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "grouped-list",
+        "title": "MobileConversations renders collapsible project groups, collapsed on first load",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T17:57:37Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5045",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/mobile/MobileConversations.tsx",
+            "src/dashboard/frontend/src/components/mobile/__tests__/MobileConversations.test.tsx",
+            "src/dashboard/frontend/tests/pan-2355-mobile.spec.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/mobile/__tests__/MobileConversations.test.tsx src/components/mobile/__tests__/MobileApp.test.tsx",
+            "npm run typecheck:frontend",
+            "npm run typecheck:mobile",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "MobileConversations.test.tsx and MobileApp.test.tsx pass",
+            "frontend typecheck and lint complete without errors",
+            "mobile typecheck completes without errors (apps/mobile compiles MobileConversations through MachineView)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "FR-5",
+            "FR-7",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In src/dashboard/frontend/src/components/mobile/MobileConversations.tsx: delete the local recencyAt and import recencyAt, groupMobileConversations, readExpandedProjects, writeExpandedProjects from './conversationGroups'. Add fetchProjectList() using fetchWithTimeout('/api/registered-projects') that throws on !res.ok or a non-array body, and useQuery({ queryKey: ['mobile-registered-projects'], queryFn: fetchProjectList, staleTime: 60_000 }) in ConversationListView. Show 'Loading conversations…' while either query is loading; keep the existing conversation error text; groups = groupMobileConversations(rows, projectsQuery.isError ? null : projectsQuery.data ?? []); render 'No conversations.' when groups is empty. State: const [expanded, setExpanded] = useState(readExpandedProjects); toggle adds/removes the key and calls writeExpandedProjects(next). Replace the single <ul aria-label=\"Conversations\"> with <div role=\"region\" aria-label=\"Conversations\"> containing one <section> per group: a header row with a toggle <button type=\"button\" aria-expanded aria-controls={listId} className includes min-h-11> showing a ▸/▾ glyph (aria-hidden), the label and the row count; when open, either <p id={listId}>No conversations in this project.</p> or <ul id={listId} aria-label={group.label}> with the unchanged per-row button markup (title, issue id, relative time, onOpen(conversationRouteKey(c))). Leave a spot after the toggle for the + button (project-create adds it). Update the module header comment to say rows are grouped by project with the desktop resolver (PAN-5045), groups start collapsed, and the expanded set lives in localStorage key pan-mobile-expanded-projects. Update __tests__/MobileConversations.test.tsx: answer fetch by URL ('/api/registered-projects' -> a project list, '/api/conversations' -> rows); expand the relevant group before reading or clicking rows in the existing tests; localStorage.clear() in afterEach; add tests 'renders every group collapsed on first load', 'expands and collapses a group and remembers it in localStorage', 'groups by project and puts unscoped rows in No project last', 'falls back to projectKey groups when the project list returns 403'. Update src/dashboard/frontend/tests/pan-2355-mobile.spec.ts: add page.route('**/api/registered-projects', r => r.fulfill({ json: [] })) next to the existing conversation routes and tap the 'No project' header before the locator('li').first() assertion (line ~161). Do not edit ConversationPanel.tsx or any CommandDeck file. Locator changes: the list container is now a region, so getByRole('list', { name: 'Conversations' }) matches nothing. In pan-2355-mobile.spec.ts use getByRole('region', { name: 'Conversations' }) for the visibility check and, after tapping the 'No project' header, getByRole('list', { name: 'No project' }).locator('li').first() for the row check. In MobileConversations.test.tsx replace findByRole('list', { name: 'Conversations' }) with the expanded group's list, findByRole('list', { name: <group label> })."
+        },
+        "items": [
+          {
+            "id": "grouped-list.ac1",
+            "title": "Given empty localStorage, when the Conversations tab loads, then every group header renders with aria-expanded=\"false\" and no conversation row button is in the document",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grouped-list.ac2",
+            "title": "When a header is tapped, then its rows render newest first and localStorage key pan-mobile-expanded-projects stores an array containing that group's key; tapping again collapses it and removes the key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grouped-list.ac3",
+            "title": "Given /api/registered-projects answers 403, then the list still renders groups labeled by projectKey with unscoped rows under No project",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grouped-list.ac4",
+            "title": "Every header toggle button renders with class min-h-11 (44 px tap target) and an aria-controls attribute naming the group's list element",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "project-create",
+        "title": "+ on a project header creates a conversation in that project and opens it",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T17:57:37Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5045",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/mobile/MobileConversations.tsx",
+            "src/dashboard/frontend/src/components/mobile/__tests__/MobileConversations.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/mobile/__tests__/MobileConversations.test.tsx",
+            "npm run typecheck:frontend",
+            "npm run typecheck:mobile",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "MobileConversations.test.tsx passes including the three + tests",
+            "frontend typecheck and lint complete without errors",
+            "mobile typecheck completes without errors (apps/mobile compiles MobileConversations through MachineView)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-8",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In MobileConversations.tsx add createProjectConversation(projectKey) that calls fetchWithTimeout('/api/conversations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectKey }) }); on !res.ok it throws new Error(body.error || `Failed to start a conversation: ${res.status}`) (body parsed with .catch(() => ({}))); on success it returns the Conversation JSON. Use useMutation from @tanstack/react-query; on success await queryClient.invalidateQueries({ queryKey: ['mobile-conversations'] }) then onOpen(conversationRouteKey(created)). Track the pending project key and the failed { key, message } in state. When group.canCreate, render a sibling button after the header toggle (never nested inside it): <button type=\"button\" aria-label={`New conversation in ${group.label}`} disabled={pendingKey === group.key} className=\"min-h-11 min-w-11 px-3 text-lg text-foreground\">+</button>. When the last create for group.key failed, render <p role=\"alert\" className=\"px-4 pb-2 text-xs text-destructive\">Couldn’t start a conversation: {message}</p> directly under that header whether the group is open or collapsed; a new attempt clears it. Send no model, harness or effort. Tests in __tests__/MobileConversations.test.tsx: '+ posts { projectKey } and opens the created conversation' (asserts URL '/api/conversations', method POST, JSON body exactly { projectKey: 'alpha' }, onOpen called with the created id as a string, the group's aria-expanded unchanged); 'shows the server error inline when the create fails' (POST answers 400 { error: 'Unknown project' }, alert contains 'Unknown project', onOpen not called); 'shows no + on No project or in fallback mode'."
+        },
+        "items": [
+          {
+            "id": "project-create.ac1",
+            "title": "When + on project alpha is tapped, then the phone sends POST /api/conversations with JSON body exactly {\"projectKey\":\"alpha\"} and calls onOpen with the created conversation's id as a string",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-create.ac2",
+            "title": "Tapping + preserves the group's aria-expanded value and renders the + button disabled while the request is pending",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-create.ac3",
+            "title": "Given the POST answers 400 { error: 'Unknown project' }, then a role=\"alert\" element under that header contains 'Unknown project' and onOpen is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-create.ac4",
+            "title": "The No project group renders no button whose accessible name starts with 'New conversation in', and neither does any group when the project list falls back",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "phone-screenshot",
+        "title": "Playwright proof at 390x844: collapsed groups, expanded group, + opens the new conversation",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T17:57:37Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-5045",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-5045-mobile-conversation-groups.spec.ts",
+            "src/dashboard/frontend/package.json",
+            "apps/mobile/acceptance/pan-5045-groups-collapsed.png",
+            "apps/mobile/acceptance/pan-5045-groups-expanded.png",
+            "apps/mobile/ACCEPTANCE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build",
+            "cd src/dashboard/frontend && npx playwright test tests/pan-5045-mobile-conversation-groups.spec.ts"
+          ],
+          "expected_outputs": [
+            "the build completes",
+            "the pan-5045 Playwright spec passes and writes test-results/pan-5045/groups-collapsed.png and groups-expanded.png"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-5",
+            "FR-4",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Create src/dashboard/frontend/tests/pan-5045-mobile-conversation-groups.spec.ts with the structure of tests/pan-2355-mobile.spec.ts: startIsolatedDashboard() from './fixtures/isolated-dashboard.js' (own temp OVERDECK_HOME and port; never the live dashboard on :3011), stop it in afterEach, and a fresh browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true }) so no browser state is shared with any other agent. Route mocks: '**/api/registered-projects' -> [{ key: 'alpha', name: 'alpha', path: '/tmp/alpha' }, { key: 'beta', name: 'beta', path: '/tmp/beta' }]; '**/api/conversations' -> GET answers four rows (two with cwd under /tmp/alpha, one with projectKey 'beta', one with cwd '/tmp/elsewhere'), POST records postDataJSON() and answers { id: 99, name: 'pan-5045-new', title: 'New conversation', status: 'active', cwd: '/tmp/beta', projectKey: 'beta', issueId: null, createdAt, lastAttachedAt: null, endedAt: null, sessionAlive: true, tmuxSession: 'conv-pan-5045-new' }; '**/api/conversations/99' -> that row. Steps: goto /m?tab=conversations; assert every header toggle has aria-expanded='false'; screenshot test-results/pan-5045/groups-collapsed.png; tap the 'alpha' header; assert its two rows are visible; screenshot test-results/pan-5045/groups-expanded.png; tap 'New conversation in beta'; assert the recorded body equals { projectKey: 'beta' } and the page URL ends with /m?conversation=99. Inspect both PNGs yourself (self-verify-rendering rule). Add the spec path to the test:playwright script in src/dashboard/frontend/package.json. Copy the PNGs to apps/mobile/acceptance/pan-5045-groups-collapsed.png and apps/mobile/acceptance/pan-5045-groups-expanded.png, commit them, add a '## PAN-5045 conversation groups' section to apps/mobile/ACCEPTANCE.md linking both with the date and the run command, and link both images in the PR body. Never add skipIf or .only."
+        },
+        "items": [
+          {
+            "id": "phone-screenshot.ac1",
+            "title": "At 390x844 on an isolated dashboard, the spec passes: every header toggle renders aria-expanded=\"false\" on first load, and after tapping alpha its two rows render",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phone-screenshot.ac2",
+            "title": "Tapping 'New conversation in beta' sends a POST whose recorded body equals { projectKey: 'beta' } and the page URL ends with /m?conversation=99",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phone-screenshot.ac3",
+            "title": "apps/mobile/acceptance/pan-5045-groups-collapsed.png and pan-5045-groups-expanded.png are committed, apps/mobile/ACCEPTANCE.md contains a PAN-5045 section linking both, and the PR body links both images",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "user-docs",
+        "title": "configuration/phone.mdx describes project groups, collapse and +",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T17:57:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5045",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/phone.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'collapsed' configuration/phone.mdx",
+            "grep -n 'No project' configuration/phone.mdx"
+          ],
+          "expected_outputs": [
+            "both greps print at least one line from the conversations paragraph"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. In configuration/phone.mdx replace the paragraph beginning 'The phone lists conversations and opens one full screen.' (line ~110) with prose (plain STE style, no em-dash flourishes) that says, in order: the phone groups conversations by project, one header per project, with No project last; every group starts collapsed and the phone remembers which groups you opened; tap + next to a project's name to start a conversation in that project, which opens full screen and uses the machine's default model; conversations owned by linked machines are listed too and open from the machine that runs them at /m?conversation=@<environment-id>/<name> (keep that sentence); a machine running an older Overdeck shows groups by project key without + until it is updated. Keep the following sentences about terminals and the pipeline unchanged."
+        },
+        "items": [
+          {
+            "id": "user-docs.ac1",
+            "title": "configuration/phone.mdx contains a paragraph stating that conversations are grouped by project with No project last and that every group starts collapsed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "user-docs.ac2",
+            "title": "configuration/phone.mdx states that tapping + next to a project name starts a conversation in that project with the machine's default model, and that an older machine shows groups by project key without +",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "group-helper",
+        "to": "grouped-list",
+        "type": "blocks"
+      },
+      {
+        "from": "grouped-list",
+        "to": "project-create",
+        "type": "blocks"
+      },
+      {
+        "from": "project-create",
+        "to": "phone-screenshot",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
