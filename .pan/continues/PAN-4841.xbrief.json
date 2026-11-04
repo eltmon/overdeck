@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4841",
   "created": "2026-11-04T10:01:07.580Z",
-  "updated": "2026-11-04T17:08:57.848Z",
+  "updated": "2026-11-04T17:29:36.671Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -98,6 +98,10 @@
       "claimedBy": "agent-pan-4841",
       "claimedAt": "2026-11-04T15:40:27.193Z",
       "doneAt": "2026-11-04T17:08:57.848Z"
+    },
+    "rel-operator-checklist.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:29:36.671Z"
     }
   }
 }
