@@ -1,10 +1,11 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-04T10:17:46.734845Z · model: claude-opus-5-5 · open: 867_
+_Last sequenced: 2026-11-04T10:19:47.123589Z · model: claude-opus-5-5 · open: 868_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
+| 1 | PAN-5001 | S | critical | ok |  |  | Closed-issue reaper re-checks 426 reaped issues every minute and drains the 5k/hr GitHub App quota; in pipeline. |
 | 2 | PAN-4998 | M | high | ok |  |  | Reboot wipes /tmp, so agent scratchpads and published-page sources are lost; move managed scratch to ~/.overdeck/tmp + 14-day cleanup |
 | 3 | PAN-4995 | S | high | ok |  |  | pan review request verifies a half-adopted workspace; its main merge trips adoption's head check -> false Needs-you on handoff PRs |
 | 4 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
@@ -171,7 +172,6 @@ _Last sequenced: 2026-11-04T10:17:46.734845Z · model: claude-opus-5-5 · open: 
 | 167 | PAN-3833 | S | high | ok |  |  | Feed renders assistant text emitted after tool calls as collapsed thinking rows; operator believes the agent never answered |
 | 168 | PAN-3902 | S | high | ok |  |  | Verification gates inherit OVERDECK_* env from the dashboard, so host boot state (e.g. OVERDECK_NO_RESUME) can red any branch |
 | 169 | PAN-4629 | M | high | ok |  |  | Fresh npx machine cannot pan start: no gh auth token fallback for the GitHub tracker, and registration derives the wrong issue prefix. |
-| 170 | PAN-1775 | M | medium | needs-refinement |  |  | PAN-4734 merged 2026-11-02 and should deliver this; verify Fly work agents show as session rows, then close. |
 | 171 | PAN-3854 | S | high | ok |  |  | Feature-workspace devcontainer stack 403s on POST /api/dashboard/session, blocking all in-browser mutation UAT |
 | 172 | PAN-4577 | M | high | ok |  |  | Operator's facts didn't follow them to a new Mac: no importer for Claude auto-memory. PAN-3957 merged, so W9-W11 are unblocked. |
 | 173 | PAN-3307 | XS | high | ok |  |  | commitlint scope-enum lists 11 scopes, 14 real ones are missing, and it still names the removed beads scope — trains everyone to ignore it. |
@@ -452,6 +452,7 @@ _Last sequenced: 2026-11-04T10:17:46.734845Z · model: claude-opus-5-5 · open: 
 | 455 | PAN-3354 | XS | medium | ok |  |  | The archive write door accepts kind=main, hiding a project's singleton workspace with no unarchive affordance in the UI. |
 | 456 | PAN-3178 | XL | medium | ok |  |  | Make worktrees and diffs first class: +/- badge, dedicated Changes surface, conversation worktrees. PRD and mockup exist. |
 | 457 | PAN-3017 | S | medium | ok |  |  | The issue-page UAT panel renders only inline actions, so restart/rebuild/stop are unreachable outside the rail's context menu. |
+| 458 | PAN-5000 | S | medium | ok |  |  | Five Anywhere display bugs from the 2026-11-04 screenshot run: device count, raw project key, linked titles, Escape. |
 | 459 | PAN-3873 | M | medium | ok |  |  | GitHub event delivery: support gh webhook forward alongside smee with guided setup, settings exposure, and docs |
 | 460 | PAN-1150 | S | medium | ok |  |  | Settings: "Anthropic is not configured" warning persists in Model Routing after claude /login (Provider tab disagrees) |
 | 461 | PAN-1149 | S | medium | ok |  |  | v0.9.3 upgraders: stale workhorses.mid: claude-sonnet-4-7 in config.yaml keeps breaking Model Routing saves |
@@ -875,6 +876,10 @@ _Last sequenced: 2026-11-04T10:17:46.734845Z · model: claude-opus-5-5 · open: 
 
 ## Rationale detail
 
+### PAN-5001 (rank 1)
+
+New in-pipeline substrate bug: the deacon close-out sweep alone exhausted the GitHub App REST pool, which pauses every tracker read and write across the pipeline. Pinned at the free top slot; the fix (skip already-reaped residue for 6h, no overlapping deacon-lite sweeps) is small and well specified.
+
 ### PAN-4998 (rank 2)
 
 New in-pipeline issue, placed in the open rank-2 slot so no other rank moves. Ubuntu's tmpfiles rule empties /tmp at every boot, and Claude Code's session scratchpad lives under /tmp by default, so a reboot on 2026-11-03 destroyed an orchestrator's published-page source and screenshots. The issue fixes the cause in the managed launch env (CLAUDE_CODE_TMPDIR), adds Deacon cleanup and a doctor size check because the root disk is 97% full, and ships a short universal rule. It is fully specified with checkable acceptance criteria.
@@ -1191,10 +1196,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
 
 Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066 merged, so these seven follow-ups now harden code that is on main. Items 2 and 5 are real merge-path correctness hazards: a success status can sit on a head that never landed, and git reset --keep can move an agent commit off its branch. Each item names its file, so the work is well defined and is now startable.
 
-### PAN-4753 (rank 83)
-
-Rank held: its strike-lane dependency PAN-4750 merged and is verifying on main, so that blocker is cleared; the epic still has no children.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1202,10 +1203,10 @@ Rank held: its strike-lane dependency PAN-4750 merged and is verifying on main, 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-04T10:17:46.734845Z",
+  "generatedAt": "2026-11-04T10:19:47.123589Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 867,
+  "openCount": 868,
   "nodes": [
     {
       "issue": "PAN-4636",
@@ -3323,19 +3324,6 @@ Rank held: its strike-lane dependency PAN-4750 merged and is verifying on main, 
       "rationale": "New issue: on a fresh npx install with gh logged in, pan start fails with Tracker not configured, and project registration picked OVERDECK instead of PAN. Both block first-run onboarding outright; causes are verified and the acceptance tests are concrete.",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-1775",
-      "rank": 170,
-      "size": "M",
-      "importance": "medium",
-      "score": 30,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "PAN-4734 merged 2026-11-02 and should deliver this; verify Fly work agents show as session rows, then close.",
-      "rationale": "Dependency PAN-4734 closed as completed, so this issue is likely satisfied; demoted in score pending a verify-and-close check.",
-      "gate": "auto",
-      "planning": "skip"
     },
     {
       "issue": "PAN-3854",
@@ -12001,6 +11989,32 @@ Rank held: its strike-lane dependency PAN-4750 merged and is verifying on main, 
       "rationale": "New in-pipeline child of epic PAN-4927 (W-CONN2), placed in the free rank-419 slot beside its in-pipeline sibling PAN-4935 so no other rank moves.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-5001",
+      "rank": 1,
+      "size": "S",
+      "importance": "critical",
+      "score": 92,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Closed-issue reaper re-checks 426 reaped issues every minute and drains the 5k/hr GitHub App quota; in pipeline.",
+      "rationale": "New in-pipeline substrate bug: the deacon close-out sweep alone exhausted the GitHub App REST pool, which pauses every tracker read and write across the pipeline. Pinned at the free top slot; the fix (skip already-reaped residue for 6h, no overlapping deacon-lite sweeps) is small and well specified.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5000",
+      "rank": 458,
+      "size": "S",
+      "importance": "medium",
+      "score": 45,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Five Anywhere display bugs from the 2026-11-04 screenshot run: device count, raw project key, linked titles, Escape.",
+      "rationale": "New issue with concrete repro and acceptance; user-facing polish on Anywhere, ranked beside the similar PAN-4918 UI-issue batch.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12755,13 +12769,6 @@ Rank held: its strike-lane dependency PAN-4750 merged and is verifying on main, 
     },
     {
       "from": "PAN-2350",
-      "to": "PAN-1775",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
       "to": "PAN-1676",
       "type": "contains",
       "source": "github-ref",
@@ -13256,6 +13263,27 @@ Rank held: its strike-lane dependency PAN-4750 merged and is verifying on main, 
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-5001",
+      "to": "PAN-2259",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-5001",
+      "to": "PAN-4240",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
+    },
+    {
+      "from": "PAN-5000",
+      "to": "PAN-4918",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
     }
   ]
 }
