@@ -21,6 +21,8 @@ const SINGLE_ROUTE_PATHS: Record<string, { method: string; path: string }> = {
   list_pending_input: { method: 'GET', path: '/api/conversations/pending-input' },
   answer_permission: { method: 'POST', path: '/api/conversations/conv-a/permission' },
   wait_job: { method: 'GET', path: '/api/self/jobs/abc/wait' },
+  request_secret: { method: 'POST', path: '/api/self/secret-requests' },
+  secret_wait: { method: 'GET', path: '/api/self/secret-requests/abc/wait' },
 };
 
 describe('MCP tool annotations (PAN-4927 W-MCP1)', () => {
