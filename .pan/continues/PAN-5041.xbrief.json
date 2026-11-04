@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-5041",
   "created": "2026-11-04T17:22:54.161Z",
-  "updated": "2026-11-04T18:30:10.906Z",
+  "updated": "2026-11-04T18:41:36.817Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-04T18:41Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-04T18:41:36.817Z"
+    }
+  ],
   "items": {
     "wi1-usetheme-settheme": {
       "status": "completed",
@@ -197,5 +203,14 @@
       "status": "completed",
       "doneAt": "2026-11-04T18:30:10.906Z"
     }
-  }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-04T18:41:36Z",
+      "markdownBody": "# CodeRabbit findings for PAN-5041 (PR #5047)\n\nCodeRabbit posted 2 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4471729717 · configuration/phone.mdx:129 [Minor]: Distinguish the native app from the browser phone view.\n  https://github.com/eltmon/overdeck/pull/5047#discussion_r4471729717\n- Thread 4471729731 · src/dashboard/frontend/src/hooks/useTheme.ts:74 [Minor]: Guard the `localStorage.setItem` call in `setTheme`.\n  https://github.com/eltmon/overdeck/pull/5047#discussion_r4471729731\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5047/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-5041`.\n   If you only replied, you are done.\n5. If PR #5047 has already merged when you read this, nothing more lands on it: open a follow-up issue\n   for the findings you agree with instead of pushing."
+    }
+  ]
 }
