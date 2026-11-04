@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4950",
   "created": "2026-11-04T10:02:21.153Z",
-  "updated": "2026-11-04T11:15:16.001Z",
+  "updated": "2026-11-04T11:15:34.460Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -140,6 +140,10 @@
     "conn-dial.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T11:15:16.000Z"
+    },
+    "conn-dial.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T11:15:34.459Z"
     }
   }
 }
