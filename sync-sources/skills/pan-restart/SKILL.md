@@ -45,6 +45,16 @@ Each stage is health-gated: the command waits for `GET /api/health` from the
 newly spawned dashboard process, or port binding for CLIProxy, before reporting
 `✓`. It exits non-zero with a `[stage] reason` message on timeout.
 
+## Operator restart hold (PAN-5007)
+
+```bash
+pan restart hold --reason "<why>" [--until 2h|<ISO time>]   # hold every dashboard restart and reload
+pan restart hold --status
+pan restart release
+```
+
+While a hold is active, `pan restart` (dashboard and `--full`, `--now` and `--force` included), `pan reload` and `pan restart approve` refuse with exit 1 and print the reason. Only `pan restart release` or the `--until` expiry lifts it. **Never release a hold you did not set unless the operator asks you to.** If a restart is refused by a hold, stop and report it; do not work around it. The supervisor watchdog's crash-recovery restart is exempt.
+
 ## Identity guard
 
 When `pan restart` would restart the dashboard, it refuses to run from a

@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { Info, PauseCircle, RotateCw } from 'lucide-react';
+import { Info, Lock, PauseCircle, RotateCw } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
@@ -69,6 +69,10 @@ function GateStrip({
  * requester died before claiming it says so for a few seconds. Before that the
  * banner simply vanished on approval, which read as a broken button.
  *
+ * While the operator restart hold is active (PAN-5007) the banner shows the
+ * hold instead of the "Restart now" button: the server refuses every approval
+ * until `pan restart release`, so the button could only fail.
+ *
  * State arrives through the read model (snapshot on connect, then
  * `restart_gate.changed` events); the banner never polls. A request whose
  * process died stops refreshing and disappears on its own within 20 seconds.
@@ -122,6 +126,27 @@ export function RestartApprovalBanner() {
     return request.builtSha ? `${label} · build ${request.builtSha.slice(0, 12)}` : label;
   };
   const reasons = gate.pending.map(describeRequest).join('; ');
+
+  // A claimed restart is already under way, so it outranks the hold.
+  const hold = gate.restartHold;
+  if (hold && gate.status !== 'claimed') {
+    const expiry = hold.until ? `until ${new Date(hold.until).toLocaleString()}` : 'until released';
+    const waiting = count > 0 ? ` · ${count} restart request${count === 1 ? '' : 's'} waiting` : '';
+    return (
+      <GateStrip
+        tone="settled"
+        icon={Lock}
+        title={
+          `Dashboard restarts are on hold: ${hold.reason}. Set by ${hold.who}, ${expiry}. ` +
+          '`pan reload`, `pan restart` and restart approvals all refuse until the hold is released with `pan restart release`.' +
+          (count > 0 ? ` Waiting: ${reasons}` : '')
+        }
+      >
+        <span className="font-medium">Restarts on hold</span>
+        {' — '}{hold.reason}{waiting}
+      </GateStrip>
+    );
+  }
 
   if (gate.status === 'pending' && count > 0) {
     const explanation =

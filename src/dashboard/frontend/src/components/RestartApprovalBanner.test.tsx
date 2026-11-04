@@ -72,6 +72,24 @@ describe('RestartApprovalBanner', () => {
     expect(screen.queryByTestId('restart-approval-banner')).toBeNull();
   });
 
+  it('shows an active restart hold instead of the Restart now button (PAN-5007)', () => {
+    const restartHold = { reason: 'live three-machine check', who: 'operator', setAt: '2026-11-04T10:35:00.000Z' };
+    seed({ ...TWO_PENDING, restartHold });
+    const first = renderBanner();
+
+    expect(bannerText()).toContain('Restarts on hold');
+    expect(bannerText()).toContain('live three-machine check');
+    expect(bannerText()).toContain('2 restart requests waiting');
+    expect(screen.queryByRole('button', { name: 'Restart now' })).toBeNull();
+    first.unmount();
+
+    // A hold with nothing waiting still shows, so the operator sees it before anyone asks.
+    seed({ status: 'idle', pending: [], restartHold });
+    renderBanner();
+    expect(bannerText()).toContain('Restarts on hold');
+    expect(bannerText()).not.toContain('waiting');
+  });
+
   it('names every waiting requester and approves them with one click (AC-1)', async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({ approved: true, pendingCount: 2 }), { status: 200 }));
     global.fetch = fetchMock as unknown as typeof fetch;

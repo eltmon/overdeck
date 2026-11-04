@@ -27,6 +27,7 @@ import { formatBootGateState, type BootGateState } from '../../lib/boot-gates.js
 import { supervisorDeploymentFailure } from '../../lib/channels/pty-supervisor-locate.js';
 import { dashboardServerBootFailure } from '../../lib/deploy/dashboard-bundle-integrity.js';
 import { acquireRestartLock, readRestartLockHolder } from '../../lib/restart-lock.js';
+import { readRestartHold, restartHoldRefusal } from '../../lib/restart-hold.js';
 import {
   leavesDashboardRunning,
   parseHealthTimeoutMs,
@@ -174,8 +175,20 @@ async function runReload(
     return;
   }
 
-  // A restart is voluntary, so the operator gate below is the only thing that
-  // holds it. There is no deploy queue and no deploy window to consult.
+  // PAN-5007: the operator restart hold refuses every reload, including the
+  // `pan dev` hot-restart below, which drops live connections too. Nothing is
+  // built while it is held, and a refused reload is not queued.
+  const hold = await readRestartHold();
+  if (hold) {
+    console.error(chalk.red(restartHoldRefusal('reload the dashboard', hold)));
+    await recordReloadStatus(startedAt, false, `restart hold active: ${hold.reason}`);
+    process.exitCode = 1;
+    return;
+  }
+
+  // A restart is voluntary, so the operator gate below (and the PAN-5007 hold
+  // above) is all that holds it. There is no deploy queue and no deploy window
+  // to consult.
   if (process.env.OVERDECK_AGENT_ID) {
     console.log(chalk.yellow(
       '  This agent-issued restart will disconnect every live conversation and terminal until clients reconnect.',

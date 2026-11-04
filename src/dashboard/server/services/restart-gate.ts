@@ -28,6 +28,11 @@
  * gate is runtime-plane state, never canonical, never mirrored, never written
  * to the event log.
  *
+ * The operator restart hold (PAN-5007) is not gate state: it is a file the CLI
+ * owns (`src/lib/restart-hold.ts`). The gate only reads it on every read and
+ * sweep and adds it to the published snapshot as `restartHold`, so the banner
+ * learns of a new hold or a release within one 5s sweep.
+ *
  * ── Expiry rules ───────────────────────────────────────────────────────────
  * - A pending request not refreshed for 20s expires (a poll IS the refresh).
  * - A claim not completed within 5 minutes lapses; the epoch falls back to
@@ -47,7 +52,10 @@ import type {
   RestartGateOutcome,
   RestartGateRequest,
   RestartGateSnapshot,
+  RestartHold,
 } from '@overdeck/contracts';
+
+import { isRestartHoldActive, readRestartHold } from '../../../lib/restart-hold.js';
 
 // ─── Constants (pinned by the PAN-3729 wire contract) ────────────────────────
 
@@ -177,7 +185,10 @@ export function deriveRestartGateStatus(state: RestartGateState, nowMs: number):
   return state.pending.length > 0 ? 'pending' : 'idle';
 }
 
-/** The operator-facing projection — identical to the `GET /api/restart-gate` body. */
+/**
+ * The operator-facing projection — the `GET /api/restart-gate` body, minus the
+ * `restartHold` field that `publish` adds (PAN-5007).
+ */
 export function toRestartGateSnapshot(state: RestartGateState, nowMs: number): RestartGateSnapshot {
   return {
     status: deriveRestartGateStatus(state, nowMs),
@@ -362,6 +373,8 @@ export interface RestartGateDeps {
   now?: () => number;
   /** Publishes the projection to the read model; defaults to the event store. */
   emit?: (snapshot: RestartGateSnapshot) => void;
+  /** Reads the operator restart hold (PAN-5007); defaults to the hold file. */
+  readHold?: () => Promise<RestartHold | null>;
 }
 
 export interface RestartGate {
@@ -397,12 +410,28 @@ function emitThroughEventStore(snapshot: RestartGateSnapshot): void {
 export function createRestartGate(deps: RestartGateDeps = {}): RestartGate {
   const now = deps.now ?? (() => Date.now());
   const emit = deps.emit ?? emitThroughEventStore;
+  const readHold = deps.readHold ?? (() => readRestartHold());
 
   let state: RestartGateState = emptyRestartGateState();
   let lastPublished: string | null = null;
+  let hold: RestartHold | null = null;
+
+  /** Re-read the hold. A failed read keeps the last value rather than failing the sweep. */
+  async function refreshHold(): Promise<void> {
+    try {
+      hold = await readHold();
+    } catch (error) {
+      console.error('[restart-gate] Reading the restart hold failed:', error);
+    }
+  }
 
   function publish(): RestartGateSnapshot {
-    const snapshot = toRestartGateSnapshot(state, now());
+    const nowMs = now();
+    const activeHold = hold && isRestartHoldActive(hold, nowMs) ? hold : null;
+    const snapshot: RestartGateSnapshot = {
+      ...toRestartGateSnapshot(state, nowMs),
+      ...(activeHold ? { restartHold: activeHold } : {}),
+    };
     const serialized = JSON.stringify(snapshot);
     if (serialized !== lastPublished) {
       lastPublished = serialized;
@@ -426,6 +455,7 @@ export function createRestartGate(deps: RestartGateDeps = {}): RestartGate {
     withdraw: async (requesterId) => mutate((current, nowMs) => withdrawRestartRequest(current, requesterId, nowMs)),
     approve: async () => mutate((current, nowMs) => approveRestartGate(current, nowMs)),
     read: async () => {
+      await refreshHold();
       state = pruneRestartGateState(state, now());
       return publish();
     },
@@ -436,6 +466,7 @@ export function createRestartGate(deps: RestartGateDeps = {}): RestartGate {
       }));
     },
     sweep: async () => {
+      await refreshHold();
       state = pruneRestartGateState(state, now());
       return publish();
     },

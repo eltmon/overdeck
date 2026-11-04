@@ -1,6 +1,7 @@
 /**
  * Command definitions for the dashboard lifecycle verbs: `pan up`,
- * `pan reload` and `pan restart` (plus `pan restart approve`).
+ * `pan reload` and `pan restart` (plus `pan restart approve`, `hold` and
+ * `release`).
  *
  * None of these verbs takes a positional argument. Commander 12 accepts
  * excess arguments by default, so `pan restart status` used to fall through
@@ -27,7 +28,7 @@ export function defineUpCommand(program: Command): Command {
     .option('--seed-from-legacy', 'Seed a fresh local database from the legacy database (copy conversations + reconstruct in-flight agents/issues). Default is an empty local database.');
 }
 
-/** Registers `pan reload`, `pan restart` and `pan restart approve`. */
+/** Registers `pan reload`, `pan restart` and its `approve`, `hold` and `release` subcommands. */
 export function registerReloadAndRestartCommands(program: Command): void {
   program
     .command('reload')
@@ -73,5 +74,24 @@ export function registerReloadAndRestartCommands(program: Command): void {
     .description('Approve every dashboard restart request that is waiting for the operator')
     .action(async () => {
       await (await import('./restart.js')).restartApproveCommand();
+    });
+
+  // PAN-5007: an operator-set hold that every `pan reload`, `pan restart` and
+  // restart approval refuses on, from any conversation, until released.
+  restart
+    .command('hold')
+    .description('Hold every dashboard restart and reload until `pan restart release` (or --until expires)')
+    .option('--reason <text>', 'Why restarts are held; every refused command prints it')
+    .option('--until <when>', 'Lift the hold on its own: a duration (90m, 2h, 1d) or an ISO time')
+    .option('--status', 'Show the current hold instead of setting one')
+    .action(async (options: { reason?: string; until?: string; status?: boolean }) => {
+      await (await import('./restart-hold.js')).restartHoldCommand(options);
+    });
+
+  restart
+    .command('release')
+    .description('Release the restart hold so `pan reload` and `pan restart` run again')
+    .action(async () => {
+      await (await import('./restart-hold.js')).restartReleaseCommand();
     });
 }

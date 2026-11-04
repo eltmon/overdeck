@@ -38,6 +38,7 @@ import {
   RESTART_GATE_CLAIMED_ENV,
 } from '../../lib/restart-gate-client.js';
 import { writeRestartStatus, type RestartPhase } from '../../lib/restart-status.js';
+import { refuseIfRestartHeld } from './restart-hold.js';
 import {
   applyBootGateEnv,
   formatBootGateState,
@@ -448,6 +449,7 @@ async function reportHeldRestartLock(startedAt: number): Promise<void> {
  * that is currently blocked; it does not start a restart of its own.
  */
 export async function restartApproveCommand(): Promise<void> {
+  if (await refuseIfRestartHeld('approve the waiting restart requests')) return;
   const result = await approveRestartGate();
   if (!result) {
     console.error(chalk.yellow(
@@ -593,6 +595,17 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
       process.exitCode = 2;
       return;
     }
+  }
+
+  // PAN-5007: the operator restart hold stops every voluntary dashboard
+  // restart, `--now` included. The supervisor watchdog is exempt: it restarts a
+  // dashboard that is already failing, so the live links are already gone.
+  if (
+    (scope === 'dashboard' || scope === 'full')
+    && !INVOLUNTARY_RESTART_INITIATORS.has(process.env.OVERDECK_RESTART_INITIATOR ?? '')
+    && await refuseIfRestartHeld('restart the dashboard')
+  ) {
+    return;
   }
 
   const lockInherited = process.env.OVERDECK_RESTART_LOCK_HELD === '1';

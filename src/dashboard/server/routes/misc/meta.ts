@@ -418,7 +418,7 @@ const postRestartDashboardRoute = HttpRouter.add(
     const result = await restartDashboardDetached(`dashboard-ui:${process.pid}`);
     return result.ok
       ? jsonResponse(result, { status: 202 })
-      : jsonResponse({ error: 'Restart failed: ' + result.error }, { status: 500 });
+      : jsonResponse({ error: 'Restart failed: ' + result.error }, { status: result.held ? 409 : 500 });
   }),
 );
 

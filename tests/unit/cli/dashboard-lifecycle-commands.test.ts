@@ -14,6 +14,8 @@ const mocks = vi.hoisted(() => ({
   restartCommand: vi.fn(async () => {}),
   restartApproveCommand: vi.fn(async () => {}),
   reloadCommand: vi.fn(async () => {}),
+  restartHoldCommand: vi.fn(async () => {}),
+  restartReleaseCommand: vi.fn(async () => {}),
   upAction: vi.fn(async () => {}),
 }));
 
@@ -22,6 +24,10 @@ vi.mock('../../../src/cli/commands/restart.js', () => ({
   restartApproveCommand: mocks.restartApproveCommand,
 }));
 vi.mock('../../../src/cli/commands/reload.js', () => ({ reloadCommand: mocks.reloadCommand }));
+vi.mock('../../../src/cli/commands/restart-hold.js', () => ({
+  restartHoldCommand: mocks.restartHoldCommand,
+  restartReleaseCommand: mocks.restartReleaseCommand,
+}));
 
 const { defineUpCommand, registerReloadAndRestartCommands } = await import(
   '../../../src/cli/commands/dashboard-lifecycle-commands.js'
@@ -112,5 +118,26 @@ describe('pan reload boot-gate flags (PAN-3899)', () => {
     await parse('reload', '--deacon', '--resume');
     expect(mocks.reloadCommand.mock.calls[0][0]).toEqual({ deacon: false, resume: false });
     expect(mocks.reloadCommand.mock.calls[1][0]).toEqual({ deacon: true, resume: true });
+  });
+});
+
+describe('pan restart hold / release (PAN-5007)', () => {
+  it('parses --reason, --until and --status, and dispatches release', async () => {
+    expect((await parse('restart', 'hold', '--reason', 'live check', '--until', '2h')).error).toBeUndefined();
+    expect(mocks.restartHoldCommand.mock.calls[0][0]).toEqual({ reason: 'live check', until: '2h' });
+
+    expect((await parse('restart', 'hold', '--status')).error).toBeUndefined();
+    expect(mocks.restartHoldCommand.mock.calls[1][0]).toEqual({ status: true });
+
+    expect((await parse('restart', 'release')).error).toBeUndefined();
+    expect(mocks.restartReleaseCommand).toHaveBeenCalledTimes(1);
+    expect(mocks.restartCommand).not.toHaveBeenCalled();
+  });
+
+  it('pan restart release <stray> errors without releasing', async () => {
+    const { error } = await parse('restart', 'release', 'extra');
+
+    expect((error as CommanderError).code).toBe('commander.excessArguments');
+    expect(mocks.restartReleaseCommand).not.toHaveBeenCalled();
   });
 });

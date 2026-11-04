@@ -649,6 +649,53 @@ entry, so no `Deploy ✗` chip appears, and it exits 0. The first deploy of this
 change still runs the installed CLI as the holder, so that one reload is
 refused the old way.
 
+### Operator restart hold (PAN-5007)
+
+The restart gate's approval is often given by an agent conversation
+(`pan restart approve`), so an operator's spoken "hold reloads" reached only
+the conversation that heard it. The restart hold is the shared, durable
+version of that instruction:
+
+```bash
+pan restart hold --reason "live three-machine check" [--until 2h|<ISO time>]
+pan restart hold --status
+pan restart release
+```
+
+`hold` writes `~/.overdeck/restart-hold.json` (mode 0600, atomic rename) with
+the reason, who set it (`OVERDECK_RESTART_INITIATOR`, else `OVERDECK_AGENT_ID`,
+else the OS user), when, and the optional expiry. A second `hold` replaces the
+first. An expired hold reads as released; nothing deletes the file except
+`pan restart release`. The module is
+[`restart-hold.ts`](../src/lib/restart-hold.ts).
+
+While the hold is active:
+
+- `pan reload` refuses with exit 1 before it fetches, builds or takes the
+  restart lock, and before it signals a `pan dev` session. It records a failed
+  restart status (`restart hold active: <reason>`), so a held post-merge
+  deploy shows `Deploy ✗` with the reason. A refused reload is not queued:
+  after `pan restart release`, run `pan reload` to ship what merged meanwhile.
+- `pan restart` and `pan restart --full` refuse with exit 1, `--now` and
+  `--force` included. The supervisor watchdog's restart
+  (`OVERDECK_RESTART_INITIATOR=supervisor-watchdog`) is exempt: it restarts a
+  dashboard that is already failing, so the live links are already gone.
+  `--cliproxy` and `--traefik` are not held.
+- `pan restart approve` refuses with exit 1, and the server enforces the same
+  rule: `POST /api/restart-gate/approve` and
+  `POST /api/system/restart-dashboard` answer 409 while the hold is active. A
+  reload that was already waiting at the gate keeps waiting until the hold is
+  released and somebody approves it.
+
+The restart banner shows `Restarts on hold — <reason>` in place of the
+"Restart now" button. The gate reads the hold file on every read and every
+5-second sweep and publishes it as `restartHold` on the restart-gate snapshot
+(`GET /api/restart-gate`, `restart_gate.changed`).
+
+Anyone who can run `pan` as this user can set or release a hold; it is one
+shared lock, not per-conversation memory. An agent must never release a hold
+it did not set unless the operator asks it to. Every refusal message says so.
+
 ### Boot preflight before switchover
 
 `pan reload` builds `origin/main` into the idle generation, then refuses to
