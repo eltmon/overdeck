@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5016",
   "created": "2026-11-04T13:28:40.332Z",
-  "updated": "2026-11-04T13:42:28.786Z",
+  "updated": "2026-11-04T13:43:17.088Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,9 +52,10 @@
       "doneAt": "2026-11-04T13:42:25.061Z"
     },
     "relay-usage": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5016",
-      "claimedAt": "2026-11-04T13:42:28.786Z"
+      "claimedAt": "2026-11-04T13:42:28.786Z",
+      "doneAt": "2026-11-04T13:43:17.088Z"
     }
   }
 }
