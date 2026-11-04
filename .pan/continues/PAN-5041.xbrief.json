@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5041",
   "created": "2026-11-04T17:22:54.161Z",
-  "updated": "2026-11-04T17:43:35.515Z",
+  "updated": "2026-11-04T17:43:42.341Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,6 +50,11 @@
       "claimedBy": "agent-pan-5041",
       "claimedAt": "2026-11-04T17:41:06.138Z",
       "doneAt": "2026-11-04T17:43:35.514Z"
+    },
+    "wi8-docs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5041",
+      "claimedAt": "2026-11-04T17:43:42.341Z"
     }
   }
 }
