@@ -192,3 +192,37 @@ describe('openLink', () => {
     expect(label).toBe('desk');
   });
 });
+
+describe('failure logging (PAN-5018 FR-1)', () => {
+  it('logs the direct and relay failures with their messages', async () => {
+    const f = fakeDirectory({ relayAllowed: true, direct: 'fail', relay: 'fail' });
+    const log = vi.fn();
+    const connection = createConnection({ directory: f.directory, meter, log });
+    const error = await rejection(connection.openLink(MACHINE));
+    expect(error.message).toBe('Could not reach desk directly or through the relay.');
+    const lines = log.mock.calls.map(([line]) => line as string);
+    expect(lines).toEqual(['link desk: direct dial failed: direct dial failed', 'link desk: relay dial failed: relay dial failed']);
+  });
+
+  it('logs the ChannelOpenError code when the secure open fails', async () => {
+    const f = fakeDirectory({ relayAllowed: false, direct: 'ok' });
+    const log = vi.fn();
+    const open = vi.fn(async () => {
+      throw new ChannelOpenError('timeout', 'no handshake reply');
+    });
+    const connection = createConnection({ directory: f.directory, meter, openSecureChannel: open, log });
+    await rejection(connection.openLink(MACHINE));
+    expect(log).toHaveBeenCalledWith('link desk: secure open failed over direct (timeout): no handshake reply');
+  });
+
+  it('names the relay route when the secure open over the relay fails', async () => {
+    const f = fakeDirectory({ relayAllowed: true, direct: 'fail', relay: 'ok' });
+    const log = vi.fn();
+    const open = vi.fn(async () => {
+      throw new ChannelOpenError('protocol', 'bad frame');
+    });
+    const connection = createConnection({ directory: f.directory, meter, openSecureChannel: open, log });
+    await rejection(connection.openLink(MACHINE));
+    expect(log).toHaveBeenLastCalledWith('link desk: secure open failed over relay (protocol): bad frame');
+  });
+});
