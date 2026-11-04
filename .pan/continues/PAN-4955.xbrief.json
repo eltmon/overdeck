@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4955",
   "created": "2026-11-04T14:23:26.498Z",
-  "updated": "2026-11-04T14:56:21.540Z",
+  "updated": "2026-11-04T14:56:36.653Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -104,6 +104,10 @@
     "readme.ac4": {
       "status": "completed",
       "doneAt": "2026-11-04T14:56:21.540Z"
+    },
+    "mcp-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:56:36.652Z"
     }
   }
 }
