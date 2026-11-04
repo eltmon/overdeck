@@ -1,5 +1,3 @@
-import { materializeMuseContext } from '../runtimes/muse-context.js';
-import { resolveMuseSessionPath, museSessionId } from '../runtimes/storage/muse.js';
 import { getPrimeAgentLauncherFields } from '../prime-agent/launcher-fields.js';
 import { requirePrimeAgentSessionFile } from '../runtimes/storage/prime-agent.js';
 import { existsSync } from 'fs';
@@ -32,7 +30,7 @@ import { applyEffectiveDifficulty } from './tier-escalation.js';
 import { checkStaffingFitness } from './tier-fitness.js';
 import { buildTierFitnessContext } from './tier-fitness-context.js';
 import { resolveTieredExecutionEnabled, resolveTieredExecutionEnabledForIssue, type ValidatedTieredExecutionConfig } from './tier-table.js';
-import { resolveEffort } from './resolve-effort.js';
+import { getMuseLauncherFields } from './muse-launcher-fields.js';
 import {
   buildCavemanExports,
   determineModel,
@@ -740,15 +738,10 @@ export async function buildAgentLaunchConfig(opts: {
   const codexLauncherFields = behavior.usesCodexHome
     ? getCodexLauncherFields(opts.agentId, model, opts.workspace, launchRole, opts.effort)
     : {};
-  const museSavedSession = opts.harness === 'muse' && opts.spawnMode === 'resume'
-    ? await resolveMuseSessionPath(opts.agentId) : null;
-  const museLauncherFields = opts.harness === 'muse' ? {
-    harness: 'muse' as const,
-    museModel: model,
-    museEffort: resolveEffort({ explicit: opts.effort, role: launchRole, model, harness: 'muse' }).effort,
-    museContextFile: await materializeMuseContext(opts.agentId, opts.workspace, roleAgentDefinitionPath(launchRole)),
-    museResumeSessionId: museSavedSession ? museSessionId(museSavedSession) : undefined,
-  } : {};
+  const museLauncherFields = opts.harness === 'muse' ? await getMuseLauncherFields({
+    agentId: opts.agentId, model, workspace: opts.workspace, role: launchRole, effort: opts.effort,
+    resume: opts.spawnMode === 'resume', definitionPath: roleAgentDefinitionPath(launchRole),
+  }) : {};
   const kimiCodeLauncherFields = behavior.launchCommandKind === 'kimi-code-tui'
     ? getKimiCodeLauncherFields(model, opts.effort)
     : {};
