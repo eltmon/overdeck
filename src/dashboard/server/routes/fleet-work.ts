@@ -2,7 +2,10 @@
  * Fleet work routes (PAN-4651 D-4651-10, D-4651-12): this machine's browser,
  * CLI and MCP start work on any machine through them. Every fleet route
  * refuses a request that arrives through a secure channel (no chained hops,
- * `refuseFleetRequest`) and then applies the usual dashboard auth.
+ * `refuseFleetRequest`) and then applies the usual dashboard auth. The one
+ * exception (PAN-4950 D-5): the three spawn routes admit a `connector`
+ * credential through its link channel for a target on this machine only,
+ * answering 403 `connector-local-only` for any other target before any side effect.
  *
  * - `POST /api/fleet/placement { gitOrigin: string | null, needs: string[] }`
  *   → Auto placement over this machine and its links: `{ ok: true,
@@ -104,9 +107,13 @@ export interface FleetCaller {
   mayCreateFly?: boolean;
   /** The caller presented an odk_ token (PAN-4938 D-10); only the issue-start route reads it. */
   viaToken?: boolean;
+  /** A connector caller (PAN-4950 D-5): only this machine may be the target. */
+  localOnly?: boolean;
 }
 
 export function fleetCaller(credential: DashboardCredential | null, sender: string | undefined): FleetCaller | null {
+  // PAN-4950 D-5: a connector acts as the operator within its own scopes, on this machine only.
+  if (credential?.kind === 'connector') return { actor: 'operator', ceiling: [...credential.scopes], mayCreateFly: false, viaToken: true, localOnly: true };
   const mayCreateFly = credential !== null && credentialScopes(credential).includes('admin');
   if (credential?.kind === 'token') {
     return { actor: tokenLinkActor(credential), ceiling: credentialScopes(credential).filter((scope): scope is AccessTokenScope => scope !== 'admin') as AccessTokenScope[], mayCreateFly, viaToken: true };
@@ -201,6 +208,15 @@ function optionalStrings(body: Record<string, unknown>, keys: readonly string[])
 
 const machineOf = (target: Extract<FleetTarget, { ok: true }>) => ({ environmentId: target.environmentId, label: target.label, self: target.self });
 
+/** PAN-4950 D-5: a connector caller's refusal for a target that is not this machine, else null. */
+export function connectorLocalOnly(target: FleetTarget, caller: FleetCaller): HttpServerResponse.HttpServerResponse | null {
+  if (!caller.localOnly || !target.ok || target.self) return null;
+  return jsonResponse({
+    code: 'connector-local-only',
+    error: `An Overdeck connector reaches only the machine it paired with; run a second connector for ${target.label}.`,
+  }, { status: 403 });
+}
+
 /** `POST /api/fleet/conversations`. */
 export async function handleFleetConversation(raw: unknown, caller: FleetCaller, deps: FleetSpawnDeps = defaultFleetSpawnDeps()): Promise<HttpServerResponse.HttpServerResponse> {
   const body = asObject(raw);
@@ -218,6 +234,8 @@ export async function handleFleetConversation(raw: unknown, caller: FleetCaller,
   const spawn: FlySpawn = { projectKey: projectKey ?? null, harness: options.harness, model: options.model, mayCreate: caller.mayCreateFly === true };
   const target = await deps.resolveTarget(machine, gitOrigin, needs, spawn);
   if (!target.ok) return jsonResponse(target.body, { status: target.status });
+  const localOnly = connectorLocalOnly(target, caller);
+  if (localOnly) return localOnly;
   const message = body['message'];
   if (target.self) {
     const created = await deps.createLocal({ ...options, message, ...(projectKey ? { projectKey } : {}) });
@@ -291,6 +309,8 @@ export async function handleFleetWorker(raw: unknown, caller: FleetCaller, deps:
 
   const target = await deps.resolveTarget(typeof machine === 'string' ? machine : undefined, gitOrigin, needs);
   if (!target.ok) return jsonResponse(target.body, { status: target.status });
+  const localOnly = connectorLocalOnly(target, caller);
+  if (localOnly) return localOnly;
   if (target.self) {
     try {
       const { id } = await deps.startLocal({ ...parsed.value, parentId });
@@ -340,6 +360,8 @@ export function handleFleetIssueStart<R>(
     if (!project) return jsonResponse({ code: 'unknown-project', error: `No project on this machine owns ${issueId}` }, { status: 404 });
     const target = yield* Effect.promise(() => deps.resolveTarget(machine, project.gitOrigin, needs));
     if (!target.ok) return jsonResponse(target.body, { status: target.status });
+    const localOnly = connectorLocalOnly(target, caller);
+    if (localOnly) return localOnly;
     if (target.self) {
       if (!caller.viaToken) return jsonResponse({ code: 'use-local-start', error: `${issueId} would start on this machine; run pan start ${issueId} without --machine` }, { status: 400 });
       const response = yield* deps.spawn({ body: { issueId, ...options }, internalRequest: false });
@@ -431,6 +453,13 @@ export const fleetWriteGate = Effect.gen(function* () {
   return refuseFleetRequest(channelOfRequest(request) !== null, () => rejectUnsafeDashboardMutationRequest(request));
 });
 
+/** Like fleetWriteGate, but a connector's link channel may spawn on this machine (PAN-4950 D-5). */
+export const fleetSpawnGate = Effect.gen(function* () {
+  const request = yield* HttpServerRequest.HttpServerRequest;
+  const viaChannel = channelOfRequest(request) !== null && resolveRequestCredential(request)?.kind !== 'connector';
+  return refuseFleetRequest(viaChannel, () => rejectUnsafeDashboardMutationRequest(request));
+});
+
 const placementRoute = HttpRouter.add(
   'POST',
   '/api/fleet/placement',
@@ -453,7 +482,7 @@ const conversationsRoute = HttpRouter.add(
   'POST',
   '/api/fleet/conversations',
   Effect.gen(function* () {
-    const refused = yield* fleetWriteGate;
+    const refused = yield* fleetSpawnGate;
     if (refused) return refused;
     const caller = yield* fleetCallerOf;
     if (!caller) return jsonResponse({ error: `invalid ${SENDER_HEADER} header` }, { status: 400 });
@@ -466,7 +495,7 @@ const workersRoute = HttpRouter.add(
   'POST',
   '/api/fleet/workers',
   Effect.gen(function* () {
-    const refused = yield* fleetWriteGate;
+    const refused = yield* fleetSpawnGate;
     if (refused) return refused;
     const caller = yield* fleetCallerOf;
     if (!caller) return jsonResponse({ error: `invalid ${SENDER_HEADER} header` }, { status: 400 });
@@ -492,7 +521,7 @@ const issueStartRoute = HttpRouter.add(
   'POST',
   '/api/fleet/issues/:id/start',
   Effect.gen(function* () {
-    const refused = yield* fleetWriteGate;
+    const refused = yield* fleetSpawnGate;
     if (refused) return refused;
     const caller = yield* fleetCallerOf;
     if (!caller) return jsonResponse({ error: `invalid ${SENDER_HEADER} header` }, { status: 400 });
