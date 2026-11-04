@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4998",
   "created": "2026-11-04T10:12:10.948Z",
-  "updated": "2026-11-04T10:50:31.121Z",
+  "updated": "2026-11-04T10:50:53.935Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -94,6 +94,10 @@
     "w5-doctor-size.ac4": {
       "status": "completed",
       "doneAt": "2026-11-04T10:50:31.120Z"
+    },
+    "w6-no-tmp-rule.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:50:53.935Z"
     }
   }
 }
