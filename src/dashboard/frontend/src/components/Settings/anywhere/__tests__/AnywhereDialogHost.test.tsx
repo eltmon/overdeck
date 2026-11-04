@@ -55,6 +55,7 @@ function allDialogTestIds(): string[] {
 }
 
 beforeEach(() => {
+  useAnywhereDialogStore.setState({ dialog: null, agentRequestId: null });
   viewerKind = 'root-session';
   fetchMock = vi.fn((input: string | URL | Request) => {
     const url = input.toString();
@@ -77,7 +78,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  useAnywhereDialogStore.setState({ dialog: null });
+  useAnywhereDialogStore.setState({ dialog: null, agentRequestId: null });
   toastInfo.mockClear();
   cleanup();
   vi.unstubAllGlobals();
@@ -104,6 +105,15 @@ describe('AnywhereDialogHost', () => {
     expect(screen.getByTestId('dialog-link-machine')).toBeTruthy();
     screen.getByRole('button', { name: 'close' }).click();
     expect(useAnywhereDialogStore.getState().dialog).toBeNull();
+  });
+
+  it('holds the agent request id from the open until close, and a later open without one leaves it null (PAN-4942)', () => {
+    openAnywhereDialog('link-machine', { agentRequestId: 'r1' });
+    expect(useAnywhereDialogStore.getState()).toMatchObject({ dialog: 'link-machine', agentRequestId: 'r1' });
+    useAnywhereDialogStore.getState().close();
+    expect(useAnywhereDialogStore.getState()).toMatchObject({ dialog: null, agentRequestId: null });
+    openAnywhereDialog('link-machine');
+    expect(useAnywhereDialogStore.getState()).toMatchObject({ dialog: 'link-machine', agentRequestId: null });
   });
 
   it('opens Tailscale setup for a root session', async () => {
