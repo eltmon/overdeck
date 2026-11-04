@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4954",
   "created": "2026-11-04T14:48:01.762Z",
-  "updated": "2026-11-04T15:15:46.616Z",
+  "updated": "2026-11-04T15:16:03.704Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -206,6 +206,10 @@
     "entry.ac4": {
       "status": "completed",
       "doneAt": "2026-11-04T15:15:46.615Z"
+    },
+    "readme.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:16:03.704Z"
     }
   }
 }
