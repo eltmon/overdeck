@@ -113,9 +113,10 @@ in-memory snapshot, so it works in CLI processes too.
   state, agents the liveness oracle confirms dead (after a 10-minute grace from
   mint, start or resume), and conversations whose row is missing, archived, or
   ended. It then removes agent-token records revoked more than 7 days ago
-  (`pruneEndedAccessTokens`); OAuth records are removed 7 days after they
-  expire (never earlier, even when revoked, so a refresh can still see that
-  its access token was revoked); other records are never pruned.
+  (`pruneEndedAccessTokens`); an unrevoked OAuth record is removed 7 days
+  after it expires, and a revoked one 7 days after its sign-in's 90-day
+  refresh window has closed (`revokedAt` + 90 days), so a refresh can always
+  see that its access token was revoked; other records are never pruned.
 - **Older versions.** An Overdeck that predates PAN-4927 ignores the extra
   fields and reads an agent token as a plain token, so a downgrade keeps the
   file valid.

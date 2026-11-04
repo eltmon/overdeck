@@ -14,7 +14,7 @@
  */
 import { createHash, timingSafeEqual } from 'node:crypto';
 
-import type { AccessTokenScope } from '../access-token-records.js';
+import { OAUTH_REFRESH_WINDOW_MS, type AccessTokenScope } from '../access-token-records.js';
 
 export const OAUTH_LEVELS = ['read', 'message', 'operate', 'approve'] as const;
 export type OAuthLevel = (typeof OAUTH_LEVELS)[number];
@@ -34,7 +34,7 @@ export const LEVEL_SCOPES: Readonly<Record<OAuthLevel, readonly AccessTokenScope
 };
 
 export const ACCESS_TOKEN_TTL_MS = 30 * 24 * 60 * 60_000;
-export const REFRESH_TOKEN_TTL_MS = 90 * 24 * 60 * 60_000;
+export const REFRESH_TOKEN_TTL_MS = OAUTH_REFRESH_WINDOW_MS;
 export const CODE_TTL_MS = 60_000;
 export const APPROVAL_TTL_MS = 10 * 60_000;
 export const REFRESH_TOKEN_PREFIX = 'odr_';

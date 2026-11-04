@@ -19,6 +19,7 @@ type Service = typeof import('../../../../src/lib/mcp/oauth-service.js');
 const VERIFIER = 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk';
 const CHALLENGE = 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM';
 const REDIRECT = 'http://127.0.0.1:8123/callback';
+const DAY = 24 * 60 * 60_000;
 
 let registry: Registry;
 let store: Store;
@@ -310,13 +311,25 @@ describe('refresh rotation and revocation (D-8, D-9)', () => {
     expect((await store.readMcpOAuthData(Date.now())).families[0]!.revokedAt).toBeDefined();
   });
 
-  it('ends the sign-in at the next refresh even after the 7-day prune of a token revoked elsewhere', async () => {
+  it.each([8, 38, 89])('ends the sign-in at a refresh %i days after its token was revoked elsewhere, despite the prune', async (days) => {
     const first = await signIn();
     const family = (await store.readMcpOAuthData(Date.now())).families[0]!;
     await registry.revokeAccessToken(family.accessTokenId);
-    offset += 8 * 24 * 60 * 60_000;
-    await expect(registry.pruneEndedAccessTokens(7 * 24 * 60 * 60_000, Date.now() + offset)).resolves.toBe(0);
+    offset += days * DAY;
+    await expect(registry.pruneEndedAccessTokens(7 * DAY, Date.now() + offset)).resolves.toBe(0);
     await expect(service.refresh(refreshForm(first.clientId, first.refresh))).resolves.toMatchObject({ ok: false, body: { error: 'invalid_grant' } });
+    expect((await store.readMcpOAuthData(Date.now() + offset)).families[0]!.revokedAt).toBeDefined();
+  });
+
+  it('ends the sign-in when the token revoked elsewhere came from a rotation, past that token\'s expiry + 8 days', async () => {
+    const first = await signIn();
+    const second = await refreshed(first.clientId, first.refresh);
+    const family = (await store.readMcpOAuthData(Date.now())).families[0]!;
+    const current = (await registry.listAccessTokens()).find((record) => record.id === family.accessTokenId)!;
+    await registry.revokeAccessToken(current.id);
+    offset += Date.parse(current.expiresAt!) - Date.now() + 8 * DAY;
+    await registry.pruneEndedAccessTokens(7 * DAY, Date.now() + offset);
+    await expect(service.refresh(refreshForm(first.clientId, second.refresh))).resolves.toMatchObject({ ok: false, body: { error: 'invalid_grant' } });
     expect((await store.readMcpOAuthData(Date.now() + offset)).families[0]!.revokedAt).toBeDefined();
   });
 

@@ -31,6 +31,8 @@ export const AGENT_ROLE = /^[a-z][a-z0-9-]{0,63}$/;
 export const OAUTH_CLIENT_ID = /^odc_[0-9a-f]{32}$/;
 /** An OAuth sign-in (family) id: 32 lowercase hex. */
 export const OAUTH_FAMILY_ID = /^[0-9a-f]{32}$/;
+/** How long an OAuth refresh token works after its sign-in begins (PAN-4945 D-7): 90 days. */
+export const OAUTH_REFRESH_WINDOW_MS = 90 * 24 * 60 * 60_000;
 
 export interface AccessTokenRecord {
   id: string;

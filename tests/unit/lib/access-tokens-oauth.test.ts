@@ -103,18 +103,21 @@ describe('OAuth tokens in the access-token registry (PAN-4945)', () => {
     expect(registry.verifyAccessToken(token)).toEqual({ ok: false });
   });
 
-  it('prunes OAuth records expired more than olderThanMs ago and keeps the rest, even long-revoked ones', async () => {
+  it('prunes OAuth records expired more than olderThanMs ago, and revoked ones only past the 90-day refresh window', async () => {
     const ago = (days: number) => new Date(NOW.getTime() - days * DAY_MS).toISOString();
     const oauth = { kind: 'token', oauthClientId: CLIENT_ID, oauthFamilyId: FAMILY_ID };
     await writeRegistryFile([
       baseRecord({ id: 'expired-8d', ...oauth, expiresAt: ago(8) }),
       baseRecord({ id: 'expired-6d', ...oauth, expiresAt: ago(6) }),
       baseRecord({ id: 'revoked-9d-expires-later', ...oauth, revokedAt: ago(9), expiresAt: ago(-20) }),
+      baseRecord({ id: 'revoked-60d-expired-30d', ...oauth, revokedAt: ago(60), expiresAt: ago(30) }),
+      baseRecord({ id: 'revoked-96d', ...oauth, revokedAt: ago(96), expiresAt: ago(66) }),
+      baseRecord({ id: 'revoked-98d', ...oauth, revokedAt: ago(98), expiresAt: ago(68) }),
       baseRecord({ id: 'plain-revoked-30d', kind: 'token', revokedAt: ago(30) }),
     ]);
-    await expect(registry.pruneEndedAccessTokens(7 * DAY_MS)).resolves.toBe(1);
-    // A revoked OAuth record stays until it expires, so a refresh can still tell revoked from expired.
-    expect((await readFileRecords()).map((r) => r.id)).toEqual(['expired-6d', 'revoked-9d-expires-later', 'plain-revoked-30d']);
+    await expect(registry.pruneEndedAccessTokens(7 * DAY_MS)).resolves.toBe(2);
+    // A revoked OAuth record outlives its sign-in's 90-day refresh window, so a refresh can still see the revocation.
+    expect((await readFileRecords()).map((r) => r.id)).toEqual(['expired-6d', 'revoked-9d-expires-later', 'revoked-60d-expired-30d', 'revoked-96d', 'plain-revoked-30d']);
   });
 
   it('resolves an OAuth Bearer token to a token credential naming its client', async () => {

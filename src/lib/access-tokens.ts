@@ -73,6 +73,7 @@ import {
   isMachineAccess,
   isRecord,
   MACHINE_ACCESS_LEVELS,
+  OAUTH_REFRESH_WINDOW_MS,
   oauthFieldsValid,
   MACHINE_KEY_HEX,
   UUID_V4,
@@ -507,16 +508,16 @@ export async function revokeAccessTokensMatching(match: (record: PublicAccessTok
 }
 
 /**
- * Remove records that ended more than `olderThanMs` before `now`: agent tokens by `revokedAt`, OAuth tokens
- * (PAN-4945) by `expiresAt` only, so a missing OAuth record always means expired, never revoked (D-8.6).
- * Never removes any other record. Returns the count removed.
- */
+ * Remove records that ended more than `olderThanMs` before `now`: agent tokens at `revokedAt`; OAuth tokens (PAN-4945)
+ * at `expiresAt`, or when revoked at `revokedAt` + the 90-day refresh window, so a refresh still sees a revocation (D-8.6).
+ * Never removes any other record. Returns the count removed. */
 export async function pruneEndedAccessTokens(olderThanMs: number, now = Date.now()): Promise<number> {
   return mutate((records) => {
     const kept = records.filter((record) => {
       // NaN (a record that never ends) fails the comparison and is kept.
-      const ended = record.oauthClientId !== undefined ? Date.parse(record.expiresAt!)
-        : record.agentId !== undefined && record.revokedAt !== undefined ? Date.parse(record.revokedAt) : NaN;
+      const revoked = record.revokedAt !== undefined ? Date.parse(record.revokedAt) : NaN;
+      const ended = record.oauthClientId === undefined ? (record.agentId !== undefined ? revoked : NaN)
+        : record.revokedAt !== undefined ? revoked + OAUTH_REFRESH_WINDOW_MS : Date.parse(record.expiresAt!);
       return !(now - ended > olderThanMs);
     });
     const removed = records.length - kept.length;
