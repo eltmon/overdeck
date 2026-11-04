@@ -29,6 +29,7 @@ const mocks = vi.hoisted(() => ({
   deliverAgentMessage: vi.fn(),
   resolveModel: vi.fn(),
   appended: [] as Record<string, unknown>[],
+  launcherConfigs: [] as Record<string, unknown>[],
 }));
 
 vi.mock('../../../../../src/lib/agents/liveness.js', async (importOriginal) => {
@@ -92,7 +93,10 @@ vi.mock('../../../../../src/lib/config-yaml.js', async (importOriginal) => {
 });
 
 vi.mock('../../../../../src/lib/launcher-generator.js', () => ({
-  generateLauncherScript: () => '#!/usr/bin/env bash\n',
+  generateLauncherScript: (config: Record<string, unknown>) => {
+    mocks.launcherConfigs.push(config);
+    return '#!/usr/bin/env bash\n';
+  },
 }));
 
 vi.mock('../../../../../src/lib/tmux.js', async (importOriginal) => {
@@ -140,6 +144,7 @@ let prevOverdeckHome: string | undefined;
 beforeEach(async () => {
   vi.clearAllMocks();
   mocks.appended.length = 0;
+  mocks.launcherConfigs.length = 0;
   mocks.projectPath = await mkdtemp(join(tmpdir(), 'pan-3960-planning-routes-'));
   await mkdir(join(mocks.projectPath, 'workspaces', 'feature-pan-3960', '.pan'), { recursive: true });
   prevOverdeckHome = process.env.OVERDECK_HOME;
@@ -175,6 +180,16 @@ describe('POST /api/planning/:issueId/message (M1)', () => {
     }));
     expect(mocks.closeAgentPane.mock.invocationCallOrder[0]!)
       .toBeLessThan(mocks.launchAgentPane.mock.invocationCallOrder[0]!);
+  });
+
+  it('gives the continued planner the overdeck MCP server (PAN-4932)', async () => {
+    mocks.isAlive.mockResolvedValue({ alive: false, reason: 'pane-dead' });
+
+    const response = await call('POST', `/api/planning/${ISSUE}/message`, { message: 'use option B' });
+
+    expect(response.status).toBe(200);
+    expect(mocks.launcherConfigs).toHaveLength(1);
+    expect(mocks.launcherConfigs[0]!.overdeckMcpConfig).toBe(join(mocks.projectPath, 'home', 'agents', PLANNER, 'overdeck-mcp.json'));
   });
 
   it('records the relaunched claude-code harness, so the oracle probes the right process next time', async () => {
