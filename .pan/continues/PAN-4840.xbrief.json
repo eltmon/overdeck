@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4840",
   "created": "2026-11-03T20:58:06.302Z",
-  "updated": "2026-11-04T18:53:15.437Z",
+  "updated": "2026-11-04T18:53:29.787Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -114,6 +114,10 @@
     "js-push-registration.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T18:53:15.437Z"
+    },
+    "js-push-registration.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:53:29.786Z"
     }
   }
 }
