@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4841",
   "created": "2026-11-04T10:01:07.580Z",
-  "updated": "2026-11-04T15:40:27.194Z",
+  "updated": "2026-11-04T17:08:57.848Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -94,9 +94,10 @@
       "doneAt": "2026-11-04T12:17:56.565Z"
     },
     "rel-device-live-activity-check": {
-      "status": "pending",
+      "status": "completed",
       "claimedBy": "agent-pan-4841",
-      "claimedAt": "2026-11-04T15:40:27.193Z"
+      "claimedAt": "2026-11-04T15:40:27.193Z",
+      "doneAt": "2026-11-04T17:08:57.848Z"
     }
   }
 }
