@@ -142,42 +142,12 @@ async function defaultForgeOf(): Promise<(projectPath: string) => 'github' | 'gi
   return forgeForProject;
 }
 
-/** True when two SHAs (full or abbreviated) name the same commit. */
-function sameCommit(a: string, b: string): boolean {
-  const x = a.toLowerCase();
-  const y = b.toLowerCase();
-  return x.startsWith(y) || y.startsWith(x);
-}
-
-/**
- * Whether the issue's latest auto-merge row lets the scheduler write a new one
- * for this PR head. Asked only once the merge gate has passed.
- *
- *   - none, or `merged`: yes;
- *   - `pending` / `merging`: no, it is already scheduled;
- *   - `cancelled`: no, for the whole issue, whatever PR or head it now has. An
- *     operator's cancel means stop; only the operator re-schedules it (the
- *     schedule endpoint), which writes a newer row;
- *   - `blocked` / `failed` for another PR, or for this PR at another head: yes,
- *     the new push re-arms it;
- *   - `blocked` / `failed` without a recorded head (written before heads were
- *     tracked): no, a new head cannot be told apart from the old one;
- *   - the same head: `failed` (a merge was attempted) stays; `blocked` (the
- *     executor's pre-merge refusal) re-arms, because the gate passing now means
- *     the block's reason has cleared.
- */
-export function latestAutoMergeAllowsSchedule(
-  latest: PendingAutoMerge | null,
-  pr: Pick<PrFacts, 'url' | 'headSha'>,
-): boolean {
-  if (!latest || latest.status === 'merged') return true;
-  if (latest.status === 'pending' || latest.status === 'merging' || latest.status === 'cancelled') return false;
-  const samePr = !pr.url || latest.prUrl.replace(/\/+$/, '').toLowerCase() === pr.url.replace(/\/+$/, '').toLowerCase();
-  if (!samePr) return true;
-  if (!latest.headSha) return false;
-  if (pr.headSha && !sameCommit(latest.headSha, pr.headSha)) return true;
-  return latest.status === 'blocked';
-}
+// PAN-4970: moved to lib/cloister/auto-merge-rearm.js to break an import
+// cycle through routes/merge-train.js, services/uat-train.js and
+// services/merge-path-owner.js. Re-exported so existing importers keep
+// resolving it from here.
+import { latestAutoMergeAllowsSchedule } from '../../../lib/cloister/auto-merge-rearm.js';
+export { latestAutoMergeAllowsSchedule };
 
 async function defaultMergeGate(issueId: string): Promise<GateAnswer> {
   const { evaluateIssueMergeGate } = await import('../../../lib/cloister/merge-gate.js');

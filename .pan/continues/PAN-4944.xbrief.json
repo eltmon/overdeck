@@ -1,0 +1,157 @@
+{
+  "version": "1",
+  "issueId": "PAN-4944",
+  "created": "2026-11-04T00:25:07.459Z",
+  "updated": "2026-11-04T02:31:06.849Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-04T02:31:06.849Z"
+    }
+  ],
+  "items": {
+    "needs-you-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4944",
+      "claimedAt": "2026-11-04T00:25:07.459Z",
+      "doneAt": "2026-11-04T00:51:41.083Z"
+    },
+    "conv-answer-tools": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4944",
+      "claimedAt": "2026-11-04T00:51:49.268Z",
+      "doneAt": "2026-11-04T00:56:33.887Z"
+    },
+    "agent-answer-tools": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4944",
+      "claimedAt": "2026-11-04T00:56:47.779Z",
+      "doneAt": "2026-11-04T01:02:45.806Z"
+    },
+    "list-pending-fleet": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4944",
+      "claimedAt": "2026-11-04T01:02:50.801Z",
+      "doneAt": "2026-11-04T01:08:41.565Z"
+    },
+    "acceptance-ac15": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4944",
+      "claimedAt": "2026-11-04T01:08:45.753Z",
+      "doneAt": "2026-11-04T01:13:48.430Z"
+    },
+    "docs-mcp": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4944",
+      "claimedAt": "2026-11-04T01:13:54.764Z",
+      "doneAt": "2026-11-04T01:37:27.694Z"
+    },
+    "needs-you-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:40:19.068Z"
+    },
+    "needs-you-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:40:37.822Z"
+    },
+    "needs-you-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:40:56.899Z"
+    },
+    "needs-you-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:41:15.067Z"
+    },
+    "needs-you-route.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:41:32.193Z"
+    },
+    "conv-answer-tools.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:41:51.203Z"
+    },
+    "conv-answer-tools.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:42:06.576Z"
+    },
+    "conv-answer-tools.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:42:22.321Z"
+    },
+    "conv-answer-tools.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:42:37.744Z"
+    },
+    "conv-answer-tools.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:42:53.609Z"
+    },
+    "agent-answer-tools.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:43:13.097Z"
+    },
+    "agent-answer-tools.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:43:29.397Z"
+    },
+    "agent-answer-tools.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:43:45.447Z"
+    },
+    "agent-answer-tools.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:44:01.658Z"
+    },
+    "agent-answer-tools.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:44:17.569Z"
+    },
+    "list-pending-fleet.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:44:37.134Z"
+    },
+    "list-pending-fleet.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:44:54.100Z"
+    },
+    "list-pending-fleet.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:45:11.467Z"
+    },
+    "list-pending-fleet.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:45:30.504Z"
+    },
+    "acceptance-ac15.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:45:56.198Z"
+    },
+    "acceptance-ac15.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:46:14.853Z"
+    },
+    "acceptance-ac15.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:46:34.227Z"
+    },
+    "docs-mcp.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:46:57.345Z"
+    },
+    "docs-mcp.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:47:15.468Z"
+    },
+    "docs-mcp.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:47:36.526Z"
+    }
+  },
+  "feedback": [],
+  "agentModel": "claude-opus-5-5"
+}

@@ -38,6 +38,7 @@ import type { AgentPaneRef, TerminalBackend, TerminalBackendName } from '../term
 import { normalizeHarnessName, type AgentRole } from '@overdeck/contracts';
 import { conversationStateDir, readConversationPaneRole, writeConversationPaneRole } from './conversation-pane-role.js';
 import { revokeAgentMcpTokens } from '../mcp/agent-token.js';
+import { conversationTokenRole, prepareClaudeOverdeckMcp } from '../mcp/agent-injection.js';
 import { validateCwdContainment } from './cwd-containment.js';
 import { conversationWriteRefusal } from './conversation-release.js';
 import { closeConversationPane, conversationHarnessAlive, conversationSessionAlive, waitForConversationSession } from './conversation-liveness.js';
@@ -767,6 +768,11 @@ export async function spawnConversationSession(
     writeBridgeToken(tmuxSession);
     await writeChannelsBridgeMcpConfig(channelsBridgeMcpConfig, tmuxSession);
   }
+  // PAN-4932: the overdeck MCP server, owned by the conversation row (D-4, D-6, D-7).
+  const tokenRow = bareContext ? null : getConversationByTmuxSession(tmuxSession);
+  const overdeckMcp = tokenRow
+    ? await prepareClaudeOverdeckMcp({ agentId: tokenRow.name, agentKind: 'conversation', role: conversationTokenRole(tokenRow, role, tmuxSession), harness, dir: stateDir })
+    : {};
   // PAN-1837 review fix: the tmux-create + session-capture sequence below is
   // wrapped per-bucket (withKimiSessionCaptureLock) for kimi-code conversations
   // and genuinely awaited — not fire-and-forget — so two conversations sharing
@@ -837,6 +843,7 @@ export async function spawnConversationSession(
         execConversationHarness: backend.name !== 'tmux',
         fileMode: 0o700,
         channelsBridgeMcpConfig,
+        ...overdeckMcp,
         useSupervisor,
         supervisorScriptPath,
       }),

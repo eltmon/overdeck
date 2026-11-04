@@ -669,6 +669,11 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   missing from the `✓ root <file>` list. Spy `process.kill` in any test whose code under test
   signals a fixture PID. 39 test files carry literal PIDs without a `process.kill` spy; most only
   use the PID as data, but none were audited.
+<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4931, PAN-4944) -->
+<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4925) -->
+<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917) -->
+<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4931) -->
+<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4929) -->
 - **The access-token snapshot is per process** (PAN-4930 planning) — `verifyAccessToken` and
   `listActiveRecordsOfKind` (`src/lib/access-tokens.ts`) read an in-memory snapshot that only the dashboard
   fills (`startAccessTokenRefresh`, every 5 s). A CLI process (`pan kill`, `pan start`) sees zero records
@@ -683,3 +688,24 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   handoff fails and the claim is a `cli-<pid>` that `probeHolder` treats as dead. Work agents have no conversation
   row (only `*-review` role runs do), so `pan handoff self` refuses them.
 <!-- last-verified: 2026-11-04 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4930, PAN-4931, PAN-4482, PAN-4937) -->
+<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4930) -->
+<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4482) -->
+- **One merge path per feature (PAN-4970)** — the UAT reconciler drops features
+  `mergePathOwner` (`src/dashboard/server/services/merge-path-owner.ts`) assigns to the
+  per-PR train from its ready set before it ever assembles a batch; any new merge path
+  must ask the same function, or batches churn (30 generations invalidated in a day was
+  the original symptom, caused by the per-PR scheduler and the batch reconciler both
+  claiming the same unheld, gate-approved PR).
+<!-- last-verified: 2026-11-04 (PAN-4970) -->
+- **Claude Code variadic flags swallow a positional prompt** (PAN-4932 planning, Claude Code 2.1.293) —
+  `--allowedTools <x> "prompt"` reads the prompt as another tool name (`claude -p` then fails with
+  "Input must be provided"); `--mcp-config <configs...>` is declared variadic the same way in `claude --help`. Launchers that end with `"$prompt"` must
+  emit the equals form (`--allowedTools=mcp__overdeck`, `--mcp-config=<path>`) or put another flag
+  between. Two equals-form `--mcp-config=` flags both load.
+- **ACP agents spawn stdio MCP servers from `session/new` and `session/load`** (PAN-4934 planning probe) —
+  opencode 1.18.31 and kimi 2.0.2 both start a stdio `mcpServers` entry, pass its `env` array, keep the
+  inherited `PATH`/`HOME`, and call `initialize` then `tools/list`, on a new session and on a load. Both
+  advertise `mcpCapabilities: { http, sse }` too. The ACP host's `mcpServers` field
+  (`src/lib/acp/session-runtime.ts`) carries the `overdeck` server read from the host's `--mcp-config`
+  (PAN-4934); before that it was always `[]`.
+<!-- last-verified: 2026-11-04 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4930, PAN-4931, PAN-4932, PAN-4934) -->

@@ -1,0 +1,235 @@
+{
+  "version": "1",
+  "issueId": "PAN-4932",
+  "created": "2026-11-04T01:06:56.441Z",
+  "updated": "2026-11-04T02:01:22.641Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "mcp-config-switch": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4932",
+      "claimedAt": "2026-11-04T01:06:56.441Z",
+      "doneAt": "2026-11-04T01:08:28.267Z"
+    },
+    "overdeck-mcp-capability": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4932",
+      "claimedAt": "2026-11-04T01:08:33.762Z",
+      "doneAt": "2026-11-04T01:09:56.195Z"
+    },
+    "launcher-overdeck-mcp-flags": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4932",
+      "claimedAt": "2026-11-04T01:09:57.620Z",
+      "doneAt": "2026-11-04T01:12:17.439Z"
+    },
+    "sweep-missing-state-grace": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4932",
+      "claimedAt": "2026-11-04T01:12:22.592Z",
+      "doneAt": "2026-11-04T01:13:03.184Z"
+    },
+    "agent-injection-module": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4932",
+      "claimedAt": "2026-11-04T01:13:04.730Z",
+      "doneAt": "2026-11-04T01:15:25.774Z"
+    },
+    "role-allowlist-overdeck": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4932",
+      "claimedAt": "2026-11-04T01:15:31.833Z",
+      "doneAt": "2026-11-04T01:16:44.735Z"
+    },
+    "work-agent-builder-wiring": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4932",
+      "claimedAt": "2026-11-04T01:16:45.829Z",
+      "doneAt": "2026-11-04T01:21:22.490Z"
+    },
+    "spawn-run-wiring": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4932",
+      "claimedAt": "2026-11-04T01:21:27.619Z",
+      "doneAt": "2026-11-04T01:24:44.976Z"
+    },
+    "role-relaunch-wiring": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4932",
+      "claimedAt": "2026-11-04T01:24:46.726Z",
+      "doneAt": "2026-11-04T01:26:49.388Z"
+    },
+    "planning-session-wiring": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4932",
+      "claimedAt": "2026-11-04T01:26:50.981Z",
+      "doneAt": "2026-11-04T01:28:18.151Z"
+    },
+    "planning-continuation-wiring": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4932",
+      "claimedAt": "2026-11-04T01:28:19.767Z",
+      "doneAt": "2026-11-04T01:29:55.116Z"
+    },
+    "conversation-wiring": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4932",
+      "claimedAt": "2026-11-04T01:29:56.514Z",
+      "doneAt": "2026-11-04T01:32:32.407Z"
+    },
+    "docs-agent-mcp": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4932",
+      "claimedAt": "2026-11-04T01:32:34.142Z",
+      "doneAt": "2026-11-04T01:33:26.110Z"
+    },
+    "mcp-config-switch.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:51:22.829Z"
+    },
+    "mcp-config-switch.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:51:39.077Z"
+    },
+    "mcp-config-switch.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:51:54.141Z"
+    },
+    "overdeck-mcp-capability.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:52:10.303Z"
+    },
+    "overdeck-mcp-capability.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:52:27.157Z"
+    },
+    "overdeck-mcp-capability.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:52:43.842Z"
+    },
+    "launcher-overdeck-mcp-flags.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:53:00.494Z"
+    },
+    "launcher-overdeck-mcp-flags.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:53:17.922Z"
+    },
+    "launcher-overdeck-mcp-flags.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:53:34.391Z"
+    },
+    "launcher-overdeck-mcp-flags.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:53:50.853Z"
+    },
+    "agent-injection-module.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:54:07.836Z"
+    },
+    "agent-injection-module.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:54:23.148Z"
+    },
+    "agent-injection-module.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:54:39.004Z"
+    },
+    "agent-injection-module.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:54:54.917Z"
+    },
+    "agent-injection-module.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:55:11.267Z"
+    },
+    "sweep-missing-state-grace.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:55:28.025Z"
+    },
+    "sweep-missing-state-grace.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:55:45.161Z"
+    },
+    "work-agent-builder-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:56:02.624Z"
+    },
+    "work-agent-builder-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:56:19.068Z"
+    },
+    "work-agent-builder-wiring.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:56:34.801Z"
+    },
+    "role-allowlist-overdeck.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:56:50.332Z"
+    },
+    "role-allowlist-overdeck.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:57:08.251Z"
+    },
+    "spawn-run-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:57:27.423Z"
+    },
+    "spawn-run-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:57:44.330Z"
+    },
+    "role-relaunch-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:58:02.105Z"
+    },
+    "role-relaunch-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:58:20.015Z"
+    },
+    "planning-session-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:58:37.647Z"
+    },
+    "planning-session-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:58:56.984Z"
+    },
+    "planning-continuation-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:59:15.774Z"
+    },
+    "planning-continuation-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:59:33.565Z"
+    },
+    "conversation-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:59:50.539Z"
+    },
+    "conversation-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T02:00:08.085Z"
+    },
+    "conversation-wiring.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T02:00:27.099Z"
+    },
+    "docs-agent-mcp.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T02:00:46.773Z"
+    },
+    "docs-agent-mcp.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T02:01:04.896Z"
+    },
+    "docs-agent-mcp.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T02:01:22.641Z"
+    }
+  }
+}

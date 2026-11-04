@@ -13,8 +13,8 @@ export type HarnessContextChannel =
 export type HarnessAttachmentDelivery = "native" | "inline-paths"
 export type HarnessBinaryConfigKey = "acp.kimi.binaryPath" | "kimiCode.binaryPath"
 export type HarnessLaunchPreflight = "claude-code-model-minimum"
-/** message = an AskUserQuestion answer is sent as a conversation message; pi-ask-modal = keystrokes drive the open ask modal (a queued message would be swallowed). */
-export type HarnessAskAnswerDelivery = "message" | "pi-ask-modal"
+/** message = an AskUserQuestion answer is sent as a conversation message; pi-ask-modal = keystrokes drive the open ask modal (a queued message would be swallowed); codex-approval = answered as a numbered approval prompt (PAN-4944), not a question. */
+export type HarnessAskAnswerDelivery = "message" | "pi-ask-modal" | "codex-approval"
 /** claude-project-hash = resolve via HashResolver; agent-dir = first-message cwd, else the agent dir; first-message-only = first-message cwd, else null. */
 export type HarnessWorkspaceResolution = "claude-project-hash" | "agent-dir" | "first-message-only"
 
@@ -66,6 +66,8 @@ export interface HarnessCapabilities {
   readonly askAnswerDelivery: HarnessAskAnswerDelivery
   /** A conversation may be started on a Fly machine (pan machines add-fly): Claude Code (PAN-4652) and Codex (PAN-4296). */
   readonly runsOnFlyMachine: boolean
+  /** Launches get the `overdeck` MCP server with a per-agent token (PAN-4927 D-13): Claude Code (PAN-4932) and the ACP harnesses (PAN-4934). Codex follows (W-INJ2). */
+  readonly overdeckMcp: boolean
 }
 
 export const HARNESS_CAPABILITY_KEYS = [
@@ -90,6 +92,7 @@ export const HARNESS_CAPABILITY_KEYS = [
   "answersQuestionByMessage",
   "askAnswerDelivery",
   "runsOnFlyMachine",
+  "overdeckMcp",
 ] as const satisfies readonly (keyof HarnessCapabilities)[]
 
 export const CLAUDE_CODE_CAPABILITIES: HarnessCapabilities = {
@@ -114,6 +117,7 @@ export const CLAUDE_CODE_CAPABILITIES: HarnessCapabilities = {
   answersQuestionByMessage: true,
   askAnswerDelivery: "message",
   runsOnFlyMachine: true,
+  overdeckMcp: true,
 }
 
 export const OHMYPI_CAPABILITIES: HarnessCapabilities = {
@@ -138,6 +142,7 @@ export const OHMYPI_CAPABILITIES: HarnessCapabilities = {
   answersQuestionByMessage: false,
   askAnswerDelivery: "pi-ask-modal",
   runsOnFlyMachine: false,
+  overdeckMcp: false,
 }
 
 export const CODEX_CAPABILITIES: HarnessCapabilities = {
@@ -160,8 +165,9 @@ export const CODEX_CAPABILITIES: HarnessCapabilities = {
   workspaceResolution: "agent-dir",
   correlatesBySessionId: true,
   answersQuestionByMessage: false,
-  askAnswerDelivery: "message",
+  askAnswerDelivery: "codex-approval",
   runsOnFlyMachine: true,
+  overdeckMcp: false,
 }
 
 export const ACP_CAPABILITIES: HarnessCapabilities = {
@@ -186,6 +192,7 @@ export const ACP_CAPABILITIES: HarnessCapabilities = {
   answersQuestionByMessage: false,
   askAnswerDelivery: "message",
   runsOnFlyMachine: false,
+  overdeckMcp: true,
 }
 
 export const KIMI_CODE_CAPABILITIES: HarnessCapabilities = {
@@ -210,6 +217,7 @@ export const KIMI_CODE_CAPABILITIES: HarnessCapabilities = {
   answersQuestionByMessage: false,
   askAnswerDelivery: "message",
   runsOnFlyMachine: false,
+  overdeckMcp: false,
 }
 
 export const OPENCODE_CAPABILITIES: HarnessCapabilities = {
@@ -234,6 +242,7 @@ export const OPENCODE_CAPABILITIES: HarnessCapabilities = {
   answersQuestionByMessage: false,
   askAnswerDelivery: "message",
   runsOnFlyMachine: false,
+  overdeckMcp: true,
 }
 
 export const MUSE_CAPABILITIES: HarnessCapabilities = {
@@ -258,6 +267,7 @@ export const MUSE_CAPABILITIES: HarnessCapabilities = {
   answersQuestionByMessage: false,
   askAnswerDelivery: "message",
   runsOnFlyMachine: false,
+  overdeckMcp: false,
 }
 
 export const PRIME_AGENT_CAPABILITIES: HarnessCapabilities = {
@@ -282,4 +292,5 @@ export const PRIME_AGENT_CAPABILITIES: HarnessCapabilities = {
   answersQuestionByMessage: false,
   askAnswerDelivery: "message",
   runsOnFlyMachine: false,
+  overdeckMcp: false,
 }

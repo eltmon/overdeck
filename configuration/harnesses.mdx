@@ -1054,8 +1054,9 @@ name. Every field is required, so a harness cannot leave a decision undeclared.
 | `workspaceResolution` | How the conversation scanner finds a transcript's workspace: `claude-project-hash`, `agent-dir`, or `first-message-only`. |
 | `correlatesBySessionId` | The conversation scanner correlates transcripts to agents by session id. |
 | `answersQuestionByMessage` | The MCP `answer_question` tool may answer this harness's pending question with a composed message. It is narrower than `askAnswerDelivery`: the tool carries no tool-use id, so it cannot tell a Codex approval from a question, and only Claude Code declares it. |
-| `askAnswerDelivery` | How the dashboard delivers an answer to a conversation's pending question: `message` sends it as a message; `pi-ask-modal` drives the open ask modal with keystrokes. |
+| `askAnswerDelivery` | How the dashboard delivers an answer to a conversation's pending question: `message` sends it as a message; `pi-ask-modal` drives the open ask modal with keystrokes; `codex-approval` means it is really a numbered approval prompt, answered with `answer_codex_approval` (PAN-4944), not a question. |
 | `runsOnFlyMachine` | A conversation may be started on a Fly machine (`pan machines add-fly`). Only Claude Code declares it; other harnesses on Fly are #4296. |
+| `overdeckMcp` | Launches get the `overdeck` MCP server with a per-agent token. Claude Code, `acp` and `opencode` declare it; Codex follows. |
 
 The rule for harness-specific code:
 
@@ -1066,6 +1067,44 @@ The rule for harness-specific code:
   `Record<HarnessTranscriptKind, …>` table fails `tsc` when a kind has no entry.
 - Never compare a harness name. `src/lib/harness-policy.ts` is the one
   exception: its ToS rules key on names on purpose.
+
+### Overdeck MCP server
+
+A harness that declares `overdeckMcp` gets the `overdeck` MCP server at launch
+(see [Agents get these tools](/configuration/mcp#agents-get-these-tools)).
+Claude Code 2.1.293 was checked against what the launcher emits:
+
+- Two `--mcp-config=` flags load together, so the Channels bridge and
+  `overdeck` both start.
+- An `overdeck` tool call completes with no permission prompt under
+  `--permission-mode default` with `--allowedTools=mcp__overdeck`.
+- Bash still runs with `--allowedTools=mcp__overdeck`; the flag does not narrow
+  the other tools.
+- The space form `--allowedTools <x>` reads a following prompt argument as
+  another tool name, so Overdeck always emits the equals form
+  (`--allowedTools=mcp__overdeck`, `--mcp-config=<path>`).
+
+**ACP harnesses (PAN-4934).** The launcher passes `--mcp-config <file>` to the
+ACP host. The host reads the same `overdeck-mcp.json` and sends its server as
+an ACP stdio entry in `session/new` and `session/load`. Only stdio entries are
+sent: an `http` or `sse` entry would carry the token inside the ACP payload.
+The CP-3 live check (2026-11-04) ran each agent with a real `overdeck` server
+and asked it to list the server's tools:
+
+- **OpenCode 1.18.31** (`opencode`, model `opencode/big-pickle`): passed. The
+  `opencode acp` process started `pan mcp serve` as its child. The agent listed
+  all 14 tools, as `overdeck_list_conversations` and so on, and called
+  `overdeck_list_machines` with no permission prompt. A Task subagent also
+  called the tool, and its turn ended in 11 s with no hang. (The calls returned
+  `HTTP 401` because the probe token belonged to a throwaway `OVERDECK_HOME`;
+  the check covers the path, not the data.) `opencode-go` uses the same binary
+  and gets the same result. `OPENCODE_PERMISSION` is unchanged.
+- **Kimi Code CLI 2.0.2** (`acp`): not verified live. `kimi acp` accepted the
+  entry in `session/new` and started `pan mcp serve` as its child, but the
+  prompt failed with `403 Your current subscription does not have access to
+  Kimi Code right now`. The planning probe had already shown that kimi 2.0.2
+  starts a stdio server from `session/new` and `session/load` and calls
+  `tools/list` on it, so `acp` keeps `overdeckMcp`.
 
 ### The harness-branch ratchet
 

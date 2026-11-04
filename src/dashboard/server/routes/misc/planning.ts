@@ -12,6 +12,7 @@ import { workspaceContextFile } from '../../../../lib/context-layers/layers.js';
 import { extractPrefix } from '../../../../lib/issue-id.js';
 import { prepareHarnessLaunch } from '../../../../lib/harness-binary.js';
 import { generateLauncherScript } from '../../../../lib/launcher-generator.js';
+import { prepareClaudeOverdeckMcp } from '../../../../lib/mcp/agent-injection.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../../lib/pan-dir/types.js';
 import { getOverdeckHome } from '../../../../lib/paths.js';
 import { extractTeamPrefix, findProjectByTeam } from '../../../../lib/projects.js';
@@ -345,6 +346,7 @@ Continue the PLANNING session. Do NOT implement anything.
             extraEnvExports: [harnessLaunch.pathExport],
             appendSystemPromptFiles: await claudePlanningSystemPromptFiles(agentCwd),
             promptInline: `Please read the continuation prompt at ${continuationPromptPath} and continue the planning session.`,
+            ...(await prepareClaudeOverdeckMcp({ agentId: sessionName, agentKind: 'agent', role: 'plan', harness: 'claude-code' })),
           }),
           { mode: 0o755 },
         );

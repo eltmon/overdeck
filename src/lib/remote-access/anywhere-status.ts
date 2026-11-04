@@ -29,8 +29,9 @@ export interface AnywhereProblem {
 /**
  * PAN-4645: `machine` is a linked machine reading the status over its secure
  * channel. PAN-4835: `phone` is the phone app reading it the same way.
+ * PAN-4927 D-17: `connector` is an Overdeck connector reading it the same way.
  */
-export type AnywhereViewerKind = 'root-session' | 'device' | 'token' | 'internal-token' | 'machine' | 'phone';
+export type AnywhereViewerKind = 'root-session' | 'device' | 'token' | 'internal-token' | 'machine' | 'phone' | 'connector';
 
 export interface AnywhereStatus {
   machine: { environmentId: string; label: string } | null;

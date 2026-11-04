@@ -109,6 +109,8 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   // PAN-4651 WI-20: fleet Needs-You (owner feed for linked machines; the viewer's combined list).
   { method: 'GET', path: '/api/machines/needs-you', scope: 'read:conversations' },
   { method: 'GET', path: '/api/fleet/needs-you', scope: 'read:conversations' },
+  // PAN-4944 (PAN-4927 W-APPR1): this machine's Needs-You for list_pending_input.
+  { method: 'GET', path: '/api/needs-you', scope: 'read:conversations' },
   // PAN-4651 WI-21: palette search across linked machines.
   { method: 'GET', path: '/api/fleet/search', scope: 'read:conversations' },
   // PAN-4651 WI-22: which machine is working on an issue.
@@ -132,6 +134,11 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'POST', path: '/api/self/done', scope: 'operate' },
   { method: 'POST', path: '/api/self/handoff', scope: 'tell' },
   { method: 'POST', path: '/api/self/worker-report', scope: 'tell' },
+  // PAN-4927 W-SEC1: secret requests; the handler also requires an agent token (D-10).
+  { method: 'POST', path: '/api/self/secret-requests', scope: 'tell' },
+  { method: 'GET', path: '/api/self/secret-requests/:id/wait', scope: 'read:state' },
+  { method: 'GET', path: '/api/agent-requests', scope: 'read:conversations' },
+  // POST /api/agent-requests/:id/secret and /decline have no row: root credentials only (D-4).
   // PAN-4650 WI-9: the owner's half of Pull here (a linked machine's operator only, checked by the routes).
   { method: 'POST', path: '/api/conversations/:name/release', scope: 'operate' },
   { method: 'GET', path: '/api/conversations/:name/release/transfer/:transferId', scope: 'operate' },
@@ -165,6 +172,8 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'GET', path: '/api/activity', scope: 'read:state' },
   { method: 'PUT', path: '/api/phones/self/push-key', scope: 'tell' },
   { method: 'DELETE', path: '/api/phones/self', scope: 'tell' },
+  // PAN-4927 W-CONN1: a connector's logout (the handler also requires a connector credential).
+  { method: 'DELETE', path: '/api/connectors/self', scope: 'read:state' },
 ];
 
 /** `/ws/terminal` needs `operate`; every other WebSocket path keeps the `admin` default. */

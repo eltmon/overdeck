@@ -27,6 +27,8 @@ export const EnvironmentCapabilities = Schema.Struct({
   machineLinks: Schema.optional(Schema.Boolean),
   /** The phone app can pair and use this machine (PAN-4835). Absent on older servers ⇒ unsupported. */
   phoneApp: Schema.optional(Schema.Boolean),
+  /** An Overdeck connector can pair with this machine (PAN-4927 W-CONN1). Absent on older servers ⇒ unsupported. */
+  connector: Schema.optional(Schema.Boolean),
 })
 export type EnvironmentCapabilities = typeof EnvironmentCapabilities.Type
 
