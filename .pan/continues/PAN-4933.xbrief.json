@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4933",
   "created": "2026-11-04T03:01:37.295Z",
-  "updated": "2026-11-04T03:50:53.770Z",
+  "updated": "2026-11-04T03:51:13.549Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -118,6 +118,10 @@
     "codex-conversation-site.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T03:50:53.770Z"
+    },
+    "codex-mcp-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:51:13.549Z"
     }
   }
 }
