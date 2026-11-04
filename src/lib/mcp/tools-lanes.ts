@@ -6,7 +6,7 @@
  * `lane_stop` call the lane routes.
  */
 import { MACHINE_PROPERTY, NEEDS_PROPERTY } from './tools-write.js';
-import { type OverdeckTool, requiredString, routeResult } from './tool.js';
+import { optionalString, type OverdeckTool, requiredString, routeResult, WAIT_CHUNK_MS } from './tool.js';
 
 const LANE_PROPERTY = { type: 'string', description: 'The lane conversation name.' } as const;
 
@@ -74,4 +74,28 @@ const laneStop: OverdeckTool = {
   },
 };
 
-export const LANE_TOOLS: readonly OverdeckTool[] = [laneStart, laneStatus, laneStop];
+const laneWait: OverdeckTool = {
+  name: 'lane_wait',
+  description:
+    'Wait up to 50 s for the next report of any lane you launched (or of run). Answers done with the report and a cursor, or running with next. Pass the cursor as after to get the next report. Never sleep or poll.',
+  scope: 'read:state',
+  audience: 'agent',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      run: { type: 'string', description: 'Wait on this run\'s lanes instead of the lanes you launched.' },
+      after: { type: 'string', description: 'The cursor of the last report you consumed; omit to start from the first.' },
+    },
+  },
+  async run(args, ctx) {
+    const body: Record<string, unknown> = { timeoutMs: WAIT_CHUNK_MS };
+    for (const field of ['run', 'after']) {
+      const value = optionalString(args, field);
+      if (!value.ok) return value.error;
+      if (value.value !== undefined) body[field] = value.value;
+    }
+    return routeResult(await ctx.api.request('POST', '/api/self/lanes/wait', body));
+  },
+};
+
+export const LANE_TOOLS: readonly OverdeckTool[] = [laneStart, laneStatus, laneStop, laneWait];

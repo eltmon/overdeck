@@ -506,6 +506,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/self/workers',                      kind: 'http', disposition: 'READ',        door: 'worker/list.listWorkers + remote-standin.listRemoteStandIns + liveness.isAlive, owner-only, agent tokens only (PAN-4938 W-DEL1)' },
   { surface: 'GET /api/self/workers/:id',                  kind: 'http', disposition: 'READ',        door: 'worker/list.listWorkers + remote-standin.listRemoteStandIns + liveness.isAlive, owner-only, agent tokens only (PAN-4938 W-DEL1)' },
   { surface: 'POST /api/self/lanes',                       kind: 'http', disposition: 'WRITE',       door: 'lanes.handleLaneLaunch with parent = the calling conversation (PAN-4938 W-DEL1)' },
+  { surface: 'POST /api/self/lanes/wait',                  kind: 'http', disposition: 'READ',        door: 'lanes/wait.waitForLaneSet over lanes/views.listLaneViews (at most 50 s), agent tokens only (PAN-4938 W-DEL1)' },
   { surface: '* /api/conversations/@<machine>/*',          kind: 'http', disposition: 'RELOCATE',    door: "linked-conversation-proxy -> owner's /api/conversations/* over the machine link (PAN-4650)" },
   { surface: 'POST /api/conversations/:name/release',      kind: 'http', disposition: 'WRITE',       door: 'conversation-release-service.releaseConversation (settle + pack + stop) (PAN-4650)' },
   { surface: 'GET /api/conversations/:name/release/transfer/:transferId', kind: 'http', disposition: 'READ', door: 'conversation-release-service.readTransferPack (PAN-4650)' },

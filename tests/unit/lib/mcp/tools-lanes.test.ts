@@ -13,6 +13,7 @@ const ROUTES: Record<string, { method: string; path: string }> = {
   lane_start: { method: 'POST', path: '/api/self/lanes' },
   lane_status: { method: 'GET', path: '/api/lanes/abc-builder-1' },
   lane_stop: { method: 'POST', path: '/api/lanes/abc-builder-1/stop' },
+  lane_wait: { method: 'POST', path: '/api/self/lanes/wait' },
 };
 
 describe('MCP lane tools (PAN-4938 W-DEL1)', () => {
@@ -58,6 +59,18 @@ describe('MCP lane tools (PAN-4938 W-DEL1)', () => {
     expect(api.calls).toEqual([
       { method: 'GET', path: '/api/lanes/abc-builder-1' },
       { method: 'POST', path: '/api/lanes/abc-builder-1/stop', body: {} },
+    ]);
+  });
+
+  it('lane_wait posts run and after with a 50 s timeout and passes running through', async () => {
+    const running = { status: 'running', cursor: '', warnings: [], next: { tool: 'lane_wait', arguments: { run: 'r' } } };
+    const api = fakeApi({ 'POST /api/self/lanes/wait': { status: 200, json: running } });
+    const client = await connectClient(api, SCOPES, true);
+    expect(resultJson(await callTool(client, 'lane_wait', { run: 'r', after: '1.a.1' }))).toEqual(running);
+    expect(resultJson(await callTool(client, 'lane_wait'))).toEqual(running);
+    expect(api.calls).toEqual([
+      { method: 'POST', path: '/api/self/lanes/wait', body: { timeoutMs: 50_000, run: 'r', after: '1.a.1' } },
+      { method: 'POST', path: '/api/self/lanes/wait', body: { timeoutMs: 50_000 } },
     ]);
   });
 });
