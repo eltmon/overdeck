@@ -206,6 +206,23 @@ export function pairingExpiresInText(expiresAt: number): string {
   return `Expires in ${minutes} minute${minutes === 1 ? '' : 's'} · works once`;
 }
 
+/**
+ * A future timestamp as "in N minute(s)" / "in N hour(s)" / "in N day(s)", or
+ * "expired" once past (PAN-4946 review — `formatRelativeTime` is "ago"-only
+ * and reads every future timestamp as "just now").
+ */
+export function expiresInText(expiresAt: string, now: Date = new Date()): string {
+  const diffMs = new Date(expiresAt).getTime() - now.getTime();
+  if (diffMs <= 0) return 'expired';
+  const minutes = Math.round(diffMs / 60_000);
+  if (minutes < 1) return 'in under a minute';
+  if (minutes < 60) return `in ${minutes} minute${minutes === 1 ? '' : 's'}`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `in ${hours} hour${hours === 1 ? '' : 's'}`;
+  const days = Math.round(hours / 24);
+  return `in ${days} day${days === 1 ? '' : 's'}`;
+}
+
 export async function issuePairingLink(): Promise<ApiResult<PairingLinkBody>> {
   return readResult(await fetch('/api/pairing/credentials', {
     method: 'POST',

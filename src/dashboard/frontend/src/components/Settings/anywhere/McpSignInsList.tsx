@@ -7,6 +7,7 @@ import { AccessTokensForbiddenError } from '../sections/accessTokensShared';
 import {
   ANYWHERE_ACCESS_TOKENS_QUERY_KEY,
   apiError,
+  expiresInText,
   isOk,
   loadMcpSignIns,
   MCP_OAUTH_LEVEL_LABELS,
@@ -81,7 +82,7 @@ export function McpSignInsList() {
                   {MCP_OAUTH_LEVEL_LABELS[signIn.level as keyof typeof MCP_OAUTH_LEVEL_LABELS] ?? signIn.level}
                   {' · '}created {formatRelativeTime(signIn.createdAt)}
                   {' · '}last used {signIn.lastUsedAt ? formatRelativeTime(signIn.lastUsedAt) : '—'}
-                  {' · '}expires {formatRelativeTime(signIn.refreshExpiresAt)}
+                  {' · '}expires {expiresInText(signIn.refreshExpiresAt)}
                 </p>
               </div>
               <button

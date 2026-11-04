@@ -423,7 +423,12 @@ export function useDecisions(): Decision[] {
     }
 
     out.push(...agentRequestDecisions(Array.isArray(agentRequestRows) ? agentRequestRows : []));
-    out.push(...mcpSignInDecisions(Array.isArray(mcpSignInApprovals) ? mcpSignInApprovals : []));
+    // PAN-4946 review — a disabled query still returns its last cached rows
+    // (`enabled: false` only stops refetching), so a viewer that just dropped
+    // from root to device could otherwise still see a stale approval's detail.
+    if (canSeeMcpSignIns) {
+      out.push(...mcpSignInDecisions(Array.isArray(mcpSignInApprovals) ? mcpSignInApprovals : []));
+    }
 
     // Blocking first, then oldest first — the longest-stalled agent is the one
     // costing the most.
@@ -433,5 +438,5 @@ export function useDecisions(): Decision[] {
       return a.since.localeCompare(b.since);
     });
     return out;
-  }, [agentSubjects, convRows, fleetMachines, agentRequestRows, mcpSignInApprovals, titleByIssueId]);
+  }, [agentSubjects, convRows, fleetMachines, agentRequestRows, mcpSignInApprovals, canSeeMcpSignIns, titleByIssueId]);
 }

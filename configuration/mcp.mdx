@@ -220,8 +220,11 @@ names it.
    name, where it will send you back, and an approval code such as `KQZT-MWRB`.
 2. The dashboard's Needs you panel shows a card with the app's name, the
    redirect host, and the same approval code — or run `pan mcp oauth pending`
-   from a terminal on this machine. Only a browser on this machine sees the
-   card; a phone or a paired device shows "Approve on the desktop" instead.
+   from a terminal on this machine. Only this machine's own session can see
+   it: on its desktop layout that's the full card below; on its mobile
+   layout, which has no room for the card, it's "Approve on the desktop"
+   instead. A paired device never receives the pending sign-in at all — there
+   is nothing to approve from someone else's phone.
 3. You check that the card's code matches the page you opened, pick an access
    level (the select starts at the level the app asked for), and click
    Approve or Deny.

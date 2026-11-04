@@ -219,6 +219,14 @@ describe('useDecisions MCP sign-ins (PAN-4946)', () => {
     fetchSpy.mockRestore();
   });
 
+  it('review fix: drops a cached approval once the viewer is no longer root — enabled:false only stops refetching, not the cached read', () => {
+    // Simulates a query client that populated the approvals cache while the
+    // viewer was root-session, then the viewer dropped to device within the
+    // same lifetime: the cache entry is still there, but it must not surface.
+    const { result } = renderDecisions([], [], { viewerKind: 'device', mcpApprovals: [approvalRow] });
+    expect(result.current.some((d) => d.kinds.includes('mcpSignIn'))).toBe(false);
+  });
+
   it('labels the kind "MCP sign-in waiting" and treats it as blocking', () => {
     expect(describePendingInput(['mcpSignIn'])).toBe('MCP sign-in waiting');
     expect(isBlockingDecision(['mcpSignIn'])).toBe(true);

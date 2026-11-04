@@ -12,11 +12,11 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import type { Decision } from '../lib/useDecisions';
 import { describePendingInput } from '../lib/pendingInput';
-import { formatRelativeTime } from '../lib/formatRelativeTime';
 import { useNow } from '../hooks/useNow';
 import {
   apiError,
   decideMcpSignIn,
+  expiresInText,
   isMcpOAuthLevel,
   isOk,
   MCP_OAUTH_APPROVALS_QUERY_KEY,
@@ -68,7 +68,7 @@ export function McpSignInCard({ decision }: { decision: Decision }) {
         <p className={styles.prompt}>Approve only if the page you opened shows this code.</p>
         <div className={styles.meta}>
           <span className={styles.mono}>{approval.redirectHost}</span>
-          <span>· expires {formatRelativeTime(approval.expiresAt, now)}</span>
+          <span>· expires {expiresInText(approval.expiresAt, now)}</span>
         </div>
         <div className={styles.secretForm}>
           <select
