@@ -4,6 +4,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
+import { ALL_TOOLS } from '../../../../src/lib/mcp/server.js';
 import { SCHEDULE_TOOLS } from '../../../../src/lib/mcp/tools-schedule.js';
 import { callTool, connectClient, fakeApi, resultJson, resultText } from './harness.js';
 
@@ -202,5 +203,66 @@ describe('MCP schedule tools: delete_scheduled (PAN-4927 WI-6)', () => {
     const result = await callTool(client, 'delete_scheduled', { conversation: 'conv-a', kind: 'once', id: 1 });
     expect(result.isError).toBe(true);
     expect(resultText(result)).toContain('message already sent');
+  });
+});
+
+describe('MCP schedule tools registered in ALL_TOOLS (PAN-4927 WI-7, epic AC-10)', () => {
+  it('a read:conversations + tell token lists all five schedule tools', async () => {
+    const api = fakeApi({
+      'POST /api/conversations/conv-a/scheduled-messages': { status: 201, json: { id: 1 } },
+      'POST /api/conversations/conv-a/schedules': { status: 201, json: { id: 2 } },
+      'GET /api/conversations/conv-a/scheduled-messages': { status: 200, json: { messages: [{ id: 1 }], supported: true, limit: null } },
+      'GET /api/conversations/conv-a/schedules': { status: 200, json: { schedules: [{ id: 2 }] } },
+      'DELETE /api/conversations/conv-a/scheduled-messages/1': { status: 200, json: { ok: true } },
+      'DELETE /api/conversations/conv-a/schedules/2': { status: 200, json: { ok: true } },
+    });
+    const client = await connectClient(api, SCOPES);
+    const { tools } = await client.listTools();
+    expect(tools.map((tool) => tool.name)).toEqual(
+      expect.arrayContaining(['schedule_message', 'schedule_recurring', 'list_scheduled', 'update_scheduled', 'delete_scheduled']),
+    );
+
+    expect((await callTool(client, 'schedule_message', { conversation: 'conv-a', message: 'later' })).isError).toBeFalsy();
+    expect((await callTool(client, 'schedule_recurring', { conversation: 'conv-a', prompt: 'check in', cron: '0 9 * * *' })).isError).toBeFalsy();
+    expect((await callTool(client, 'list_scheduled', { conversation: 'conv-a' })).isError).toBeFalsy();
+    expect((await callTool(client, 'delete_scheduled', { conversation: 'conv-a', kind: 'once', id: 1 })).isError).toBeFalsy();
+    expect((await callTool(client, 'delete_scheduled', { conversation: 'conv-a', kind: 'recurring', id: 2 })).isError).toBeFalsy();
+
+    expect(api.calls).toEqual([
+      { method: 'POST', path: '/api/conversations/conv-a/scheduled-messages', body: { message: 'later' } },
+      { method: 'POST', path: '/api/conversations/conv-a/schedules', body: { prompt: 'check in', cron: '0 9 * * *' } },
+      { method: 'GET', path: '/api/conversations/conv-a/scheduled-messages' },
+      { method: 'GET', path: '/api/conversations/conv-a/schedules' },
+      { method: 'DELETE', path: '/api/conversations/conv-a/scheduled-messages/1' },
+      { method: 'DELETE', path: '/api/conversations/conv-a/schedules/2' },
+    ]);
+  });
+
+  it('a read:conversations-only token lists list_scheduled and none of schedule_message, schedule_recurring, update_scheduled, delete_scheduled', async () => {
+    const api = fakeApi({});
+    const client = await connectClient(api, ['read:conversations']);
+    const { tools } = await client.listTools();
+    const names = tools.map((tool) => tool.name);
+    expect(names).toContain('list_scheduled');
+    expect(names).not.toContain('schedule_message');
+    expect(names).not.toContain('schedule_recurring');
+    expect(names).not.toContain('update_scheduled');
+    expect(names).not.toContain('delete_scheduled');
+
+    const result = await callTool(client, 'schedule_message', { conversation: 'conv-a', message: 'later' });
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toBe('Unknown tool schedule_message');
+    expect(api.calls).toEqual([]);
+  });
+
+  it('ALL_TOOLS carries the five schedule tools in order between the write and approve tools', () => {
+    const names = ALL_TOOLS.map((tool) => tool.name);
+    expect(names.slice(names.indexOf('schedule_message'), names.indexOf('schedule_message') + 5)).toEqual([
+      'schedule_message',
+      'schedule_recurring',
+      'list_scheduled',
+      'update_scheduled',
+      'delete_scheduled',
+    ]);
   });
 });
