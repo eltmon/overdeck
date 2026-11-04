@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4938",
   "created": "2026-11-04T03:39:16.629Z",
-  "updated": "2026-11-04T04:41:46.018Z",
+  "updated": "2026-11-04T04:42:01.283Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -282,6 +282,9 @@
     "docs-delegation.ac4": {
       "status": "completed",
       "doneAt": "2026-11-04T04:41:46.017Z"
+    },
+    "tool-list-tests.ac4": {
+      "status": "cancelled"
     }
   }
 }
