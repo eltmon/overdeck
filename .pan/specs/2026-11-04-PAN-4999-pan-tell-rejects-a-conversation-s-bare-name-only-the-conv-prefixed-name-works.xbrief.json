@@ -1,0 +1,364 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T10:01:58Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4999: pan tell rejects a conversation's bare name; only the conv- prefixed name works",
+    "updated": "2026-11-04T10:05:07.466Z"
+  },
+  "plan": {
+    "id": "pan-4999",
+    "title": "pan tell rejects a conversation's bare name; only the conv- prefixed name works",
+    "status": "proposed",
+    "uid": "8cec1150-0cdc-4b68-a5f0-a46881fd45b6",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-04T10:01:58Z",
+    "updated": "2026-11-04T10:05:07.466Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4999",
+        "label": "PAN-4999",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "cli",
+      "pan-tell",
+      "agent-target",
+      "conversations"
+    ],
+    "narratives": {
+      "Problem": "A name-shaped target such as 20261103-3f3a falls through resolveCliAgentTarget (src/cli/agent-target.ts) to the issue branch. resolveAgentTarget then returns the canonical agent-20261103-3f3a even though no such agent exists, and messageAgent throws 'Agent agent-20261103-3f3a not running' (src/lib/agents/messaging.ts:704). The conversation table is never consulted, so a running conversation is reported as not running and the operator never sees the accepted-forms list.",
+      "Proposal": "In the shared resolver, keep issue-shaped input (/^[A-Za-z]+-\\d+$/) on today's issue path. Route other name-shaped input through a new resolveNameShaped helper: look the raw input up as a conversation name, check whether the agent directory <AGENTS_DIR>/<resolveAgentTarget(resolveIssueId(input))> exists, then return the conversation's tmuxSession (conversation only), today's issue result (agent only), ambiguous (both) or unresolved with a reason that names every form tried (neither). Add the bare name to ACCEPTED_TARGET_FORMS, add resolver unit tests, and state the bare-name form in the pan-tell/kill/pause/unpause skills and docs/USAGE.md. See .pan/drafts/PAN-4999.md for exact code.",
+      "NonGoals": "- Reaching a conversation by its bare name when the name is issue-shaped (e.g. a conversation named pan-1148); conv/<name> and conv-<name> cover it\n- Case-insensitive conversation-name lookup\n- Changing messageAgent's 'Agent <id> not running' error in src/lib/agents/messaging.ts\n- Changing pan tell's --when-limit-resets or lane-verdict guards, which slice conv- off the agent ID\n- Changing rowToLegacyConversation's conv-<name> default for a null tmux_session\n- Making non-prefixed agent directories (ext-…, cctest) addressable by raw name\n- Adding any export to the src/lib/agents.js barrel or editing the mocks of existing resolver test suites\n- Changing any CLI help string or tell-register.ts"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Issue-shaped input (/^[A-Za-z]+-\\d+$/) never consults the conversation table.",
+        "rationale": "Keeps pan tell PAN-123 unchanged and keeps the lazily-imported conversation DB module off the hot path; a conversation named like an issue ID stays reachable through conv/<name>."
+      },
+      {
+        "summary": "Agent-directory existence (not state.json) decides between today's issue path and unresolved for name-shaped input.",
+        "rationale": "Remote (Fly) agents persist only remote-state.json, and suffix forms such as PAN-1148-review must keep resolving to agent-pan-1148-review."
+      },
+      {
+        "summary": "Use an inline ISSUE_ID_SHAPE regex instead of parseIssueId.",
+        "rationale": "kill.test.ts mocks lib/issue-id.js without parseIssueId and vitest throws on a missing mocked export; Rally IDs still resolve through the agent-directory check."
+      },
+      {
+        "summary": "A name matching both a conversation and an agent directory is ambiguous.",
+        "rationale": "Mirrors resolveBareDigits; guessing could deliver a message to the wrong recipient."
+      },
+      {
+        "summary": "Fix lives in the shared resolver, so tell, kill, pause, unpause, untroubled and conv pending all gain the bare-name form.",
+        "rationale": "All six already route through resolveCliAgentTarget; a per-command fix would diverge."
+      }
+    ],
+    "items": [
+      {
+        "id": "resolve-name-shaped",
+        "title": "Resolve name-shaped targets through the conversation table in resolveCliAgentTarget",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T10:01:58Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4999",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/agent-target.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/cli/__tests__/agent-target.test.ts src/cli/commands/__tests__/tell.test.ts src/cli/commands/__tests__/kill.test.ts src/cli/commands/__tests__/kill-conv-target.test.ts src/cli/commands/__tests__/pause-conv-target.test.ts src/cli/commands/__tests__/bare-numeric-id-resolution.test.ts src/cli/commands/__tests__/agent-targeting.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "all listed resolver suites pass with their existing mocks unchanged"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 exactly. In src/cli/agent-target.ts: import existsSync (node:fs), join (node:path) and AGENTS_DIR (../lib/paths.js); add const ISSUE_ID_SHAPE = /^[A-Za-z]+-\\d+$/; add async resolveNameShaped(input) that computes issueId = resolveIssueId(input), agentId = resolveAgentTarget(issueId), agentExists = agentId !== null && existsSync(join(AGENTS_DIR, agentId)), looks up the raw input via the existing lookupConversation, treats a vault row as no row, then returns ambiguous (both; candidates [{explicitForm: agentId, label: `agent ${agentId}`}, conversationCandidate(row)]), {kind:'agent', agentId: row.tmuxSession, via:'conversation'} (conversation only), {kind:'issue', issueId} (agent only), or unresolved with reason `no conversation named ${input} and no agent ${agentLabel}` / `conversation lookup failed: ${message}; no agent ${agentLabel}` (neither). Replace the final `return { kind: 'issue', issueId: resolveIssueId(input) };` with `if (ISSUE_ID_SHAPE.test(input)) return { kind: 'issue', issueId: resolveIssueId(input) }; return resolveNameShaped(input);`. Update the module header and resolveCliAgentTarget JSDoc to mention conversation names (PAN-4999). Do not change resolveCliSingleAgentId, resolveBareDigits, resolveExplicitConversationForm, any command file, or the agents.js barrel."
+        },
+        "items": [
+          {
+            "id": "resolve-name-shaped.ac1",
+            "title": "Given a local conversation named 20260928-7563, when resolveCliAgentTarget('20260928-7563') runs, then it returns { kind: 'agent', agentId: 'conv-20260928-7563', via: 'conversation' } and getConversationByName receives the raw lower-case name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolve-name-shaped.ac2",
+            "title": "Given input PAN-1148, when resolveCliAgentTarget runs, then it returns { kind: 'issue', issueId: 'PAN-1148' } without calling getConversationByName or getConversationById",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolve-name-shaped.ac3",
+            "title": "Given no conversation and no agent directory for 20261103-zzzz, when resolveCliAgentTarget runs, then it returns unresolved with reason exactly 'no conversation named 20261103-zzzz and no agent agent-20261103-zzzz'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolve-name-shaped.ac4",
+            "title": "Given an existing agent directory agent-pan-1148-review and no matching conversation, when resolveCliAgentTarget('PAN-1148-review') runs, then it returns { kind: 'issue', issueId: 'PAN-1148-REVIEW' } as before this change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolve-name-shaped.ac5",
+            "title": "The existing suites tell.test.ts, kill.test.ts, kill-conv-target.test.ts, pause-conv-target.test.ts, bare-numeric-id-resolution.test.ts and agent-targeting.test.ts each passes with no edits to its file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "accepted-forms-bare-name",
+        "title": "List the bare conversation name in ACCEPTED_TARGET_FORMS",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T10:01:58Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-4999",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/agent-target.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/__tests__/agent-target.test.ts"
+          ],
+          "expected_outputs": [
+            "agent-target.test.ts passes, including the printAgentTargetFailure accepted-forms test"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ],
+          "acJustification": "One-line constant change; two ACs cover the constant and the printed output."
+        },
+        "narrative": {
+          "Action": "In src/cli/agent-target.ts replace the ACCEPTED_TARGET_FORMS conversation line 'conversation   conv/2972, conv:2972, or a dashboard URL such as https://overdeck.localhost/conv/2972' with 'conversation   its name 20260928-7563, conv/2972, conv:2972, or a dashboard URL such as https://overdeck.localhost/conv/2972'. Leave the other three lines unchanged."
+        },
+        "items": [
+          {
+            "id": "accepted-forms-bare-name.ac1",
+            "title": "ACCEPTED_TARGET_FORMS contains a line with 'its name 20260928-7563' and still contains the issue ID, agent ID and bare number lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "accepted-forms-bare-name.ac2",
+            "title": "When printAgentTargetFailure runs for any failure, then stderr includes the line containing 'its name 20260928-7563'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "resolver-name-tests",
+        "title": "Unit tests for conversation-name resolution in agent-target.test.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T10:01:58Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4999",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/__tests__/agent-target.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/__tests__/agent-target.test.ts"
+          ],
+          "expected_outputs": [
+            "agent-target.test.ts passes including the new describe 'resolveCliAgentTarget — conversation name (PAN-4999)' and its 8 tests"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. Add describe('resolveCliAgentTarget — conversation name (PAN-4999)') with the 8 named tests from the PRD (bare name + conv- name + rowid of one live conversation; issue-shaped never consults conversations; agent directory keeps the issue path; conversation + agent directory is ambiguous; unknown name is unresolved naming the tried forms; vault-only name is no conversation; lookup throw reports failure plus agent form; resolveCliSingleAgentId returns the conversation agent). Add the printAgentTargetFailure test 'prints the tried forms for an unresolved bare name'. Create agent directories with mkdirSync(join(AGENTS_DIR, 'agent-pan-1148-review'), { recursive: true }) using AGENTS_DIR from ../../lib/paths.js (the per-worker OVERDECK_HOME from tests/setup/overdeck-home.ts) and remove them in afterEach with rmSync(join(AGENTS_DIR, 'agent-pan-1148-review'), { recursive: true, force: true }). Keep the existing vi.mock blocks; add no fake-timer or delay logic (none is needed)."
+        },
+        "items": [
+          {
+            "id": "resolver-name-tests.ac1",
+            "title": "A test named 'resolves the bare name, the conv- name and the rowid of one live conversation to the same agent' asserts all three inputs return agentId 'conv-20260928-7563'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolver-name-tests.ac2",
+            "title": "A test named 'is unresolved and names every form tried for an unknown name' shows the resolver returns reason exactly 'no conversation named 20261103-zzzz and no agent agent-20261103-zzzz'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolver-name-tests.ac3",
+            "title": "A test named 'is ambiguous when a conversation and an agent directory share the name' shows the resolver returns kind 'ambiguous' with candidates agent-pan-1148-review and conv/77",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolver-name-tests.ac4",
+            "title": "A test named 'prints the tried forms for an unresolved bare name' asserts stderr contains the tried-forms reason and 'its name 20260928-7563'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolver-name-tests.ac5",
+            "title": "npx vitest run src/cli/__tests__/agent-target.test.ts exits 0 and leaves no agent-pan-1148-review directory under AGENTS_DIR after the run",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-bare-name-form",
+        "title": "Document the bare conversation-name target in the pan-tell/kill/pause/unpause skills and USAGE.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T10:01:58Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4999",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/pan-tell/SKILL.md",
+            "sync-sources/skills/pan-kill/SKILL.md",
+            "sync-sources/skills/pan-pause/SKILL.md",
+            "sync-sources/skills/pan-unpause/SKILL.md",
+            "docs/USAGE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '20260928-7563' sync-sources/skills/pan-tell/SKILL.md sync-sources/skills/pan-kill/SKILL.md sync-sources/skills/pan-pause/SKILL.md sync-sources/skills/pan-unpause/SKILL.md",
+            "grep -n 'pan tell 20260928-7563' docs/USAGE.md",
+            "bash scripts/lint-skills.sh"
+          ],
+          "expected_outputs": [
+            "each of the four SKILL.md files prints a line naming the bare conversation name 20260928-7563",
+            "docs/USAGE.md prints the pan tell 20260928-7563 example",
+            "lint-skills.sh exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4. pan-tell/SKILL.md line 32: change the conversation clause to '(its name `20260928-7563`, `conv/2972`, `conv:2972`, or a dashboard URL)' and append the sentence 'A name that matches both a conversation and an agent is refused with both explicit forms listed.'. pan-kill/SKILL.md line 45: insert 'a conversation name such as `20260928-7563`,' after '`<id>` also accepts'. pan-pause/SKILL.md line 29 and pan-unpause/SKILL.md line 28: insert 'a conversation name such as `20260928-7563`,' after 'a full agent ID,'. docs/USAGE.md after the line 'pan tell agent-pan-123 \"Your message\"': add 'pan tell 20260928-7563 \"Your message\"   # a conversation, by the name the dashboard shows'. Do not edit tell-register.ts or any help string."
+        },
+        "items": [
+          {
+            "id": "docs-bare-name-form.ac1",
+            "title": "sync-sources/skills/pan-tell/SKILL.md states that <id> accepts a conversation by its name `20260928-7563` and that a name matching both a conversation and an agent is refused",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-bare-name-form.ac2",
+            "title": "pan-kill, pan-pause and pan-unpause SKILL.md each shows 'a conversation name such as `20260928-7563`' among the accepted <id> forms",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-bare-name-form.ac3",
+            "title": "docs/USAGE.md shows the example 'pan tell 20260928-7563 \"Your message\"' next to the agent-pan-123 example, and bash scripts/lint-skills.sh exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "resolve-name-shaped",
+        "to": "accepted-forms-bare-name",
+        "type": "blocks"
+      },
+      {
+        "from": "resolve-name-shaped",
+        "to": "resolver-name-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "accepted-forms-bare-name",
+        "to": "resolver-name-tests",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-04-PAN-4999-pan-tell-rejects-a-conversation-s-bare-name-only-the-conv-prefixed-name-works.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
