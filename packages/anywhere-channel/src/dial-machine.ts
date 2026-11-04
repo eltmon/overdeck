@@ -7,6 +7,10 @@
  * `(environmentId, relay)` and opens one more ordered `ovdl` data channel on it per dial. The first
  * channel exists before the offer so the SDP carries the SCTP section. A dial resolves with an
  * {@link RtcDuplexWeb} once its channel opens.
+ *
+ * Closing a peer connection ends every raw channel the dialer handed out on it (PAN-5046 FR-1):
+ * `RTCPeerConnection.close()` fires no `close` on its data channels, so without this an open stream
+ * or an in-flight handshake would hang until its own timeout.
  */
 import type { IceServer, SignalData } from '@overdeck/contracts';
 
@@ -39,6 +43,8 @@ interface PeerEntry {
   readonly pendingLocal: Candidate[];
   /** Pending dials on this connection; each is told when the connection dies. */
   readonly waiters: Set<(error: Error) => void>;
+  /** Raw channels handed out on this connection and not yet closed; each ends when the connection closes. */
+  readonly duplexes: Set<RtcDuplexWeb>;
   readonly unsubscribe: Array<() => void>;
   remoteSet: boolean;
   localSent: boolean;
@@ -72,9 +78,10 @@ function toRtcIceServers(servers: readonly IceServer[]): RTCIceServer[] {
 
 export function createMachineDialer(
   directory: ClientSignaling,
-  deps: { RTCPeerConnection?: typeof RTCPeerConnection } = {},
+  deps: { RTCPeerConnection?: typeof RTCPeerConnection; log?: (message: string) => void } = {},
 ): MachineDialer {
   const PeerConnection = deps.RTCPeerConnection ?? globalThis.RTCPeerConnection;
+  const log = deps.log ?? ((message: string) => console.warn(`[overdeck] ${message}`));
   const byKey = new Map<string, PeerEntry>();
   /** Peer connections being created, so concurrent dials to one machine share one connection. */
   const creating = new Map<string, Promise<{ entry: PeerEntry; channel: RTCDataChannel }>>();
@@ -82,6 +89,7 @@ export function createMachineDialer(
   function closeEntry(entry: PeerEntry, error: Error): void {
     if (entry.closed) return;
     entry.closed = true;
+    log(`rtc ${entry.peer.slice(0, 8)} closing session ${entry.session.slice(0, 8)}: ${error.message}`);
     if (byKey.get(entry.key) === entry) byKey.delete(entry.key);
     for (const off of entry.unsubscribe.splice(0)) off();
     try {
@@ -90,6 +98,8 @@ export function createMachineDialer(
       // Already closed.
     }
     for (const waiter of [...entry.waiters]) waiter(error);
+    for (const duplex of [...entry.duplexes]) duplex.destroy(new Error(`direct connection closed: ${error.message}`));
+    entry.duplexes.clear();
   }
 
   function send(entry: PeerEntry, data: SignalData): void {
@@ -135,6 +145,7 @@ export function createMachineDialer(
       pendingRemote: [],
       pendingLocal: [],
       waiters: new Set(),
+      duplexes: new Set(),
       unsubscribe: [],
       remoteSet: false,
       localSent: false,
@@ -213,7 +224,10 @@ export function createMachineDialer(
           return;
         }
         entry.everOpen = true;
-        resolve(new RtcDuplexWeb(channel, entry.peer));
+        const duplex = new RtcDuplexWeb(channel, entry.peer);
+        entry.duplexes.add(duplex);
+        duplex.once('close', () => entry.duplexes.delete(duplex));
+        resolve(duplex);
       };
       const onOpen = (): void => finish(null);
       const onClose = (): void => finish(new Error('data channel closed before it opened'));

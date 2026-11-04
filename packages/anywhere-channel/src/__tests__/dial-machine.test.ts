@@ -1,9 +1,17 @@
 /** PAN-4833 WI-9: the machine dialer over fake peer connections, a fake directory and fake timers. */
+import { createRequire } from 'node:module';
+
 import type { ClientToDirectoryFrame, DirectoryToClientFrame, SignalData } from '@overdeck/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type ClientSignaling, createMachineDialer } from '../dial-machine.js';
+import { ChannelOpenError } from '../initiator.js';
+import type { StaticKeyPair } from '../noise.js';
 import { RtcDuplexWeb } from '../rtc-duplex-web.js';
+import { openSecureChannel } from '../secure-channel-web.js';
+
+const _require = createRequire(import.meta.url);
+const dh = _require('noise-handshake/dh') as { generateKeyPair(): StaticKeyPair };
 
 class FakeDataChannel extends EventTarget {
   readyState: RTCDataChannelState = 'connecting';
@@ -125,8 +133,20 @@ const flush = async (): Promise<void> => {
 
 function setup() {
   const dir = fakeDirectory();
-  const dialer = createMachineDialer(dir.directory, { RTCPeerConnection: FakePeerConnection as unknown as typeof RTCPeerConnection });
-  return { ...dir, dialer };
+  const logs: string[] = [];
+  const dialer = createMachineDialer(dir.directory, {
+    RTCPeerConnection: FakePeerConnection as unknown as typeof RTCPeerConnection,
+    log: (message) => logs.push(message),
+  });
+  return { ...dir, dialer, logs };
+}
+
+/** Dial and open the first channel; resolves with the raw channel. */
+async function openRaw(dialer: ReturnType<typeof setup>['dialer'], environmentId: string): Promise<RtcDuplexWeb> {
+  const dialing = dialer.dialMachine(environmentId, { relay: false });
+  await flush();
+  FakePeerConnection.instances.at(-1)!.channels.at(-1)!.open();
+  return dialing;
 }
 
 beforeEach(() => {
@@ -217,7 +237,8 @@ describe('createMachineDialer', () => {
     const first = dialer.dialMachine('env-1', { relay: false });
     await flush();
     FakePeerConnection.instances[0]!.channels[0]!.open();
-    await first;
+    // Closing the connection ends the raw channel with an error.
+    (await first).on('error', () => {});
     FakePeerConnection.instances[0]!.setState('failed');
     expect(FakePeerConnection.instances[0]!.closed).toBe(true);
 
@@ -249,6 +270,58 @@ describe('createMachineDialer', () => {
     expect(await dialing).toBeInstanceOf(Error);
     expect(pc.channels[0]!.closed).toBe(true);
     expect(pc.closed).toBe(true);
+  });
+
+  it('ends every open raw channel with an error when the dialer closes its peer connection', async () => {
+    const { dialer } = setup();
+    const raw = await openRaw(dialer, 'env-1');
+    const events: string[] = [];
+    let error: unknown;
+    raw.on('error', (e: unknown) => {
+      events.push('error');
+      error = e;
+    });
+    raw.on('close', () => events.push('close'));
+
+    dialer.close('env-1');
+    await flush();
+
+    expect(events).toEqual(['error', 'close']);
+    expect(raw.destroyed).toBe(true);
+    expect((error as Error).message).toBe('direct connection closed: dialer closed');
+    expect(FakePeerConnection.instances[0]!.channels[0]!.closed).toBe(true);
+  });
+
+  it('a handshake running on a closed connection fails as unreachable', async () => {
+    const { dialer } = setup();
+    const raw = await openRaw(dialer, 'env-1');
+    const opening = openSecureChannel(raw, {
+      mode: 'link',
+      localKey: dh.generateKeyPair(),
+      remoteKeyHex: Buffer.from(dh.generateKeyPair().publicKey).toString('hex'),
+    }).catch((e: unknown) => e);
+    await flush();
+
+    dialer.close('env-1');
+    await flush();
+
+    const error = await opening;
+    expect(error).toBeInstanceOf(ChannelOpenError);
+    expect((error as ChannelOpenError).code).toBe('unreachable');
+    // Rejected on the close, not by the 10 s open deadline.
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('logs one line per closed connection with shortened ids and no SDP', async () => {
+    const { dialer, logs } = setup();
+    (await openRaw(dialer, '933e853d-6c1a-4f7e-9d2b-1a2b3c4d5e6f')).on('error', () => {});
+
+    dialer.close();
+    dialer.close();
+
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).toMatch(/^rtc [0-9a-f-]{8} closing session [0-9a-f]{8}: dialer closed$/);
+    expect(logs.some((line) => line.includes('v=0'))).toBe(false);
   });
 
   it('rejects with an AbortError when the caller aborts', async () => {
