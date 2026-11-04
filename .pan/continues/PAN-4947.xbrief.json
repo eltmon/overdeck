@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4947",
   "created": "2026-11-04T05:30:29.044Z",
-  "updated": "2026-11-04T05:44:50.811Z",
+  "updated": "2026-11-04T05:47:45.877Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-11-04T05:44:48.371Z"
     },
     "funnel-middleware": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4947",
-      "claimedAt": "2026-11-04T05:44:50.811Z"
+      "claimedAt": "2026-11-04T05:44:50.811Z",
+      "doneAt": "2026-11-04T05:47:45.876Z"
     }
   }
 }
