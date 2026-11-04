@@ -567,6 +567,8 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'PATCH /api/machines/:id',                     kind: 'http', disposition: 'WRITE',       door: 'link-store.setLinkHidden (Hide this machine) (PAN-4650)' },
   { surface: 'GET /api/directory',                         kind: 'http', disposition: 'AGGREGATE',   door: 'directory-client.status (PAN-2356)' },
   { surface: 'GET /api/account',                           kind: 'http', disposition: 'AGGREGATE',   door: 'account-view: account.json + cached /v1/me + directory-client plan and relay (PAN-4960)' },
+  { surface: 'POST /api/account/sign-in',                   kind: 'http', disposition: 'WRITE',       door: 'account-sign-in.begin: pending PKCE slot (PAN-4960)' },
+  { surface: 'GET /oauth/account/callback',                kind: 'http', disposition: 'WRITE',       door: 'account-sign-in.complete -> /oauth/token + writeAccount + directory recheck (PAN-4960)' },
   { surface: 'POST /api/directory/join',                   kind: 'http', disposition: 'WRITE',       door: 'directory-approval.join -> directory approval-request (PAN-2356)' },
   { surface: 'POST /api/directory/joins/:requestId/accept', kind: 'http', disposition: 'WRITE',      door: 'directory-approval.accept (PAN-2356)' },
   { surface: 'POST /api/directory/joins/:requestId/reject', kind: 'http', disposition: 'WRITE',      door: 'directory-approval.rejectJoin -> directory approval-cancel (PAN-2356)' },
