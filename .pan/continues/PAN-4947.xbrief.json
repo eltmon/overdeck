@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-4947",
   "created": "2026-11-04T05:30:29.044Z",
-  "updated": "2026-11-04T06:24:29.058Z",
+  "updated": "2026-11-04T06:52:06.688Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-04T06:52:06.688Z"
+    }
+  ],
   "items": {
     "public-mcp-flag": {
       "status": "completed",
@@ -220,5 +226,6 @@
       "doneAt": "2026-11-04T06:21:08.461Z"
     }
   },
-  "feedback": []
+  "feedback": [],
+  "agentModel": "claude-opus-5-5"
 }
