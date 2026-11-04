@@ -66,7 +66,12 @@ import {
 } from '../services/derived-issue-state.js';
 import { evaluateIssueMergeGate, type MergeGateResult } from '../../../lib/cloister/merge-gate.js';
 import { deftAutoMergeHold } from '../../../lib/deft/policy.js';
-import { getSharedIssueService } from '../services/issue-service-singleton.js';
+// PAN-4970: moved to services/auto-merge-door-policy.js to break an import
+// cycle through services/uat-train.js and services/merge-path-owner.js.
+// Re-exported so existing importers (auto-merge-scheduler.ts, its tests)
+// keep resolving autoMergePolicyRefusal from here.
+import { autoMergePolicyRefusal, cachedIssueLabels } from '../services/auto-merge-door-policy.js';
+export { autoMergePolicyRefusal };
 import type { PipelineMembership } from '../../../lib/pipeline-membership.js';
 
 const readUnknownJsonBody = Effect.gen(function* () {
@@ -97,7 +102,8 @@ export interface MergeTrainQueueEntry {
    * False = one ready feature merges directly.
    */
   holdsForUat: boolean;
-  queue: MergeQueueItem[];
+  /** PAN-4970: `mergesPerPr` marks the items the per-PR auto-merge scheduler owns, not this batch. */
+  queue: Array<MergeQueueItem & { mergesPerPr: boolean }>;
 }
 
 /** One project's UAT generation chain as served by GET /api/merge-train/generations. */
@@ -132,9 +138,17 @@ async function queueEntryForProject(
   // Imported here so the conflict-ordering module's git work is only loaded
   // when a queue is actually computed.
   const { computeMergeQueueFromCandidates } = await import('../../../lib/flywheel-merge-order.js');
-  const queue = await Effect.runPromise(
+  const rawQueue = await Effect.runPromise(
     computeMergeQueueFromCandidates(candidates, projectPath).pipe(Effect.provide(nodeServicesLayer)),
   );
+  // PAN-4970: mark the items the per-PR auto-merge scheduler already owns —
+  // this batch never claims them, and the page says so instead of promising
+  // a batch that will never assemble.
+  const { mergePathOwner } = await import('../services/merge-path-owner.js');
+  const queue = await Promise.all(rawQueue.map(async (item) => ({
+    ...item,
+    mergesPerPr: (await mergePathOwner(item.issueId, projectPath, config)) === 'per-pr',
+  })));
   // Review of #4017: a lone ready feature's hold is its own (label, then
   // project, then global), the same one the reconciler applies — the page must
   // not say "merges directly" for a feature that gets a UAT batch.
@@ -521,32 +535,6 @@ export interface AutoMergeScheduleDeps {
   deftHold?: (issueId: string) => Promise<string | null>;
 }
 
-/**
- * PAN-3932: the issue's `auto-merge` / `hold-for-uat` labels from the cached
- * tracker row. The auto-merge policy map is polled across every in-flight
- * issue, so it reads the cache rather than asking the forge per issue.
- */
-function cachedIssueLabels(issueId: string): readonly string[] {
-  try {
-    return getSharedIssueService().getTrackerIssue(issueId)?.labels ?? [];
-  } catch {
-    return [];
-  }
-}
-
-/**
- * #3983: whether the cached tracker row says the issue is closed. An issue the
- * cache does not know reads as open here; the executor reads the tracker live
- * before it merges.
- */
-function cachedIssueClosed(issueId: string): boolean {
-  try {
-    return getSharedIssueService().getTrackerIssue(issueId)?.open === false;
-  } catch {
-    return false;
-  }
-}
-
 export interface AutoMergeCancelDeps {
   now?: () => Date;
   getPending?: (issueId: string) => PendingAutoMerge | null;
@@ -575,37 +563,6 @@ function announceAutoMergeCancelled(issueId: string): void {
     source: 'dashboard',
     eventType: 'auto-merge-cancelled',
   });
-}
-
-type AutoMergePolicyDeps = Pick<
-  AutoMergeScheduleDeps,
-  'getIssueLabels' | 'getProjectAutoMergeDefault' | 'isRequireUatBeforeMerge' | 'isMergeTrainEnabled' | 'isIssueClosed'
->;
-
-/**
- * The schedule door's policy check, which reads no forge: the issue's UAT hold
- * (its `auto-merge` / `hold-for-uat` label (PAN-3932), then the project
- * default, then global), the merge-train switch, and a closed tracker issue
- * (from the cached tracker row). The scheduler (#3983) asks it first, so a held
- * PR costs no forge read per tick.
- */
-export function autoMergePolicyRefusal(
-  issueId: string,
-  deps: AutoMergePolicyDeps = {},
-): { status: 412 | 422; body: { error: string } } | null {
-  if ((deps.isIssueClosed ?? cachedIssueClosed)(issueId)) {
-    return { status: 422, body: { error: `${issueId} is closed in the tracker` } };
-  }
-  const labels = (deps.getIssueLabels ?? cachedIssueLabels)(issueId);
-  const projectDefault = (deps.getProjectAutoMergeDefault ?? getProjectAutoMergeDefault)(issueId);
-  const globalRequireUat = (deps.isRequireUatBeforeMerge ?? isFlywheelRequireUatBeforeMerge)();
-  if (shouldHoldForUat(autoMergeFromLabels(labels), projectDefault, globalRequireUat)) {
-    return { status: 412, body: { error: 'UAT is still required before merge' } };
-  }
-  if (!(deps.isMergeTrainEnabled ?? isMergeTrainEnabled)()) {
-    return { status: 412, body: { error: 'Merge train is disabled' } };
-  }
-  return null;
 }
 
 /**

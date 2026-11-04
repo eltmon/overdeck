@@ -152,6 +152,32 @@ export type PromoteResult =
 
 const PROMOTABLE: readonly UatGenerationStatus[] = ['ready', 'superseded'];
 
+/**
+ * The fast, forge-free refusal for a promote request: a generation that
+ * doesn't exist (wrong name, or a different project's name) or isn't in a
+ * promotable status. Returns null when `gen` is ready to promote, so a
+ * caller can refuse before any forge read (PAN-4970: the Merge batch button
+ * on a stale/invalidated card used to pay for a round of per-member forge
+ * reads before reporting the same 409).
+ */
+export function promoteStatusRefusal(
+  name: string,
+  gen: UatGeneration | null | undefined,
+  projectRoot?: string,
+): PromoteResult & { success: false } | null {
+  if (!gen || (projectRoot !== undefined && gen.projectRoot !== projectRoot)) {
+    return { success: false, reason: 'not-found', message: `No UAT generation named ${name}` };
+  }
+  if (!PROMOTABLE.includes(gen.status)) {
+    return {
+      success: false,
+      reason: 'wrong-status',
+      message: `${name} is ${gen.status} — only a ready or superseded batch can be merged to main`,
+    };
+  }
+  return null;
+}
+
 export function buildPromoteMergeMessage(gen: UatGeneration): string {
   const ids = gen.members.map((m) => m.issueId).join(', ');
   const resolutionNote = gen.resolutions.length > 0
@@ -169,17 +195,11 @@ export async function promoteUatGeneration(
 ): Promise<PromoteResult> {
   const log = deps.log ?? (() => {});
 
-  const gen = deps.store.get(name);
-  if (!gen || gen.projectRoot !== projectRoot) {
-    return { success: false, reason: 'not-found', message: `No UAT generation named ${name}` };
-  }
-  if (!PROMOTABLE.includes(gen.status)) {
-    return {
-      success: false,
-      reason: 'wrong-status',
-      message: `${name} is ${gen.status} — only a ready or superseded batch can be merged to main`,
-    };
-  }
+  const stored = deps.store.get(name);
+  const statusRefusal = promoteStatusRefusal(name, stored, projectRoot);
+  if (statusRefusal) return statusRefusal;
+  // promoteStatusRefusal returning null guarantees stored exists and is promotable.
+  const gen = stored as UatGeneration;
 
   const notReady = gen.members
     .map((m) => ({ issueId: m.issueId, gate: deps.memberEligibility(m.issueId) }))

@@ -6,6 +6,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   promoteUatGeneration,
+  promoteStatusRefusal,
   buildPromoteMergeMessage,
   type UatPromoteDeps,
 } from '../../../../src/lib/cloister/uat-promote.js';
@@ -74,6 +75,39 @@ function makeDeps(rows: UatGeneration[], options: { mainSha?: string; failMerge?
     log: () => {},
   };
 }
+
+// promote-fast-refusal.ac1
+describe('promoteStatusRefusal', () => {
+  it('refuses with wrong-status for every non-promotable status', () => {
+    for (const status of ['invalidated', 'failed', 'assembling', 'promoted'] as const) {
+      expect(promoteStatusRefusal('uat/pan-x-0610', gen('uat/pan-x-0610', status))).toMatchObject({
+        success: false,
+        reason: 'wrong-status',
+        message: `uat/pan-x-0610 is ${status} — only a ready or superseded batch can be merged to main`,
+      });
+    }
+  });
+
+  it('returns null for a ready or superseded generation', () => {
+    expect(promoteStatusRefusal('uat/pan-x-0610', gen('uat/pan-x-0610', 'ready'))).toBeNull();
+    expect(promoteStatusRefusal('uat/pan-x-0610', gen('uat/pan-x-0610', 'superseded'))).toBeNull();
+  });
+
+  it('refuses with not-found for an undefined generation', () => {
+    expect(promoteStatusRefusal('uat/pan-ghost-0610', undefined)).toEqual({
+      success: false,
+      reason: 'not-found',
+      message: 'No UAT generation named uat/pan-ghost-0610',
+    });
+    expect(promoteStatusRefusal('uat/pan-ghost-0610', null)).toMatchObject({ reason: 'not-found' });
+  });
+
+  it('refuses with not-found when the generation belongs to a different project root', () => {
+    expect(promoteStatusRefusal('uat/pan-x-0610', gen('uat/pan-x-0610', 'ready'), '/other-proj')).toMatchObject({
+      reason: 'not-found',
+    });
+  });
+});
 
 describe('promoteUatGeneration — success', () => {
   it('merges the batch, flips to promoted, tears down its stack, fires post-merge once per member', async () => {
