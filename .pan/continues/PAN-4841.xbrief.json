@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4841",
   "created": "2026-11-04T10:01:07.580Z",
-  "updated": "2026-11-04T10:07:48.532Z",
+  "updated": "2026-11-04T10:07:56.442Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-4841",
       "claimedAt": "2026-11-04T10:05:11.652Z",
       "doneAt": "2026-11-04T10:07:48.531Z"
+    },
+    "rel-android-build-script": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4841",
+      "claimedAt": "2026-11-04T10:07:56.441Z"
     }
   }
 }
