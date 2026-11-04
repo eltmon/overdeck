@@ -12,6 +12,7 @@ import { DEFAULT_CONFIG } from './defaults.js';
 import { normalizeOllamaConfig } from './ollama.js';
 import { normalizeJevConfig } from './jev.js';
 import { defaultPushConfig, mergePushConfig } from './push-config.js';
+import { defaultMcpConfig, mergeMcpConfig } from './mcp-config.js';
 import { normalizeSecurityConfig } from './semgrep.js';
 import { normalizeGovernorReserves } from './governor-reserves.js';
 import { cloneRoles, DEFAULT_ROLES, DEFAULT_WORKHORSES, mergeRoleConfig, validateRoleModelRefs } from './roles.js';
@@ -232,6 +233,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       mutedIssues: [...DEFAULT_CONFIG.tts.mutedIssues],
     },
     push: defaultPushConfig(),
+    mcp: defaultMcpConfig(),
     ttsSummarizer: {
       enabled: DEFAULT_CONFIG.ttsSummarizer.enabled,
       model: DEFAULT_CONFIG.ttsSummarizer.model,
@@ -747,6 +749,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
     // Merge needs-you push configuration (PAN-2354)
     mergePushConfig(result.push, config);
+    mergeMcpConfig(result.mcp, config);
 
     // Merge TTS summarizer configuration
     if (config.tts?.summarizer) {
