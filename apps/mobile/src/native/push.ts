@@ -19,6 +19,8 @@ import { OverdeckKeys, type OverdeckKeysPlugin } from './keys';
 
 export const PUSH_TOKEN_KEY = 'overdeck.pushToken';
 export const NOTIFICATIONS_PREF_KEY = 'overdeck.notifications';
+/** Set once the app has asked for permission on its own; sign-out clears it (PAN-4840 FR-7). */
+export const PUSH_ASKED_KEY = 'overdeck.pushAsked';
 /** `unavailable`: an Android build without a Firebase config (PAN-4840 NFR-2). */
 export type PushPermission = 'granted' | 'denied' | 'prompt' | 'unknown' | 'unavailable';
 
@@ -146,8 +148,12 @@ export function startPush({
     });
   };
 
-  /** R2: check, ask once while iOS says `prompt`, and register when granted. */
-  const refreshPermission = async () => {
+  /**
+   * R2: check, and register when granted. Startup asks while the OS says `prompt` only if the app
+   * has not asked since sign-in, so a dismissed Android dialog does not return on every reload
+   * (PAN-4840 FR-7); the Notifications switch always asks.
+   */
+  const refreshPermission = async (ask: 'once' | 'always') => {
     if (!(await configured)) {
       if (stopped) return;
       permission = 'unavailable';
@@ -155,7 +161,11 @@ export function startPush({
       return;
     }
     let status = await plugin.checkPermissions();
-    if (status.receive === 'prompt' || status.receive === 'prompt-with-rationale') status = await plugin.requestPermissions();
+    const canAsk = ask === 'always' || readStorage(PUSH_ASKED_KEY) === null;
+    if (canAsk && (status.receive === 'prompt' || status.receive === 'prompt-with-rationale')) {
+      writeStorage(PUSH_ASKED_KEY, '1');
+      status = await plugin.requestPermissions();
+    }
     if (stopped) return;
     permission = toPermission(status.receive);
     notify();
@@ -194,7 +204,7 @@ export function startPush({
         return;
       }
       handles.push(...added);
-      if (enabled) await refreshPermission();
+      if (enabled) await refreshPermission('once');
     } catch (error) {
       log('push setup failed', error);
     }
@@ -218,7 +228,7 @@ export function startPush({
       enabled = true;
       writeStorage(NOTIFICATIONS_PREF_KEY, null);
       try {
-        await refreshPermission();
+        await refreshPermission('always');
       } catch (error) {
         log('push permission failed', error);
       }

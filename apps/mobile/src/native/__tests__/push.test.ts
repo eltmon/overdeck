@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   NOTIFICATIONS_PREF_KEY,
+  PUSH_ASKED_KEY,
   PUSH_TOKEN_KEY,
   type PushDeps,
   type PushDirectory,
@@ -106,6 +107,8 @@ describe('startPush', () => {
     expect(asked.calls).toEqual(['addListener:registration', 'addListener:registrationError', 'checkPermissions', 'requestPermissions', 'register']);
     expect(control.permission).toBe('granted');
 
+    // A separate install: it has not asked yet.
+    localStorage.removeItem(PUSH_ASKED_KEY);
     const denied = fakePlugin('prompt-with-rationale', 'denied');
     const deniedControl = startPush({ directory: fakeDirectory().directory, platform: 'ios', plugin: denied.plugin, keys, log: () => {} });
     await settle();
@@ -277,6 +280,25 @@ describe('startPush on Android (PAN-4840)', () => {
     fake.emit('registration', { value: TOKEN });
     await settle();
     expect(sent).toEqual([{ type: 'push-register', platform: 'android', token: TOKEN }]);
+  });
+
+  it('asks on its own only once per sign-in; a dismissed dialog does not return on the next start', async () => {
+    const first = fakePlugin('prompt', 'prompt');
+    startPush({ directory: fakeDirectory('online').directory, platform: 'android', plugin: first.plugin, keys, overdeckPush: firebase(true), log: () => {} });
+    await settle();
+    expect(first.plugin.requestPermissions).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem(PUSH_ASKED_KEY)).toBe('1');
+
+    // The next page load (a machine switch reloads the page) still sees `prompt`.
+    const second = fakePlugin('prompt', 'prompt');
+    const push = startPush({ directory: fakeDirectory('online').directory, platform: 'android', plugin: second.plugin, keys, overdeckPush: firebase(true), log: () => {} });
+    await settle();
+    expect(second.plugin.requestPermissions).not.toHaveBeenCalled();
+    expect(push.permission).toBe('prompt');
+
+    // The Notifications switch always asks.
+    await push.enable();
+    expect(second.plugin.requestPermissions).toHaveBeenCalledTimes(1);
   });
 
   it('does not register when Android says denied', async () => {
