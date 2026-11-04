@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-4957",
   "created": "2026-11-04T16:52:59.952Z",
-  "updated": "2026-11-04T17:16:22.544Z",
+  "updated": "2026-11-04T17:17:07.136Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-04T17:17Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-04T17:17:07.136Z"
+    }
+  ],
   "items": {
     "ci-job-skill-check": {
       "status": "completed",
@@ -95,5 +101,14 @@
       "status": "completed",
       "doneAt": "2026-11-04T17:16:22.544Z"
     }
-  }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-04T17:17:07Z",
+      "markdownBody": "# CI Failure Feedback for PAN-4957\n\nPull request: https://github.com/eltmon/overdeck/pull/5040 (head `31cc535b`)\n\nSource: check_run:lint-group (core)\n\n## Failing checks (2)\n\n### lint\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/126735343275/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/41875921886/job/126735343275  \n```\n2026-11-04T17:16:33.1275712Z Current runner version: '2.338.2'\n##[group]Runner Image Provisioner\nHosted Compute Agent\nVersion: 20261028.624\nCommit: 54898b74c23fde5556c9b3c3a2290865feef0dfe\nBuild Date: 2026-10-28T21:51:42Z\nWorker ID: {37936f52-c01c-45db-94d6-daa96ce63403}\nRegion: centralus\nCloud: Azure\n##[endgroup]\n##[group]Operating System\nUbuntu\n24.04.5\nLTS\n##[endgroup]\n##[group]Runner Image\nImage: ubuntu-24.04\nVersion: 20261101.360.1\nIncluded Software: https://github.com/actions/runner-images/blob/ubuntu24/20261101.360/images/ubuntu/Ubuntu2404-Readme.md\nImage Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261101.360\n##[endgroup]\n##[group]GITHUB_TOKEN Permissions\nContents: read\nMetadata: read\nPackages: read\n##[endgroup]\nSecret source: Actions\nCache mode: write\nPrepare workflow directory\nPrepare all required actions\nComplete job name: lint\n##[group]Run echo \"lint-group: cancelled\"\n\u001b[36;1mecho \"lint-group: cancelled\"\u001b[0m\n\u001b[36;1mtest \"cancelled\" = success\u001b[0m\nshell: /usr/bin/bash -e {0}\nenv:\n  SKIP_DOCS_INDEX: 1\n##[endgroup]\nlint-group: cancelled\n##[error]Process completed with exit code 1.\nCleaning up orphan processes\n```\n\n### test\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/126735342491/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/41875921886/job/126735342491  \n```\n2026-11-04T17:16:33.0305661Z Current runner version: '2.338.2'\n##[group]Runner Image Provisioner\nHosted Compute Agent\nVersion: 20261021.618\nCommit: 21505ad2541d5be6135ed84fc33697146cf75b8e\nBuild Date: 2026-10-21T00:45:21Z\nWorker ID: {f0bcb094-9d95-43bf-a4c1-d546eaf22d1e}\nRegion: westus3\nCloud: Azure\n##[endgroup]\n##[group]Operating System\nUbuntu\n24.04.5\nLTS\n##[endgroup]\n##[group]Runner Image\nImage: ubuntu-24.04\nVersion: 20261025.353.1\nIncluded Software: https://github.com/actions/runner-images/blob/ubuntu24/20261025.353/images/ubuntu/Ubuntu2404-Readme.md\nImage Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261025.353\n##[endgroup]\n##[group]GITHUB_TOKEN Permissions\nContents: read\nMetadata: read\nPackages: read\n##[endgroup]\nSecret source: Actions\nCache mode: write\nPrepare workflow directory\nPrepare all required actions\nComplete job name: test\n##[group]Run echo \"test-shard:     cancelled\"\n\u001b[36;1mecho \"test-shard:     cancelled\"\u001b[0m\n\u001b[36;1mecho \"test-e2e:       cancelled\"\u001b[0m\n\u001b[36;1mecho \"mobile-android: cancelled\"\u001b[0m\n\u001b[36;1mecho \"integrations:   cancelled\"\u001b[0m\n\u001b[36;1mtest \"cancelled\" = success\u001b[0m\n\u001b[36;1mtest \"cancelled\" = success\u001b[0m\n\u001b[36;1mtest \"cancelled\" = success\u001b[0m\n\u001b[36;1mtest \"cancelled\" = success\u001b[0m\nshell: /usr/bin/bash -e {0}\nenv:\n  SKIP_DOCS_INDEX: 1\n##[endgroup]\ntest-shard:     cancelled\ntest-e2e:       cancelled\nmobile-android: cancelled\nintegrations:   cancelled\n##[error]Process completed with exit code 1.\nCleaning up orphan processes\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ]
 }
