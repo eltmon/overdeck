@@ -1304,4 +1304,11 @@ describe("AcpHost", () => {
       resumeSessionId: "persisted-session",
     });
   });
+
+  it("parses --mcp-config into mcpConfig only when it is passed (PAN-4934)", () => {
+    const base = ["--agent", "a", "--provider", "opencode", "--workspace", "/w", "--binary-path", "/opt/opencode"];
+    expect(parseAcpHostArgs([...base, "--mcp-config", "/h/agents/a/overdeck-mcp.json"]))
+      .toMatchObject({ mcpConfig: "/h/agents/a/overdeck-mcp.json" });
+    expect(parseAcpHostArgs(base)).not.toHaveProperty("mcpConfig");
+  });
 });

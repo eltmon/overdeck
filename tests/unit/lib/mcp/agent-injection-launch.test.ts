@@ -71,4 +71,23 @@ describe('buildAgentLaunchConfig overdeck MCP (PAN-4932)', () => {
     const { launcherContent } = await buildAgentLaunchConfig({ agentId: 'agent-pan-4932-docker', model: 'claude-sonnet-4-6', workspace, role: 'work' });
     expect(launcherContent).not.toContain('--mcp-config=');
   });
+
+  it('injects the server into a fresh opencode work launch (PAN-4934)', async () => {
+    const agentId = 'agent-pan-4934-oc';
+    const dir = join(home, 'agents', agentId);
+    const { launcherContent } = await buildAgentLaunchConfig({
+      agentId,
+      model: 'opencode/big-pickle',
+      workspace,
+      role: 'work',
+      harness: 'opencode',
+      harnessBinaryPath: '/opt/opencode/bin/opencode',
+    });
+
+    expect(launcherContent).toContain('dist/acp-host.js');
+    expect(launcherContent).toContain(`--mcp-config '${join(dir, 'overdeck-mcp.json')}'`);
+    expect(launcherContent).not.toContain('odk_');
+    expect(launcherContent).not.toContain('--allowedTools');
+    expect(statSync(join(dir, 'mcp-token')).mode & 0o777).toBe(0o600);
+  });
 });

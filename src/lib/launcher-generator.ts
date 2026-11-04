@@ -884,6 +884,7 @@ function buildAcpCommand(config: LauncherConfig, useExec: boolean): string[] {
   if (config.acpContextFile) {
     tokens.push('--context-file', shellQuote(config.acpContextFile));
   }
+  if (config.overdeckMcpConfig) tokens.push('--mcp-config', shellQuote(config.overdeckMcpConfig));
   if (config.acpProvider === 'kimi' && config.model) {
     const effort = resolveKimiNativeEffort(config.model, config.acpEffort);
     if (effort) tokens.push('--effort', shellQuote(effort));

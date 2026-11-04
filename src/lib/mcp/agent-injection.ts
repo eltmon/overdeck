@@ -8,6 +8,7 @@
  * its path. The config names only the token file; the token never leaves `mcp-token`.
  * It returns `{}` when injection is off and never throws: a failed mint starts the
  * agent without the server and logs one warning.
+ * The file is Claude Code's `--mcp-config` format; the ACP host reads the same file and converts it (PAN-4934).
  */
 import { randomUUID } from 'node:crypto';
 import { mkdir, rename, unlink, writeFile } from 'node:fs/promises';
@@ -95,9 +96,12 @@ async function mintOverdeckTokenFile(owner: OverdeckMcpLaunchOwner): Promise<{ d
   return { dir, tokenFile };
 }
 
-/** D-2/D-3: `{}` unless a Claude Code launch is enabled; never throws. */
+/** Launch kinds whose command builder reads `overdeckMcpConfig`: Claude Code `--mcp-config=` and the ACP host's `--mcp-config` (PAN-4934). */
+const OVERDECK_MCP_JSON_LAUNCH_KINDS: ReadonlySet<string> = new Set(['claude-code', 'acp-host']);
+
+/** D-2/D-3: `{}` unless a Claude Code or ACP launch is enabled; never throws. */
 export async function prepareClaudeOverdeckMcp(owner: OverdeckMcpLaunchOwner): Promise<{ overdeckMcpConfig?: string }> {
-  if (getHarnessBehavior(owner.harness).launchCommandKind !== 'claude-code') return {};
+  if (!OVERDECK_MCP_JSON_LAUNCH_KINDS.has(getHarnessBehavior(owner.harness).launchCommandKind)) return {};
   try {
     const minted = await mintOverdeckTokenFile(owner);
     if (minted === null) return {};

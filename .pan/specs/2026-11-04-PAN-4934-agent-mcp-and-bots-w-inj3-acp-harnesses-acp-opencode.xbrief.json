@@ -1,0 +1,619 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T02:51:18Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4934: Agent MCP and bots (W-INJ3): ACP harnesses (acp, opencode)",
+    "updated": "2026-11-04T02:59:18.454Z"
+  },
+  "plan": {
+    "id": "pan-4934",
+    "title": "Agent MCP and bots (W-INJ3): ACP harnesses (acp, opencode)",
+    "status": "running",
+    "uid": "8376bdd6-f577-4407-8e92-ce51175221c2",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-04T02:51:18Z",
+    "updated": "2026-11-04T02:59:18.454Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4934",
+        "label": "PAN-4934",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4927",
+        "label": "PAN-4927 (epic)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4934.md",
+        "label": "PRD PAN-4934",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/pan-4927.md",
+        "label": "Epic PRD, work item W-INJ3",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "mcp",
+      "acp",
+      "opencode",
+      "kimi",
+      "agent-tokens",
+      "pan-4927"
+    ],
+    "narratives": {
+      "Problem": "Claude Code agents get the `overdeck` MCP server since PAN-4932, but agents on the ACP harnesses (`acp` = Kimi Code over ACP, `opencode` = OpenCode over ACP) get nothing. The ACP host sends `mcpServers` in `session/new` and `session/load`, but the field is always `[]`: the host has no flag for it, `buildAcpCommand` ignores `overdeckMcpConfig`, `prepareClaudeOverdeckMcp` returns `{}` for every launch kind but `claude-code`, and both ACP harnesses declare `overdeckMcp: false`.",
+      "Proposal": "Reuse W-INJ1's per-owner `overdeck-mcp.json`. Every ACP launch site already spreads `prepareClaudeOverdeckMcp` with the real harness, so: (1) declare `overdeckMcp: true` for `acp` and `opencode`; (2) widen the helper's launch-kind guard to the closed set {claude-code, acp-host}; (3) `buildAcpCommand` passes `--mcp-config <path>` to the host; (4) a new leaf `src/lib/acp/mcp-config.ts` converts the file's stdio entries to ACP `McpServerStdio` (`env` as `{name,value}[]`, no `type`) and degrades to `[]` with one stderr line; (5) the host parses `--mcp-config` and passes `mcpServers` to `makeRuntime`, which already forwards it to `session/new` and `session/load`. A planning probe showed opencode 1.18.31 and kimi 2.0.2 spawn a stdio server and call `tools/list` on both requests; CP-3 then verifies the real path end to end and records it in `configuration/harnesses.mdx`.",
+      "NonGoals": "- Renaming `prepareClaudeOverdeckMcp` or `writeClaudeOverdeckMcpConfig` (PRD D-1)\n- Codex injection (W-INJ2, PAN-4933)\n- The MCP/CLI instructions blocks in the ACP launch context (W-INJ4)\n- Provisioning role-declared `mcpServers` (Playwright etc.) for ACP harnesses\n- The ACP `http` or `sse` MCP transports; stdio only, so no token enters an ACP payload\n- `kimi-code` (native TUI), `ohmypi`, `muse`, `prime-agent`\n- Changing `OPENCODE_PRE_ALLOWED_PERMISSION` unless CP-3 shows a main-session hang\n- A committed live-probe test or probe script\n- Editing any launch call site (spawn.ts, spawn-prep.ts, conversation-runtime.ts, recovery.ts, messaging.ts, spawn-planning-session.ts, routes/misc/planning.ts)\n- Putting the agent token, or any secret, in argv, the launcher, the MCP config or an ACP payload"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Keep the names `prepareClaudeOverdeckMcp` and `writeClaudeOverdeckMcpConfig`; update the header comment to say the file is Claude Code's --mcp-config format and the ACP host reads it.",
+        "rationale": "A rename touches 8 call sites in 7 files that W-INJ2 (PAN-4933) will also edit, for no behavior change; 'Claude' names the file format, which stays accurate."
+      },
+      {
+        "summary": "Widen the helper's guard to a closed set OVERDECK_MCP_JSON_LAUNCH_KINDS = {claude-code, acp-host}, not a check of the capability alone.",
+        "rationale": "Codex (W-INJ2) needs config.toml tables, not this JSON, so the guard must list only the launch kinds whose command builders read overdeckMcpConfig."
+      },
+      {
+        "summary": "No change to getAcpLauncherFields or any launch call site (epic file list corrected, PRD C-1).",
+        "rationale": "W-INJ1 already spreads the helper into every ACP launch config with the real harness (spawn-prep, spawn, planning, conversation-runtime; recovery via buildAgentLaunchConfig)."
+      },
+      {
+        "summary": "Stdio transport only; the ACP http transport is not used even though both agents advertise it.",
+        "rationale": "http would put the token in a header inside the ACP session/new payload, which protocol capture and agent logs record (epic NFR-2)."
+      },
+      {
+        "summary": "The JSON-to-ACP conversion lives in a new leaf module src/lib/acp/mcp-config.ts; host.ts grows by at most 6 lines.",
+        "rationale": "Unit-testable without spawning the host; host.ts is 915 lines."
+      },
+      {
+        "summary": "A missing, unreadable or malformed config file makes the host log one stderr line and start with no MCP servers.",
+        "rationale": "Matches W-INJ1's never-throw degrade rule: losing the tools must never block an agent start."
+      },
+      {
+        "summary": "ACP tests go in src/lib/acp/__tests__/, not the epic's tests/unit/lib/acp/host-mcp-servers.test.ts.",
+        "rationale": "Every existing ACP test lives there (host, session-runtime, permissions, providers)."
+      },
+      {
+        "summary": "CP-3 fallback is per harness (kimi -> acp, opencode/opencode-go -> opencode), and opencode-go is covered by the opencode check.",
+        "rationale": "harnessGetsOverdeckMcp reads a per-harness capability (PAN-4932 C-2); opencode and opencode-go share one binary and support object, and session/new carries no model."
+      },
+      {
+        "summary": "Declare overdeckMcp: true for both acp and opencode in the first item, before the live check.",
+        "rationale": "The planning probe showed opencode 1.18.31 and kimi 2.0.2 spawn a stdio server and call tools/list on session/new and session/load; CP-3 can still set a harness back to false."
+      },
+      {
+        "summary": "Do not change OPENCODE_PRE_ALLOWED_PERMISSION; CP-3 checks main-session and Task-subagent tool calls and documents a subagent hang as a limitation.",
+        "rationale": "The ACP host auto-approves main-session permission asks; widening pre-allowed keys also overrides an operator's own deny (concerns.md, PAN-3937)."
+      },
+      {
+        "summary": "The CP-3 probe script is not committed; its result goes into configuration/harnesses.mdx and the PR description.",
+        "rationale": "A live test needs installed binaries, auth and a model turn; a skipIf-guarded test would trip the test-skip gate."
+      }
+    ],
+    "metadata": {
+      "prd": ".pan/drafts/PAN-4934.md",
+      "epicWorkItem": "W-INJ3",
+      "canonicalFilename": "2026-11-04-PAN-4934-agent-mcp-and-bots-w-inj3-acp-harnesses-acp-opencode.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "acp-capability-flag",
+        "title": "Declare overdeckMcp: true for the acp and opencode harnesses",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T02:51:18Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4934",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/harness-capabilities.ts",
+            "packages/contracts/src/harness-behavior.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "(cd packages/contracts && npx vitest run --configLoader runner --config vitest.config.ts src/harness-behavior.test.ts)"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "harness-behavior.test.ts exits 0 with the rewritten overdeckMcp set test"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-1. In packages/contracts/src/harness-capabilities.ts set `overdeckMcp: true` in ACP_CAPABILITIES (line 195) and OPENCODE_CAPABILITIES (line 245). Replace the field comment at line 69 with: `/** Launches get the \\`overdeck\\` MCP server with a per-agent token (PAN-4927 D-13): Claude Code (PAN-4932) and the ACP harnesses (PAN-4934). Codex follows (W-INJ2). */`. In packages/contracts/src/harness-behavior.test.ts replace the test at lines 83-88 ('only Claude Code declares overdeckMcp…') with the PRD's explicit-set test: `const injected = new Set([\"claude-code\", \"acp\", \"opencode\"])`, and for every runtime in RUNTIMES expect `capabilities.overdeckMcp` toBe `injected.has(runtime)`. Use the file's double-quote, no-semicolon style."
+        },
+        "items": [
+          {
+            "id": "acp-capability-flag.ac1",
+            "title": "Given the contracts package, when getHarnessBehavior('acp') and getHarnessBehavior('opencode') are read, then capabilities.overdeckMcp returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-capability-flag.ac2",
+            "title": "Given every runtime outside {claude-code, acp, opencode}, when its capabilities are read, then overdeckMcp returns false, and `(cd packages/contracts && npx vitest run --configLoader runner --config vitest.config.ts src/harness-behavior.test.ts)` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-capability-flag.ac3",
+            "title": "harness-capabilities.ts contains an overdeckMcp field comment naming PAN-4934 and the ACP harnesses, and harness-behavior.test.ts contains an explicit Set of injected runtimes instead of a filter on 'claude-code'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "acp-launcher-flag",
+        "title": "buildAcpCommand passes --mcp-config <path> to the ACP host",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T02:51:18Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4934",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/launcher-generator.ts",
+            "tests/unit/lib/launcher-generator-overdeck-mcp.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/launcher-generator-overdeck-mcp.test.ts src/lib/__tests__/launcher-generator.test.ts",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "both launcher test files exit 0, including the three new ACP cases",
+            "lint:file-size prints the passed line; launcher-generator.ts is at most 1000 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-3. In src/lib/launcher-generator.ts `buildAcpCommand`, directly after the `--context-file` block (search `tokens.push('--context-file'`) and before the Kimi effort block, add exactly one line: `if (config.overdeckMcpConfig) tokens.push('--mcp-config', shellQuote(config.overdeckMcpConfig));` (space form on purpose: the host's own parser reads the next argv item and no positional prompt follows). The file is 994 lines and must stay at or under 1000. In tests/unit/lib/launcher-generator-overdeck-mcp.test.ts add a base ACP_CONFIG (role 'work', workingDir '/workspace/project', harness 'opencode', acpAgentId 'agent-a', acpProvider 'opencode', acpWorkspace '/workspace/project', acpBinaryPath '/opt/opencode', model 'opencode/big-pickle', overdeckEnv { agentId: 'agent-a' }) and three tests: opencode launch with overdeckMcpConfig CONFIG_PATH has ` --mcp-config '/h/agents/a/overdeck-mcp.json'` exactly once on the acp-host.js line and no `--allowedTools`; the same for harness 'acp', acpProvider 'kimi', model 'kimi-for-coding'; no `--mcp-config` on the acp-host.js line when the field is unset."
+        },
+        "items": [
+          {
+            "id": "acp-launcher-flag.ac1",
+            "title": "Given an opencode LauncherConfig with overdeckMcpConfig '/h/agents/a/overdeck-mcp.json', when generateLauncherScript runs, then the acp-host.js line contains ` --mcp-config '/h/agents/a/overdeck-mcp.json'` exactly once and no `--allowedTools`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-launcher-flag.ac2",
+            "title": "Given a kimi acp LauncherConfig with the same overdeckMcpConfig, when generateLauncherScript runs, then its acp-host.js line contains the same flag exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-launcher-flag.ac3",
+            "title": "Given an ACP LauncherConfig without overdeckMcpConfig, when generateLauncherScript runs, then the acp-host.js line contains no `--mcp-config`, and the existing exact-match test at launcher-generator.test.ts:1957 still exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-launcher-flag.ac4",
+            "title": "`wc -l src/lib/launcher-generator.ts` reports at most 1000 lines and `npm run lint:file-size` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "acp-injection-guard",
+        "title": "prepareClaudeOverdeckMcp writes the overdeck MCP config for acp-host launches",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T02:51:18Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4934",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "acp-cp3-live-check",
+            "acp-mcp-docs"
+          ],
+          "files_scope": [
+            "src/lib/mcp/agent-injection.ts",
+            "tests/unit/lib/mcp/agent-injection.test.ts",
+            "tests/unit/lib/mcp/agent-injection-launch.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/mcp/agent-injection.test.ts tests/unit/lib/mcp/agent-injection-launch.test.ts",
+            "npm run lint:harness-branches"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "both agent-injection test files exit 0, including the new opencode/acp cases",
+            "lint:harness-branches reports no new harness-name branch"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-2. In src/lib/mcp/agent-injection.ts add, above prepareClaudeOverdeckMcp, `const OVERDECK_MCP_JSON_LAUNCH_KINDS: ReadonlySet<string> = new Set(['claude-code', 'acp-host']);` with the doc comment from the PRD, and replace line 90 `if (getHarnessBehavior(owner.harness).launchCommandKind !== 'claude-code') return {};` with `if (!OVERDECK_MCP_JSON_LAUNCH_KINDS.has(getHarnessBehavior(owner.harness).launchCommandKind)) return {};`. Change the function doc comment to '`{}` unless a Claude Code or ACP launch is enabled; never throws.' Add one header sentence: 'The file is Claude Code's `--mcp-config` format; the ACP host reads the same file and converts it (PAN-4934).' Do NOT rename the function or touch any call site. Tests: in tests/unit/lib/mcp/agent-injection.test.ts extend 'reads the overdeckMcp capability' with acp and opencode true; add 'writes the config for acp and opencode launches' (agent-pan-2 with harness 'opencode', agent-pan-3 with harness 'acp' each return `{ overdeckMcpConfig: join(home, 'agents', <id>, 'overdeck-mcp.json') }`); leave the kimi-code {} case unchanged. In tests/unit/lib/mcp/agent-injection-launch.test.ts add 'injects the server into a fresh opencode work launch' calling buildAgentLaunchConfig({ agentId: 'agent-pan-4934-oc', model: 'opencode/big-pickle', workspace, role: 'work', harness: 'opencode', harnessBinaryPath: '/opt/opencode/bin/opencode' }) and asserting the launcher contains `--mcp-config '<home>/agents/agent-pan-4934-oc/overdeck-mcp.json'` and `dist/acp-host.js`, contains neither `odk_` nor `--allowedTools`, and mcp-token has mode 0600. Implementation checkpoint: if buildAgentLaunchConfig cannot build an opencode launch in the unit harness, vi.mock '../../../../src/lib/acp/context.js' materializeAcpContextFile to return join(home, 'acp-context.md') and keep every assertion."
+        },
+        "items": [
+          {
+            "id": "acp-injection-guard.ac1",
+            "title": "Given mcp.agents true and no Docker env, when prepareClaudeOverdeckMcp runs for harness 'opencode' and for harness 'acp', then it returns { overdeckMcpConfig: '<home>/agents/<id>/overdeck-mcp.json' } and writes a 0600 mcp-token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-injection-guard.ac2",
+            "title": "Given harness 'kimi-code', when prepareClaudeOverdeckMcp runs, then it still returns {} and mints no token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-injection-guard.ac3",
+            "title": "Given a fresh opencode work agent, when buildAgentLaunchConfig builds its launcher, then the launcher contains `--mcp-config '<agentDir>/overdeck-mcp.json'` and `dist/acp-host.js`, and contains neither `odk_` nor `--allowedTools`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-injection-guard.ac4",
+            "title": "src/lib/mcp/agent-injection.ts preserves the exported names prepareClaudeOverdeckMcp and writeClaudeOverdeckMcpConfig, contains a launch-kind set holding exactly 'claude-code' and 'acp-host', and `git diff --stat` shows at most 4 added code lines plus the header sentence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "acp-mcp-config-reader",
+        "title": "New leaf module readAcpMcpServers converts the overdeck MCP config to ACP stdio entries",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T02:51:18Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4934",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/acp/mcp-config.ts",
+            "src/lib/acp/__tests__/mcp-config.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/acp/__tests__/mcp-config.test.ts",
+            "npm run lint:effect-facades"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "mcp-config.test.ts exits 0 with every conversion and degrade case",
+            "lint:effect-facades count does not rise"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-2",
+            "NFR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-4. Create src/lib/acp/mcp-config.ts (under 80 lines, double-quote style like the other src/lib/acp files) with header 'PAN-4927 W-INJ3 (PAN-4934): read the overdeck MCP config (Claude Code --mcp-config format) and convert its stdio servers to ACP McpServerStdio entries for session/new and session/load.' Export `async function readAcpMcpServers(path: string, warn: (line: string) => void = (line) => console.error(line)): Promise<EffectAcpSchema.McpServerStdio[]>` using `readFile` from node:fs/promises and `import type * as EffectAcpSchema from \"effect-acp/schema\"`. Rules (PRD D-5, D-6): each `mcpServers` entry whose `type` is 'stdio' or absent and whose `command` is a non-empty string becomes `{ name: <key>, command, args: <string[] or []>, env: Object.entries(env ?? {}).map(([name, value]) => ({ name, value: String(value) })) }` with no `type` key, in file order; any other type or a missing command is skipped with one warn line `[acp-host] MCP server <name> skipped: <reason>`; a read error, invalid JSON or a top level without an `mcpServers` object returns [] with one warn line `[acp-host] overdeck MCP config skipped: <reason>`. Never throws, no *Sync call, no Effect wrapper. Create src/lib/acp/__tests__/mcp-config.test.ts with a mkdtemp dir and a warn spy covering: the W-INJ1 overdeck shape (type stdio, three env keys) converts to one entry with name 'overdeck', the same command/args, env as three {name,value} pairs and no type; an entry without type converts the same and absent args/env become []; an http entry and a command-less entry are skipped with one warning each while a stdio sibling survives; a missing file, invalid JSON and {} each return [] with exactly one warning."
+        },
+        "items": [
+          {
+            "id": "acp-mcp-config-reader.ac1",
+            "title": "Given the W-INJ1 overdeck-mcp.json shape, when readAcpMcpServers reads it, then it returns one entry { name: 'overdeck', command, args, env: [{ name, value } ×3] } with no type key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-mcp-config-reader.ac2",
+            "title": "Given a file with one http entry, one command-less entry and one stdio entry, when readAcpMcpServers reads it, then it returns only the stdio entry and calls warn exactly twice, each line naming the skipped server",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-mcp-config-reader.ac3",
+            "title": "Given a missing file, invalid JSON, or {}, when readAcpMcpServers reads it, then it returns [] and calls warn exactly once with a line starting '[acp-host] overdeck MCP config skipped:' without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-mcp-config-reader.ac4",
+            "title": "src/lib/acp/mcp-config.ts is under 80 lines, imports only node:fs/promises and effect-acp schema types, and `npm run lint:effect-facades` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "acp-host-mcp-flag",
+        "title": "ACP host parses --mcp-config and sends the servers in session/new and session/load",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T02:51:18Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4934",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/acp/host.ts",
+            "src/lib/acp/__tests__/host.test.ts",
+            "src/lib/acp/__tests__/session-runtime.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/acp/__tests__/host.test.ts src/lib/acp/__tests__/session-runtime.test.ts src/lib/acp/__tests__/mcp-config.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck (including typecheck:acp) completes without errors",
+            "the three ACP test files exit 0, including the new parse and session/new payload cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-5. In src/lib/acp/host.ts: add `readonly mcpConfig?: string;` to AcpHostArgs (line 777); in parseAcpHostArgs add `...(values.get(\"--mcp-config\") ? { mcpConfig: values.get(\"--mcp-config\") } : {}),` after the contextFile line; import readAcpMcpServers from './mcp-config.js'; in main(), before the Effect.gen block, `const mcpServers = args.mcpConfig ? await readAcpMcpServers(args.mcpConfig) : [];` and add `...(mcpServers.length > 0 ? { mcpServers } : {}),` to the support.makeRuntime({…}) object (lines 859-872). host.ts grows by at most 6 lines. In src/lib/acp/__tests__/host.test.ts, next to the parseAcpHostArgs assertion (search `parseAcpHostArgs([`, line 1287), assert `--mcp-config /h/agents/a/overdeck-mcp.json` parses to mcpConfig and argv without it has no mcpConfig key (at most 12 added lines). In src/lib/acp/__tests__/session-runtime.test.ts add 'sends mcpServers in session/new': build the layer with { ...runtimeOptions(), mcpServers: [server], requestLogger } where server = { name: 'overdeck', command: '/usr/bin/node', args: ['x'], env: [{ name: 'OVERDECK_MCP_TOKEN_FILE', value: '/a/mcp-token' }] } and requestLogger pushes each event and returns Effect.void; after runtime.start(), the session/new event with status 'started' has payload.mcpServers equal to [server]. Add the session/load twin if the mock peer accepts resumeSessionId; else cover session/new only and say so in the commit message."
+        },
+        "items": [
+          {
+            "id": "acp-host-mcp-flag.ac1",
+            "title": "Given argv with `--mcp-config /h/agents/a/overdeck-mcp.json`, when parseAcpHostArgs runs, then it returns mcpConfig '/h/agents/a/overdeck-mcp.json'; given argv without the flag, then the result has no mcpConfig key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-host-mcp-flag.ac2",
+            "title": "Given the session runtime built with mcpServers [server] and a requestLogger, when start() runs, then the logged session/new request with status 'started' carries payload.mcpServers equal to [server]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-host-mcp-flag.ac3",
+            "title": "The diff of main() in host.ts passes mcpServers from readAcpMcpServers into support.makeRuntime only when the list is non-empty, and host.ts grows by at most 6 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "acp-cp3-live-check",
+        "title": "CP-3: live check that opencode and kimi ACP agents list the real overdeck tools",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T02:51:18Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "spike",
+          "issueLabel": "pan-4934",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/harnesses.mdx",
+            "packages/contracts/src/harness-capabilities.ts",
+            "packages/contracts/src/harness-behavior.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run build",
+            "npm run typecheck",
+            "(cd packages/contracts && npx vitest run --configLoader runner --config vitest.config.ts src/harness-behavior.test.ts)"
+          ],
+          "expected_outputs": [
+            "build completes and dist/acp-host.js and dist/cli/index.js exist",
+            "typecheck completes without errors",
+            "harness-behavior.test.ts exits 0 with the final injected set"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-6 (epic AC-5). After `npm run build`, write an uncommitted probe under `.tmp/` run with `npx tsx` and OVERDECK_HOME=$(mktemp -d): call ensureAgentMcpToken({ agentId: 'cp3-probe', agentKind: 'agent', role: 'work', dir }) and writeClaudeOverdeckMcpConfig(dir, tokenFile) from src/lib/mcp/, then readAcpMcpServers(<config>). For each binary — `opencode acp --hostname 127.0.0.1 --port <free port>` and `kimi acp` — speak ACP over stdio: initialize, authenticate ('opencode-login'; Kimi: the method resolveKimiAuthMethodId picks), session/new { cwd, mcpServers }, then session/prompt 'List the names of every tool you have from the overdeck MCP server. Reply with the names only.' and collect agent_message_chunk text. Pass for a provider: the reply contains `list_conversations`; also record that a `dist/cli/index.js mcp serve` process ran as a child of the agent (`ps -o pid,ppid,args --ppid <agent pid>`). Permission check on opencode: prompt 'Call the overdeck list_machines tool and tell me how many machines it returned.' (must finish within 120 s, AbortController + setTimeout), then 'Use the task tool to start a subagent that calls the overdeck list_machines tool and reports the count.' (must finish within 180 s). Decision rule: a provider whose agent rejects or ignores the entry => set that harness's overdeckMcp to false (kimi -> acp, opencode -> opencode) and update the acp-capability-flag test set; a failure from missing auth or exhausted quota is not a fallback: record 'not verified live: <reason>' and keep the capability; a subagent hang => do not change OPENCODE_PRE_ALLOWED_PERMISSION, record it as a known limitation. Write the outcome (binary versions, pass/fail per provider and per step, exact errors) into configuration/harnesses.mdx section '### Overdeck MCP server' under a paragraph 'ACP harnesses (PAN-4934)' and into the PR description. Never commit the probe."
+        },
+        "items": [
+          {
+            "id": "acp-cp3-live-check.ac1",
+            "title": "configuration/harnesses.mdx contains, for opencode and for kimi with their binary versions, whether the ACP agent returns `list_conversations` from the overdeck server, or the exact reason it was not verified live",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-cp3-live-check.ac2",
+            "title": "Given a provider whose agent rejected or ignored the stdio entry, then its harness declares overdeckMcp: false and the harness-behavior test set omits it; given every provider passed, then both acp and opencode still declare true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-cp3-live-check.ac3",
+            "title": "configuration/harnesses.mdx contains whether an opencode main-session overdeck tool call and a Task-subagent overdeck tool call each returns a result, and src/lib/acp/opencode.ts preserves OPENCODE_PRE_ALLOWED_PERMISSION unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-cp3-live-check.ac4",
+            "title": "`git ls-files .tmp` prints no CP-3 probe script and the PR diff contains no probe script",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "acp-mcp-docs",
+        "title": "Document overdeck MCP injection for the ACP harnesses",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T02:51:18Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4934",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/mcp.mdx",
+            "configuration/harnesses.mdx",
+            "docs/ROLES.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-7. configuration/mcp.mdx section '## Agents get these tools' (line 151): change 'Every Claude Code agent that Overdeck launches' to 'Every Claude Code, Kimi Code ACP (`acp`) and OpenCode (`opencode`) agent that Overdeck launches'; after the paragraph ending '`mcp__overdeck` in that list instead.' add: 'An ACP agent gets the same `overdeck-mcp.json`. The launcher passes `--mcp-config <file>` to the ACP host, which sends the server to the agent in `session/new` and `session/load`. The ACP host approves the agent's permission requests itself, so no allow-list is needed.'; change 'harnesses other than Claude Code (Codex and the ACP harnesses follow)' to list every harness declaring overdeckMcp on main at merge time — with W-INJ2 still open: 'harnesses other than Claude Code, `acp` and `opencode` (Codex follows)'. configuration/harnesses.mdx: capability table row `overdeckMcp` (line 1059) becomes 'Launches get the `overdeck` MCP server with a per-agent token. Claude Code, `acp` and `opencode` declare it; Codex follows.' (same merge rule); the 'ACP harnesses (PAN-4934)' paragraph in '### Overdeck MCP server' (written by acp-cp3-live-check) also says the host reads `--mcp-config` and sends a stdio entry, and that `opencode-go` shares OpenCode's binary and result. docs/ROLES.md list under 'Overdeck renders this declaration for each harness' (line 128): add '- **ACP harnesses** (`acp`, `opencode`) get only the `overdeck` server (PAN-4934); role-declared servers are not provisioned for them.' If a harness fell back in CP-3, name only the harnesses that still declare overdeckMcp."
+        },
+        "items": [
+          {
+            "id": "acp-mcp-docs.ac1",
+            "title": "configuration/mcp.mdx 'Agents get these tools' contains `acp` and `opencode` as injected harnesses and contains the ACP host's `--mcp-config` path through session/new and session/load",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-mcp-docs.ac2",
+            "title": "The overdeckMcp row of the capability table in configuration/harnesses.mdx contains Claude Code, `acp` and `opencode` (minus any CP-3 fallback), and the 'ACP harnesses (PAN-4934)' paragraph contains the statement that opencode-go shares OpenCode's result",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-mcp-docs.ac3",
+            "title": "docs/ROLES.md lists an ACP-harnesses bullet stating they get only the overdeck server and no role-declared servers, and `npm run lint:docs` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "acp-capability-flag",
+        "to": "acp-injection-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "acp-launcher-flag",
+        "to": "acp-injection-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "acp-mcp-config-reader",
+        "to": "acp-host-mcp-flag",
+        "type": "blocks"
+      },
+      {
+        "from": "acp-injection-guard",
+        "to": "acp-cp3-live-check",
+        "type": "blocks"
+      },
+      {
+        "from": "acp-host-mcp-flag",
+        "to": "acp-cp3-live-check",
+        "type": "blocks"
+      },
+      {
+        "from": "acp-cp3-live-check",
+        "to": "acp-mcp-docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

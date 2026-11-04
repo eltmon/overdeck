@@ -251,6 +251,45 @@ the call to make again. The accepted risk: a job runs `pan` with the
 dashboard user's rights, so the closed verb set, the argv builder and the
 token-only caller are the boundary.
 
+Secret requests (PAN-4941, W-SEC1) are self routes too.
+`POST /api/self/secret-requests` (`tell`) takes `{ name, prompt, timeoutMs? }`:
+`name` matches `^[A-Z][A-Z0-9_]{0,63}$`, `prompt` is 1–300 characters and
+`timeoutMs` is 60,000–3,600,000 (default 600,000); bad input is **400**
+`bad-name`, `bad-prompt`, `bad-timeout` or `bad-body`. It answers **201** with
+`{ requestId, status: "pending", expiresAt, next }`, or **200** with the
+agent's pending request for the same name. An agent may hold 20 pending
+requests (**429** `too-many-requests`). `GET /api/self/secret-requests/:id/wait`
+(`read:state`) blocks at most 50 s and answers `pending` with `next`,
+`delivered` with `file` (a path, never the value), `declined` or `expired`.
+Only the requesting agent can wait on its request. Requests live in dashboard
+memory (`src/dashboard/server/services/agent-requests.ts`), so after a restart
+a wait answers **404** `unknown-request`, as it does for another agent's id,
+and the agent calls `request_secret` again. The MCP tools over these routes
+are `request_secret` and `secret_wait`.
+
+### Agent requests (`/api/agent-requests`)
+
+The operator answers agent requests here
+(`src/dashboard/server/routes/agent-requests.ts`).
+
+- `GET /api/agent-requests` needs `read:conversations` and answers the pending
+  requests for the Decisions panel. It never answers a value, a result or the
+  agent's directory.
+- `POST /api/agent-requests/:id/secret` (`{ value }`, at most 65,536 bytes)
+  and `POST /api/agent-requests/:id/decline` have no route-scope row, so the
+  gate refuses every registry credential (a token, device, machine or phone,
+  even one holding `approve`) with **403** `insufficient_scope`. The handler
+  also accepts only the internal token or the root session (**403**
+  `root-only`), and runs the CSRF and Origin checks for the root session.
+- Delivery writes the value to `<agent dir>/secrets/<name>` (0600 in a 0700
+  directory) and marks the request `delivered`. When the agent no longer holds
+  an active agent token, the request expires, no file is written and the
+  answer is **409** `agent-stopped`. A request that is no longer pending is
+  **409** `not-pending`.
+- The value is never echoed, logged or put in an activity entry. A malformed
+  body is **400** with a fixed message, and a failed write logs only the
+  error's name. Revoking an agent's tokens deletes its `secrets/` directory.
+
 Only root credentials may create or revoke access tokens, issue pairing
 credentials, or revoke a device other than the caller's own (D-11). A device or
 token credential gets 403 on those operations, even with `admin`.

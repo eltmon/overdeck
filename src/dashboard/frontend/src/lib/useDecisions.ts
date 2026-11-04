@@ -122,6 +122,8 @@ export interface Decision {
   machineLabel?: string;
   /** PAN-4651 — the subject lives on a linked machine: open it there; no inline answer here. */
   remote?: boolean;
+  /** PAN-4941 — set on an agent request row; DecisionsPanel renders AgentRequestCard for it. */
+  agentRequest?: { id: string; kind: 'secret'; name: string; prompt: string; agentId: string; expiresAt: string };
 }
 
 /**
@@ -148,6 +150,8 @@ const BLOCKING_KINDS = new Set([
   // payload) halts the turn exactly like an askUserQuestion; omitting it here
   // sorted these genuinely frozen agents into the non-blocking "Waiting" group.
   'paneQuestion',
+  // PAN-4941 — the agent is parked in secret_wait until the operator answers.
+  'secretRequest',
 ]);
 
 export function isBlockingDecision(kinds: ReadonlyArray<string>): boolean {
@@ -158,6 +162,44 @@ export function fetchConversationPendingInput(signal?: AbortSignal): Promise<Con
   return fetchWithTimeout('/api/conversations/pending-input', { signal })
     .then((res) => (res.ok ? res.json() : []))
     .catch(() => []);
+}
+
+/** PAN-4941 — a pending agent request as `GET /api/agent-requests` serves it (never a value). */
+export interface AgentRequestRow {
+  id: string;
+  kind: 'secret';
+  agentId: string;
+  agentKind: 'agent' | 'conversation';
+  label: string;
+  name: string;
+  prompt: string;
+  createdAt: string;
+  expiresAt: string;
+}
+
+export function fetchAgentRequests(signal?: AbortSignal): Promise<AgentRequestRow[]> {
+  return fetchWithTimeout('/api/agent-requests', { signal })
+    .then((res) => (res.ok ? res.json() : { requests: [] }))
+    .then((body: { requests?: unknown }) => (Array.isArray(body?.requests) ? body.requests as AgentRequestRow[] : []))
+    .catch(() => []);
+}
+
+/** Pending secret requests as blocking decisions, one row per request (D-9). */
+export function agentRequestDecisions(rows: ReadonlyArray<AgentRequestRow>): Decision[] {
+  const out: Decision[] = [];
+  for (const row of rows) {
+    if (row.kind !== 'secret') continue;
+    out.push({
+      id: row.id,
+      source: row.agentKind === 'conversation' ? 'conversation' : 'agent',
+      label: row.label,
+      kinds: ['secretRequest'],
+      since: row.createdAt,
+      blocking: true,
+      agentRequest: { id: row.id, kind: 'secret', name: row.name, prompt: row.prompt, agentId: row.agentId, expiresAt: row.expiresAt },
+    });
+  }
+  return out;
 }
 
 /** PAN-4651 D-4651-15 — `GET /api/fleet/needs-you`: what waits on the operator on each online linked machine. */
@@ -286,6 +328,13 @@ export function useDecisions(): Decision[] {
     refetchInterval: 5000,
   });
 
+  // PAN-4941 — pending agent requests (secret requests), never a value.
+  const { data: agentRequestRows = [] } = useQuery({
+    queryKey: ['agent-requests'],
+    queryFn: ({ signal }) => fetchAgentRequests(signal),
+    refetchInterval: 5000,
+  });
+
   return useMemo(() => {
     const out: Decision[] = [...fleetDecisions(fleetMachines)];
 
@@ -333,6 +382,8 @@ export function useDecisions(): Decision[] {
       });
     }
 
+    out.push(...agentRequestDecisions(Array.isArray(agentRequestRows) ? agentRequestRows : []));
+
     // Blocking first, then oldest first — the longest-stalled agent is the one
     // costing the most.
     out.sort((a, b) => {
@@ -341,5 +392,5 @@ export function useDecisions(): Decision[] {
       return a.since.localeCompare(b.since);
     });
     return out;
-  }, [agentSubjects, convRows, fleetMachines, titleByIssueId]);
+  }, [agentSubjects, convRows, fleetMachines, agentRequestRows, titleByIssueId]);
 }

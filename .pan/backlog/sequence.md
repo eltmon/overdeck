@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-04T03:50:55.251752Z · model: claude-opus-5-5 · open: 881_
+_Last sequenced: 2026-11-04T04:13:17.499737Z · model: claude-opus-5-5 · open: 880_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -331,7 +331,7 @@ _Last sequenced: 2026-11-04T03:50:55.251752Z · model: claude-opus-5-5 · open: 
 | 328 | PAN-1480 | L | high | ok |  |  | TLDR: 93% bypass rate |
 | 329 | PAN-1479 | M | high | ok |  |  | RTK: Add telemetry to measure token savings from bash output compression |
 | 330 | PAN-2950 | L | high | ok |  |  | Refactor god files back under file-size ceilings after the UX overhaul |
-| 331 | PAN-4949 | M | medium | ok |  |  | Machine side of bot connectors: credential, pairing intents and exchange; W-TOK1 closed, so it is unblocked. Unblocks CONN2. |
+| 331 | PAN-4950 | M | medium | ok |  |  | pan mcp connector process bridging outside bots to /mcp; gates Hermes, OpenClaw and Grok Build plugins. |
 | 332 | PAN-2720 | M | high | ok |  |  | File-size ratchet counts lines, so it rewards line-packing on the god files it means to improve |
 | 333 | PAN-2650 | S | high | ok |  |  | Shed-stack half is moot (slot merges verify on host); remaining: pan swarm recover path for a stuck ready-to-merge slot. |
 | 334 | PAN-2358 | M | high | ok |  |  | PAN-2145 follow-up: restore PAN-1535 hardening in transformMessageForHarness (rewritten during conversations.ts decomposition) |
@@ -877,8 +877,7 @@ _Last sequenced: 2026-11-04T03:50:55.251752Z · model: claude-opus-5-5 · open: 
 | 898 | PAN-4934 | S | medium | ok |  |  | ACP harnesses (acp, opencode) get the Overdeck MCP server injected. |
 | 899 | PAN-4942 | S | medium | ok |  | PAN-4941 | link_machine tool: a conversation asks the operator to link a machine; builds on request_secret. |
 | 900 | PAN-4946 | M | medium | ok |  | PAN-4945 | Dashboard OAuth approval card and sign-in list for /mcp clients. |
-| 901 | PAN-4950 | M | medium | ok |  | PAN-4949 | pan mcp connector process bridging outside bots to /mcp; gates Hermes, OpenClaw and Grok Build plugins. |
-| 902 | PAN-4951 | M | medium | ok |  | PAN-4949 | "Connect a bot" flow in Settings > Anywhere for pairing outside bots. |
+| 902 | PAN-4951 | M | medium | ok |  |  | "Connect a bot" flow in Settings > Anywhere for pairing outside bots. |
 | 903 | PAN-4947 | L | medium | ok |  | PAN-4945 | Opt-in public /mcp via Tailscale Funnel, TLS ends on the user machine; no plaintext relay on overdeck.ai. |
 | 904 | PAN-4953 | M | medium | ok |  | PAN-4950 | integrations/hermes/: Hermes plugin with its own revocable scoped token. |
 | 905 | PAN-4954 | M | medium | ok |  | PAN-4950 | integrations/openclaw/: OpenClaw plugin with its own revocable scoped token. |
@@ -1216,10 +1215,10 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-04T03:50:55.251752Z",
+  "generatedAt": "2026-11-04T04:13:17.499737Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 881,
+  "openCount": 880,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -11921,19 +11920,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-4949",
-      "rank": 331,
-      "size": "M",
-      "importance": "medium",
-      "score": 46,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Machine side of bot connectors: credential, pairing intents and exchange; W-TOK1 closed, so it is unblocked. Unblocks CONN2.",
-      "rationale": "Its only dependency PAN-4930 (W-TOK1) closed on 2026-11-04, so this unblocked root of the bot-connector track moves from the tail into slot 331, which PAN-4930 vacated next to the epic.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4937",
       "rank": 892,
       "size": "M",
@@ -12056,16 +12042,14 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4950",
-      "rank": 901,
+      "rank": 331,
       "size": "M",
       "importance": "medium",
       "score": 44,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4949"
-      ],
+      "dependsOn": [],
       "why": "pan mcp connector process bridging outside bots to /mcp; gates Hermes, OpenClaw and Grok Build plugins.",
-      "rationale": "PAN-4931 and PAN-4948 closed since the prior run; still waits on PAN-4949, so rank holds.",
+      "rationale": "Its only dependency PAN-4949 (W-CONN1) closed on 2026-11-04, so this now-unblocked connector bridge moves from the tail into slot 331, which PAN-4949 vacated next to the epic.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12076,9 +12060,7 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "importance": "medium",
       "score": 40,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4949"
-      ],
+      "dependsOn": [],
       "why": "\"Connect a bot\" flow in Settings > Anywhere for pairing outside bots.",
       "rationale": "New child W-BOT1 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
       "gate": "auto",
@@ -13404,13 +13386,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "from": "PAN-4927",
-      "to": "PAN-4949",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4927",
       "to": "PAN-4937",
       "type": "contains",
       "source": "github-ref",
@@ -13487,23 +13462,9 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "confidence": 1
     },
     {
-      "from": "PAN-4949",
-      "to": "PAN-4950",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4927",
       "to": "PAN-4950",
       "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4949",
-      "to": "PAN-4951",
-      "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
     },
