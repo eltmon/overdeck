@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4954",
   "created": "2026-11-04T14:48:01.762Z",
-  "updated": "2026-11-04T15:06:38.227Z",
+  "updated": "2026-11-04T15:08:29.307Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -78,6 +78,10 @@
       "claimedBy": "agent-pan-4954",
       "claimedAt": "2026-11-04T15:02:40.269Z",
       "doneAt": "2026-11-04T15:06:38.227Z"
+    },
+    "scaffold.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:08:29.306Z"
     }
   }
 }
