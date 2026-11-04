@@ -10,12 +10,12 @@
  */
 import { errorResult, optionalString, requiredString, routeErrorResult, routeResult, type ArgResult, type OverdeckTool } from './tool.js';
 
-const MACHINE_PROPERTY = {
+export const MACHINE_PROPERTY = {
   type: 'string',
   description: 'Where to run: omit for this machine, a linked machine\'s label or environment id, or "auto" to place it by load.',
 } as const;
 
-const NEEDS_PROPERTY = {
+export const NEEDS_PROPERTY = {
   type: 'array',
   items: { type: 'string' },
   description: 'With machine "auto": capability tags the machine must have, such as docker or gpu.',
