@@ -16,7 +16,8 @@
  * is still `disconnected` after {@link DISCONNECT_GRACE_MS}, the dialer sends one ICE-restart offer on
  * the same session, so every open channel survives once the new path connects; if it is not
  * connected {@link ICE_RESTART_TIMEOUT_MS} after that offer, the dialer closes it and the next dial
- * sends a fresh offer (PAN-5046 FR-4).
+ * sends a fresh offer (PAN-5046 FR-4). `onRecovered` reports a machine whose link came back: an ICE
+ * restart that connected, or a new connection after the previous one failed (FR-8).
  */
 import type { IceServer, SignalData } from '@overdeck/contracts';
 
@@ -49,6 +50,12 @@ export interface MachineDialer {
    * flight is not offered twice; the call waits on that restart.
    */
   restartIce(environmentId: string): Promise<void>;
+  /**
+   * Called with a machine's id when its link comes back: an ICE restart reached `connected`, or a new
+   * connection connected after the previous one for the same route closed for any reason other than
+   * {@link MachineDialer.close} (resume and teardown are not recoveries). Returns the unsubscriber.
+   */
+  onRecovered(listener: (environmentId: string) => void): () => void;
 }
 
 type Candidate = NonNullable<SignalData['candidate']>;
@@ -113,6 +120,13 @@ export function createMachineDialer(
   const byKey = new Map<string, PeerEntry>();
   /** The peer connection each handed-out raw channel runs on. */
   const owners = new WeakMap<RtcDuplexWeb, PeerEntry>();
+  /** Keys whose current connection closed by failure; the next connection there to connect is a recovery. */
+  const lost = new Set<string>();
+  const recoveredListeners = new Set<(environmentId: string) => void>();
+
+  function notifyRecovered(environmentId: string): void {
+    for (const listener of [...recoveredListeners]) listener(environmentId);
+  }
   /** Peer connections being created, so concurrent dials to one machine share one connection. */
   const creating = new Map<string, Promise<{ entry: PeerEntry; channel: RTCDataChannel }>>();
 
@@ -123,7 +137,10 @@ export function createMachineDialer(
     clearTimers(entry);
     entry.restart?.reject(error);
     entry.restart = null;
-    if (byKey.get(entry.key) === entry) byKey.delete(entry.key);
+    if (byKey.get(entry.key) === entry) {
+      byKey.delete(entry.key);
+      lost.add(entry.key);
+    }
     for (const off of entry.unsubscribe.splice(0)) off();
     try {
       entry.pc.close();
@@ -197,6 +214,7 @@ export function createMachineDialer(
     entry.restart = null;
     log(`rtc ${entry.peer.slice(0, 8)} ice restart recovered`);
     restarting.resolve();
+    notifyRecovered(entry.peer);
   }
 
   function send(entry: PeerEntry, data: SignalData): void {
@@ -290,6 +308,7 @@ export function createMachineDialer(
       } else if (state === 'connected') {
         if (entry.graceTimer) clearTimeout(entry.graceTimer);
         entry.graceTimer = null;
+        if (lost.delete(entry.key)) notifyRecovered(entry.peer);
         settleRestart(entry);
       }
     });
@@ -411,6 +430,10 @@ export function createMachineDialer(
       for (const entry of [...byKey.values()]) {
         if (environmentId === undefined || entry.peer === environmentId) closeEntry(entry, new Error('dialer closed'));
       }
+      // A closed dialer starts over: the next connection is not a recovery.
+      for (const key of [...lost]) {
+        if (environmentId === undefined || key.startsWith(`${environmentId}|`)) lost.delete(key);
+      }
     },
     evict(raw, reason) {
       const owner = owners.get(raw);
@@ -418,6 +441,10 @@ export function createMachineDialer(
     },
     async restartIce(environmentId) {
       await Promise.all([...byKey.values()].filter((entry) => entry.peer === environmentId).map(restart));
+    },
+    onRecovered(listener) {
+      recoveredListeners.add(listener);
+      return () => recoveredListeners.delete(listener);
     },
   };
 }

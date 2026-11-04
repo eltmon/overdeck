@@ -518,3 +518,62 @@ describe('ICE restart on a disconnected connection (PAN-5046 FR-4, FR-5)', () =>
     expect(((await restarting) as Error).message).toBe('ice restart timed out');
   });
 });
+
+describe('onRecovered (PAN-5046 FR-8)', () => {
+  async function connect(ctx: ReturnType<typeof setup>) {
+    const dialing = ctx.dialer.dialMachine('env-1', { relay: false });
+    await flush();
+    const pc = FakePeerConnection.instances.at(-1)!;
+    ctx.emit(answer('env-1', ctx.signals().at(-1)!.session));
+    await flush();
+    pc.channels.at(-1)!.open();
+    (await dialing).on('error', () => {});
+    pc.setState('connected');
+    return pc;
+  }
+
+  it('fires when an ICE restart reconnects', async () => {
+    const ctx = setup();
+    const recovered: string[] = [];
+    ctx.dialer.onRecovered((id) => recovered.push(id));
+    const pc = await connect(ctx);
+    expect(recovered).toEqual([]);
+
+    pc.setState('disconnected');
+    await vi.advanceTimersByTimeAsync(DISCONNECT_GRACE_MS);
+    ctx.emit(answer('env-1', ctx.signals().at(-1)!.session));
+    await flush();
+    pc.setState('connected');
+
+    expect(recovered).toEqual(['env-1']);
+    ctx.dialer.close();
+  });
+
+  it('fires when a new connection connects after the previous one failed', async () => {
+    const ctx = setup();
+    const recovered: string[] = [];
+    ctx.dialer.onRecovered((id) => recovered.push(id));
+    const first = await connect(ctx);
+    first.setState('failed');
+    await connect(ctx);
+    expect(recovered).toEqual(['env-1']);
+    ctx.dialer.close();
+  });
+
+  it('does not fire for a new connection after the dialer was closed', async () => {
+    const ctx = setup();
+    const recovered: string[] = [];
+    const off = ctx.dialer.onRecovered((id) => recovered.push(id));
+    const first = await connect(ctx);
+    first.setState('failed');
+    ctx.dialer.close('env-1');
+    await connect(ctx);
+    expect(recovered).toEqual([]);
+
+    off();
+    FakePeerConnection.instances.at(-1)!.setState('failed');
+    await connect(ctx);
+    expect(recovered).toEqual([]);
+    ctx.dialer.close();
+  });
+});

@@ -9,7 +9,9 @@ import { type PushController, pushSupported, startPush, usePushState } from '../
 import { type Connection, createConnection } from './connection';
 import { createDirectory, type ShellDirectory } from './directory';
 import { resetTransport } from '../../../../src/dashboard/frontend/src/lib/wsTransport';
+import { deriveConnectionPhase, useConnectionState } from '../../../../src/dashboard/frontend/src/lib/connectionState';
 import { installResumeHandler } from './lifecycle';
+import { installLinkRecovery } from './linkRecovery';
 import { createLiveActivityController, type LiveActivityController, liveActivityEnabled, setLiveActivityEnabled } from './liveActivity';
 import { MachinesScreen } from './MachinesScreen';
 import { MachineView } from './MachineView';
@@ -204,8 +206,15 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
         },
       },
     }));
+    const uninstallLinkRecovery = installLinkRecovery({
+      dialer: directory.dialer,
+      currentEnvironmentId: currentMachineId,
+      phase: () => deriveConnectionPhase(useConnectionState.getState()),
+      requestReconnect: () => useConnectionState.getState().requestReconnect(),
+    });
     return () => {
       uninstallResume();
+      uninstallLinkRecovery();
       push?.stop();
       prefsSync?.stop();
       liveActivity.dispose();

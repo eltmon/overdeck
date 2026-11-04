@@ -48,7 +48,7 @@ vi.mock('../directory', () => ({
         return true;
       }),
     },
-    dialer: { close: vi.fn() },
+    dialer: { close: vi.fn(), onRecovered: () => () => {} },
     relayStopped: () => false,
   }),
   useDirectoryState: (client: { state: string }) => client.state,
