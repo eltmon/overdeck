@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5015",
   "created": "2026-11-04T15:25:55.139Z",
-  "updated": "2026-11-04T15:38:21.003Z",
+  "updated": "2026-11-04T15:38:34.620Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,6 +46,10 @@
     "done-defers-github-5xx.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T15:38:21.003Z"
+    },
+    "done-defers-github-5xx.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:38:34.620Z"
     }
   }
 }
