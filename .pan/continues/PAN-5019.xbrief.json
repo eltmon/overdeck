@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5019",
   "created": "2026-11-04T13:12:00.752Z",
-  "updated": "2026-11-04T14:34:00.657Z",
+  "updated": "2026-11-04T14:34:14.797Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -96,6 +96,10 @@
     "classify-category.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T14:34:00.656Z"
+    },
+    "classify-category.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:34:14.797Z"
     }
   }
 }
