@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4956",
   "created": "2026-11-04T09:00:33.744Z",
-  "updated": "2026-11-04T09:29:06.568Z",
+  "updated": "2026-11-04T09:29:19.614Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -100,6 +100,10 @@
     "py-example.ac4": {
       "status": "completed",
       "doneAt": "2026-11-04T09:29:06.568Z"
+    },
+    "docs-readme.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:29:19.614Z"
     }
   }
 }
