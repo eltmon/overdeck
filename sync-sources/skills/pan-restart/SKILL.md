@@ -53,7 +53,7 @@ pan restart hold --status
 pan restart release
 ```
 
-While a hold is active, `pan restart` (dashboard and `--full`, `--now` and `--force` included), `pan reload` and `pan restart approve` refuse with exit 1 and print the reason. Only `pan restart release` or the `--until` expiry lifts it. **Never release a hold you did not set unless the operator asks you to.** If a restart is refused by a hold, stop and report it; do not work around it. The supervisor watchdog's crash-recovery restart is exempt.
+While a hold is active, `pan restart` (dashboard and `--full`, `--now` and `--force` included), `pan reload` and `pan restart approve` refuse with exit 1 and print the reason. Only `pan restart release` or the `--until` expiry lifts it. **Never release a hold you did not set unless the operator asks you to.** If a restart is refused by a hold, stop and report it; do not work around it (`pan down` then `pan up` included). The supervisor watchdog's crash-recovery restart is exempt.
 
 ## Identity guard
 

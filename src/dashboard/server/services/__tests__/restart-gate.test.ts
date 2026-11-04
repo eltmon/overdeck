@@ -465,6 +465,32 @@ describe('restart gate read-model exposure', () => {
     expect(applied.restartGate).toEqual(projection);
   });
 
+  it('carries the restart hold through the reducer, and clears it when a later payload omits it (PAN-5007)', () => {
+    const restartHold: RestartHold = { reason: 'live check', who: 'operator', setAt: new Date(T0).toISOString() };
+    const held: RestartGateSnapshot = { status: 'idle', pending: [], restartHold };
+    const withHold = applyEvent(INITIAL_READ_MODEL_STATE, {
+      type: 'restart_gate.changed',
+      sequence: -1,
+      timestamp: new Date(T0).toISOString(),
+      payload: held,
+    });
+    expect(withHold.restartGate).toEqual(held);
+    expect(isDomainEvent({
+      type: 'restart_gate.changed',
+      sequence: 1,
+      timestamp: new Date(T0).toISOString(),
+      payload: held,
+    })).toBe(true);
+
+    const released = applyEvent(withHold, {
+      type: 'restart_gate.changed',
+      sequence: -1,
+      timestamp: new Date(T0 + 5_000).toISOString(),
+      payload: { status: 'idle', pending: [] },
+    });
+    expect(released.restartGate).toEqual({ status: 'idle', pending: [] });
+  });
+
   it('lands the gate in read-model state from an event and from a snapshot', () => {
     const state = upsertRestartRequest(emptyRestartGateState(), deployRequest('reload:22', 'pan reload'), T0).state;
     const projection = toRestartGateSnapshot(state, T0);

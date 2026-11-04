@@ -60,10 +60,13 @@ describe('restart hold (PAN-5007)', () => {
     expect(JSON.parse(readFileSync(restartHoldPath(), 'utf8')).reason).toBe('short');
   });
 
-  it('ignores a malformed hold file', async () => {
+  it.each([['malformed', '{"reason": 3}'], ['empty', '']])('treats a %s hold file as an active hold', async (_label, contents) => {
     mkdirSync(testHome, { recursive: true });
-    writeFileSync(restartHoldPath(), '{"reason": 3}');
+    writeFileSync(restartHoldPath(), contents);
 
+    const hold = await readRestartHold();
+    expect(hold?.reason).toContain('cannot be read');
+    expect((await releaseRestartHold())?.reason).toBe('an unreadable hold file');
     expect(await readRestartHold()).toBeNull();
   });
 

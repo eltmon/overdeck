@@ -27,7 +27,12 @@ import { getRestartGate } from './restart-gate.js';
 export async function restartDashboardDetached(
   requester: string,
 ): Promise<{ ok: true; pid: number | null } | { ok: false; error: string; held?: true }> {
-  const hold = await readRestartHold();
+  let hold;
+  try {
+    hold = await readRestartHold();
+  } catch (error: unknown) {
+    return { ok: false, error: `could not read the restart hold: ${error instanceof Error ? error.message : String(error)}` };
+  }
   if (hold) {
     return {
       ok: false,

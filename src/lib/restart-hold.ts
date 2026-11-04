@@ -6,14 +6,16 @@
  * `~/.overdeck/restart-hold.json`; `pan restart release` deletes it. While it is
  * active, `pan reload`, `pan restart` (dashboard and full scope, `--now`
  * included) and every restart-gate approval refuse. An expired hold reads as
- * released, and reads never delete the file.
+ * released, and reads never delete the file. A file that exists but cannot be
+ * parsed (for example one a crash truncated) reads as an active hold: failing
+ * open would let a restart through that the operator asked to stop.
  *
  * This is not the restart lock (`restart-lock.ts`): that lock is transient and
  * belongs to one live process, while the hold has no owner process and lasts
  * until somebody releases it or it expires.
  */
 
-import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import { userInfo } from 'node:os';
 import { dirname, join } from 'node:path';
 import { getOverdeckHome } from './paths.js';
@@ -60,17 +62,25 @@ export function isRestartHoldActive(hold: RestartHold, nowMs: number = Date.now(
   return !Number.isFinite(until) || until > nowMs;
 }
 
-/** The active hold, or null when there is none, it is unreadable, or it has expired. */
+/** The active hold, or null when there is none or it has expired. */
 export async function readRestartHold(nowMs: number = Date.now()): Promise<RestartHold | null> {
+  const path = restartHoldPath();
   let text: string;
   try {
-    text = await readFile(restartHoldPath(), 'utf8');
+    text = await readFile(path, 'utf8');
   } catch (error) {
     if (isErrnoException(error) && error.code === 'ENOENT') return null;
     throw error;
   }
   const hold = parseHold(text);
-  return hold && isRestartHoldActive(hold, nowMs) ? hold : null;
+  if (!hold) {
+    return {
+      reason: `the hold file ${path} exists but cannot be read; check it, then run \`pan restart release\``,
+      who: 'unknown',
+      setAt: (await stat(path)).mtime.toISOString(),
+    };
+  }
+  return isRestartHoldActive(hold, nowMs) ? hold : null;
 }
 
 /** The OS user, or a fixed label when the platform cannot name one. */
@@ -103,9 +113,10 @@ export async function writeRestartHold(hold: RestartHold): Promise<void> {
 /** Delete the hold file. Returns the hold that was there (expired or not), or null when there was none. */
 export async function releaseRestartHold(): Promise<RestartHold | null> {
   const path = restartHoldPath();
-  let previous: RestartHold | null = null;
+  let previous: RestartHold;
   try {
-    previous = parseHold(await readFile(path, 'utf8'));
+    previous = parseHold(await readFile(path, 'utf8'))
+      ?? { reason: 'an unreadable hold file', who: 'unknown', setAt: (await stat(path)).mtime.toISOString() };
   } catch (error) {
     if (!isErrnoException(error) || error.code !== 'ENOENT') throw error;
     return null;
