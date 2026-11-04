@@ -83,6 +83,7 @@ src/components/Stage/cockpit/IssueMissionControl.render-count.test.tsx
 src/components/Stage/launcherFocusStore.test.ts
 src/components/Stage/panes/EditorPane.test.tsx
 src/components/XTerminal.test.tsx
+src/components/__tests__/AgentRequestCard.test.tsx
 src/components/__tests__/AskUserQuestionDialog.test.tsx
 src/components/__tests__/DecisionsPanel.test.tsx
 src/components/__tests__/DegradedModeBanner.test.tsx

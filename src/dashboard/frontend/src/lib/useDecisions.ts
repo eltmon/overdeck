@@ -122,8 +122,10 @@ export interface Decision {
   machineLabel?: string;
   /** PAN-4651 — the subject lives on a linked machine: open it there; no inline answer here. */
   remote?: boolean;
-  /** PAN-4941 — set on an agent request row; DecisionsPanel renders AgentRequestCard for it. */
-  agentRequest?: { id: string; kind: 'secret'; name: string; prompt: string; agentId: string; expiresAt: string };
+  /** PAN-4941, PAN-4942 — set on an agent request row; DecisionsPanel renders AgentRequestCard for it. */
+  agentRequest?:
+    | { id: string; kind: 'secret'; name: string; prompt: string; agentId: string; expiresAt: string }
+    | { id: string; kind: 'machine-link'; hint: string; agentId: string; expiresAt: string };
 }
 
 /**
@@ -152,6 +154,8 @@ const BLOCKING_KINDS = new Set([
   'paneQuestion',
   // PAN-4941 — the agent is parked in secret_wait until the operator answers.
   'secretRequest',
+  // PAN-4942 — the agent is parked in link_machine_wait until the operator links or dismisses.
+  'machineLink',
 ]);
 
 export function isBlockingDecision(kinds: ReadonlyArray<string>): boolean {
@@ -164,15 +168,19 @@ export function fetchConversationPendingInput(signal?: AbortSignal): Promise<Con
     .catch(() => []);
 }
 
-/** PAN-4941 — a pending agent request as `GET /api/agent-requests` serves it (never a value). */
+/** PAN-4941, PAN-4942 — a pending agent request as `GET /api/agent-requests` serves it (never a value). */
 export interface AgentRequestRow {
   id: string;
-  kind: 'secret';
+  kind: 'secret' | 'machine-link';
   agentId: string;
   agentKind: 'agent' | 'conversation';
   label: string;
-  name: string;
-  prompt: string;
+  /** Secret requests only. */
+  name?: string;
+  /** Secret requests only. */
+  prompt?: string;
+  /** Machine-link requests only. */
+  hint?: string;
   createdAt: string;
   expiresAt: string;
 }
@@ -184,20 +192,30 @@ export function fetchAgentRequests(signal?: AbortSignal): Promise<AgentRequestRo
     .catch(() => []);
 }
 
-/** Pending secret requests as blocking decisions, one row per request (D-9). */
+/** Pending secret and machine-link requests as blocking decisions, one row per request (D-9). Other kinds are skipped. */
 export function agentRequestDecisions(rows: ReadonlyArray<AgentRequestRow>): Decision[] {
   const out: Decision[] = [];
   for (const row of rows) {
-    if (row.kind !== 'secret') continue;
-    out.push({
+    const common: Omit<Decision, 'kinds' | 'agentRequest'> = {
       id: row.id,
       source: row.agentKind === 'conversation' ? 'conversation' : 'agent',
       label: row.label,
-      kinds: ['secretRequest'],
       since: row.createdAt,
       blocking: true,
-      agentRequest: { id: row.id, kind: 'secret', name: row.name, prompt: row.prompt, agentId: row.agentId, expiresAt: row.expiresAt },
-    });
+    };
+    if (row.kind === 'secret') {
+      out.push({
+        ...common,
+        kinds: ['secretRequest'],
+        agentRequest: { id: row.id, kind: 'secret', name: row.name ?? '', prompt: row.prompt ?? '', agentId: row.agentId, expiresAt: row.expiresAt },
+      });
+    } else if (row.kind === 'machine-link') {
+      out.push({
+        ...common,
+        kinds: ['machineLink'],
+        agentRequest: { id: row.id, kind: 'machine-link', hint: row.hint ?? '', agentId: row.agentId, expiresAt: row.expiresAt },
+      });
+    }
   }
   return out;
 }

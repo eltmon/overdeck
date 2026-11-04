@@ -162,8 +162,10 @@
   opacity: 0.55;
 }
 
-/* PAN-4941 — the masked input and buttons of a secret request card. */
-.secretForm {
+/* PAN-4941 — the masked input and buttons of a secret request card;
+   PAN-4942 — the buttons of a machine-link request card. */
+.secretForm,
+.requestActions {
   display: flex;
   align-items: center;
   gap: 6px;

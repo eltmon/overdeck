@@ -160,11 +160,36 @@ describe('useDecisions secret requests (PAN-4941)', () => {
   it('labels the kind "Secret requested"', () => {
     expect(describePendingInput(['secretRequest'])).toBe('Secret requested');
   });
+
+  it('PAN-4942: maps a machine-link row to a blocking machineLink decision with the hint', () => {
+    const { result } = renderDecisions([], [{
+      ...secretRow,
+      kind: 'machine-link',
+      name: undefined,
+      prompt: undefined,
+      hint: 'my desk Mac',
+      expiresAt: '2026-11-05T00:00:00.000Z',
+    }]);
+    expect(result.current).toEqual([{
+      id: secretRow.id,
+      source: 'agent',
+      label: 'agent-pan-1 · PAN-1',
+      kinds: ['machineLink'],
+      since: '2026-11-04T00:00:00.000Z',
+      blocking: true,
+      agentRequest: { id: secretRow.id, kind: 'machine-link', hint: 'my desk Mac', agentId: 'agent-pan-1', expiresAt: '2026-11-05T00:00:00.000Z' },
+    }]);
+    expect(describePendingInput(['machineLink'])).toBe('Machine link requested');
+  });
 });
 
 describe('isBlockingDecision', () => {
   it('treats a secret request as blocking — the agent is parked in secret_wait', () => {
     expect(isBlockingDecision(['secretRequest'])).toBe(true);
+  });
+
+  it('treats a machine-link request as blocking — the agent is parked in link_machine_wait', () => {
+    expect(isBlockingDecision(['machineLink'])).toBe(true);
   });
 
   it('treats a waiting question as blocking — the agent has stopped', () => {

@@ -22,7 +22,9 @@ export type PendingInputKind =
   /** PAN-4596 — a `--hold` handoff whose kickoff was never sent. */
   | 'heldKickoff'
   /** PAN-4941 — an agent asked the operator for a secret (request_secret). */
-  | 'secretRequest';
+  | 'secretRequest'
+  /** PAN-4942 — an agent asked the operator to link a machine (link_machine). */
+  | 'machineLink';
 
 /** Short label for a single kind (used in tooltips, joined by comma). */
 export const PENDING_INPUT_KIND_LABEL: Record<string, string> = {
@@ -37,6 +39,7 @@ export const PENDING_INPUT_KIND_LABEL: Record<string, string> = {
   paneQuestion: 'Question in terminal — answer the agent',
   heldKickoff: 'Held handoff — kickoff not sent',
   secretRequest: 'Secret requested',
+  machineLink: 'Machine link requested',
 };
 
 /** PAN-4371 — replaces "Answer the agent" when Jev read the turn end with confidence. */
