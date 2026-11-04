@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4955",
   "created": "2026-11-04T14:23:26.498Z",
-  "updated": "2026-11-04T14:53:40.759Z",
+  "updated": "2026-11-04T14:53:55.026Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -60,6 +60,10 @@
     "manifest.ac4": {
       "status": "completed",
       "doneAt": "2026-11-04T14:53:40.759Z"
+    },
+    "run-mcp.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:53:55.026Z"
     }
   }
 }
