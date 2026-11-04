@@ -1,8 +1,9 @@
 /**
  * The write tools of the Overdeck MCP server (PAN-4649 FR-5, FR-6):
- * `send_message`, `start_conversation`, `start_worker` and (PAN-4938 FR-6)
- * `start_issue`. Each proxies one dashboard route; the route enforces the
- * scope (`tell` or `operate`).
+ * `send_message`, `start_conversation`, `start_worker` and (PAN-4938 FR-6,
+ * FR-7) `start_issue`, `stop_conversation` and `interrupt_conversation`. Each
+ * proxies one dashboard route; the route enforces the scope (`tell` or
+ * `operate`).
  * PAN-4651 D-4651-18: the start tools go through the fleet routes, which
  * resolve `machine` (a label, an environment id or `auto`, with `needs`) and
  * start the work on that machine; `send_message` takes `@<machine>/<name>`.
@@ -169,4 +170,37 @@ const startIssue: OverdeckTool = {
   },
 };
 
-export const WRITE_TOOLS: readonly OverdeckTool[] = [sendMessage, startConversation, startWorker, startIssue];
+const CONVERSATION_PROPERTY = {
+  type: 'string',
+  description: 'The conversation name or id; @<machine>/<name> for one on a linked machine.',
+} as const;
+
+/** A tool that posts `{}` to `/api/conversations/<conversation>/<action>`. */
+function conversationControlTool(name: string, action: 'stop' | 'abort', description: string): OverdeckTool {
+  return {
+    name,
+    description,
+    scope: 'operate',
+    audience: 'any',
+    inputSchema: {
+      type: 'object',
+      properties: { conversation: CONVERSATION_PROPERTY },
+      required: ['conversation'],
+    },
+    async run(args, ctx) {
+      const conversation = requiredString(args, 'conversation');
+      if (!conversation.ok) return conversation.error;
+      return routeResult(await ctx.api.request('POST', `/api/conversations/${encodeURIComponent(conversation.value)}/${action}`, {}));
+    },
+  };
+}
+
+const stopConversation = conversationControlTool('stop_conversation', 'stop', 'Stop a conversation: end its agent session.');
+
+const interruptConversation = conversationControlTool(
+  'interrupt_conversation',
+  'abort',
+  'Interrupts the current turn of a Pi conversation. Other harnesses answer an error; use stop_conversation to end them.',
+);
+
+export const WRITE_TOOLS: readonly OverdeckTool[] = [sendMessage, startConversation, startWorker, startIssue, stopConversation, interruptConversation];

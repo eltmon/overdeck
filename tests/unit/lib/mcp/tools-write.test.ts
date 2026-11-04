@@ -11,8 +11,35 @@ import { callTool, connectClient, fakeApi, resultJson, resultText } from './harn
 const SCOPES = ['read:state', 'read:conversations', 'operate'];
 
 describe('MCP write tools (PAN-4649 W-6)', () => {
-  it('the write tools are send_message, start_conversation, start_worker and start_issue', () => {
-    expect(WRITE_TOOLS.map((tool) => tool.name)).toEqual(['send_message', 'start_conversation', 'start_worker', 'start_issue']);
+  it('the write tools are send_message, start_conversation, start_worker, start_issue, stop_conversation and interrupt_conversation', () => {
+    expect(WRITE_TOOLS.map((tool) => tool.name)).toEqual([
+      'send_message', 'start_conversation', 'start_worker', 'start_issue', 'stop_conversation', 'interrupt_conversation',
+    ]);
+  });
+
+  it('PAN-4938: stop_conversation posts {} to the encoded conversation stop route', async () => {
+    const api = fakeApi({ 'POST /api/conversations/%40desk%2Fconv-a/stop': { status: 200, json: { ok: true } } });
+    const client = await connectClient(api, SCOPES);
+    expect((await callTool(client, 'stop_conversation', { conversation: '@desk/conv-a' })).isError).toBeFalsy();
+    expect(api.calls).toEqual([{ method: 'POST', path: '/api/conversations/%40desk%2Fconv-a/stop', body: {} }]);
+  });
+
+  it('PAN-4938: interrupt_conversation posts {} to the abort route and returns its Pi-only error unchanged', async () => {
+    const api = fakeApi({ 'POST /api/conversations/conv-a/abort': { status: 400, json: { error: 'Abort control endpoint is only supported for Pi conversations' } } });
+    const client = await connectClient(api, SCOPES);
+    const result = await callTool(client, 'interrupt_conversation', { conversation: 'conv-a' });
+    expect(api.calls).toEqual([{ method: 'POST', path: '/api/conversations/conv-a/abort', body: {} }]);
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toBe('HTTP 400: Abort control endpoint is only supported for Pi conversations');
+  });
+
+  it('PAN-4938: stop_conversation and interrupt_conversation need their routes\' scopes and are listed to any token', () => {
+    const stop = WRITE_TOOLS.find((candidate) => candidate.name === 'stop_conversation')!;
+    const interrupt = WRITE_TOOLS.find((candidate) => candidate.name === 'interrupt_conversation')!;
+    expect(stop.scope).toBe(requiredScopeFor('POST', '/api/conversations/c/stop'));
+    expect(interrupt.scope).toBe(requiredScopeFor('POST', '/api/conversations/c/abort'));
+    expect(stop.audience).toBe('any');
+    expect(interrupt.audience).toBe('any');
   });
 
   it('PAN-4938: start_issue posts the given fields to the fleet issue-start route', async () => {
