@@ -26,7 +26,7 @@ describe('MCP tool visibility (PAN-4927 W-MCP1)', () => {
     expect(tools.map((tool) => tool.name)).toEqual(['list_machines']);
   });
 
-  it('read:state, read:conversations and operate see every tool but the two approve tools', async () => {
+  it('read:state, read:conversations and operate see every tool but the approve tools', async () => {
     const client = await connectClient(fakeApi({}), ['read:state', 'read:conversations', 'operate']);
     const { tools } = await client.listTools();
     expect(tools.map((tool) => tool.name)).not.toContain('answer_question');

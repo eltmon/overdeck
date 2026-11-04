@@ -669,6 +669,7 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   missing from the `✓ root <file>` list. Spy `process.kill` in any test whose code under test
   signals a fixture PID. 39 test files carry literal PIDs without a `process.kill` spy; most only
   use the PID as data, but none were audited.
+<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4931, PAN-4944) -->
 <!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4925) -->
 <!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917) -->
 <!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4931) -->
@@ -681,3 +682,16 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   within one process, so a CLI write and a dashboard `lastUsedAt` write can lose each other.
 <!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4930) -->
 <!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4482) -->
+- **One merge path per feature (PAN-4970)** — the UAT reconciler drops features
+  `mergePathOwner` (`src/dashboard/server/services/merge-path-owner.ts`) assigns to the
+  per-PR train from its ready set before it ever assembles a batch; any new merge path
+  must ask the same function, or batches churn (30 generations invalidated in a day was
+  the original symptom, caused by the per-PR scheduler and the batch reconciler both
+  claiming the same unheld, gate-approved PR).
+<!-- last-verified: 2026-11-04 (PAN-4970) -->
+- **Claude Code variadic flags swallow a positional prompt** (PAN-4932 planning, Claude Code 2.1.293) —
+  `--allowedTools <x> "prompt"` reads the prompt as another tool name (`claude -p` then fails with
+  "Input must be provided"); `--mcp-config <configs...>` is declared variadic the same way in `claude --help`. Launchers that end with `"$prompt"` must
+  emit the equals form (`--allowedTools=mcp__overdeck`, `--mcp-config=<path>`) or put another flag
+  between. Two equals-form `--mcp-config=` flags both load.
+<!-- last-verified: 2026-11-04 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4930, PAN-4931, PAN-4932) -->

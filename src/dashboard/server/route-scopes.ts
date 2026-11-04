@@ -109,6 +109,8 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   // PAN-4651 WI-20: fleet Needs-You (owner feed for linked machines; the viewer's combined list).
   { method: 'GET', path: '/api/machines/needs-you', scope: 'read:conversations' },
   { method: 'GET', path: '/api/fleet/needs-you', scope: 'read:conversations' },
+  // PAN-4944 (PAN-4927 W-APPR1): this machine's Needs-You for list_pending_input.
+  { method: 'GET', path: '/api/needs-you', scope: 'read:conversations' },
   // PAN-4651 WI-21: palette search across linked machines.
   { method: 'GET', path: '/api/fleet/search', scope: 'read:conversations' },
   // PAN-4651 WI-22: which machine is working on an issue.

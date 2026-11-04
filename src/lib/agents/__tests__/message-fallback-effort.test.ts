@@ -107,6 +107,8 @@ describe('messageAgent fresh-launch fallback re-applies the persisted effort (PA
     await messageAgent(agentId, 'feedback for the stopped agent');
 
     expect(readLauncher(agentId)).toContain('--effort max');
+    // PAN-4932 FR-7: the fallback relaunch keeps the overdeck MCP server.
+    expect(readLauncher(agentId)).toContain(`--mcp-config='${join(getAgentDir(agentId), 'overdeck-mcp.json')}'`);
   });
 
   it('resolves legacy state (no persisted effort) to the role default', async () => {

@@ -7,7 +7,9 @@
  *
  * Owners are probed one at a time. An agent is dead only when the liveness
  * oracle confirms it (`isConfirmedDead`), and only after a grace period, so a
- * token minted for an agent whose pane does not exist yet survives. A
+ * token minted for an agent whose pane does not exist yet survives. A token
+ * whose agent state is missing is revoked only after the same grace, because
+ * planning launches mint before their first state save (PAN-4932 D-9). A
  * conversation is ended by its row: missing, archived, or ended.
  *
  * The first run is `AGENT_TOKEN_SWEEP_FIRST_MS` after start, then one
@@ -61,7 +63,10 @@ async function sweepOwner(record: PublicAccessTokenRecord, agentId: string, deps
     return deps.revokeAgentMcpTokens(agentId, { agentKind: 'conversation', dir: conversationStateDir(conv?.tmuxSession ?? `conv-${agentId}`) });
   }
   const state = deps.getAgentState(agentId);
-  if (state !== null) {
+  if (state === null) {
+    // PAN-4932 D-9: planning launches mint before their first state save.
+    if (Date.parse(record.createdAt) >= graceCutoff) return 0;
+  } else {
     if (newestMs(record.createdAt, state.startedAt, state.lastResumeAt) >= graceCutoff) return 0;
     if (!isConfirmedDead(await deps.isAlive(agentId))) return 0;
   }

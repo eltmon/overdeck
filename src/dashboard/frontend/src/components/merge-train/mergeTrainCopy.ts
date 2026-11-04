@@ -11,6 +11,18 @@ export interface ConfirmCopy {
   confirmLabel: string;
 }
 
+/** Short display name: uat/pan-otter-0610 → pan-otter-0610. */
+export function shortName(name: string): string {
+  return name.replace(/^uat\//, '');
+}
+
+/**
+ * PAN-3965: the reconciler assembles no batch for a single ready feature — a
+ * one-member batch is the PR branch itself and its CI run a duplicate — unless
+ * the project holds merges for UAT, where that batch is the UAT stack.
+ */
+export const SINGLE_FEATURE_READY_LINE = '1 feature ready — merges directly; batches assemble when 2+ are ready.';
+
 /** ` at Sep 20, 19:14` for a failed generation, or '' when its time is unreadable. */
 export function formatFailedAt(gen: { updatedAt?: string; createdAt?: string }): string {
   const at = Date.parse(gen.updatedAt || gen.createdAt || '');
@@ -51,9 +63,42 @@ export function mergeRowConfirmCopy(input: {
  * Whether a forced reassembly can build a batch from this ready set. One
  * unheld feature merges directly — the reconciler returns `single-feature`
  * even when forced — so Retry is offered only for 2+ features or a held one.
+ * PAN-4970: every ready feature merging through the per-PR auto-merge train
+ * has no batch path at all, so Retry is never offered for that set either.
  */
-export function canRetryAssembly(input: { featureCount: number; holdsForUat?: boolean }): boolean {
+export function canRetryAssembly(input: { featureCount: number; holdsForUat?: boolean; perPrCount?: number }): boolean {
+  if (input.perPrCount === input.featureCount && input.featureCount > 0) return false;
   return input.featureCount >= 2 || (input.featureCount === 1 && input.holdsForUat !== false);
+}
+
+/**
+ * PAN-4970: every ready feature in this section merges one at a time through
+ * the per-PR auto-merge scheduler, so no test batch assembles for them.
+ */
+export function perPrTrainLine(count: number, projectName: string): string {
+  return ` ${projectName} merges ${count === 1 ? 'it' : 'them'} one at a time through auto-merge (each waits a 5-minute cooldown), so no test batch assembles. Issues labelled hold-for-uat still batch.`;
+}
+
+/**
+ * PAN-4970: a failed promote's toast and whether the operator's card is
+ * stale. `wrong-status` and `not-found` mean the generation already changed
+ * under them (promoted, invalidated, or gone) — the card should drop rather
+ * than invite another doomed click. Plain inputs only, so `onError` can call
+ * this with strings pulled off the thrown error.
+ */
+export function promoteFailureCopy(
+  batchName: string,
+  failure: { message?: string; reason?: string },
+): { message: string; dropCard: boolean } {
+  const detail = failure.message || 'Batch merge failed';
+  const reason = failure.reason;
+  const dropCard = reason === 'wrong-status' || reason === 'not-found';
+  return {
+    message: dropCard
+      ? `Batch ${batchName} can no longer be merged: ${detail}. The list now shows the current batches.`
+      : `Batch ${batchName} did not merge: ${detail}`,
+    dropCard,
+  };
 }
 
 export function retryAssemblyConfirmCopy(input: { projectName: string; failedName: string; readyCount: number }): ConfirmCopy {

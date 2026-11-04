@@ -1,5 +1,3 @@
-import { materializeMuseContext } from '../runtimes/muse-context.js';
-import { resolveMuseSessionPath, museSessionId } from '../runtimes/storage/muse.js';
 import { getPrimeAgentLauncherFields } from '../prime-agent/launcher-fields.js';
 import { requirePrimeAgentSessionFile } from '../runtimes/storage/prime-agent.js';
 import { existsSync } from 'fs';
@@ -17,6 +15,7 @@ import { getWorkspaceStackHealth } from '../workspace/stack-health.js';
 import { resolveIssueStackDiskHold } from '../workspace/disk-cost.js';
 import { getPrFacts } from '../cloister/pr-facts.js';
 import { generateLauncherScript } from '../launcher-generator.js';
+import { prepareClaudeOverdeckMcp } from '../mcp/agent-injection.js';
 import { getProviderForModel, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
 import type { ModelId } from '../settings.js';
 import { requireModelOverride } from '../model-validation.js';
@@ -31,7 +30,7 @@ import { applyEffectiveDifficulty } from './tier-escalation.js';
 import { checkStaffingFitness } from './tier-fitness.js';
 import { buildTierFitnessContext } from './tier-fitness-context.js';
 import { resolveTieredExecutionEnabled, resolveTieredExecutionEnabledForIssue, type ValidatedTieredExecutionConfig } from './tier-table.js';
-import { resolveEffort } from './resolve-effort.js';
+import { getMuseLauncherFields } from './muse-launcher-fields.js';
 import {
   buildCavemanExports,
   determineModel,
@@ -727,6 +726,7 @@ export async function buildAgentLaunchConfig(opts: {
   // A resumed review/test/ship run loads the wrong frontmatter (and wrong
   // tool permissions) if it always points at roles/work.md.
   const launchRole: Role = opts.isPlanning ? 'plan' : opts.role;
+  const overdeckMcp = await prepareClaudeOverdeckMcp({ agentId: opts.agentId, agentKind: 'agent', role: launchRole, harness: opts.harness ?? 'claude-code' });
 
   // PAN-1055: ohmypi harness needs --session-dir + fifo redirect threaded into
   // the launcher; getOhmypiLauncherFields() resolves them from the agent state
@@ -738,15 +738,10 @@ export async function buildAgentLaunchConfig(opts: {
   const codexLauncherFields = behavior.usesCodexHome
     ? getCodexLauncherFields(opts.agentId, model, opts.workspace, launchRole, opts.effort)
     : {};
-  const museSavedSession = opts.harness === 'muse' && opts.spawnMode === 'resume'
-    ? await resolveMuseSessionPath(opts.agentId) : null;
-  const museLauncherFields = opts.harness === 'muse' ? {
-    harness: 'muse' as const,
-    museModel: model,
-    museEffort: resolveEffort({ explicit: opts.effort, role: launchRole, model, harness: 'muse' }).effort,
-    museContextFile: await materializeMuseContext(opts.agentId, opts.workspace, roleAgentDefinitionPath(launchRole)),
-    museResumeSessionId: museSavedSession ? museSessionId(museSavedSession) : undefined,
-  } : {};
+  const museLauncherFields = opts.harness === 'muse' ? await getMuseLauncherFields({
+    agentId: opts.agentId, model, workspace: opts.workspace, role: launchRole, effort: opts.effort,
+    resume: opts.spawnMode === 'resume', definitionPath: roleAgentDefinitionPath(launchRole),
+  }) : {};
   const kimiCodeLauncherFields = behavior.launchCommandKind === 'kimi-code-tui'
     ? getKimiCodeLauncherFields(model, opts.effort)
     : {};
@@ -818,6 +813,7 @@ export async function buildAgentLaunchConfig(opts: {
       ...kimiCodeLauncherFields,
       ...museLauncherFields,
       ...(primeLaunch?.fields ?? {}),
+      ...overdeckMcp,
     });
     return { launcherContent, providerEnv };
   }
@@ -859,6 +855,7 @@ export async function buildAgentLaunchConfig(opts: {
     ...kimiCodeLauncherFields,
     ...museLauncherFields,
     ...(primeLaunch?.fields ?? {}),
+    ...overdeckMcp,
     ...(opts.channelsBridgeMcpConfig
       ? {
           channelsBridgeMcpConfig: opts.channelsBridgeMcpConfig,

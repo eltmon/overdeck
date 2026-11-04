@@ -73,10 +73,17 @@ describe('parseRoleMcpServers', () => {
     const mcpPath = join(tempDir, 'role-prompts', 'test.mcp.json');
 
     expect(flags).toContain(` --mcp-config '${mcpPath}'`);
-    expect(flags).toContain(" --allowedTools 'Read,Bash,mcp__playwright'");
+    expect(flags).toContain(" --allowedTools 'Read,Bash,mcp__playwright,mcp__overdeck'");
     expect(JSON.parse(readFileSync(mcpPath, 'utf8'))).toEqual({
       mcpServers: parseRoleMcpServers(rolePath),
     });
+  });
+
+  it('emits no allow-list for a role without tools: (PAN-4932 D-8)', () => {
+    const rolePath = join(tempDir, 'plain.md');
+    writeFileSync(rolePath, '---\neffort: high\n---\nBody');
+
+    expect(roleSystemPromptInjection(rolePath)).not.toContain('--allowedTools');
   });
 
   it('preserves role MCP servers across Codex home rewrites', () => {
