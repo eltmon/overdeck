@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5011",
   "created": "2026-11-04T11:42:07.971Z",
-  "updated": "2026-11-04T12:13:38.537Z",
+  "updated": "2026-11-04T12:13:49.206Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-5011",
       "claimedAt": "2026-11-04T12:08:09.510Z",
       "doneAt": "2026-11-04T12:13:38.537Z"
+    },
+    "activity-route-presence": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5011",
+      "claimedAt": "2026-11-04T12:13:49.206Z"
     }
   }
 }
