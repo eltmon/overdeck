@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5046",
   "created": "2026-11-04T18:10:57.891Z",
-  "updated": "2026-11-04T18:52:17.240Z",
+  "updated": "2026-11-04T18:52:31.655Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -162,6 +162,10 @@
     "phone-ice-restart-integration.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T18:52:17.240Z"
+    },
+    "phone-ice-restart-integration.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:52:31.655Z"
     }
   }
 }
