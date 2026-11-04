@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4947",
   "created": "2026-11-04T05:30:29.044Z",
-  "updated": "2026-11-04T06:14:31.401Z",
+  "updated": "2026-11-04T06:14:48.078Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -114,6 +114,10 @@
     "mcp-oauth-only.ac4": {
       "status": "completed",
       "doneAt": "2026-11-04T06:14:31.401Z"
+    },
+    "public-mcp-acceptance.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:14:48.077Z"
     }
   }
 }
