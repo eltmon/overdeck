@@ -178,3 +178,25 @@ answered `{"ok":true,"configured":true,"turn":true,"apns":false,"fcm":false}`. T
 the widget App ID `ai.overdeck.app.widgets` and the reuse of the existing APNs key are handed to
 PAN-4841's TestFlight run:
 https://github.com/eltmon/overdeck/issues/4841#issuecomment-6616154481
+
+## PAN-4841 store builds
+
+### Directory secrets
+
+On 2026-11-04 at 11:07:21 UTC, after the agent set the five push secrets on `overdeck-connect`
+with `wrangler secret put` (no `wrangler deploy`), `GET https://connect.overdeck.ai/healthz`
+answered:
+
+```json
+{"ok":true,"configured":true,"turn":true,"apns":true,"fcm":true}
+```
+
+- `wrangler secret list` names `APNS_KEY_P8`, `APNS_KEY_ID`, `APNS_TEAM_ID`,
+  `FCM_SERVICE_ACCOUNT_JSON` and `FCM_PROJECT_ID` (plus the TURN pair).
+- APNs: a new team-scoped auth key "Overdeck Push Notifications" (Sandbox & Production) for team
+  `KUU2VM9GB9`. MYN's existing key was not reused.
+- FCM: service account `overdeck-fcm-sender` with only `roles/firebasecloudmessaging.admin` in the
+  new Firebase project `overdeck-app`; `FCM_PROJECT_ID` is `project_info.project_id` of
+  `apps/mobile/android/app/google-services.json`.
+- `apns: true` means the values are present and parse. The delivered-push proof is the device
+  run below ("PAN-4838 iOS notifications", "Device run (PAN-4841)").
