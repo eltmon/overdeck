@@ -80,10 +80,10 @@ describe("HarnessCapabilities (PAN-4562)", () => {
     expect(opencode.contextChannel).toBe("acp-initial-context")
   })
 
-  it("only Claude Code declares overdeckMcp until W-INJ2/W-INJ3 wire the others (PAN-4932)", () => {
-    expect(getHarnessBehavior("claude-code").capabilities.overdeckMcp).toBe(true)
-    for (const runtime of RUNTIMES.filter((r) => r !== "claude-code")) {
-      expect(getHarnessBehavior(runtime).capabilities.overdeckMcp).toBe(false)
+  it("declares overdeckMcp exactly for the harnesses wired to the overdeck MCP server (PAN-4932, PAN-4934)", () => {
+    const injected = new Set(["claude-code", "acp", "opencode"])
+    for (const runtime of RUNTIMES) {
+      expect(getHarnessBehavior(runtime).capabilities.overdeckMcp).toBe(injected.has(runtime))
     }
   })
 
