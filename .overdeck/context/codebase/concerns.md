@@ -669,26 +669,18 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   missing from the `✓ root <file>` list. Spy `process.kill` in any test whose code under test
   signals a fixture PID. 39 test files carry literal PIDs without a `process.kill` spy; most only
   use the PID as data, but none were audited.
-<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4931, PAN-4944) -->
-<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4925) -->
-<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917) -->
-<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4931) -->
-<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4929) -->
 - **The access-token snapshot is per process** (PAN-4930 planning) — `verifyAccessToken` and
   `listActiveRecordsOfKind` (`src/lib/access-tokens.ts`) read an in-memory snapshot that only the dashboard
   fills (`startAccessTokenRefresh`, every 5 s). A CLI process (`pan kill`, `pan start`) sees zero records
   unless it calls `refreshAccessTokens()` first (as `pan mcp serve` does) or reads the file with
   `listAccessTokens()`. `verifyAccessToken` also writes `lastUsedAt`, and `mutate` serializes writes only
   within one process, so a CLI write and a dashboard `lastUsedAt` write can lose each other.
-<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4930) -->
-<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4482) -->
 - **One merge path per feature (PAN-4970)** — the UAT reconciler drops features
   `mergePathOwner` (`src/dashboard/server/services/merge-path-owner.ts`) assigns to the
   per-PR train from its ready set before it ever assembles a batch; any new merge path
   must ask the same function, or batches churn (30 generations invalidated in a day was
   the original symptom, caused by the per-PR scheduler and the batch reconciler both
   claiming the same unheld, gate-approved PR).
-<!-- last-verified: 2026-11-04 (PAN-4970) -->
 - **Claude Code variadic flags swallow a positional prompt** (PAN-4932 planning, Claude Code 2.1.293) —
   `--allowedTools <x> "prompt"` reads the prompt as another tool name (`claude -p` then fails with
   "Input must be provided"); `--mcp-config <configs...>` is declared variadic the same way in `claude --help`. Launchers that end with `"$prompt"` must
@@ -700,4 +692,9 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   advertise `mcpCapabilities: { http, sse }` too. The ACP host's `mcpServers` field
   (`src/lib/acp/session-runtime.ts`) carries the `overdeck` server read from the host's `--mcp-config`
   (PAN-4934); before that it was always `[]`.
-<!-- last-verified: 2026-11-04 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4930, PAN-4931, PAN-4932, PAN-4934) -->
+- **Work agents have no `conversations` row** (PAN-4943 planning) — `spawnRun` registers one only for
+  specialist roles or `registerConversation: true` (`src/lib/agents/spawn.ts:259`); a work agent
+  (`agent-pan-<n>`) has none, and `agent-pan-<n>-review` appears only once review starts. Anything keyed
+  on "the agent's own conversation" (PR links, the PR sync sweep, `getConversationByName(agentId)`) finds
+  nothing for a work agent; PR watches therefore carry their own key and baseline.
+<!-- last-verified: 2026-11-04 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4930, PAN-4931, PAN-4932, PAN-4934, PAN-4943, PAN-4944, PAN-4970, PAN-4482) -->
