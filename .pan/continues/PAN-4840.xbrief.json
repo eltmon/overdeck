@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4840",
   "created": "2026-11-03T20:58:06.302Z",
-  "updated": "2026-11-04T18:54:58.290Z",
+  "updated": "2026-11-04T18:55:15.988Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -142,6 +142,10 @@
     "settings-notifications-row.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T18:54:58.289Z"
+    },
+    "ci-android-unit-tests.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:55:15.987Z"
     }
   }
 }
