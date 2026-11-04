@@ -282,3 +282,62 @@ describe('bare conversations launch without Overdeck context (PAN-4185)', () => 
     ]));
   });
 });
+
+describe('conversations get the overdeck MCP server (PAN-4932)', () => {
+  const launch = (name: string, context: { bareContext?: boolean } = {}) =>
+    spawnConversationSession(name, overdeckHome, '11111111-1111-4111-8111-111111111111', undefined, 'high', undefined, false, 'claude-code', false, { backend: fakeBackend('herdr').backend, ...context });
+
+  afterEach(async () => {
+    const { _resetAccessTokensForTests, _settleAccessTokenWritesForTests } = await import('../../access-tokens.js');
+    await _settleAccessTokenWritesForTests();
+    _resetAccessTokensForTests();
+  });
+
+  async function tokenFor(agentId: string) {
+    const { listAccessTokens } = await import('../../access-tokens.js');
+    return (await listAccessTokens()).filter((record) => !record.revokedAt && record.agentId === agentId);
+  }
+
+  it('mints a conversation token and passes the config under the conversation state dir', async () => {
+    const { createConversation } = await import('../conversations.js');
+    createConversation({ name: 'op', tmuxSession: 'conv-op', cwd: overdeckHome, workspaceId: null });
+
+    await launch('conv-op');
+
+    expect(launcherConfigs[0]!['overdeckMcpConfig']).toBe(join(overdeckHome, 'conversations', 'conv-op', 'overdeck-mcp.json'));
+    expect(await tokenFor('op')).toEqual([expect.objectContaining({ agentKind: 'conversation', role: 'conversation' })]);
+  });
+
+  it('passes no config for a bare conversation', async () => {
+    const { createConversation } = await import('../conversations.js');
+    createConversation({ name: 'bare', tmuxSession: 'conv-bare', cwd: overdeckHome, workspaceId: null });
+
+    await launch('conv-bare', { bareContext: true });
+
+    expect(launcherConfigs[0]!['overdeckMcpConfig']).toBeUndefined();
+    expect(await tokenFor('bare')).toEqual([]);
+  });
+
+  it('passes no config for a conversation without a row', async () => {
+    await launch('conv-norow');
+    expect(launcherConfigs[0]!['overdeckMcpConfig']).toBeUndefined();
+  });
+
+  it('mints a worker token for a lane row', async () => {
+    const { createConversation } = await import('../conversations.js');
+    createConversation({ name: 'lane-root2', tmuxSession: 'conv-lane-root2', cwd: overdeckHome, workspaceId: null });
+    createConversation({
+      name: 'lane-c1',
+      tmuxSession: 'conv-lane-c1',
+      cwd: overdeckHome,
+      workspaceId: null,
+      parentName: 'lane-root2',
+      lane: { run: 'beta', key: 'c1', role: 'builder' },
+    });
+
+    await launch('conv-lane-c1');
+
+    expect(launcherConfigs[0]!['overdeckMcpConfig']).toBe(join(overdeckHome, 'conversations', 'conv-lane-c1', 'overdeck-mcp.json'));
+    expect(await tokenFor('lane-c1')).toEqual([expect.objectContaining({ agentKind: 'conversation', role: 'worker' })]);
+  });
+});
