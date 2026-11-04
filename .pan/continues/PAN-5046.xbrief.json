@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5046",
   "created": "2026-11-04T18:10:57.891Z",
-  "updated": "2026-11-04T18:53:30.397Z",
+  "updated": "2026-11-04T18:53:44.986Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -182,6 +182,9 @@
     "docs-network-change.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T18:53:30.397Z"
+    },
+    "device-repro.ac2": {
+      "status": "cancelled"
     }
   }
 }
