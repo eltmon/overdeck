@@ -77,6 +77,13 @@ describe('PushPanel (PAN-2354)', () => {
     expect((await screen.findByTestId('push-native-line')).textContent).toBe(text);
   });
 
+  it('names browsers in the empty state, next to the paired-phone line (PAN-5000)', async () => {
+    currentStatus = { ...currentStatus, webpush: { subscriptions: [] }, native: { phones: 1, directoryOnline: true } };
+    renderPanel();
+    expect(await screen.findByText('No browser receives notifications yet.')).toBeTruthy();
+    expect((await screen.findByTestId('push-native-line')).textContent).toBe('Overdeck app: 1 phone');
+  });
+
   it('does not report a skipped phone as a failed test (PAN-4843)', async () => {
     vi.mocked(sendTestPush).mockResolvedValueOnce([
       { target: 'webpush:s1', ok: true },

@@ -200,6 +200,27 @@ describe('sanitizeTitle', () => {
   });
 });
 
+describe('derivePromptTitle attachments (PAN-5000)', () => {
+  it('drops a leading attachment reference line and titles the remaining text', () => {
+    const withAttachment = derivePromptTitle('@/Users/op/.overdeck/conversation-attachments/c1/a.png\nfix the login button');
+    expect(withAttachment).toBe(derivePromptTitle('fix the login button'));
+  });
+
+  it('returns an empty title for one or more attachment reference lines with no other text', () => {
+    expect(derivePromptTitle('@/Users/op/.overdeck/conversation-attachments/c1/a.png')).toBe('');
+    expect(derivePromptTitle('@/Users/op/a.png\n@/Users/op/b.png')).toBe('');
+  });
+
+  it('keeps a path mentioned inline, since only whole attachment-reference lines are dropped', () => {
+    expect(derivePromptTitle('look at /etc/hosts')).toContain('/etc/hosts');
+  });
+
+  it('drops a Windows-style attachment reference line', () => {
+    const withAttachment = derivePromptTitle('@C:\\Users\\op\\a.png\nfix the login button');
+    expect(withAttachment).toBe(derivePromptTitle('fix the login button'));
+  });
+});
+
 describe('fallbackTranscriptTitle', () => {
   it('uses the latest user turn', () => {
     const transcript = [

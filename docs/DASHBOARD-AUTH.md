@@ -348,6 +348,13 @@ token's call is forwarded to a linked machine, an agent-kind agent token is
 forwarded with actor `{ agentId }` (PAN-4927 D-9); any other token goes as the
 operator, and every token carries its scopes as the ceiling.
 
+A `connector` credential (PAN-4950 D-5) may call `POST /api/fleet/conversations`,
+`POST /api/fleet/workers` and `POST /api/fleet/issues/:id/start` through its link
+channel for a target on this machine: it acts as the operator with its scopes
+as the ceiling and never creates a Fly machine. Any other target answers
+**403** `{ "code": "connector-local-only" }` before any side effect. Every other
+fleet route still refuses channel callers.
+
 Secret requests (PAN-4941, W-SEC1) are self routes too.
 `POST /api/self/secret-requests` (`tell`) takes `{ name, prompt, timeoutMs? }`:
 `name` matches `^[A-Z][A-Z0-9_]{0,63}$`, `prompt` is 1–300 characters and

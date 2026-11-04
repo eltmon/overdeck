@@ -344,9 +344,52 @@ W-CONN1)". The facts that belong here:
 - **Handshake pin.** `isPinnedPeer` (`server.ts`) accepts a key held by an
   active `machine`, `phone` or `connector` record
   (`findActiveChannelTokenByKey`).
-- **One machine only.** Fleet routes and the linked-conversation proxy refuse
-  every channel caller, so a connector reaches only the machine it paired
-  with.
+- **One machine only.** The three fleet spawn routes (`POST
+  /api/fleet/conversations`, `/api/fleet/workers`,
+  `/api/fleet/issues/:id/start`) admit a connector through its link channel
+  for a target on this machine only and answer 403 `connector-local-only` for
+  any other target, before any side effect (PAN-4950 D-5). Placement, worker
+  stop, the fleet reads and the linked-conversation proxy still refuse every
+  channel caller, so a connector reaches only the machine it paired with.
+
+## The connector process (PAN-4927 W-CONN2)
+
+`pan mcp connector login|pair|serve|status|logout` (PAN-4950) is the process a
+self-hosted bot runs. The CLI group is `src/cli/commands/mcp-connector.ts`
+(type-only at load; each action imports its module); the modules live in
+`src/lib/mcp/connector/` and import nothing from `src/dashboard/`:
+
+- `home.ts` — the connector home, `$OVERDECK_CONNECTOR_HOME` (default
+  `~/.overdeck-connector`, 0700) with `account.json`, `identity.json`,
+  `pairing.json` and `local-token` (0600, written atomically). It never reads
+  or writes `~/.overdeck`; in particular the connector never uses
+  `ensureMachineKey` or `readDirectoryUrl`.
+- `account.ts` — `login` (the overdeck.ai device flow with
+  `environment_id` = the connector's `clientId`) and `status`.
+- `directory.ts` — `DirectoryWebClient` in the client role with
+  `platform: 'node'`: the account token rides in the `overdeck.bearer.<token>`
+  subprotocol, `hello-client.publicKeyHex` is the home's install key (not a
+  push key), and the client id is the home's `clientId`.
+- `dial.ts` — an `RtcTransport` whose signalling port is that directory
+  socket (`signal` frames with purpose `link`, `ice-servers` requests),
+  registered with `setRtcDialer`. It only dials. Relay channels are metered
+  like the phone's (`relay-usage` every 60 s and on close, at most 1e9 bytes
+  per frame), because the directory counts only the initiator's reports; a
+  `relay-status` with `stopped: true` closes them and refuses new relay dials.
+- `channel-api.ts` — `ConnectorLink`, a `LinkRouteSource`, and the tools'
+  `DashboardApi` over `linkFetch(environmentId, path, { routeSource })`, so
+  the connector reuses `LinkAgent`'s pool. `openLinkSocket` bounds a dial at
+  `LINK_WAIT_MS` (2.5 s), which a cold ICE negotiation through TURN can
+  exceed, so the link reports `online` only after a probe channel (15 s
+  timeout, then closed) has set up the peer connection; later dials reuse it.
+  Each later probe first closes the transport entry. Direct first, relay only
+  when allowed; failed rounds back off 1 s doubling to 60 s.
+- `pair.ts` — `pair` (a pairing-mode channel with the `odp_` code and a fresh
+  link key, then `POST /api/connectors/exchange`; the proven key and the
+  descriptor's `machineKey` must both equal the string's `k`) and `logout`.
+- `serve.ts` — `127.0.0.1:7466` `POST /mcp` (stateless, local-token bearer,
+  constant-time compare) or stdio, with the shared tool module minus
+  `list_machines` and with the start tools' `machine`/`needs` removed.
 
 ## Phone Live Activity (PAN-4839)
 
@@ -1268,6 +1311,15 @@ linked row with the stand-in's parent, run, key, role, critic link and home's pr
 so the Command Deck tree nests it under its orchestrator and the Awareness rail counts it
 in the run card, with no frontend change.
 
+PAN-5005: lane list fields (`laneReport`, `laneIteration`, `laneVerdict`, `laneLatestVerdict`)
+come from `laneFieldsByRun` in `lanes/lane-list-fields.ts`, which pairs over
+`listAllLaneRows` (local and remote lanes of a run) instead of the home-only context
+`conversation-list.ts` used before. `getMergedConversationList` passes them to
+`mergeConversationRows` through `RemoteLaneEntry.fields`, which is spread onto the stamped
+row alongside the lane facts above. `laneLatestVerdict.criticRoute` is the critic's route
+key — `@<environmentId>/<name>` for a remote critic, its numeric id as a string for a local
+one — so a builder's verdict link opens the right row on either machine.
+
 Live check, 2026-11-01: the three-machine run (orchestrator and builders on the desktop,
 critics on a Fly machine and the laptop) did not run before merge: no laptop or Fly machine
 was linked to the desktop, and the desktop dashboard runs `main`, which has no lane doors
@@ -1280,5 +1332,5 @@ Live check, 2026-11-04 (build `65e3b1adf86`, 0.73.1 on all three machines): pass
 desktop; critics on a Fly machine (`add-fly`) and the laptop rig each judged a builder's pushed head and
 reported PASS; `--machine auto` chose the Fly machine by CPU pressure, `--needs macos` the laptop and
 `--needs docker` the desktop. All 8 lanes were listed under the orchestrator in `pan lane list` and the
-Command Deck. The tree shows no report badges for remote lanes (#5005), and Auto prints no reason when it
+Command Deck. The tree showed no report badges for remote lanes, fixed by #5005. Auto prints no reason when it
 picks this machine (#5006). Evidence: `.pan/uat/pan-4638/check-1-three-machine-gauntlet.md`.
