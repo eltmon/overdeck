@@ -168,4 +168,31 @@ const updateScheduled: OverdeckTool = {
   },
 };
 
-export const SCHEDULE_TOOLS: readonly OverdeckTool[] = [scheduleMessage, scheduleRecurring, listScheduled, updateScheduled];
+const deleteScheduled: OverdeckTool = {
+  name: 'delete_scheduled',
+  description: 'Cancel a one-shot scheduled message that has not been sent (kind once) or delete a recurring schedule (kind recurring).',
+  scope: 'tell',
+  audience: 'any',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      conversation: CONVERSATION_PROPERTY,
+      kind: { type: 'string', enum: ['once', 'recurring'], description: 'Which kind of scheduled item id refers to.' },
+      id: { type: 'number', description: 'The id of the scheduled message or schedule.' },
+    },
+    required: ['conversation', 'kind', 'id'],
+  },
+  async run(args, ctx) {
+    const conversation = requiredString(args, 'conversation');
+    if (!conversation.ok) return conversation.error;
+    const kind = requiredKind(args);
+    if (!kind.ok) return kind.error;
+    const id = requiredId(args);
+    if (!id.ok) return id.error;
+    const base = conversationPath(conversation.value);
+    const path = kind.value === 'once' ? `${base}/scheduled-messages/${id.value}` : `${base}/schedules/${id.value}`;
+    return routeResult(await ctx.api.request('DELETE', path));
+  },
+};
+
+export const SCHEDULE_TOOLS: readonly OverdeckTool[] = [scheduleMessage, scheduleRecurring, listScheduled, updateScheduled, deleteScheduled];

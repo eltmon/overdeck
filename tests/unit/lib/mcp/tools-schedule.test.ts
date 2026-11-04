@@ -178,3 +178,29 @@ describe('MCP schedule tools: update_scheduled (PAN-4927 WI-5)', () => {
     expect(api.calls).toEqual([]);
   });
 });
+
+describe('MCP schedule tools: delete_scheduled (PAN-4927 WI-6)', () => {
+  it('kind once deletes scheduled-messages/:id with no body', async () => {
+    const api = fakeApi({ 'DELETE /api/conversations/conv-a/scheduled-messages/1': { status: 200, json: { ok: true } } });
+    const client = await connectClient(api, SCOPES, false, SCHEDULE_TOOLS);
+    const result = await callTool(client, 'delete_scheduled', { conversation: 'conv-a', kind: 'once', id: 1 });
+    expect(result.isError).toBeFalsy();
+    expect(api.calls).toEqual([{ method: 'DELETE', path: '/api/conversations/conv-a/scheduled-messages/1' }]);
+  });
+
+  it('kind recurring deletes schedules/:id', async () => {
+    const api = fakeApi({ 'DELETE /api/conversations/conv-a/schedules/2': { status: 200, json: { ok: true } } });
+    const client = await connectClient(api, SCOPES, false, SCHEDULE_TOOLS);
+    const result = await callTool(client, 'delete_scheduled', { conversation: 'conv-a', kind: 'recurring', id: 2 });
+    expect(result.isError).toBeFalsy();
+    expect(api.calls).toEqual([{ method: 'DELETE', path: '/api/conversations/conv-a/schedules/2' }]);
+  });
+
+  it('a 409 already-sent is a tool error with the route text', async () => {
+    const api = fakeApi({ 'DELETE /api/conversations/conv-a/scheduled-messages/1': { status: 409, json: { error: 'message already sent' } } });
+    const client = await connectClient(api, SCOPES, false, SCHEDULE_TOOLS);
+    const result = await callTool(client, 'delete_scheduled', { conversation: 'conv-a', kind: 'once', id: 1 });
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toContain('message already sent');
+  });
+});
