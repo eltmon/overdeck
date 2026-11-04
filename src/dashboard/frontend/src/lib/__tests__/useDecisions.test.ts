@@ -1,19 +1,32 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook } from '@testing-library/react';
 import { createElement, type ReactNode } from 'react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useDashboardStore } from '../store';
 import { describePendingInput } from '../pendingInput';
 import { type AgentRequestRow, isBlockingDecision, useDecisions } from '../useDecisions';
+import type { McpSignInApproval } from '../../components/Settings/anywhere/anywhereApi';
 
-function renderDecisions(convRows: unknown[] = [], agentRequestRows: AgentRequestRow[] = []) {
+interface RenderDecisionsOptions {
+  /** PAN-4946: who the dashboard sees itself answering to; defaults to this machine's own session. */
+  viewerKind?: 'root-session' | 'device' | 'token' | 'internal-token' | 'machine' | null;
+  mcpApprovals?: McpSignInApproval[];
+}
+
+function renderDecisions(
+  convRows: unknown[] = [],
+  agentRequestRows: AgentRequestRow[] = [],
+  options: RenderDecisionsOptions = {},
+) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
   });
   queryClient.setQueryData(['conv-ask-user-question'], convRows);
   queryClient.setQueryData(['fleet-needs-you'], []); // PAN-4651: no linked machines
   queryClient.setQueryData(['agent-requests'], agentRequestRows); // PAN-4941
+  queryClient.setQueryData(['anywhere-status'], { viewer: { kind: options.viewerKind ?? 'root-session' } }); // PAN-4946
+  queryClient.setQueryData(['mcp-oauth-approvals'], options.mcpApprovals ?? []); // PAN-4946
 
   return renderHook(() => useDecisions(), {
     wrapper: ({ children }: { children: ReactNode }) =>
@@ -159,6 +172,56 @@ describe('useDecisions secret requests (PAN-4941)', () => {
 
   it('labels the kind "Secret requested"', () => {
     expect(describePendingInput(['secretRequest'])).toBe('Secret requested');
+  });
+});
+
+describe('useDecisions MCP sign-ins (PAN-4946)', () => {
+  const approvalRow: McpSignInApproval = {
+    id: 'appr-1',
+    clientId: 'odc_123',
+    clientName: 'Claude Desktop',
+    redirectHost: 'localhost',
+    requestedLevel: 'operate',
+    approvalCode: 'ABCDE',
+    createdAt: '2026-11-04T00:00:00.000Z',
+    expiresAt: '2026-11-04T00:10:00.000Z',
+  };
+
+  it('maps a pending approval to a blocking mcpSignIn decision for a root-session viewer, sorted before non-blocking decisions', () => {
+    setDashboardState(
+      { 'agent-x': { id: 'agent-x', pendingInputKinds: ['exitPlanMode'] } },
+      [],
+    );
+
+    const { result } = renderDecisions([], [], { viewerKind: 'root-session', mcpApprovals: [approvalRow] });
+
+    expect(result.current).toHaveLength(2);
+    expect(result.current[0]).toMatchObject({
+      id: 'appr-1',
+      source: 'agent',
+      label: 'Claude Desktop',
+      kinds: ['mcpSignIn'],
+      blocking: true,
+      mcpSignIn: approvalRow,
+    });
+    expect(result.current[0]?.mcpSignIn?.approvalCode).toBe('ABCDE');
+  });
+
+  it('emits no mcpSignIn decision and makes no request to the approvals route for a device viewer', () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
+    // No ['mcp-oauth-approvals'] cache entry: a real session never populates it
+    // for a device viewer, since the approvals query is `enabled: false`.
+    const { result } = renderDecisions([], [], { viewerKind: 'device' });
+
+    expect(result.current.some((d) => d.kinds.includes('mcpSignIn'))).toBe(false);
+    expect(fetchSpy.mock.calls.some(([url]) => String(url).includes('/api/mcp-oauth/approvals'))).toBe(false);
+    fetchSpy.mockRestore();
+  });
+
+  it('labels the kind "MCP sign-in waiting" and treats it as blocking', () => {
+    expect(describePendingInput(['mcpSignIn'])).toBe('MCP sign-in waiting');
+    expect(isBlockingDecision(['mcpSignIn'])).toBe(true);
   });
 });
 
