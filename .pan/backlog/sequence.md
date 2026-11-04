@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-04T00:14:02.653222Z · model: claude-opus-5-5 · open: 890_
+_Last sequenced: 2026-11-04T00:16:05.212633Z · model: claude-opus-5-5 · open: 891_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -448,6 +448,7 @@ _Last sequenced: 2026-11-04T00:14:02.653222Z · model: claude-opus-5-5 · open: 
 | 447 | PAN-1392 | S | low | stale |  |  | docs/prds/active→completed archive step is superseded by .pan/drafts and .pan/specs on the feature branch |
 | 448 | PAN-4151 | L | medium | needs-refinement |  | PAN-3822 | Deferred remainder of PAN-3822/#4067: GitLab MR sync, PR page + search, handoff link copy, diffstat, link-dialog a11y, sync throttle |
 | 449 | PAN-1330 | S | medium | ok |  |  | CLI cannot address planning-*/specialist-* sessions |
+| 450 | PAN-4971 | S | medium | ok |  |  | Viewer header shows only host + count; roster of all participants with host/controller marked. Frontend-only, payload exists. |
 | 451 | PAN-4482 | S | medium | ok |  |  | Shared Sessions slice 11: signaling-privacy e2e, forced-TURN check (operator checkpoint) and full AC sweep |
 | 452 | PAN-1226 | L | medium | ok |  |  | PAN-1148 unified-dashboard redesign |
 | 453 | PAN-1173 | S | medium | ok |  |  | pan show <bare-number> derives wrong agent ID for PAN-prefixed issues |
@@ -1225,10 +1226,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-04T00:14:02.653222Z",
+  "generatedAt": "2026-11-04T00:16:05.212633Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 890,
+  "openCount": 891,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -12379,6 +12380,19 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "rationale": "New in-pipeline substrate-improvement bug filed 2026-11-03: the per-PR auto-merge train and the UAT batch reconciler both act on the same ready Overdeck PRs, so every per-PR merge invalidates the current batch and the Merge train page offers a promote action that returns 409 without telling the operator. PRs still land through the per-PR path, so this is high rather than critical, but it makes merge ownership and deploy units unclear. It takes the free rank 3 because in-pipeline work is pinned at the top, and no other node moves. The fix direction and acceptance tests are concrete, so condition is ok.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4971",
+      "rank": 450,
+      "size": "S",
+      "importance": "medium",
+      "score": 48,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Viewer header shows only host + count; roster of all participants with host/controller marked. Frontend-only, payload exists.",
+      "rationale": "New issue filed by the PAN-4482 acceptance sweep; placed beside PAN-4482 since it closes the PAN-658 FR-6/AC-7 gap that sweep found.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -14026,6 +14040,13 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-4971",
+      "to": "PAN-4482",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     }
   ]
 }
