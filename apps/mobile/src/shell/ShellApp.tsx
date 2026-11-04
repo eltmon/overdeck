@@ -53,8 +53,9 @@ const errorText = (e: unknown): string => (e instanceof Error ? e.message : Stri
  * iOS it answers with the last URL that opened the app, even one delivered by `appUrlOpen` while it
  * ran. Without this a pair link would reopen the pair screen with a used code after each reload, and
  * an Android cold-launch notification link would replay over a later warm tap's screen (PAN-4840):
- * one slot cannot hold both the cold launch URL and a warm one, so every handled URL is kept. Session
- * storage survives a reload and is empty in a new app process.
+ * one slot cannot hold both the cold launch URL and a warm one, so handled URLs are kept: the first,
+ * which on Android is the cold launch URL, plus the newest 19. Session storage survives a reload and is
+ * empty in a new app process.
  */
 const LAUNCH_URL_KEY = 'overdeck.launchUrlHandled';
 const HANDLED_URLS_MAX = 20;
@@ -76,7 +77,10 @@ function takeLaunchUrl(url: string): boolean {
   try {
     const handled = readHandledUrls();
     if (handled.includes(url)) return false;
-    sessionStorage.setItem(LAUNCH_URL_KEY, JSON.stringify([...handled, url].slice(-HANDLED_URLS_MAX)));
+    // Keep the first entry: on Android it is the cold-launch URL getLaunchUrl() keeps answering.
+    const next = [...handled, url];
+    if (next.length > HANDLED_URLS_MAX) next.splice(1, next.length - HANDLED_URLS_MAX);
+    sessionStorage.setItem(LAUNCH_URL_KEY, JSON.stringify(next));
   } catch {
     // Storage unavailable: handle the URL.
   }

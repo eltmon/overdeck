@@ -313,6 +313,31 @@ describe('ShellApp notification taps', () => {
     expect(navigate.mock.calls).toEqual([['/m?subject=a'], ['/m?subject=b']]);
   });
 
+  it('still skips the cold-launch link after more than 20 warm taps', async () => {
+    const link = (subject: string, t: string) =>
+      `ai.overdeck.app:/open#v=1&e=${MACHINE.environmentId}&p=%2Fm%3Fsubject%3D${subject}&t=${t}`;
+    const navigate = vi.fn();
+    harness.launchUrl = link('cold', '0');
+    const cold = render(<ShellApp navigate={navigate} />);
+    await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith('/m?subject=cold'));
+    cold.unmount();
+
+    harness.urlListeners.length = 0;
+    const warm = render(<ShellApp navigate={navigate} />);
+    await screen.findByText('Machines');
+    for (let i = 1; i <= 21; i++) await tap(link(`w${i}`, String(i)));
+    expect(navigate).toHaveBeenLastCalledWith('/m?subject=w21');
+    warm.unmount();
+
+    render(<ShellApp navigate={navigate} />);
+    await screen.findByText('Machines');
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    expect(navigate).toHaveBeenLastCalledWith('/m?subject=w21');
+    expect(navigate).toHaveBeenCalledTimes(22);
+  });
+
   it('does nothing while signed out', async () => {
     await removeAccount();
     const navigate = vi.fn();
