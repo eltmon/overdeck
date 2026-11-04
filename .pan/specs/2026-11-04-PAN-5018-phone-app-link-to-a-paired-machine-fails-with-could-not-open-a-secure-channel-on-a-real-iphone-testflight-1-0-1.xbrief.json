@@ -4,17 +4,17 @@
     "created": "2026-11-04T12:36:37Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5018: Phone app: link to a paired machine fails with \"Could not open a secure channel\" on a real iPhone (TestFlight 1.0 (1))",
-    "updated": "2026-11-04T12:41:25.160Z"
+    "updated": "2026-11-04T13:12:35.003Z"
   },
   "plan": {
     "id": "pan-5018",
     "title": "Phone app: link to a paired machine fails with \"Could not open a secure channel\" on a real iPhone (TestFlight 1.0 (1))",
-    "status": "proposed",
+    "status": "running",
     "uid": "a63a5e3f-d6bb-4fde-b8ea-d729103470e6",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-04T12:36:37Z",
-    "updated": "2026-11-04T12:41:25.160Z",
+    "updated": "2026-11-04T13:12:35.003Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5018",
@@ -781,5 +781,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
