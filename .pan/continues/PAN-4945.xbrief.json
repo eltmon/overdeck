@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4945",
   "created": "2026-11-04T01:22:40.341Z",
-  "updated": "2026-11-04T02:55:13.213Z",
+  "updated": "2026-11-04T02:55:31.541Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -218,6 +218,10 @@
     "routes-authorize.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T02:55:13.213Z"
+    },
+    "routes-authorize.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T02:55:31.541Z"
     }
   }
 }
