@@ -54,7 +54,7 @@ node integrations/shared/sync-skill.mjs --check
 python3.11 -m venv .tmp/hermes-venv
 .tmp/hermes-venv/bin/pip install -e 'integrations/hermes[test]'
 .tmp/hermes-venv/bin/python -m pytest integrations/hermes
-cd integrations/openclaw && npm ci && npm run build && npm test
+(cd integrations/openclaw && npm ci && npm run build && npm test)
 ```
 
 ## Publishing

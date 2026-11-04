@@ -4,17 +4,17 @@
     "created": "2026-11-04T16:48:20Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4957: Agent MCP and bots (W-CI1): CI for the integration packages",
-    "updated": "2026-11-04T16:51:49.754Z"
+    "updated": "2026-11-04T16:52:42.030Z"
   },
   "plan": {
     "id": "pan-4957",
     "title": "Agent MCP and bots (W-CI1): CI for the integration packages",
-    "status": "proposed",
+    "status": "running",
     "uid": "76652cd4-5c6b-4f36-b334-5a7f83195be5",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-04T16:48:20Z",
-    "updated": "2026-11-04T16:51:49.754Z",
+    "updated": "2026-11-04T16:52:42.030Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4957",
@@ -387,5 +387,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
