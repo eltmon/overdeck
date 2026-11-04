@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4841",
   "created": "2026-11-04T10:01:07.580Z",
-  "updated": "2026-11-04T17:31:55.362Z",
+  "updated": "2026-11-04T17:32:08.430Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -142,6 +142,10 @@
     "rel-upload-keystore.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T17:31:55.362Z"
+    },
+    "rel-android-build-script.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:32:08.430Z"
     }
   }
 }
