@@ -44,7 +44,7 @@
 import type { ProjectConfig } from '../../../lib/projects.js';
 import type { PendingAutoMerge } from '../../../lib/overdeck/merge-sync.js';
 import type { PrFacts } from '../../../lib/cloister/pr-facts.js';
-import { latestAutoMergeAllowsSchedule } from './auto-merge-scheduler.js';
+import { latestAutoMergeAllowsSchedule } from '../../../lib/cloister/auto-merge-rearm.js';
 
 export type MergePathOwner = 'per-pr' | 'batch';
 
@@ -75,7 +75,7 @@ async function defaultForgeOf(): Promise<(projectPath: string) => 'github' | 'gi
 }
 
 async function defaultPolicyRefusal(): Promise<(issueId: string) => PolicyRefusal> {
-  const { autoMergePolicyRefusal } = await import('../routes/merge-train.js');
+  const { autoMergePolicyRefusal } = await import('./auto-merge-door-policy.js');
   return (issueId) => autoMergePolicyRefusal(issueId);
 }
 

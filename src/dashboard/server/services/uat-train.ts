@@ -38,6 +38,7 @@ import {
 } from '../../../lib/cloister/uat-polyrepo-engine.js';
 import { buildConflictAgentHook } from '../../../lib/cloister/uat-conflict-agent.js';
 import { reconcileUatGenerations, type ReconcileResult } from '../../../lib/cloister/uat-reconciler.js';
+import { mergePathOwner } from './merge-path-owner.js';
 import { ensureUatStack, probeUatStack, teardownUatStack } from '../../../lib/cloister/uat-stack.js';
 import {
   promoteUatGeneration,
@@ -220,6 +221,7 @@ async function runUatTrainReconcileForProject(
       teardownStack: (gen) => teardownUatStack(gen),
       cleanup: makeCleanupForProject(projectPath),
       holdsForUat: (feature) => issueHoldsForUat(feature.issueId, projectConfig, isFlywheelRequireUatBeforeMerge()),
+      mergesPerPr: async (feature) => (await mergePathOwner(feature.issueId, projectPath, projectConfig)) === 'per-pr',
       log: (msg) => console.log(msg),
     }, options);
   }
@@ -237,6 +239,7 @@ async function runUatTrainReconcileForProject(
     teardownStack: (gen) => teardownUatStack(gen),
     cleanup: makeCleanupForProject(projectPath),
     holdsForUat: (feature) => issueHoldsForUat(feature.issueId, projectConfig, isFlywheelRequireUatBeforeMerge()),
+    mergesPerPr: async (feature) => (await mergePathOwner(feature.issueId, projectPath, projectConfig)) === 'per-pr',
     log: (msg) => console.log(msg),
   }, options);
 }
