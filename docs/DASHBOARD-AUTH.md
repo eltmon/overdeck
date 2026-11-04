@@ -113,10 +113,63 @@ in-memory snapshot, so it works in CLI processes too.
   state, agents the liveness oracle confirms dead (after a 10-minute grace from
   mint, start or resume), and conversations whose row is missing, archived, or
   ended. It then removes agent-token records revoked more than 7 days ago
-  (`pruneEndedAccessTokens`); other records are never pruned.
+  (`pruneEndedAccessTokens`); OAuth records are removed 7 days after they
+  expire or are revoked; other records are never pruned.
 - **Older versions.** An Overdeck that predates PAN-4927 ignores the extra
   fields and reads an agent token as a plain token, so a downgrade keeps the
   file valid.
+
+### OAuth sign-ins for /mcp (PAN-4945)
+
+Hosted MCP clients sign in through OAuth 2.1 (authorization code with PKCE
+S256, dynamic client registration, public clients only). User guide:
+[configuration/mcp.mdx](../configuration/mcp.mdx) "Sign in with OAuth".
+
+- **Record fields.** An OAuth access token is a `kind: 'token'` record that
+  also carries `oauthClientId` (`odc_` + 32 hex), `oauthFamilyId` (32 hex, the
+  sign-in) and `expiresAt` (ISO 8601). `oauthFieldsValid`
+  (`src/lib/access-token-records.ts`) requires all three or none, only on
+  `kind: 'token'`, and never together with the agent fields; anything else
+  makes the registry file corrupt. `createAccessToken` refuses `admin`,
+  `forward`, `read:settings`, `read:costs` and `read:events` on an OAuth token.
+  The resolved credential is `{ kind: 'token', tokenId, scopes, oauthClientId }`.
+- **Expiry.** `verifyAccessToken` and `listActiveRecordsOfKind` treat a record
+  at or past `expiresAt` as inactive; `readActiveAccessTokenRecord` does not,
+  so an expired token can still end its sign-in through `POST /oauth/mcp/revoke`.
+  Expiry fires no `onAccessTokensRevoked` event: `/mcp` is stateless, so the
+  next request fails, but a long-lived `/ws/*` socket is not closed at expiry.
+- **The store.** `~/.overdeck/mcp-oauth.json` (`src/lib/mcp/oauth-store.ts`,
+  mode 0600, temp file plus rename) holds registered clients and sign-ins
+  (families). A family stores its refresh token only as a SHA-256 digest, plus
+  up to 20 digests of retired refresh tokens for reuse detection, and names its
+  current access token by `accessTokenId`. Every read prunes families ended
+  more than 7 days ago and clients with no family created more than 24 h ago.
+  A malformed file throws and is never overwritten. Approvals and authorization
+  codes live only in memory (`src/lib/mcp/oauth-service.ts`).
+- **Rotation and theft.** Each refresh replaces both tokens and revokes the
+  family's other access tokens. A retired refresh token, a reused authorization
+  code, or a current access token revoked by another path (Settings → Access
+  Tokens, `pan token revoke`) ends the whole family.
+- **Issuer allowlist.** Every metadata URL is built from the trusted origin
+  (`getTrustedOrigins()`) whose host equals the request's `Host`, then
+  `X-Forwarded-Host`; a Funnel request uses the Funnel base. The raw header is
+  never echoed, and an unknown host gets 400. The MCP SDK client refuses a
+  `resource` whose origin differs from the URL it called, which is why the
+  issuer follows the request.
+- **Routes.** `/.well-known/oauth-protected-resource[/mcp]`,
+  `/.well-known/oauth-authorization-server` and `/oauth/mcp/*` (register,
+  authorize, authorize/status, token, revoke) are outside the gate's `/api/`
+  and `/events/` prefixes and check their own input
+  (`src/dashboard/server/routes/mcp-oauth.ts`). The gate's Funnel rule still
+  answers them 404. The authorize page escapes every value and sends a nonce
+  CSP with `connect-src 'self'`, `frame-ancestors 'none'` and `form-action 'none'`.
+- **Operator routes.** `GET /api/mcp-oauth/approvals`,
+  `POST /api/mcp-oauth/approvals/:id`, `GET /api/mcp-oauth/sign-ins`,
+  `DELETE /api/mcp-oauth/sign-ins/:familyId` and `POST /api/mcp-oauth/issue`
+  (`routes/mcp-oauth-admin.ts`) stay `admin` at the gate and then admit only
+  the internal token or the root session. `pan mcp oauth` calls them.
+- **Older versions.** An Overdeck that predates PAN-4945 ignores the three
+  fields, so it accepts an expired OAuth access token until it is revoked.
 
 ## Scopes
 
@@ -184,7 +237,9 @@ outside the gate's `/api/` and `/events/` prefixes, so the gate does not see it,
 and it is not in the route-scope table: `rejectUnauthorizedDashboardRequest`
 would demand `admin` for it. The route checks the credential itself, in order:
 an untrusted `Origin` that is present → 403, no internal token configured →
-503, no credential → 401, a credential that is not `kind: 'token'` (the
+503, no credential → 401 (with `WWW-Authenticate: Bearer
+resource_metadata="<issuer>/.well-known/oauth-protected-resource/mcp"` when the
+host is a trusted origin, PAN-4945), a credential that is not `kind: 'token'` (the
 internal token, the root session, a paired device) → 403, a token carrying
 `admin` → 403. MCP never runs with a root credential (parent PRD D-21).
 
