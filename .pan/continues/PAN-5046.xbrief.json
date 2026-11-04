@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5046",
   "created": "2026-11-04T18:10:57.891Z",
-  "updated": "2026-11-04T18:40:11.871Z",
+  "updated": "2026-11-04T18:40:16.639Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,11 @@
       "claimedBy": "agent-pan-5046",
       "claimedAt": "2026-11-04T18:38:41.633Z",
       "doneAt": "2026-11-04T18:40:11.871Z"
+    },
+    "docs-network-change": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5046",
+      "claimedAt": "2026-11-04T18:40:16.639Z"
     }
   }
 }
