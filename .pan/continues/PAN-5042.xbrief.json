@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5042",
   "created": "2026-11-04T17:47:47.339Z",
-  "updated": "2026-11-04T19:03:33.541Z",
+  "updated": "2026-11-04T19:04:12.570Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -128,6 +128,10 @@
     "log-failure-reason.ac4": {
       "status": "completed",
       "doneAt": "2026-11-04T19:03:33.540Z"
+    },
+    "scheduler-open-listing.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:04:12.570Z"
     }
   }
 }
