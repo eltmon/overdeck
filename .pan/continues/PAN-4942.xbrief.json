@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4942",
   "created": "2026-11-04T05:29:28.990Z",
-  "updated": "2026-11-04T06:20:59.515Z",
+  "updated": "2026-11-04T06:21:14.394Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -72,6 +72,10 @@
     "store-machine-link.ac4": {
       "status": "completed",
       "doneAt": "2026-11-04T06:20:59.514Z"
+    },
+    "store-machine-link.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:21:14.394Z"
     }
   }
 }
