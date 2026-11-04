@@ -218,8 +218,16 @@ names it.
 
 1. Your app opens a sign-in page in your browser. The page shows the app's
    name, where it will send you back, and an approval code such as `KQZT-MWRB`.
-2. You open the Overdeck dashboard on this machine, or run `pan mcp oauth pending`.
-3. You check that the dashboard shows the same code, and pick an access level.
+2. The dashboard's Needs you panel shows a card with the app's name, the
+   redirect host, and the same approval code — or run `pan mcp oauth pending`
+   from a terminal on this machine. Only this machine's own session can see
+   it: on its desktop layout that's the full card below; on its mobile
+   layout, which has no room for the card, it's "Approve on the desktop"
+   instead. A paired device never receives the pending sign-in at all — there
+   is nothing to approve from someone else's phone.
+3. You check that the card's code matches the page you opened, pick an access
+   level (the select starts at the level the app asked for), and click
+   Approve or Deny.
 4. The page sends you back to your app, and your app is signed in.
 
 The page itself can never approve anything, because anyone who can reach the
@@ -357,11 +365,16 @@ through the dashboard fails its next request at once. A token revoked by
 another process (for example `pan token revoke` while the dashboard is
 unreachable) fails within 5 seconds, when the dashboard rereads its token list.
 
-End an OAuth sign-in with `pan mcp oauth revoke <sign-in id>` (ids from
-`pan mcp oauth list`); its access and refresh tokens stop working at once.
-Revoking an OAuth access token under **Settings → Access Tokens** or with
-`pan token revoke` stops that access token at once and ends its sign-in at its
-next refresh.
+End an OAuth sign-in under **Settings → Access Tokens → Sign-ins** (also
+**Settings → Anywhere → Access tokens**), or with `pan mcp oauth revoke
+<sign-in id>` (ids from `pan mcp oauth list`); its access and refresh tokens
+stop working at once. Revoking an OAuth access token under **Settings →
+Access Tokens** or with `pan token revoke` stops that access token at once and
+ends its sign-in at its next refresh.
+
+Both token lists fold one access token per running agent under a collapsed
+**Show agent tokens (N)** toggle, so a fleet of agents doesn't bury your own
+tokens; click it to reveal and revoke an individual agent's token.
 
 ## Fleet reach
 
