@@ -346,6 +346,7 @@ Changing the transport does not disable a user's native instructions.
 | Legacy context paths | `.pan/context/project.md`, `.pan/context/workspace.md` | Read fallback only when the canonical file is absent |
 | Role instructions | Role definition selected by the launcher | Frontmatter removed; source path retained in the role prompt |
 | Session briefing | The briefing resolver's Overdeck-owned file | Added to the launch context |
+| Overdeck tools block | `src/lib/mcp/agent-instructions.ts` | Last section of the managed launch context: "Overdeck tools" when the launch gets the `overdeck` MCP server (`overdeckMcpEnabledFor`), else "Overdeck commands"; the shared launch file name ends in `-mcp.md` or `-cli.md` |
 
 Global render files are outputs, not independent sources. Claude receives one
 composed append-file argument, including role context and briefing; conversation

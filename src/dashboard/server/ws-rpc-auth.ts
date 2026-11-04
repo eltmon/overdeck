@@ -154,7 +154,7 @@ export function withRpcRevocation<E, R>(
 
 /**
  * The dashboard's one `onAccessTokensRevoked` listener (D-4645-16): close the
- * record's live connections and, for a machine record, its channels. Returns
+ * record's live connections and, for a machine, phone or connector record, its channels. Returns
  * the unsubscribe function.
  */
 export function registerRevocationClosers(): () => void {
@@ -162,6 +162,7 @@ export function registerRevocationClosers(): () => void {
     closeDeviceConnections(record.id);
     if (record.kind === 'machine' && record.machineKey) closeChannelsForPeer(record.machineKey);
     if (record.kind === 'phone' && record.phoneKey) closeChannelsForPeer(record.phoneKey);
+    if (record.kind === 'connector' && record.connectorKey) closeChannelsForPeer(record.connectorKey);
   });
 }
 

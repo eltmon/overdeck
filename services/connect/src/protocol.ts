@@ -6,7 +6,7 @@
  * and wrong field types are all `bad_frame`. Each frame is rebuilt from its known keys only, so an
  * unlisted field is never stored or forwarded.
  */
-import { CONNECT_PROTOCOL_VERSION, PUSH_SEALED_MAX_CHARS } from '../../../packages/contracts/src/connect.ts';
+import { ACTIVITY_COUNT_MAX, CONNECT_PROTOCOL_VERSION, PUSH_SEALED_MAX_CHARS } from '../../../packages/contracts/src/connect.ts';
 import type { ClientToDirectoryFrame, DirectoryEndpoint, MachineToDirectoryFrame } from '../../../packages/contracts/src/connect.ts';
 import type { SignalData } from '../../../packages/contracts/src/sharing.ts';
 
@@ -89,6 +89,13 @@ function endpointsOf(obj: Obj): DirectoryEndpoint[] {
     if (kind !== 'lan' && kind !== 'tailnet') fail();
     return { kind, url: str(entry, 'url', MAX_ENDPOINT_URL_CHARS, ENDPOINT_URL_RE) };
   });
+}
+
+/** A Live Activity count (PAN-4839): a safe integer in 0..ACTIVITY_COUNT_MAX. */
+function countOf(obj: Obj, key: string): number {
+  const value = obj[key];
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0 || value > ACTIVITY_COUNT_MAX) fail();
+  return value;
 }
 
 function bool(obj: Obj, key: string): boolean {
@@ -226,6 +233,8 @@ function build(obj: Obj): MachineToDirectoryFrame {
         collapseId: str(obj, 'collapseId', 32, ID_HEX_RE),
       };
     }
+    case 'push-activity':
+      return { type, to: environmentIdOf(obj, 'to'), needsYou: countOf(obj, 'needsYou'), running: countOf(obj, 'running') };
     default:
       return fail();
   }
@@ -246,7 +255,7 @@ function buildClient(obj: Obj): ClientToDirectoryFrame {
         publicKeyHex: str(obj, 'publicKeyHex', 64, KEY_HEX_RE),
         appVersion: str(obj, 'appVersion', 32),
       } as const;
-      if (platform !== 'ios' && platform !== 'android') fail();
+      if (platform !== 'ios' && platform !== 'android' && platform !== 'node') fail();
       return { ...frame, platform };
     }
     case 'signal': {
@@ -276,6 +285,15 @@ function buildClient(obj: Obj): ClientToDirectoryFrame {
       return { type, platform, token, apsEnvironment };
     }
     case 'push-unregister':
+      return { type };
+    case 'activity-register': {
+      const token = str(obj, 'token', MAX_PUSH_TOKEN_CHARS, PUSH_TOKEN_RE);
+      const apsEnvironment = obj['apsEnvironment'];
+      if (apsEnvironment === undefined) return { type, token };
+      if (apsEnvironment !== 'production' && apsEnvironment !== 'sandbox') fail();
+      return { type, token, apsEnvironment };
+    }
+    case 'activity-unregister':
       return { type };
     default:
       return fail();

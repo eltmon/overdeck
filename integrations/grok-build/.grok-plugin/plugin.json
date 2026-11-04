@@ -1,0 +1,10 @@
+{
+  "name": "overdeck",
+  "version": "0.1.0",
+  "description": "See and steer your Overdeck coding agents from Grok Build: read conversations, see prompts that wait for you, and, with the access you grant, send messages and answer prompts.",
+  "author": { "name": "Overdeck" },
+  "homepage": "https://overdeck.ai",
+  "repository": "https://github.com/eltmon/overdeck",
+  "license": "MIT",
+  "keywords": ["overdeck", "coding-agents", "mcp", "orchestration"]
+}

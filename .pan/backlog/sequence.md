@@ -1,14 +1,15 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-03T20:56:11.922834Z · model: claude-opus-5-5 · open: 864_
+_Last sequenced: 2026-11-04T10:19:47.123589Z · model: claude-opus-5-5 · open: 868_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
-| 1 | PAN-4702 | S | critical | ok |  |  | Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs. |
-| 3 | PAN-4925 | M | critical | ok |  |  | CI shard 3/4 worker exits with all tests passing; each flake turns main red and holds every merge and deploy |
+| 1 | PAN-5001 | S | critical | ok |  |  | Closed-issue reaper re-checks 426 reaped issues every minute and drains the 5k/hr GitHub App quota; in pipeline. |
+| 2 | PAN-4998 | M | high | ok |  |  | Reboot wipes /tmp, so agent scratchpads and published-page sources are lost; move managed scratch to ~/.overdeck/tmp + 14-day cleanup |
+| 3 | PAN-4995 | S | high | ok |  |  | pan review request verifies a half-adopted workspace; its main merge trips adoption's head check -> false Needs-you on handoff PRs |
 | 4 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
-| 5 | PAN-4553 | S | critical | ok |  |  | Polyrepo root npm install aborts workspace creation (since #4163); reproduced 2026-11-02 on botland too, so every polyrepo start fails. |
+| 5 | PAN-4553 | S | critical | ok |  |  | Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges. |
 | 6 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
 | 7 | PAN-4690 | S | critical | ok |  |  | Review dispatch rewrites the tracked continue file uncommitted, so the dirty-tree gate blocks the review it dispatched |
 | 8 | PAN-4710 | S | high | ok |  |  | Deferred plan hand-off retries omit the guardrail ack, so they're refused at 'agent count high' and give up silently; needs handoff |
@@ -20,8 +21,6 @@ _Last sequenced: 2026-11-03T20:56:11.922834Z · model: claude-opus-5-5 · open: 
 | 14 | PAN-4544 | S | high | ok |  |  | /api/costs/stream blocks the event loop ~1.6 s per poll with a sync scan of a 386 MB events.jsonl |
 | 15 | PAN-4551 | L | high | ok |  |  | Upgrade all Effect packages from 4.0.0-beta.73 to stable 4.0.0; run after the verification bundle merges. TENET-10: supervised |
 | 16 | PAN-4671 | M | high | ok |  |  | CodeRabbit comments posted after the reviewer snapshot merge unseen; deliver late ones to the work agent at merge. Needs handoff. |
-| 17 | PAN-4674 | S | high | ok |  |  | Operator can't remove a configured crew (Fable expert) in Settings tiered execution; removal or model change doesn't persist |
-| 18 | PAN-4673 | S | high | ok |  |  | Model Routing selects truncate model names (Opus 5.5 shows as Opus 5): narrow column plus repeated provider prefix in option text |
 | 19 | PAN-4675 | S | critical | ok |  |  | One transient gh label timeout aborts post-merge lifecycle; merge door replies Already merged, so the issue can never close. |
 | 20 | PAN-4705 | S | high | ok |  |  | quality-gate-admission test leaks a poller past afterEach rmSync; unhandled ENOENT fails unrelated PR CI shards. |
 | 21 | PAN-4746 | S | high | ok |  |  | CI test shard flakes on ENOTEMPTY: afterEach rmSync races an unawaited snapshot write; reds unrelated PRs (seen on #4745). |
@@ -173,7 +172,6 @@ _Last sequenced: 2026-11-03T20:56:11.922834Z · model: claude-opus-5-5 · open: 
 | 167 | PAN-3833 | S | high | ok |  |  | Feed renders assistant text emitted after tool calls as collapsed thinking rows; operator believes the agent never answered |
 | 168 | PAN-3902 | S | high | ok |  |  | Verification gates inherit OVERDECK_* env from the dashboard, so host boot state (e.g. OVERDECK_NO_RESUME) can red any branch |
 | 169 | PAN-4629 | M | high | ok |  |  | Fresh npx machine cannot pan start: no gh auth token fallback for the GitHub tracker, and registration derives the wrong issue prefix. |
-| 170 | PAN-1775 | M | medium | needs-refinement |  |  | PAN-4734 merged 2026-11-02 and should deliver this; verify Fly work agents show as session rows, then close. |
 | 171 | PAN-3854 | S | high | ok |  |  | Feature-workspace devcontainer stack 403s on POST /api/dashboard/session, blocking all in-browser mutation UAT |
 | 172 | PAN-4577 | M | high | ok |  |  | Operator's facts didn't follow them to a new Mac: no importer for Claude auto-memory. PAN-3957 merged, so W9-W11 are unblocked. |
 | 173 | PAN-3307 | XS | high | ok |  |  | commitlint scope-enum lists 11 scopes, 14 real ones are missing, and it still names the removed beads scope — trains everyone to ignore it. |
@@ -227,7 +225,7 @@ _Last sequenced: 2026-11-03T20:56:11.922834Z · model: claude-opus-5-5 · open: 
 | 221 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
 | 222 | PAN-3778 | S | medium | ok |  |  | Server snapshot cap shipped in #4558 (closed). Resume-from-offset on resubscribe is the remaining open piece; now unblocked. |
 | 223 | PAN-4575 | S | high | ok |  |  | Kimi ACP cancel is sent with id:"" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed. Unblocked. |
-| 224 | PAN-4903 | S | high | ok |  |  | Codex conv on a Herdr host loses its first message: spawn pastes it via tmux, no target; silent. needs-handoff (TENET-10). |
+| 224 | PAN-4999 | S | medium | ok |  |  | pan tell prefixes agent- to a bare conversation name and reports a live conversation as not running; resolver should accept name/conv-/rowid |
 | 225 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 226 | PAN-4616 | S | medium | ok |  |  | After PAN-4614 lands, check whether GitHub mergeable honors merge=union; if not, plan a merge-gate fallback |
 | 227 | PAN-4909 | S | high | ok |  |  | Mac set up with connect: Safari on localhost:3011 gets HTTP 401 from the loopback session mint, so the Mac's own dashboard won't load. |
@@ -327,7 +325,7 @@ _Last sequenced: 2026-11-03T20:56:11.922834Z · model: claude-opus-5-5 · open: 
 | 321 | PAN-1219 | M | high | needs-refinement |  |  | Promote across-cycle review state to first-class data (cycle SHA, prior findings) instead of prompt-derived |
 | 322 | PAN-1451 | M | high | needs-refinement |  |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
 | 323 | PAN-1452 | M | high | ok |  |  | PAN-1381 follow-up: per-reviewer restart with model override (architectural mismatch with PAN-1048) |
-| 324 | PAN-4927 | XL | medium | needs-refinement | ✓ |  | Epic: inject Overdeck MCP into every managed agent + OAuth /mcp + Hermes/OpenClaw/Grok plugins; PRD in progress, no children filed. |
+| 324 | PAN-4927 | XL | medium | ok | ✓ |  | Epic: Overdeck MCP in every managed agent, OAuth /mcp, Hermes/OpenClaw/Grok plugins; W-SELF1 closed, 29 children filed. |
 | 326 | PAN-1553 | M | high | ok |  |  | Investigate Claude Code Fast mode support (and fast-tier pricing) |
 | 327 | PAN-1504 | M | high | ok |  |  | pan hygiene |
 | 328 | PAN-1480 | L | high | ok |  |  | TLDR: 93% bypass rate |
@@ -417,6 +415,8 @@ _Last sequenced: 2026-11-03T20:56:11.922834Z · model: claude-opus-5-5 · open: 
 | 416 | PAN-3016 | M | medium | ok |  |  | Operator ask: every view should be URL-addressable; cockpit tabs, stage panes and several drawers are still local state. |
 | 417 | PAN-3890 | S | medium | ok |  |  | opencode provider stream errors (rate limit) are invisible in the feed and never retried; first message dies silently |
 | 418 | PAN-3822 | L | medium | ok |  |  | PRD landed (12 items, FR-1..14): link PRs to conversations via branch detection + explicit override; unblocks PAN-3920 |
+| 419 | PAN-4950 | M | medium | ok |  |  | pan mcp connector login/pair/serve for self-hosted bots; deps W-CONN1/W-DIR1/W-MCP1 closed; directory redeploy (CP-5) gates release. |
+| 420 | PAN-4935 | M | medium | ok |  |  | Instruction blocks and no-MCP fallback; only W-PR1 (PAN-4943, in review) remains before it can start. |
 | 421 | PAN-1673 | S | medium | ok |  |  | Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
 | 422 | PAN-1669 | S | medium | ok |  |  | restart-with-model doesn't emit a live event |
 | 423 | PAN-1668 | S | medium | ok |  |  | right-click 'restart with <model>' carries model only, never harness |
@@ -445,14 +445,14 @@ _Last sequenced: 2026-11-03T20:56:11.922834Z · model: claude-opus-5-5 · open: 
 | 447 | PAN-1392 | S | low | stale |  |  | docs/prds/active→completed archive step is superseded by .pan/drafts and .pan/specs on the feature branch |
 | 448 | PAN-4151 | L | medium | needs-refinement |  | PAN-3822 | Deferred remainder of PAN-3822/#4067: GitLab MR sync, PR page + search, handoff link copy, diffstat, link-dialog a11y, sync throttle |
 | 449 | PAN-1330 | S | medium | ok |  |  | CLI cannot address planning-*/specialist-* sessions |
-| 450 | PAN-4481 | M | medium | ok |  |  | Shared Sessions slice 10: hosted web join page; awaits operator decision OD-1 on sign-in without a local install |
-| 451 | PAN-4482 | S | medium | ok |  | PAN-4481 | Shared Sessions slice 11: signaling-privacy e2e, forced-TURN check (operator checkpoint) and full AC sweep |
+| 450 | PAN-4971 | S | medium | ok |  |  | Viewer header shows only host + count; roster of all participants with host/controller marked. Frontend-only, payload exists. |
 | 452 | PAN-1226 | L | medium | ok |  |  | PAN-1148 unified-dashboard redesign |
 | 453 | PAN-1173 | S | medium | ok |  |  | pan show <bare-number> derives wrong agent ID for PAN-prefixed issues |
 | 454 | PAN-1154 | M | medium | ok |  |  | pan up does not kill existing port holders |
 | 455 | PAN-3354 | XS | medium | ok |  |  | The archive write door accepts kind=main, hiding a project's singleton workspace with no unarchive affordance in the UI. |
 | 456 | PAN-3178 | XL | medium | ok |  |  | Make worktrees and diffs first class: +/- badge, dedicated Changes surface, conversation worktrees. PRD and mockup exist. |
 | 457 | PAN-3017 | S | medium | ok |  |  | The issue-page UAT panel renders only inline actions, so restart/rebuild/stop are unreachable outside the rail's context menu. |
+| 458 | PAN-5000 | S | medium | ok |  |  | Five Anywhere display bugs from the 2026-11-04 screenshot run: device count, raw project key, linked titles, Escape. |
 | 459 | PAN-3873 | M | medium | ok |  |  | GitHub event delivery: support gh webhook forward alongside smee with guided setup, settings exposure, and docs |
 | 460 | PAN-1150 | S | medium | ok |  |  | Settings: "Anthropic is not configured" warning persists in Model Routing after claude /login (Provider tab disagrees) |
 | 461 | PAN-1149 | S | medium | ok |  |  | v0.9.3 upgraders: stale workhorses.mid: claude-sonnet-4-7 in config.yaml keeps breaking Model Routing saves |
@@ -597,6 +597,7 @@ _Last sequenced: 2026-11-03T20:56:11.922834Z · model: claude-opus-5-5 · open: 
 | 600 | PAN-958 | M | medium | ok |  |  | Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
 | 601 | PAN-949 | M | medium | ok |  |  | feat: add conversation for project from sidebar |
 | 602 | PAN-3157 | XS | medium | ok |  |  | Rescoped: Awareness rail should show conv-flywheel as the Flywheel with its last tick (derive-status.ts) and link to /flywheel. |
+| 603 | PAN-4960 | M | medium | ok |  |  | Dashboard Settings → Anywhere Account card with PKCE sign-in; no code deps (the PAN-4959 page it linked to has closed). |
 | 604 | PAN-4908 | S | low | ok |  |  | Other remote-not-enabled messages name no file and the dead verb 'pan remote setup'; reuse PAN-4905's remoteEnabledHint(). |
 | 605 | PAN-947 | M | medium | ok |  |  | feat: project management actions in unified sidebar |
 | 606 | PAN-938 | M | medium | ok |  |  | Fizzy visual pipeline |
@@ -658,7 +659,6 @@ _Last sequenced: 2026-11-03T20:56:11.922834Z · model: claude-opus-5-5 · open: 
 | 662 | PAN-2353 | M | low | needs-refinement |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
 | 663 | PAN-4294 | L | low | ok |  |  | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
 | 664 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
-| 665 | PAN-4896 | XS | low | ok |  |  | pan connect on macOS prints the Linux-only PAN-2804 systemd-run warning; gate it on process.platform linux and add a darwin test. |
 | 666 | PAN-4638 | L | medium | ok |  |  | Anywhere: run gauntlet lanes on linked machines/Fly VMs; waits on unfiled machine-link plan items; Fly stack + creds open |
 | 667 | PAN-3011 | M | low | ok |  | PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
 | 668 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
@@ -862,23 +862,31 @@ _Last sequenced: 2026-11-03T20:56:11.922834Z · model: claude-opus-5-5 · open: 
 | 871 | PAN-4592 | M | low | ok |  | PAN-4590 | pan semgrep ci-setup opens a PR adding a Semgrep Actions workflow + failure relay; needs gate mode from PAN-4590. |
 | 872 | PAN-4594 | M | low | ok |  | PAN-4590 | Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590. |
 | 873 | PAN-4593 | L | low | needs-refinement |  | PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
-| 876 | PAN-4838 | M | medium | ok |  |  | Phone app W-IOS1: APNs registration and Notification Service Extension that decrypts sealed alerts. |
 | 877 | PAN-4840 | M | medium | ok |  |  | Phone app W-AND1: FCM FirebaseMessagingService decrypts sealed data payloads and posts notifications. |
 | 878 | PAN-4841 | M | medium | ok |  |  | Phone app W-REL1: Apple/Firebase/Play/Cloudflare setup and first store builds; operator approves purchases. |
-| 879 | PAN-4839 | S | low | ok |  | PAN-4838 | Phone app W-IOS2: counts-only Live Activity, on by default with a Settings off switch; OD-1 settled; after PAN-4838. |
 | 880 | PAN-4842 | S | medium | ok |  |  | Phone app W-DOC: phone-app.mdx and updates to Anywhere, push, tailscale and service docs; finished last. |
 | 881 | PAN-4851 | S | low | needs-refinement |  |  | Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them |
 | 882 | PAN-4887 | M | medium | ok |  |  | Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); PAN-4835 merged. |
+| 885 | PAN-4958 | S | low | ok |  |  | Docs for agent MCP and bot plugins; no hard deps but best written once Part A and B surfaces have landed. |
+| 904 | PAN-4953 | M | medium | ok |  |  | integrations/hermes/: Hermes plugin with its own revocable scoped token. Waits on in-progress PAN-4950. |
+| 905 | PAN-4954 | M | medium | ok |  |  | integrations/openclaw/: OpenClaw plugin with its own revocable scoped token. Waits on in-progress PAN-4950. |
+| 906 | PAN-4955 | S | medium | ok |  |  | integrations/grok-build/: Grok Build plugin with its own revocable scoped token. Waits on in-progress PAN-4950. |
+| 907 | PAN-4956 | S | low | ok |  |  | integrations/grok-bot/ and xAI API example; needs OAuth UI and public Funnel /mcp, not the connector. |
+| 909 | PAN-4957 | S | low | ok |  | PAN-4953, PAN-4954, PAN-4955, PAN-4956 | CI for the four integration packages; lands after all integrations exist. |
 
 ## Rationale detail
 
-### PAN-4702 (rank 1)
+### PAN-5001 (rank 1)
 
-New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.
+New in-pipeline substrate bug: the deacon close-out sweep alone exhausted the GitHub App REST pool, which pauses every tracker read and write across the pipeline. Pinned at the free top slot; the fix (skip already-reaped residue for 6h, no overlapping deacon-lite sweeps) is small and well specified.
 
-### PAN-4925 (rank 3)
+### PAN-4998 (rank 2)
 
-New since the prior run and already in the pipeline. An intermittent vitest worker exit on shard 3/4 turns main red on roughly 1 in 4 runs, and a red main silently empties the merge gate and holds post-merge deploys until someone re-runs the shard. Fixing the root cause (not quarantining) restores trust in main's CI signal, so it sits beside PAN-4917 at the top of the CI-substrate tier.
+New in-pipeline issue, placed in the open rank-2 slot so no other rank moves. Ubuntu's tmpfiles rule empties /tmp at every boot, and Claude Code's session scratchpad lives under /tmp by default, so a reboot on 2026-11-03 destroyed an orchestrator's published-page source and screenshots. The issue fixes the cause in the managed launch env (CLAUDE_CODE_TMPDIR), adds Deacon cleanup and a doctor size check because the root disk is 97% full, and ships a short universal rule. It is fully specified with checkable acceptance criteria.
+
+### PAN-4995 (rank 3)
+
+New substrate-improvement issue, placed in the open rank-3 slot so no other rank moves. Every handoff that opens a PR and then runs pan review request (the order the handoff brief prescribes) can race the PR-opened adoption: verification merges origin/main into the workspace before adoption's final head check, so adoption journals workspace-head-mismatch and the issue shows a false needs pr-outside-pipeline. Nothing is stranded, but each occurrence costs operator attention. The issue names the cause and picks the fix (await an in-flight adoptPrAndStartReview from the request-review path), so it is small and ready to plan.
 
 ### PAN-4636 (rank 4)
 
@@ -886,7 +894,7 @@ New substrate bug with a verified root cause: adoption (PAN-4605) calls startRev
 
 ### PAN-4553 (rank 5)
 
-Moved from rank 9 to the free rank 4: a 2026-11-02 comment shows the same abort on a second polyrepo project (botland), so the bug now blocks workspace creation for every polyrepo project, not only mind-your-now.
+Rank unchanged; its duplicate PAN-4929 entered the pipeline with an open PR, so this issue now waits on that PR instead of being picked up separately.
 
 ### PAN-4733 (rank 6)
 
@@ -931,14 +939,6 @@ Moves 705 importing files off a four-month-old beta onto the supported line, whi
 ### PAN-4671 (rank 16)
 
 New substrate fix to the merge door that closes the gap which let PAN-4672's findings merge unreviewed; advisory-only with a clear design and ACs, but TENET-10 requires a supervised handoff.
-
-### PAN-4674 (rank 17)
-
-New operator-reported substrate bug: tiered-execution crew removal and model changes do not persist, so the operator cannot route the expert difficulty to Opus 5.5. Clear repro steps, file pointers, and testable ACs; ranked beside the other fresh operator-reported substrate fixes.
-
-### PAN-4673 (rank 18)
-
-New operator-reported settings UI bug (substrate-improvement label sets a high floor): truncated model names make the operator misread which model is routed. Cause and fix are already identified in WorkhorsePanel.tsx, so it is a small, self-contained change; ranked just below the crew-removal bug because it misleads but does not block configuration.
 
 ### PAN-4675 (rank 19)
 
@@ -1192,6 +1192,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 
 New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.
 
+### PAN-4213 (rank 82)
+
+Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066 merged, so these seven follow-ups now harden code that is on main. Items 2 and 5 are real merge-path correctness hazards: a success status can sit on a head that never landed, and git reset --keep can move an agent commit off its branch. Each item names its file, so the work is well defined and is now startable.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1199,37 +1203,11 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-03T20:56:11.922834Z",
+  "generatedAt": "2026-11-04T10:19:47.123589Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 864,
+  "openCount": 868,
   "nodes": [
-    {
-      "issue": "PAN-4702",
-      "rank": 1,
-      "size": "S",
-      "importance": "critical",
-      "score": 92,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs.",
-      "rationale": "New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4925",
-      "rank": 3,
-      "size": "M",
-      "importance": "critical",
-      "score": 88,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "CI shard 3/4 worker exits with all tests passing; each flake turns main red and holds every merge and deploy",
-      "rationale": "New since the prior run and already in the pipeline. An intermittent vitest worker exit on shard 3/4 turns main red on roughly 1 in 4 runs, and a red main silently empties the merge gate and holds post-merge deploys until someone re-runs the shard. Fixing the root cause (not quarantining) restores trust in main's CI signal, so it sits beside PAN-4917 at the top of the CI-substrate tier.",
-      "gate": "auto",
-      "planning": "auto"
-    },
     {
       "issue": "PAN-4636",
       "rank": 4,
@@ -1251,8 +1229,8 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "score": 90,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Polyrepo root npm install aborts workspace creation (since #4163); reproduced 2026-11-02 on botland too, so every polyrepo start fails.",
-      "rationale": "Moved from rank 9 to the free rank 4: a 2026-11-02 comment shows the same abort on a second polyrepo project (botland), so the bug now blocks workspace creation for every polyrepo project, not only mind-your-now.",
+      "why": "Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges.",
+      "rationale": "Rank unchanged; its duplicate PAN-4929 entered the pipeline with an open PR, so this issue now waits on that PR instead of being picked up separately.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1396,32 +1374,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "dependsOn": [],
       "why": "CodeRabbit comments posted after the reviewer snapshot merge unseen; deliver late ones to the work agent at merge. Needs handoff.",
       "rationale": "New substrate fix to the merge door that closes the gap which let PAN-4672's findings merge unreviewed; advisory-only with a clear design and ACs, but TENET-10 requires a supervised handoff.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4674",
-      "rank": 17,
-      "size": "S",
-      "importance": "high",
-      "score": 72,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Operator can't remove a configured crew (Fable expert) in Settings tiered execution; removal or model change doesn't persist",
-      "rationale": "New operator-reported substrate bug: tiered-execution crew removal and model changes do not persist, so the operator cannot route the expert difficulty to Opus 5.5. Clear repro steps, file pointers, and testable ACs; ranked beside the other fresh operator-reported substrate fixes.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4673",
-      "rank": 18,
-      "size": "S",
-      "importance": "high",
-      "score": 64,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Model Routing selects truncate model names (Opus 5.5 shows as Opus 5): narrow column plus repeated provider prefix in option text",
-      "rationale": "New operator-reported settings UI bug (substrate-improvement label sets a high floor): truncated model names make the operator misread which model is routed. Cause and fix are already identified in WorkhorsePanel.tsx, so it is a small, self-contained change; ranked just below the crew-removal bug because it misleads but does not block configuration.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3374,19 +3326,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
-      "issue": "PAN-1775",
-      "rank": 170,
-      "size": "M",
-      "importance": "medium",
-      "score": 30,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "PAN-4734 merged 2026-11-02 and should deliver this; verify Fly work agents show as session rows, then close.",
-      "rationale": "Dependency PAN-4734 closed as completed, so this issue is likely satisfied; demoted in score pending a verify-and-close check.",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
       "issue": "PAN-3854",
       "rank": 171,
       "size": "S",
@@ -4049,19 +3988,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
-      "issue": "PAN-4903",
-      "rank": 224,
-      "size": "S",
-      "importance": "high",
-      "score": 72,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Codex conv on a Herdr host loses its first message: spawn pastes it via tmux, no target; silent. needs-handoff (TENET-10).",
-      "rationale": "New since the prior run. The first-message path for a Codex app-server conversation on a Herdr host still pastes through tmux, so the prompt is dropped with no dashboard error while pan tell works; it takes the free rank 224 so no other node moves, and its needs-handoff label means a supervised strike, never an autonomous pickup.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3510",
       "rank": 225,
       "size": "S",
@@ -4605,6 +4531,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "condition": "ok",
       "dependsOn": [],
       "why": "pan tell contradicts itself on dead ohmypi sessions",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4926",
+      "rank": 269,
+      "size": "XS",
+      "importance": "medium",
+      "score": 64,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan down SIGTERMs the smee pidfile PID without verifying it is smee; a reused PID kills an unrelated process. XS guard + test.",
+      "rationale": "New since prior run: a small safety fix with an exact recipe (reuse the isSmeeCommand cmdline guard), placed in the free rank 269 slot.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -5281,6 +5220,20 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "why": "PAN-1381 follow-up: per-reviewer restart with model override (architectural mismatch with PAN-1048)",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4927",
+      "rank": 324,
+      "size": "XL",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Epic: Overdeck MCP in every managed agent, OAuth /mcp, Hermes/OpenClaw/Grok plugins; W-SELF1 closed, 29 children filed.",
+      "rationale": "The PRD (.pan/drafts/pan-4927.md) is written and child issues were filed per work item, so the epic is ok and keeps rank 324. Roots W-TOK1, W-MCP1 and W-SELF1 have closed; W-SELF1 closing unblocks W-DEL1, W-MEM1 and W-PR1, lifted to the 396-419 band. W-INJ2 (PAN-4934), request_secret (PAN-4941) and the OAuth server (PAN-4945) closed 2026-11-04, unblocking W-LINK1, W-OAUTH2 and W-FUN1.",
+      "gate": "auto",
+      "planning": "auto",
+      "isEpic": true
     },
     {
       "issue": "PAN-1553",
@@ -6365,6 +6318,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
+      "issue": "PAN-4935",
+      "rank": 420,
+      "size": "M",
+      "importance": "medium",
+      "score": 45,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Instruction blocks and no-MCP fallback; only W-PR1 (PAN-4943, in review) remains before it can start.",
+      "rationale": "Dependency PAN-4942 (W-LINK1 link_machine) closed as completed, leaving only in-review PAN-4943, so it moves from the tail into the freed slot right after it.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1673",
       "rank": 421,
       "size": "S",
@@ -6710,30 +6676,15 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
-      "issue": "PAN-4481",
+      "issue": "PAN-4971",
       "rank": 450,
-      "size": "M",
+      "size": "S",
       "importance": "medium",
       "score": 48,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Shared Sessions slice 10: hosted web join page; awaits operator decision OD-1 on sign-in without a local install",
-      "rationale": "Rank held: dependency PAN-4475 (Shared Sessions slice 4, viewer surface) closed completed on 2026-11-03; no open dependency remains, but sibling slices ahead of it are still in the pipeline.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4482",
-      "rank": 451,
-      "size": "S",
-      "importance": "medium",
-      "score": 50,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4481"
-      ],
-      "why": "Shared Sessions slice 11: signaling-privacy e2e, forced-TURN check (operator checkpoint) and full AC sweep",
-      "rationale": "Dependency PAN-4478 (slice 7) closed as completed; rank unchanged because other Shared Sessions slices remain open.",
+      "why": "Viewer header shows only host + count; roster of all participants with host/controller marked. Frontend-only, payload exists.",
+      "rationale": "New issue filed by the PAN-4482 acceptance sweep; placed beside PAN-4482 since it closes the PAN-658 FR-6/AC-7 gap that sweep found.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -8573,6 +8524,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
+      "issue": "PAN-4960",
+      "rank": 603,
+      "size": "M",
+      "importance": "medium",
+      "score": 30,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Dashboard Settings → Anywhere Account card with PKCE sign-in; no code deps (the PAN-4959 page it linked to has closed).",
+      "rationale": "PAN-4959 closed since the prior run; the informs edge is dropped and rank holds.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-4908",
       "rank": 604,
       "size": "S",
@@ -9318,19 +9282,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "why": "Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice.",
       "gate": "auto",
       "planning": "interactive"
-    },
-    {
-      "issue": "PAN-4896",
-      "rank": 665,
-      "size": "XS",
-      "importance": "low",
-      "score": 30,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan connect on macOS prints the Linux-only PAN-2804 systemd-run warning; gate it on process.platform linux and add a darwin test.",
-      "rationale": "New issue filed 2026-11-03 from the Mac rig: a misleading but harmless warning during Anywhere onboarding with a one-line fix and clear AC, so it takes free rank 664 beside the Anywhere work.",
-      "gate": "auto",
-      "planning": "auto"
     },
     {
       "issue": "PAN-4638",
@@ -11840,19 +11791,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
-      "issue": "PAN-4838",
-      "rank": 876,
-      "size": "M",
-      "importance": "medium",
-      "score": 30,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Phone app W-IOS1: APNs registration and Notification Service Extension that decrypts sealed alerts.",
-      "rationale": "PAN-4830 and PAN-4843 closed; rank unchanged because the remaining dependency PAN-4837 is still in the work phase.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4840",
       "rank": 877,
       "size": "M",
@@ -11874,22 +11812,7 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "condition": "ok",
       "dependsOn": [],
       "why": "Phone app W-REL1: Apple/Firebase/Play/Cloudflare setup and first store builds; operator approves purchases.",
-      "rationale": "PAN-4774 (Anywhere release AC run) closed as completed, so that dependency is removed; rank held because the phone-app epic is feature work that still ranks below substrate items.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4839",
-      "rank": 879,
-      "size": "S",
-      "importance": "low",
-      "score": 22,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4838"
-      ],
-      "why": "Phone app W-IOS2: counts-only Live Activity, on by default with a Settings off switch; OD-1 settled; after PAN-4838.",
-      "rationale": "PAN-4774 (Anywhere release AC run) closed as completed, so that dependency is removed; rank held because the phone-app epic is feature work that still ranks below substrate items.",
+      "rationale": "Rank held: PAN-4839 (Live Activity) closed completed 2026-11-04, removing its informs edge; release setup is still feature work below substrate.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11933,31 +11856,165 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
-      "issue": "PAN-4926",
-      "rank": 269,
-      "size": "XS",
-      "importance": "medium",
-      "score": 64,
+      "issue": "PAN-4958",
+      "rank": 885,
+      "size": "S",
+      "importance": "low",
+      "score": 30,
       "condition": "ok",
       "dependsOn": [],
-      "why": "pan down SIGTERMs the smee pidfile PID without verifying it is smee; a reused PID kills an unrelated process. XS guard + test.",
-      "rationale": "New since prior run: a small safety fix with an exact recipe (reuse the isSmeeCommand cmdline guard), placed in the free rank 269 slot.",
+      "why": "Docs for agent MCP and bot plugins; no hard deps but best written once Part A and B surfaces have landed.",
+      "rationale": "New child W-DOC of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
       "gate": "auto",
       "planning": "auto"
     },
     {
-      "issue": "PAN-4927",
-      "rank": 324,
-      "size": "XL",
+      "issue": "PAN-4953",
+      "rank": 904,
+      "size": "M",
       "importance": "medium",
-      "score": 55,
-      "condition": "needs-refinement",
+      "score": 40,
+      "condition": "ok",
       "dependsOn": [],
-      "why": "Epic: inject Overdeck MCP into every managed agent + OAuth /mcp + Hermes/OpenClaw/Grok plugins; PRD in progress, no children filed.",
-      "rationale": "New issue that describes itself as an epic: it injects the Overdeck MCP server into every managed harness with per-agent scoped tokens, turns agent workflow verbs into tools, adds OAuth and an opt-in Tailscale Funnel /mcp, and ships Hermes, OpenClaw and Grok plugins. The PRD is still being written and no child issues are filed, so it is needs-refinement and marked as an epic so nothing picks it up directly. It slots into free rank 324 beside the overlapping MCP and Anywhere work (PAN-3789, PAN-2350) without moving any other node.",
+      "why": "integrations/hermes/: Hermes plugin with its own revocable scoped token. Waits on in-progress PAN-4950.",
+      "rationale": "Rank held: its blocker PAN-4950 (connector process) left the backlog because work started on it; this plugin still waits for that merge.",
       "gate": "auto",
-      "planning": "auto",
-      "isEpic": true
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4954",
+      "rank": 905,
+      "size": "M",
+      "importance": "medium",
+      "score": 38,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "integrations/openclaw/: OpenClaw plugin with its own revocable scoped token. Waits on in-progress PAN-4950.",
+      "rationale": "Rank held: its blocker PAN-4950 (connector process) left the backlog because work started on it; this plugin still waits for that merge.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4955",
+      "rank": 906,
+      "size": "S",
+      "importance": "medium",
+      "score": 36,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "integrations/grok-build/: Grok Build plugin with its own revocable scoped token. Waits on in-progress PAN-4950.",
+      "rationale": "Rank held: its blocker PAN-4950 (connector process) left the backlog because work started on it; this plugin still waits for that merge.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4956",
+      "rank": 907,
+      "size": "S",
+      "importance": "low",
+      "score": 32,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "integrations/grok-bot/ and xAI API example; needs OAuth UI and public Funnel /mcp, not the connector.",
+      "rationale": "Rank held: dependency PAN-4952 (shared skill text) closed completed 2026-11-04; still waits on PAN-4946 and PAN-4947.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4957",
+      "rank": 909,
+      "size": "S",
+      "importance": "low",
+      "score": 30,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4953",
+        "PAN-4954",
+        "PAN-4955",
+        "PAN-4956"
+      ],
+      "why": "CI for the four integration packages; lands after all integrations exist.",
+      "rationale": "New child W-CI1 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4995",
+      "rank": 3,
+      "size": "S",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan review request verifies a half-adopted workspace; its main merge trips adoption's head check -> false Needs-you on handoff PRs",
+      "rationale": "New substrate-improvement issue, placed in the open rank-3 slot so no other rank moves. Every handoff that opens a PR and then runs pan review request (the order the handoff brief prescribes) can race the PR-opened adoption: verification merges origin/main into the workspace before adoption's final head check, so adoption journals workspace-head-mismatch and the issue shows a false needs pr-outside-pipeline. Nothing is stranded, but each occurrence costs operator attention. The issue names the cause and picks the fix (await an in-flight adoptPrAndStartReview from the request-review path), so it is small and ready to plan.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4998",
+      "rank": 2,
+      "size": "M",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Reboot wipes /tmp, so agent scratchpads and published-page sources are lost; move managed scratch to ~/.overdeck/tmp + 14-day cleanup",
+      "rationale": "New in-pipeline issue, placed in the open rank-2 slot so no other rank moves. Ubuntu's tmpfiles rule empties /tmp at every boot, and Claude Code's session scratchpad lives under /tmp by default, so a reboot on 2026-11-03 destroyed an orchestrator's published-page source and screenshots. The issue fixes the cause in the managed launch env (CLAUDE_CODE_TMPDIR), adds Deacon cleanup and a doctor size check because the root disk is 97% full, and ships a short universal rule. It is fully specified with checkable acceptance criteria.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4999",
+      "rank": 224,
+      "size": "S",
+      "importance": "medium",
+      "score": 60,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan tell prefixes agent- to a bare conversation name and reports a live conversation as not running; resolver should accept name/conv-/rowid",
+      "rationale": "New in-pipeline issue, placed in the open rank-224 slot next to the other in-pipeline work so no other rank moves. The bug misdirects agent-to-conversation messages and its error misleads (the conversation was running); the fix is a small target-resolver change with a named unit test.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4950",
+      "rank": 419,
+      "size": "M",
+      "importance": "medium",
+      "score": 45,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan mcp connector login/pair/serve for self-hosted bots; deps W-CONN1/W-DIR1/W-MCP1 closed; directory redeploy (CP-5) gates release.",
+      "rationale": "New in-pipeline child of epic PAN-4927 (W-CONN2), placed in the free rank-419 slot beside its in-pipeline sibling PAN-4935 so no other rank moves.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5001",
+      "rank": 1,
+      "size": "S",
+      "importance": "critical",
+      "score": 92,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Closed-issue reaper re-checks 426 reaped issues every minute and drains the 5k/hr GitHub App quota; in pipeline.",
+      "rationale": "New in-pipeline substrate bug: the deacon close-out sweep alone exhausted the GitHub App REST pool, which pauses every tracker read and write across the pipeline. Pinned at the free top slot; the fix (skip already-reaped residue for 6h, no overlapping deacon-lite sweeps) is small and well specified.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5000",
+      "rank": 458,
+      "size": "S",
+      "importance": "medium",
+      "score": 45,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Five Anywhere display bugs from the 2026-11-04 screenshot run: device count, raw project key, linked titles, Escape.",
+      "rationale": "New issue with concrete repro and acceptance; user-facing polish on Anywhere, ranked beside the similar PAN-4918 UI-issue batch.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12712,13 +12769,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
     },
     {
       "from": "PAN-2350",
-      "to": "PAN-1775",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2350",
       "to": "PAN-1676",
       "type": "contains",
       "source": "github-ref",
@@ -12776,13 +12826,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
     {
       "from": "PAN-4409",
       "to": "PAN-4410",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4481",
-      "to": "PAN-4482",
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
@@ -12963,13 +13006,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "confidence": 0.5
     },
     {
-      "from": "PAN-4702",
-      "to": "PAN-3946",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
       "from": "PAN-1824",
       "to": "PAN-4705",
       "type": "informs",
@@ -13041,13 +13077,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
     },
     {
       "from": "PAN-4823",
-      "to": "PAN-4838",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4823",
       "to": "PAN-4840",
       "type": "contains",
       "source": "github-ref",
@@ -13062,31 +13091,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
     },
     {
       "from": "PAN-4823",
-      "to": "PAN-4839",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4838",
-      "to": "PAN-4839",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.9
-    },
-    {
-      "from": "PAN-4823",
       "to": "PAN-4842",
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-4838",
-      "to": "PAN-4841",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.8
     },
     {
       "from": "PAN-4840",
@@ -13131,25 +13139,11 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "confidence": 0.6
     },
     {
-      "from": "PAN-3944",
-      "to": "PAN-4903",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
-    },
-    {
       "from": "PAN-2626",
       "to": "PAN-4924",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
-    },
-    {
-      "from": "PAN-4925",
-      "to": "PAN-4926",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
     },
     {
       "from": "PAN-4927",
@@ -13171,6 +13165,125 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4958",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4953",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4954",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4955",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4956",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4935",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4953",
+      "to": "PAN-4957",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4954",
+      "to": "PAN-4957",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4955",
+      "to": "PAN-4957",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4956",
+      "to": "PAN-4957",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4957",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2350",
+      "to": "PAN-4960",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4995",
+      "to": "PAN-4636",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4950",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-5001",
+      "to": "PAN-2259",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-5001",
+      "to": "PAN-4240",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
+    },
+    {
+      "from": "PAN-5000",
+      "to": "PAN-4918",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
     }
   ]
 }

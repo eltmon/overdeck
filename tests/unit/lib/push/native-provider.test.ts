@@ -5,6 +5,7 @@ import {
   PUSH_PLAINTEXT_MAX_BYTES,
   PUSH_SEALED_MAX_CHARS,
   type MachineToDirectoryFrame,
+  type PhoneNotificationPreferences,
   type PushResultError,
 } from '@overdeck/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -24,6 +25,7 @@ import type { NeedsYouNotification } from '../../../../src/lib/push/types.js';
 function notification(overrides: Partial<NeedsYouNotification> = {}): NeedsYouNotification {
   return {
     kind: 'question',
+    category: 'question',
     tag: 'auq:toolu_01',
     title: 'PAN-1 work asks a question',
     publicTitle: 'PAN-1 needs you',
@@ -147,8 +149,17 @@ function fakePort(options: { online?: boolean; accept?: boolean; answer?: (frame
 
 const okReply = (frame: PushFrame) => ({ type: 'push-result' as const, requestId: frame.requestId, ok: true as const });
 
-function provider(port: PushDirectoryPort | null, phones = PHONES) {
-  return createNativePushProvider({ directory: () => port, listPhones: () => phones, environmentId: async () => 'env-1' });
+function provider(
+  port: PushDirectoryPort | null,
+  phones = PHONES,
+  overrides: { readPreferences?: () => Promise<ReadonlyMap<string, PhoneNotificationPreferences>>; now?: () => number } = {},
+) {
+  return createNativePushProvider({
+    directory: () => port,
+    listPhones: () => phones,
+    environmentId: async () => 'env-1',
+    ...overrides,
+  });
 }
 
 function openFrame(frame: PushFrame, keys: MachineKeyPair): unknown {
@@ -275,5 +286,49 @@ describe('native push provider (PAN-4843)', () => {
     const fake = fakePort({ answer: okReply });
     expect(await provider(fake.port, []).send(notification())).toEqual([]);
     expect(fake.frames).toEqual([]);
+  });
+
+  it('omits an indefinitely paused phone and sends only to the other (PAN-5019 D-1)', async () => {
+    const fake = fakePort({ answer: okReply });
+    const prefs = new Map([[PHONE_A.clientId, { v: 1 as const, pause: { until: null }, muted: [] }]]);
+    const outcomes = await provider(fake.port, PHONES, { readPreferences: async () => prefs }).send(notification());
+    expect(outcomes).toEqual([{ target: `native:${PHONE_B.clientId}`, ok: true }]);
+    expect(fake.frames.map((frame) => frame.to)).toEqual([PHONE_B.clientId]);
+  });
+
+  it('withholds a muted category from one phone but still sends an unmuted category', async () => {
+    const fake = fakePort({ answer: okReply });
+    const prefs = new Map([[PHONE_A.clientId, { v: 1 as const, pause: null, muted: ['stopped' as const] }]]);
+    const deps = { readPreferences: async () => prefs };
+
+    const stopped = await provider(fake.port, PHONES, deps).send(notification({ category: 'stopped' }));
+    expect(stopped).toEqual([{ target: `native:${PHONE_B.clientId}`, ok: true }]);
+
+    fake.frames.length = 0;
+    const question = await provider(fake.port, PHONES, deps).send(notification({ category: 'question' }));
+    expect(question.map((outcome) => outcome.target)).toEqual([`native:${PHONE_A.clientId}`, `native:${PHONE_B.clientId}`]);
+  });
+
+  it('reaches a paused phone with a test notification', async () => {
+    const fake = fakePort({ answer: okReply });
+    const prefs = new Map([[PHONE_A.clientId, { v: 1 as const, pause: { until: null }, muted: [] }]]);
+    const outcomes = await provider(fake.port, PHONES, { readPreferences: async () => prefs }).send(notification({ kind: 'test', category: 'test' }));
+    expect(outcomes.map((outcome) => outcome.target)).toEqual([`native:${PHONE_A.clientId}`, `native:${PHONE_B.clientId}`]);
+  });
+
+  it('delivers to a phone whose pause until is already in the past', async () => {
+    const fake = fakePort({ answer: okReply });
+    const prefs = new Map([[PHONE_A.clientId, { v: 1 as const, pause: { until: '2026-11-01T00:00:00.000Z' }, muted: [] }]]);
+    const outcomes = await provider(fake.port, PHONES, {
+      readPreferences: async () => prefs,
+      now: () => Date.parse('2026-11-02T00:00:00.000Z'),
+    }).send(notification());
+    expect(outcomes.map((outcome) => outcome.target)).toEqual([`native:${PHONE_A.clientId}`, `native:${PHONE_B.clientId}`]);
+  });
+
+  it('sends to every phone when readPreferences rejects (fail open, NFR-1)', async () => {
+    const fake = fakePort({ answer: okReply });
+    const outcomes = await provider(fake.port, PHONES, { readPreferences: async () => { throw new Error('store unreadable'); } }).send(notification());
+    expect(outcomes.map((outcome) => outcome.target)).toEqual([`native:${PHONE_A.clientId}`, `native:${PHONE_B.clientId}`]);
   });
 });

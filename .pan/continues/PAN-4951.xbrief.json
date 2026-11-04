@@ -1,0 +1,168 @@
+{
+  "version": "1",
+  "issueId": "PAN-4951",
+  "created": "2026-11-04T04:17:47.457Z",
+  "updated": "2026-11-04T06:16:28.684Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "bot-snippets": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:17:47.456Z"
+    },
+    "bots-api": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4951",
+      "claimedAt": "2026-11-04T04:17:55.195Z",
+      "doneAt": "2026-11-04T04:30:34.263Z"
+    },
+    "dialog-connector": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4951",
+      "claimedAt": "2026-11-04T04:30:47.600Z",
+      "doneAt": "2026-11-04T04:47:31.272Z"
+    },
+    "dialog-token-reaches": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4951",
+      "claimedAt": "2026-11-04T04:47:39.139Z",
+      "doneAt": "2026-11-04T05:02:58.526Z"
+    },
+    "dialog-public-reach": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4951",
+      "claimedAt": "2026-11-04T05:03:04.962Z",
+      "doneAt": "2026-11-04T05:18:11.758Z"
+    },
+    "dialog-entry": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4951",
+      "claimedAt": "2026-11-04T05:18:18.049Z",
+      "doneAt": "2026-11-04T05:31:37.364Z"
+    },
+    "bots-panel": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4951",
+      "claimedAt": "2026-11-04T05:31:44.304Z",
+      "doneAt": "2026-11-04T05:47:52.465Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4951",
+      "claimedAt": "2026-11-04T05:47:59.778Z",
+      "doneAt": "2026-11-04T05:58:34.669Z"
+    },
+    "bot-snippets.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:00:45.965Z"
+    },
+    "bot-snippets.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:01:07.920Z"
+    },
+    "bot-snippets.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:01:29.321Z"
+    },
+    "bot-snippets.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:01:48.341Z"
+    },
+    "bots-api.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:02:10.161Z"
+    },
+    "bots-api.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:02:28.394Z"
+    },
+    "bots-api.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:02:45.430Z"
+    },
+    "dialog-connector.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:03:04.651Z"
+    },
+    "dialog-connector.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:03:27.372Z"
+    },
+    "dialog-connector.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:03:45.255Z"
+    },
+    "dialog-connector.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:04:03.920Z"
+    },
+    "dialog-token-reaches.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:04:22.854Z"
+    },
+    "dialog-token-reaches.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:04:43.251Z"
+    },
+    "dialog-token-reaches.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:05:06.885Z"
+    },
+    "dialog-public-reach.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:05:29.862Z"
+    },
+    "dialog-public-reach.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:05:55.861Z"
+    },
+    "dialog-public-reach.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:06:13.188Z"
+    },
+    "dialog-public-reach.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:06:29.724Z"
+    },
+    "dialog-entry.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:06:48.386Z"
+    },
+    "dialog-entry.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:07:03.867Z"
+    },
+    "dialog-entry.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:07:18.540Z"
+    },
+    "bots-panel.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:07:33.095Z"
+    },
+    "bots-panel.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:07:48.532Z"
+    },
+    "bots-panel.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:08:06.763Z"
+    },
+    "bots-panel.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:08:22.200Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:08:38.382Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:08:55.664Z"
+    }
+  },
+  "feedback": []
+}

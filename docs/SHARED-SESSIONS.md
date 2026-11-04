@@ -8,7 +8,7 @@ A Cloudflare Worker at `https://share.overdeck.ai` (Worker `overdeck-share`) tha
 
 Each room is one `ShareRoom` Durable Object on the SQLite storage backend, addressed by the room's short code. Its WebSockets use the hibernation API. The service also mints short-lived Cloudflare Realtime TURN credentials for peers that cannot connect directly.
 
-It performs no OAuth. Every host and viewer is identified by a PAN-4293 device token (`odd_…`), verified on every request through the `ACCOUNT` service binding to the account Worker's `AccountRpc.verifyDevice`.
+Every host and viewer is identified by a PAN-4293 device token (`odd_…`), verified on every request through the `ACCOUNT` service binding to the account Worker's `AccountRpc.verifyDevice`. A server viewer presents it as `Authorization: Bearer odd_…`. A browser viewer on the hosted join page (slice 10) gets its token through a GitHub sign-in that this Worker runs as the OAuth client, and keeps it in a sealed `HttpOnly` cookie; see "Hosted web join" below.
 
 Runtime code uses Web APIs only; `src/index.ts` is the only module that imports `cloudflare:workers`. Every room rule lives in the pure reducer `src/room-state.ts`; `src/room.ts` is the Durable Object glue that persists the record and executes the reducer's effects.
 
@@ -49,18 +49,24 @@ After every state change the host receives a fresh `room` snapshot while it is c
 
 ## HTTP API
 
-Every response carries `Cache-Control: no-store` and `X-Content-Type-Options: nosniff`, and none carries CORS headers. A request body over 16 KiB is 413 `payload_too_large`. An unknown path is 404 `{"error":"not_found"}`; a wrong method is 405 with an `Allow` header. Without `PUBLIC_BASE_URL` every route except `/healthz` is 503 `{"error":"not_configured","missing":["PUBLIC_BASE_URL"]}`.
+Every response carries `Cache-Control: no-store` and `X-Content-Type-Options: nosniff`, and none carries CORS headers. A request body over 16 KiB is 413 `payload_too_large`. An unknown path is 404 `{"error":"not_found"}`; a wrong method is 405 with an `Allow` header. Without `PUBLIC_BASE_URL` every route except `/healthz` is 503 `{"error":"not_configured","missing":["PUBLIC_BASE_URL"]}`. Without `ACCOUNT_BASE_URL` or a valid `WEB_SESSION_KEY`, the web routes (`/auth/*`, `/v1/web/session`, `/v1/rooms/:code/web-join`) are 503 `{"error":"not_configured","missing":[…]}` and the invite page renders without its browser section.
 
 Short codes are 8 symbols from `BCDFGHJKLMNPQRSTVWXZ23456789` (no vowels, no 0/O/1/I). Codes in paths are uppercased and stripped of spaces and dashes, so `bcdf-ghjk` and `BCDFGHJK` are the same room.
 
 | Method & path | Auth | Responses |
 | --- | --- | --- |
-| `GET /healthz` | none | 200 `{"ok":true,"configured":<bool>,"turn":<bool>}`; `turn` is true when both TURN secrets are set |
+| `GET /healthz` | none | 200 `{"ok":true,"configured":<bool>,"turn":<bool>,"web":<bool>}`; `turn` is true when both TURN secrets are set; `web` is true when `ACCOUNT_BASE_URL` is set and `WEB_SESSION_KEY` is 64 hex characters |
 | `POST /v1/rooms` | `Bearer odd_…` | Body `{"scope":{"kind":"conversation","conversationId":"…"}}` (id 1–200 characters, no control characters). 201 `{shortCode, hostToken, joinUrl, snapshot}`; 400 `invalid_request`; 401 `invalid_token` / `device_revoked` / `account_deleted`; 403 `grant_expired`; 429 `rate_limited` with `Retry-After: 60` (10 rooms per minute per GitHub id); 503 `account_unavailable`, `account_service_outdated`, `room_unavailable` or `code_space_exhausted` |
 | `DELETE /v1/rooms/:code` | `Bearer odh_…` (host token) | 204; 401 `invalid_token` for a missing or malformed host token; 404 `not_found` for an unknown code, an ended room or a wrong token (no oracle) |
 | `GET /v1/rooms/:code/host?v=1` | `Bearer odh_…`, `Upgrade: websocket` | 101; 426 `upgrade_required` without the upgrade header; 400 `unsupported_protocol` when `v` is not `1`; 401 `invalid_token`; 404 `not_found` for an unknown code, an ended room or a wrong token |
 | `GET /v1/rooms/:code/join?v=1` | `Bearer odd_…`, `Upgrade: websocket` | 101; 426; 400 `unsupported_protocol`; 401/403/503 as for `POST /v1/rooms`; 404 `not_found` for an unknown code or an ended room. Refusals for a blocked identity, the data owner or a full room arrive **after** the upgrade as close codes |
-| `GET /s/:code` | none | 200 HTML invite page that finds Overdeck on this computer (PAN-4475): one nonce'd inline script probes `GET /api/share-probe` on `http://localhost:3011` and `http://127.0.0.1:3011` (1.5 s each, `credentials: 'omit'`) and navigates to `<origin>/#/shared/<CODE>` when one answers. The page always shows a manual **Open it in Overdeck on this computer** link, `pan up` instructions, a hint to allow Chrome's local-network prompt, and a link to install docs. Its CSP adds a fresh 16-byte nonce per response: `default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-…'; connect-src http://localhost:3011 http://127.0.0.1:3011; frame-ancestors 'none'; base-uri 'none'; form-action 'none'`. It also shows `pan join <CODE>` and the no-install `npx @overdeck/core join <CODE>` (slice 9, [PAN-4480](https://github.com/eltmon/overdeck/issues/4480)). 404 HTML "This share link has ended or does not exist.", with no script and CSP `default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'`. Neither page shows a host name, scope or participant count. |
+| `GET /s/:code` | none | 200 HTML invite page that finds Overdeck on this computer (PAN-4475): one nonce'd inline script probes `GET /api/share-probe` on `http://localhost:3011` and `http://127.0.0.1:3011` (1.5 s each, `credentials: 'omit'`) and navigates to `<origin>/#/shared/<CODE>` when one answers. The page always shows a manual **Open it in Overdeck on this computer** link, `pan up` instructions, a hint to allow Chrome's local-network prompt, and a link to install docs. Its CSP adds a fresh 16-byte nonce per response: `default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-…'; connect-src http://localhost:3011 http://127.0.0.1:3011; frame-ancestors 'none'; base-uri 'none'; form-action 'none'`. It also shows `pan join <CODE>` and the no-install `npx @overdeck/core join <CODE>` (slice 9, [PAN-4480](https://github.com/eltmon/overdeck/issues/4480)). 404 HTML "This share link has ended or does not exist.", with no script and CSP `default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'`. Neither page shows a host name, scope or participant count. **With web join configured (PAN-4481):** `<body data-short-code="<CODE>">`, the content above inside `<section id="local-join">`, then a hidden `<section id="web-join">` that the viewer bundle fills, the probe script, and `<script src="/viewer/viewer.js" defer>`. The CSP becomes `default-src 'none'; style-src 'unsafe-inline'; script-src 'self' 'nonce-…'; connect-src 'self' wss://<share host> http://localhost:3011 http://127.0.0.1:3011; img-src https://avatars.githubusercontent.com; frame-ancestors 'none'; base-uri 'none'; form-action 'self'`, and `Referrer-Policy` is `same-origin` instead of `no-referrer` (under `no-referrer` a same-origin form POST carries `Origin: null`, which would fail the **Sign out** Origin check). In both modes the probe navigates only when `document.documentElement.dataset.hostedJoin` is not `"started"`. |
+| `GET /auth/signin?code=<CODE>` | none | 302 to `<ACCOUNT_BASE_URL>/auth/start` with `redirect_uri=<PUBLIC_BASE_URL>/auth/callback`, a fresh `state`, an S256 `code_challenge`, `platform=web` and the browser's `environment_id`; sets `__Host-ods_signin` and `__Host-ods_env`. 400 HTML "This share link is not valid." for a bad code |
+| `GET /auth/callback` | `__Host-ods_signin` cookie | 303 to `/s/<CODE>` with `__Host-ods_session` after `AccountRpc.redeemWebCode`. HTML error pages, each with a link back to `/s/<CODE>`: 400 expired (missing, wrong or older-than-10-minutes sign-in cookie, or a redeem `invalid_grant`), 403 invite-only (`invite_only` or a redeem `access_denied`), 400 cancelled on GitHub (`github_denied`), 403 account being deleted (`account_deleting`), 503 account service unavailable. Always clears the sign-in cookie |
+| `POST /auth/signout` | `Origin` equal to `PUBLIC_BASE_URL`; form field `code` | 303 to `/s/<CODE>`; revokes the web device through `AccountRpc.signOutDevice` and clears `__Host-ods_session`. 403 `forbidden_origin`; 400 HTML for an invalid code (the cookie is still cleared) |
+| `GET /v1/web/session` | `__Host-ods_session` cookie | 200 `{"signedIn":true,"githubId","login","avatarUrl"}`; 200 `{"signedIn":false}` without a valid cookie (a revoked device, an unknown token or a deleted account also clears the cookie); 200 `{"signedIn":false,"reason":"grant_expired"}` (cookie kept); 503 `account_unavailable` or `account_service_outdated` |
+| `GET /v1/rooms/:code/web-join?v=1` | `__Host-ods_session` cookie, `Origin` equal to `PUBLIC_BASE_URL`, `Upgrade: websocket` | The browser viewer's signaling socket: the same viewer protocol and the same Durable Object `/join` path as `/join`. 426; 400 `unsupported_protocol`; 403 `forbidden_origin`; 401 `invalid_token` without a valid cookie (an `Authorization` header is never read here); 401/403/503 from `verifyDevice` as for `/join`; 404 `not_found` |
+| `GET /viewer/viewer.js` | none | 200 `text/javascript` from the `ASSETS` binding; 404 `not_found` without the binding or the built asset |
 
 `hostToken` (`odh_` + 64 hex) appears only in the `POST /v1/rooms` response. The Worker stores and forwards only its SHA-256 and never logs either.
 
@@ -97,6 +103,8 @@ The account service is invite-only (PAN-4293), so a person can get a device toke
 
 GitHub sign-in supplies identity; the lobby and the block list supply authorization. Both are required.
 
+A browser viewer is held to the same rule: its sign-in goes through the account Worker's PKCE flow, which mints a device only for an allowlisted account. A non-allowlisted browser sign-in gets the invite-only page and leaves a pending attempt the operator can allow.
+
 ## TURN
 
 `fetchIceServers()` (`src/turn.ts`) posts `{"ttl":3600}` to `https://rtc.live.cloudflare.com/v1/turn/keys/$TURN_KEY_ID/credentials/generate-ice-servers` with `Authorization: Bearer $TURN_KEY_API_TOKEN`, times out after 5 seconds, and accepts only `stun:`, `turn:` and `turns:` URLs. Any failure, including missing secrets, gives the requester `error turn_unavailable`; rooms still work over STUN. Credentials go only to the host and admitted viewers.
@@ -110,8 +118,10 @@ Facts verified against the Cloudflare docs on 2026-10-02:
 
 ## What the service can and cannot see
 
-- **Sees:** room membership (GitHub id, login and avatar of the host and participants), the controller's admit, kick, revoke, contributor and handoff decisions, connect and disconnect times, SDP and ICE blobs, and the opaque scope descriptor (a conversation id).
+- **Sees:** room membership (GitHub id, login and avatar of the host and participants), the controller's admit, kick, revoke, contributor and handoff decisions, connect and disconnect times, SDP and ICE blobs, and the opaque scope descriptor (a conversation id). For a browser viewer it also sees the sealed session cookie, which holds that browser's device token encrypted with `WEB_SESSION_KEY`.
 - **Never sees:** conversation messages, terminal bytes or prompt drafts. Content flows only over DTLS DataChannels opened after admission. Cloudflare TURN may relay those encrypted packets but cannot read them.
+
+`tests/integration/services/share/signaling-privacy.test.ts` checks this on every CI run: it plants a unique string in every kind of content, proves each one arrives over a DataChannel, and fails if any appears in the host or viewer signaling traffic or if any frame carries a type or key outside the protocol table.
 
 ## Configuration
 
@@ -123,9 +133,12 @@ Facts verified against the Cloudflare docs on 2026-10-02:
 | `ROOMS` | Durable Object binding | class `ShareRoom`, migration `v1` (`new_sqlite_classes`) |
 | `ACCOUNT` | service binding | `overdeck-account`, entrypoint `AccountRpc` (PAN-4293) |
 | `ROOM_CREATE_LIMIT` | rate-limit binding | 10 room creations per 60 s per GitHub id; unbound in tests, which means no limit |
+| `ACCOUNT_BASE_URL` | `wrangler.jsonc` `vars` (committed) | `https://account.overdeck.ai`; where browser sign-in sends the visitor (`/auth/start`). Optional: without it web join is off |
+| `WEB_SESSION_KEY` | secret | 64 hex characters (32 bytes), the AES-GCM key that seals the web cookies. Optional: without a valid value web join is off |
+| `ASSETS` | static assets binding | `./public` with `run_worker_first: true`; serves the built `public/viewer/viewer.js` |
 | `anywhere.share_url` | the host's `${OVERDECK_HOME}/config.yaml` (dashboard side, not the Worker) | the share service the dashboard talks to. Default `https://share.overdeck.ai`; `https:`, or `http:` to a loopback host for local development; no query, fragment or credentials |
 
-Local development reads the same names from `services/share/.dev.vars` (gitignored); `.dev.vars.example` holds placeholders.
+Local development reads the same names from `services/share/.dev.vars` (gitignored); `.dev.vars.example` holds placeholders. `.dev.vars` overrides the committed `vars`, so for local web join set `PUBLIC_BASE_URL=http://localhost:8787` (the web-join Origin check compares against it), `ACCOUNT_BASE_URL=http://localhost:8788` and a test `WEB_SESSION_KEY`.
 
 ## Host side in the dashboard (slice 2, PAN-4473)
 
@@ -288,6 +301,47 @@ Inside the share service's 5-minute window, a host network drop, a host dashboar
 
 The Miniflare tests `tests/integration/services/share/join-manager.test.ts` (a dropped join socket) and `tests/integration/services/share/host-repark.test.ts` (a host restart inside the window, and a room that is gone) cover these paths on real workerd.
 
+## Hosted web join (slice 10, PAN-4481)
+
+A person with only a browser and an allowlisted GitHub account can join from `https://share.overdeck.ai/s/<code>`: sign in with GitHub, come back to the same page, click **Join**, wait in the lobby, and read the live conversation after the host admits them. Content still flows only over the WebRTC data channels between the host's dashboard and the browser; the Worker serves the page, the sign-in and the signaling.
+
+**Sign-in sequence.** The account Worker sends no CORS headers, so the browser cannot redeem a code itself. This Worker is the OAuth client (backend-for-frontend):
+
+1. `GET /auth/signin?code=<CODE>` generates a 32-hex `state` and a 64-hex PKCE verifier, seals them with the code and the issue time into `__Host-ods_signin`, and redirects to the account Worker's `/auth/start` with `redirect_uri=<PUBLIC_BASE_URL>/auth/callback` and `platform=web`.
+2. The account Worker accepts that redirect only as an exact match of its `SHARE_BASE_URL` callback, paired with `platform=web` (`docs/ACCOUNT-SERVICE.md`), and runs the usual GitHub leg.
+3. `GET /auth/callback?code=odc_…&state=…` checks the state against the sealed cookie (refused after 10 minutes), calls `env.ACCOUNT.redeemWebCode({ code, codeVerifier, redirectUri })` over the service binding, seals the returned `odd_` token into `__Host-ods_session`, and redirects 303 to `/s/<CODE>`.
+4. Sign-in never opens the join socket. The page shows **Join**, because opening a join socket reveals the visitor's GitHub identity to the host (join intent is a click, PAN-4475 D-1).
+
+A web sign-in is a device: `platform` `web`, label `Web browser`, one per browser (the `__Host-ods_env` UUID). It appears in the account's device list, and operator revoke and account deletion end it like any other device. **Sign out** (`POST /auth/signout`) revokes it with `revoked_by = 'user'`.
+
+**Cookies.** All three are `__Host-` cookies (`Secure`, `Path=/`, no `Domain`) and `HttpOnly`:
+
+| Cookie | Holds | Attributes |
+| --- | --- | --- |
+| `__Host-ods_session` | sealed `{v:1, token, iat}`; refused 30 days after `iat` | `SameSite=Strict; Max-Age=2592000` |
+| `__Host-ods_signin` | sealed `{v:1, state, verifier, code, iat}` | `SameSite=Lax; Max-Age=600` (it must survive the GitHub → account → share redirect chain) |
+| `__Host-ods_env` | the browser's environment id (lowercase UUID v4, not secret) | `SameSite=Lax; Max-Age=34560000` |
+
+**Sealed cookies.** A sealed value is `base64url(iv ‖ AES-GCM ciphertext)` of the JSON payload, with a random 12-byte IV and the 32-byte `WEB_SESSION_KEY` (`src/web-auth.ts`, Web Crypto only). Any decode, decrypt or parse failure reads as no cookie. The device token never reaches page JavaScript or browser storage in usable form, and a stolen cookie is useless outside this Worker.
+
+**The web-join socket.** `GET /v1/rooms/:code/web-join?v=1` needs the session cookie **and** `Origin` equal to `PUBLIC_BASE_URL` (cross-site WebSocket hijacking defence). It never reads `Authorization`, so `/join` stays the only bearer path. After `verifyDevice` it forwards the upgrade to the room's `/join` with the same `X-Share-Identity` header, so every room rule above applies unchanged.
+
+**Keepalive.** A browser cannot send WebSocket protocol pings. The `ShareRoom` object registers a runtime auto-response, so the text frame `ping` gets `pong` without waking the object and never reaches the frame decoder.
+
+**The viewer bundle.** `services/share/web/` holds plain TypeScript and DOM code (no React, no markdown). `scripts/build-web.mjs` bundles `web/main.ts` with esbuild into `public/viewer/viewer.js` (gitignored), aliasing `@overdeck/contracts` to `web/contracts.ts`, which re-exports only `sharing.ts` and `sharing-wire.ts`, so `effect` stays out. The bundle reuses the dashboard's `WebRtcViewer` and must stay at or under 64 KiB. wrangler runs the build as its `build.command`, and the Worker serves the file through the `ASSETS` binding with `run_worker_first`, so it keeps the security headers. `npm run typecheck:share` also checks `web/tsconfig.json`.
+
+**Viewer state rules** (`web/join-socket.ts`, mirroring the viewer server's `share-join.ts`):
+
+- After `status admitted` the viewer requests ICE servers once and caches them for 50 minutes; `error turn_unavailable` or 5 s of silence gives `[]`.
+- It sends `ping` every 30 s and treats 75 s without `pong` as a lost connection.
+- **Reconnect** runs the restart dance: close the socket with 1000 and no `leave`, and open the new one only from the old one's `close` event (or after 5 s). Opening first gets the old socket replaced with 4008 and the host never re-offers.
+- When no offer arrives within 10 s of `status admitted`, the viewer runs that dance once on its own. A second miss shows **Reconnect** instead of looping.
+- A socket that fails before `open` hides its HTTP status from the browser, so the viewer re-reads `/v1/web/session`: signed out shows the sign-in screen; signed in shows "Could not reach the share. It may have ended; reload the page to check."
+- A **Join** click sets a per-tab `sessionStorage` marker; a reload with that marker and a signed-in session rejoins without a second click. A link cannot set it. Final states remove it.
+- **Join** (and a reload rejoin) sets `document.documentElement.dataset.hostedJoin = "started"`, which stops the page's localhost probe from navigating to an installed dashboard.
+
+Message text renders through `textContent` with `white-space: pre-wrap`, never `innerHTML`, and avatars are built from the numeric GitHub id. **The browser viewer is read-only:** it has no composer, no drafts and no terminal. Drafts and contributor submits (slice 5, [PAN-4476](https://github.com/eltmon/overdeck/issues/4476), below) exist only in the dashboard viewer so far.
+
 ## Prompt drafts, contributor submits and the queue (slice 5, PAN-4476)
 
 Slice 5 lets viewers take part. Every viewer can type a **draft** that the other participants see live; the host can pick a draft, edit it and send it. A **contributor** (a viewer with `contributor: true` in the room snapshot, set by **Admit as contributor** or `set-contributor`) can also send prompts directly. Every shared prompt, from a contributor or from the host's share dialog, goes through one host-side queue that delivers one prompt per agent turn.
@@ -409,7 +463,10 @@ npm --prefix services/share run dev                           # wrangler dev --l
 npm run typecheck:share                                       # tsc against @cloudflare/workers-types
 npx vitest run tests/unit/services/share/                     # reducer, decoder, codes, TURN, routes (no workerd)
 npx vitest run tests/integration/services/share/              # real workerd via Miniflare, account and TURN stubbed
-npm --prefix services/share run build:dry                     # wrangler deploy --dry-run --outdir dist (no credentials)
+npm --prefix services/share run build:web                     # esbuild → public/viewer/viewer.js (the hosted viewer)
+npm --prefix services/share run build:dry                     # wrangler deploy --dry-run --outdir dist (runs build:web first; no credentials)
+npx vitest run tests/helpers/share/                           # capture, candidate and harness helpers
+npx vitest run tests/integration/services/share/signaling-privacy.test.ts tests/integration/services/share/rate-limit.test.ts
 ```
 
 A local `ACCOUNT` binding needs PAN-4293's `npm --prefix services/account run dev` running in another terminal; wrangler's local dev registry connects service bindings between local sessions.
@@ -418,14 +475,86 @@ Unit tests drive the reducer with an injected clock and `routes.handle()` with i
 
 Agents may run `wrangler dev --local` and `wrangler deploy --dry-run`; nothing else. Deploying is operator-only.
 
+## Verification
+
+Three tests back the service's security claims (PAN-4482). The first two run in the default vitest run on CI; the third is an operator checkpoint. All three use `startShareWorker` (`tests/helpers/share/share-worker.ts`), which bundles the Worker with `wrangler deploy --dry-run` and runs it in Miniflare beside an account stub.
+
+### Signaling privacy
+
+`tests/integration/services/share/signaling-privacy.test.ts` runs one share end to end on real workerd and real werift: a `ShareManager` with a `PeerHub` on the host side, and two `JoinManager`s with werift `LoopbackViewer`s on the viewer side. A unique canary sits in each kind of content: the conversation history, a live append, the stream label, a viewer draft, a contributor submit, a host controller send, a viewer-controller send, and the terminal snapshot and output. A second viewer stays in the lobby the whole time.
+
+`SignalingCapture` (`tests/helpers/share/signaling-capture.ts`) records every frame and HTTP body both local servers exchange with the service. The test then asserts four things:
+
+1. **Positive control.** Every canary reached its destination over a DataChannel, and the queue delivered the three prompts in order.
+2. **No content in signaling.** No canary appears in any captured frame or HTTP body, plain, case-folded or base64-encoded.
+3. **Protocol shape.** Every frame's `type` and keys belong to the protocol table above for its socket and direction, `signal.data` holds only `sdp` and `candidate`, the `room` snapshot holds only its seven keys, and no binary frame crossed.
+4. **Live path.** The capture saw the SDP offer and answer, ICE candidates in both directions, `room` snapshots, `POST /v1/rooms` and `DELETE /v1/rooms/:code`. The lobby viewer received exactly one frame, `status lobby`, and its socket closed with 4004 when the share ended.
+
+The capture wraps the injected `openSocket`, `createRoom` and `deleteRoom` seams rather than logging TCP bytes. RFC 6455 masks every client-to-server frame with a random key, so a canary sent by a local server never appears in raw bytes, and a byte-level check would pass even if content leaked.
+
+### Room-creation rate limit
+
+`tests/integration/services/share/rate-limit.test.ts` reads the `ROOM_CREATE_LIMIT` entry from the committed `services/share/wrangler.jsonc` and binds it in Miniflare, so a change to the committed limit fails the test. One GitHub id gets `201` ten times, then `429` `rate_limited` with `Retry-After: 60`; another account still gets `201`.
+
+### Forced-relay checkpoint (operator)
+
+`tests/integration/services/share/forced-turn.slow.test.ts` proves the symmetric-NAT case of NFR-7: both peers connect relay-only through Cloudflare Realtime TURN. It forces `iceTransportPolicy: 'relay'` on the host (through `PeerHubDeps.createPeerConnection`) and on the viewer (through `LoopbackViewer`'s configuration, built from `JoinManager.iceServers`). Only the operator runs it:
+
+```bash
+TURN_KEY_ID=<key id> TURN_KEY_API_TOKEN=<api token> VITEST_INCLUDE_SLOW=1 \
+  npx vitest run tests/integration/services/share/forced-turn.slow.test.ts
+```
+
+It needs the same Realtime TURN key as the deployed Worker, and the local Worker makes one real credential request to Cloudflare per run. Without the two env vars it fails with `forced-TURN checkpoint needs TURN_KEY_ID and TURN_KEY_API_TOKEN`; it never skips, and no assertion prints an ICE URL, username or credential. A pass means the conversation history arrived over the DataChannel and every candidate both sides signaled was `typ relay`. Post the result (`PASS`, or the failing assertion) as a comment on PAN-4482.
+
+werift 0.25.1 uses only the first TURN URL in the list, and the test passes the Worker's list unchanged, as production does. If the run fails because the operator's network blocks that first transport, that is a real finding: file an issue to order the hub's TURN URLs (as PAN-4862 did for Anywhere) and re-run the checkpoint after it lands.
+
+## Acceptance sweep (PAN-4482)
+
+On 2026-11-03, at commit `80fbeb7a1f` on `feature/pan-4482`, the share backend test set (39 files, 579 tests) and the frontend sharing tests (7 files, 148 tests) passed. The commands are in PAN-4482's PRD, WI-9 step 1. Each row cites a file and, where one test carries the evidence, that test's name. The opt-in `*.slow.test.ts` files are not in the default run.
+
+| ID | Requirement | Evidence | Verdict |
+| --- | --- | --- | --- |
+| AC-1 | The dashboard and `pan share` both return a working share link | `tests/unit/dashboard/server/routes/shares.test.ts` :: "creates a share with a join link, and a repeat answers 200 with the same code (ac1)"; `tests/unit/cli/sharing/share.test.ts` :: "prints the link, the join code and both join commands for a new share"; `tests/integration/services/share/host-manager.test.ts` | Covered |
+| AC-2 | A browser link recipient signs in and is handed off to their local dashboard | `tests/unit/services/share/routes.test.ts` :: "an active room returns the localhost-detect invite page with a nonce…"; `tests/unit/dashboard/server/routes/joins.test.ts` :: "answers 412 not_signed_in without an account"; `tests/integration/services/share/miniflare.test.ts` :: "signs a browser in, opens the web-join socket with the session cookie and lands in the lobby" | Covered, with the rev-3 order: the invite page detects the local dashboard first and sign-in happens there (OD-1, D-R3-2) |
+| AC-3 | `pan join` signs in, lands in the lobby, and starts the local dashboard if needed | `tests/unit/cli/sharing/join.test.ts`; `tests/integration/cli/join-cold-start.slow.test.ts` :: "signs in, auto-starts the bundled dashboard and leaves the join in the lobby" | Covered (end to end only in the opt-in slow test) |
+| AC-4 | A joiner receives no content or presence until admitted | `tests/unit/services/share/room-state.test.ts` :: "a lobby viewer only ever receives status lobby, error not_admitted or a close"; `src/dashboard/server/sharing/__tests__/peer-hub.test.ts` :: "never connects a viewer the host did not admit, whatever the snapshot says (NFR-4)"; `tests/integration/services/share/signaling-privacy.test.ts` (lobby viewer) | Covered |
+| AC-5 | The controller sees pending joiners (avatar and handle) and admits each | `src/dashboard/frontend/src/components/chat/sharing/__tests__/SharingLobbyPanel.test.tsx` :: "ac1: renders the three sections with each @login and avatar" | Covered |
+| AC-6 | An admitted viewer sees the full history, then live updates | `src/dashboard/server/sharing/__tests__/peer-hub-loopback.test.ts` :: "streams the host hello, the history, then a live append"; `tests/integration/services/share/join-manager.test.ts` | Covered |
+| AC-7 | Presence shows every participant, host and controller marked | `src/dashboard/server/sharing/__tests__/peer-hub.test.ts` :: "sends the roster with the data owner first and no connected or blocked fields"; `src/dashboard/frontend/src/components/chat/sharing/__tests__/SharingLobbyPanel.test.tsx` | **Gap** for a plain viewer: the viewer header shows only the host, a count and the controller → [PAN-4971](https://github.com/eltmon/overdeck/issues/4971) |
+| AC-8 | Viewer drafts appear live for the controller, who can pick, edit and send one | `src/dashboard/server/sharing/__tests__/draft-board.test.ts` :: "relays the first of three quick updates at once and the last at 200 ms"; `src/dashboard/frontend/src/components/chat/sharing/__tests__/ShareDialog.test.tsx` :: "lists the drafts and posts a picked, edited draft with its author" | Covered |
+| AC-9 | Contributor grant and revoke; concurrent submits land in FIFO order, queued mid-turn | `src/dashboard/server/sharing/__tests__/submit-queue.test.ts` :: "delivers concurrent submits in FIFO order, one per agent turn"; `src/dashboard/server/sharing/__tests__/peer-hub.test.ts` :: "rejects queued items as grant_revoked when a snapshot removes the contributor grant (FR-7)" | Covered |
+| AC-10 | The viewer terminal shows the host session live, and viewer keys have no effect | `src/dashboard/server/sharing/__tests__/peer-hub.test.ts` :: "never reads from terminal and sends on it only after a watch"; `src/dashboard/frontend/src/components/chat/sharing/__tests__/SharedTerminalView.test.tsx` :: "creates a read-only terminal with no input handler and starts the watch" | Covered |
+| AC-11 | Kick sends a viewer back to the lobby; revoke blocks them until unrevoked | `tests/unit/services/share/room-state.test.ts` :: "kick removes and closes with 4010; the kicked viewer rejoins into the lobby" and "revoke blocks (rejoin closes 4003) until unrevoke, after which a rejoin lands in the lobby"; `tests/integration/services/share/miniflare.test.ts` | Covered |
+| AC-12 | Ending the share drops every participant; no fixed expiry | `tests/unit/services/share/room-state.test.ts` :: "both end the room with close-all 4004, cancel-alarm and delete-storage"; `src/dashboard/server/services/__tests__/share-host.test.ts` :: "end deletes the room with the host token, closes the socket and removes the record" | Covered |
+| AC-13 | Handoff to an admitted viewer works, and the data owner can reclaim | `src/dashboard/server/sharing/__tests__/peer-hub.test.ts` :: "the handoff chain: appoint B, B admits C over control, C gets a peer, the data owner reclaims, …" | Covered |
+| AC-14 | A host drop under 5 minutes restores viewers; over 5 minutes ends the room | `tests/unit/services/share/room-state.test.ts` :: "ends the room only once the full reconnect window has elapsed"; `tests/integration/services/share/host-repark.test.ts` :: "a host restart inside the window restores the admitted viewer without the lobby" | Covered |
+| AC-15 | A connection succeeds through symmetric NATs via TURN relay | `tests/integration/services/share/forced-turn.slow.test.ts` (operator checkpoint); `tests/unit/services/share/turn.test.ts`; `src/dashboard/server/sharing/__tests__/peer-hub.test.ts` :: "passes TURN credentials through to the peer connection" | **Pending operator checkpoint** until the operator posts PASS on PAN-4482 |
+| AC-16 | Channel traffic uses the versioned wire format with `streamId`; internal RPC types never cross | `packages/contracts/src/__tests__/sharing-wire.test.ts` :: "copies exactly the allow-listed keys and drops everything else"; `tests/integration/services/share/signaling-privacy.test.ts` (frame allow-lists) | Covered by allow-list construction; no import-boundary lint exists |
+| AC-17 | The signaling service never sees content | `tests/integration/services/share/signaling-privacy.test.ts` | Covered |
+| AC-18 | New tagged errors live in `src/lib/errors.ts` | — | Waived: PAN-4473 D-9 and PAN-4474 D-19 use string error codes because nothing runs in an Effect error channel |
+| AC-19 | One active share per scope | `tests/unit/lib/sharing/share-record.test.ts` :: "rejects a second short code for the same conversation, naming the conversation and the existing code (ac2)" | Covered (the file record replaces the table, parent rev 3) |
+| AC-20 | Documentation shipped | `docs/SHARED-SESSIONS.md`, `configuration/shared-sessions.mdx` (listed in `docs.json`), the `CLAUDE.md` topic row | Covered |
+| NFR-1 | Content never transits the share service; DataChannels only, TURN relay at most | `tests/integration/services/share/signaling-privacy.test.ts` | Covered |
+| NFR-2 | Data channels use the versioned contracts wire format; version skew degrades gracefully | `packages/contracts/src/__tests__/sharing-wire.test.ts`; `src/dashboard/frontend/src/components/chat/sharing/__tests__/webrtc-viewer.test.ts` :: "reports an unsupported scope kind and sends nothing" | Covered |
+| NFR-3 | Every content envelope carries a `streamId` | `src/dashboard/server/sharing/__tests__/peer-hub-loopback.test.ts` (asserts `streamId` on every envelope) | Covered |
+| NFR-4 | The host hub gates content on its own admitted set | `src/dashboard/server/sharing/__tests__/peer-hub.test.ts` :: "never connects a viewer the host did not admit, whatever the snapshot says (NFR-4)" | Covered |
+| NFR-5 | Viewers need no native dependency; the host uses pure-TypeScript werift | `find node_modules/werift -name '*.node' -o -name binding.gyp` prints nothing (pure TypeScript); viewers use the browser `RTCPeerConnection` | Covered; the dashboard runs only on Node 22, so the NFR's "`bun run` dev mode" wording is obsolete |
+| NFR-6 | The host dashboard stays localhost-only | `tests/unit/dashboard/server/routes/shares.test.ts` :: "401s an uncredentialed request from a non-loopback peer"; `tests/unit/dashboard/server/routes/joins.test.ts` :: "refuses a mutation without a credential or CSRF token" | Covered |
+| NFR-7 | Works through symmetric NATs via Cloudflare Realtime TURN | as AC-15 | **Pending operator checkpoint** |
+| NFR-8 | The share service is a Web-API-only Cloudflare Worker | `npm run typecheck:share`; `npm --prefix services/share run build:dry` | Covered |
+| NFR-9 | Room rules are a pure reducer with an injected clock | `tests/unit/services/share/room-state.test.ts` (injected `now`) | Covered |
+| Rate limit | 10 room creations per 60 s per GitHub id | `tests/integration/services/share/rate-limit.test.ts`; `tests/unit/services/share/routes.test.ts` :: "a refused rate limit is 429 rate_limited with Retry-After: 60, keyed by githubId" | Covered |
+
 ## Deploy
 
 Operator-only. **No agent deploys** and no agent runs any of the commands below. The custom-domain route in `wrangler.jsonc` creates the `share.overdeck.ai` DNS record in the Cloudflare zone on first deploy.
 
 0. Confirm the bundle builds with no credentials: `npm --prefix services/share run build:dry` exits 0.
-1. Deploy PAN-4293's account Worker first (`docs/ACCOUNT-SERVICE.md`, "Deploy"). The `ACCOUNT` service binding needs `overdeck-account` with its `AccountRpc` entrypoint, and that entrypoint must return `githubLogin` or room creation answers `account_service_outdated`.
+1. Deploy PAN-4293's account Worker first (`docs/ACCOUNT-SERVICE.md`, "Deploy"), with `SHARE_BASE_URL` in its vars. The `ACCOUNT` service binding needs `overdeck-account` with its `AccountRpc` entrypoint, and that entrypoint must return `githubLogin` or room creation answers `account_service_outdated`. It must also have `redeemWebCode` and `signOutDevice` (PAN-4481): a share Worker deployed before them shows browser visitors the "sign-in is unavailable" page.
 2. Create a Realtime TURN key in the Cloudflare dashboard (the Realtime section). Note the key id and its API token.
 3. `cd services/share && npx wrangler secret put TURN_KEY_ID`, then `npx wrangler secret put TURN_KEY_API_TOKEN`.
+   Then generate the web session key with `openssl rand -hex 32` and store it with `npx wrangler secret put WEB_SESSION_KEY`. Rotating it signs every browser out.
 4. `npx wrangler deploy` (uploads the Worker, creates the `ShareRoom` Durable Object class from migration `v1`, binds `ACCOUNT` and the rate limiter, and registers `share.overdeck.ai`).
-5. Smoke test: `curl -s https://share.overdeck.ai/healthz` shows `"configured":true` and `"turn":true`.
+5. Smoke test: `curl -s https://share.overdeck.ai/healthz` shows `"configured":true`, `"turn":true` and `"web":true`.
 6. Rollback: `npx wrangler rollback` returns to the previous Worker version.

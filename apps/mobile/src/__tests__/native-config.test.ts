@@ -50,4 +50,42 @@ describe('native project config', () => {
     expect(read('ios/App/App/SceneDelegate.swift')).toContain('window?.rootViewController = MainViewController()');
     expect(read('ios/App/App.xcodeproj/project.pbxproj')).toContain('/* MainViewController.swift in Sources */,');
   });
+
+  it('signs the App with the push entitlement and the private then shared Keychain groups (PAN-4838 WI-3)', () => {
+    const entitlements = read('ios/App/App/App.entitlements');
+    expect(entitlements).toContain('<key>aps-environment</key>');
+    const privateGroup = entitlements.indexOf('<string>$(AppIdentifierPrefix)ai.overdeck.app</string>');
+    const sharedGroup = entitlements.indexOf('<string>$(AppIdentifierPrefix)ai.overdeck.shared</string>');
+    expect(privateGroup).toBeGreaterThan(-1);
+    expect(sharedGroup).toBeGreaterThan(privateGroup);
+
+    expect(read('ios/App/App/Info.plist')).toMatch(
+      /<key>OverdeckSharedKeychainGroup<\/key>\s*<string>\$\(AppIdentifierPrefix\)ai\.overdeck\.shared<\/string>/,
+    );
+
+    const pbxproj = read('ios/App/App.xcodeproj/project.pbxproj');
+    expect(pbxproj.split('CODE_SIGN_ENTITLEMENTS = App/App.entitlements;')).toHaveLength(3);
+    expect(pbxproj).toContain('relativePath = ../OverdeckPush;');
+    expect(pbxproj).not.toContain('KeychainStore.swift in Sources');
+  });
+
+  it('embeds a NotificationService extension that reads only the shared Keychain group (PAN-4838 WI-5)', () => {
+    const plist = read('ios/App/NotificationService/Info.plist');
+    expect(plist).toContain('<string>com.apple.usernotifications.service</string>');
+    expect(plist).toContain('<string>$(PRODUCT_MODULE_NAME).NotificationService</string>');
+
+    const groups = [...read('ios/App/NotificationService/NotificationService.entitlements').matchAll(/<string>([^<]*)<\/string>/g)].map(
+      (match) => match[1],
+    );
+    expect(groups).toEqual(['$(AppIdentifierPrefix)ai.overdeck.shared']);
+
+    const pbxproj = read('ios/App/App.xcodeproj/project.pbxproj');
+    expect(pbxproj).toContain('PRODUCT_BUNDLE_IDENTIFIER = ai.overdeck.app.NotificationService;');
+    expect(pbxproj).toContain('productType = "com.apple.product-type.app-extension";');
+    expect(pbxproj).toContain('dstSubfolderSpec = 13;');
+    const marketing = new Set([...pbxproj.matchAll(/MARKETING_VERSION = ([^;]+);/g)].map((match) => match[1]));
+    const build = new Set([...pbxproj.matchAll(/CURRENT_PROJECT_VERSION = ([^;]+);/g)].map((match) => match[1]));
+    expect([...marketing]).toEqual(['1.0']);
+    expect([...build]).toEqual(['1']);
+  });
 });

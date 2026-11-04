@@ -1,0 +1,542 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T10:03:31Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4998: Keep agent scratch files out of /tmp so a reboot doesn't delete them",
+    "updated": "2026-11-04T10:11:55.627Z"
+  },
+  "plan": {
+    "id": "pan-4998",
+    "title": "Keep agent scratch files out of /tmp so a reboot doesn't delete them",
+    "status": "running",
+    "uid": "13f04ccc-767c-4af6-9b19-83fc854de370",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-04T10:03:31Z",
+    "updated": "2026-11-04T10:11:55.627Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4998",
+        "label": "PAN-4998",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "launcher",
+      "deacon",
+      "hygiene",
+      "doctor",
+      "rules",
+      "claude-code"
+    ],
+    "narratives": {
+      "Problem": "Claude Code keeps each managed session's scratchpad under /tmp/claude-<uid>/<encoded-cwd>/<session-uuid>/. Ubuntu's tmpfiles.d rule 'D /tmp 1777 root root 30d' empties /tmp at every boot, so a reboot on 2026-11-03 deleted an orchestrator's published-page source and 30 screenshots. Overdeck sets neither CLAUDE_CODE_TMPDIR nor TMPDIR for managed launches, and no rule tells agents to avoid /tmp.",
+      "Proposal": "Add src/lib/agent-tmpdir.ts (getAgentTmpDir() = <OVERDECK_HOME>/tmp, and a launcher line that runs mkdir -p + chmod 700 + export CLAUDE_CODE_TMPDIR). generateLauncherScript() pushes that line in its existing non-remote block, so every local managed launch (conversations, work/review/test/plan agents, handoffs, workers, resumes) gets it. A new Deacon hygiene routine (src/lib/cloister/agent-tmp-sweep.ts, hourly) removes session directories at <root>/claude-<uid>/<project>/<session-uuid>/ whose newest mtime is older than 14 days and whose uuid is not in any live agent's sessions.json; a null backend inventory or a global Deacon pause skips the pass. pan doctor gains an 'Agent scratch' size line that warns above 10 GiB. A universal bundled rule no-tmp-scratch tells agents to keep files out of /tmp. configuration/harnesses.mdx documents the location, variable, cleanup and doctor line.",
+      "NonGoals": "- Moving or migrating existing /tmp/claude-<uid> contents.\n- Setting TMPDIR for any harness (Claude Code, codex, pi or others).\n- Removing loose files in claude-<uid>/, the background-ai/ directory, or anything other than depth-3 session directories.\n- Changing systemd-tmpfiles configuration or making /tmp persistent.\n- Config keys for the 14-day window or the 10 GiB threshold.\n- Exporting CLAUDE_CODE_TMPDIR in remote (Fly) launchers.\n- Rewriting launcher scripts of sessions that are already running.\n- Adding harness-name comparisons (harness === '...') in src/.\n- Raising any row in scripts/file-size-allowlist.txt."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Export CLAUDE_CODE_TMPDIR in every non-remote launcher regardless of harness.",
+        "rationale": "Non-Claude harnesses ignore the variable and any Claude Code child they start benefits; a harness branch would trip the lint:harness-branches ratchet."
+      },
+      {
+        "summary": "Set TMPDIR for no harness, including codex and pi.",
+        "rationale": "The issue forbids it for Claude Code. Codex keeps sessions in a per-agent CODEX_HOME and pi in piSessionDir, both under ~/.overdeck/agents/<id>/, so their state already survives a reboot; moving all their build temp output onto a 98%-full home disk would be worse."
+      },
+      {
+        "summary": "Liveness = listLiveAgentIds() backend inventory plus the session ids recorded in those agents' sessions.json.",
+        "rationale": "A session directory carries only a Claude session uuid, and liveness.ts isAlive() needs an agent id. Reading sessions.json for the ~10 live agents is cheap, matches the oracle transcript-retention.ts uses for deletion, errs toward keeping (a pane with only its shell left still counts as live), and a null inventory skips the pass."
+      },
+      {
+        "summary": "Session directories are the depth-3 entries <root>/claude-<uid>/<encoded-project>/<session-uuid>/, not top-level entries.",
+        "rationale": "A probe with CLAUDE_CODE_TMPDIR set on 2026-11-04 created exactly that layout; ~/.overdeck/tmp also already holds background-ai/, which must not be swept."
+      },
+      {
+        "summary": "14 days and 10 GiB are constants; the sweep runs hourly.",
+        "rationale": "The issue fixes both values and asks for no knob; hourly matches the transcript retention sweep."
+      },
+      {
+        "summary": "Doctor measures size with async execFile('du', ['-sk', root]) and a 30 s timeout.",
+        "rationale": "du is faster than a Node walk on a large tree, exists on Linux and macOS, and async keeps the call safe if doctor code is ever reached from the server."
+      },
+      {
+        "summary": "Docs go in configuration/harnesses.mdx plus one codebase-map line; context-layers docs stay unchanged.",
+        "rationale": "Neither configuration/context-layers.mdx nor docs/CONTEXT-LAYERS.md lists individual bundled rules, so adding a rule does not change them."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Seven small vertical items across launcher, cloister, doctor, rules and docs; the launcher export without the sweep would grow ~/.overdeck/tmp without bound, so the pieces ship together.",
+      "canonicalFilename": "2026-11-04-PAN-4998-keep-agent-scratch-files-out-of-tmp-so-a-reboot-doesn-t-delete-them.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "w1-agent-tmp-path",
+        "title": "Add agent-tmpdir module with getAgentTmpDir and the launcher line",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T10:03:31Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4998",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "w2-launcher-export",
+            "w3-tmp-sweep",
+            "w5-doctor-size"
+          ],
+          "files_scope": [
+            "src/lib/agent-tmpdir.ts",
+            "src/lib/__tests__/agent-tmpdir.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/agent-tmpdir.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "agent-tmpdir.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item W1. Create src/lib/agent-tmpdir.ts as a leaf module importing only node:path, ./paths.js (getOverdeckHome) and ./shell-quote.js. Export AGENT_TMP_RETENTION_DAYS = 14, getAgentTmpDir() returning join(getOverdeckHome(), 'tmp') at call time, and agentTmpdirLauncherLine(dir = getAgentTmpDir()) returning `mkdir -p <q> && chmod 700 <q> && export CLAUDE_CODE_TMPDIR=<q>` where <q> = shellQuote(dir). The line must contain no '$'. Add src/lib/__tests__/agent-tmpdir.test.ts covering the OVERDECK_HOME override, the exact string for '/a b/tmp', and running the line through bash (async execFile) against a mkdtemp dir whose tmp child pre-exists at 0775."
+        },
+        "items": [
+          {
+            "id": "w1-agent-tmp-path.ac1",
+            "title": "Given OVERDECK_HOME=/x/home, getAgentTmpDir() returns /x/home/tmp",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-agent-tmp-path.ac2",
+            "title": "agentTmpdirLauncherLine('/a b/tmp') returns exactly mkdir -p '/a b/tmp' && chmod 700 '/a b/tmp' && export CLAUDE_CODE_TMPDIR='/a b/tmp'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-agent-tmp-path.ac3",
+            "title": "Given a pre-existing 0775 directory, running the line in bash applies mode 0700 and the shell prints CLAUDE_CODE_TMPDIR equal to that path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w2-launcher-export",
+        "title": "Export CLAUDE_CODE_TMPDIR from non-remote launcher scripts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T10:03:31Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4998",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/launcher-generator.ts",
+            "src/lib/__tests__/launcher-generator.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/launcher-generator.test.ts src/lib/__tests__/launcher-context.test.ts tests/unit/lib/launcher-generator-overdeck-mcp.test.ts tests/unit/lib/launcher-generator-prime-agent.test.ts src/lib/overdeck/__tests__/conversation-runtime-launch.test.ts",
+            "bash scripts/lint-file-size.sh",
+            "npm run lint:harness-branches",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all listed launcher test files pass",
+            "file-size guard passes with launcher-generator.ts at or under 1000 lines",
+            "harness-branches ratchet passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item W2. In src/lib/launcher-generator.ts, import agentTmpdirLauncherLine from './agent-tmpdir.js' and change the block at `if (config.spawnMode !== 'remote') {` (line 330) to push both the OVERDECK_HOME export and agentTmpdirLauncherLine(), with a one-line PAN-4998 comment. Add at most 3 lines in total (the file is 995 lines; the ceiling is 1000). Update the 14 inline snapshots in src/lib/__tests__/launcher-generator.test.ts with `npx vitest run <file> -u` and confirm each non-remote snapshot gains exactly the one new line after `export OVERDECK_HOME=`. Add tests: a spawnMode 'remote' script does not contain CLAUDE_CODE_TMPDIR; a harness 'codex' non-remote script contains it. Run every test file from `git grep -ln generateLauncherScript -- '*.test.ts'` that asserts a full script and update it the same way if it fails. If files outside files_scope need snapshot updates, include them in this item's commit."
+        },
+        "items": [
+          {
+            "id": "w2-launcher-export.ac1",
+            "title": "Given a non-remote LauncherConfig, generateLauncherScript emits mkdir -p '<home>/tmp' && chmod 700 '<home>/tmp' && export CLAUDE_CODE_TMPDIR='<home>/tmp' on the line after export OVERDECK_HOME",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-launcher-export.ac2",
+            "title": "Given spawnMode 'remote', the generated script does not contain CLAUDE_CODE_TMPDIR",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-launcher-export.ac3",
+            "title": "wc -l src/lib/launcher-generator.ts reports at most 1000 and scripts/lint-file-size.sh exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w3-tmp-sweep",
+        "title": "Add the agent tmp sweep that removes idle, non-live session directories",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T10:03:31Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4998",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "w4-sweep-schedule"
+          ],
+          "files_scope": [
+            "src/lib/cloister/agent-tmp-sweep.ts",
+            "src/lib/cloister/__tests__/agent-tmp-sweep.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/agent-tmp-sweep.test.ts",
+            "npm run lint:agent-dir-removal",
+            "npm run lint:liveness",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "agent-tmp-sweep.test.ts passes",
+            "agent-dir-removal guard passes (no rm/rmdir line mentions an AGENTS_DIR-derived variable)",
+            "liveness lint passes",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item W3 exactly (deps interface, 9-step algorithm, test list). Model the module on src/lib/cloister/transcript-retention.ts: injectable deps (readDir with withFileTypes, lstat, realpath, removeTree via rm recursive+force, removeEmptyDir via rmdir, readSessionsIndex reading <agentsDir>/<id>/sessions.json, listLiveAgentIds from src/lib/terminal-backends/inventory.ts, isPaused = isDeaconGloballyPaused from src/lib/overdeck/control-settings.ts, now, log). Only depth-3 directories under claude-<digits>/<dir>/ are candidates; never follow symlinks; require realpath containment with exactly three segments before removal. Live session ids come from JSON lines' sessionId fields in live agents' sessions.json, read once per pass. Tests use vi.useFakeTimers() + vi.setSystemTime(), real fs in mkdtemp, and utimes for mtimes; never real waits. Use only node:fs/promises (no sync child processes). scripts/guard-agent-dir-removal.sh flags any rm/rmdir line that mentions AGENTS_DIR or a variable derived from it: keep the sessions.json reader (the only AGENTS_DIR user) in its own function whose variables never appear on a line that calls rm or rmdir, and run npm run lint:agent-dir-removal."
+        },
+        "items": [
+          {
+            "id": "w3-tmp-sweep.ac1",
+            "title": "Given a session dir claude-1000/-proj/<uuid>/ whose newest file is 15 days old and whose uuid is in no live agent's sessions.json, the sweep removes it and returns an action naming 1 removed directory",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-tmp-sweep.ac2",
+            "title": "Given a 15-day-old session dir whose uuid is recorded in a live agent's sessions.json, or one containing a file modified 1 day ago, the sweep preserves it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-tmp-sweep.ac3",
+            "title": "Given listLiveAgentIds returns null, the sweep preserves every directory and returns the 'Agent tmp sweep skipped' action; given isPaused returns true, it returns [] without reading the root",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-tmp-sweep.ac4",
+            "title": "Given background-ai/, a loose file in claude-1000/ and a symlink at session depth pointing outside the root, each survives a sweep unchanged and the symlink target is preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w4-sweep-schedule",
+        "title": "Run the agent tmp sweep hourly from the hygiene scheduler",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T10:03:31Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4998",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/cloister/hygiene-scheduler.ts",
+            "tests/unit/lib/cloister/hygiene-scheduler.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/hygiene-scheduler.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "hygiene-scheduler.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item W4. In src/lib/cloister/hygiene-scheduler.ts add the import of sweepAgentTmpDirs, a constant AGENT_TMP_SWEEP_INTERVAL_MS = 60 * 60_000 with a PAN-4998 comment, and the routine row ['sweepAgentTmpDirs', () => sweepAgentTmpDirs(), AGENT_TMP_SWEEP_INTERVAL_MS] next to sweepTranscriptRetention. In tests/unit/lib/cloister/hygiene-scheduler.test.ts add sweepAgentTmpDirs to the hoisted mocks and a vi.mock for '../../../../src/lib/cloister/agent-tmp-sweep.js' (without it the test runs the real sweep on the real home), assert one call at start, and add an hourly-cadence case mirroring the transcript-retention case at line 177 using vi.advanceTimersByTimeAsync."
+        },
+        "items": [
+          {
+            "id": "w4-sweep-schedule.ac1",
+            "title": "Given startHygieneScheduler() runs, sweepAgentTmpDirs is called exactly once immediately",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-sweep-schedule.ac2",
+            "title": "Given 60 minutes elapse via vi.advanceTimersByTimeAsync(60 * 60_000), the scheduler sends one more sweepAgentTmpDirs call, and after stopHygieneScheduler() no further call is made",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w5-doctor-size",
+        "title": "Report agent scratch size in pan doctor and warn above 10 GiB",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T10:03:31Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4998",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/cli/commands/doctor-agent-tmp.ts",
+            "src/cli/commands/__tests__/doctor-agent-tmp.test.ts",
+            "src/cli/commands/doctor.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/doctor-agent-tmp.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "doctor-agent-tmp.test.ts passes",
+            "typecheck completes without errors",
+            "file-size guard passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item W5. Create src/cli/commands/doctor-agent-tmp.ts re-declaring CheckResult (like doctor-inotify.ts), exporting AGENT_TMP_WARN_BYTES = 10 * 1024 ** 3 and checkAgentTmp({ root?, exists?, measureBytes? }) with default measureBytes = promisify(execFile)('du', ['-sk', root], { timeout: 30_000 }) → parseInt(stdout) * 1024. Name 'Agent scratch (~/.overdeck/tmp)'. Results: absent root → ok 'not created yet'; ≤ 10 GiB → ok '<size> in <root>'; > 10 GiB → warn '<size> in <root> (over 10 GiB)' with the fix text from the PRD; measure throws → warn 'could not measure: <message>'. Sizes print as 'x.y GiB' at ≥ 1 GiB, else 'n MiB'. Wire it in src/cli/commands/doctor.ts with one import and `for (const c of await checkAgentTmp()) checks.push(c); // PAN-4998` beside the checkInotify line (line 905). Tests inject exists/measureBytes for all four results."
+        },
+        "items": [
+          {
+            "id": "w5-doctor-size.ac1",
+            "title": "Given measureBytes returns 11 GiB, checkAgentTmp returns one result with status warn whose message includes 'over 10 GiB'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-doctor-size.ac2",
+            "title": "Given measureBytes returns 1 GiB, checkAgentTmp returns status ok with message '1.0 GiB in <root>'; given the root is absent, it returns ok 'not created yet' without calling measureBytes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-doctor-size.ac3",
+            "title": "Given measureBytes throws, checkAgentTmp returns status warn with message starting 'could not measure:'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-doctor-size.ac4",
+            "title": "Running pan doctor from the built branch prints a line containing 'Agent scratch'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w6-no-tmp-rule",
+        "title": "Add the universal no-tmp-scratch bundled rule",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T10:03:31Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4998",
+          "requiresInspection": false,
+          "files_scope": [
+            "sync-sources/rules/no-tmp-scratch.md",
+            "tests/lib/context-layers/rules.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/context-layers/rules.test.ts src/lib/__tests__/agent-text-cli-verbs.test.ts"
+          ],
+          "expected_outputs": [
+            "rules.test.ts and agent-text-cli-verbs.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item W6. Create sync-sources/rules/no-tmp-scratch.md with exactly the frontmatter and text given in the PRD (scope: universal; title '### Keep files you may need later out of `/tmp`'; one short paragraph). Name no pan verb. Add a test to tests/lib/context-layers/rules.test.ts asserting readBundledRules() includes a rule named no-tmp-scratch with scope universal and renderBundledRules('claude-code', false) contains 'Keep files you may need later out of'. After merge, `pan sync` puts it into ~/.overdeck/context/claude-global.md."
+        },
+        "items": [
+          {
+            "id": "w6-no-tmp-rule.ac1",
+            "title": "readBundledRules() returns a rule named no-tmp-scratch whose scope is universal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-no-tmp-rule.ac2",
+            "title": "renderBundledRules('claude-code', false) produces output that contains 'Keep files you may need later out of' and the rule's source path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w7-docs",
+        "title": "Document the scratch directory in the harness docs and codebase map",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T10:03:31Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4998",
+          "requiresInspection": false,
+          "files_scope": [
+            "configuration/harnesses.mdx",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '#### Scratch directory' configuration/harnesses.mdx",
+            "grep -c 'last-verified' .overdeck/context/codebase/architecture.md"
+          ],
+          "expected_outputs": [
+            "the heading is found inside the Claude Code section before '#### Claude Code version requirements'",
+            "exactly 1 last-verified line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item W7. In configuration/harnesses.mdx, inside '### Claude Code (default)' directly before '#### Claude Code version requirements', add '#### Scratch directory' in plain prose stating: managed Claude Code sessions keep their scratchpad under ~/.overdeck/tmp/claude-<uid>/ because Overdeck sets CLAUDE_CODE_TMPDIR=~/.overdeck/tmp (mode 0700) in every local launch; /tmp is emptied at boot on many Linux distributions; TMPDIR is unchanged so build tools still use /tmp; Fly launches are unchanged; the Deacon checks hourly and removes a session's directory once nothing in it has changed for 14 days and no live agent owns the session; pan doctor shows the folder size and warns above 10 GiB; Codex and pi already keep session state under ~/.overdeck/agents/. In .overdeck/context/codebase/architecture.md add one line after the launcher-generator.ts bullet naming src/lib/agent-tmpdir.ts and cloister/agent-tmp-sweep.ts, and keep exactly one <!-- last-verified: --> line at the end, updated. Leave configuration/context-layers.mdx and docs/CONTEXT-LAYERS.md unchanged (they list no individual rules)."
+        },
+        "items": [
+          {
+            "id": "w7-docs.ac1",
+            "title": "configuration/harnesses.mdx renders a '#### Scratch directory' heading inside the Claude Code section whose text names CLAUDE_CODE_TMPDIR, ~/.overdeck/tmp, 14 days, hourly and 10 GiB",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w7-docs.ac2",
+            "title": "The Scratch directory text contains statements that TMPDIR is unchanged and that Fly (remote) launches are unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w7-docs.ac3",
+            "title": ".overdeck/context/codebase/architecture.md contains src/lib/agent-tmpdir.ts and cloister/agent-tmp-sweep.ts and exactly one last-verified line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "w1-agent-tmp-path",
+        "to": "w2-launcher-export",
+        "type": "blocks"
+      },
+      {
+        "from": "w1-agent-tmp-path",
+        "to": "w3-tmp-sweep",
+        "type": "blocks"
+      },
+      {
+        "from": "w1-agent-tmp-path",
+        "to": "w5-doctor-size",
+        "type": "blocks"
+      },
+      {
+        "from": "w3-tmp-sweep",
+        "to": "w4-sweep-schedule",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

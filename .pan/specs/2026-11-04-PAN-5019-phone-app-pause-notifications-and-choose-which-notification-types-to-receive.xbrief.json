@@ -1,0 +1,875 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T12:33:37Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5019: Phone app: pause notifications and choose which notification types to receive",
+    "updated": "2026-11-04T13:11:33.544Z"
+  },
+  "plan": {
+    "id": "pan-5019",
+    "title": "Phone app: pause notifications and choose which notification types to receive",
+    "status": "running",
+    "uid": "57d75631-081c-464a-880a-6a70d8e0abf5",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-04T12:33:37Z",
+    "updated": "2026-11-04T13:11:33.544Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5019",
+        "label": "PAN-5019",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5022",
+        "label": "PAN-5022 (follow-up: directory relay and phone-side drop)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5018",
+        "label": "PAN-5018 (link channels fail on a real iPhone)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "phone-app",
+      "push",
+      "notifications",
+      "anywhere"
+    ],
+    "metadata": {
+      "sizeJustification": "One vertical feature that only works end to end when the phone and the machine both change: the phone owns and sends the preferences, the machine applies them before sealing. A machine-only half is not observable by a user, and a phone-only half has nothing to apply it. The plan already splits the separable parts (directory relay and phone-side drop) into PAN-5022. The 7 subsystem roots come from the lint counting each top-level doc file as its own subsystem.",
+      "canonicalFilename": "2026-11-04-PAN-5019-phone-app-pause-notifications-and-choose-which-notification-types-to-receive.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The Overdeck phone app receives every needs-you push from every paired machine. The only controls are the Notifications switch (which unregisters the phone at the directory) and iOS Settings. The operator wants to pause notifications for a while and to turn off individual types, in particular 'Failed: the agent stopped responding'.",
+      "Proposal": "The phone owns a small preferences object ({ v: 1, pause: null | { until }, muted: categories[] }) kept in localStorage. It sends it to each paired machine in the pairing exchange and later with PUT /api/phones/self/notification-preferences over a link channel, tracking which machines have it. The machine stores it per phone clientId in <OVERDECK_HOME>/push/phone-preferences.json, and the native push provider skips a paused phone or a muted category before sealing, so no push frame reaches the directory. A new explicit category on every needs-you notification (question, plan, permission, finished, failed, stopped) splits the coarse kinds into the six switches. Settings gains a Pause switch, 'Pause for 1 hour', 'Pause until tomorrow 8:00', six type switches and a line for each machine that has not received the settings. Full detail: .pan/drafts/PAN-5019.md.",
+      "NonGoals": "- No relay of preferences through the overdeck.ai directory for unreachable machines (follow-up PAN-5022)\n- No dropping of notifications in the iOS Notification Service Extension (needs Apple's filtering entitlement; PAN-5022)\n- No per-machine preferences; every machine receives the same preferences\n- No change to Web Push subscriptions, ntfy, the machine's push.events config, or the Live Activity\n- No Android notification preferences (Android push is PAN-4840)\n- No display of a phone's preferences in the machine dashboard's Settings → Anywhere\n- No change to the push wire format (PhonePushPayload, push frame) or NeedsYouKind\n- No exclusion of muted items from the dispatcher's 6-per-minute rate-limit count\n- The existing Notifications switch (push-unregister at the directory) keeps its current behavior"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Filter on the machine inside the native push provider, per phone, omitting filtered phones from outcomes",
+        "rationale": "The issue names native-provider.ts as where the filter belongs; filtering there leaves Web Push and ntfy untouched and sends no push frame, which is the acceptance check."
+      },
+      {
+        "summary": "Add an explicit category field (question, plan, permission, finished, failed, stopped) set by the classifier",
+        "rationale": "NeedsYouKind cannot tell plan approvals from permission prompts or 'stopped responding' from other failures, and the issue lists those as separate switches."
+      },
+      {
+        "summary": "The 'test' push bypasses pause and mutes; 'summary' is blocked by pause but not by mutes",
+        "rationale": "Send test is the operator's explicit pipe check; a summary aggregates mixed categories so only pause can apply to it."
+      },
+      {
+        "summary": "Store machine-side preferences in a separate file keyed by phone clientId, not on the access-token record",
+        "rationale": "clientId is stable across re-pairs and the token store's validation is security-sensitive."
+      },
+      {
+        "summary": "Send preferences in the pairing exchange as well as by a PUT over a link channel",
+        "rationale": "Makes a re-pair carry the settings without a second channel, which matters while PAN-5018 breaks link channels on a real iPhone."
+      },
+      {
+        "summary": "Defer the directory relay and the Notification Service Extension fallback to a follow-up issue (PAN-5022)",
+        "rationale": "The relay is a services/connect protocol change and the extension cannot suppress notifications without an Apple-granted entitlement; both are separable."
+      },
+      {
+        "summary": "Defer per-machine preferences",
+        "rationale": "The issue marks them optional; the phone already sends prefs per machine, so adding them later is phone-only."
+      },
+      {
+        "summary": "'Until tomorrow morning' means the next 08:00 phone-local strictly after now, sent as an absolute ISO instant",
+        "rationale": "An absolute instant needs no timer or time zone on the machine and matches the plain meaning at night and during the day."
+      },
+      {
+        "summary": "Keep the existing Notifications switch alongside Pause",
+        "rationale": "It controls the directory registration, which other features rely on; the UI and docs explain the difference."
+      }
+    ],
+    "items": [
+      {
+        "id": "contracts-prefs",
+        "title": "Add the phone notification categories and preferences contract to @overdeck/contracts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T12:33:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-5019",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "packages/contracts/src/phone-notifications.ts",
+            "packages/contracts/src/index.ts",
+            "packages/contracts/src/__tests__/phone-notifications.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix packages/contracts test -- src/__tests__/phone-notifications.test.ts",
+            "npm run typecheck:contracts"
+          ],
+          "expected_outputs": [
+            "phone-notifications.test.ts passes",
+            "typecheck:contracts completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "NFR-1"
+          ],
+          "foundationFor": [
+            "classify-category",
+            "machine-store",
+            "native-filter",
+            "prefs-route",
+            "exchange-prefs",
+            "phone-prefs-model",
+            "prefs-sync",
+            "settings-ui"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Create packages/contracts/src/phone-notifications.ts with PhoneNotificationCategory ('question'|'plan'|'permission'|'finished'|'failed'|'stopped'), PHONE_NOTIFICATION_CATEGORIES in that order, PhoneNotificationPreferences { v: 1; pause: null | { until: string | null }; muted: readonly PhoneNotificationCategory[] }, DEFAULT_PHONE_NOTIFICATION_PREFERENCES = { v: 1, pause: null, muted: [] }, parsePhoneNotificationPreferences(value: unknown) (never throws; null unless v === 1, pause is null or {until: null|Date.parse-able string}, muted is an array; unknown and duplicate muted entries dropped, result in category order) and notificationAllowed(prefs, category, nowMs) with the PRD D-3 rules: null prefs -> true; 'test' -> true; paused (pause non-null and (until null or Date.parse(until) > nowMs)) -> false; 'summary' -> true; otherwise !muted.includes(category). Export it from packages/contracts/src/index.ts next to ./phone-pairing. Add packages/contracts/src/__tests__/phone-notifications.test.ts."
+        },
+        "items": [
+          {
+            "id": "contracts-prefs.ac1",
+            "title": "Given { v: 2, pause: null, muted: [] }, a non-array muted, or pause.until 'not-a-date', parsePhoneNotificationPreferences returns null without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-prefs.ac2",
+            "title": "Given muted ['stopped', 'bogus', 'question', 'stopped'], parsePhoneNotificationPreferences returns muted ['question', 'stopped']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-prefs.ac3",
+            "title": "notificationAllowed returns false for any category except 'test' when pause.until is null or later than nowMs, and returns true once until is earlier than nowMs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-prefs.ac4",
+            "title": "notificationAllowed returns false for a muted category, true for 'summary' and 'test' while that category is muted, and true for every category when prefs is null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "classify-category",
+        "title": "Set an explicit notification category on every needs-you notification",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T12:33:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5019",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/push/types.ts",
+            "src/lib/push/classify.ts",
+            "src/lib/push/dispatcher.ts",
+            "src/dashboard/server/services/needs-you-push-service.ts",
+            "tests/unit/lib/push/classify.test.ts",
+            "tests/unit/lib/push/dispatcher.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/push/classify.test.ts tests/unit/lib/push/dispatcher.test.ts src/dashboard/server/services/__tests__/needs-you-push-service.test.ts",
+            "npx tsc --noEmit"
+          ],
+          "expected_outputs": [
+            "the three test files pass",
+            "tsc completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. In src/lib/push/types.ts add `export type NeedsYouCategory = PhoneNotificationCategory | 'summary' | 'test'` (import type from @overdeck/contracts) and a required `category: NeedsYouCategory` field on NeedsYouNotification. In src/lib/push/classify.ts add `category: 'question' | 'plan' | 'permission'` to PendingItem and set it where items are pushed (auq -> question, plan -> plan, permission -> permission) in both pendingItemsFromEnrichment and pendingItemsFromConversationRow; toNotification copies item.category; edgeNotificationFromEvent sets category 'stopped' for agent.heartbeat_dead and category edge.kind for journal edges. Set category 'summary' on the dispatcher's summary notification (src/lib/push/dispatcher.ts) and category 'test' in sendTestPush (src/dashboard/server/services/needs-you-push-service.ts). NeedsYouKind, PhonePushPayload and the push wire stay unchanged. Fix every other constructor tsc reports, tests included. Extend tests/unit/lib/push/classify.test.ts."
+        },
+        "items": [
+          {
+            "id": "classify-category.ac1",
+            "title": "Given an enrichment payload with a pending AskUserQuestion, a proposed plan and a permissionRequest, pendingItemsFromEnrichment returns items whose notifications have categories 'question', 'plan' and 'permission'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "classify-category.ac2",
+            "title": "Given an agent.heartbeat_dead event, edgeNotificationFromEvent returns kind 'failed' with category 'stopped'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "classify-category.ac3",
+            "title": "Given pipeline.journal entries merge.failed and merge.completed, edgeNotificationFromEvent returns categories 'failed' and 'finished'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "classify-category.ac4",
+            "title": "The dispatcher's rate-limit summary notification carries category 'summary' and sendTestPush emits category 'test'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "machine-store",
+        "title": "Store each phone's notification preferences on the machine, keyed by clientId",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T12:33:37Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5019",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/push/phone-preferences-store.ts",
+            "tests/unit/lib/push/phone-preferences-store.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/push/phone-preferences-store.test.ts",
+            "npx tsc --noEmit"
+          ],
+          "expected_outputs": [
+            "phone-preferences-store.test.ts passes",
+            "tsc completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3 and D-7. Create src/lib/push/phone-preferences-store.ts: phonePreferencesPath() = join(pushDir(), 'phone-preferences.json'); file shape { v: 1, phones: { [clientId]: PhoneNotificationPreferences } }; loadPhoneNotificationPreferences(): Promise<ReadonlyMap<string, PhoneNotificationPreferences>> cached in memory after the first read; a missing, corrupt or unreadable file reads as an empty map with one console.warn (fail open) and each entry is re-validated with parsePhoneNotificationPreferences; setPhoneNotificationPreferences(clientId, prefs) writes mode 0600 via temp file + rename through one in-process write queue (copy subscription-store.ts), updates the cache, and prunes clientIds without an active phone record (listActiveRecordsOfKind('phone') from src/lib/access-tokens.ts) except the one being written; resetPhoneNotificationPreferencesCacheForTests(). node:fs/promises only (no sync I/O). Add tests/unit/lib/push/phone-preferences-store.test.ts using a temp OVERDECK_HOME like subscription-store.test.ts."
+        },
+        "items": [
+          {
+            "id": "machine-store.ac1",
+            "title": "setPhoneNotificationPreferences followed by a cache reset and loadPhoneNotificationPreferences returns the same prefs for that clientId, and the file mode is 0600",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "machine-store.ac2",
+            "title": "Given a phone-preferences.json containing invalid JSON, loadPhoneNotificationPreferences resolves to an empty map and a later setPhoneNotificationPreferences writes a valid file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "machine-store.ac3",
+            "title": "Given a stored entry whose clientId has no active phone record, the next setPhoneNotificationPreferences for another clientId removes that entry from the file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "native-filter",
+        "title": "Filter each phone's needs-you push by its preferences before sealing",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T12:33:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5019",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/push/native-provider.ts",
+            "tests/unit/lib/push/native-provider.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/push/native-provider.test.ts",
+            "npx tsc --noEmit"
+          ],
+          "expected_outputs": [
+            "native-provider.test.ts passes",
+            "tsc completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 and D-1/D-3. In src/lib/push/native-provider.ts add deps readPreferences?: () => Promise<ReadonlyMap<string, PhoneNotificationPreferences>> (default loadPhoneNotificationPreferences; a rejection reads as an empty map) and now?: () => number (default Date.now). In send(n), return [] when listPhones() is empty before reading preferences; otherwise filter listPhones() with notificationAllowed(prefs.get(phone.clientId) ?? null, n.category, now()) before sealing; filtered phones are omitted from the returned outcomes (no 'skipped' outcome). hasTargets is unchanged. Add one sentence about PAN-5019 to the module header. Extend tests/unit/lib/push/native-provider.test.ts."
+        },
+        "items": [
+          {
+            "id": "native-filter.ac1",
+            "title": "Given two phones and one paused with until null, send of a question notification calls port.send exactly once, for the other phone, and returns one outcome",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "native-filter.ac2",
+            "title": "Given a phone whose prefs mute 'stopped', send of a 'stopped' notification makes no port.send call for it while a 'question' notification is sent to it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "native-filter.ac3",
+            "title": "Given a paused phone, a notification with category 'test' is still sent to it, and a phone whose pause.until is in the past receives a 'question' notification",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "native-filter.ac4",
+            "title": "Given readPreferences rejects, send seals and sends to every phone",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "prefs-route",
+        "title": "Add PUT /api/phones/self/notification-preferences for a paired phone",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T12:33:37Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-5019",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/phones.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/route-scopes-phone.test.ts",
+            "src/dashboard/server/__tests__/phones-routes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/phones-routes.test.ts src/dashboard/server/__tests__/route-scopes-phone.test.ts src/dashboard/server/__tests__/route-scopes.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npx tsc --noEmit"
+          ],
+          "expected_outputs": [
+            "the four test files pass",
+            "tsc completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5 and D-8. In src/dashboard/server/routes/phones.ts add handlePhonesNotificationPreferences(credential, bodyText) modelled on handlePhonesPushKey: 403 { error: 'only a paired phone may set its notification preferences' } unless credential?.kind === 'phone'; 400 { error: 'body is not JSON' } or 400 { error: 'invalid notification preferences' } when parsePhoneNotificationPreferences returns null; else setPhoneNotificationPreferences(credential.clientId, prefs) and { ok: true }. Add the PUT route with rejectUnsafeDashboardMutationRequest, include it in phonesRouteLayer, update the header comment. Add `{ method: 'PUT', path: '/api/phones/self/notification-preferences', scope: 'tell' }` in src/dashboard/server/route-scopes.ts after the push-key row; add a WRITE row to tests/unit/lib/overdeck/no-loss-matrix.ts after the push-key row (door 'push/phone-preferences-store.setPhoneNotificationPreferences (own phone clientId) (PAN-5019)'); add the route to the phone surface inventory in src/dashboard/server/__tests__/route-scopes-phone.test.ts; add route tests to src/dashboard/server/__tests__/phones-routes.test.ts."
+        },
+        "items": [
+          {
+            "id": "prefs-route.ac1",
+            "title": "Given a phone credential and a valid prefs body, the handler returns 200 { ok: true } and loadPhoneNotificationPreferences then holds those prefs under the credential's clientId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prefs-route.ac2",
+            "title": "Given a non-phone credential, the handler returns 403; given a body with v: 2, it returns 400 with error 'invalid notification preferences'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prefs-route.ac3",
+            "title": "route-scopes-phone.test.ts resolves PUT /api/phones/self/notification-preferences to a scope PHONE_TOKEN_SCOPES satisfies, and no-loss-matrix.test.ts passes with the new row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "exchange-prefs",
+        "title": "Carry the phone's preferences in the pairing exchange",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T12:33:37Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-5019",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/phones.ts",
+            "src/dashboard/server/__tests__/phones-routes.test.ts",
+            "apps/mobile/src/shell/pairing.ts",
+            "apps/mobile/src/shell/__tests__/pairing.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/phones-routes.test.ts",
+            "npm --prefix apps/mobile test -- src/shell/__tests__/pairing.test.ts",
+            "npm run typecheck:mobile"
+          ],
+          "expected_outputs": [
+            "phones-routes.test.ts passes",
+            "pairing.test.ts passes",
+            "typecheck:mobile completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6 and D-8. Machine: in src/dashboard/server/routes/phones.ts, parsePhoneExchangeBody reads optional body.notificationPreferences through parsePhoneNotificationPreferences (invalid is treated as absent, never a 400); after minting the token and revoking older records, handlePhonesExchange stores valid prefs with setPhoneNotificationPreferences(clientId, prefs) and adds notificationPreferencesStored: true to the answer; a store failure is logged and the flag omitted while pairing still succeeds. Phone: in apps/mobile/src/shell/pairing.ts, PairingDeps gains notificationPreferences?: () => { revision: number; prefs: PhoneNotificationPreferences } and onPreferencesStored?: (environmentId: string, revision: number) => void; the exchange body adds notificationPreferences when the dep is given; after writeMachines, call onPreferencesStored when answer.notificationPreferencesStored === true. pairMachine's return type stays PairedMachine. Extend src/dashboard/server/__tests__/phones-routes.test.ts and apps/mobile/src/shell/__tests__/pairing.test.ts."
+        },
+        "items": [
+          {
+            "id": "exchange-prefs.ac1",
+            "title": "Given a pairing-mode exchange whose body carries valid notificationPreferences, the answer includes notificationPreferencesStored: true and the store holds the prefs under that clientId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "exchange-prefs.ac2",
+            "title": "Given an exchange whose notificationPreferences has v: 2, the exchange returns 200 with a token and the answer has no notificationPreferencesStored field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "exchange-prefs.ac3",
+            "title": "Given the notificationPreferences dep, pairMachine sends the prefs in the POST /api/phones/exchange body and calls onPreferencesStored(environmentId, revision) only when the answer carries notificationPreferencesStored: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "phone-prefs-model",
+        "title": "Persist the phone's notification preferences and compute pause times",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T12:33:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5019",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/src/shell/notificationPrefs.ts",
+            "apps/mobile/src/shell/__tests__/notificationPrefs.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix apps/mobile test -- src/shell/__tests__/notificationPrefs.test.ts",
+            "npm run typecheck:mobile"
+          ],
+          "expected_outputs": [
+            "notificationPrefs.test.ts passes",
+            "typecheck:mobile completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7, D-6 and D-9. Create apps/mobile/src/shell/notificationPrefs.ts with NOTIFICATION_PREFS_KEY = 'overdeck.notificationPrefs' ({ revision, prefs }) and NOTIFICATION_PREFS_SYNCED_KEY = 'overdeck.notificationPrefsSynced' ({ [environmentId]: revision }) in localStorage; readNotificationPrefs() (invalid or unreadable -> DEFAULT_PHONE_NOTIFICATION_PREFERENCES, revision 0); writeNotificationPrefs(prefs) stores revision + 1, notifies listeners and returns the new revision; type PauseChoice = 'hour' | 'morning' | 'indefinite'; pauseFor(choice, now: Date) -> { until: ISO } for hour (now + 3,600,000 ms) and morning (the next 08:00 phone-local strictly after now), { until: null } for indefinite; isPaused(prefs, nowMs); syncedRevision(environmentId) (0 when absent); markSynced(environmentId, revision); onNotificationPrefsChange(listener); useNotificationPrefs() via useSyncExternalStore. Storage errors never throw (match push.ts readStorage/writeStorage). Add apps/mobile/src/shell/__tests__/notificationPrefs.test.ts with fake timers / fixed dates."
+        },
+        "items": [
+          {
+            "id": "phone-prefs-model.ac1",
+            "title": "pauseFor('hour', t) returns until equal to t + 1 hour; pauseFor('morning') at 02:00 local returns 08:00 the same day and at 09:00 local returns 08:00 the next day; pauseFor('indefinite') returns { until: null }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phone-prefs-model.ac2",
+            "title": "writeNotificationPrefs followed by readNotificationPrefs returns the written prefs with the revision incremented by 1, and a corrupt stored value reads as the default prefs with revision 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phone-prefs-model.ac3",
+            "title": "isPaused returns true before pause.until and false after it (advanced with fake timers), and markSynced then syncedRevision returns the marked revision for that machine",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "prefs-sync",
+        "title": "Send the phone's preferences to every paired machine and track which have them",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T12:33:37Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5019",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/src/shell/notificationPrefsSync.ts",
+            "apps/mobile/src/shell/__tests__/notificationPrefsSync.test.ts",
+            "apps/mobile/src/shell/ShellApp.tsx",
+            "apps/mobile/src/shell/__tests__/ShellApp.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix apps/mobile test -- src/shell/__tests__/notificationPrefsSync.test.ts src/shell/__tests__/ShellApp.test.tsx",
+            "npm run typecheck:mobile"
+          ],
+          "expected_outputs": [
+            "notificationPrefsSync.test.ts and ShellApp.test.tsx pass",
+            "typecheck:mobile completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8 and D-10. Create apps/mobile/src/shell/notificationPrefsSync.ts: type PrefsSyncStatus = 'synced' | 'pending' | 'outdated' | 'failed'; createPrefsSync({ directory: Pick<DirectoryWebClient, 'state' | 'machines' | 'onStateChange'>, paired, send, now? }) returning { syncNow, status(environmentId), onChange, stop }; putPrefsOver(connection) follows removeSelfOver in signOut.ts (openLink, requestOnChannel PUT /api/phones/self/notification-preferences with Authorization Bearer machine.token and Content-Type application/json, stream.destroy() in finally) and resolves with the HTTP status. syncNow skips machines already at the current revision, not listed online by the directory (status pending), in flight, failed within the last 60 s, or outdated for this revision; each send is bounded to 10 s with AbortController + setTimeout; 200 -> markSynced + synced, 404/405 -> outdated, anything else or a rejection -> failed. It subscribes to onNotificationPrefsChange and directory.onStateChange (acting only while state is 'online'). In apps/mobile/src/shell/ShellApp.tsx create the sync in the services effect when pushSupported(), add it to Services, stop it in cleanup, and pass notificationPreferences: readNotificationPrefs and onPreferencesStored: markSynced to pairMachine. Add apps/mobile/src/shell/__tests__/notificationPrefsSync.test.ts with fake timers; keep apps/mobile/src/shell/__tests__/ShellApp.test.tsx passing."
+        },
+        "items": [
+          {
+            "id": "prefs-sync.ac1",
+            "title": "Given a paired machine listed online with synced revision below the current revision, syncNow sends one PUT and status(environmentId) becomes 'synced' after a 200",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prefs-sync.ac2",
+            "title": "Given a paired machine the directory lists offline, its status stays 'pending' with no send, and a later onStateChange listing it online sends the PUT",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prefs-sync.ac3",
+            "title": "Given a 404 answer, the status becomes 'outdated' and further onStateChange events produce no second PUT until the prefs change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prefs-sync.ac4",
+            "title": "Given a 500 answer, no retry is sent within 60 s, and a state change after advancing fake timers past 60 s sends one retry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-ui",
+        "title": "Add pause controls and notification-type switches to the phone app's Settings",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T12:33:37Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5019",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/src/shell/SettingsScreen.tsx",
+            "apps/mobile/src/shell/__tests__/SettingsScreen.test.tsx",
+            "apps/mobile/src/shell/ShellApp.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix apps/mobile test -- src/shell/__tests__/SettingsScreen.test.tsx src/shell/__tests__/ShellApp.test.tsx",
+            "npm run typecheck:mobile"
+          ],
+          "expected_outputs": [
+            "SettingsScreen.test.tsx and ShellApp.test.tsx pass",
+            "typecheck:mobile completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9 and D-11. In apps/mobile/src/shell/SettingsScreen.tsx extend SettingsScreenProps.notifications with prefs, onPause(choice: PauseChoice), onResume(), onToggleCategory(category, on) and unsynced: ReadonlyArray<{ label; status: 'pending' | 'outdated' | 'failed' }>. Inside the existing Notifications section, below the existing switch, render: a role=switch 'Pause notifications' row (aria-checked = paused; on -> onPause('indefinite'), off -> onResume()); when not paused, buttons 'Pause for 1 hour' and 'Pause until tomorrow 8:00'; when paused, 'Paused until <locale h:mm>' or 'Paused until you turn it back on' instead of the buttons; a 'Notification types' subheading with six role=switch rows labelled exactly 'Agent questions', 'Plan approvals', 'Permission prompts', 'Finished work', 'Failures', 'Agent stopped responding' (aria-checked = not muted); the help line from the PRD; for each unsynced machine 'Not yet sent to <label>.' (pending/failed) or 'Update Overdeck on <label> to apply these settings.' (outdated). In apps/mobile/src/shell/ShellApp.tsx build these props from useNotificationPrefs() and the sync's status (useSyncExternalStore over sync.onChange); handlers call writeNotificationPrefs. Extend apps/mobile/src/shell/__tests__/SettingsScreen.test.tsx."
+        },
+        "items": [
+          {
+            "id": "settings-ui.ac1",
+            "title": "The Settings screen renders six role=switch rows with the exact labels 'Agent questions', 'Plan approvals', 'Permission prompts', 'Finished work', 'Failures' and 'Agent stopped responding', and clicking 'Agent stopped responding' while on calls onToggleCategory('stopped', false)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-ui.ac2",
+            "title": "When 'Pause for 1 hour' is clicked the screen calls onPause('hour'), and when the 'Pause notifications' switch is toggled on it calls onPause('indefinite')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-ui.ac3",
+            "title": "Given prefs paused until a future instant, the screen renders 'Paused until' text and does not render the 'Pause for 1 hour' button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-ui.ac4",
+            "title": "Given an unsynced machine with status 'outdated' labelled 'z790', the screen renders 'Update Overdeck on z790 to apply these settings.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document pause and notification types for users, the phone app and the auth model",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T12:33:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5019",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/push-notifications.mdx",
+            "apps/mobile/README.md",
+            "docs/DASHBOARD-AUTH.md",
+            "apps/mobile/ACCEPTANCE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '### Pause and notification types' configuration/push-notifications.mdx",
+            "grep -n 'notification-preferences' docs/DASHBOARD-AUTH.md apps/mobile/README.md",
+            "grep -n '## PAN-5019 notification preferences' apps/mobile/ACCEPTANCE.md"
+          ],
+          "expected_outputs": [
+            "each grep prints at least one matching line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. configuration/push-notifications.mdx, section '## The Overdeck app': say each phone receives the notifications its Settings allow, and add '### Pause and notification types' covering the Pause switch and the two timed pauses, the six types and how they map to the 'What you get' table (Approval needed splits into plan approvals and permission prompts; Failed splits into failures and agent stopped responding), that the machine applies them before sending so nothing reaches overdeck.ai or Apple, that 'Send test' still arrives while paused, that each machine must run this version and be reached once (the app lists machines it has not reached), and how Pause differs from the Notifications switch. apps/mobile/README.md '## Notifications (iOS)': add a 'Pause and types' bullet (overdeck.notificationPrefs, sync to each machine, the exchange field, the PUT route, the four statuses). docs/DASHBOARD-AUTH.md: add PUT /api/phones/self/notification-preferences to the tell row and the phone self-service routes paragraph, and mention the optional notificationPreferences exchange field and <OVERDECK_HOME>/push/phone-preferences.json. apps/mobile/ACCEPTANCE.md: add '## PAN-5019 notification preferences' with the device steps from the PRD (pause -> real AskUserQuestion -> no push frame in wrangler tail overdeck-connect; resume; mute 'Agent stopped responding'; restart app; forget and re-pair). If configuration/phone-app.mdx exists on main when this runs, add one linking sentence there; otherwise skip it."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "configuration/push-notifications.mdx contains a '### Pause and notification types' subsection that names all six type labels and states that 'Send test' still arrives while paused",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "docs/DASHBOARD-AUTH.md lists PUT /api/phones/self/notification-preferences in the tell scope row and in the phone self-service routes paragraph",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "apps/mobile/README.md's Notifications (iOS) section contains overdeck.notificationPrefs and the per-machine sync statuses pending, synced, outdated and failed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac4",
+            "title": "apps/mobile/ACCEPTANCE.md contains '## PAN-5019 notification preferences' with a step that checks wrangler tail overdeck-connect shows no push frame for the paused client",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "contracts-prefs",
+        "to": "classify-category",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-prefs",
+        "to": "machine-store",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-prefs",
+        "to": "native-filter",
+        "type": "blocks"
+      },
+      {
+        "from": "classify-category",
+        "to": "native-filter",
+        "type": "blocks"
+      },
+      {
+        "from": "machine-store",
+        "to": "native-filter",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-prefs",
+        "to": "prefs-route",
+        "type": "blocks"
+      },
+      {
+        "from": "machine-store",
+        "to": "prefs-route",
+        "type": "blocks"
+      },
+      {
+        "from": "prefs-route",
+        "to": "exchange-prefs",
+        "type": "blocks"
+      },
+      {
+        "from": "machine-store",
+        "to": "exchange-prefs",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-prefs",
+        "to": "exchange-prefs",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-prefs",
+        "to": "phone-prefs-model",
+        "type": "blocks"
+      },
+      {
+        "from": "phone-prefs-model",
+        "to": "prefs-sync",
+        "type": "blocks"
+      },
+      {
+        "from": "exchange-prefs",
+        "to": "prefs-sync",
+        "type": "blocks"
+      },
+      {
+        "from": "prefs-sync",
+        "to": "settings-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "phone-prefs-model",
+        "to": "settings-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "settings-ui",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "exchange-prefs",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "native-filter",
+        "to": "docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

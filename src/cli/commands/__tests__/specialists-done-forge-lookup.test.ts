@@ -2,6 +2,10 @@
  * PAN-4263: `pan admin specialists done` separates a forge failure from an
  * absent PR, and saves a review verdict that hit a transient failure as a
  * `review.verdict-deferred` journal entry for deacon-lite to replay.
+ *
+ * PAN-5015: that deferral also covers GitHub's GraphQL 5xx wording
+ * ("Something went wrong while executing your query") and gh's raw
+ * "non-200 OK status code: 50x" wording, in both the post and the lookup.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Effect } from 'effect';
@@ -150,6 +154,40 @@ describe('specialists done: forge lookup failure is not absence (PAN-4263)', () 
     expect(stderr).toContain('The verdict is saved and deacon-lite will retry recording it.');
     expect(journaled('review.verdict-deferred')).toEqual([expect.objectContaining({
       data: expect.objectContaining({ status: 'blocked', runId: RUN_ID, callerId: 'agent-pan-4222-review' }),
+    })]);
+  });
+
+  it('defers a verdict whose post hit GitHub\'s GraphQL 5xx wording (PAN-5015)', async () => {
+    mocks.postReviewVerdict.mockResolvedValue({
+      posted: false,
+      reason: 'gh pr review failed: GraphQL: Something went wrong while executing your query on 2026-11-04T10:15:14Z. Please include `abc123` when reporting this issue.',
+    });
+
+    const { exit, stderr } = await recordReview();
+
+    expect(exit).toHaveBeenCalledWith(1);
+    expect(stderr).toContain('The verdict is saved and deacon-lite will retry recording it.');
+    expect(journaled('review.verdict-deferred')).toEqual([expect.objectContaining({
+      data: expect.objectContaining({
+        status: 'passed',
+        runId: RUN_ID,
+        reason: expect.stringContaining('Something went wrong while executing your query'),
+      }),
+    })]);
+  });
+
+  it('defers a verdict whose lookup hit gh\'s raw non-200 502 wording (PAN-5015)', async () => {
+    lookupFails('gh pr view feature/pan-4222 failed: non-200 OK status code: 502 Bad Gateway body: "<html>"');
+
+    const { exit, stderr } = await recordReview();
+
+    expect(exit).toHaveBeenCalledWith(1);
+    expect(stderr).toContain("Couldn't reach github");
+    expect(mocks.postReviewVerdict).not.toHaveBeenCalled();
+    expect(journaled('review.verdict-deferred')).toEqual([expect.objectContaining({
+      data: expect.objectContaining({
+        reason: expect.stringContaining('non-200 OK status code: 502'),
+      }),
     })]);
   });
 

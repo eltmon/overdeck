@@ -49,6 +49,11 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'POST', path: '/api/conversations/:name/scheduled-messages', scope: 'tell' },
   { method: 'PATCH', path: '/api/conversations/:name/scheduled-messages/:id', scope: 'tell' },
   { method: 'DELETE', path: '/api/conversations/:name/scheduled-messages/:id', scope: 'tell' },
+  // PAN-4927 W-SCHED1: recurring schedules (PAN-4640), for the MCP schedule tools.
+  { method: 'GET', path: '/api/conversations/:name/schedules', scope: 'read:conversations' },
+  { method: 'POST', path: '/api/conversations/:name/schedules', scope: 'tell' },
+  { method: 'PATCH', path: '/api/conversations/:name/schedules/:id', scope: 'tell' },
+  { method: 'DELETE', path: '/api/conversations/:name/schedules/:id', scope: 'tell' },
   // PAN-4649: approvals need approve.
   { method: 'POST', path: '/api/conversations/:id/permission', scope: 'approve' },
   { method: 'POST', path: '/api/conversations/:id/pane-choice', scope: 'approve' },
@@ -69,6 +74,9 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'POST', path: '/api/lanes', scope: 'operate' },
   // PAN-4638 WI-8: stop a lane here, or on its owner through the link.
   { method: 'POST', path: '/api/lanes/:name/stop', scope: 'operate' },
+  // PAN-4938 D-11: lane_status reads one lane; lanes are state.
+  { method: 'GET', path: '/api/lanes', scope: 'read:state' },
+  { method: 'GET', path: '/api/lanes/:name', scope: 'read:state' },
   // PAN-4645 WI-13: a linked machine revokes its own token (the route then
   // requires exactly a machine credential).
   { method: 'DELETE', path: '/api/machines/self', scope: 'read:state' },
@@ -104,6 +112,8 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   // PAN-4651 WI-20: fleet Needs-You (owner feed for linked machines; the viewer's combined list).
   { method: 'GET', path: '/api/machines/needs-you', scope: 'read:conversations' },
   { method: 'GET', path: '/api/fleet/needs-you', scope: 'read:conversations' },
+  // PAN-4944 (PAN-4927 W-APPR1): this machine's Needs-You for list_pending_input.
+  { method: 'GET', path: '/api/needs-you', scope: 'read:conversations' },
   // PAN-4651 WI-21: palette search across linked machines.
   { method: 'GET', path: '/api/fleet/search', scope: 'read:conversations' },
   // PAN-4651 WI-22: which machine is working on an issue.
@@ -117,6 +127,48 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   // PAN-4651 WI-5: a linked machine follows (and stops) a worker it delegated here.
   { method: 'GET', path: '/api/workers/:id/status', scope: 'read:state' },
   { method: 'POST', path: '/api/workers/:id/stop', scope: 'operate' },
+  // PAN-4927 W-SELF1: self routes; the handler also requires an agent token (D-10).
+  { method: 'GET', path: '/api/self/jobs/:id', scope: 'read:state' },
+  { method: 'GET', path: '/api/self/jobs/:id/wait', scope: 'read:state' },
+  // PAN-4938 (W-DEL1): delegation self routes; handlers also require an agent token (D-10).
+  { method: 'POST', path: '/api/self/workers', scope: 'operate' },
+  { method: 'GET', path: '/api/self/workers/:id/wait', scope: 'read:state' },
+  { method: 'GET', path: '/api/self/workers', scope: 'read:state' },
+  { method: 'GET', path: '/api/self/workers/:id', scope: 'read:state' },
+  { method: 'POST', path: '/api/self/lanes', scope: 'operate' },
+  { method: 'POST', path: '/api/self/lanes/wait', scope: 'read:state' },
+  { method: 'POST', path: '/api/self/lanes/report', scope: 'tell' },
+  // PAN-4927 W-SELF2: agent workflow routes; the handler also requires an agent token (D-10).
+  { method: 'POST', path: '/api/self/tasks/claim', scope: 'tell' },
+  { method: 'POST', path: '/api/self/tasks/done', scope: 'tell' },
+  { method: 'POST', path: '/api/self/tasks/block', scope: 'tell' },
+  { method: 'POST', path: '/api/self/done', scope: 'operate' },
+  { method: 'POST', path: '/api/self/handoff', scope: 'tell' },
+  { method: 'POST', path: '/api/self/worker-report', scope: 'tell' },
+  // PAN-4927 W-SEC1: secret requests; the handler also requires an agent token (D-10).
+  { method: 'POST', path: '/api/self/secret-requests', scope: 'tell' },
+  { method: 'GET', path: '/api/self/secret-requests/:id/wait', scope: 'read:state' },
+  // PAN-4927 W-LINK1: machine-link requests; the handler also requires an agent token (D-10).
+  { method: 'POST', path: '/api/self/machine-link-requests', scope: 'tell' },
+  { method: 'GET', path: '/api/self/machine-link-requests/:id/wait', scope: 'read:state' },
+  // PAN-4927 W-MEM1: memory; the handler also requires an agent token (D-10).
+  { method: 'POST', path: '/api/self/memory/facts', scope: 'tell' },
+  { method: 'POST', path: '/api/self/memory/search', scope: 'read:state' },
+  { method: 'GET', path: '/api/agent-requests', scope: 'read:conversations' },
+  // POST /api/agent-requests/:id/secret, /decline and /linked have no row: root credentials only (D-4).
+  // PAN-4960: GET /api/account has no row (admin); POST /api/account/sign-in has no row (root credentials from this machine only); GET /oauth/account/callback is outside /api/.
+  // PAN-4943 W-PR1: PR-link routes (PAN-3822), for the MCP link/watch tools.
+  { method: 'GET', path: '/api/conversations/:name/pull-requests', scope: 'read:conversations' },
+  { method: 'POST', path: '/api/conversations/:name/pull-requests', scope: 'tell' },
+  { method: 'DELETE', path: '/api/conversations/:name/pull-requests', scope: 'tell' },
+  { method: 'POST', path: '/api/conversations/:name/pull-requests/sync', scope: 'tell' },
+  { method: 'GET', path: '/api/pull-requests', scope: 'read:state' },
+  { method: 'GET', path: '/api/pull-requests/conversations', scope: 'read:state' },
+  // PAN-4943 W-PR1 WI-6: self pull-request watch routes; the handlers also require an agent token (D-10).
+  { method: 'POST', path: '/api/self/pull-request-watches', scope: 'tell' },
+  { method: 'GET', path: '/api/self/pull-request-watches', scope: 'read:state' },
+  { method: 'DELETE', path: '/api/self/pull-request-watches/:id', scope: 'tell' },
+  { method: 'POST', path: '/api/self/pull-requests', scope: 'tell' },
   // PAN-4650 WI-9: the owner's half of Pull here (a linked machine's operator only, checked by the routes).
   { method: 'POST', path: '/api/conversations/:name/release', scope: 'operate' },
   { method: 'GET', path: '/api/conversations/:name/release/transfer/:transferId', scope: 'operate' },
@@ -149,7 +201,10 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   // (the handlers also require a phone credential).
   { method: 'GET', path: '/api/activity', scope: 'read:state' },
   { method: 'PUT', path: '/api/phones/self/push-key', scope: 'tell' },
+  { method: 'PUT', path: '/api/phones/self/notification-preferences', scope: 'tell' },
   { method: 'DELETE', path: '/api/phones/self', scope: 'tell' },
+  // PAN-4927 W-CONN1: a connector's logout (the handler also requires a connector credential).
+  { method: 'DELETE', path: '/api/connectors/self', scope: 'read:state' },
 ];
 
 /** `/ws/terminal` needs `operate`; every other WebSocket path keeps the `admin` default. */

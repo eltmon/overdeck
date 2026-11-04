@@ -12,8 +12,13 @@
       "migrations_dir": "migrations"
     }
   ],
+  // Cross-script binding to the connect Worker's per-account Durable Object (PAN-4959 D-2). The class is defined in
+  // overdeck-connect, so there is no "migrations" entry here, and overdeck-connect must be deployed first.
+  "durable_objects": {
+    "bindings": [{ "name": "DIRECTORY", "class_name": "AccountDirectory", "script_name": "overdeck-connect" }]
+  },
   "triggers": { "crons": ["0 * * * *"] },
-  "vars": { "PUBLIC_BASE_URL": "https://account.overdeck.ai" }
+  "vars": { "PUBLIC_BASE_URL": "https://account.overdeck.ai", "SHARE_BASE_URL": "https://share.overdeck.ai" }
   // GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, OWNER_GITHUB_ID: Worker secrets set by the operator (docs/ACCOUNT-SERVICE.md "Deploy").
   // "services": [{ "binding": "VAULT", "service": "overdeck-vault", "entrypoint": "VaultRpc" }] — added by PAN-4297.
 }

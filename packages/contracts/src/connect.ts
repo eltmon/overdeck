@@ -3,7 +3,8 @@
 // plus the constants and user-facing strings both sides share. PAN-4823 W-CON1 adds the phone app's
 // client role (`ClientToDirectoryFrame` / `DirectoryToClientFrame`) and the sealed `push` /
 // `push-result` frames; the directory serves them from W-CON2 (client role) and W-CON3 (push).
-// `PhonePushPayload` is the plaintext a machine seals into `push` (PAN-4843).
+// `PhonePushPayload` is the plaintext a machine seals into `push` (PAN-4843). PAN-4839 adds the
+// counts-only Live Activity: `push-activity` (machine) and `activity-register` / `activity-unregister` (phone).
 //
 // Runtime-import-free (like sharing.ts): the connect Worker imports this file by relative path, so it
 // may only `import type`. The dashboard's `GET /api/directory` view schemas live in connect-view.ts.
@@ -26,6 +27,8 @@ export const INBOX_HOLD_MS = 86_400_000
 export const APPROVAL_TTL_MS = 600_000
 /** Phones (directory clients) one account may register (PAN-4823 D-2, NFR-3). Clients never count as machines. */
 export const CLIENT_LIMIT = 5
+/** PAN-4927 D-18: connectors are counted apart from phones. */
+export const CONNECTOR_LIMIT = 10
 /** Pushes the directory forwards per account per minute (PAN-4823 D-9). */
 export const PUSH_RATE_PER_MINUTE = 30
 /**
@@ -38,11 +41,22 @@ export const PUSH_SEALED_MAX_CHARS = 3_072
  * grows by 4/3, so 2,256 bytes seal to exactly `PUSH_SEALED_MAX_CHARS` characters.
  */
 export const PUSH_PLAINTEXT_MAX_BYTES = 2_256
+/** Live Activity (PAN-4839, OD-1): the most either count may be. */
+export const ACTIVITY_COUNT_MAX = 9_999
+/** A machine's report counts toward a phone's card this long; also the APNs `stale-date` offset. */
+export const ACTIVITY_STALE_MS = 600_000
+/** The directory re-pushes unchanged counts at most this often, so the stale date moves ahead. */
+export const ACTIVITY_REFRESH_MS = 240_000
+/** Live Activity pushes per account per minute, counted apart from alert pushes (NFR-1). */
+export const ACTIVITY_PUSH_RATE_PER_MINUTE = 60
+/** The whole content of the Live Activity (OD-1): two counts and nothing else. */
+export interface LiveActivityCounts { readonly needsYou: number; readonly running: number }
 
 export const FREE_MACHINE_LIMIT_MESSAGE = "The free account includes 3 machines"
 export const NO_DIRECT_PATH_MESSAGE = "No direct path; install Tailscale or use the relay plan"
 export const RELAY_CAP_MESSAGE = "Relay allowance used; install Tailscale or add 50 GB"
 export const CLIENT_LIMIT_MESSAGE = "This account already has 5 phones. Remove one in the app or on a machine."
+export const CONNECTOR_LIMIT_MESSAGE = "This account already has 10 Overdeck connectors. Remove one in Settings → Anywhere → Bots."
 
 /** WebSocket close codes the directory uses. */
 export const CONNECT_CLOSE_CODES = {
@@ -53,7 +67,7 @@ export const CONNECT_CLOSE_CODES = {
   /** Replaced by a newer socket for the same machine. */
   replaced: 4011,
   forgotten: 4012,
-  /** A sixth phone on one account (PAN-4823 D-2). */
+  /** A sixth phone or an eleventh connector on one account (PAN-4823 D-2, PAN-4927 D-18). */
   clientLimit: 4013,
 } as const
 export type ConnectCloseCode = (typeof CONNECT_CLOSE_CODES)[keyof typeof CONNECT_CLOSE_CODES]
@@ -94,8 +108,10 @@ export interface RelayStatus {
 
 export type SignalPurpose = "link" | "approval"
 
-/** The phone app's platform. */
-export type ClientPlatform = "ios" | "android"
+/** A phone's platform: the only platforms that can hold a push registration. */
+export type PhonePlatform = "ios" | "android"
+/** A directory client's platform: a phone, or `node` for an Overdeck connector (PAN-4927 D-18). */
+export type ClientPlatform = PhonePlatform | "node"
 /** Which APNs host a token belongs to: Debug builds register `sandbox`, Release builds `production`. */
 export type ApsEnvironment = "production" | "sandbox"
 /** `high` for question, approval and failed; else `normal` (the Web Push rule). */
@@ -169,6 +185,8 @@ export type MachineToDirectoryFrame =
     /** 32 lowercase hex: the first 32 hex characters of sha256(notification tag). */
     readonly collapseId: string
   }
+  /** One machine's counts for one phone's Live Activity (PAN-4839). Integers 0..ACTIVITY_COUNT_MAX; no answer frame. */
+  | { readonly type: "push-activity"; readonly to: string; readonly needsYou: number; readonly running: number }
 
 /** Directory → machine. */
 export type DirectoryToMachineFrame =
@@ -238,7 +256,8 @@ export type ClientToDirectoryFrame =
     readonly label: string
     /**
      * The phone's install-level X25519 public key: its push public key (PAN-4837 C-2), 64 lowercase
-     * hex. Link keys are per machine.
+     * hex. Link keys are per machine. A `node` client (connector) sends its install key here, not a
+     * push key.
      */
     readonly publicKeyHex: string
     /** At most 32 characters. */
@@ -258,8 +277,11 @@ export type ClientToDirectoryFrame =
   }
   | Extract<MachineToDirectoryFrame, { type: "ice-servers" | "relay-usage" }>
   /** `token` is at most 4096 characters; `apsEnvironment` is sent by iOS only. */
-  | { readonly type: "push-register"; readonly platform: ClientPlatform; readonly token: string; readonly apsEnvironment?: ApsEnvironment }
+  | { readonly type: "push-register"; readonly platform: PhonePlatform; readonly token: string; readonly apsEnvironment?: ApsEnvironment }
   | { readonly type: "push-unregister" }
+  /** An activity push token (iOS only); same token rule as `push-register`. iOS without `apsEnvironment` is production. */
+  | { readonly type: "activity-register"; readonly token: string; readonly apsEnvironment?: ApsEnvironment }
+  | { readonly type: "activity-unregister" }
   | { readonly type: "forget-client" }
 
 /** Directory → phone. Clients reuse the machine frames below; they never get approvals or inbox frames. */

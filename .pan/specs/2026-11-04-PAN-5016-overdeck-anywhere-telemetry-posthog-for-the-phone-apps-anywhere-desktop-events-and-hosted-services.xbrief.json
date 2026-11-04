@@ -1,0 +1,804 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T12:32:30Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5016: Overdeck Anywhere telemetry: PostHog for the phone apps, Anywhere desktop events and hosted services",
+    "updated": "2026-11-04T13:28:26.701Z"
+  },
+  "plan": {
+    "id": "pan-5016",
+    "title": "Overdeck Anywhere telemetry: PostHog for the phone apps, Anywhere desktop events and hosted services",
+    "status": "running",
+    "uid": "5782d43b-1c94-4998-8c7b-0e5d2a01f3cc",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-04T12:32:30Z",
+    "updated": "2026-11-04T13:28:26.701Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5016",
+        "label": "PAN-5016",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5021",
+        "label": "PAN-5021 (phone app sibling)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5016.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "telemetry",
+      "posthog",
+      "anywhere",
+      "machine-links",
+      "privacy"
+    ],
+    "narratives": {
+      "Problem": "Overdeck Anywhere sends no telemetry: the typed PostHog schema (packages/contracts/src/telemetry.ts, docs/TELEMETRY.md) has no event for machine linking, phone pairing, secure-channel routes or relay use, so the maintainers cannot see adoption, link-method choice, relay fallback rate or real failure classes. The hosted Workers' stance on telemetry is undecided and undocumented.",
+      "Proposal": "Add seven closed-enum events (machine_link_started/approved/failed, phone_paired, phone_removed, anywhere_channel_opened, relay_usage_sampled) to the contract and docs; emit them from the dashboard server through a new helper module src/lib/telemetry/anywhere.ts that wraps AnalyticsService (same opt-out and anonymity); dedupe supervisor channel outcomes per link; sample relay bytes hourly as a bucket; keep the overdeck.ai Workers silent and document why. The phone app's PostHog moves to sibling PAN-5021 (blocked by PAN-4841).",
+      "NonGoals": "- No PostHog, opt-out switch or store/privacy changes in the phone app (apps/mobile): sibling PAN-5021 owns them\n- No telemetry from the overdeck.ai Workers (services/account, services/connect, services/share); no file under services/ changes\n- No Session Vault or Shared Sessions events (pan vault sends no telemetry by PAN-2609 P-12)\n- No new telemetry switch or config key; the existing opt-out governs the new events\n- No change to packages/anywhere-channel (relay plan and cap refusals stay reported as unreachable)\n- No events from openLinkSocket per-request opens or probeBetter failures\n- No machine label, environment id, token id, URL, key, client id or raw byte count in any event property\n- No change to the overdeck-landing repo or to App Store / Play Console declarations"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Split the phone app into sibling issue PAN-5021, blocked by PAN-4841; this issue keeps desktop events and the Workers decision",
+        "rationale": "The phone store/privacy files exist only on the unmerged feature/pan-4841 branch, the landing copy and console answers are outside this repo, and the desktop slice alone fills the finalize lint's 6-subsystem budget."
+      },
+      {
+        "summary": "The overdeck.ai Workers stay silent and the decision is documented in docs/TELEMETRY.md",
+        "rationale": "Smallest acceptable option: client-side events already measure the funnel, and the Workers hold GitHub and device ids, so any event from them would sit next to an identity that configuration/telemetry.mdx promises never to send."
+      },
+      {
+        "summary": "Supervisor channel outcomes are reported only when a link's (route, ok, error_class) tuple changes",
+        "rationale": "connect() retries indefinitely while a peer is offline; per-probe events would flood PostHog."
+      },
+      {
+        "summary": "Relay usage is a bucketed sample at most once per hour",
+        "rationale": "Mirrors the hourly github_quota_sample cadence; the 60 s directory report cadence is too frequent for telemetry."
+      },
+      {
+        "summary": "The approver side of a pairing-channel exchange always reports method pairing_code",
+        "rationale": "The approver cannot distinguish pasted pairing URLs from SSH or Fly provisioning; all present an odp_ code."
+      },
+      {
+        "summary": "Only successful phone pairings are reported from the machine",
+        "rationale": "The issue scope names 'phone paired/removed'; pairing failures are visible on the phone and belong to PAN-5021."
+      }
+    ],
+    "items": [
+      {
+        "id": "schema",
+        "title": "Add the seven Anywhere events and domains to the telemetry contract, its docs tables and the schema test",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T12:32:30Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-5016",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/telemetry.ts",
+            "docs/TELEMETRY.md",
+            "tests/unit/contracts/telemetry-schema.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/contracts/telemetry-schema.test.ts tests/unit/telemetry-docs.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ],
+          "foundationFor": [
+            "helper",
+            "link-requester",
+            "link-approver-pairing",
+            "link-directory-approval",
+            "phone-paired",
+            "phone-removed",
+            "channel-open",
+            "relay-usage",
+            "docs"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Append machine_link_started, machine_link_approved, machine_link_failed, phone_paired, phone_removed, anywhere_channel_opened, relay_usage_sampled to TELEMETRY_EVENT_NAMES; add domains channel_error_class, channel_route (TELEMETRY_CHANNEL_ROUTES = ROUTE_KINDS + 'stored', checked with `satisfies` against `typeof ROUTE_KINDS` via a type-only import from ./machines), link_failure_reason, link_method, link_side, phone_removed_by, relay_bytes_bucket with the exact values in the PRD; add the catalog entries, the per-event property aliases, the domain value types and bucketRelayBytes (decimal MB). In the same commit append the seven event rows and seven domain rows to docs/TELEMETRY.md in the exact table formats the PRD gives, and extend EXPECTED_EVENTS plus rename the test to 'exports all twenty-five telemetry event names'. The three files must land together: the drift tests fail otherwise. Also add to telemetry-schema.test.ts a bucketRelayBytes boundary test and a test that every ROUTE_KINDS value is in the channel_route domain (PRD WI-1 step 8)."
+        },
+        "items": [
+          {
+            "id": "schema.ac1",
+            "title": "Given the updated contract, when `npx vitest run tests/unit/contracts/telemetry-schema.test.ts` runs, then it passes with TELEMETRY_EVENT_NAMES equal to the 25-name EXPECTED_EVENTS list ending in relay_usage_sampled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schema.ac2",
+            "title": "Given docs/TELEMETRY.md, when `npx vitest run tests/unit/telemetry-docs.test.ts` runs, then it passes and the documented catalog equals TELEMETRY_EVENT_CATALOG including the seven new events",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schema.ac3",
+            "title": "Given telemetry-schema.test.ts, when `npx vitest run tests/unit/contracts/telemetry-schema.test.ts` runs, then its bucket test exits 0 asserting bucketRelayBytes returns under_1mb for 999_999, 1mb-9mb for 1_000_000, 100mb-999mb for 999_999_999 and 1gb+ for 1_000_000_000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schema.ac4",
+            "title": "Given telemetry-schema.test.ts, when it runs, then it asserts every ROUTE_KINDS value plus `stored` is in TELEMETRY_PROPERTY_DOMAINS.channel_route, and `npm run typecheck` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "helper",
+        "title": "Create the Anywhere telemetry helper module src/lib/telemetry/anywhere.ts with its unit test",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T12:32:30Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5016",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/telemetry/anywhere.ts",
+            "tests/unit/lib/telemetry/anywhere-telemetry.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/telemetry/anywhere-telemetry.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "anywhere-telemetry.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "link-requester",
+            "link-approver-pairing",
+            "link-directory-approval",
+            "phone-paired",
+            "phone-removed",
+            "channel-open",
+            "relay-usage"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Export AnywhereAnalytics, defaultAnywhereAnalytics(), captureLinkStarted/Approved/Failed, capturePhonePaired, capturePhoneRemoved, captureChannelOpen (each with an `analytics = defaultAnywhereAnalytics()` default parameter and a try/catch safeCapture), linkMethodForTransport (undefined→pairing_code, ssh→ssh, public→fly, else other), linkFailureReason (structural `code` string table, else other; no import from src/dashboard), RELAY_USAGE_TELEMETRY_INTERVAL_MS = 3_600_000, class RelayUsageSampler with injectable now/analytics, and the singleton relayUsageSampler. Tests use a fake `{ capture: vi.fn() }` and an injected clock; no real waiting, no source reading."
+        },
+        "items": [
+          {
+            "id": "helper.ac1",
+            "title": "Given a fake analytics client, when each capture function is called, then capture receives exactly the event name and closed-enum properties listed in the PRD and nothing else",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "helper.ac2",
+            "title": "Given an analytics client whose capture throws, when any helper is called, then the helper returns without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "helper.ac3",
+            "title": "linkMethodForTransport returns pairing_code, ssh, fly and other for undefined, 'ssh', 'public' and 'lan'; linkFailureReason returns other for new Error('x') and null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "helper.ac4",
+            "title": "Given an injected clock, when the sampler records 5_000_000 bytes at t=0 and 1 byte at t=59 min, then nothing is captured, and when it records 1 byte at t=60 min, then exactly one relay_usage_sampled { bytes: '1mb-9mb' } is captured",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "link-requester",
+        "title": "Emit requester-side machine link events from createMachineLink",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T12:32:30Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5016",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/machine-link-service.ts",
+            "src/dashboard/server/services/__tests__/machine-link-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/machine-link-service.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "machine-link-service.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Add `analytics?: AnywhereAnalytics` to MachineLinkServiceDeps; move the existing createMachineLink body unchanged into a private createMachineLinkUnobserved(input, deps) and export a wrapper that captures machine_link_started at entry, machine_link_approved(side requester) on return and machine_link_failed(side requester, linkFailureReason(error)) on throw before rethrowing. Method = linkMethodForTransport(input.transport?.kind) (D-8)."
+        },
+        "items": [
+          {
+            "id": "link-requester.ac1",
+            "title": "Given a successful link with no transport, when createMachineLink resolves, then the injected analytics records machine_link_started {method:'pairing_code'} followed by machine_link_approved {method:'pairing_code', side:'requester'}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "link-requester.ac2",
+            "title": "Given transport.kind 'ssh' and openChannel rejecting with ChannelOpenError('pairing-refused'), when createMachineLink runs, then it records machine_link_failed {method:'ssh', side:'requester', reason:'pairing_refused'} and still rejects with MachineLinkError code 'pairing-refused'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "link-requester.ac3",
+            "title": "Given a malformed pairing URL, when createMachineLink runs, then it records machine_link_failed with reason 'bad_pairing_url'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "link-approver-pairing",
+        "title": "Emit approver-side link events from POST /api/machines/exchange",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T12:32:30Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5016",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/machines-peer.ts",
+            "src/dashboard/server/__tests__/machines-exchange.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/machines-exchange.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "machines-exchange.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In handleMachinesExchange call captureLinkFailed('pairing_code','approver','grant_refused') in the GrantMachineLinkError branch before the 400, and captureLinkApproved('pairing_code','approver') after `const { token, record, reverseLinkId } = granted;`. Pre-grant refusals send nothing. Tests vi.mock '../../../lib/telemetry/anywhere.js'."
+        },
+        "items": [
+          {
+            "id": "link-approver-pairing.ac1",
+            "title": "Given a valid pairing-channel exchange, when handleMachinesExchange returns 200, then captureLinkApproved is called once with ('pairing_code','approver')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "link-approver-pairing.ac2",
+            "title": "Given grantMachineLink throwing GrantMachineLinkError, when the exchange runs, then it returns 400 and captureLinkFailed is called with ('pairing_code','approver','grant_refused')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "link-approver-pairing.ac3",
+            "title": "Given a null channel marker, when the exchange runs, then it returns 403 and neither capture function is called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "link-directory-approval",
+        "title": "Emit two-screen approval link events from DirectoryApprovalService",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T12:32:30Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5016",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/directory-approval.ts",
+            "src/dashboard/server/services/__tests__/directory-approval.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/directory-approval.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "directory-approval.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Add `analytics?: AnywhereAnalytics` to ApprovalServiceDeps. join: offline failure before the throw, else started before return. rejectJoin: failed(approval_refused). handleExchange: approved(requester) right after `join.granted = {...}` (once per join). runApprove: approved(approver) after approvals.delete; failed(approver, approval_failed) after `approval.state = 'failed'`. Method is always directory_approval."
+        },
+        "items": [
+          {
+            "id": "link-directory-approval.ac1",
+            "title": "Given a connected directory, when join runs, then analytics records machine_link_started {method:'directory_approval'}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "link-directory-approval.ac2",
+            "title": "Given directory.send returning false, when join runs, then it records machine_link_failed {method:'directory_approval', side:'requester', reason:'offline'} and throws DirectoryApprovalError('offline')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "link-directory-approval.ac3",
+            "title": "Given an accepted join, when handleExchange is called twice, then machine_link_approved {side:'requester'} is recorded exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "link-directory-approval.ac4",
+            "title": "Given an approve run whose exchange answers 200, then machine_link_approved {side:'approver'} is recorded; given one that answers 403, then machine_link_failed {side:'approver', reason:'approval_failed'} is recorded",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "phone-paired",
+        "title": "Emit phone_paired from POST /api/phones/exchange",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T12:32:30Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5016",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/phones.ts",
+            "src/dashboard/server/__tests__/phones-routes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/phones-routes.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "phones-routes.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6 step 1. After the `replaced` revocation loop in handlePhonesExchange call capturePhonePaired(replaced.length > 0). Refusals (403/400/409) send nothing. Tests vi.mock '../../../lib/telemetry/anywhere.js'."
+        },
+        "items": [
+          {
+            "id": "phone-paired.ac1",
+            "title": "Given a first phone exchange, when handlePhonesExchange returns 200, then capturePhonePaired is called once with false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phone-paired.ac2",
+            "title": "Given a second exchange from the same clientId with a new key, when it returns 200, then capturePhonePaired is called with true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phone-paired.ac3",
+            "title": "Given a link key already paired, when the exchange returns 409 link-key-in-use, then capturePhonePaired is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "phone-removed",
+        "title": "Emit phone_removed from phone self-revoke and operator device revoke",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T12:32:30Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5016",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/phones.ts",
+            "src/dashboard/server/routes/pairing.ts",
+            "src/dashboard/server/__tests__/phones-routes.test.ts",
+            "src/dashboard/server/__tests__/devices-routes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/phones-routes.test.ts src/dashboard/server/__tests__/devices-routes.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6 steps 2-3. handlePhonesSelfRevoke: capturePhoneRemoved('phone') after closeDeviceConnections(credential.tokenId). revokeDeviceRoute in pairing.ts: `if (target.kind === 'phone') capturePhoneRemoved('operator');` after the closeChannelsForPeer line. The devices-routes test creates a record with kind 'phone' and a phoneKey via createAccessToken."
+        },
+        "items": [
+          {
+            "id": "phone-removed.ac1",
+            "title": "Given a phone credential, when handlePhonesSelfRevoke runs, then capturePhoneRemoved is called once with 'phone'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phone-removed.ac2",
+            "title": "Given a phone record, when DELETE /api/devices/<phone id> returns 200, then capturePhoneRemoved is called once with 'operator'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phone-removed.ac3",
+            "title": "Given a browser device record, when DELETE /api/devices/<device id> returns 200, then capturePhoneRemoved is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "channel-open",
+        "title": "Report deduplicated channel open outcomes from the link supervisor",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T12:32:30Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5016",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/link-supervisor.ts",
+            "src/dashboard/server/services/__tests__/link-supervisor-telemetry.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/link-supervisor-telemetry.test.ts src/dashboard/server/services/__tests__/link-supervisor-phases.test.ts src/dashboard/server/services/__tests__/link-supervisor.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three supervisor test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-2"
+          ],
+          "parallelSafeReason": "It touches only link-supervisor.ts and a new test file; no other item edits either."
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Add optional dep reportChannelOpen (default captureChannelOpen), Entry fields lastProbePhase ('stored' initially) and lastChannelReport (null), set lastProbePhase before each phase probe in probePhased, add private reportChannel(entry, props) that skips a repeat of the last (route|ok|error_class) key, and call it from connect()'s !ok branch (only for unknown-peer, unsupported, or !entry.channel) and from adopt() failure/success points with the PRD's error_class mapping (NO_DIRECT_PATH_MESSAGE → no_relay_plan; heartbeat 401 → revoked). probeBetter failures and generation-mismatch returns report nothing. New test file reuses the harness pattern from link-supervisor-phases.test.ts with fake timers; no private-method calls."
+        },
+        "items": [
+          {
+            "id": "channel-open.ac1",
+            "title": "Given a link whose lan route opens and heartbeats, when the supervisor starts, then reportChannelOpen is called once with {route:'lan', ok:true, error_class:'none'}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "channel-open.ac2",
+            "title": "Given a link with no reachable route, when fake timers advance until openChannel has been called at least 10 times, then reportChannelOpen has been called exactly once, with {route:'stored', ok:false, error_class:'unreachable'}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "channel-open.ac3",
+            "title": "Given only a failing direct route and relayEntitled returning false, when the supervisor probes, then it reports {route:'direct', ok:false, error_class:'no_relay_plan'}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "channel-open.ac4",
+            "title": "Given a heartbeat that rejects with status 401, when the supervisor adopts the channel, then it reports error_class 'revoked' with the adopted route's kind",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "relay-usage",
+        "title": "Feed relayed bytes from RelayClient into the hourly relay usage sampler",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T12:32:30Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5016",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/relay-client.ts",
+            "src/dashboard/server/services/__tests__/relay-client.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/relay-client.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "relay-client.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. Add a second constructor parameter onRelayBytes defaulting to `(bytes) => relayUsageSampler.record(bytes)`; call it inside try/catch as the first statement of send(bytes). anywhere-boot.ts is not changed."
+        },
+        "items": [
+          {
+            "id": "relay-usage.ac1",
+            "title": "Given a tracked transport with bytesIn 1500 and bytesOut 500, when report() runs, then onRelayBytes is called once with 2000 and the directory receives one relay-usage frame with bytes 2000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-usage.ac2",
+            "title": "Given no new bytes since the last report, when report() runs again, then onRelayBytes is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-usage.ac3",
+            "title": "Given an onRelayBytes that throws, when report() runs with new bytes, then the relay-usage frame is still sent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document the Anywhere events and the hosted-services decision in TELEMETRY.md and telemetry.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T12:32:30Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5016",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/TELEMETRY.md",
+            "configuration/telemetry.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/telemetry-docs.test.ts",
+            "grep -n '## Overdeck Anywhere events\\|## Hosted services\\|PAN-5021' docs/TELEMETRY.md",
+            "grep -n 'Overdeck Anywhere\\|send no telemetry' configuration/telemetry.mdx"
+          ],
+          "expected_outputs": [
+            "telemetry-docs.test.ts passes",
+            "grep prints both headings and PAN-5021 in docs/TELEMETRY.md",
+            "grep prints the Anywhere bullet and the hosted-services sentence in configuration/telemetry.mdx"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. docs/TELEMETRY.md: new '## Overdeck Anywhere events' section (process, requester/approver, D-4 dedupe, D-5 hourly relay bucket, D-6 approver method, D-7 relay refusals, what is never sent), new '## Hosted services' section (D-2: account, directory and share Workers send nothing; Cloudflare request metrics only), a bullet under Implementation boundaries that services/ Workers import no PostHog SDK, and one sentence that the phone app has no telemetry yet (PAN-5021). configuration/telemetry.mdx 'What is sent': an Overdeck Anywhere bullet and the sentence 'The overdeck.ai hosted services (account, directory and share) send no telemetry.' No table rows change."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "docs/TELEMETRY.md renders a '## Overdeck Anywhere events' section that states channel events are sent at most once per change of route, result and error class per link, and relay bytes at most hourly as a bucket",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "docs/TELEMETRY.md renders a '## Hosted services' section stating the account, directory and share Workers send no telemetry to PostHog, and names PAN-5021 as the phone-app follow-up",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "configuration/telemetry.mdx 'What is sent' contains an Overdeck Anywhere bullet and the sentence 'The overdeck.ai hosted services (account, directory and share) send no telemetry.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac4",
+            "title": "Given the edited docs, when `npx vitest run tests/unit/telemetry-docs.test.ts` runs, then it passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "schema",
+        "to": "helper",
+        "type": "blocks"
+      },
+      {
+        "from": "schema",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "helper",
+        "to": "link-requester",
+        "type": "blocks"
+      },
+      {
+        "from": "helper",
+        "to": "link-approver-pairing",
+        "type": "blocks"
+      },
+      {
+        "from": "helper",
+        "to": "link-directory-approval",
+        "type": "blocks"
+      },
+      {
+        "from": "helper",
+        "to": "phone-paired",
+        "type": "blocks"
+      },
+      {
+        "from": "helper",
+        "to": "channel-open",
+        "type": "blocks"
+      },
+      {
+        "from": "helper",
+        "to": "relay-usage",
+        "type": "blocks"
+      },
+      {
+        "from": "phone-paired",
+        "to": "phone-removed",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-04-PAN-5016-overdeck-anywhere-telemetry-posthog-for-the-phone-apps-anywhere-desktop-events-and-hosted-services.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

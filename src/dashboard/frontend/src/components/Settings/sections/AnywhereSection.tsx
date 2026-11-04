@@ -4,6 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import { requestSettingsSection } from '../../../lib/settingsSection';
 import { SettingsSection } from '../primitives/SettingsSection';
 import { AccessTokensPanel } from '../anywhere/AccessTokensPanel';
+import { BotsPanel } from '../anywhere/BotsPanel';
+import { AccountCard } from '../anywhere/AccountCard';
 import { AnywhereStatusCard } from '../anywhere/AnywhereStatusCard';
 import { ANYWHERE_STATUS_QUERY_KEY, loadAnywhereStatus, type AnywhereAction } from '../anywhere/anywhereApi';
 import { DevicesPanel } from '../anywhere/DevicesPanel';
@@ -14,6 +16,7 @@ import { McpUrlDialog } from '../anywhere/McpUrlDialog';
 import { PairDeviceDialog } from '../anywhere/PairDeviceDialog';
 import { TriggersPanel } from '../anywhere/TriggersPanel';
 import { SetUpPhoneDialog } from '../anywhere/SetUpPhoneDialog';
+import { PublicMcpPanel } from '../anywhere/PublicMcpPanel';
 import { PushPanel } from '../anywhere/PushPanel';
 import { TailscalePeersPanel } from '../anywhere/TailscalePeersPanel';
 import { TailscaleSetupDialog } from '../anywhere/TailscaleSetupDialog';
@@ -86,6 +89,7 @@ export function AnywhereSection({ pairDialogOpen, onPairDialogChange }: Anywhere
     >
       <div className="space-y-4">
         <AnywhereStatusCard onAction={handleAction} />
+        <AccountCard />
         <DevicesPanel />
         <MachinesPanel />
         <DirectoryPanel />
@@ -93,6 +97,8 @@ export function AnywhereSection({ pairDialogOpen, onPairDialogChange }: Anywhere
         {status?.tailscale?.nextStep === 'ready' && <TailscalePeersPanel />}
         <TriggersPanel />
         <AccessTokensPanel />
+        <BotsPanel />
+        <PublicMcpPanel />
         <PushPanel />
       </div>
       <PairDeviceDialog open={open} onClose={() => setOpen(false)} />

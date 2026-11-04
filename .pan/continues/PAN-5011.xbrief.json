@@ -1,0 +1,192 @@
+{
+  "version": "1",
+  "issueId": "PAN-5011",
+  "created": "2026-11-04T11:42:07.971Z",
+  "updated": "2026-11-04T13:59:52.606Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-04T13:56:17.815Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-04T13:59Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-04T13:59:52.606Z"
+    }
+  ],
+  "items": {
+    "presence-helper": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5011",
+      "claimedAt": "2026-11-04T11:42:07.971Z",
+      "doneAt": "2026-11-04T11:56:16.525Z"
+    },
+    "pane-first-presence": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5011",
+      "claimedAt": "2026-11-04T11:56:22.864Z",
+      "doneAt": "2026-11-04T12:07:58.194Z"
+    },
+    "session-tree-work-pane": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5011",
+      "claimedAt": "2026-11-04T12:08:09.510Z",
+      "doneAt": "2026-11-04T12:13:38.537Z"
+    },
+    "activity-route-presence": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5011",
+      "claimedAt": "2026-11-04T12:13:49.206Z",
+      "doneAt": "2026-11-04T12:28:25.352Z"
+    },
+    "cockpit-pane-status": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5011",
+      "claimedAt": "2026-11-04T12:28:36.221Z",
+      "doneAt": "2026-11-04T12:38:15.912Z"
+    },
+    "cockpit-pane-identity": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5011",
+      "claimedAt": "2026-11-04T12:38:26.873Z",
+      "doneAt": "2026-11-04T12:49:44.893Z"
+    },
+    "specialist-presence": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5011",
+      "claimedAt": "2026-11-04T12:49:54.126Z",
+      "doneAt": "2026-11-04T13:01:41.773Z"
+    },
+    "sessionpanel-alive-test": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5011",
+      "claimedAt": "2026-11-04T13:01:49.780Z",
+      "doneAt": "2026-11-04T13:13:07.970Z"
+    },
+    "docs-presence-table": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5011",
+      "claimedAt": "2026-11-04T13:13:15.266Z",
+      "doneAt": "2026-11-04T13:14:10.287Z"
+    },
+    "presence-helper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:17:23.563Z"
+    },
+    "presence-helper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:17:36.105Z"
+    },
+    "presence-helper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:17:49.060Z"
+    },
+    "pane-first-presence.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:18:06.891Z"
+    },
+    "pane-first-presence.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:18:19.470Z"
+    },
+    "pane-first-presence.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:18:31.850Z"
+    },
+    "session-tree-work-pane.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:18:44.388Z"
+    },
+    "session-tree-work-pane.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:18:56.522Z"
+    },
+    "session-tree-work-pane.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:19:09.931Z"
+    },
+    "session-tree-work-pane.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:19:24.332Z"
+    },
+    "activity-route-presence.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:19:43.049Z"
+    },
+    "activity-route-presence.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:19:57.841Z"
+    },
+    "activity-route-presence.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:20:12.763Z"
+    },
+    "activity-route-presence.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:20:28.833Z"
+    },
+    "activity-route-presence.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:20:44.689Z"
+    },
+    "cockpit-pane-status.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:21:01.684Z"
+    },
+    "cockpit-pane-status.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:21:16.793Z"
+    },
+    "cockpit-pane-status.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:21:31.267Z"
+    },
+    "cockpit-pane-identity.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:21:51.541Z"
+    },
+    "cockpit-pane-identity.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:22:05.076Z"
+    },
+    "specialist-presence.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:22:18.436Z"
+    },
+    "specialist-presence.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:22:32.226Z"
+    },
+    "sessionpanel-alive-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:22:47.282Z"
+    },
+    "sessionpanel-alive-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:23:02.344Z"
+    },
+    "docs-presence-table.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:23:17.320Z"
+    },
+    "docs-presence-table.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:23:32.071Z"
+    }
+  },
+  "agentModel": "claude-opus-5-5",
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-04T13:59:52Z",
+      "markdownBody": "# CodeRabbit findings for PAN-5011 (PR #5026)\n\nCodeRabbit posted 1 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4468444511 · src/dashboard/frontend/src/components/Stage/cockpit/IssueTreeLane.tsx:119 [Minor]: Deduplicate panes by agent key before building cockpit rows.\n  https://github.com/eltmon/overdeck/pull/5026#discussion_r4468444511\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5026/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-5011`.\n   If you only replied, you are done.\n5. If PR #5026 has already merged when you read this, nothing more lands on it: open a follow-up issue\n   for the findings you agree with instead of pushing."
+    }
+  ]
+}

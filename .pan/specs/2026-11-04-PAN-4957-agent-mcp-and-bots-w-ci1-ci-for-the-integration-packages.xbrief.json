@@ -1,0 +1,391 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T16:48:20Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4957: Agent MCP and bots (W-CI1): CI for the integration packages",
+    "updated": "2026-11-04T16:52:42.030Z"
+  },
+  "plan": {
+    "id": "pan-4957",
+    "title": "Agent MCP and bots (W-CI1): CI for the integration packages",
+    "status": "running",
+    "uid": "76652cd4-5c6b-4f36-b334-5a7f83195be5",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-04T16:48:20Z",
+    "updated": "2026-11-04T16:52:42.030Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4957",
+        "label": "PAN-4957",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4927",
+        "label": "PAN-4927 (epic)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "ci",
+      "integrations",
+      "github-actions",
+      "pan-4927"
+    ],
+    "narratives": {
+      "Problem": "The four outside-bot integration packages under integrations/ (PAN-4927 Part B) are on main, but CI never runs the Hermes plugin's pytest suite or builds and tests the OpenClaw plugin from its own lockfile (its tests sit outside the root Vitest include globs), and the shared skill check runs only indirectly. A broken package can merge unnoticed. PAN-4927 FR-15 and AC-29 require an `integrations` CI job that runs the skill check, the Hermes tests and the OpenClaw build and tests, and is green.",
+      "Proposal": "Add one self-contained GitHub Actions job `integrations` to .github/workflows/ci.yml after mobile-android: checkout, Node 22, `node integrations/shared/sync-skill.mjs --check`, Python 3.11 with `pip install -e 'integrations/hermes[test]'` and `python -m pytest integrations/hermes`, then `npm ci`, `npm run build`, `npm test` in integrations/openclaw. Add it to the `test` aggregator's needs so a red package blocks Overdeck's merge gate and reaches the work agent as CI verification feedback (mobile-android precedent). Document the job in integrations/README.md and the codebase map. All commands were verified locally on 2026-11-04: skill check OK, Hermes 81 passed, OpenClaw 94 passed.",
+      "NonGoals": "- No change to package code, tests or manifests under integrations/ other than integrations/README.md\n- No CI step for grok-build/ or grok-bot/: their tests already run in the root test shards via tests/unit/integrations/\n- No pip or npm dependency caching\n- No paths filter or job-level if on the integrations job\n- No bun install, root build, Playwright or ripgrep install in the integrations job\n- No new Vitest file that parses ci.yml\n- No branch protection changes\n- No publishing of any package to PyPI, npm or a plugin catalog\n- No Mintlify page changes (W-DOC, PAN-4958)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Add `integrations` to the `test` aggregator's needs (the parent PRD only says 'next to mobile-android').",
+        "rationale": "Overdeck's merge gate and CI verification feedback read only the `test` check (TEST_GATE_NAME, isCiTestCheckName does not match `integrations`), so without the aggregator a red package would be advisory; mobile-android (PAN-4837 D-10) set this precedent."
+      },
+      {
+        "summary": "Keep the job id exactly `integrations` rather than a test-prefixed name.",
+        "rationale": "AC-29 names the job `integrations`; the aggregator wiring makes it count for the test gate without renaming."
+      },
+      {
+        "summary": "Run the job on every PR with no paths filter.",
+        "rationale": "The parent PRD says 'on every PR', and a skipped needs job would make the aggregator's `= success` assertion fail and block unrelated PRs."
+      },
+      {
+        "summary": "No pip or npm caching; one step per command with working-directory for OpenClaw.",
+        "rationale": "Installs take seconds (47 npm packages, pytest and hatchling); per-command steps make the failing command the failing step name, matching the mobile-android Gradle step style."
+      },
+      {
+        "summary": "Docs scope is integrations/README.md and the codebase map row only.",
+        "rationale": "Mintlify pages belong to W-DOC (PAN-4958) and do not describe CI jobs; the README already describes the skill check and its CI coverage, which this change alters."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-04-PAN-4957-agent-mcp-and-bots-w-ci1-ci-for-the-integration-packages.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "ci-job-skill-check",
+        "title": "Add the integrations CI job with checkout, Node 22 and the shared skill check",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T16:48:20Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-4957",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".github/workflows/ci.yml"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node -e \"const y=require('yaml');const j=y.parse(require('fs').readFileSync('.github/workflows/ci.yml','utf8')).jobs.integrations;if(!j||j['runs-on']!=='ubuntu-latest'||j['timeout-minutes']!==10||j.if)process.exit(1);console.log(j.steps.map(s=>s.name||s.uses).join(' | '))\"",
+            "node integrations/shared/sync-skill.mjs --check"
+          ],
+          "expected_outputs": [
+            "the YAML check prints a step list starting 'actions/checkout@v4 | Use Node.js 22 | Shared skill copies match' and exits 0",
+            "sync-skill --check prints '✓ 4 skill copies match integrations/shared/SKILL.md' and exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/pan-4957.md WI-1 exactly. In .github/workflows/ci.yml, insert a new job with id `integrations` immediately after the mobile-android job (after the line `retention-days: 7`, ci.yml:332) and before the comment block that starts `# \\`test\\` is the check name the close-out gate requires on main`. Copy the comment block and YAML from WI-1 verbatim: runs-on ubuntu-latest, timeout-minutes 10, steps `actions/checkout@v4`, `Use Node.js 22` (actions/setup-node@v4, node-version 22), and `Shared skill copies match` running `node integrations/shared/sync-skill.mjs --check`. Do NOT add bun install, a root npm run build, a paths filter or a job-level if: (PRD D-2, D-3, NFR-1). Push over SSH: git push git@github.com:eltmon/overdeck.git HEAD:feature/pan-4957 (HTTPS pushes of workflow files are refused)."
+        },
+        "items": [
+          {
+            "id": "ci-job-skill-check.ac1",
+            "title": "Given ci.yml parsed with the yaml package, jobs.integrations exists with runs-on ubuntu-latest, timeout-minutes 10 and no job-level if, and the YAML check command exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-job-skill-check.ac2",
+            "title": "The integrations job contains a step named 'Shared skill copies match' whose run is exactly `node integrations/shared/sync-skill.mjs --check`, placed after checkout and the Node 22 setup step",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-job-skill-check.ac3",
+            "title": "The integrations job contains no step that runs bun install, npm run build at the repository root, a Playwright install or a ripgrep install",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-job-hermes",
+        "title": "Add the Hermes Python 3.11 install and pytest steps to the integrations job",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T16:48:20Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-4957",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".github/workflows/ci.yml"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "python3.11 -m venv .tmp/hermes-venv && .tmp/hermes-venv/bin/pip install -q -e 'integrations/hermes[test]' && .tmp/hermes-venv/bin/python -m pytest integrations/hermes",
+            "node -e \"const y=require('yaml');const j=y.parse(require('fs').readFileSync('.github/workflows/ci.yml','utf8')).jobs.integrations;if(!j||j['runs-on']!=='ubuntu-latest'||j['timeout-minutes']!==10||j.if)process.exit(1);console.log(j.steps.map(s=>s.name||s.uses).join(' | '))\""
+          ],
+          "expected_outputs": [
+            "pytest prints '81 passed' (or more) and exits 0",
+            "the YAML check step list contains 'Use Python 3.11 | Install the Hermes plugin | Hermes tests' right after 'Shared skill copies match'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-3",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/pan-4957.md WI-2. In the integrations job of .github/workflows/ci.yml, append after the 'Shared skill copies match' step three steps: 'Use Python 3.11' (uses actions/setup-python@v5 with python-version '3.11', quoted), 'Install the Hermes plugin' running `pip install -e 'integrations/hermes[test]'`, and 'Hermes tests' running `python -m pytest integrations/hermes` from the repository root (no cd; integrations/hermes/pyproject.toml supplies testpaths, pythonpath and -p no:cacheprovider). Verify locally in the gitignored .tmp/hermes-venv venv, never in the system Python. Push over SSH."
+        },
+        "items": [
+          {
+            "id": "ci-job-hermes.ac1",
+            "title": "The integrations job contains a step using actions/setup-python@v5 with python-version '3.11', followed by a step whose run is `pip install -e 'integrations/hermes[test]'` and a step whose run is `python -m pytest integrations/hermes`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-job-hermes.ac2",
+            "title": "Given a fresh .tmp/hermes-venv on Python 3.11, when the install and pytest commands run from the repository root, pytest prints '81 passed' or more and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-job-hermes.ac3",
+            "title": "After the local run, git status --porcelain shows no new untracked or modified paths under integrations/hermes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-job-openclaw",
+        "title": "Add the OpenClaw npm ci, build and test steps to the integrations job",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T16:48:20Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-4957",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".github/workflows/ci.yml"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd integrations/openclaw && npm ci && npm run build && npm test",
+            "node -e \"const y=require('yaml');const j=y.parse(require('fs').readFileSync('.github/workflows/ci.yml','utf8')).jobs.integrations;if(!j||j['runs-on']!=='ubuntu-latest'||j['timeout-minutes']!==10||j.if)process.exit(1);console.log(j.steps.map(s=>s.name||s.uses).join(' | '))\""
+          ],
+          "expected_outputs": [
+            "vitest prints 'Test Files  8 passed (8)' and the command exits 0",
+            "the YAML check step list ends with 'Install the OpenClaw plugin | Build the OpenClaw plugin | OpenClaw tests'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/pan-4957.md WI-3. In the integrations job of .github/workflows/ci.yml, append after the 'Hermes tests' step three steps, each with `working-directory: integrations/openclaw`: 'Install the OpenClaw plugin' running `npm ci`, 'Build the OpenClaw plugin' running `npm run build`, and 'OpenClaw tests' running `npm test`. One command per step so the failing command names the failing step (PRD D-5). No npm cache (D-6). integrations/openclaw/node_modules and dist are gitignored. Push over SSH."
+        },
+        "items": [
+          {
+            "id": "ci-job-openclaw.ac1",
+            "title": "The integrations job ends with three steps that each set working-directory integrations/openclaw and run `npm ci`, `npm run build` and `npm test` in that order, and the YAML check command prints a step list ending 'Install the OpenClaw plugin | Build the OpenClaw plugin | OpenClaw tests'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-job-openclaw.ac2",
+            "title": "Given integrations/openclaw, when `npm ci && npm run build && npm test` runs locally, vitest prints 'Test Files  8 passed (8)' and the command exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-test-aggregator",
+        "title": "Require the integrations job in the test aggregator",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T16:48:20Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-4957",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".github/workflows/ci.yml"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node -e \"const y=require('yaml');const t=y.parse(require('fs').readFileSync('.github/workflows/ci.yml','utf8')).jobs.test;if(!t.needs.includes('integrations')||!t.steps[0].run.includes('needs.integrations.result }}\\\" = success'))process.exit(1);console.log(t.needs.join(','))\""
+          ],
+          "expected_outputs": [
+            "the check prints 'test-shard,test-e2e,mobile-android,integrations' and exits 0",
+            "on the PR, gh pr checks lists integrations and test as pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/pan-4957.md WI-4 before/after snippet. In the `test` job of .github/workflows/ci.yml: change needs to [test-shard, test-e2e, mobile-android, integrations]; add the echo line `echo \"integrations:   ${{ needs.integrations.result }}\"` after the mobile-android echo; add `test \"${{ needs.integrations.result }}\" = success` after the mobile-android assert; reword the comment above `test:` to say green only when every shard, test-e2e, mobile-android and integrations passed. Keep if: always() and timeout-minutes: 5. This makes a red package block Overdeck's merge gate and reach the work agent as CI verification feedback, because both read the `test` check (PRD D-2). After the PR exists, confirm with gh pr checks on the whole job set. Order for AC-29 (ac3 needs a PR before pan done): SSH-push the branch, open the PR with `gh pr create --base main --head feature/pan-4957`, wait once with `gh pr checks <pr> --watch`, then mark ci-test-aggregator.ac3 done, then run pan done (it adopts the open PR, src/dashboard/server/routes/workspaces/ensure-pr.ts:69-72)."
+        },
+        "items": [
+          {
+            "id": "ci-test-aggregator.ac1",
+            "title": "Given ci.yml parsed with the yaml package, jobs.test.needs equals [test-shard, test-e2e, mobile-android, integrations] and jobs.test keeps if: always() and timeout-minutes 5, so the aggregator check command prints test-shard,test-e2e,mobile-android,integrations and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-test-aggregator.ac2",
+            "title": "The test job's step echoes needs.integrations.result and fails unless `test \"${{ needs.integrations.result }}\" = success` passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-test-aggregator.ac3",
+            "title": "Given the PR for feature/pan-4957, when CI completes, gh pr checks shows the integrations check and the test check as pass (AC-29)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-integrations-ci",
+        "title": "Document the integrations CI job in integrations/README.md and the codebase map",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T16:48:20Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4957",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "integrations/README.md",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '## Continuous integration' integrations/README.md",
+            "grep -c 'CI job `integrations`' .overdeck/context/codebase/architecture.md",
+            "npm run lint:docs",
+            "npm run lint:last-verified"
+          ],
+          "expected_outputs": [
+            "grep finds exactly one '## Continuous integration' heading",
+            "grep prints 1",
+            "lint:docs exits 0",
+            "lint:last-verified exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/pan-4957.md WI-5. In integrations/README.md (lines 28-31) replace the sentence ending '`tests/unit/integrations/sync-skill.test.ts` runs that check in CI.' with the WI-5 wording that names the `integrations` CI job, and add the `## Continuous integration` section from WI-5 between `## The shared skill` and `## Publishing`, including the local commands block. In .overdeck/context/codebase/architecture.md line 25 (the `integrations/` row), append before the closing ` |` the sentence: CI job `integrations` (PAN-4957) runs the skill check, Hermes pytest and the OpenClaw build and tests, and the `test` aggregator requires it. Never change the `<!-- last-verified: -->` line. Do not touch Mintlify pages (W-DOC, PAN-4958)."
+        },
+        "items": [
+          {
+            "id": "docs-integrations-ci.ac1",
+            "title": "integrations/README.md contains a '## Continuous integration' section that names the `integrations` job in .github/workflows/ci.yml and its three checks: the skill check, Hermes pytest on Python 3.11, and the OpenClaw npm ci, build and test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-integrations-ci.ac2",
+            "title": "integrations/README.md no longer contains the sentence '`tests/unit/integrations/sync-skill.test.ts` runs that check in CI'; it contains a sentence naming the `integrations` CI job as what runs the check on every pull request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-integrations-ci.ac3",
+            "title": "The integrations/ row of .overdeck/context/codebase/architecture.md contains the text 'CI job `integrations`' and the file's last-verified line is unchanged, so npm run lint:last-verified exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "ci-job-skill-check",
+        "to": "ci-job-hermes",
+        "type": "blocks"
+      },
+      {
+        "from": "ci-job-hermes",
+        "to": "ci-job-openclaw",
+        "type": "blocks"
+      },
+      {
+        "from": "ci-job-skill-check",
+        "to": "ci-test-aggregator",
+        "type": "blocks"
+      },
+      {
+        "from": "ci-job-openclaw",
+        "to": "ci-test-aggregator",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

@@ -52,9 +52,12 @@
   runs only the frontend files listed in `scripts/frontend-test-subset.txt` (one path per line,
   relative to `src/dashboard/frontend`, `merge=union`; run by `npm run test:frontend-subset`);
   add new must-run frontend tests there in sorted position.
-- Tests that run the real `createWorkspace` (`src/lib/workspace-manager/create.ts`) must mock
-  `src/lib/disk-floor.js` as well as `util.promisify`: its 10 GiB disk floor reads the temp dir's
-  real free space with `statfs`, and CI runners sometimes have less (PAN-4723).
+- Tests that run the real `createWorkspace` (`src/lib/workspace-manager/create.ts`) or
+  `rebuildWorkspaceStack` (`src/lib/workspace/rebuild-stack.ts`) must mock `checkDiskFloor` and
+  `reserveDiskFloor` in `src/lib/disk-floor.js` and `estimateWorkspaceDiskCost` in
+  `src/lib/workspace/disk-cost.js` (as well as `util.promisify` for `createWorkspace`): the floor
+  reads the temp dir's real free space with `statfs`, CI runners sometimes have less (PAN-4723),
+  and the estimator runs real `git` and `docker` (PAN-4961).
 - Issue actions: every menu/overflow surface renders from `ISSUE_ACTIONS`
   (`src/dashboard/frontend/src/lib/issueActions.ts`) via `useIssueActions`; removing a key needs a
   `RETIREMENT_AUDIT` row in `issueActions.parity.test.tsx`.
@@ -75,5 +78,8 @@
   `/ws/rpc` (`pan-4523-river-bands.spec.ts`); never add a production store hook.
 
 - Issue IDs are `LETTERS-NUMBER`: `parseIssueId` (`src/lib/issue-id.ts`) and dozens of path/session regexes assume a letters-only prefix, so project issue prefixes must be letters only; use `issue_pattern` for other ID shapes (PAN-4860).
+- Root `setupFiles` (`vitest.config.ts`) run in order: `tests/setup/overdeck-home.ts`,
+  `tests/setup/no-real-home-writes.ts`, `tests/setup/no-worker-signals.ts`, `tests/setup.ts`; the
+  latter two guards throw `[test-guard]` errors (PAN-4925).
 
-<!-- last-verified: 2026-11-02 -->
+<!-- last-verified: 2026-11-03 -->

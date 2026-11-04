@@ -1,0 +1,184 @@
+{
+  "version": "1",
+  "issueId": "PAN-4953",
+  "created": "2026-11-04T13:46:40.439Z",
+  "updated": "2026-11-04T14:30:51.137Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "hermes-skeleton": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4953",
+      "claimedAt": "2026-11-04T13:46:40.439Z",
+      "doneAt": "2026-11-04T13:48:11.109Z"
+    },
+    "pending-routing": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4953",
+      "claimedAt": "2026-11-04T13:48:17.411Z",
+      "doneAt": "2026-11-04T13:52:04.502Z"
+    },
+    "summary-hook": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4953",
+      "claimedAt": "2026-11-04T13:52:09.038Z",
+      "doneAt": "2026-11-04T13:52:55.546Z"
+    },
+    "overdeck-commands": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4953",
+      "claimedAt": "2026-11-04T13:53:01.011Z",
+      "doneAt": "2026-11-04T13:54:22.299Z"
+    },
+    "register-plugin": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4953",
+      "claimedAt": "2026-11-04T13:54:27.315Z",
+      "doneAt": "2026-11-04T13:55:32.691Z"
+    },
+    "snippet-settings": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4953",
+      "claimedAt": "2026-11-04T13:55:38.572Z",
+      "doneAt": "2026-11-04T13:56:25.620Z"
+    },
+    "package-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4953",
+      "claimedAt": "2026-11-04T13:56:31.063Z",
+      "doneAt": "2026-11-04T14:06:31.819Z"
+    },
+    "cp9-verification": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4953",
+      "claimedAt": "2026-11-04T14:06:40.755Z",
+      "doneAt": "2026-11-04T14:19:26.314Z"
+    },
+    "hermes-skeleton.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:23:18.178Z"
+    },
+    "hermes-skeleton.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:23:31.503Z"
+    },
+    "hermes-skeleton.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:23:45.275Z"
+    },
+    "hermes-skeleton.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:24:00.402Z"
+    },
+    "pending-routing.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:24:17.988Z"
+    },
+    "pending-routing.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:24:33.679Z"
+    },
+    "pending-routing.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:24:47.653Z"
+    },
+    "pending-routing.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:25:02.668Z"
+    },
+    "summary-hook.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:25:19.956Z"
+    },
+    "summary-hook.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:25:36.389Z"
+    },
+    "summary-hook.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:25:52.936Z"
+    },
+    "summary-hook.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:26:09.386Z"
+    },
+    "overdeck-commands.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:26:24.046Z"
+    },
+    "overdeck-commands.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:26:38.685Z"
+    },
+    "overdeck-commands.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:26:54.017Z"
+    },
+    "overdeck-commands.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:27:08.602Z"
+    },
+    "overdeck-commands.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:27:23.642Z"
+    },
+    "register-plugin.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:27:39.507Z"
+    },
+    "register-plugin.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:27:53.083Z"
+    },
+    "register-plugin.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:28:07.794Z"
+    },
+    "register-plugin.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:28:21.086Z"
+    },
+    "snippet-settings.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:28:33.942Z"
+    },
+    "snippet-settings.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:28:47.247Z"
+    },
+    "snippet-settings.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:29:02.359Z"
+    },
+    "package-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:29:17.379Z"
+    },
+    "package-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:29:32.634Z"
+    },
+    "package-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:29:47.948Z"
+    },
+    "package-docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:30:02.438Z"
+    },
+    "cp9-verification.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:30:19.125Z"
+    },
+    "cp9-verification.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:30:34.834Z"
+    },
+    "cp9-verification.ac3": {
+      "status": "cancelled"
+    }
+  }
+}

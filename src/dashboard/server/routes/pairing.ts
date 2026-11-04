@@ -18,14 +18,17 @@
  *   token and root session may revoke any.
  *
  * No pairing response is cacheable, and none ever contains the internal token.
+ * A code issued for an Overdeck connector never pairs a browser (PAN-4927 W-CONN1).
  */
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
-import { createAccessToken, listAccessTokens, revokeAccessToken, type PublicAccessTokenRecord } from '../../../lib/access-tokens.js';
+import { createAccessToken, isPairedDeviceRecord, listAccessTokens, revokeAccessToken, type PublicAccessTokenRecord } from '../../../lib/access-tokens.js';
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
+import { capturePhoneRemoved } from '../../../lib/telemetry/anywhere.js';
 import { closeChannelsForPeer } from '../channel-listener.js';
+import { isConnectorCode } from '../connector-pairing.js';
 import { closeDeviceConnections } from '../device-connections.js';
 import { jsonResponse } from '../http-helpers.js';
 import {
@@ -121,6 +124,13 @@ const exchangePairingCredentialRoute = HttpRouter.add(
       return noStore(jsonResponse({ error: 'use-https' }, { status: 403 }));
     }
 
+    // PAN-4927 W-CONN1: a connector's code must never pair a browser as an admin device. Checked before
+    // the code is consumed, so a mistaken paste still lets the connector pair.
+    if (isConnectorCode(credential)) {
+      recordPairingExchangeFailure();
+      return noStore(jsonResponse({ error: 'this pairing code is for an Overdeck connector; run pan mcp connector pair with it', code: 'connector-code' }, { status: 403 }));
+    }
+
     const outcome = consumePairingCredential(credential);
     if (outcome !== 'ok') {
       recordPairingExchangeFailure();
@@ -168,7 +178,7 @@ const listDevicesRoute = HttpRouter.add(
     const authError = rejectUnauthorizedDashboardRequest(request);
     if (authError) return noStore(authError);
     const records = yield* Effect.promise(() => listAccessTokens());
-    return noStore(jsonResponse({ devices: records.filter((record) => record.kind === 'device' || record.kind === 'phone').map(deviceView) }));
+    return noStore(jsonResponse({ devices: records.filter(isPairedDeviceRecord).map(deviceView) }));
   }),
 );
 
@@ -187,7 +197,7 @@ const revokeDeviceRoute = HttpRouter.add(
     }
 
     const records = yield* Effect.promise(() => listAccessTokens());
-    const target = records.find((record) => record.id === id && (record.kind === 'device' || record.kind === 'phone'));
+    const target = records.find((record) => record.id === id && isPairedDeviceRecord(record));
     if (!target) return noStore(jsonResponse({ error: `no paired device with id ${id}` }, { status: 404 }));
 
     if (credential?.kind === 'device' && credential.deviceId !== id) {
@@ -198,6 +208,7 @@ const revokeDeviceRoute = HttpRouter.add(
     if (!revoked) return noStore(jsonResponse({ error: `no paired device with id ${id}` }, { status: 404 }));
     const closed = closeDeviceConnections(id);
     if (target.kind === 'phone' && target.phoneKey) closeChannelsForPeer(target.phoneKey);
+    if (target.kind === 'phone') capturePhoneRemoved('operator');
     emitActivityEntry({
       source: 'dashboard',
       level: 'info',

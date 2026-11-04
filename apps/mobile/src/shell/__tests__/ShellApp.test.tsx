@@ -7,13 +7,23 @@ const harness = vi.hoisted(() => ({
   dialKind: 'removed' as 'removed' | 'no-path',
   launchUrl: undefined as string | undefined,
   urlListeners: [] as Array<(event: { url: string }) => void>,
+  resumeListeners: [] as Array<(state: { isActive: boolean }) => void>,
+  platform: 'android' as 'ios' | 'android',
+  sent: [] as Array<{ type: string }>,
+  liveActivity: {
+    status: vi.fn(async () => ({ supported: true, enabled: true })),
+    start: vi.fn(async () => ({ started: true })),
+    end: vi.fn(async () => undefined),
+    addListener: vi.fn(async () => ({ remove: vi.fn(async () => undefined) })),
+  },
 }));
 
 vi.mock('@capacitor/app', () => ({
   App: {
     getLaunchUrl: vi.fn(async () => (harness.launchUrl ? { url: harness.launchUrl } : undefined)),
-    addListener: vi.fn(async (_event: string, listener: (event: { url: string }) => void) => {
-      harness.urlListeners.push(listener);
+    addListener: vi.fn(async (event: string, listener: (event: never) => void) => {
+      if (event === 'appStateChange') harness.resumeListeners.push(listener);
+      else harness.urlListeners.push(listener);
       return { remove: vi.fn() };
     }),
   },
@@ -22,9 +32,22 @@ vi.mock('../../native/keys', async () => {
   const { OverdeckKeysWeb } = await import('../../native/keys-web');
   return { OverdeckKeys: new OverdeckKeysWeb(), loadIdentity: async () => IDENTITY };
 });
+vi.mock('../platform', () => ({ shellPlatform: () => harness.platform }));
+vi.mock('../../native/liveActivity', () => ({ OverdeckLiveActivity: harness.liveActivity }));
 vi.mock('../directory', () => ({
   createDirectory: () => ({
-    client: { state: 'online', machines: [], refusal: null, onStateChange: () => () => undefined, start: vi.fn(async () => undefined), stop: vi.fn(), send: vi.fn(() => true) },
+    client: {
+      state: 'online',
+      machines: [],
+      refusal: null,
+      onStateChange: () => () => undefined,
+      start: vi.fn(async () => undefined),
+      stop: vi.fn(),
+      send: vi.fn((frame: { type: string }) => {
+        harness.sent.push(frame);
+        return true;
+      }),
+    },
     dialer: { close: vi.fn() },
     relayStopped: () => false,
   }),
@@ -86,6 +109,10 @@ beforeEach(async () => {
   harness.dialKind = 'removed';
   harness.launchUrl = undefined;
   harness.urlListeners.length = 0;
+  harness.resumeListeners.length = 0;
+  harness.platform = 'android';
+  harness.sent.length = 0;
+  for (const fn of Object.values(harness.liveActivity)) fn.mockClear();
   sessionStorage.clear();
   localStorage.clear();
   useShellStore.setState({ account: null, machines: [] });
@@ -145,6 +172,70 @@ describe('ShellApp machine view', () => {
     render(<ShellApp navigate={() => undefined} />);
     expect(await screen.findByText('Machines')).toBeTruthy();
     expect(screen.queryByPlaceholderText('ai.overdeck.app:/pair#…')).toBeNull();
+  });
+
+  it('does not reopen a pair link that arrived while running after a reload (iOS reports it as the launch URL)', async () => {
+    localStorage.removeItem(CURRENT_MACHINE_KEY);
+    history.replaceState(null, '', '/');
+    const first = render(<ShellApp navigate={() => undefined} />);
+    await screen.findByText('Machines');
+    await act(async () => {
+      for (const listener of harness.urlListeners) listener({ url: PAIR_LINK });
+    });
+    expect(await screen.findByPlaceholderText('ai.overdeck.app:/pair#…')).toBeTruthy();
+    first.unmount();
+    // Pairing reloads the page; iOS then answers getLaunchUrl() with the link that opened the app.
+    harness.urlListeners.length = 0;
+    harness.launchUrl = PAIR_LINK;
+    render(<ShellApp navigate={() => undefined} />);
+    expect(await screen.findByText('Machines')).toBeTruthy();
+    expect(screen.queryByPlaceholderText('ai.overdeck.app:/pair#…')).toBeNull();
+  });
+});
+
+describe('ShellApp Live Activity (PAN-4839 WI-10)', () => {
+  beforeEach(() => {
+    localStorage.removeItem(CURRENT_MACHINE_KEY);
+    history.replaceState(null, '', '/');
+  });
+
+  it('starts the card on iOS, and the Settings switch ends it and unregisters', async () => {
+    harness.platform = 'ios';
+    render(<ShellApp navigate={() => undefined} />);
+    const settings = await screen.findByText('Settings');
+    await act(async () => settings.click());
+    const toggle = await screen.findByRole('switch', { name: 'Live Activity' });
+    expect(harness.liveActivity.start).toHaveBeenCalledTimes(1);
+    await act(async () => toggle.click());
+    expect(harness.liveActivity.end).toHaveBeenCalledTimes(1);
+    expect(harness.sent).toContainEqual({ type: 'activity-unregister' });
+    expect(localStorage.getItem('overdeck.liveActivity')).toBe('off');
+    expect(screen.getByRole('switch', { name: 'Live Activity' }).getAttribute('aria-checked')).toBe('false');
+  });
+
+  it('reads the iOS permission again on resume, so the Settings row follows iOS Settings', async () => {
+    harness.platform = 'ios';
+    render(<ShellApp navigate={() => undefined} />);
+    const settings = await screen.findByText('Settings');
+    await act(async () => settings.click());
+    expect(await screen.findByRole('switch', { name: 'Live Activity' })).toBeTruthy();
+    harness.liveActivity.status.mockResolvedValueOnce({ supported: true, enabled: false });
+    await act(async () => {
+      for (const listener of harness.resumeListeners) listener({ isActive: true });
+    });
+    expect(await screen.findByText('Turn on Live Activities for Overdeck in iOS Settings.')).toBeTruthy();
+    expect(screen.queryByRole('switch', { name: 'Live Activity' })).toBeNull();
+    expect(harness.liveActivity.start).toHaveBeenCalledTimes(2);
+  });
+
+  it('shows no Live Activity row and never calls the plugin on Android', async () => {
+    render(<ShellApp navigate={() => undefined} />);
+    const settings = await screen.findByText('Settings');
+    await act(async () => settings.click());
+    await screen.findByText('Paired machines');
+    expect(screen.queryByText('Live Activity')).toBeNull();
+    expect(harness.liveActivity.status).not.toHaveBeenCalled();
+    expect(harness.liveActivity.start).not.toHaveBeenCalled();
   });
 });
 

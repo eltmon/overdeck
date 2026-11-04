@@ -1,0 +1,315 @@
+{
+  "version": "1",
+  "issueId": "PAN-4841",
+  "created": "2026-11-04T10:01:07.580Z",
+  "updated": "2026-11-04T17:41:39.412Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "rel-operator-checklist": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4841",
+      "claimedAt": "2026-11-04T10:01:07.580Z",
+      "doneAt": "2026-11-04T10:03:06.786Z"
+    },
+    "rel-android-signing-config": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4841",
+      "claimedAt": "2026-11-04T10:03:12.934Z",
+      "doneAt": "2026-11-04T10:05:09.920Z"
+    },
+    "rel-upload-keystore": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4841",
+      "claimedAt": "2026-11-04T10:05:11.652Z",
+      "doneAt": "2026-11-04T10:07:48.531Z"
+    },
+    "rel-android-build-script": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4841",
+      "claimedAt": "2026-11-04T10:07:56.441Z",
+      "doneAt": "2026-11-04T10:10:06.903Z"
+    },
+    "rel-ios-privacy-manifest": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4841",
+      "claimedAt": "2026-11-04T10:10:13.691Z",
+      "doneAt": "2026-11-04T10:11:37.323Z"
+    },
+    "rel-brand-assets": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4841",
+      "claimedAt": "2026-11-04T10:11:43.655Z",
+      "doneAt": "2026-11-04T10:13:21.340Z"
+    },
+    "rel-ios-rig-script": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4841",
+      "claimedAt": "2026-11-04T10:13:26.541Z",
+      "doneAt": "2026-11-04T10:15:12.314Z"
+    },
+    "rel-privacy-policy": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4841",
+      "claimedAt": "2026-11-04T10:15:17.474Z",
+      "doneAt": "2026-11-04T10:17:51.694Z"
+    },
+    "rel-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4841",
+      "claimedAt": "2026-11-04T10:18:09.874Z",
+      "doneAt": "2026-11-04T10:28:40.276Z"
+    },
+    "rel-google-services-json": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4841",
+      "claimedAt": "2026-11-04T10:28:55.486Z",
+      "doneAt": "2026-11-04T11:02:56.272Z"
+    },
+    "rel-directory-push-secrets": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4841",
+      "claimedAt": "2026-11-04T11:03:04.331Z",
+      "doneAt": "2026-11-04T11:08:09.428Z"
+    },
+    "rel-first-android-release": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4841",
+      "claimedAt": "2026-11-04T11:11:27.172Z",
+      "doneAt": "2026-11-04T11:21:21.286Z"
+    },
+    "rel-first-testflight-build": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4841",
+      "claimedAt": "2026-11-04T11:21:22.288Z",
+      "doneAt": "2026-11-04T11:25:43.288Z"
+    },
+    "rel-device-push-check": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4841",
+      "claimedAt": "2026-11-04T11:25:55.556Z",
+      "doneAt": "2026-11-04T12:17:56.565Z"
+    },
+    "rel-device-live-activity-check": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4841",
+      "claimedAt": "2026-11-04T15:40:27.193Z",
+      "doneAt": "2026-11-04T17:08:57.848Z"
+    },
+    "rel-operator-checklist.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:29:36.671Z"
+    },
+    "rel-operator-checklist.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:29:49.270Z"
+    },
+    "rel-operator-checklist.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:30:01.766Z"
+    },
+    "rel-operator-checklist.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:30:16.729Z"
+    },
+    "rel-operator-checklist.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:30:32.268Z"
+    },
+    "rel-android-signing-config.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:30:47.599Z"
+    },
+    "rel-android-signing-config.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:31:04.263Z"
+    },
+    "rel-android-signing-config.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:31:17.116Z"
+    },
+    "rel-upload-keystore.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:31:30.472Z"
+    },
+    "rel-upload-keystore.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:31:42.928Z"
+    },
+    "rel-upload-keystore.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:31:55.362Z"
+    },
+    "rel-android-build-script.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:32:08.430Z"
+    },
+    "rel-android-build-script.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:32:20.721Z"
+    },
+    "rel-android-build-script.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:32:32.929Z"
+    },
+    "rel-android-build-script.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:32:46.697Z"
+    },
+    "rel-ios-privacy-manifest.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:32:59.960Z"
+    },
+    "rel-ios-privacy-manifest.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:33:12.275Z"
+    },
+    "rel-ios-privacy-manifest.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:33:25.030Z"
+    },
+    "rel-brand-assets.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:33:38.678Z"
+    },
+    "rel-brand-assets.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:33:52.022Z"
+    },
+    "rel-brand-assets.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:34:04.621Z"
+    },
+    "rel-brand-assets.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:34:17.206Z"
+    },
+    "rel-ios-rig-script.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:34:30.700Z"
+    },
+    "rel-ios-rig-script.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:34:43.331Z"
+    },
+    "rel-ios-rig-script.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:34:55.450Z"
+    },
+    "rel-ios-rig-script.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:35:08.666Z"
+    },
+    "rel-privacy-policy.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:35:22.793Z"
+    },
+    "rel-privacy-policy.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:35:37.350Z"
+    },
+    "rel-privacy-policy.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:35:51.473Z"
+    },
+    "rel-google-services-json.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:36:06.933Z"
+    },
+    "rel-google-services-json.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:36:19.259Z"
+    },
+    "rel-google-services-json.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:36:31.606Z"
+    },
+    "rel-directory-push-secrets.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:36:43.822Z"
+    },
+    "rel-directory-push-secrets.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:36:57.509Z"
+    },
+    "rel-directory-push-secrets.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:37:11.041Z"
+    },
+    "rel-directory-push-secrets.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:37:23.653Z"
+    },
+    "rel-directory-push-secrets.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:37:36.558Z"
+    },
+    "rel-first-android-release.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:37:48.732Z"
+    },
+    "rel-first-android-release.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:38:01.278Z"
+    },
+    "rel-first-android-release.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:38:13.947Z"
+    },
+    "rel-first-testflight-build.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:38:26.487Z"
+    },
+    "rel-first-testflight-build.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:38:39.699Z"
+    },
+    "rel-first-testflight-build.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:38:53.034Z"
+    },
+    "rel-device-push-check.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:39:06.167Z"
+    },
+    "rel-device-push-check.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:39:18.960Z"
+    },
+    "rel-device-push-check.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:39:31.870Z"
+    },
+    "rel-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:39:45.083Z"
+    },
+    "rel-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:39:58.174Z"
+    },
+    "rel-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:40:12.099Z"
+    },
+    "rel-docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:40:27.783Z"
+    },
+    "rel-privacy-policy.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:40:52.283Z"
+    },
+    "rel-device-live-activity-check.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:41:26.670Z"
+    },
+    "rel-device-live-activity-check.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:41:39.411Z"
+    }
+  }
+}

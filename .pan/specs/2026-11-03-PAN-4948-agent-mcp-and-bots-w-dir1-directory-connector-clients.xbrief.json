@@ -1,0 +1,499 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-03T21:35:12Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4948: Agent MCP and bots (W-DIR1): Directory: connector clients",
+    "updated": "2026-11-03T21:38:13.947Z"
+  },
+  "plan": {
+    "id": "pan-4948",
+    "title": "Agent MCP and bots (W-DIR1): Directory: connector clients",
+    "status": "running",
+    "uid": "aaf79256-866b-4f84-8e44-880e055d3a2b",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-03T21:35:12Z",
+    "updated": "2026-11-03T21:38:13.947Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4948",
+        "label": "PAN-4948",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-4948.md",
+        "label": "PRD draft (.pan/drafts/pan-4948.md)",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/pan-4927.md",
+        "label": "Epic PRD PAN-4927 (W-DIR1, D-18)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "connect",
+      "directory",
+      "anywhere",
+      "contracts",
+      "pan-4927"
+    ],
+    "metadata": {
+      "sizeJustification": "Six small items across contracts, the connect Worker and the anywhere-channel web client; 13 files total.",
+      "canonicalFilename": "2026-11-03-PAN-4948-agent-mcp-and-bots-w-dir1-directory-connector-clients.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The overdeck.ai directory accepts only phones (ios/android) as clients, capped at 5 per account. The connector that W-CONN2 builds (pan mcp connector, platform node) needs to join as a client without taking a machine slot or a phone slot. The epic PRD's W-DIR1 also missed three things: loadDirectory drops non-phone rows on rehydration, PushRegistration would become type-legal for node, and DirectoryWebClient overwrites the limit message with the phone wording on close 4013.",
+      "Proposal": "Split the contracts type into PhonePlatform (ios|android, used for push) and ClientPlatform = PhonePlatform | node. Add CONNECTOR_LIMIT = 10 and CONNECTOR_LIMIT_MESSAGE. The decoder accepts hello-client with node and still refuses node push-register. The reducer counts phones and connectors against separate caps and recounts on a family change. loadDirectory reloads node rows. DirectoryWebClient takes ClientPlatform and picks the limit message by platform. CONNECT_PROTOCOL_VERSION stays 1. Docs describe the connector limit and the deploy-before-connector order.",
+      "NonGoals": "- Deploying connect.overdeck.ai: operator-only (docs/CONNECT-SERVICE.md Deploy, PAN-4927 CP-5); no agent runs wrangler\n- The connector process, credential or pairing (W-CONN1, W-CONN2) and the Bots settings UI (W-BOT1)\n- Changing CONNECT_PROTOCOL_VERSION from 1\n- Any new close code, error code, frame type or SQLite column\n- Changing apps/mobile types or behavior (it keeps ClientPlatform)\n- Connector-specific wording for forget-client or the forgotten refusal\n- A new miniflare/workerd integration test for connectors\n- Changing any phone message, the 5-phone cap or the 3-machine free cap"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Split PhonePlatform (ios|android) from ClientPlatform (PhonePlatform|node); push-register and PushRegistration use PhonePlatform.",
+        "rationale": "Widening ClientPlatform alone makes a node push registration type-legal and routes it to FCM in push/deliver.ts; the split makes the epic's 'push-register from node is bad_frame' rule hold at compile time too."
+      },
+      {
+        "summary": "A re-hello that moves a client row to the other family counts against the new family's cap and clears its push registration.",
+        "rationale": "Without it a phone row flipped to node bypasses the connector cap and keeps a phone push token; recounting is three lines and needs no new error path."
+      },
+      {
+        "summary": "loadDirectory reloads platform node rows (directory-store.ts:161).",
+        "rationale": "The current filter drops node rows on every Durable Object rehydration, so connectors would vanish and the cap would reset; the epic PRD missed it."
+      },
+      {
+        "summary": "DirectoryWebClient picks the 4013 message by deps.platform instead of the REFUSALS map entry.",
+        "rationale": "The close handler overwrites the error frame's message with CLIENT_LIMIT_MESSAGE; choosing by platform is deterministic and covers a close with no error frame."
+      },
+      {
+        "summary": "apps/mobile stays on ClientPlatform; no mobile edits.",
+        "rationale": "PhonePlatform is a subset, so mobile compiles unchanged; moving shellPlatform belongs with mobile push work."
+      },
+      {
+        "summary": "The CP-5 directory deploy is not a plan item; the PR description must state the operator redeploy requirement.",
+        "rationale": "docs/CONNECT-SERVICE.md says no agent deploys; making the requirement visible in the PR lets the Flywheel hold W-CONN2."
+      }
+    ],
+    "items": [
+      {
+        "id": "contracts-platform-split",
+        "title": "Contracts: PhonePlatform, node ClientPlatform, CONNECTOR_LIMIT and message",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T21:35:12Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4948",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "decoder-node-hello",
+            "reducer-family-caps",
+            "store-reload-node",
+            "web-client-connector-refusal"
+          ],
+          "files_scope": [
+            "packages/contracts/src/connect.ts",
+            "packages/contracts/src/__tests__/connect.test.ts",
+            "services/connect/src/push/config.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:contracts",
+            "npm run typecheck:connect",
+            "npm run typecheck:mobile",
+            "npx vitest run packages/contracts/src/__tests__/connect.test.ts"
+          ],
+          "expected_outputs": [
+            "all three typecheck lanes exit 0",
+            "connect.test.ts passes, including the new CONNECTOR_LIMIT assertions and the node push-register @ts-expect-error"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-8",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In packages/contracts/src/connect.ts: replace line 98 `export type ClientPlatform = \"ios\" | \"android\"` with `export type PhonePlatform = \"ios\" | \"android\"` plus `export type ClientPlatform = PhonePlatform | \"node\"` (doc comments per PRD). Add `export const CONNECTOR_LIMIT = 10` after CLIENT_LIMIT and `export const CONNECTOR_LIMIT_MESSAGE = \"This account already has 10 Overdeck connectors. Remove one in Settings → Anywhere → Bots.\"` after CLIENT_LIMIT_MESSAGE. Change the clientLimit close-code comment (line 56) to 'A sixth phone or an eleventh connector on one account (PAN-4823 D-2, PAN-4927 D-18)'. Document on hello-client.publicKeyHex that a node client sends its install key there, not a push key. Type push-register.platform (line 261) as PhonePlatform. Keep CONNECT_PROTOCOL_VERSION = 1. Keep the file runtime-import-free. In services/connect/src/push/config.ts change PushRegistration.platform to PhonePlatform. Tests in connect.test.ts: assert CONNECTOR_LIMIT and the exact message; add a node hello-client to the valid clientFrames list; add a @ts-expect-error push-register with platform node and raise the rejected-array length from 7 to 8."
+        },
+        "items": [
+          {
+            "id": "contracts-platform-split.ac1",
+            "title": "connect.test.ts asserts CONNECTOR_LIMIT returns 10, CONNECTOR_LIMIT_MESSAGE equals the exact PRD string, and CONNECT_PROTOCOL_VERSION still returns 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-platform-split.ac2",
+            "title": "Given a push-register literal with platform \"node\", the compile-time block rejects it via @ts-expect-error and npm run typecheck:contracts exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-platform-split.ac3",
+            "title": "Given a hello-client literal with platform \"node\", connect.test.ts accepts it as a ClientToDirectoryFrame and the JSON round trip returns an equal frame",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-platform-split.ac4",
+            "title": "When npm run typecheck:connect and typecheck:mobile run with PushRegistration.platform typed PhonePlatform in services/connect/src/push/config.ts, both exit 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "decoder-node-hello",
+        "title": "Decoder accepts hello-client with platform node",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T21:35:12Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-4948",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/connect/src/protocol.ts",
+            "tests/unit/services/connect/protocol-client.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:connect",
+            "npx vitest run tests/unit/services/connect/protocol-client.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:connect exits 0",
+            "protocol-client.test.ts passes with the new node cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. In services/connect/src/protocol.ts buildClient, case 'hello-client' (line 249): change `if (platform !== 'ios' && platform !== 'android') fail();` to also allow 'node'. Leave the push-register check at line 271 unchanged, so a node push-register stays bad_frame. Add tests to tests/unit/services/connect/protocol-client.test.ts using the file's existing decode helpers."
+        },
+        "items": [
+          {
+            "id": "decoder-node-hello.ac1",
+            "title": "Given a client socket, decoding a hello-client with platform 'node' returns a frame with platform 'node'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "decoder-node-hello.ac2",
+            "title": "Given a client socket, decoding a push-register with platform 'node' returns bad_frame",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "decoder-node-hello.ac3",
+            "title": "Decoding a hello-client with platform 'web' still returns bad_frame",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reducer-family-caps",
+        "title": "Client reducer counts phones and connectors against separate caps",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T21:35:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4948",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/connect/src/client-state.ts",
+            "services/connect/src/directory-state.ts",
+            "tests/unit/services/connect/client-state.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:connect",
+            "npx vitest run tests/unit/services/connect/client-state.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:connect exits 0",
+            "client-state.test.ts passes, including the 3 machines + 5 phones + 10 connectors scenario"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In services/connect/src/client-state.ts helloClient (lines 60-81): add a module-local `familyOf(platform: ClientPlatform): 'phone' | 'connector'` (node → connector). Compute `kept` = the existing row only when its family equals the hello's family. Refuse when `!kept` and the count of same-family clients is at the family's limit (CONNECTOR_LIMIT for connectors, CLIENT_LIMIT for phones), sending errorFrame('client_limit', <family message>) and close CONNECT_CLOSE_CODES.clientLimit exactly as today. Set the row's `push: kept?.push ?? null`. Keep registeredAt from `existing` and the existing log outcomes. Update the header comment (lines 1-8) and the ClientRow / clients comments in services/connect/src/directory-state.ts (lines 48, 80) to say phones and connectors. Tests in tests/unit/services/connect/client-state.test.ts: add a node hello helper; the scenario and cases listed in the PRD WI-3."
+        },
+        "items": [
+          {
+            "id": "reducer-family-caps.ac1",
+            "title": "Given a free account with 3 machines and 5 phones, 10 node hellos register (15 clients, 3 machines) and the 11th node hello emits exactly the client_limit error with CONNECTOR_LIMIT_MESSAGE and close 4013",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reducer-family-caps.ac2",
+            "title": "Given that same state, a 6th ios hello emits the client_limit error with CLIENT_LIMIT_MESSAGE and close 4013",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reducer-family-caps.ac3",
+            "title": "After the connectors register, an endpoints frame from env(1) emits directory frames whose machines list exactly the 3 machine environment ids and no client id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reducer-family-caps.ac4",
+            "title": "A phone with a push registration that re-hellos as node is rejected with CONNECTOR_LIMIT_MESSAGE when 10 connectors exist, and with room it is accepted with a put-client row whose push is null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "store-reload-node",
+        "title": "loadDirectory reloads node connector rows after rehydration",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T21:35:12Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-4948",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/connect/src/directory-store.ts",
+            "tests/unit/services/connect/directory-glue.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:connect",
+            "npx vitest run tests/unit/services/connect/directory-glue.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:connect exits 0",
+            "directory-glue.test.ts passes with the node round-trip case"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In services/connect/src/directory-store.ts loadDirectory (line 161), extend the platform filter `r.platform === 'ios' || r.platform === 'android'` with `|| r.platform === 'node'`. No schema change. In tests/unit/services/connect/directory-glue.test.ts, inside the 'directory storage round trip' block, use sqlShim() and PUT_CLIENT_SQL to insert a node row and a 'web' row beside phone rows, then call loadDirectory."
+        },
+        "items": [
+          {
+            "id": "store-reload-node.ac1",
+            "title": "Given a stored clients row with platform 'node', loadDirectory returns it with platform 'node' and push null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "store-reload-node.ac2",
+            "title": "Given a stored clients row with platform 'web', loadDirectory still drops it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "web-client-connector-refusal",
+        "title": "DirectoryWebClient takes ClientPlatform and reports the connector limit message on 4013",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T21:35:12Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4948",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/anywhere-channel/src/directory-web.ts",
+            "packages/anywhere-channel/src/__tests__/directory-web.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:anywhere-channel",
+            "npm run typecheck:mobile",
+            "npx vitest run packages/anywhere-channel/src/__tests__/directory-web.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:anywhere-channel and typecheck:mobile exit 0",
+            "directory-web.test.ts passes, including the node 4013 case and the unchanged phone 4013 case"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. In packages/anywhere-channel/src/directory-web.ts: change DirectoryWebDeps.platform (line 50) from 'ios' | 'android' to ClientPlatform (import type from @overdeck/contracts). Remove the clientLimit entry from REFUSALS (lines 63-70) and, in the close handler (line 251), use `event.code === CONNECT_CLOSE_CODES.clientLimit ? this.limitMessage() : REFUSALS[event.code]`, where the new private limitMessage() returns CONNECTOR_LIMIT_MESSAGE for platform 'node' and CLIENT_LIMIT_MESSAGE otherwise. Update the header comment if it names phones for 4013. Tests in directory-web.test.ts use the existing fake timers (vi.advanceTimersByTimeAsync)."
+        },
+        "items": [
+          {
+            "id": "web-client-connector-refusal.ac1",
+            "title": "A DirectoryWebClient built with platform 'node' sends a hello-client frame whose platform is 'node'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "web-client-connector-refusal.ac2",
+            "title": "Given a node client, serverClose(4013) sets state 'refused' and refusal to CONNECTOR_LIMIT_MESSAGE, and no new socket opens after advancing 600000 ms",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "web-client-connector-refusal.ac3",
+            "title": "The existing phone 4013 test still returns CLIENT_LIMIT_MESSAGE as the refusal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-connector-clients",
+        "title": "Document connector clients, their limit and the deploy order",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T21:35:12Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4948",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/CONNECT-SERVICE.md",
+            "docs/ANYWHERE-ARCHITECTURE.md",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'This account already has 10 Overdeck connectors' docs/CONNECT-SERVICE.md",
+            "grep -n 'CP-5' docs/CONNECT-SERVICE.md",
+            "grep -n 'connector' .overdeck/context/codebase/architecture.md"
+          ],
+          "expected_outputs": [
+            "each grep prints at least one matching line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. docs/CONNECT-SERVICE.md: list CONNECTOR_LIMIT beside CLIENT_LIMIT (line 31); rename 'Phone clients (PAN-4829)' to 'Clients: phones and connectors (PAN-4829, PAN-4927)' and rewrite the Role bullet (ios/android = phone, node = Overdeck connector); add a Connector bullet (same frames as a phone, publicKeyHex is its install key, push-register from node is bad_frame, a family change on re-hello counts against the new cap and clears push); add the 10-connector line to 'Limits' with the exact CONNECTOR_LIMIT_MESSAGE and close 4013; add to 'Deploy' that an older directory refuses platform node, so the directory deploys before any release with the connector (PAN-4927 CP-5). docs/ANYWHERE-ARCHITECTURE.md around line 184: say DirectoryWebClient also serves node connector clients. .overdeck/context/codebase/architecture.md line 23: add connector clients (10 per account, platform node), not machines. The PR description must state that connect.overdeck.ai must be redeployed by the operator before W-CONN2 ships."
+        },
+        "items": [
+          {
+            "id": "docs-connector-clients.ac1",
+            "title": "docs/CONNECT-SERVICE.md 'Limits' contains a Connectors line with the exact text 'This account already has 10 Overdeck connectors. Remove one in Settings → Anywhere → Bots.' and close 4013",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-connector-clients.ac2",
+            "title": "docs/CONNECT-SERVICE.md 'Deploy' states that an older directory rejects platform node and names PAN-4927 CP-5 as the deploy-before-connector order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-connector-clients.ac3",
+            "title": ".overdeck/context/codebase/architecture.md services/connect/ row contains connector clients at 10 per account alongside the 5 phones",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-connector-clients.ac4",
+            "title": "The PR description contains the sentence that connect.overdeck.ai must be redeployed by the operator before W-CONN2 ships",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "contracts-platform-split",
+        "to": "decoder-node-hello",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-platform-split",
+        "to": "reducer-family-caps",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-platform-split",
+        "to": "store-reload-node",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-platform-split",
+        "to": "web-client-connector-refusal",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

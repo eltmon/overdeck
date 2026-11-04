@@ -42,7 +42,7 @@ import { capturePane, listSessionNames } from '../../../lib/tmux.js';
 import { buildLintSessionNode } from './command-deck-lint-node.js';
 import { getBackendPanesForIssue } from '../services/backend-inventory.js';
 import { getDerivedIssueState } from '../services/derived-issue-state.js';
-import type { AgentSnapshot, BackendPane, SessionNodePresence } from '@overdeck/contracts';
+import { indexPanesByAgentKey, presenceForPaneState, type AgentSnapshot, type BackendPane, type SessionNodePresence } from '@overdeck/contracts';
 import { deriveSessionPresence } from '../services/session-presence.js';
 import { resolveIssueHeadlineCost } from '../services/issue-cost-resolver.js';
 import { getCachedRunningAgents } from '../services/running-agents-cache.js';
@@ -290,6 +290,10 @@ export async function fetchActivityDataWithContext(
 
   let hasPlanningSection = false;
 
+  // PAN-5011: resolved here (not below, where it was) for the pane-first check in the loop below.
+  const issuePanes = await getBackendPanesForIssue(issueId);
+  const panesByAgent = indexPanesByAgentKey(issuePanes);
+
   for (const checkId of [planningAgentId, agentId, planRunAgentId, knowledgeAgentId, strikeAgentId]) {
     const agentDir = join(agentsDir, checkId);
     // PAN-1908: the agents registry decides whether a session exists — never
@@ -328,7 +332,8 @@ export async function fetchActivityDataWithContext(
       }
 
       const rtState = await Effect.runPromise(getAgentRuntimeState(checkId));
-      const presence = await deriveSessionPresence(checkId, rtState, tmuxSessionNames);
+      const pane = panesByAgent.get(checkId);
+      const presence = await deriveSessionPresence(checkId, rtState, tmuxSessionNames, pane);
       const projectedAwaitingInput = awaitingInputFromProjection(checkId, context.agentSnapshotsById);
       const awaitingInput = projectedAwaitingInput !== undefined
         ? projectedAwaitingInput
@@ -347,10 +352,11 @@ export async function fetchActivityDataWithContext(
 
       // Terminal-end signal: endedAt is populated only when the session has
       // actually ended. duration is preserved as elapsed seconds for existing UI.
+      // PAN-5011: a live pane overrides the fallback below — Herdr holds no tmux entry.
       const tmuxAlive = tmuxSessionNames.has(checkId);
-      const sessionEnded = rtState?.state === 'suspended'
-        || presence === 'ended'
-        || (!!state.stoppedAt && !tmuxAlive);
+      const paneLive = pane !== undefined && pane.state !== 'exited';
+      const sessionEnded = !paneLive
+        && (rtState?.state === 'suspended' || presence === 'ended' || (!!state.stoppedAt && !tmuxAlive));
       const endedAt = sessionEnded
         ? (state.stoppedAt || state.lastActivity || state.startedAt)
         : undefined;
@@ -421,26 +427,20 @@ export async function fetchActivityDataWithContext(
   // status history to replay: a pane's role token says which row it is, its
   // state says whether it is live, and the PR's own review state says whether
   // the review passed. `buildReviewerNodes` still reads the round artifacts.
-  const issuePanes = await getBackendPanesForIssue(issueId);
   const derivedState = await getDerivedIssueState(issueId);
 
+  // PAN-5011: prefer a live pane over a stale exited one for the same role.
   const firstPaneWithRole = (role: BackendPane['role']): BackendPane | undefined =>
-    issuePanes.find((pane) => pane.role === role);
+    issuePanes.find((pane) => pane.role === role && pane.state !== 'exited')
+      ?? issuePanes.find((pane) => pane.role === role);
 
-  /** Pane state → the tree node's status + presence pair. */
+  /** Pane state → the tree node's status + presence pair (PAN-5011: done is a finished turn, not an exit). */
   const nodeStatusFor = (pane: BackendPane | undefined, verdict?: 'completed' | 'failed'): {
     status: string;
     presence: SessionNodePresence;
   } => {
-    if (!pane) return { status: verdict ?? 'completed', presence: 'ended' };
-    switch (pane.state) {
-      case 'working': return { status: 'running', presence: 'active' };
-      case 'blocked': return { status: 'running', presence: 'active' };
-      case 'idle': return { status: 'running', presence: 'idle' };
-      case 'done': return { status: verdict ?? 'completed', presence: 'ended' };
-      case 'exited': return { status: verdict ?? 'completed', presence: 'ended' };
-      default: return { status: 'running', presence: 'idle' };
-    }
+    if (!pane || pane.state === 'exited') return { status: verdict ?? 'completed', presence: 'ended' };
+    return { status: 'running', presence: presenceForPaneState(pane.state) };
   };
 
   const startedAtFor = (pane: BackendPane | undefined): string =>

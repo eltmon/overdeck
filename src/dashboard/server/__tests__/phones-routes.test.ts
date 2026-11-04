@@ -3,8 +3,9 @@
  * to the pairing channel's remote key, refuses plain sockets and link
  * channels, and revokes a previous active phone record with the same
  * clientId; a key already held by an active phone record gets 409.
- * DELETE /api/phones/self and PUT /api/phones/self/push-key take exactly a
- * phone credential.
+ * DELETE /api/phones/self, PUT /api/phones/self/push-key and
+ * PUT /api/phones/self/notification-preferences (PAN-5019 WI-5) take exactly
+ * a phone credential.
  */
 import { createRequire } from 'node:module';
 import { createServer } from 'node:http';
@@ -16,6 +17,8 @@ import { HttpServerResponse } from 'effect/unstable/http';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../lib/activity-logger.js', () => ({ emitActivityEntry: vi.fn() }));
+const telemetry = vi.hoisted(() => ({ capturePhonePaired: vi.fn(), capturePhoneRemoved: vi.fn() }));
+vi.mock('../../../lib/telemetry/anywhere.js', () => telemetry);
 
 const {
   _resetAccessTokensForTests,
@@ -28,7 +31,8 @@ const { openChannel } = await import('../../../lib/anywhere/channel/open.js');
 const { _resetChannelListenerForTests, installChannelListener, liveChannelCount } = await import('../channel-listener.js');
 const { remoteGateRejection } = await import('../remote-request-gate.js');
 const { resolveDashboardCredential } = await import('../routes/dashboard-auth.js');
-const { handlePhonesExchange, handlePhonesPushKey, handlePhonesSelfRevoke } = await import('../routes/phones.js');
+const { handlePhonesExchange, handlePhonesNotificationPreferences, handlePhonesPushKey, handlePhonesSelfRevoke } = await import('../routes/phones.js');
+const { loadPhoneNotificationPreferences, resetPhoneNotificationPreferencesCacheForTests } = await import('../../../lib/push/phone-preferences-store.js');
 type ChannelMarker = import('../channel-peer.js').ChannelMarker;
 type MachineKeyPair = import('../../../lib/anywhere/machine-key.js').MachineKeyPair;
 
@@ -56,6 +60,9 @@ beforeEach(async () => {
   process.env.OVERDECK_HOME = home;
   _resetAccessTokensForTests();
   _resetChannelListenerForTests();
+  resetPhoneNotificationPreferencesCacheForTests();
+  telemetry.capturePhonePaired.mockClear();
+  telemetry.capturePhoneRemoved.mockClear();
 });
 
 afterEach(async () => {
@@ -63,6 +70,7 @@ afterEach(async () => {
   await _settleAccessTokenWritesForTests();
   _resetAccessTokensForTests();
   _resetChannelListenerForTests();
+  resetPhoneNotificationPreferencesCacheForTests();
   if (originalHome === undefined) delete process.env.OVERDECK_HOME;
   else process.env.OVERDECK_HOME = originalHome;
   await rm(home, { recursive: true, force: true });
@@ -121,6 +129,20 @@ describe('POST /api/phones/exchange (PAN-4835 WI-7)', () => {
     expect(repeat.json.code).toBe('link-key-in-use');
     expect(verifyAccessToken(first.json.token as string).ok).toBe(true);
     expect(listActiveRecordsOfKind('phone')).toHaveLength(1);
+  });
+
+  it('ac-5019: an exchange carrying valid notification preferences stores them and answers notificationPreferencesStored', async () => {
+    const prefs = { v: 1, pause: null, muted: ['failed'] };
+    const { status, json } = await read(await handlePhonesExchange(body({ notificationPreferences: prefs }), PAIRING));
+    expect(status).toBe(200);
+    expect(json.notificationPreferencesStored).toBe(true);
+    expect((await loadPhoneNotificationPreferences()).get(CLIENT_ID)).toEqual(prefs);
+  });
+
+  it('ac-5019: an exchange carrying invalid notification preferences still answers 200 without the flag', async () => {
+    const { status, json } = await read(await handlePhonesExchange(body({ notificationPreferences: { v: 2 } }), PAIRING));
+    expect(status).toBe(200);
+    expect(json.notificationPreferencesStored).toBeUndefined();
   });
 
   it('remoteGateRejection admits the exchange on a pairing marker and refuses it on a plain request', async () => {
@@ -193,6 +215,23 @@ describe('DELETE /api/phones/self and PUT /api/phones/self/push-key (PAN-4835 WI
 
     expect((await read(await handlePhonesPushKey(asPhone, JSON.stringify({ pushKeyHex: 'not-hex' })))).status).toBe(400);
   });
+
+  it('ac-5019: notification-preferences takes exactly a phone credential, stores valid prefs, and 400s an invalid body', async () => {
+    const { json: exchanged } = await read(await handlePhonesExchange(body(), PAIRING));
+    const asPhone = resolveDashboardCredential({ authorization: `Bearer ${exchanged.token}` }, LINK);
+    expect(asPhone?.kind).toBe('phone');
+
+    const asMachine = { kind: 'machine', tokenId: 'm', environmentId: 'e', scopes: ['admin'], actor: { agentId: 'unknown' }, access: 'operator' } as const;
+    expect((await read(await handlePhonesNotificationPreferences(asMachine, JSON.stringify({ v: 1, pause: null, muted: [] })))).status).toBe(403);
+
+    const prefs = { v: 1, pause: { until: null }, muted: ['failed'] };
+    expect((await read(await handlePhonesNotificationPreferences(asPhone, JSON.stringify(prefs)))).json).toEqual({ ok: true });
+    const stored = await loadPhoneNotificationPreferences();
+    expect(stored.get(CLIENT_ID)).toEqual(prefs);
+
+    expect((await read(await handlePhonesNotificationPreferences(asPhone, JSON.stringify({ v: 2, pause: null, muted: [] })))).status).toBe(400);
+    expect((await read(await handlePhonesNotificationPreferences(asPhone, 'not json'))).status).toBe(400);
+  });
 });
 
 describe('capabilities.phoneApp (PAN-4835 WI-11)', () => {
@@ -206,5 +245,30 @@ describe('capabilities.phoneApp (PAN-4835 WI-11)', () => {
     const legacy = { ...descriptor, capabilities: { ...descriptor.capabilities, phoneApp: undefined } };
     delete (legacy.capabilities as { phoneApp?: boolean }).phoneApp;
     expect(() => Schema.decodeUnknownSync(EnvironmentDescriptor)(legacy)).not.toThrow();
+  });
+});
+
+describe('phone telemetry (PAN-5016 WI-6)', () => {
+  it('a first exchange records phone_paired(false); a re-pair of the same phone records phone_paired(true)', async () => {
+    expect((await read(await handlePhonesExchange(body(), PAIRING))).status).toBe(200);
+    expect((await read(await handlePhonesExchange(body(), { mode: 'pairing', remoteKeyHex: 'b2'.repeat(32), pairingId: 'ef'.repeat(16) }))).status).toBe(200);
+    expect(telemetry.capturePhonePaired.mock.calls).toEqual([[false], [true]]);
+  });
+
+  it('a 409 link-key-in-use exchange records nothing', async () => {
+    await handlePhonesExchange(body(), PAIRING);
+    telemetry.capturePhonePaired.mockClear();
+    expect((await read(await handlePhonesExchange(body({ clientId: '22222222-2222-4222-8222-222222222222' }), PAIRING))).status).toBe(409);
+    expect(telemetry.capturePhonePaired).not.toHaveBeenCalled();
+  });
+
+  it('self-revoke records phone_removed(phone); a refused self-revoke records nothing', async () => {
+    const { json: exchanged } = await read(await handlePhonesExchange(body(), PAIRING));
+    expect((await read(await handlePhonesSelfRevoke(null))).status).toBe(403);
+    expect(telemetry.capturePhoneRemoved).not.toHaveBeenCalled();
+
+    const asPhone = resolveDashboardCredential({ authorization: `Bearer ${exchanged.token}` }, LINK);
+    expect((await read(await handlePhonesSelfRevoke(asPhone))).status).toBe(200);
+    expect(telemetry.capturePhoneRemoved.mock.calls).toEqual([['phone']]);
   });
 });

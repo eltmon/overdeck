@@ -6,6 +6,7 @@ import type { Deps, Env, RoomInitBody } from '../../../../services/share/src/env
 import { HDR_HOST_TOKEN_HASH, parseConfig } from '../../../../services/share/src/env.ts';
 import { HTML_CSP, invitePageCsp } from '../../../../services/share/src/pages.ts';
 import { guardBody, handle, MAX_BODY_BYTES } from '../../../../services/share/src/routes.ts';
+import { seal, SESSION_COOKIE } from '../../../../services/share/src/web-auth.ts';
 
 const TEST_BASE_URL = 'https://share.test';
 const NOW = 1_700_000_000_000;
@@ -108,21 +109,21 @@ describe('share service route table (PAN-658 share-scaffold)', () => {
     const env = makeEnv({ PUBLIC_BASE_URL: undefined, TURN_KEY_ID: undefined, TURN_KEY_API_TOKEN: undefined });
     const res = await call('GET', '/healthz', env);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true, configured: false, turn: false });
+    expect(await res.json()).toEqual({ ok: true, configured: false, turn: false, web: false });
   });
 
   it('GET /healthz reports configured=true once PUBLIC_BASE_URL is set', async () => {
     const res = await call('GET', '/healthz', makeEnv({ TURN_KEY_ID: undefined }));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true, configured: true, turn: false });
+    expect(await res.json()).toEqual({ ok: true, configured: true, turn: false, web: false });
   });
 
   it('GET /healthz reports turn=true only when both TURN secrets are set', async () => {
     const res = await call('GET', '/healthz');
-    expect(await res.json()).toEqual({ ok: true, configured: true, turn: true });
+    expect(await res.json()).toEqual({ ok: true, configured: true, turn: true, web: false });
 
     const blank = await call('GET', '/healthz', makeEnv({ TURN_KEY_API_TOKEN: '  ' }));
-    expect(await blank.json()).toEqual({ ok: true, configured: true, turn: false });
+    expect(await blank.json()).toEqual({ ok: true, configured: true, turn: false, web: false });
   });
 
   it('an unknown path returns 404 not_found', async () => {
@@ -147,11 +148,11 @@ describe('share service route table (PAN-658 share-scaffold)', () => {
     expect(parseConfig(makeEnv({ PUBLIC_BASE_URL: undefined }))).toEqual({ ok: false, missing: ['PUBLIC_BASE_URL'] });
     expect(parseConfig(makeEnv({ PUBLIC_BASE_URL: 'https://share.test//', TURN_KEY_ID: undefined }))).toEqual({
       ok: true,
-      config: { publicBaseUrl: 'https://share.test', turn: null },
+      config: { publicBaseUrl: 'https://share.test', turn: null, web: null },
     });
     expect(parseConfig(makeEnv())).toEqual({
       ok: true,
-      config: { publicBaseUrl: TEST_BASE_URL, turn: { keyId: 'turn-key-id', apiToken: 'turn-api-token' } },
+      config: { publicBaseUrl: TEST_BASE_URL, turn: { keyId: 'turn-key-id', apiToken: 'turn-api-token' }, web: null },
     });
   });
 
@@ -469,6 +470,162 @@ describe('GET /v1/rooms/:code/host and /join (upgrade routes)', () => {
       avatarUrl: 'https://avatars.githubusercontent.com/u/42',
     });
     expect(rooms.calls[0]?.headers.get('Authorization')).toBeNull();
+  });
+});
+
+describe('GET /s/:code with web join (PAN-4481 share-invite-page-hosted)', () => {
+  const webEnv = (overrides: Partial<Env> = {}) => makeEnv({ ACCOUNT_BASE_URL: 'https://account.test', WEB_SESSION_KEY: 'ab'.repeat(32), ...overrides });
+
+  it('adds the hidden web-join section, the viewer script, the hosted CSP and Referrer-Policy: same-origin', async () => {
+    const res = await call('GET', '/s/bcdf-ghjk', webEnv());
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    const nonce = /<script nonce="([^"]+)">/.exec(text)?.[1] ?? '';
+    expect(nonce).not.toBe('');
+    expect(text).toContain('<body data-short-code="BCDFGHJK">');
+    expect(text).toContain('<section id="local-join">');
+    expect(text).toContain('<section id="web-join" hidden><h2>Join in this browser</h2>');
+    expect(text).toContain('<script src="/viewer/viewer.js" defer></script>');
+    expect(text.indexOf(`<script nonce="${nonce}">`)).toBeLessThan(text.indexOf('<script src="/viewer/viewer.js"'));
+    expect(res.headers.get('Content-Security-Policy')).toBe(
+      `default-src 'none'; style-src 'unsafe-inline'; script-src 'self' 'nonce-${nonce}'; ` +
+        `connect-src 'self' wss://share.test http://localhost:3011 http://127.0.0.1:3011; ` +
+        `img-src https://avatars.githubusercontent.com; frame-ancestors 'none'; base-uri 'none'; form-action 'self'`,
+    );
+    expect(res.headers.get('Referrer-Policy')).toBe('same-origin');
+  });
+
+  it('without web config the page keeps the local-only CSP, Referrer-Policy: no-referrer and one script', async () => {
+    const res = await call('GET', '/s/BCDFGHJK', makeEnv());
+    const text = await res.text();
+    const nonce = /<script nonce="([^"]+)">/.exec(text)?.[1] ?? '';
+    expect(res.headers.get('Content-Security-Policy')).toBe(invitePageCsp(nonce));
+    expect(res.headers.get('Content-Security-Policy')).not.toContain('img-src');
+    expect(res.headers.get('Referrer-Policy')).toBe('no-referrer');
+    expect(text).toContain('<body>');
+    expect(text).not.toContain('id="web-join"');
+    expect(text).not.toContain('/viewer/viewer.js');
+    expect(text.match(/<script/g)).toHaveLength(1);
+  });
+
+  it('the probe script navigates only when no browser join has started, in both modes', async () => {
+    for (const env of [makeEnv(), webEnv()]) {
+      const text = await (await call('GET', '/s/BCDFGHJK', env)).text();
+      expect(text).toContain('document.documentElement.dataset.hostedJoin === "started"');
+      expect(text).toContain('Overdeck is running on this computer. You can also open it there.');
+      expect(text.indexOf('dataset.hostedJoin')).toBeLessThan(text.indexOf('location.assign('));
+    }
+  });
+
+  it('the ended page has no script in both modes', async () => {
+    for (const env of [makeEnv({ ROOMS: fakeRooms(() => new Response(null, { status: 404 })).ns }), webEnv({ ROOMS: fakeRooms(() => new Response(null, { status: 404 })).ns })]) {
+      const res = await call('GET', '/s/BCDFGHJK', env);
+      expect(res.status).toBe(404);
+      expect(await res.text()).not.toContain('<script');
+      expect(res.headers.get('Content-Security-Policy')).toBe(HTML_CSP);
+    }
+  });
+});
+
+describe('GET /viewer/viewer.js (PAN-4481 FR-15)', () => {
+  function fakeAssets(respond: (req: Request) => Response) {
+    const requests: string[] = [];
+    const fetcher = {
+      fetch: async (input: Request) => {
+        requests.push(input.url);
+        return respond(input);
+      },
+    };
+    return { fetcher: fetcher as unknown as Fetcher, requests };
+  }
+
+  it('serves the bundle from ASSETS as text/javascript with the security headers', async () => {
+    const assets = fakeAssets(() => new Response('console.log(1)', { status: 200, headers: { 'Content-Type': 'application/octet-stream' } }));
+    const res = await call('GET', '/viewer/viewer.js', makeEnv({ ASSETS: assets.fetcher }));
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Content-Type')).toBe('text/javascript; charset=utf-8');
+    expect(res.headers.get('X-Content-Type-Options')).toBe('nosniff');
+    expect(res.headers.get('Cache-Control')).toBe('no-store');
+    expect(await res.text()).toBe('console.log(1)');
+    expect(assets.requests).toEqual([`${TEST_BASE_URL}/viewer/viewer.js`]);
+  });
+
+  it('is 404 without an ASSETS binding and when the asset is missing', async () => {
+    const none = await call('GET', '/viewer/viewer.js', makeEnv());
+    expect(none.status).toBe(404);
+    expect(await none.json()).toEqual({ error: 'not_found' });
+    const missing = await call('GET', '/viewer/viewer.js', makeEnv({ ASSETS: fakeAssets(() => new Response('nope', { status: 404 })).fetcher }));
+    expect(missing.status).toBe(404);
+  });
+});
+
+describe('GET /v1/rooms/:code/web-join (PAN-4481 share-web-join-route)', () => {
+  const WEB_KEY = 'ab'.repeat(32);
+  const webEnv = (overrides: Partial<Env> = {}) => makeEnv({ ACCOUNT_BASE_URL: 'https://account.test', WEB_SESSION_KEY: WEB_KEY, ...overrides });
+  const sessionCookie = async (token = DEVICE_TOKEN) => `${SESSION_COOKIE}=${await seal(WEB_KEY, { v: 1, token, iat: NOW }, deps)}`;
+  const webUpgrade = (headers: Record<string, string>) => ({ headers: { Upgrade: 'websocket', ...headers } });
+  const PATH = '/v1/rooms/BCDFGHJK/web-join?v=1';
+
+  it('answers 426 without an upgrade and 400 for a protocol other than v=1', async () => {
+    const cookie = await sessionCookie();
+    expect((await call('GET', PATH, webEnv(), { headers: { Origin: TEST_BASE_URL, Cookie: cookie } })).status).toBe(426);
+    const v2 = await call('GET', '/v1/rooms/BCDFGHJK/web-join?v=2', webEnv(), webUpgrade({ Origin: TEST_BASE_URL, Cookie: cookie }));
+    expect(v2.status).toBe(400);
+  });
+
+  it('refuses a missing or foreign Origin with 403 before reading the session', async () => {
+    const account = fakeAccount();
+    const env = webEnv({ ACCOUNT: account.binding });
+    const cookie = await sessionCookie();
+    for (const headers of [{ Cookie: cookie }, { Cookie: cookie, Origin: 'https://evil.test' }]) {
+      const res = await call('GET', PATH, env, webUpgrade(headers));
+      expect(res.status).toBe(403);
+      expect(await res.json()).toEqual({ error: 'forbidden_origin' });
+    }
+    expect(account.calls).toEqual([]);
+  });
+
+  it('is 401 without a cookie, with a tampered cookie and with only a bearer header', async () => {
+    const account = fakeAccount();
+    const rooms = fakeRooms(defaultRoom);
+    const env = webEnv({ ACCOUNT: account.binding, ROOMS: rooms.ns });
+    const tampered = (await sessionCookie()).slice(0, -2) + 'zz';
+    for (const headers of [{}, { Cookie: tampered }, { Authorization: `Bearer ${DEVICE_TOKEN}` }]) {
+      const res = await call('GET', PATH, env, webUpgrade({ Origin: TEST_BASE_URL, ...headers }));
+      expect(res.status).toBe(401);
+      expect(await res.json()).toEqual({ error: 'invalid_token' });
+    }
+    expect(account.calls).toEqual([]);
+    expect(rooms.calls).toEqual([]);
+  });
+
+  it('a lapsed grant is 403 grant_expired and an unknown room is 404', async () => {
+    const cookie = await sessionCookie();
+    const expired = await call('GET', PATH, webEnv({ ACCOUNT: fakeAccount({ ok: false, error: 'grant_expired' }).binding }), webUpgrade({ Origin: TEST_BASE_URL, Cookie: cookie }));
+    expect(expired.status).toBe(403);
+    expect(await expired.json()).toEqual({ error: 'grant_expired' });
+
+    const rooms = fakeRooms(() => new Response(null, { status: 404 }));
+    const unknown = await call('GET', PATH, webEnv({ ROOMS: rooms.ns }), webUpgrade({ Origin: TEST_BASE_URL, Cookie: cookie }));
+    expect(unknown.status).toBe(404);
+    expect(await unknown.json()).toEqual({ error: 'not_found' });
+  });
+
+  it('a valid cookie and Origin forward /join with the verified identity, never the cookie', async () => {
+    const rooms = fakeRooms(() => new Response(null, { status: 404 }));
+    const account = fakeAccount();
+    await call('GET', '/v1/rooms/bcdf-ghjk/web-join?v=1', webEnv({ ROOMS: rooms.ns, ACCOUNT: account.binding }), webUpgrade({ Origin: TEST_BASE_URL, Cookie: await sessionCookie() }));
+    expect(account.calls).toEqual([DEVICE_TOKEN]);
+    expect(rooms.calls).toHaveLength(1);
+    expect(rooms.calls[0]).toMatchObject({ name: 'BCDFGHJK', path: '/join' });
+    expect(JSON.parse(rooms.calls[0]?.headers.get('X-Share-Identity') ?? '')).toEqual({ githubId: 42, login: 'octo', avatarUrl: 'https://avatars.githubusercontent.com/u/42' });
+    expect(rooms.calls[0]?.headers.get('Cookie')).toBeNull();
+  });
+
+  it('without web configuration the route answers 503 not_configured', async () => {
+    const res = await call('GET', PATH, makeEnv(), webUpgrade({ Origin: TEST_BASE_URL, Cookie: await sessionCookie() }));
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: 'not_configured', missing: ['ACCOUNT_BASE_URL', 'WEB_SESSION_KEY'] });
   });
 });
 

@@ -1,0 +1,901 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-03T15:48:54Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4481: Shared Sessions v0 (slice 10): hosted web join page",
+    "updated": "2026-11-03T15:56:58.797Z"
+  },
+  "plan": {
+    "id": "pan-4481",
+    "title": "Shared Sessions v0 (slice 10): hosted web join page",
+    "status": "running",
+    "uid": "9c321233-6fa0-4839-85f0-c2b2f1635dae",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-03T15:48:54Z",
+    "updated": "2026-11-03T15:56:58.797Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4481",
+        "label": "PAN-4481",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/658",
+        "label": "PAN-658 (parent)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "shared-sessions",
+      "share-service",
+      "account-service",
+      "cloudflare-workers",
+      "webrtc",
+      "auth"
+    ],
+    "narratives": {
+      "Problem": "A person without Overdeck installed cannot join a shared conversation: the /s/:code page only finds a local dashboard, the account Worker has no browser sign-in (no CORS, only loopback/native redirects and device flow), and the share Worker's viewer socket needs a bearer header a browser WebSocket cannot send.",
+      "Proposal": "Add a third PKCE redirect rule (share callback, platform web) and two AccountRpc methods (redeemWebCode, signOutDevice) to the account Worker. Make the share Worker the OAuth client: it runs /auth/signin and /auth/callback, keeps the device token in an AES-GCM sealed HttpOnly cookie, exposes /v1/web/session and a cookie+Origin authenticated /v1/rooms/:code/web-join socket that reaches the unchanged ShareRoom join path, and answers ping with pong. Serve a small esbuild-built plain-DOM viewer (reusing slice 4's WebRtcViewer) from the Worker's static assets on the /s/:code page, next to the existing localhost probe. Full design in .pan/drafts/PAN-4481.md.",
+      "NonGoals": "- No identity-only participant grant or allowlist change (OD-2 stands)\n- No server-rendered conversation view; no content passes through the share Worker\n- No composer, drafts or contributor input in the browser viewer (slice 5, PAN-4476)\n- No terminal channel in the browser viewer (slice 6, PAN-4477)\n- No markdown, tool-call, thinking or work-log rendering in the browser viewer\n- No CORS headers on the account Worker and no browser call to account.overdeck.ai /oauth/* or /v1/*\n- No change to ShareRoom room rules, viewer protocol frames, the host PeerHub or /api/shares\n- No change to /v1/rooms/:code/join (stays bearer-only)\n- No deploy, wrangler login or wrangler secret put by any agent\n- No pan join / CLI changes (slice 9, PAN-4480)"
+    },
+    "metadata": {
+      "sizeJustification": "One user-visible feature split across two Workers: the account half (redirect rule + RPC) has no user value alone and defines the contract the share half consumes, and the viewer bundle is useless without the cookie-authenticated socket. Most of the ~37 files are new small modules, their tests and four docs; items are fine-grained with explicit edges so independent parts (account, DO ping, build pipeline, join-socket) run in parallel.",
+      "canonicalFilename": "2026-11-03-PAN-4481-shared-sessions-v0-slice-10-hosted-web-join-page.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "autoDecisions": [
+      {
+        "summary": "The share Worker is the OAuth client and redeems the code over the ACCOUNT service binding (AccountRpc.redeemWebCode).",
+        "rationale": "The account Worker sends no CORS headers by design, so the page cannot call /oauth/token; the binding avoids a public hop between Workers (PAN-658 security section) and keeps the token server-side (D-R3-2)."
+      },
+      {
+        "summary": "The browser's device token lives only in an AES-GCM sealed HttpOnly SameSite=Strict __Host- cookie keyed by a new WEB_SESSION_KEY secret.",
+        "rationale": "Page JavaScript never holds a credential, a stolen cookie is useless outside the share Worker, and the Worker can trust the cookie contents without a database."
+      },
+      {
+        "summary": "The web flow reuses the PKCE purpose with a third, separate redirect rule (validateShareRedirect) and a new platform value 'web'; no D1 migration.",
+        "rationale": "auth_requests.purpose and pending_attempts.last_flow have CHECK constraints that a new purpose would need a table rebuild to change; devices.platform has no CHECK. The operator asked to keep redirect rules as separate functions (PAN-4831 coordination)."
+      },
+      {
+        "summary": "The browser uses a separate socket path /v1/rooms/:code/web-join authenticated by cookie plus an exact Origin check; /join stays bearer-only.",
+        "rationale": "Browser WebSockets cannot send Authorization headers; a separate path keeps the server path's contract unchanged and adds cross-site WebSocket hijacking defence."
+      },
+      {
+        "summary": "OD-2 stands: browser viewers must be allowlisted overdeck.ai accounts; a non-allowlisted user sees an invite-only page.",
+        "rationale": "The approved scope lists three deliverables and none changes the allowlist; an identity-only participant grant is a separate PAN-4293 decision."
+      },
+      {
+        "summary": "The hosted viewer is plain TypeScript and DOM (no React, no markdown) bundled by esbuild 0.28.1 into the Worker's static assets, reusing WebRtcViewer through a contracts shim.",
+        "rationale": "Smallest bundle with no new runtime dependencies; esbuild 0.28.1 is the version wrangler 4.146.0 already resolves; the shim keeps effect out of the bundle; plain-text rendering removes an XSS surface."
+      },
+      {
+        "summary": "Join intent stays an explicit click; a per-tab sessionStorage marker lets a reload rejoin without a click.",
+        "rationale": "PAN-4475 D-1: opening the socket reveals identity to the host, so no URL may trigger it; sessionStorage cannot be set by a link."
+      },
+      {
+        "summary": "The browser viewer is read-only in this slice; the composer arrives with slice 5 (PAN-4476).",
+        "rationale": "The slice 4 dashboard viewer is also read-only today, and drafts/direct-submit are slice 5's scope."
+      },
+      {
+        "summary": "The localhost probe stays and still navigates to an installed dashboard, unless the visitor already started a browser join.",
+        "rationale": "An installed dashboard is the richer client and the PAN-4475 behaviour must not regress."
+      },
+      {
+        "summary": "The plan stays one issue with a sizeJustification instead of splitting the account half into a sibling issue.",
+        "rationale": "The account changes alone deliver no user-visible value and define the RPC contract the share half consumes; the operator approved the three parts together."
+      }
+    ],
+    "items": [
+      {
+        "id": "account-share-redirect",
+        "title": "Account Worker: accept the share callback as a third PKCE redirect rule paired with platform web",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T15:48:54Z",
+        "metadata": {
+          "issueLabel": "pan-4481",
+          "readiness": "ready",
+          "inspectionDepth": "fast",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "account-web-rpc"
+          ],
+          "files_scope": [
+            "services/account/src/pkce.ts",
+            "services/account/src/devices.ts",
+            "services/account/src/env.ts",
+            "services/account/src/device-flow.ts",
+            "services/account/wrangler.jsonc",
+            "services/account/.dev.vars.example",
+            "tests/unit/services/account/pkce.test.ts",
+            "tests/unit/services/account/device-flow.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:account",
+            "npx vitest run tests/unit/services/account/pkce.test.ts tests/unit/services/account/device-flow.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:account exits 0",
+            "pkce.test.ts and device-flow.test.ts pass, including the new share-redirect cases"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD .pan/drafts/PAN-4481.md WI-1. Add SHARE_BASE_URL (optional, committed var https://share.overdeck.ai) to services/account env.ts Config as shareBaseUrl. In pkce.ts add shareRedirectUri(config) and validateShareRedirect(raw, config) as separate functions beside validateLoopbackRedirect and NATIVE_APP_REDIRECT; validateClientRedirect(raw, config) tries native, then share, then loopback. parseStart/readPayload take config. Pairing rule: the share redirect requires platform=web and platform=web requires the share redirect. devices.ts PLATFORM_RE gains |web and defaultLabel('web') returns 'Web browser'. device-flow.ts issueCode refuses platform=web with 400 invalid_request. Extend pkce.test.ts and device-flow.test.ts as the PRD lists."
+        },
+        "items": [
+          {
+            "id": "account-share-redirect.ac1",
+            "title": "Given SHARE_BASE_URL=https://share.test, GET /auth/start with redirect_uri=https://share.test/auth/callback and platform=web returns 302 to GitHub, and after the GitHub leg the minted device row has platform 'web' and label 'Web browser'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-share-redirect.ac2",
+            "title": "GET /auth/start rejects with the 400 page each of https://share.test/auth/callback/x, https://share.test/auth/callback?x=1, http://share.test/auth/callback and https://evil.test/auth/callback",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-share-redirect.ac3",
+            "title": "GET /auth/start rejects with the 400 page the share redirect with platform=linux-x64, a loopback redirect with platform=web, and the share redirect when SHARE_BASE_URL is unset",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-share-redirect.ac4",
+            "title": "POST /oauth/device/code with platform=web returns 400 invalid_request, and GET /auth/start still accepts the existing loopback and ai.overdeck.app:/oauth/callback redirects",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "account-web-rpc",
+        "title": "Account Worker: AccountRpc.redeemWebCode and AccountRpc.signOutDevice",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T15:48:54Z",
+        "metadata": {
+          "issueLabel": "pan-4481",
+          "readiness": "ready",
+          "inspectionDepth": "deep",
+          "difficulty": "medium",
+          "kind": "api",
+          "requiresInspection": true,
+          "foundationFor": [
+            "share-web-session",
+            "share-web-join-route"
+          ],
+          "files_scope": [
+            "services/account/src/pkce.ts",
+            "services/account/src/devices.ts",
+            "services/account/src/index.ts",
+            "services/account/src/contract.ts",
+            "tests/unit/services/account/web-rpc.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:account",
+            "npx vitest run tests/unit/services/account/web-rpc.test.ts tests/unit/services/account/pkce.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:account exits 0",
+            "web-rpc.test.ts passes and the existing /oauth/token tests in pkce.test.ts pass unchanged"
+          ],
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-2. Split pkce.ts exchangeAuthorizationCode into redeemAuthorizationCode (returns RedeemResult) plus the unchanged HTTP wrapper; add redeemWebCode(rc, input) that refuses any redirectUri other than the share redirect with invalid_request. Add signOutDeviceToken(rc, token) in devices.ts (revokes with revoked_by 'user'; an expired grant still signs out). Export RedeemWebCodeInput, RedeemResult and SignOutResult types from contract.ts. Add the two methods to class AccountRpc in index.ts using rpcContext. New tests/unit/services/account/web-rpc.test.ts on the D1 shim with an injected clock."
+        },
+        "items": [
+          {
+            "id": "account-web-rpc.ac1",
+            "title": "redeemWebCode with a valid share-redirect code and verifier returns ok with an accessToken matching ^odd_[0-9a-f]{64}$ for a device whose platform is web",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-web-rpc.ac2",
+            "title": "redeemWebCode returns invalid_grant for a reused code, a wrong verifier and a code older than 5 minutes, returns access_denied when the grant was revoked before redeem, and returns invalid_request for a loopback redirectUri",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-web-rpc.ac3",
+            "title": "signOutDeviceToken makes verifyDeviceToken return device_revoked for that token and returns invalid_token for an unknown token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-web-rpc.ac4",
+            "title": "POST /oauth/token returns the same status and JSON body as before for every existing authorization_code test case",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "share-room-ping",
+        "title": "Share DO: answer text ping with pong through the WebSocket auto-response",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T15:48:54Z",
+        "metadata": {
+          "issueLabel": "pan-4481",
+          "readiness": "ready",
+          "inspectionDepth": "fast",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "services/share/src/room.ts",
+            "tests/integration/services/share/miniflare.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:share",
+            "npx vitest run tests/integration/services/share/miniflare.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:share exits 0",
+            "miniflare.test.ts passes including the ping/pong case"
+          ],
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-3. In services/share/src/room.ts RoomHost constructor call ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair('ping', 'pong')) before blockConcurrencyWhile, with the comment from the PRD. Extend tests/integration/services/share/miniflare.test.ts: an admitted viewer socket sends 'ping' and receives 'pong', then an ice-servers request is still answered and no invalid_frame error arrives."
+        },
+        "items": [
+          {
+            "id": "share-room-ping.ac1",
+            "title": "Given an admitted viewer socket in Miniflare, sending the text frame ping returns exactly the text frame pong",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-room-ping.ac2",
+            "title": "After the ping, a {\"type\":\"ice-servers\"} frame still receives an ice-servers reply and the viewer receives no error invalid_frame frame",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "share-web-session",
+        "title": "Share Worker: browser sign-in, sealed session cookie and GET /v1/web/session",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T15:48:54Z",
+        "metadata": {
+          "issueLabel": "pan-4481",
+          "readiness": "ready",
+          "inspectionDepth": "deep",
+          "difficulty": "complex",
+          "kind": "backend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "share-web-join-route",
+            "share-invite-page-hosted",
+            "web-viewer-ui"
+          ],
+          "files_scope": [
+            "services/share/src/web-auth.ts",
+            "services/share/src/env.ts",
+            "services/share/src/account.ts",
+            "services/share/src/routes.ts",
+            "services/share/src/pages.ts",
+            "tests/unit/services/share/web-auth.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:share",
+            "npx vitest run tests/unit/services/share/web-auth.test.ts tests/unit/services/share/routes.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:share exits 0",
+            "web-auth.test.ts passes and the existing routes.test.ts cases still pass"
+          ],
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "NFR-1",
+            "NFR-2",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-4. env.ts: ACCOUNT_BASE_URL, WEB_SESSION_KEY (64 hex), ASSETS?: Fetcher, parseWebConfig/missingWebConfig, Config.web. account.ts: structural redeemWebCode/signOutDevice on AccountBinding and verifyDeviceIdentity(env, token) split out of verifyIdentity. New src/web-auth.ts: AES-GCM seal/unseal, cookie constants and attributes per PRD D-6, readWebSession, and handlers GET /auth/signin, GET /auth/callback, POST /auth/signout (Origin check), GET /v1/web/session with the exact outcomes and page texts in the PRD. pages.ts exports messagePage(title, bodyHtml, status) built on page() with HTML_CSP. routes.ts adds the four rows and the healthz web flag. New tests/unit/services/share/web-auth.test.ts drives routes.handle() with injected deps and a fake ACCOUNT."
+        },
+        "items": [
+          {
+            "id": "share-web-session.ac1",
+            "title": "GET /auth/signin?code=<CODE> sets __Host-ods_signin (HttpOnly; Secure; SameSite=Lax; Max-Age=600) and returns 302 to <ACCOUNT_BASE_URL>/auth/start with platform=web, code_challenge_method=S256 and redirect_uri=<PUBLIC_BASE_URL>/auth/callback",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-web-session.ac2",
+            "title": "GET /auth/callback with the matching state calls ACCOUNT.redeemWebCode with the sealed verifier, sets __Host-ods_session with HttpOnly, Secure, SameSite=Strict, Path=/ and Max-Age=2592000, and returns 303 to /s/<CODE>; the cookie value does not contain the odd_ token in plaintext",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-web-session.ac3",
+            "title": "GET /auth/callback returns the documented page for a mismatched state, a sign-in cookie older than 600 s, invite_only, github_denied, a redeem access_denied and a throwing redeemWebCode",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-web-session.ac4",
+            "title": "GET /v1/web/session returns signedIn true with githubId, login and avatarUrl for a valid session, signedIn false with reason grant_expired for an expired grant, and signedIn false plus a cleared cookie for a revoked device",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-web-session.ac5",
+            "title": "Without WEB_SESSION_KEY every web route returns 503 not_configured and GET /healthz returns \"web\": false; POST /auth/signout with a foreign Origin returns 403 forbidden_origin and does not call signOutDevice",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "share-web-join-route",
+        "title": "Share Worker: GET /v1/rooms/:code/web-join authenticated by session cookie and Origin",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T15:48:54Z",
+        "metadata": {
+          "issueLabel": "pan-4481",
+          "readiness": "ready",
+          "inspectionDepth": "fast",
+          "difficulty": "medium",
+          "kind": "api",
+          "requiresInspection": false,
+          "files_scope": [
+            "services/share/src/routes.ts",
+            "tests/unit/services/share/routes.test.ts",
+            "tests/integration/services/share/miniflare.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:share",
+            "npx vitest run tests/unit/services/share/routes.test.ts tests/integration/services/share/miniflare.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:share exits 0",
+            "routes.test.ts and miniflare.test.ts pass including the web-join cases"
+          ],
+          "traces": [
+            "FR-9",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-5 using the webJoinSocket handler shown there (upgradeRefusal, web config gate, Origin === PUBLIC_BASE_URL, readWebSession, verifyDeviceIdentity, forwardUpgrade to INTERNAL.join with X-Share-Identity). Add the unit cases to tests/unit/services/share/routes.test.ts. In tests/integration/services/share/miniflare.test.ts bind ACCOUNT_BASE_URL and WEB_SESSION_KEY, extend the inline AccountRpc stub with redeemWebCode and signOutDevice, and run sign-in -> callback -> web-join -> status lobby plus the foreign-Origin refusal."
+        },
+        "items": [
+          {
+            "id": "share-web-join-route.ac1",
+            "title": "Given a valid session cookie and Origin equal to PUBLIC_BASE_URL, GET /v1/rooms/<CODE>/web-join?v=1 forwards the upgrade to the room's /join with X-Share-Identity of the verified identity",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-web-join-route.ac2",
+            "title": "web-join returns 403 forbidden_origin for a missing or foreign Origin, 401 invalid_token without a cookie, with a tampered cookie, or with only an Authorization bearer header, 403 grant_expired, and 404 for an unknown room",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-web-join-route.ac3",
+            "title": "In Miniflare, sign-in then callback then a web-join socket with the session cookie receives status lobby and the host snapshot lists the viewer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "share-web-build",
+        "title": "Share Worker: esbuild viewer bundle build, static assets binding and web typecheck lane",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T15:48:54Z",
+        "metadata": {
+          "issueLabel": "pan-4481",
+          "readiness": "ready",
+          "inspectionDepth": "fast",
+          "difficulty": "medium",
+          "kind": "infra",
+          "requiresInspection": false,
+          "files_scope": [
+            "services/share/package.json",
+            "services/share/wrangler.jsonc",
+            "services/share/.gitignore",
+            "services/share/.dev.vars.example",
+            "services/share/public/.gitkeep",
+            "services/share/scripts/build-web.mjs",
+            "services/share/web/tsconfig.json",
+            "services/share/web/contracts.ts",
+            "services/share/web/main.ts",
+            "package.json",
+            "bun.lock"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck:share",
+            "npm --prefix services/share run build:web",
+            "npm --prefix services/share run build:dry"
+          ],
+          "expected_outputs": [
+            "typecheck:share exits 0 for both tsconfigs",
+            "services/share/public/viewer/viewer.js exists after build:web",
+            "build:dry exits 0"
+          ],
+          "traces": [
+            "FR-15",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-6. Add esbuild 0.28.1 (exact) as a devDependency of services/share and a build:web script; run bun install so bun.lock updates. New scripts/build-web.mjs bundles web/main.ts to public/viewer/viewer.js (iife, minify, es2022, alias @overdeck/contracts -> web/contracts.ts). New web/contracts.ts shim re-exporting packages/contracts/src/sharing.ts and sharing-wire.ts, web/tsconfig.json (DOM libs, paths alias to the shim), and a web/main.ts stub importing WebRtcViewer by relative path. wrangler.jsonc: assets {directory ./public, binding ASSETS, run_worker_first true}, build.command, ACCOUNT_BASE_URL var, WEB_SESSION_KEY secret comment. .gitignore public/viewer/; commit public/.gitkeep. Root package.json typecheck:share runs both tsconfigs. Resolve the two implementation checkpoints in the PRD (tsc through the shim; dry-run running build.command) using their stated fallbacks."
+        },
+        "items": [
+          {
+            "id": "share-web-build.ac1",
+            "title": "npm --prefix services/share run build:web creates services/share/public/viewer/viewer.js, and git status shows that file as ignored",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-web-build.ac2",
+            "title": "npm run typecheck:share runs tsc on services/share/tsconfig.json and services/share/web/tsconfig.json and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-web-build.ac3",
+            "title": "npm --prefix services/share run build:dry exits 0 from a checkout where public/viewer/ does not exist yet",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-web-build.ac4",
+            "title": "services/share/wrangler.jsonc contains the ASSETS assets binding with run_worker_first true and the ACCOUNT_BASE_URL var https://account.overdeck.ai",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "web-join-socket",
+        "title": "Hosted viewer: BrowserJoin state machine for the web-join socket",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T15:48:54Z",
+        "metadata": {
+          "issueLabel": "pan-4481",
+          "readiness": "ready",
+          "inspectionDepth": "fast",
+          "difficulty": "complex",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "services/share/web/join-socket.ts",
+            "tests/unit/services/share/web/join-socket.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:share",
+            "npx vitest run tests/unit/services/share/web/join-socket.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:share exits 0",
+            "join-socket.test.ts passes without real-time waits"
+          ],
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-7: services/share/web/join-socket.ts with the BrowserJoin class, deps, constants and rules exactly as specified (status and close-code mapping mirroring src/dashboard/server/services/share-join.ts, ping every 30 s with a 75 s pong timeout, ICE request/cache/timeout, restart dance, one-shot 10 s offer watchdog, pre-open failure callback). No DOM access. Tests in tests/unit/services/share/web/join-socket.test.ts with a fake WebSocket class and vi.useFakeTimers() only."
+        },
+        "items": [
+          {
+            "id": "web-join-socket.ac1",
+            "title": "Each service status frame and each close code 1000, 4003, 4004, 4008, 4009, 4010, 4011 and 4013 produces the BrowserJoinState listed in the PRD, and a signal frame received in lobby is dropped",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "web-join-socket.ac2",
+            "title": "With fake timers, the socket sends the text ping at 30 s, and closes and reports disconnected with error connection_lost when 75 s pass without a pong",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "web-join-socket.ac3",
+            "title": "status admitted sends one ice-servers request; fetchIceServers resolves the cached list, resolves [] on error turn_unavailable, and resolves [] after 5 s without an answer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "web-join-socket.ac4",
+            "title": "reconnect() sends no leave frame and opens the second socket only after the first socket's close event, or after 5 s when no close event arrives",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "web-join-socket.ac5",
+            "title": "When no offer arrives 10 s after status admitted, BrowserJoin closes and reopens the socket once and not a second time; an error before open calls onPreOpenFailure and reports disconnected with error unreachable",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "web-viewer-ui",
+        "title": "Hosted viewer: screen model, DOM rendering and page wiring",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T15:48:54Z",
+        "metadata": {
+          "issueLabel": "pan-4481",
+          "readiness": "ready",
+          "inspectionDepth": "fast",
+          "difficulty": "complex",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "services/share/web/view.ts",
+            "services/share/web/main.ts",
+            "tests/unit/services/share/web/view.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:share",
+            "npx vitest run tests/unit/services/share/web/view.test.ts",
+            "npm --prefix services/share run build:web && test $(wc -c < services/share/public/viewer/viewer.js) -le 65536"
+          ],
+          "expected_outputs": [
+            "typecheck:share exits 0",
+            "view.test.ts passes",
+            "the size test exits 0"
+          ],
+          "traces": [
+            "FR-12",
+            "FR-14",
+            "NFR-3",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-8: services/share/web/view.ts (pure screenFor(model) with the exact kinds and strings of the PRD table, and renderScreen using createElement/textContent only) and services/share/web/main.ts (session fetch, sign-in link, Join click setting dataset.hostedJoin and the sessionStorage marker, BrowserJoin + WebRtcViewer wiring, reload rejoin, Leave, Reconnect, Sign out form, pagehide cleanup). Notice texts copied from noticeText in SharedConversationView.tsx. Avatars built from githubId. Tests in tests/unit/services/share/web/view.test.ts (node, no DOM). Keep the bundle at or under 65,536 bytes."
+        },
+        "items": [
+          {
+            "id": "web-viewer-ui.ac1",
+            "title": "screenFor returns the kind and exact text listed in the PRD table for every session and join state, including signed-out with the /auth/signin?code=<CODE> link and confirm with Join",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "web-viewer-ui.ac2",
+            "title": "A lobby model never yields a conversation screen even when messages is non-empty, and a message whose text is <img src=x onerror=alert(1)> appears verbatim as text in the screen model",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "web-viewer-ui.ac3",
+            "title": "Roster avatar URLs are built as https://avatars.githubusercontent.com/u/<githubId>?s=48 even when presence carries a different avatarUrl",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "web-viewer-ui.ac4",
+            "title": "npm --prefix services/share run build:web produces public/viewer/viewer.js of at most 65536 bytes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "share-invite-page-hosted",
+        "title": "Share Worker: hosted-join section and CSP on /s/:code, probe guard, and /viewer/viewer.js route",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T15:48:54Z",
+        "metadata": {
+          "issueLabel": "pan-4481",
+          "readiness": "ready",
+          "inspectionDepth": "fast",
+          "difficulty": "medium",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "services/share/src/pages.ts",
+            "services/share/src/routes.ts",
+            "tests/unit/services/share/routes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:share",
+            "npx vitest run tests/unit/services/share/routes.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:share exits 0",
+            "routes.test.ts passes including the hosted-page and asset-route cases"
+          ],
+          "traces": [
+            "FR-11",
+            "FR-15",
+            "NFR-4",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-9. pages.ts invitePage(shortCode, nonce, web) renders today's page unchanged when web is null; with web it adds data-short-code on body, wraps the existing content in section#local-join, adds section#web-join (hidden), the deferred /viewer/viewer.js script and the CSP from the PRD. The probe script only navigates when document.documentElement.dataset.hostedJoin !== 'started'. Viewer CSS goes into STYLE. routes.ts passes the web flag to invitePage and adds GET /viewer/viewer.js served through env.ASSETS with Content-Type text/javascript. The hosted page and messagePage send Referrer-Policy same-origin (page() gains a referrerPolicy parameter defaulting to no-referrer) so the Sign out form POST carries a real Origin. The ws origin in the CSP and in main.ts follows the page scheme (wss for https, ws for local http). Extend tests/unit/services/share/routes.test.ts."
+        },
+        "items": [
+          {
+            "id": "share-invite-page-hosted.ac1",
+            "title": "With web configured, GET /s/<active code> renders data-short-code=\"<CODE>\", section id=\"web-join\" and <script src=\"/viewer/viewer.js\" defer>, with the CSP default-src 'none'; style-src 'unsafe-inline'; script-src 'self' 'nonce-<nonce>'; connect-src 'self' wss://<share host> http://localhost:3011 http://127.0.0.1:3011; img-src https://avatars.githubusercontent.com; frame-ancestors 'none'; base-uri 'none'; form-action 'self', and sends Referrer-Policy same-origin",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-invite-page-hosted.ac2",
+            "title": "Without web config, GET /s/<active code> returns the same CSP and Referrer-Policy no-referrer as before this change, and the ended page contains no script in both modes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-invite-page-hosted.ac3",
+            "title": "The probe script calls location.assign only when document.documentElement.dataset.hostedJoin is not started",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-invite-page-hosted.ac4",
+            "title": "GET /viewer/viewer.js returns 200 text/javascript with X-Content-Type-Options nosniff when the ASSETS binding returns the file, and 404 not_found when ASSETS is absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-hosted-join",
+        "title": "Docs: hosted web join in SHARED-SESSIONS.md, ACCOUNT-SERVICE.md, shared-sessions.mdx and the codebase map",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T15:48:54Z",
+        "metadata": {
+          "issueLabel": "pan-4481",
+          "readiness": "ready",
+          "inspectionDepth": "fast",
+          "difficulty": "simple",
+          "kind": "docs",
+          "requiresInspection": false,
+          "files_scope": [
+            "docs/SHARED-SESSIONS.md",
+            "docs/ACCOUNT-SERVICE.md",
+            "configuration/shared-sessions.mdx",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -c 'web-join' docs/SHARED-SESSIONS.md",
+            "grep -c 'redeemWebCode' docs/ACCOUNT-SERVICE.md",
+            "grep -c 'Join in a browser' configuration/shared-sessions.mdx"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "each grep prints a count of at least 1"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-5",
+            "FR-9",
+            "FR-11",
+            "NFR-6",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-10 exactly: docs/SHARED-SESSIONS.md section 'Hosted web join (slice 10, PAN-4481)', new HTTP API rows, configuration rows, visibility note, deploy steps (WEB_SESSION_KEY via openssl rand -hex 32; account Worker first); docs/ACCOUNT-SERVICE.md share redirect, web platform, device-flow refusal, RPC methods, SHARE_BASE_URL; configuration/shared-sessions.mdx 'Join in a browser' subsection and Before-you-start wording; .overdeck/context/codebase/architecture.md services/share row plus last-verified date."
+        },
+        "items": [
+          {
+            "id": "docs-hosted-join.ac1",
+            "title": "docs/SHARED-SESSIONS.md contains GET /auth/signin, GET /auth/callback, POST /auth/signout, GET /v1/web/session, GET /v1/rooms/:code/web-join and GET /viewer/viewer.js in its HTTP API table and contains ACCOUNT_BASE_URL, WEB_SESSION_KEY and ASSETS in its configuration table",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-hosted-join.ac2",
+            "title": "docs/SHARED-SESSIONS.md Deploy names the openssl rand -hex 32 / wrangler secret put WEB_SESSION_KEY step and states that the account Worker deploys first",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-hosted-join.ac3",
+            "title": "docs/ACCOUNT-SERVICE.md contains the exact <SHARE_BASE_URL>/auth/callback redirect, the platform=web pairing, the device flow's refusal of web, SHARE_BASE_URL, and the redeemWebCode and signOutDevice RPC signatures",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-hosted-join.ac4",
+            "title": "configuration/shared-sessions.mdx contains a 'Join in a browser' subsection whose steps are open the link, Sign in with GitHub, Join, wait in the lobby, and which states that browser viewers are read-only",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "account-share-redirect",
+        "to": "account-web-rpc",
+        "type": "blocks"
+      },
+      {
+        "from": "account-web-rpc",
+        "to": "share-web-session",
+        "type": "blocks"
+      },
+      {
+        "from": "share-room-ping",
+        "to": "share-web-join-route",
+        "type": "blocks"
+      },
+      {
+        "from": "share-web-session",
+        "to": "share-web-join-route",
+        "type": "blocks"
+      },
+      {
+        "from": "share-web-build",
+        "to": "share-web-join-route",
+        "type": "blocks"
+      },
+      {
+        "from": "share-web-build",
+        "to": "web-join-socket",
+        "type": "blocks"
+      },
+      {
+        "from": "share-web-build",
+        "to": "web-viewer-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "web-join-socket",
+        "to": "web-viewer-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "share-web-session",
+        "to": "share-invite-page-hosted",
+        "type": "blocks"
+      },
+      {
+        "from": "share-web-join-route",
+        "to": "share-invite-page-hosted",
+        "type": "blocks"
+      },
+      {
+        "from": "account-web-rpc",
+        "to": "docs-hosted-join",
+        "type": "blocks"
+      },
+      {
+        "from": "share-invite-page-hosted",
+        "to": "docs-hosted-join",
+        "type": "blocks"
+      },
+      {
+        "from": "web-viewer-ui",
+        "to": "docs-hosted-join",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

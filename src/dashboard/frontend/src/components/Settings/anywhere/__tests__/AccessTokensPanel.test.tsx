@@ -86,3 +86,59 @@ describe('AccessTokensPanel (PAN-4649)', () => {
     expect(await screen.findByText('Only a browser on this machine can list access tokens.')).toBeInTheDocument();
   });
 });
+
+describe('AccessTokensPanel — agent token fold (PAN-4946)', () => {
+  const AGENT_TOKENS = [
+    ...TOKENS,
+    { id: 'tok-agent-1', name: 'agent-pan-1', scopes: ['operate'], createdAt: '2026-10-01T00:00:00.000Z', lastUsedAt: null, agentId: 'agent-pan-1' },
+    { id: 'tok-agent-2', name: 'agent-pan-2', scopes: ['read:state'], createdAt: '2026-09-01T00:00:00.000Z', lastUsedAt: null, revokedAt: '2026-09-02T00:00:00.000Z', agentId: 'agent-pan-2' },
+  ];
+
+  beforeEach(() => {
+    fetchMock = vi.fn((input: string | URL | Request, init?: RequestInit) => {
+      const url = input.toString();
+      if (url === '/api/access-tokens' && !init?.method) return Promise.resolve(jsonResponse(200, { tokens: AGENT_TOKENS }));
+      return Promise.resolve(jsonResponse(404, { error: 'not found' }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('ac1: hides agent tokens behind "Show agent tokens (2)", counting a revoked one', async () => {
+    renderPanel();
+    expect(await screen.findByText('Claude Desktop')).toBeInTheDocument();
+    expect(screen.queryByText('agent-pan-1')).not.toBeInTheDocument();
+    expect(screen.queryByText('agent-pan-2')).not.toBeInTheDocument();
+    const toggle = screen.getByTestId('show-agent-tokens');
+    expect(toggle).toHaveTextContent('Show agent tokens (2)');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('ac2: expands to show both agent tokens and reads "Hide agent tokens (2)"', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await screen.findByText('Claude Desktop');
+
+    await user.click(screen.getByTestId('show-agent-tokens'));
+
+    expect(screen.getByText('agent-pan-1')).toBeInTheDocument();
+    expect(screen.getByText('agent-pan-2')).toBeInTheDocument();
+    const toggle = screen.getByTestId('show-agent-tokens');
+    expect(toggle).toHaveTextContent('Hide agent tokens (2)');
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('ac3: renders no toggle when no record carries an agentId', async () => {
+    fetchMock.mockImplementation((input: string | URL | Request, init?: RequestInit) => {
+      const url = input.toString();
+      if (url === '/api/access-tokens' && !init?.method) return Promise.resolve(jsonResponse(200, { tokens: TOKENS }));
+      return Promise.resolve(jsonResponse(404, { error: 'not found' }));
+    });
+    renderPanel();
+    await screen.findByText('Claude Desktop');
+    expect(screen.queryByTestId('show-agent-tokens')).not.toBeInTheDocument();
+  });
+});

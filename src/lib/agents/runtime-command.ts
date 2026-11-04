@@ -15,9 +15,10 @@ import { loadConfigSync as loadYamlConfig, type RoleEffort } from '../config-yam
 import { resolveEffort } from './resolve-effort.js';
 import { getClaudeAuthStatus } from '../claude-auth.js';
 import { materializeAcpContextFile } from '../acp/context.js';
+import { overdeckMcpEnabledFor } from '../mcp/overdeck-mcp-gate.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { hostLabel, hostLaunchErrorFile, hostSessionIdFile, hostSocketPath, hostTokenFile, type HostTransport } from '../runtimes/host-transport.js';
-import { initCodexHome } from '../runtimes/codex.js';
+import { initCodexHome, type CodexMcpServerDef } from '../runtimes/codex.js';
 import { createOhmypiFifo, ohmypiFifoPaths, OhmypiNotReady, writeOhmypiCommandSync } from '../runtimes/ohmypi-fifo.js';
 import { piFifoPaths, PiNotReady, writePiCommand } from '../runtimes/pi-fifo.js';
 import type { RuntimeName } from '../runtimes/types.js';
@@ -32,6 +33,7 @@ import { waitForReadySignal } from './identity.js';
 import { CLI_PROXY_MODEL_ALIASES } from './provider-env.js';
 import { getClaudeCodeLaunchModel } from '../kimi-claude-routing.js';
 import { codexSessionsRoot } from '../runtimes/storage/codex.js';
+import { OVERDECK_MCP_SERVER_NAME } from '../mcp/overdeck-mcp-args.js';
 
 const execAsync = promisify(exec);
 const missingRoleDefinitionWarnings = new Set<string>();
@@ -118,14 +120,14 @@ export async function getOhmypiLauncherFields(agentId: string, model: string, ef
   };
 }
 
-export function getAcpLauncherFields(
+export async function getAcpLauncherFields(
   agentId: string,
   model: string,
   workspace: string,
   binaryPath: string,
   role?: Role,
   effort?: string,
-): {
+): Promise<{
   harness: 'acp' | 'opencode';
   acpAgentId: string;
   acpProvider: string;
@@ -135,7 +137,7 @@ export function getAcpLauncherFields(
   acpEffort: string;
   model: string;
   unsetProviderEnv: true;
-} {
+}> {
   const harness = model.startsWith('opencode/') || model.startsWith('opencode-go/') ? 'opencode' : 'acp';
   return {
     harness,
@@ -143,7 +145,7 @@ export function getAcpLauncherFields(
     acpProvider: getProviderForModel(model).name,
     acpWorkspace: workspace,
     acpBinaryPath: binaryPath,
-    acpContextFile: materializeAcpContextFile(getAgentDir(agentId), workspace, harness),
+    acpContextFile: materializeAcpContextFile(getAgentDir(agentId), workspace, harness, { overdeckMcp: await overdeckMcpEnabledFor(harness).catch(() => false) }),
     acpEffort: harness === 'opencode' && effort && !isEffortLevel(effort) ? effort : resolveEffort({ explicit: effort, role, model, harness }).effort,
     model,
     unsetProviderEnv: true,
@@ -171,7 +173,7 @@ export function getKimiCodeLauncherFields(model: string, effort?: string): {
   };
 }
 
-export function getCodexLauncherFields(agentId: string, model: string, workspacePath?: string, role?: Role, effort?: string): {
+export function getCodexLauncherFields(agentId: string, model: string, workspacePath?: string, role?: Role, effort?: string, overdeckMcpServers: Record<string, CodexMcpServerDef> = {}): {
   harness: 'codex';
   codexMode: 'app-server' | 'work-tui';
   codexEffort: string;
@@ -197,7 +199,7 @@ export function getCodexLauncherFields(agentId: string, model: string, workspace
     approvalPolicy,
     sandboxMode,
     approvalsReviewer,
-    mcpServers: role ? parseRoleMcpServers(roleAgentDefinitionPath(role)) : undefined,
+    mcpServers: { ...(role ? parseRoleMcpServers(roleAgentDefinitionPath(role)) : {}), ...overdeckMcpServers },
   });
   return {
     harness: 'codex',
@@ -813,6 +815,7 @@ export function roleAgentDefinitionPath(role: Role, subRole?: string): string | 
  *   - `tools:`    → `--allowedTools` (PAN-2090), with each declared MCP server
  *     appended as `mcp__<name>` so the role can still call its own MCP tools —
  *     otherwise the strict allow-list would block e.g. playwright for `test`.
+ *     The allow-list always names `mcp__overdeck` too (PAN-4932 D-8).
  *
  * The role frontmatter's hooks are deliberately NOT reconstituted: they are
  * installed globally in `~/.claude/settings.json` and fire for every claude
@@ -871,7 +874,7 @@ export function roleSystemPromptInjection(definitionPath: string, explicitEffort
   if (Array.isArray(frontmatter.tools)) {
     const toolNames = frontmatter.tools.filter((t): t is string => typeof t === 'string');
     if (toolNames.length > 0) {
-      const allowed = [...toolNames, ...mcpNames.map((n) => `mcp__${n}`)];
+      const allowed = [...toolNames, ...mcpNames.map((n) => `mcp__${n}`), `mcp__${OVERDECK_MCP_SERVER_NAME}`];
       flags.push(` --allowedTools '${allowed.join(',')}'`);
     }
   }

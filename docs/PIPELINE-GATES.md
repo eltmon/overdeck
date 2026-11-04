@@ -562,6 +562,26 @@ run in the deacon child yet
 waits for the next request. [PAN-4622](https://github.com/eltmon/overdeck/issues/4622)
 tracks closing this window.
 
+### Review dispatch touches neither the stack nor tracked files (PAN-4690)
+
+After verification passes, review dispatch keeps the window in which a
+dashboard restart can strand it short, and it leaves the workspace in a state
+from which `recoverUndispatchedReviews` can re-request the review:
+
+- **No stack gate for review.** `assertWorkspaceStackHealthyForSpawn`
+  (`agents/spawn-prep.ts`) returns at once for the `review` role, after the
+  missing-workspace check. Review reads only the committed diff, so it never
+  checks stack health, never rebuilds the stack, and runs on the host. Before
+  this, review dispatch could tear the stack down and run `docker compose up -d
+  --build` before spawning. A restart in that window killed the rebuild and the
+  spawn together, and left the containers in `Created`. Other non-`work` roles
+  keep the bounded rebuild with host fallback.
+- **No uncommitted tracked writes.** Dispatch clears only the gitignored
+  feedback mirror, never the continue file's `feedback[]`, and a no-op
+  continue-file update writes nothing (see [XBRIEF.md](XBRIEF.md)). Otherwise
+  the dirty-tree gate refuses the dispatched review and every deacon-lite
+  re-request of it.
+
 ## Verification artifacts (FR-8)
 
 Each verification run writes an immutable artifact named by run time and
@@ -729,7 +749,10 @@ the entry after it.
 **Recording retries transient forge failures (PAN-4263).** `pan admin
 specialists done` finds the PR through `discoverArtifact` (`lib/forge.ts`),
 which retries a rate-limit, network or 502/503/504 failure twice, after 2 s
-and 8 s (`lib/forge-transient.ts`). A lookup that still fails is reported as
+and 8 s (`lib/forge-transient.ts`). A 502/503/504 counts in any of gh's
+wordings (`HTTP 502`, `failed: 502`, `non-200 OK status code: 502`), and so
+does GitHub's GraphQL `Something went wrong while executing your query`
+(PAN-5015). A 500 does not. A lookup that still fails is reported as
 `Couldn't reach <forge> to find the review artifact for <branch>: <reason>`,
 never as "No open review artifact": only gh's own "no pull requests found"
 answer (or an empty `glab mr list`) means there is no PR, and a closed PR on
@@ -824,6 +847,16 @@ nothing while a review is already running. Every completed pass keeps each candi
 `GET /api/merge-train/auto-merge/pending` and shown on the Flywheel page's
 Pending auto-merges card as "Not scheduled: <reason>". A reason is logged only
 when it changes.
+PAN-5036: the scheduler never schedules nothing silently. When the project's
+PR listing read fails (`readRepoPullRequests` answers `null`), the project gets
+one skip entry, "PR listing unavailable", with `scope: 'project'` and the
+project key as `issueId`; it logs once when it appears and once when it clears.
+An open `feature/<id>` PR that the cached listing rules out (checks not green, or
+conflicting) passes through the free checks (policy, Deft hold, latest row)
+and is then skipped with a reason naming the head it judged, for example
+"checks pending in the PR listing at 697a05f8". A journaled `review.verdict`
+APPROVED drops that repo's cached listing (`invalidatePullRequestListingOnApproval`
+in `issue-pr-refresh.ts`), so the next pass reads fresh checks.
 Auto-merge eligibility applies the same rule. Nothing is stored; each input is
 read when the question is asked. The PR is merge-ready when, in order:
 
@@ -1068,8 +1101,9 @@ both intents, build and run the gates, commit, push, and run
 
 - `scripts/file-size-allowlist.txt`: take main's rows, never raise a cap, and
   shrink a file that is over its cap.
-- `.overdeck/context/codebase/*.md`: keep both sides and refresh the
-  `last-verified` date.
+- `.overdeck/context/codebase/*.md`: keep both sides; on a conflicting
+  `last-verified` footer, keep one footer with the later date only, never
+  issue ids.
 - `bun.lock`: take main's version, then run `bun install`.
 - The slash-command manifest: run `npm run generate:slash-commands`.
 - `.pan/continues` and `.pan/specs`: `pan sync-main` already prefers main.
@@ -1171,9 +1205,13 @@ that declaration. There is no escalation for blockers that never merge.
 ## Review Convergence Gate (PAN-3151)
 
 When a review round comes back with blocking findings, the finding count is
-tracked across rounds from the round artifacts on disk. When ≥3 rounds are
-recorded and the series shows a reversal (latest count > previous) or a
-stall (two consecutive non-decreases), automatic rework re-drive is
+tracked across rounds from the round artifacts on disk. Only the current
+episode is judged: the rounds after the last 0-blocker (approved) round,
+because blockers found after an approval come from new code such as a
+conflict repair or a main merge, not from the reviewer reversing itself
+(PAN-4993). When the episode has ≥3 rounds and shows a reversal (latest
+count > previous) or a stall (two consecutive non-decreases), automatic
+rework re-drive is
 suppressed — feedback is still written and posted, but the work agent is not
 re-messaged automatically — and a needs-you escalation surfaces with the
 round history and guidance to decompose the change into sibling issues.
@@ -1487,6 +1525,36 @@ Auto-resume is intentionally suppressible:
 These gates are orthogonal to deacon-lite's own start/stop toggle
 (`pan admin cloister start|stop`).
 
+### Disk-low hold (PAN-4961)
+
+A work start whose workspace stack is unhealthy would rebuild it, and a stack
+rebuild writes about 2 GB. Before that rebuild, both start paths ask
+`resolveIssueStackDiskHold` (`src/lib/workspace/disk-cost.ts`) whether the
+project's measured stack cost fits above the 10 GiB disk floor once the
+in-flight reservations are counted (see "Disk floor and in-flight
+reservations" in [WORKSPACES-AND-PROJECTS.md](WORKSPACES-AND-PROJECTS.md)).
+When it does not, the start is held, not attempted:
+
+- `POST /api/agents` (the dashboard Start button and the finalize auto-handoff)
+  answers HTTP 507 with
+  `{ success: false, blocked: true, skipped: true, diskLow: true, error, hint }`.
+- CLI `pan start` spawns in-process, so `assertWorkspaceStackHealthyForSpawn`
+  (`src/lib/agents/spawn-prep.ts`) throws an error whose message is the
+  disk-low text. Review, test and ship fall back to the host instead, as they
+  do for any unhealthy stack.
+
+Both messages start with `Disk low — new workspace starts are held`. A start
+whose stack is already healthy adds no disk cost and is never held. The hold
+counts no rebuild attempt and sets no cooldown or escalation, so the first
+start after space returns rebuilds at once. Both spawn-refusal classifiers map
+`diskLow: true` to the retryable `guardrails` reason, so the finalize
+auto-handoff records the refusal as deferred and deacon-lite retries it on its
+usual backoff (2, 4, 8, 16, then every 20 minutes). Like every deferred
+handoff, the retries stop after `DEFERRED_HANDOFF_WINDOW_MS` (2 hours): if the
+disk is still low then, deacon-lite records `planning.failed
+stage=auto-handoff` and a warn activity asking for `pan start <id>`, and the
+work agent starts only when someone runs it.
+
 ## GitHub quota policy (PAN-4264)
 
 GitHub limits each identity to 5,000 points per hour per bucket (GraphQL and
@@ -1554,6 +1622,8 @@ failures, and the closed-issue reaper treats the issue as not closed.
 - A minted App installation token is reused until 5 minutes before it expires.
 - Boot-warm refreshes are staggered over 60 seconds and periodic convergence over 4 minutes, one project per refresh batch; the first CI refill runs at boot + 2 minutes.
 - The close-out merged-PR lookup (`isSquashMergedViaPr`) runs through `runGh` instead of a raw unmetered exec, and a "not merged" answer for a `(project, branch, tip SHA)` is cached for one hour so the deacon's 60-second closed-issue reaper does not re-ask GitHub every tick for a still-unmerged branch (PAN-4291).
+- The closed-issue reaper's passive scans (workspace dirs, `agent-<issue>` state dirs, leaked `_devnet` networks) skip an issue whose residue the same deacon process reaped in the last 6 hours (`REAPED_RESIDUE_RECHECK_MS`). Reaping keeps the `agent-<issue>` directory, so without this every closed issue was re-checked against GitHub forever; 400+ of them spent the whole App REST quota. The running-agent loops still check every tick (PAN-5001).
+- A deacon-lite patrol tick, or a manual patrol request, that arrives while a patrol is still running joins it instead of starting an overlapping sweep (PAN-5001).
 - `readRepoPullRequests` skips the `gh pr list` call entirely — no exec, no ledger line — for a repo with no git remote or a project with no resolvable tracker.
 - The PR-cache listing is capped at 100 rows, not 200, and a listing with no OPEN PR is cached for `PR_CACHE_IDLE_TTL_MS` (5 minutes) instead of the flat 30 seconds, since nothing in it can change without a new PR opening.
 - `gh pr list`/`gh issue list` calls are priced by the GraphQL pages they actually walk (`priceGhListCall`), weighted by which `--json` fields GitHub joins in, instead of a flat 1 point.

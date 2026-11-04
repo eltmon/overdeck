@@ -1,3 +1,4 @@
+import { agentTmpdirLauncherLine } from './agent-tmpdir.js';
 import { museDataHome } from './runtimes/storage/muse.js';
 import { prepareClaudeContext } from './launcher-context.js';
 import { dirname, join } from 'node:path';
@@ -11,6 +12,7 @@ import { getOverdeckHome, packageRoot } from './paths.js';
 import { buildConversationGhShimLines, buildGitGuardLines, type GitGuardMode } from './launcher-git-guard.js';
 import { buildCodexCommand, type CodexNativeEndpointOption } from './launcher-codex-command.js';
 import { shellQuote } from './shell-quote.js';
+import { overdeckMcpArgs } from './mcp/overdeck-mcp-args.js';
 import { resolveKimiNativeEffort } from './kimi-effort.js';
 import { getClaudeCodeLaunchModel } from './kimi-claude-routing.js';
 import { harnessLaunchLines } from './launcher-job-control.js';
@@ -251,6 +253,9 @@ export interface LauncherConfig extends CodexNativeEndpointOption {
    */
   channelsBridgeServerName?: string;
 
+  /** PAN-4932: `<dir>/overdeck-mcp.json`; Claude Code paths append `--mcp-config=` and, without an allow-list, `--allowedTools=mcp__overdeck`. */
+  overdeckMcpConfig?: string;
+
   /** Wrap Claude Code in the PTY supervisor: `node <supervisorScriptPath> claude ...`. Defaults to false. */
   useSupervisor?: boolean;
   /** Absolute path to dist/pty-supervisor.js. Required when useSupervisor=true. */
@@ -323,8 +328,9 @@ export function generateLauncherScript(config: LauncherConfig): string {
   lines.push('export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"');
   lines.push('unset TMUX TMUX_PANE STY');
   // Remote launchers run on Fly VMs where the spawning host's home is invalid.
+  // PAN-4998: keep Claude Code's scratch out of /tmp, which a reboot empties.
   if (config.spawnMode !== 'remote') {
-    lines.push(`export OVERDECK_HOME=${shellQuote(getOverdeckHome())}`);
+    lines.push(`export OVERDECK_HOME=${shellQuote(getOverdeckHome())}`, agentTmpdirLauncherLine());
   }
 
   // Pipefail
@@ -547,6 +553,7 @@ function buildCommand(config: LauncherConfig): string[] {
     if (config.baseCommand) {
       let cmd = config.baseCommand;
       cmd += buildChannelsArgs(config);
+      cmd += overdeckMcpArgs(config.overdeckMcpConfig, cmd);
       for (const file of systemPromptFiles(config)) {
         cmd += ` --append-system-prompt-file ${shellQuote(file)}`;
       }
@@ -679,6 +686,7 @@ function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): 
 
   // Append channels bridge args (no-op when channelsBridgeMcpConfig unset)
   cmd += buildChannelsArgs(config);
+  cmd += overdeckMcpArgs(config.overdeckMcpConfig, cmd);
 
   // Append session args
   if (config.resumeSessionId) {
@@ -878,6 +886,7 @@ function buildAcpCommand(config: LauncherConfig, useExec: boolean): string[] {
   if (config.acpContextFile) {
     tokens.push('--context-file', shellQuote(config.acpContextFile));
   }
+  if (config.overdeckMcpConfig) tokens.push('--mcp-config', shellQuote(config.overdeckMcpConfig));
   if (config.acpProvider === 'kimi' && config.model) {
     const effort = resolveKimiNativeEffort(config.model, config.acpEffort);
     if (effort) tokens.push('--effort', shellQuote(effort));

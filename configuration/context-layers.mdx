@@ -84,12 +84,16 @@ harness-correct launch artifact from global, project, and workspace layers:
 | **Claude Code** | `~/.overdeck/context/claude-global.md` | Passed with Claude's append-system-prompt launch mechanism |
 | **Codex** | `~/.overdeck/context/codex-global.md` | Passed as Codex `developer_instructions` for TUI, exec/resume, and app-server transports |
 | **Pi** | `~/.overdeck/context/pi-global.md` | Injected into the session's system-prompt context at spawn. Pi does natively support a global `~/.pi/agent/AGENTS.md`; Overdeck deliberately does not write there — the global layer is delivered per-spawn instead, leaving `~/.pi/agent/` entirely yours |
-| **Kimi Code** | `~/.overdeck/context/launch/kimi-code-<workspace-hash>.md` | Sent once per native Kimi session as a clearly delimited first-user-message envelope. The managed context block comes first and the operator's original task follows unchanged in its own block |
+| **Kimi Code** | `~/.overdeck/context/launch/kimi-code-<workspace-hash>-cli.md` | Sent once per native Kimi session as a clearly delimited first-user-message envelope. The managed context block comes first and the operator's original task follows unchanged in its own block |
 | **Prime Agent** | `<agentDir>/prime-agent-context.md` (per agent) | Passed as `--append-system-prompt` values after Overdeck's managed policy, split on paragraph boundaries into values of at most 100,000 bytes. Overdeck writes nothing under `~/.prime/agent` |
 
 The `claude-global.md` / `pi-global.md` / `codex-global.md` files are **Overdeck-owned render
 artifacts** — the harnesses do not know about them. They exist so the global
 layer has a stable, inspectable rendered form per harness.
+
+Every launch artifact ends with a tools block: "Overdeck tools" when the agent
+gets the `overdeck` MCP server, else "Overdeck commands" with the `pan`
+equivalents ([details](/configuration/mcp#what-the-agent-is-told)).
 
 The persisted `.overdeck/context/workspace.md` is **harness-neutral** and does
 not contain a pre-rendered project layer. At launch, Overdeck renders the

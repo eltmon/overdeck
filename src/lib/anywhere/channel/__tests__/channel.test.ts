@@ -328,6 +328,52 @@ describe('secure channel (PAN-4645 WI-2)', () => {
     initiatorSide.destroy();
   });
 
+  it('reports the link mode on a handshake that times out (PAN-5018 FR-4)', async () => {
+    vi.useFakeTimers();
+    const [initiatorSide, responderSide] = duplexPair();
+    const pending = acceptChannel(responderSide as Duplex, {
+      localKey: freshKey(),
+      isPinnedPeer: () => true,
+      takePairing: neverPairing,
+      onPairingFailure: () => undefined,
+      timeoutMs: 50,
+    });
+    const settled = pending.then(() => 'resolved' as const, (error: Error) => error);
+    initiatorSide.write(encodePreamble({ linkProtocol: 1, mode: 'link', pairingId: null }));
+    await vi.advanceTimersByTimeAsync(50);
+    expect(await settled).toMatchObject({ code: 'timeout', mode: 'link' });
+    initiatorSide.destroy();
+  });
+
+  it('reports internal when isPinnedPeer throws (PAN-5018 FR-4)', async () => {
+    const responderKey = freshKey();
+    const responder = await startResponder({
+      localKey: responderKey,
+      isPinnedPeer: () => {
+        throw new Error('boom');
+      },
+      takePairing: neverPairing,
+      onPairingFailure: () => undefined,
+    });
+
+    await openChannel(responder.url, { mode: 'link', localKey: freshKey(), remoteKeyHex: hex(responderKey), timeoutMs: 2_000 }).catch(() => undefined);
+    await vi.waitFor(() => expect(responder.acceptErrors).toHaveLength(1));
+    expect(responder.acceptErrors[0]).toMatchObject({ code: 'internal', mode: 'link', message: 'boom' });
+  });
+
+  it('reports a null mode when the peer closes before the preamble (PAN-5018 FR-4)', async () => {
+    const [initiatorSide, responderSide] = duplexPair();
+    const pending = acceptChannel(responderSide as Duplex, {
+      localKey: freshKey(),
+      isPinnedPeer: () => true,
+      takePairing: neverPairing,
+      onPairingFailure: () => undefined,
+    });
+    initiatorSide.end();
+    await expect(pending).rejects.toMatchObject({ code: 'closed', mode: null });
+    initiatorSide.destroy();
+  });
+
   it('respects an external abort signal while connecting', async () => {
     const controller = new AbortController();
     const pending = openChannel('tcp://127.0.0.1:9', { mode: 'link', localKey: freshKey(), remoteKeyHex: 'ab'.repeat(32), signal: controller.signal });

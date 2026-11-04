@@ -6,7 +6,8 @@
  * checks the marker again. The handshake already proved the caller's machine
  * key, so the route mints the `machine` token bound to that key (revoking the
  * environment's previous one, D-4645-18) and, when the caller sent a reverse
- * token, writes this machine's own link back to it.
+ * token, writes this machine's own link back to it. A code issued for an
+ * Overdeck connector is refused (PAN-4927 W-CONN1).
  */
 import { Effect, Layer, Option, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
@@ -16,7 +17,9 @@ import { MACHINE_ACCESS_LEVELS, type MachineAccess } from '../../../lib/access-t
 import { listMachineProjects } from '../../../lib/anywhere/project-origin.js';
 import { sharedConversations, type SharedConversationsDeps } from '../../../lib/anywhere/shared-conversations.js';
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
+import { captureLinkApproved, captureLinkFailed } from '../../../lib/telemetry/anywhere.js';
 import { type ChannelMarker, channelOfRequest } from '../channel-peer.js';
+import { hasConnectorIntent } from '../connector-pairing.js';
 import { endStreamOnDeviceRevocation } from '../device-connections.js';
 import { jsonResponse } from '../http-helpers.js';
 import { currentApprovalService } from '../services/directory-approval.js';
@@ -76,6 +79,9 @@ export async function handleMachinesExchange(
   if (channel?.mode !== 'pairing') {
     return jsonResponse({ error: 'machine exchange is accepted only inside a pairing channel' }, { status: 403 });
   }
+  if (channel.pairingId !== null && hasConnectorIntent(channel.pairingId)) {
+    return jsonResponse({ error: 'this pairing code is for an Overdeck connector; run pan mcp connector pair with it', code: 'connector-code' }, { status: 403 });
+  }
   const body = parseExchangeBody(bodyText);
   if (typeof body === 'string') return jsonResponse({ error: body }, { status: 400 });
 
@@ -89,10 +95,15 @@ export async function handleMachinesExchange(
       reverse: body.reverse,
     });
   } catch (error) {
-    if (error instanceof GrantMachineLinkError) return jsonResponse({ error: error.message }, { status: 400 });
+    if (error instanceof GrantMachineLinkError) {
+      // PAN-5016 D-6: the approver cannot tell a pasted pairing link from SSH or Fly.
+      captureLinkFailed('pairing_code', 'approver', 'grant_refused');
+      return jsonResponse({ error: error.message }, { status: 400 });
+    }
     throw error;
   }
   const { token, record, reverseLinkId } = granted;
+  captureLinkApproved('pairing_code', 'approver');
 
   emitActivityEntry({
     source: 'dashboard',

@@ -119,15 +119,78 @@ panel.
 
 ## The Overdeck app
 
-Each phone paired with the Overdeck app receives every needs-you notification,
-sealed with `crypto_box_seal` to that phone's own push key. Your machine sends
-the sealed notification to connect.overdeck.ai, which forwards the ciphertext to
-Apple or Google; neither overdeck.ai nor Apple or Google can read it. A
-notification holds at most 2,256 bytes, so a long body is shortened and ends
-with `…`. The machine must be signed in to overdeck.ai and connected to it.
-Settings → Anywhere → Phone notifications shows the count, such as
-`Overdeck app: 2 phones`, and removing a phone from the device list stops its
-notifications within 5 seconds. To pair a phone, see [Phone](/configuration/phone).
+Each phone paired with the Overdeck app receives the notifications its own
+Settings allow, sealed with `crypto_box_seal` to that phone's own push key.
+Your machine sends the sealed notification to connect.overdeck.ai, which
+forwards the ciphertext to Apple or Google; neither overdeck.ai nor Apple or
+Google can read it. A notification holds at most 2,256 bytes, so a long body
+is shortened and ends with `…`. The machine must be signed in to overdeck.ai
+and connected to it. Settings → Anywhere → Phone notifications shows the
+count, such as `Overdeck app: 2 phones`, and removing a phone from the device
+list stops its notifications within 5 seconds. To pair a phone, see
+[Phone](/configuration/phone).
+
+The list above that line holds only paired browsers (web push subscriptions),
+not phones; when none are paired it reads "No browser receives notifications
+yet."
+
+On iPhone, the app decrypts each notification on the phone and shows its real
+title and text. If it cannot (for example before the first unlock after a
+restart), the notification reads **Overdeck · Something needs you**. Turn
+notifications on or off in the app's Settings.
+
+### Pause and notification types
+
+In the app's Settings, below the Notifications switch:
+
+- **Pause notifications** is a separate switch from the Notifications switch
+  above it. Turning it on stops every notification except **Send test**.
+  **Pause for 1 hour** and **Pause until tomorrow 8:00** pick an end time for
+  you; turning the switch off resumes immediately.
+- **Notification types** lists six switches, one per kind of item: **Agent
+  questions**, **Plan approvals**, **Permission prompts**, **Finished work**,
+  **Failures** and **Agent stopped responding**. They split the "What you
+  get" table above into finer categories: **Approval needed** splits into
+  **Plan approvals** and **Permission prompts**; **Failed** splits into
+  **Failures** and **Agent stopped responding**. **Agent questions** covers
+  the **Question** row and **Finished work** covers the **Finished** row,
+  each unchanged. Turning a type off stops that one kind of notification;
+  every other kind still arrives.
+
+Your machine applies pause and the muted types before sealing a notification,
+so a filtered notification never reaches connect.overdeck.ai, Apple or Google
+at all — it is simply not sent. **Send test** always arrives, pause or no
+pause, because it is your own check that the pipe works.
+
+A machine only applies settings it has received: it must run a version that
+supports this feature and be reachable at least once after you change a
+setting. The app's Settings lists any paired machine it has not yet reached,
+so you can tell when a change is still pending.
+
+This is separate from the **Notifications switch** above it: that switch
+turns this phone's own registration with overdeck.ai off, so no paired
+machine can reach it at all. Pause and notification types stay registered
+and simply filter what each machine sends.
+
+### Live Activity (iPhone)
+
+On iOS 16.2 and later, the Overdeck app shows a Live Activity on the lock
+screen and in the Dynamic Island, such as `3 need you · 2 running`. The first
+number counts the items that need you; the second counts the running agents.
+With several paired machines, the card shows their sum.
+
+iOS draws the card from a push without running the app, so its content cannot be
+end-to-end encrypted. Apple and overdeck.ai see these two numbers and nothing
+else: no titles, no conversation text, no machine names.
+
+- The card is on by default. Turn it off in the app's Settings → Live Activity.
+  If iOS Settings does not allow Live Activities for Overdeck, the app tells you
+  to turn them on there.
+- Your machine sends the counts whenever it is connected to overdeck.ai, even
+  when notifications are off.
+- The card dims when it has had no update for 10 minutes.
+- iOS ends a Live Activity after at most 8 hours. The card comes back the next
+  time you open the app.
 
 ### On Android
 

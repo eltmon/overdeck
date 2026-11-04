@@ -7,7 +7,9 @@
  * Bearer `odk_` token (`dashboard-api.ts`), so the route-scope table judges
  * each call and no operation gains a second path (parent PRD D-21). The tool
  * layer adds one check of its own: `answer_question` needs `approve`
- * (D-4649-5). It uses the low-level SDK `Server` with hand-written JSON
+ * (D-4649-5). `tools/list` and `tools/call` only ever see a caller's visible
+ * tools (scope and audience, PAN-4927 D-14); a hidden tool answers like an
+ * unknown one. It uses the low-level SDK `Server` with hand-written JSON
  * Schemas (D-4649-12).
  *
  * This module imports only Node built-ins, the SDK, `../access-tokens.js` and
@@ -16,13 +18,19 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 
+import { scopeSatisfies } from '../access-tokens.js';
 import { errorResult, type McpToolContext, type OverdeckTool } from './tool.js';
 import { APPROVE_TOOLS } from './tools-approve.js';
+import { DELEGATE_TOOLS } from './tools-delegate.js';
+import { LANE_TOOLS } from './tools-lanes.js';
+import { PR_LINK_TOOLS, PR_WATCH_TOOLS } from './tools-pr.js';
 import { READ_TOOLS } from './tools-read.js';
+import { SCHEDULE_TOOLS } from './tools-schedule.js';
+import { SELF_TOOLS } from './tools-self.js';
 import { WRITE_TOOLS } from './tools-write.js';
 
 export type { McpToolContext, OverdeckTool } from './tool.js';
-export { routeErrorResult } from './tool.js';
+export { hasAgentId, routeErrorResult } from './tool.js';
 
 export const MCP_SERVER_NAME = 'overdeck';
 /** The server reports a fixed version; `list_machines` carries the real `serverVersion`. */
@@ -32,14 +40,20 @@ const MCP_SERVER_VERSION = '0.0.0';
 export const MCP_DEFAULT_SCOPES = ['read:state', 'read:conversations', 'operate'] as const;
 
 /** Every tool, in tools/list order. Exported so tests compare against it. */
-export const ALL_TOOLS: readonly OverdeckTool[] = [...READ_TOOLS, ...WRITE_TOOLS, ...APPROVE_TOOLS];
+export const ALL_TOOLS: readonly OverdeckTool[] = [...READ_TOOLS, ...WRITE_TOOLS, ...SCHEDULE_TOOLS, ...PR_LINK_TOOLS, ...APPROVE_TOOLS, ...SELF_TOOLS, ...PR_WATCH_TOOLS, ...DELEGATE_TOOLS, ...LANE_TOOLS];
 
-export function createOverdeckMcpServer(ctx: McpToolContext): Server {
+/** The tools a caller may list and call: its scopes cover the tool's scope, and agent-only tools need an agent token (PAN-4927 D-14). */
+export function visibleTools(ctx: Pick<McpToolContext, 'scopes' | 'isAgent'>, tools: readonly OverdeckTool[] = ALL_TOOLS): OverdeckTool[] {
+  return tools.filter((tool) => scopeSatisfies(ctx.scopes, tool.scope) && (tool.audience === 'any' || ctx.isAgent));
+}
+
+export function createOverdeckMcpServer(ctx: McpToolContext, tools: readonly OverdeckTool[] = ALL_TOOLS): Server {
   const server = new Server({ name: MCP_SERVER_NAME, version: MCP_SERVER_VERSION }, { capabilities: { tools: {} } });
-  const byName = new Map(ALL_TOOLS.map((tool) => [tool.name, tool]));
+  const visible = visibleTools(ctx, tools);
+  const byName = new Map(visible.map((tool) => [tool.name, tool]));
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: ALL_TOOLS.map(({ name, description, inputSchema }) => ({ name, description, inputSchema })),
+    tools: visible.map(({ name, description, inputSchema }) => ({ name, description, inputSchema })),
   }));
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {

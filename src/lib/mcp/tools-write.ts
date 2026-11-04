@@ -1,19 +1,21 @@
 /**
  * The write tools of the Overdeck MCP server (PAN-4649 FR-5, FR-6):
- * `send_message`, `start_conversation` and `start_worker`. Each proxies one
- * dashboard route; the route enforces the scope (`tell` or `operate`).
+ * `send_message`, `start_conversation`, `start_worker` and (PAN-4938 FR-6,
+ * FR-7) `start_issue`, `stop_conversation` and `interrupt_conversation`. Each
+ * proxies one dashboard route; the route enforces the scope (`tell` or
+ * `operate`).
  * PAN-4651 D-4651-18: the start tools go through the fleet routes, which
  * resolve `machine` (a label, an environment id or `auto`, with `needs`) and
  * start the work on that machine; `send_message` takes `@<machine>/<name>`.
  */
-import { errorResult, optionalString, requiredString, routeResult, type ArgResult, type OverdeckTool } from './tool.js';
+import { errorResult, optionalString, requiredString, routeErrorResult, routeResult, type ArgResult, type OverdeckTool } from './tool.js';
 
-const MACHINE_PROPERTY = {
+export const MACHINE_PROPERTY = {
   type: 'string',
   description: 'Where to run: omit for this machine, a linked machine\'s label or environment id, or "auto" to place it by load.',
 } as const;
 
-const NEEDS_PROPERTY = {
+export const NEEDS_PROPERTY = {
   type: 'array',
   items: { type: 'string' },
   description: 'With machine "auto": capability tags the machine must have, such as docker or gpu.',
@@ -43,6 +45,8 @@ function copyOptionalStrings(args: Record<string, unknown>, fields: readonly str
 const sendMessage: OverdeckTool = {
   name: 'send_message',
   description: 'Send a message to a running conversation, as if typed in the dashboard composer.',
+  scope: 'tell',
+  audience: 'any',
   inputSchema: {
     type: 'object',
     properties: {
@@ -64,6 +68,8 @@ const sendMessage: OverdeckTool = {
 const startConversation: OverdeckTool = {
   name: 'start_conversation',
   description: 'Start a new conversation with a first message, on this machine or a linked one.',
+  scope: 'operate',
+  audience: 'any',
   inputSchema: {
     type: 'object',
     properties: {
@@ -93,6 +99,8 @@ const startConversation: OverdeckTool = {
 const startWorker: OverdeckTool = {
   name: 'start_worker',
   description: 'Start a registered worker agent on an issue whose workspace exists on the chosen machine (this one by default).',
+  scope: 'operate',
+  audience: 'any',
   inputSchema: {
     type: 'object',
     properties: {
@@ -128,4 +136,71 @@ const startWorker: OverdeckTool = {
   },
 };
 
-export const WRITE_TOOLS: readonly OverdeckTool[] = [sendMessage, startConversation, startWorker];
+const startIssue: OverdeckTool = {
+  name: 'start_issue',
+  description: 'Start an issue\'s work agent, on this machine or a linked one, through the same gates as the dashboard\'s Start button. The issue must be planned.',
+  scope: 'operate',
+  audience: 'any',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      issueId: { type: 'string', description: 'The planned issue to start, such as PAN-123.' },
+      model: { type: 'string', description: 'The model id or alias; omit for the configured default.' },
+      harness: { type: 'string', description: 'The agent harness, such as claude-code or codex.' },
+      effort: { type: 'string', description: 'Reasoning effort: low, medium, high, xhigh or max.' },
+      machine: MACHINE_PROPERTY,
+      needs: NEEDS_PROPERTY,
+    },
+    required: ['issueId'],
+  },
+  async run(args, ctx) {
+    const issueId = requiredString(args, 'issueId');
+    if (!issueId.ok) return issueId.error;
+    const body: Record<string, unknown> = {};
+    const copied = copyOptionalStrings(args, ['model', 'harness', 'effort'], body);
+    if (!copied.ok) return copied.error;
+    const placed = copyPlacement(args, body);
+    if (!placed.ok) return placed.error;
+    const response = await ctx.api.request('POST', `/api/fleet/issues/${encodeURIComponent(issueId.value)}/start`, body);
+    if (response.status === 422) {
+      const routeErrorText = routeErrorResult(response).content.map((part) => (part.type === 'text' ? part.text : '')).join('');
+      return errorResult(`${routeErrorText}. If ${issueId.value} is not planned yet, run pan start ${issueId.value}, which plans first.`);
+    }
+    return routeResult(response);
+  },
+};
+
+const CONVERSATION_PROPERTY = {
+  type: 'string',
+  description: 'The conversation name or id; @<machine>/<name> for one on a linked machine.',
+} as const;
+
+/** A tool that posts `{}` to `/api/conversations/<conversation>/<action>`. */
+function conversationControlTool(name: string, action: 'stop' | 'abort', description: string): OverdeckTool {
+  return {
+    name,
+    description,
+    scope: 'operate',
+    audience: 'any',
+    inputSchema: {
+      type: 'object',
+      properties: { conversation: CONVERSATION_PROPERTY },
+      required: ['conversation'],
+    },
+    async run(args, ctx) {
+      const conversation = requiredString(args, 'conversation');
+      if (!conversation.ok) return conversation.error;
+      return routeResult(await ctx.api.request('POST', `/api/conversations/${encodeURIComponent(conversation.value)}/${action}`, {}));
+    },
+  };
+}
+
+const stopConversation = conversationControlTool('stop_conversation', 'stop', 'Stop a conversation: end its agent session.');
+
+const interruptConversation = conversationControlTool(
+  'interrupt_conversation',
+  'abort',
+  'Interrupts the current turn of a Pi conversation. Other harnesses answer an error; use stop_conversation to end them.',
+);
+
+export const WRITE_TOOLS: readonly OverdeckTool[] = [sendMessage, startConversation, startWorker, startIssue, stopConversation, interruptConversation];

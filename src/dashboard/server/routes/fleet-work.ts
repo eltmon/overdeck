@@ -2,7 +2,10 @@
  * Fleet work routes (PAN-4651 D-4651-10, D-4651-12): this machine's browser,
  * CLI and MCP start work on any machine through them. Every fleet route
  * refuses a request that arrives through a secure channel (no chained hops,
- * `refuseFleetRequest`) and then applies the usual dashboard auth.
+ * `refuseFleetRequest`) and then applies the usual dashboard auth. The one
+ * exception (PAN-4950 D-5): the three spawn routes admit a `connector`
+ * credential through its link channel for a target on this machine only,
+ * answering 403 `connector-local-only` for any other target before any side effect.
  *
  * - `POST /api/fleet/placement { gitOrigin: string | null, needs: string[] }`
  *   → Auto placement over this machine and its links: `{ ok: true,
@@ -22,8 +25,10 @@
  *   follower. Answers `{ id, machine, reason, remote }`.
  *
  * - `POST /api/fleet/issues/:id/start { machine, needs?, model?, harness?, effort? }`
- *   → another machine only (this machine answers 400 `use-local-start`; the
- *   CLI starts locally itself): the owner's issue-start work door.
+ *   → another machine: the owner's issue-start work door; this machine for an
+ *   `odk_` token caller (the MCP `start_issue` tool): `spawnIssueAgentForRoute`,
+ *   the Start button's gates; any other caller on this machine answers 400
+ *   `use-local-start` (the CLI starts locally itself).
  * - `POST /api/fleet/workers/:id/stop` → stops the worker a stand-in stands
  *   for on its owner, then marks the stand-in `stopped`.
  *
@@ -34,8 +39,10 @@
  *
  * The actor a forwarded call carries: `operator` for the browser and operator
  * CLIs, `{ agentId }` for an agent sender (`x-overdeck-sender`), and for an
- * `odk_` token credential `operator` with a ceiling of the token's scopes
- * (D-4651-17), derived from the resolved credential, never from a header.
+ * `odk_` token credential a ceiling of the token's scopes (D-4651-17) with the
+ * actor `{ agentId }` for an agent-kind agent token (PAN-4927 D-9) and
+ * `operator` for any other token, derived from the resolved credential, never
+ * from a header.
  */
 import type { LoadSample } from '@overdeck/contracts';
 import { Effect, Layer } from 'effect';
@@ -54,7 +61,7 @@ import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js'
 import { getProjectSync, resolveProjectFromIssue } from '../../../lib/projects.js';
 import { channelOfRequest } from '../channel-peer.js';
 import { jsonResponse } from '../http-helpers.js';
-import { actorForSender, SENDER_HEADER } from '../linked-conversation-proxy.js';
+import { actorForSender, SENDER_HEADER, tokenLinkActor } from '../linked-conversation-proxy.js';
 import type { FlySpawn } from '../services/fleet-fly-target.js';
 import { defaultFleetTargetDeps, type FleetTarget, type FleetTargetDeps, placeAuto, resolveTargetMachine } from '../services/fleet-target.js';
 import { currentLinkedConversationsSync } from '../services/linked-conversations-sync.js';
@@ -62,6 +69,7 @@ import { currentRemoteWorkerFollower } from '../services/remote-worker-follower.
 import { currentLinkSupervisor } from '../services/anywhere-boot.js';
 import { connectingStatusSource, type LinkStatusSource } from '../services/machine-link-service.js';
 import { currentMachineLoad } from '../services/machine-load.js';
+import { spawnIssueAgentForRoute } from './agents/spawn-issue.js';
 import { credentialScopes, type DashboardCredential, rejectUnauthorizedDashboardRequest, rejectUnsafeDashboardMutationRequest, resolveRequestCredential } from './dashboard-auth.js';
 import { refuseFleetRequest } from './machines-fleet.js';
 import { readJsonResponse } from './machines-work.js';
@@ -97,12 +105,18 @@ export interface FleetCaller {
   ceiling?: AccessTokenScope[];
   /** The caller holds an admin credential (PAN-4743 D-4743-4): may create a Fly machine. */
   mayCreateFly?: boolean;
+  /** The caller presented an odk_ token (PAN-4938 D-10); only the issue-start route reads it. */
+  viaToken?: boolean;
+  /** A connector caller (PAN-4950 D-5): only this machine may be the target. */
+  localOnly?: boolean;
 }
 
 export function fleetCaller(credential: DashboardCredential | null, sender: string | undefined): FleetCaller | null {
+  // PAN-4950 D-5: a connector acts as the operator within its own scopes, on this machine only.
+  if (credential?.kind === 'connector') return { actor: 'operator', ceiling: [...credential.scopes], mayCreateFly: false, viaToken: true, localOnly: true };
   const mayCreateFly = credential !== null && credentialScopes(credential).includes('admin');
   if (credential?.kind === 'token') {
-    return { actor: 'operator', ceiling: credentialScopes(credential).filter((scope): scope is AccessTokenScope => scope !== 'admin') as AccessTokenScope[], mayCreateFly };
+    return { actor: tokenLinkActor(credential), ceiling: credentialScopes(credential).filter((scope): scope is AccessTokenScope => scope !== 'admin') as AccessTokenScope[], mayCreateFly, viaToken: true };
   }
   const actor = actorForSender(sender);
   return actor === null ? null : { actor, mayCreateFly };
@@ -194,6 +208,19 @@ function optionalStrings(body: Record<string, unknown>, keys: readonly string[])
 
 const machineOf = (target: Extract<FleetTarget, { ok: true }>) => ({ environmentId: target.environmentId, label: target.label, self: target.self });
 
+/** Resolution failures that only a target other than this machine produces. */
+const NON_LOCAL_FAILURES = new Set(['machine-offline', 'fly-unavailable', 'fly-needs-admin']);
+
+/** PAN-4950 D-5: a connector caller's refusal for a target that is not this machine, else null. Runs before resolution failures. */
+export function connectorLocalOnly(target: FleetTarget, caller: FleetCaller): HttpServerResponse.HttpServerResponse | null {
+  if (!caller.localOnly || (target.ok && target.self)) return null;
+  if (!target.ok && !NON_LOCAL_FAILURES.has(String(target.body['code']))) return null;
+  return jsonResponse({
+    code: 'connector-local-only',
+    error: `An Overdeck connector reaches only the machine it paired with; run a second connector for ${target.ok ? target.label : 'that machine'}.`,
+  }, { status: 403 });
+}
+
 /** `POST /api/fleet/conversations`. */
 export async function handleFleetConversation(raw: unknown, caller: FleetCaller, deps: FleetSpawnDeps = defaultFleetSpawnDeps()): Promise<HttpServerResponse.HttpServerResponse> {
   const body = asObject(raw);
@@ -210,6 +237,8 @@ export async function handleFleetConversation(raw: unknown, caller: FleetCaller,
 
   const spawn: FlySpawn = { projectKey: projectKey ?? null, harness: options.harness, model: options.model, mayCreate: caller.mayCreateFly === true };
   const target = await deps.resolveTarget(machine, gitOrigin, needs, spawn);
+  const localOnly = connectorLocalOnly(target, caller);
+  if (localOnly) return localOnly;
   if (!target.ok) return jsonResponse(target.body, { status: target.status });
   const message = body['message'];
   if (target.self) {
@@ -283,6 +312,8 @@ export async function handleFleetWorker(raw: unknown, caller: FleetCaller, deps:
   const gitOrigin = project?.gitOrigin ?? null;
 
   const target = await deps.resolveTarget(typeof machine === 'string' ? machine : undefined, gitOrigin, needs);
+  const localOnly = connectorLocalOnly(target, caller);
+  if (localOnly) return localOnly;
   if (!target.ok) return jsonResponse(target.body, { status: target.status });
   if (target.self) {
     try {
@@ -311,26 +342,47 @@ export async function handleFleetWorker(raw: unknown, caller: FleetCaller, deps:
   return jsonResponse({ id: localId, machine: machineOf(target), reason: target.reason, remote: true });
 }
 
+export interface FleetIssueStartDeps<R> extends FleetWorkerDeps {
+  spawn: (input: { body: Record<string, unknown>; internalRequest: false }) => Effect.Effect<HttpServerResponse.HttpServerResponse, unknown, R>;
+}
+
 /** `POST /api/fleet/issues/:id/start`. */
-export async function handleFleetIssueStart(issueId: string, raw: unknown, caller: FleetCaller, deps: FleetWorkerDeps = defaultFleetWorkerDeps()): Promise<HttpServerResponse.HttpServerResponse> {
-  const body = asObject(raw) ?? {};
-  const fields = optionalStrings(body, ['machine', 'model', 'harness', 'effort']);
-  if (typeof fields === 'string') return jsonResponse({ error: fields }, { status: 400 });
-  const needs = parseNeeds(body['needs']);
-  if (typeof needs === 'string') return jsonResponse({ error: needs }, { status: 400 });
-  const { machine, ...options } = fields;
-  const project = await deps.issueOrigin(issueId);
-  if (!project) return jsonResponse({ code: 'unknown-project', error: `No project on this machine owns ${issueId}` }, { status: 404 });
-  const target = await deps.resolveTarget(machine, project.gitOrigin, needs);
-  if (!target.ok) return jsonResponse(target.body, { status: target.status });
-  if (target.self) return jsonResponse({ code: 'use-local-start', error: `${issueId} would start on this machine; run pan start ${issueId} without --machine` }, { status: 400 });
-  if (project.gitOrigin === null) {
-    return jsonResponse({ code: 'project-has-no-origin', error: `${project.projectKey} has no github_repo or gitlab_repo, so ${target.label} cannot find it` }, { status: 409 });
-  }
-  const answer = await postWorkDoor(deps, target.link, `/api/machines/work/issues/${encodeURIComponent(issueId)}/start`, { ...options, gitOrigin: project.gitOrigin }, caller);
-  if (answer.status !== 200) return ownerRefusal(answer.status, answer.json, target.link, { thisLabel: await deps.thisLabel(), projectKey: project.projectKey });
-  const started = answer.json as { issueId?: unknown; agentId?: unknown } | null;
-  return jsonResponse({ issueId: started?.issueId ?? issueId.toUpperCase(), agentId: started?.agentId ?? null, machine: machineOf(target), reason: target.reason });
+export function handleFleetIssueStart<R>(
+  issueId: string,
+  raw: unknown,
+  caller: FleetCaller,
+  deps: FleetIssueStartDeps<R>,
+): Effect.Effect<HttpServerResponse.HttpServerResponse, unknown, R> {
+  return Effect.gen(function* () {
+    const body = asObject(raw) ?? {};
+    const fields = optionalStrings(body, ['machine', 'model', 'harness', 'effort']);
+    if (typeof fields === 'string') return jsonResponse({ error: fields }, { status: 400 });
+    const needs = parseNeeds(body['needs']);
+    if (typeof needs === 'string') return jsonResponse({ error: needs }, { status: 400 });
+    const { machine, ...options } = fields;
+    const project = yield* Effect.promise(() => deps.issueOrigin(issueId));
+    if (!project) return jsonResponse({ code: 'unknown-project', error: `No project on this machine owns ${issueId}` }, { status: 404 });
+    const target = yield* Effect.promise(() => deps.resolveTarget(machine, project.gitOrigin, needs));
+    const localOnly = connectorLocalOnly(target, caller);
+    if (localOnly) return localOnly;
+    if (!target.ok) return jsonResponse(target.body, { status: target.status });
+    if (target.self) {
+      if (!caller.viaToken) return jsonResponse({ code: 'use-local-start', error: `${issueId} would start on this machine; run pan start ${issueId} without --machine` }, { status: 400 });
+      const response = yield* deps.spawn({ body: { issueId, ...options }, internalRequest: false });
+      if (response.status !== 200) return response;
+      return jsonResponse({ issueId: issueId.toUpperCase(), agentId: `agent-${issueId.toLowerCase()}`, machine: machineOf(target), reason: target.reason });
+    }
+    if (project.gitOrigin === null) {
+      return jsonResponse({ code: 'project-has-no-origin', error: `${project.projectKey} has no github_repo or gitlab_repo, so ${target.label} cannot find it` }, { status: 409 });
+    }
+    const answer = yield* Effect.promise(() => postWorkDoor(deps, target.link, `/api/machines/work/issues/${encodeURIComponent(issueId)}/start`, { ...options, gitOrigin: project.gitOrigin }, caller));
+    if (answer.status !== 200) {
+      const thisLabel = yield* Effect.promise(() => deps.thisLabel());
+      return ownerRefusal(answer.status, answer.json, target.link, { thisLabel, projectKey: project.projectKey });
+    }
+    const started = answer.json as { issueId?: unknown; agentId?: unknown } | null;
+    return jsonResponse({ issueId: started?.issueId ?? issueId.toUpperCase(), agentId: started?.agentId ?? null, machine: machineOf(target), reason: target.reason });
+  });
 }
 
 export interface FleetWorkerStopDeps {
@@ -405,6 +457,13 @@ export const fleetWriteGate = Effect.gen(function* () {
   return refuseFleetRequest(channelOfRequest(request) !== null, () => rejectUnsafeDashboardMutationRequest(request));
 });
 
+/** Like fleetWriteGate, but a connector's link channel may spawn on this machine (PAN-4950 D-5). */
+export const fleetSpawnGate = Effect.gen(function* () {
+  const request = yield* HttpServerRequest.HttpServerRequest;
+  const viaChannel = channelOfRequest(request) !== null && resolveRequestCredential(request)?.kind !== 'connector';
+  return refuseFleetRequest(viaChannel, () => rejectUnsafeDashboardMutationRequest(request));
+});
+
 const placementRoute = HttpRouter.add(
   'POST',
   '/api/fleet/placement',
@@ -427,7 +486,7 @@ const conversationsRoute = HttpRouter.add(
   'POST',
   '/api/fleet/conversations',
   Effect.gen(function* () {
-    const refused = yield* fleetWriteGate;
+    const refused = yield* fleetSpawnGate;
     if (refused) return refused;
     const caller = yield* fleetCallerOf;
     if (!caller) return jsonResponse({ error: `invalid ${SENDER_HEADER} header` }, { status: 400 });
@@ -440,7 +499,7 @@ const workersRoute = HttpRouter.add(
   'POST',
   '/api/fleet/workers',
   Effect.gen(function* () {
-    const refused = yield* fleetWriteGate;
+    const refused = yield* fleetSpawnGate;
     if (refused) return refused;
     const caller = yield* fleetCallerOf;
     if (!caller) return jsonResponse({ error: `invalid ${SENDER_HEADER} header` }, { status: 400 });
@@ -466,13 +525,13 @@ const issueStartRoute = HttpRouter.add(
   'POST',
   '/api/fleet/issues/:id/start',
   Effect.gen(function* () {
-    const refused = yield* fleetWriteGate;
+    const refused = yield* fleetSpawnGate;
     if (refused) return refused;
     const caller = yield* fleetCallerOf;
     if (!caller) return jsonResponse({ error: `invalid ${SENDER_HEADER} header` }, { status: 400 });
     const params = yield* HttpRouter.params;
     const body = yield* readFleetBody;
-    return yield* Effect.promise(() => handleFleetIssueStart(params['id'] ?? '', body, caller));
+    return yield* handleFleetIssueStart(params['id'] ?? '', body, caller, { ...defaultFleetWorkerDeps(), spawn: spawnIssueAgentForRoute });
   }),
 );
 

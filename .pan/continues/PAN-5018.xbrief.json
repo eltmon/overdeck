@@ -1,0 +1,211 @@
+{
+  "version": "1",
+  "issueId": "PAN-5018",
+  "created": "2026-11-04T13:12:52.932Z",
+  "updated": "2026-11-04T15:19:47.276Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-04T15:19Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-04T15:19:47.276Z"
+    }
+  ],
+  "items": {
+    "phone-dial-logging": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5018",
+      "claimedAt": "2026-11-04T13:12:52.932Z",
+      "doneAt": "2026-11-04T13:14:08.076Z"
+    },
+    "phone-debug-codes-and-evict": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5018",
+      "claimedAt": "2026-11-04T13:14:12.760Z",
+      "doneAt": "2026-11-04T13:15:14.342Z"
+    },
+    "anywhere-debug-helper": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5018",
+      "claimedAt": "2026-11-04T13:15:18.256Z",
+      "doneAt": "2026-11-04T13:16:02.428Z"
+    },
+    "accept-error-mode-and-internal": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5018",
+      "claimedAt": "2026-11-04T13:16:03.903Z",
+      "doneAt": "2026-11-04T13:17:11.250Z"
+    },
+    "listener-refusal-logging": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5018",
+      "claimedAt": "2026-11-04T13:17:14.429Z",
+      "doneAt": "2026-11-04T13:18:03.637Z"
+    },
+    "rtc-transport-offer-logging": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5018",
+      "claimedAt": "2026-11-04T13:18:06.582Z",
+      "doneAt": "2026-11-04T13:24:13.403Z"
+    },
+    "directory-client-transition-logging": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5018",
+      "claimedAt": "2026-11-04T13:24:17.220Z",
+      "doneAt": "2026-11-04T13:25:59.039Z"
+    },
+    "docs-link-diagnostics": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5018",
+      "claimedAt": "2026-11-04T13:26:10.117Z",
+      "doneAt": "2026-11-04T13:26:56.058Z"
+    },
+    "simulator-repro": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5018",
+      "claimedAt": "2026-11-04T14:45:37.047Z",
+      "doneAt": "2026-11-04T14:46:26.068Z"
+    },
+    "root-cause-fix": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5018",
+      "claimedAt": "2026-11-04T14:46:37.270Z",
+      "doneAt": "2026-11-04T14:55:48.624Z"
+    },
+    "phone-dial-logging.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:06:00.432Z"
+    },
+    "phone-dial-logging.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:06:15.909Z"
+    },
+    "phone-dial-logging.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:06:30.729Z"
+    },
+    "phone-debug-codes-and-evict.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:06:45.637Z"
+    },
+    "phone-debug-codes-and-evict.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:07:01.267Z"
+    },
+    "phone-debug-codes-and-evict.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:07:16.960Z"
+    },
+    "phone-debug-codes-and-evict.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:07:31.498Z"
+    },
+    "anywhere-debug-helper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:07:46.325Z"
+    },
+    "anywhere-debug-helper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:08:01.153Z"
+    },
+    "anywhere-debug-helper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:08:16.516Z"
+    },
+    "accept-error-mode-and-internal.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:08:30.636Z"
+    },
+    "accept-error-mode-and-internal.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:08:44.180Z"
+    },
+    "accept-error-mode-and-internal.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:08:58.934Z"
+    },
+    "listener-refusal-logging.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:09:12.543Z"
+    },
+    "listener-refusal-logging.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:09:25.809Z"
+    },
+    "listener-refusal-logging.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:09:38.828Z"
+    },
+    "rtc-transport-offer-logging.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:09:52.507Z"
+    },
+    "rtc-transport-offer-logging.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:10:06.952Z"
+    },
+    "rtc-transport-offer-logging.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:10:23.168Z"
+    },
+    "directory-client-transition-logging.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:10:38.397Z"
+    },
+    "directory-client-transition-logging.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:10:54.649Z"
+    },
+    "directory-client-transition-logging.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:11:09.739Z"
+    },
+    "simulator-repro.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:11:23.355Z"
+    },
+    "simulator-repro.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:11:36.862Z"
+    },
+    "root-cause-fix.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:11:50.132Z"
+    },
+    "root-cause-fix.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:12:03.294Z"
+    },
+    "root-cause-fix.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:12:16.255Z"
+    },
+    "docs-link-diagnostics.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:12:30.160Z"
+    },
+    "docs-link-diagnostics.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:12:43.288Z"
+    },
+    "docs-link-diagnostics.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:12:56.774Z"
+    },
+    "rtc-transport-offer-logging.ac3": {
+      "status": "cancelled"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-04T15:19:47Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5018\n\nPull request: https://github.com/eltmon/overdeck/pull/5034 (head `d464aa09`)\n\nSource: check_run:lint-group (core)\n\n## Failing checks (1)\n\n### lint-group (core)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/126664604713/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/41855983796/job/126664604713  \n```\nscripts/lint-last-verified.sh\n\n✖ .overdeck/context/codebase/concerns.md:756: <!-- last-verified: 2026-11-04 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4930, PAN-4931, PAN-4932\n\nlint:last-verified failed. A codebase-map footer holds only the date:\n  <!-- last-verified: YYYY-MM-DD -->\nPut issue ids and other provenance in the commit message.\n##[error]Process completed with exit code 1.\nPost job cleanup.\n[command]/usr/bin/git version\ngit version 2.56.0\nTemporarily overriding HOME='/home/runner/work/_temp/62396420-9af2-4078-a36f-be7bf38d60b3' before making global git config changes\nAdding repository directory to the temporary git global config as a safe directory\n[command]/usr/bin/git config --global --add safe.directory /home/runner/work/overdeck/overdeck\n[command]/usr/bin/git config --local --name-only --get-regexp core\\.sshCommand\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'core\\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp http\\.https\\:\\/\\/github\\.com\\/\\.extraheader\nhttp.https://github.com/.extraheader\n[command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'http\\.https\\:\\/\\/github\\.com\\/\\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\\.gitdir:\n[command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url\nCleaning up orphan processes\n##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ]
+}

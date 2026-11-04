@@ -337,28 +337,41 @@ export async function memoryFactRetireCommand(id: string, options: MemoryFactRet
 
 const MATCHING_FACTS_LIMIT = 5;
 
+export interface MatchingFacts {
+  project: MemoryFact[];
+  operator: MemoryFact[];
+  machine: MemoryFact[];
+}
+
 /**
- * `pan memory search` prints fact matches before observation hits (D13). Resolves
- * the project store the same way `resolveFactTarget(…, 'read')` does, but never
- * errors — outside a project (or with an unknown `--project`) it silently skips
- * the project store.
+ * Active facts matching `query`, at most MATCHING_FACTS_LIMIT per store
+ * (PAN-3957 W6; `here` added by PAN-4940). Resolves the project store the same
+ * way `resolveFactTarget(…, 'read')` does, but never errors — outside a
+ * project (or with an unknown `--project`) it silently skips the project store.
  */
-export function printMatchingFacts(query: string, flags: { project?: string }): void {
-  let projectFacts: MemoryFact[] = [];
+export function findMatchingFacts(query: string, flags: { project?: string; here?: boolean }): MatchingFacts {
+  let project: MemoryFact[] = [];
   try {
     const target = resolveFactTarget(flags, 'read');
     if (target.scope === 'project') {
       const { facts } = readMemoryFactsSync(target.dir, 'project');
-      projectFacts = matchMemoryFacts(facts.filter(isActiveFact), query).slice(0, MATCHING_FACTS_LIMIT);
+      project = matchMemoryFacts(facts.filter(isActiveFact), query).slice(0, MATCHING_FACTS_LIMIT);
     }
   } catch {
     // Not inside a registered project, or an unknown --project key: no project matches.
   }
 
   const { facts: userFactsAll } = readMemoryFactsSync(userMemoryDir(), 'user');
-  const operatorFacts = matchMemoryFacts(userFactsAll.filter(isActiveFact), query).slice(0, MATCHING_FACTS_LIMIT);
+  const operator = matchMemoryFacts(userFactsAll.filter(isActiveFact), query).slice(0, MATCHING_FACTS_LIMIT);
   const { facts: machineFactsAll } = readMemoryFactsSync(machineMemoryDir(), 'machine');
-  const machineFacts = matchMemoryFacts(machineFactsAll.filter(isActiveFact), query).slice(0, MATCHING_FACTS_LIMIT);
+  const machine = matchMemoryFacts(machineFactsAll.filter(isActiveFact), query).slice(0, MATCHING_FACTS_LIMIT);
+
+  return { project, operator, machine };
+}
+
+/** `pan memory search` prints fact matches before observation hits (D13). */
+export function printMatchingFacts(query: string, flags: { project?: string }): void {
+  const { project: projectFacts, operator: operatorFacts, machine: machineFacts } = findMatchingFacts(query, flags);
 
   if (projectFacts.length > 0) {
     console.log(chalk.bold('Project memory:'));

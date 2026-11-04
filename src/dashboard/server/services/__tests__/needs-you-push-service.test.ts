@@ -182,6 +182,7 @@ describe('needs-you push service (PAN-2354)', () => {
       directory: () => port,
       listPhones: () => phones.map(({ clientId, keys }) => ({ clientId, pushKey: keys.publicKey.toString('hex') })),
       environmentId: async () => 'env-1',
+      readPreferences: async () => new Map(),
     });
     const events = fakeStore();
     startNeedsYouPushService({ readConversationFeed: vi.fn(async () => ({ body: [] })), store: events.store, providers: [provider] });

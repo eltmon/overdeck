@@ -5,16 +5,30 @@
  * the pure reducer in directory-state.ts. Per event: reduce → persist → register → send → close,
  * so a crash never announces a machine that storage lacks.
  *
- * Internal requests arrive only from routes.ts through the Durable Object stub, so the identity
- * header is trusted here; the public `Authorization` header is never read.
+ * Internal requests arrive only through the Durable Object stub — from routes.ts, or from the
+ * account Worker's cross-script binding on the ACCOUNT_PATHS (PAN-4959) — so the identity header is
+ * trusted here; the public `Authorization` header is never read.
  * This module uses Web APIs only; src/index.ts owns the `cloudflare:workers` import.
  */
+import { CONNECT_CLOSE_CODES } from '../../../packages/contracts/src/connect.ts';
 import type { DirectoryToClientFrame, DirectoryToMachineFrame } from '../../../packages/contracts/src/connect.ts';
+import { ACCOUNT_PATHS, ACCOUNT_TABLES, accountView } from './account-view.ts';
 import { reduceClient } from './client-state.ts';
 import type { ClientEvent } from './client-state.ts';
+import { reduceActivityOutcome } from './activity-state.ts';
+import type { ActivityOutcomeEvent } from './activity-state.ts';
 import { EMPTY_DIRECTORY, reduce } from './directory-state.ts';
 import type { DirectoryEffect, DirectoryEvent, DirectoryState, ReduceContext, Target } from './directory-state.ts';
-import { loadDirectory, PUT_CLIENT_PUSH_SQL, PUT_CLIENT_SQL, PUT_PUSH_WINDOW_SQL, SCHEMA } from './directory-store.ts';
+import {
+  DELETE_CLIENT_ACTIVITY_ROWS_SQL,
+  DELETE_MACHINE_ACTIVITY_REPORTS_SQL,
+  loadDirectory,
+  PUT_CLIENT_PUSH_SQL,
+  PUT_CLIENT_SQL,
+  PUT_PUSH_WINDOW_SQL,
+  SCHEMA,
+  writeActivityEffect,
+} from './directory-store.ts';
 import type { ConnectIdentity, Deps, Env } from './env.ts';
 import { HDR_IDENTITY, HDR_INBOX_HEADERS, HDR_INBOX_SECRET_HASH, INTERNAL, parseConfig, parseTurnConfig } from './env.ts';
 import { keyFingerprint } from './fingerprint.ts';
@@ -26,7 +40,7 @@ import { decodeFrame } from './protocol.ts';
 import { reducePushOutcome } from './push-state.ts';
 import type { PushOutcomeEvent } from './push-state.ts';
 import { parsePushConfig } from './push/config.ts';
-import { deliverPush } from './push/deliver.ts';
+import { deliverActivity, deliverPush } from './push/deliver.ts';
 import type { SocketRole } from './protocol.ts';
 import { relayCapBytes } from './relay-meter.ts';
 import { fetchIceServers } from './turn.ts';
@@ -109,6 +123,19 @@ function parseHeaders(raw: string | null): Record<string, string> {
   }
 }
 
+/** The `environmentId` of a `/remove-machine` body: a string of 1-64 characters, else null. */
+async function parseEnvironmentId(req: Request): Promise<string | null> {
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return null;
+  }
+  if (typeof body !== 'object' || body === null) return null;
+  const { environmentId } = body as Record<string, unknown>;
+  return typeof environmentId === 'string' && environmentId.length >= 1 && environmentId.length <= 64 ? environmentId : null;
+}
+
 export class DirectoryHost {
   private state: DirectoryState = EMPTY_DIRECTORY;
   private inbox!: InboxStore;
@@ -130,6 +157,12 @@ export class DirectoryHost {
   async fetch(req: Request): Promise<Response> {
     const { pathname } = new URL(req.url);
     if (pathname === INTERNAL.inbox && req.method === 'POST') return this.intake(req);
+    if (pathname === ACCOUNT_PATHS.view && req.method === 'GET') {
+      const online = new Set(this.registered().map((r) => r.environmentId));
+      return json(accountView(this.state, online, this.deps.now(), relayCapBytes(this.env.RELAY_CAP_BYTES)));
+    }
+    if (pathname === ACCOUNT_PATHS.removeMachine && req.method === 'POST') return this.removeMachine(req);
+    if (pathname === ACCOUNT_PATHS.deleteAccount && req.method === 'POST') return this.deleteAccount();
     if (pathname !== INTERNAL.socket || !isWebSocketUpgrade(req)) return new Response(null, { status: 404 });
     const identity = parseIdentity(req.headers.get(HDR_IDENTITY));
     if (!identity) return new Response(null, { status: 400 });
@@ -188,6 +221,28 @@ export class DirectoryHost {
     this.sendEvents(due);
     this.inbox.markSent(due.map((e) => e.eventId));
     await this.rearm();
+  }
+
+  /** The account page's Remove (PAN-4959 WI-2): `{ environmentId }`, with no calling socket. */
+  private async removeMachine(req: Request): Promise<Response> {
+    const environmentId = await parseEnvironmentId(req);
+    if (environmentId === null) return json({ error: 'bad_request' }, 400);
+    if (!this.state.machines.some((m) => m.environmentId === environmentId)) return json({ error: 'unknown_machine' }, 404);
+    await this.apply(null, { kind: 'remove-machine', environmentId });
+    return json({ removed: true });
+  }
+
+  /**
+   * Account deletion (PAN-4959 WI-3, D-6): closes every machine and phone socket with 4001, empties
+   * every table and keeps the schema, which only the constructor creates. Idempotent.
+   */
+  private async deleteAccount(): Promise<Response> {
+    for (const ws of this.ctx.getWebSockets(MACHINE_TAG)) safeClose(ws, CONNECT_CLOSE_CODES.unauthorized, 'account deleted');
+    for (const table of ACCOUNT_TABLES) this.ctx.storage.sql.exec(`DELETE FROM ${table}`);
+    await this.ctx.storage.deleteAlarm();
+    this.state = EMPTY_DIRECTORY;
+    logFrame('delete-account', null, 'ok');
+    return json({ deleted: true });
   }
 
   /** A webhook event for one of this account's inboxes (the Worker already capped the body). */
@@ -273,8 +328,8 @@ export class DirectoryHost {
     await this.apply(ws, { kind: 'socket-gone', registeredAs: environmentId });
   }
 
-  /** The reducer context for an event on `ws`: who else is online, excluding `ws` itself. */
-  private context(ws: WebSocket): ReduceContext {
+  /** The reducer context for an event on `ws`: who else is online, excluding `ws` itself (null ⇒ every socket). */
+  private context(ws: WebSocket | null): ReduceContext {
     const config = parseConfig(this.env);
     return {
       now: this.deps.now(),
@@ -286,7 +341,8 @@ export class DirectoryHost {
     };
   }
 
-  private async apply(ws: WebSocket, event: DirectoryEvent): Promise<void> {
+  /** `ws` is null for an event no socket sent (PAN-4959 D-5: the account page's remove-machine). */
+  private async apply(ws: WebSocket | null, event: DirectoryEvent): Promise<void> {
     const { state, effects } = reduce(this.state, event, this.context(ws));
     this.state = state;
     await this.execute(ws, effects);
@@ -306,20 +362,30 @@ export class DirectoryHost {
     await this.execute(ws, effects);
   }
 
-  private resolve(self: WebSocket, to: Target): WebSocket[] {
-    if (to === 'self') return [self];
+  /**
+   * The second step of a Live Activity push (PAN-4839), reduced against the state current after
+   * delivery. Its effects write storage and logs only, so it needs no socket.
+   */
+  private async applyActivityOutcome(ws: WebSocket | null, event: ActivityOutcomeEvent): Promise<void> {
+    const { state, effects } = reduceActivityOutcome(this.state, event);
+    this.state = state;
+    await this.execute(ws, effects);
+  }
+
+  private resolve(self: WebSocket | null, to: Target): WebSocket[] {
+    if (to === 'self') return self ? [self] : [];
     if (to === 'clients') return this.registeredClients(self).map((r) => r.ws);
     if (typeof to === 'object' && 'clientId' in to) {
       return this.registeredClients(self).filter((r) => r.clientId === to.clientId).map((r) => r.ws);
     }
     const others = this.registered(self);
     if (to === 'others') return others.map((r) => r.ws);
-    if (to === 'all') return [self, ...others.map((r) => r.ws)];
+    if (to === 'all') return self ? [self, ...others.map((r) => r.ws)] : others.map((r) => r.ws);
     return others.filter((r) => r.environmentId === to.environmentId).map((r) => r.ws);
   }
 
   /** Persistence, then registration, then sends (and TURN answers), then closes, then logs. */
-  private async execute(self: WebSocket, effects: DirectoryEffect[]): Promise<void> {
+  private async execute(self: WebSocket | null, effects: DirectoryEffect[]): Promise<void> {
     const order: Record<DirectoryEffect['kind'], number> = {
       'put-plan': 0,
       'put-machine': 0,
@@ -334,12 +400,16 @@ export class DirectoryHost {
       'put-client': 0,
       'put-client-push': 0,
       'put-push-window': 0,
+      'put-client-activity': 0,
+      'put-activity-report': 0,
+      'put-activity-window': 0,
       'delete-client': 0,
       register: 1,
       'register-client': 1,
       send: 2,
       'fetch-turn': 2,
       'deliver-push': 2,
+      'deliver-activity': 2,
       'inbox-create': 2,
       'inbox-deliver': 2,
       close: 3,
@@ -348,7 +418,7 @@ export class DirectoryHost {
     const sorted = effects.map((e, i) => ({ e, i })).sort((a, b) => order[a.e.kind] - order[b.e.kind] || a.i - b.i);
     const sql = this.ctx.storage.sql;
     // Read lazily: a `register` effect earlier in this run binds the socket to its machine.
-    const selfEnv = (): string | null => attachmentOf(self)?.environmentId ?? null;
+    const selfEnv = (): string | null => (self ? (attachmentOf(self)?.environmentId ?? null) : null);
     let inboxChanged = false;
     for (const { e } of sorted) {
       switch (e.kind) {
@@ -370,6 +440,7 @@ export class DirectoryHost {
         }
         case 'delete-machine':
           sql.exec('DELETE FROM machines WHERE environment_id = ?', e.environmentId);
+          sql.exec(DELETE_MACHINE_ACTIVITY_REPORTS_SQL, e.environmentId);
           break;
         case 'put-approval': {
           const r = e.row;
@@ -390,7 +461,7 @@ export class DirectoryHost {
           break;
         case 'inbox-create': {
           const self$ = selfEnv();
-          if (!self$) break;
+          if (!self || !self$) break;
           const config = parseConfig(this.env);
           if (!config.ok) {
             safeSend(self, { type: 'error', code: 'unsupported', message: 'the inbox is not configured', requestId: e.requestId });
@@ -424,13 +495,14 @@ export class DirectoryHost {
           break;
         case 'inbox-deliver': {
           const self$ = selfEnv();
-          if (!self$) break;
+          if (!self || !self$) break;
           const pending = this.inbox.pendingFor(self$);
           for (const event of pending) safeSend(self, inboxEventFrame(event));
           this.inbox.markSent(pending.map((p) => p.eventId));
           break;
         }
         case 'fetch-turn': {
+          if (!self) break;
           const result = await fetchIceServers(parseTurnConfig(this.env), this.deps);
           safeSend(
             self,
@@ -454,20 +526,35 @@ export class DirectoryHost {
           sql.exec(PUT_PUSH_WINDOW_SQL, JSON.stringify(e.window));
           break;
         case 'deliver-push': {
+          if (!self) break;
           const outcome = await deliverPush(e, { config: parsePushConfig(this.env), fetch: this.deps.fetch, now: this.deps.now });
           // Other events ran during the await (H-2): read the socket's machine and the state only now.
           await this.applyPushOutcome(self, { requestId: e.requestId, clientId: e.clientId, environmentId: selfEnv(), token: e.registration.token, outcome });
           break;
         }
+        case 'put-client-activity':
+        case 'put-activity-report':
+        case 'put-activity-window':
+          writeActivityEffect(sql, e);
+          break;
+        case 'deliver-activity': {
+          const outcome = await deliverActivity(e, { config: parsePushConfig(this.env), fetch: this.deps.fetch, now: this.deps.now });
+          // Other events ran during the await: reduce against the state current now.
+          await this.applyActivityOutcome(self, { clientId: e.clientId, token: e.token, outcome });
+          break;
+        }
         case 'delete-client':
           sql.exec('DELETE FROM clients WHERE client_id = ?', e.clientId);
+          for (const statement of DELETE_CLIENT_ACTIVITY_ROWS_SQL) sql.exec(statement, e.clientId);
           break;
         case 'register-client': {
+          if (!self) break;
           const attachment = attachmentOf(self);
           if (attachment) self.serializeAttachment({ ...attachment, clientId: e.clientId } satisfies Attachment);
           break;
         }
         case 'register': {
+          if (!self) break;
           const attachment = attachmentOf(self);
           if (attachment) self.serializeAttachment({ ...attachment, environmentId: e.environmentId } satisfies Attachment);
           break;

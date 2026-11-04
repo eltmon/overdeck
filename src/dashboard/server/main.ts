@@ -14,6 +14,7 @@ import { runServer } from './server.js';
 import { startSharedIssueService, getSharedIssueService } from './services/issue-service-singleton.js';
 import { startAgentEnrichmentService, stopAgentEnrichmentService } from './services/agent-enrichment-service.js';
 import { startNeedsYouPushService, stopNeedsYouPushService } from './services/needs-you-push-service.js';
+import { startLiveActivityService, stopLiveActivityService } from './services/live-activity-service.js';
 import { conversationReadDependencies } from './routes/conversations.js';
 import { getConversationsPendingInputFeed } from '../../lib/overdeck/conversation-reads.js';
 import { startResourceRefreshTriggers } from './services/resource-refresh-triggers.js';
@@ -32,6 +33,7 @@ import { startCodexPluginImporter, stopCodexPluginImporter } from './services/co
 import { startRestartAnnouncer, stopRestartAnnouncer } from './services/restart-announcer.js';
 import { startUatTrainReconciler, stopUatTrainReconciler } from './services/uat-train.js';
 import { runAutoMergeSchedulerTick } from './services/auto-merge-scheduler.js';
+import { invalidatePullRequestListingOnApproval } from './services/issue-pr-refresh.js';
 import { runApprovalAtHeadRefreshTick } from './services/approval-at-head-refresh.js';
 import { startTtsSummarizer, stopTtsSummarizer } from './services/tts-summarizer.js';
 import { startTtsPlayback, stopTtsPlayback } from './services/tts-playback.js';
@@ -277,6 +279,7 @@ console.log(`[overdeck] AgentEnrichmentService started${isPeerDashboard ? ' (pee
 // a peer dashboard would send every notification twice.
 if (!isPeerDashboard) {
   startNeedsYouPushService({ readConversationFeed: () => getConversationsPendingInputFeed(conversationReadDependencies) });
+  startLiveActivityService();
 }
 
 // Enable demand-driven agent output capture. The poller starts only while an
@@ -345,6 +348,7 @@ setPipelineHandler((event) => {
       } catch (err) {
         console.error('[pipeline] Failed to append pipeline.journal event:', err);
       }
+      invalidatePullRequestListingOnApproval(event.entry);
       return;
     }
 
@@ -773,6 +777,7 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   stopResourceRefreshServices();
   stopAgentEnrichmentService();
   stopNeedsYouPushService();
+  stopLiveActivityService();
   stopAgentOutputService();
   stopConversationLifecycleService();
   stopCodexPluginImporter();

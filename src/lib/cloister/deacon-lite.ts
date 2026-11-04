@@ -579,13 +579,30 @@ let deaconLiteInterval: ReturnType<typeof setInterval> | null = null;
 let lastRunAt: string | null = null;
 let lastRunError: string | null = null;
 let patrolRunObserver: ((report: PatrolRunReport) => void) | null = null;
+let patrolInFlight: Promise<void> | null = null;
 
 /** Registered by the deacon child to relay each completed tick to its parent process (PAN-3922). */
 export function setPatrolRunObserver(fn: ((report: PatrolRunReport) => void) | null): void {
   patrolRunObserver = fn;
 }
 
-export async function runDeaconLitePatrol(): Promise<void> {
+/**
+ * PAN-5001: a patrol can outlast the 60s interval (the closed-issue reaper
+ * waits on GitHub per issue). A tick or manual request that arrives while one
+ * is running joins it instead of starting an overlapping sweep that repeats the
+ * same tracker reads.
+ */
+export function runDeaconLitePatrol(): Promise<void> {
+  if (!patrolInFlight) {
+    const patrol: Promise<void> = runDeaconLitePatrolOnce().finally(() => {
+      if (patrolInFlight === patrol) patrolInFlight = null;
+    });
+    patrolInFlight = patrol;
+  }
+  return patrolInFlight;
+}
+
+async function runDeaconLitePatrolOnce(): Promise<void> {
   try {
     await runDeaconLite();
     lastRunAt = new Date().toISOString();
@@ -616,6 +633,8 @@ export function stopDeaconLite(): void {
   if (!deaconLiteInterval) return;
   clearInterval(deaconLiteInterval);
   deaconLiteInterval = null;
+  // A restarted loop must not join a patrol left over from the stopped one.
+  patrolInFlight = null;
 }
 
 export function isDeaconLiteRunning(): boolean {

@@ -1,0 +1,636 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T02:33:49Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4937: Agent MCP and bots (W-SELF2): Checklist, done, handoff and worker report tools",
+    "updated": "2026-11-04T02:50:17.674Z"
+  },
+  "plan": {
+    "id": "pan-4937",
+    "title": "Agent MCP and bots (W-SELF2): Checklist, done, handoff and worker report tools",
+    "status": "running",
+    "uid": "25055148-15c4-4a9a-93bd-55b150e7207d",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-04T02:33:49Z",
+    "updated": "2026-11-04T02:50:17.674Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4937",
+        "label": "PAN-4937",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4927",
+        "label": "PAN-4927 epic",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "mcp",
+      "self-routes",
+      "agent-tokens",
+      "pan-4927"
+    ],
+    "narratives": {
+      "Problem": "W-SELF1 gave the dashboard a self-caller resolver and a job store, but no route starts a job, so agents still run pan task, pan done, pan handoff and pan worker report through Bash with the admin internal token. W-SELF1 also gives a conversation job no OVERDECK_AGENT_ID, so pan handoff self cannot find its conversation and a conversation claim is recorded as a dead cli-<pid>.",
+      "Proposal": "Add src/dashboard/server/routes/self-workflow.ts with six POST /api/self/ routes (tasks/claim, tasks/done, tasks/block, done, handoff, worker-report) that take the agent and issue from the agent token, build argv only with buildSelfJobArgv pieces, start a W-SELF1 job, wait up to 50 s and answer selfJobAnswer; add six audience-agent MCP tools in tools-self.ts that pass the answer through; set OVERDECK_AGENT_ID=<tmuxSession> for conversation jobs; document the tools and routes. PRD: .pan/drafts/PAN-4937.md.",
+      "NonGoals": "- No --steal on task_claim and no task_unblock, task_reopen, task_cancel, task_next or task_show tools\n- No done options: --comment, --force, --test-waived and --strike are never passed\n- No handoff options other than focus and title; never --cwd, --allow-primary, --model, --effort, --issue, --role, --fresh, --hold, skills, packs or author choice\n- No conversation-row or primary-checkout pre-check in the handoff route\n- No worker report --file and no reporting for another worker\n- No lane report, memory or secret routes (W-DEL1, W-MEM1, W-SEC1); no MCP injection (W-INJ1-3); no instructions block (W-INJ4)\n- No parsing of job JSON stdout in routes or tools; no isError for a non-zero exitCode\n- No change to self-caller.ts, self-job-argv.ts or the W-SELF1 wait route; the only W-SELF1 change is the conversation env in selfJobEnv\n- No CSRF or Content-Type check on the self workflow routes\n- No change to the visibility.test.ts assertions (13 non-agent tools; [list_machines, wait_job] for a read:state agent)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Handoff passes the literal ref self, and selfJobEnv gives a conversation caller OVERDECK_AGENT_ID=<tmuxSession>",
+        "rationale": "Conversation names such as conv-flywheel~0d0028ec fail SELF_JOB_REF_PATTERN; self resolves through OVERDECK_AGENT_ID exactly as in the conversation shell (conversation-runtime.ts:806-812), and the same variable makes task claim record conv-<name> instead of a dead cli-<pid>."
+      },
+      {
+        "summary": "No route pre-check for a missing conversation row or a primary-checkout cwd on handoff",
+        "rationale": "The CLI stays the one door; a work agent gets pan handoff exit 1, and an inherited cwd matches pan handoff self today (conversation-forks.ts checks only an explicit cwd)."
+      },
+      {
+        "summary": "All six routes in one file, delivered as a sequential chain of vertical slices",
+        "rationale": "Every slice appends to the same route file, scope table, no-loss matrix, tool list and enumerating tests, so they share mutations whatever the file split."
+      },
+      {
+        "summary": "Tools pass a finished job with a non-zero exitCode through as a normal result",
+        "rationale": "wait_job already passes it through (W-SELF1 D-3), so the first call and every wait_job answer the same way."
+      },
+      {
+        "summary": "task_block on is optional; done takes no options; worker_report requires status",
+        "rationale": "runTaskBlock without --on is a real plain block; the epic body for done is {}; the epic table lists status for worker_report."
+      },
+      {
+        "summary": "Started jobs answer HTTP 200 for both done and running",
+        "rationale": "Matches the W-SELF1 wait route; routeResult treats every 2xx alike."
+      },
+      {
+        "summary": "No CSRF or Content-Type check on self workflow routes",
+        "rationale": "Only a header-borne agent token is accepted, and rejectUnsafeDashboardMutationRequest skips CSRF for token credentials (dashboard-auth.ts:277)."
+      }
+    ],
+    "items": [
+      {
+        "id": "job-env-conversation-id",
+        "title": "Conversation self jobs carry OVERDECK_AGENT_ID",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T02:33:49Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4937",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/self-jobs.ts",
+            "src/dashboard/server/__tests__/self-jobs.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/dashboard/server/__tests__/self-jobs.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "self-jobs.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4937.md WI-1. In selfJobEnv (src/dashboard/server/services/self-jobs.ts:87-95), for a conversation caller with a tmuxSession set BOTH OVERDECK_CONVERSATION and OVERDECK_AGENT_ID to caller.tmuxSession (before/after snippet in the PRD), with the PAN-4937 D-5 comment; update the module header sentence. In self-jobs.test.ts lines 192-200 replace the not.toHaveProperty(OVERDECK_AGENT_ID) assertion with toBe(conv-abc) and add a claimant parity case using resolveClaimantId from src/lib/xbrief/claim-check.ts."
+        },
+        "items": [
+          {
+            "id": "job-env-conversation-id.ac1",
+            "title": "Given a conversation caller with tmuxSession conv-abc and a base env holding OVERDECK_AGENT_ID=agent-other, when selfJobEnv runs, then the returned env sets OVERDECK_AGENT_ID and OVERDECK_CONVERSATION both to conv-abc",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "job-env-conversation-id.ac2",
+            "title": "Given the same base env holding OVERDECK_CLAIM_ID=x, resolveClaimantId(selfJobEnv(conversation)) returns conv-abc and resolveClaimantId(selfJobEnv(agent)) returns agent-pan-1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "job-env-conversation-id.ac3",
+            "title": "npx vitest run src/dashboard/server/__tests__/self-jobs.test.ts exits 0 with the updated conversation-env assertion",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "task-claim-done",
+        "title": "Route file plus task_claim and task_done",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T02:33:49Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4937",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/self-workflow.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/lib/mcp/tools-self.ts",
+            "src/dashboard/server/__tests__/self-workflow.test.ts",
+            "tests/unit/lib/mcp/tools-self.test.ts",
+            "tests/unit/lib/mcp/tools-approve.test.ts",
+            "tests/unit/lib/mcp/tool-annotations.test.ts",
+            "src/dashboard/server/server.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/dashboard/server/__tests__/self-workflow.test.ts tests/unit/lib/mcp/ tests/unit/lib/overdeck/no-loss-matrix.test.ts src/dashboard/server/__tests__/route-scopes.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "self-workflow.test.ts, tests/unit/lib/mcp/*, no-loss-matrix.test.ts and route-scopes.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-6",
+            "FR-7",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4",
+            "NFR-6"
+          ],
+          "foundationFor": [
+            "task-block",
+            "done-tool",
+            "handoff-tool",
+            "worker-report-tool"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Create src/dashboard/server/routes/self-workflow.ts with the exported helpers parseSelfBody, badRequest, requiredBodyString, startSelfJobAnswer and SelfWorkflowRouteDeps exactly as specified, a private prelude, handleSelfTaskClaim and handleSelfTaskDone (argv [issue ref, item ref, --json] from the caller, never the body), and makeSelfWorkflowRouteLayer with each HttpRouter.add(POST, literal path, ...) written on its call line. Register selfWorkflowRouteLayer in server.ts after selfJobsRouteLayer. Add scope rows (tell) after route-scopes.ts:127 and no-loss rows after no-loss-matrix.ts:502. Add task_claim and task_done tools (audience agent, scope tell, descriptions verbatim from the PRD) to SELF_TOOLS via a postSelf helper. Write self-workflow.test.ts (handler level, fake timers only in a nested describe, and through the real gate) and update tools-self, tools-approve and tool-annotations tests. Do not change the visibility.test.ts assertions (PRD Fact 17)."
+        },
+        "items": [
+          {
+            "id": "task-claim-done.ac1",
+            "title": "Given an agent token for agent-pan-1 whose state has issueId PAN-1 and workspace /w/feature-pan-1, when POST /api/self/tasks/claim receives {\"itemId\":\"item-a\",\"issueId\":\"PAN-999\"}, then the job runner receives argv task claim PAN-1 item-a --json with cwd /w/feature-pan-1 and resolveClaimantId(env) returns agent-pan-1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "task-claim-done.ac2",
+            "title": "Given a runner that never settles, when the claim handler runs on fake timers, then it is still pending at 49,999 ms and resolves at 50,000 ms with 200 status running and next.tool wait_job",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "task-claim-done.ac3",
+            "title": "Through the real gate, POST /api/self/tasks/claim returns 403 code not-an-agent-token for a plain kind token with tell and returns 403 missingScope tell for a read:state-only token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "task-claim-done.ac4",
+            "title": "The handler rejects body [1] with 400 bad-body, {} with 400 bad-request, itemId --steal with 400 bad-job-arg and starts no job, and an agent without an issue with 409 no-issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "task-claim-done.ac5",
+            "title": "tools/list shows task_claim and task_done to an agent token with tell and hides them from a non-agent token, and task_claim posts exactly {itemId} to POST /api/self/tasks/claim",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "task-block",
+        "title": "task_block route and tool",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T02:33:49Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4937",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/self-workflow.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/lib/mcp/tools-self.ts",
+            "src/dashboard/server/__tests__/self-workflow.test.ts",
+            "tests/unit/lib/mcp/tools-self.test.ts",
+            "tests/unit/lib/mcp/tools-approve.test.ts",
+            "tests/unit/lib/mcp/tool-annotations.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/dashboard/server/__tests__/self-workflow.test.ts tests/unit/lib/mcp/ tests/unit/lib/overdeck/no-loss-matrix.test.ts src/dashboard/server/__tests__/route-scopes.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "self-workflow.test.ts, tests/unit/lib/mcp/*, no-loss-matrix.test.ts and route-scopes.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-7",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Add handleSelfTaskBlock to routes/self-workflow.ts: optional on (0-20 non-empty strings of at most 500 chars), each passed as {flag:on,value}, then --json; register POST /api/self/tasks/block; scope row tell; no-loss row; task_block tool (scope tell, audience agent); tests as listed in the PRD; append to tools-approve list and SINGLE_ROUTE_PATHS."
+        },
+        "items": [
+          {
+            "id": "task-block.ac1",
+            "title": "Given body {\"itemId\":\"item-a\",\"on\":[\"PAN-2\",\"#45\"]}, the job runner receives argv task block PAN-1 item-a --on=PAN-2 --on=#45 --json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "task-block.ac2",
+            "title": "Given body {\"itemId\":\"item-a\"} without on, the job runner receives argv task block PAN-1 item-a --json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "task-block.ac3",
+            "title": "An on list of 21 refs, a non-array on, or an empty-string ref returns 400 bad-request and starts no job, and on [\"--steal\"] produces the single argv element --on=--steal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "done-tool",
+        "title": "done route and tool (operate scope)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T02:33:49Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4937",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/self-workflow.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/lib/mcp/tools-self.ts",
+            "src/dashboard/server/__tests__/self-workflow.test.ts",
+            "tests/unit/lib/mcp/tools-self.test.ts",
+            "tests/unit/lib/mcp/tools-approve.test.ts",
+            "tests/unit/lib/mcp/tool-annotations.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/dashboard/server/__tests__/self-workflow.test.ts tests/unit/lib/mcp/ tests/unit/lib/overdeck/no-loss-matrix.test.ts src/dashboard/server/__tests__/route-scopes.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "self-workflow.test.ts, tests/unit/lib/mcp/*, no-loss-matrix.test.ts and route-scopes.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Add handleSelfDone (argv done <caller issue> only; body fields ignored), register POST /api/self/done, scope row operate, no-loss row, done tool (scope operate, audience agent, input {}), tests including the real-gate review-token 403; append to the tool lists."
+        },
+        "items": [
+          {
+            "id": "done-tool.ac1",
+            "title": "Given body {\"issueId\":\"PAN-9\",\"force\":true} from an agent whose issue is PAN-1, the job runner receives argv done PAN-1 and no other element",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "done-tool.ac2",
+            "title": "Through the real gate, POST /api/self/done returns 403 {error: insufficient_scope, missingScope: operate} for an agent token with the REVIEW_SCOPES set and role review, the injected runner records no call, and a work agent token receives 200",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "done-tool.ac3",
+            "title": "tools/list hides done from an agent token without operate and shows it to an agent token with operate, and requiredScopeFor(POST, /api/self/done) returns operate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "handoff-tool",
+        "title": "handoff route and tool",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T02:33:49Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4937",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/self-workflow.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/lib/mcp/tools-self.ts",
+            "src/dashboard/server/__tests__/self-workflow.test.ts",
+            "tests/unit/lib/mcp/tools-self.test.ts",
+            "tests/unit/lib/mcp/tools-approve.test.ts",
+            "tests/unit/lib/mcp/tool-annotations.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/dashboard/server/__tests__/self-workflow.test.ts tests/unit/lib/mcp/ tests/unit/lib/overdeck/no-loss-matrix.test.ts src/dashboard/server/__tests__/route-scopes.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "self-workflow.test.ts, tests/unit/lib/mcp/*, no-loss-matrix.test.ts and route-scopes.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-7",
+            "NFR-2"
+          ],
+          "acJustification": "Five criteria: the argv shape, hostile flag text, field limits, the --yolo pre-parse guard and the conversation env each fail independently."
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Add handleSelfHandoff: required focus (non-empty, at most 10,000 chars), optional title (non-empty, at most 200 chars); argv handoff self [--title=<title>] -- <focus>; never --cwd or --allow-primary; no issue check. Register POST /api/self/handoff, scope row tell, no-loss row, handoff tool with the PRD description; tests including the conversation-caller env check that depends on job-env-conversation-id. Also refuse with 400 bad-request a focus matching /^--(?:no-)?yolo(?:=|$)/, because the pan CLI pre-parse at src/cli/index.ts:60-86 removes such an element from argv even after -- and sets PAN_YOLO (permission mode)."
+        },
+        "items": [
+          {
+            "id": "handoff-tool.ac1",
+            "title": "Given body {\"focus\":\"Read .pan/brief.md\",\"title\":\"Next step\"}, the job runner receives argv handoff self --title=Next step -- Read .pan/brief.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-tool.ac2",
+            "title": "Given focus \"--cwd / --allow-primary\" and title \"--allow-primary\", the argv holds --title=--allow-primary as one element and the focus as one element after --, and no element equals --allow-primary or starts with --cwd",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-tool.ac3",
+            "title": "A 10,001-character focus or a blank title returns 400 bad-request naming the field and starts no job",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-tool.ac5",
+            "title": "Given a focus of --yolo, --no-yolo or --yolo=true, the handler rejects it with 400 bad-request and starts no job, because src/cli/index.ts strips such argv elements even after --",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-tool.ac4",
+            "title": "Given a conversation caller with cwd /home/u/proj and tmuxSession conv-abc, the handoff job runs in /home/u/proj with env OVERDECK_AGENT_ID conv-abc",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "worker-report-tool",
+        "title": "worker_report route and tool",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T02:33:49Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4937",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/self-workflow.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/lib/mcp/tools-self.ts",
+            "src/dashboard/server/__tests__/self-workflow.test.ts",
+            "tests/unit/lib/mcp/tools-self.test.ts",
+            "tests/unit/lib/mcp/tools-approve.test.ts",
+            "tests/unit/lib/mcp/tool-annotations.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/dashboard/server/__tests__/self-workflow.test.ts tests/unit/lib/mcp/ tests/unit/lib/overdeck/no-loss-matrix.test.ts src/dashboard/server/__tests__/route-scopes.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "self-workflow.test.ts, tests/unit/lib/mcp/*, no-loss-matrix.test.ts and route-scopes.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-7",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Add handleSelfWorkerReport: 403 not-a-worker unless agentKind agent and role worker (checked right after the caller); status in done|blocked|failed; report non-empty and at most MAX_WORKER_REPORT_BYTES (import from src/lib/agents/worker/report.ts); argv worker report <caller id> --status=<s> --stdin with the report on stdin. Register POST /api/self/worker-report, scope row tell, no-loss row, worker_report tool; tests; append to the tool lists."
+        },
+        "items": [
+          {
+            "id": "worker-report-tool.ac1",
+            "title": "Given a worker caller agent-pan-1-worker-2 and body {\"status\":\"blocked\",\"report\":\"R\"}, the job runner receives argv worker report agent-pan-1-worker-2 --status=blocked --stdin and stdin R, and R appears in no argv element",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "worker-report-tool.ac2",
+            "title": "A caller with role work, a caller with a null role and a conversation caller each receive 403 code not-a-worker, and the injected runner records no call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "worker-report-tool.ac3",
+            "title": "The handler rejects status maybe, a blank report and a report of MAX_WORKER_REPORT_BYTES + 1 bytes with 400 bad-request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "self-workflow-docs",
+        "title": "Document the workflow tools and routes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T02:33:49Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4937",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/mcp.mdx",
+            "docs/DASHBOARD-AUTH.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint",
+            "grep -n \"task_claim\\|worker_report\" configuration/mcp.mdx",
+            "grep -n \"not-a-worker\\|no-issue\" docs/DASHBOARD-AUTH.md"
+          ],
+          "expected_outputs": [
+            "lint completes without errors",
+            "grep prints the task_claim and worker_report rows",
+            "grep prints lines naming not-a-worker and no-issue"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Add six rows to the Agent-only tools table in configuration/mcp.mdx plus the closing paragraph given in the PRD; in docs/DASHBOARD-AUTH.md /api/self/* subsection, correct the conversation job env sentence and add the workflow routes paragraph with scopes and codes, as written in the PRD."
+        },
+        "items": [
+          {
+            "id": "self-workflow-docs.ac1",
+            "title": "configuration/mcp.mdx Agent-only tools table renders rows for task_claim, task_done, task_block, done, handoff and worker_report with scopes tell, tell, tell, operate, tell, tell",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "self-workflow-docs.ac2",
+            "title": "docs/DASHBOARD-AUTH.md contains POST /api/self/done with operate, the codes no-issue and not-a-worker, and the sentence that a conversation job sets OVERDECK_AGENT_ID and OVERDECK_CONVERSATION to its tmux session",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "self-workflow-docs.ac3",
+            "title": "npm run lint (which runs lint:docs) exits 0 after the doc edits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "task-claim-done",
+        "to": "task-block",
+        "type": "blocks"
+      },
+      {
+        "from": "task-block",
+        "to": "done-tool",
+        "type": "blocks"
+      },
+      {
+        "from": "done-tool",
+        "to": "handoff-tool",
+        "type": "blocks"
+      },
+      {
+        "from": "handoff-tool",
+        "to": "worker-report-tool",
+        "type": "blocks"
+      },
+      {
+        "from": "job-env-conversation-id",
+        "to": "handoff-tool",
+        "type": "blocks"
+      },
+      {
+        "from": "worker-report-tool",
+        "to": "self-workflow-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "job-env-conversation-id",
+        "to": "self-workflow-docs",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-04-PAN-4937-agent-mcp-and-bots-w-self2-checklist-done-handoff-and-worker-report-tools.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

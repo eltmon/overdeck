@@ -46,6 +46,17 @@ describe('installResumeHandler', () => {
     expect(connection.forgetRoutes).toHaveBeenCalledTimes(1);
     expect(resetTransport).toHaveBeenCalledTimes(1);
   });
+
+  it('refreshes the Live Activity on each resume (PAN-4839)', () => {
+    const { app, listeners } = fakeApp();
+    const liveActivity = { refresh: vi.fn(async () => undefined) };
+    installResumeHandler(() => ({ directory: null, connection: null, resetTransport: vi.fn(), liveActivity }), app);
+    listeners[0]!({ isActive: false });
+    expect(liveActivity.refresh).not.toHaveBeenCalled();
+    listeners[0]!({ isActive: true });
+    listeners[0]!({ isActive: true });
+    expect(liveActivity.refresh).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('UpdatingBanner', () => {

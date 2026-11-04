@@ -8,11 +8,14 @@
 
 /**
  * The status-code alternative is anchored to how the clients format it
- * (`githubApiWithToken` throws `… failed: 503 <text>`; gh prints `HTTP 502: …`),
- * so a PR number such as `/pull/504` inside a message never classifies as transient.
+ * (`githubApiWithToken` throws `… failed: 503 <text>`; gh prints `HTTP 502: …`;
+ * gh's raw REST errors print `non-200 OK status code: 502 …`), so a PR number
+ * such as `/pull/504` inside a message never classifies as transient. The
+ * GraphQL phrase `something went wrong while executing your query` covers
+ * GitHub's GraphQL 5xx wording, which carries no status code at all.
  */
 const TRANSIENT_FORGE_ERROR =
-  /rate limit|secondary rate|abuse detection|ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|ECONNREFUSED|socket hang up|timed out|(?:failed: |HTTP )50[234]\b/i;
+  /rate limit|secondary rate|abuse detection|ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|ECONNREFUSED|socket hang up|timed out|something went wrong while executing your query|(?:failed: |HTTP |non-200 OK status code: )50[234]\b/i;
 
 /** True when `err` (an Error, a string, or an exec error with `stderr`) is a transient forge failure. */
 export function isTransientForgeError(err: unknown): boolean {

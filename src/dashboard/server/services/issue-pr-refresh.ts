@@ -16,3 +16,20 @@ export function refreshIssuePullRequestStateNow(issueId: string): void {
     console.warn(`[issue-pr-refresh] ${issueId}: refresh failed:`, error);
   }
 }
+
+/**
+ * PAN-5036: drop the issue's repo PR listing when a `review.verdict` APPROVED is
+ * journaled, so the auto-merge scheduler's next pass judges the approved PR
+ * against fresh checks instead of a listing cached before the approval. The
+ * dashboard's pipeline handler calls it for every journal entry, including
+ * those a reviewer's CLI process forwards. Never throws.
+ */
+export function invalidatePullRequestListingOnApproval(entry: { type: string; issueId: string; data?: Record<string, unknown> }): void {
+  if (entry.type !== 'review.verdict' || entry.data?.verdict !== 'APPROVED') return;
+  try {
+    const project = resolveProjectFromIssueSync(entry.issueId);
+    if (project) invalidateRepoPullRequests(project.projectPath);
+  } catch (error) {
+    console.warn(`[issue-pr-refresh] ${entry.issueId}: listing invalidation failed:`, error);
+  }
+}

@@ -1,23 +1,44 @@
 /**
  * The shape every Overdeck MCP tool shares (PAN-4649), plus the result and
  * argument helpers the tool files use. Kept apart from `server.ts` so the tool
- * files and the server do not import each other.
+ * files and the server do not import each other. Also carries the visibility
+ * fields (PAN-4927 W-MCP1): a tool's `scope` and `audience`, and the caller's
+ * `isAgent` flag.
  */
 import type { CallToolResult, Tool } from '@modelcontextprotocol/sdk/types.js';
 
+import type { AccessTokenScope } from '../access-tokens.js';
 import type { DashboardApi, DashboardApiResponse } from './dashboard-api.js';
 
 export interface McpToolContext {
   api: DashboardApi;
   /** The scopes of the token the caller presented. */
   scopes: readonly string[];
+  /** True when the token belongs to a managed agent (`hasAgentId`, PAN-4927 D-14). */
+  isAgent: boolean;
 }
 
 export interface OverdeckTool {
   name: string;
   description: string;
   inputSchema: Tool['inputSchema'];
+  /** The scope of the route this tool calls; tools/list hides the tool from tokens without it (PAN-4927 D-14). */
+  scope: AccessTokenScope;
+  /** `'agent'`: listed only to agent tokens. */
+  audience: 'any' | 'agent';
   run(args: Record<string, unknown>, ctx: McpToolContext): Promise<CallToolResult>;
+}
+
+/** PAN-4927 D-12: no wait route or wait tool blocks longer than this. */
+export const WAIT_CHUNK_MS = 50_000;
+
+/**
+ * True when a token record or credential names a managed agent (PAN-4927 D-6,
+ * D-14): `agentId` is a non-empty string. Reads the field structurally, so it
+ * compiles before and after W-TOK1 adds `agentId` to the record and credential types.
+ */
+export function hasAgentId(value: object): boolean {
+  return 'agentId' in value && typeof value.agentId === 'string' && value.agentId.length > 0;
 }
 
 /** A successful tool result: the data as pretty-printed JSON text. */

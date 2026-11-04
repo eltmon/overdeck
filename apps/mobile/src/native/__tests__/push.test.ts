@@ -1,189 +1,313 @@
+import type { PermissionState } from '@capacitor/core';
+import type { DirectoryWebState } from '@overdeck/anywhere-channel/web';
 import type { ClientToDirectoryFrame } from '@overdeck/contracts';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const harness = vi.hoisted(() => ({
-  platform: 'android' as 'android' | 'ios',
-  configured: true,
-  receive: 'granted' as string,
-  afterRequest: 'granted' as string,
-  listeners: new Map<string, (event: { value: string }) => void>(),
-  removed: [] as string[],
-}));
+import {
+  NOTIFICATIONS_PREF_KEY,
+  PUSH_TOKEN_KEY,
+  type PushDeps,
+  type PushDirectory,
+  pushSupported,
+  startPush,
+  unregisterPush,
+} from '../push';
 
-vi.mock('../../shell/platform', () => ({ shellPlatform: () => harness.platform }));
+const TOKEN = 'a1b2c3d4'.repeat(8);
 
-vi.mock('@capacitor/core', () => ({
-  registerPlugin: () => ({ status: async () => ({ configured: harness.configured }) }),
-}));
+type Listener = (event: never) => void;
 
-vi.mock('@capacitor/push-notifications', () => ({
-  PushNotifications: {
-    checkPermissions: vi.fn(async () => ({ receive: harness.receive })),
-    requestPermissions: vi.fn(async () => {
-      harness.receive = harness.afterRequest;
-      return { receive: harness.receive };
+function fakePlugin(checked: PermissionState = 'granted', requested: PermissionState = 'granted') {
+  const listeners = new Map<string, Listener>();
+  const calls: string[] = [];
+  const removed: string[] = [];
+  const plugin = {
+    checkPermissions: vi.fn(async () => {
+      calls.push('checkPermissions');
+      return { receive: checked };
     }),
-    register: vi.fn(async () => undefined),
-    unregister: vi.fn(async () => undefined),
-    addListener: vi.fn(async (event: string, listener: (event: { value: string }) => void) => {
-      harness.listeners.set(event, listener);
+    requestPermissions: vi.fn(async () => {
+      calls.push('requestPermissions');
+      return { receive: requested };
+    }),
+    register: vi.fn(async () => {
+      calls.push('register');
+    }),
+    addListener: vi.fn(async (event: string, listener: Listener) => {
+      calls.push(`addListener:${event}`);
+      listeners.set(event, listener);
       return {
         remove: async () => {
-          harness.removed.push(event);
-          harness.listeners.delete(event);
+          removed.push(event);
+          listeners.delete(event);
         },
       };
     }),
-  },
-}));
+  };
+  const emit = (event: string, payload: unknown) => (listeners.get(event) as ((p: unknown) => void) | undefined)?.(payload);
+  return { plugin: plugin as unknown as NonNullable<PushDeps['plugin']>, calls, removed, listeners, emit };
+}
 
-import { PushNotifications } from '@capacitor/push-notifications';
-
-import { type PushDirectory, pushState, startPushRegistration, unregisterPush } from '../push';
-
-/** A directory whose state the test drives by calling the stored onStateChange listener. */
-function directory(initial: string) {
+function fakeDirectory(initial: DirectoryWebState = 'connecting') {
   const sent: ClientToDirectoryFrame[] = [];
-  const listeners = new Set<(state: string) => void>();
-  const client = {
+  const listeners = new Set<(state: DirectoryWebState) => void>();
+  const directory: PushDirectory & { set(state: DirectoryWebState): void; listenerCount(): number } = {
     state: initial,
-    send: (frame: ClientToDirectoryFrame) => {
-      if (client.state !== 'online') return false;
+    send(frame) {
+      if (this.state !== 'online') return false;
       sent.push(frame);
       return true;
     },
-    onStateChange: (listener: (state: string) => void) => {
+    onStateChange(listener) {
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
+    set(state) {
+      (this as { state: DirectoryWebState }).state = state;
+      for (const listener of listeners) listener(state);
+    },
+    listenerCount: () => listeners.size,
   };
-  const go = (state: string) => {
-    client.state = state;
-    for (const listener of listeners) listener(state);
-  };
-  return { client: client as unknown as PushDirectory, sent, go, listeners };
+  return { directory, sent };
 }
 
-const token = (value: string) => harness.listeners.get('registration')?.({ value });
+const keys = { pushEnvironment: vi.fn(async () => ({ apsEnvironment: 'sandbox' as const })) };
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 beforeEach(() => {
-  vi.clearAllMocks();
-  harness.platform = 'android';
-  harness.configured = true;
-  harness.receive = 'granted';
-  harness.afterRequest = 'granted';
-  harness.listeners.clear();
-  harness.removed = [];
+  localStorage.clear();
+  keys.pushEnvironment.mockClear();
 });
 
-describe('pushState', () => {
-  it('maps the permission to on, off and prompt', async () => {
-    expect(await pushState()).toBe('on');
-    harness.receive = 'denied';
-    expect(await pushState()).toBe('off');
-    harness.receive = 'prompt';
-    expect(await pushState()).toBe('prompt');
-    harness.receive = 'prompt-with-rationale';
-    expect(await pushState()).toBe('prompt');
-  });
-
-  it('is unavailable without a Firebase config', async () => {
-    harness.configured = false;
-    expect(await pushState()).toBe('unavailable');
-    expect(PushNotifications.checkPermissions).not.toHaveBeenCalled();
-  });
-
-  it('is unavailable on iOS', async () => {
-    harness.platform = 'ios';
-    expect(await pushState()).toBe('unavailable');
-  });
-
-  it('is unavailable when the plugin throws', async () => {
-    vi.mocked(PushNotifications.checkPermissions).mockRejectedValueOnce(new Error('not implemented'));
-    expect(await pushState()).toBe('unavailable');
+describe('pushSupported', () => {
+  it('is true on iOS and Android only', () => {
+    expect(pushSupported('ios')).toBe(true);
+    expect(pushSupported('android')).toBe(true);
+    expect(pushSupported('web')).toBe(false);
   });
 });
 
-describe('startPushRegistration', () => {
-  it('never registers or sends without a Firebase config', async () => {
-    harness.configured = false;
-    const d = directory('online');
-    await startPushRegistration(d.client);
-    expect(PushNotifications.register).not.toHaveBeenCalled();
-    expect(d.sent).toEqual([]);
+describe('startPush', () => {
+  it('R1: adds the registration listeners before calling register()', async () => {
+    const fake = fakePlugin();
+    startPush({ directory: fakeDirectory().directory, platform: 'ios', plugin: fake.plugin, keys, log: () => {} });
+    await settle();
+    expect(fake.calls.indexOf('addListener:registration')).toBeGreaterThan(-1);
+    expect(fake.calls.indexOf('addListener:registrationError')).toBeGreaterThan(-1);
+    expect(fake.calls.indexOf('register')).toBeGreaterThan(fake.calls.indexOf('addListener:registration'));
+    expect(fake.calls.indexOf('register')).toBeGreaterThan(fake.calls.indexOf('addListener:registrationError'));
   });
 
-  it('asks once when the permission was never asked', async () => {
-    harness.receive = 'prompt';
-    await startPushRegistration(directory('online').client);
-    expect(PushNotifications.requestPermissions).toHaveBeenCalledTimes(1);
-    expect(PushNotifications.register).toHaveBeenCalledTimes(1);
+  it('R2: asks while iOS says prompt, registers when granted, and maps the permission', async () => {
+    const asked = fakePlugin('prompt', 'granted');
+    const control = startPush({ directory: fakeDirectory().directory, platform: 'ios', plugin: asked.plugin, keys, log: () => {} });
+    expect(control.permission).toBe('unknown');
+    await settle();
+    expect(asked.calls).toEqual(['addListener:registration', 'addListener:registrationError', 'checkPermissions', 'requestPermissions', 'register']);
+    expect(control.permission).toBe('granted');
+
+    const denied = fakePlugin('prompt-with-rationale', 'denied');
+    const deniedControl = startPush({ directory: fakeDirectory().directory, platform: 'ios', plugin: denied.plugin, keys, log: () => {} });
+    await settle();
+    expect(denied.calls).not.toContain('register');
+    expect(deniedControl.permission).toBe('denied');
+
+    const granted = fakePlugin('granted');
+    startPush({ directory: fakeDirectory().directory, platform: 'ios', plugin: granted.plugin, keys, log: () => {} });
+    await settle();
+    expect(granted.calls).not.toContain('requestPermissions');
+    expect(granted.calls).toContain('register');
   });
 
-  it('does not register when the permission is denied', async () => {
-    harness.receive = 'prompt';
-    harness.afterRequest = 'denied';
-    await startPushRegistration(directory('online').client);
-    expect(PushNotifications.register).not.toHaveBeenCalled();
+  it('R3: stores a valid token and sends a register; rejects a bad one without logging it', async () => {
+    const fake = fakePlugin();
+    const { directory, sent } = fakeDirectory('online');
+    const log = vi.fn();
+    startPush({ directory, platform: 'ios', plugin: fake.plugin, keys, log });
+    await settle();
+
+    fake.emit('registration', { value: TOKEN });
+    await settle();
+    expect(localStorage.getItem(PUSH_TOKEN_KEY)).toBe(TOKEN);
+    expect(sent).toEqual([{ type: 'push-register', platform: 'ios', token: TOKEN, apsEnvironment: 'sandbox' }]);
+
+    fake.emit('registration', { value: 'bad token!' });
+    await settle();
+    expect(localStorage.getItem(PUSH_TOKEN_KEY)).toBe(TOKEN);
+    expect(log).toHaveBeenCalledWith('push token rejected');
+    expect(JSON.stringify(log.mock.calls)).not.toContain('bad token!');
+    expect(sent).toHaveLength(1);
   });
 
-  it('sends push-register once per transition to online', async () => {
-    const d = directory('connecting');
-    await startPushRegistration(d.client);
-    token('fcm-token-1');
-    expect(d.sent).toEqual([]);
+  it('R4: registers on each change into online, and a machine-list update while online sends nothing', async () => {
+    localStorage.setItem(PUSH_TOKEN_KEY, TOKEN);
+    const { directory, sent } = fakeDirectory('connecting');
+    startPush({ directory, platform: 'ios', plugin: fakePlugin().plugin, keys, log: () => {} });
+    await settle();
+    expect(sent).toEqual([]);
 
-    d.go('online');
-    expect(d.sent).toEqual([{ type: 'push-register', platform: 'android', token: 'fcm-token-1' }]);
+    directory.set('online');
+    await settle();
+    expect(sent).toHaveLength(1);
 
-    // A machine-list update calls the listener with the unchanged state.
-    d.go('online');
-    expect(d.sent).toHaveLength(1);
+    directory.set('online');
+    await settle();
+    expect(sent).toHaveLength(1);
 
-    d.go('connecting');
-    d.go('online');
-    expect(d.sent).toHaveLength(2);
-    expect(d.sent[1]).toEqual({ type: 'push-register', platform: 'android', token: 'fcm-token-1' });
+    directory.set('connecting');
+    directory.set('online');
+    await settle();
+    expect(sent).toHaveLength(2);
   });
 
-  it('sends a new token while online', async () => {
-    const d = directory('online');
-    await startPushRegistration(d.client);
-    token('fcm-token-1');
-    token('fcm-token-2');
-    expect(d.sent).toEqual([
-      { type: 'push-register', platform: 'android', token: 'fcm-token-1' },
-      { type: 'push-register', platform: 'android', token: 'fcm-token-2' },
-    ]);
+  it('R4: acts once at start when already online, and unregisters on online when switched off', async () => {
+    localStorage.setItem(PUSH_TOKEN_KEY, TOKEN);
+    const online = fakeDirectory('online');
+    startPush({ directory: online.directory, platform: 'ios', plugin: fakePlugin().plugin, keys, log: () => {} });
+    await settle();
+    expect(online.sent).toEqual([{ type: 'push-register', platform: 'ios', token: TOKEN, apsEnvironment: 'sandbox' }]);
+
+    localStorage.setItem(NOTIFICATIONS_PREF_KEY, 'off');
+    const off = fakeDirectory('connecting');
+    const fake = fakePlugin();
+    startPush({ directory: off.directory, platform: 'ios', plugin: fake.plugin, keys, log: () => {} });
+    off.directory.set('online');
+    await settle();
+    expect(off.sent).toEqual([{ type: 'push-unregister' }]);
+    expect(fake.calls).not.toContain('register');
   });
 
-  it('stops listening when stopped', async () => {
-    const d = directory('online');
-    const stop = await startPushRegistration(d.client);
-    const registration = harness.listeners.get('registration');
-    stop();
-    registration?.({ value: 'late-token' });
-    d.go('online');
-    expect(d.sent).toEqual([]);
-    expect(d.listeners.size).toBe(0);
-    expect(harness.removed.sort()).toEqual(['registration', 'registrationError']);
+  it('R5: sends no register without a token or while offline, and omits apsEnvironment off iOS', async () => {
+    const { directory, sent } = fakeDirectory('online');
+    startPush({ directory, platform: 'ios', plugin: fakePlugin().plugin, keys, log: () => {} });
+    await settle();
+    expect(sent).toEqual([]);
+
+    const offline = fakeDirectory('connecting');
+    const fake = fakePlugin();
+    startPush({ directory: offline.directory, platform: 'ios', plugin: fake.plugin, keys, log: () => {} });
+    await settle();
+    fake.emit('registration', { value: TOKEN });
+    await settle();
+    expect(offline.sent).toEqual([]);
+
+    const android = fakeDirectory('online');
+    startPush({ directory: android.directory, platform: 'android', plugin: fakePlugin().plugin, keys, log: () => {} });
+    await settle();
+    expect(android.sent).toEqual([{ type: 'push-register', platform: 'android', token: TOKEN }]);
+    expect(keys.pushEnvironment).toHaveBeenCalledTimes(2);
+  });
+
+  it('R6: disable stores off, unregisters while online and notifies', async () => {
+    const { directory, sent } = fakeDirectory('online');
+    const control = startPush({ directory, platform: 'ios', plugin: fakePlugin().plugin, keys, log: () => {} });
+    await settle();
+    const changed = vi.fn();
+    control.onChange(changed);
+    control.disable();
+    expect(localStorage.getItem(NOTIFICATIONS_PREF_KEY)).toBe('off');
+    expect(control.enabled).toBe(false);
+    expect(sent).toEqual([{ type: 'push-unregister' }]);
+    expect(changed).toHaveBeenCalled();
+  });
+
+  it('R7: enable clears off, checks permission, re-sends the kept token and notifies', async () => {
+    localStorage.setItem(NOTIFICATIONS_PREF_KEY, 'off');
+    localStorage.setItem(PUSH_TOKEN_KEY, TOKEN);
+    const fake = fakePlugin('prompt', 'granted');
+    const { directory, sent } = fakeDirectory('connecting');
+    const control = startPush({ directory, platform: 'ios', plugin: fake.plugin, keys, log: () => {} });
+    await settle();
+    expect(control.enabled).toBe(false);
+    expect(fake.calls).not.toContain('checkPermissions');
+
+    directory.set('online');
+    sent.length = 0;
+    const changed = vi.fn();
+    control.onChange(changed);
+    await control.enable();
+    expect(localStorage.getItem(NOTIFICATIONS_PREF_KEY)).toBeNull();
+    expect(control.enabled).toBe(true);
+    expect(fake.calls).toEqual(expect.arrayContaining(['checkPermissions', 'requestPermissions', 'register']));
+    expect(control.permission).toBe('granted');
+    expect(sent).toEqual([{ type: 'push-register', platform: 'ios', token: TOKEN, apsEnvironment: 'sandbox' }]);
+    expect(changed).toHaveBeenCalled();
+  });
+
+  it('R8: stop removes both plugin listeners and the state subscription', async () => {
+    localStorage.setItem(PUSH_TOKEN_KEY, TOKEN);
+    const fake = fakePlugin();
+    const { directory, sent } = fakeDirectory('connecting');
+    const control = startPush({ directory, platform: 'ios', plugin: fake.plugin, keys, log: () => {} });
+    await settle();
+    expect(directory.listenerCount()).toBe(1);
+    control.stop();
+    await settle();
+    expect(fake.removed.sort()).toEqual(['registration', 'registrationError']);
+    expect(directory.listenerCount()).toBe(0);
+    directory.set('online');
+    await settle();
+    expect(sent).toEqual([]);
   });
 });
 
-describe('unregisterPush', () => {
-  it('deletes the token where push is available', async () => {
-    await unregisterPush();
-    expect(PushNotifications.unregister).toHaveBeenCalledTimes(1);
+describe('startPush on Android (PAN-4840)', () => {
+  const firebase = (configured: boolean) => ({ status: vi.fn(async () => ({ configured })) });
+
+  it('never asks or registers without a Firebase config, and reports unavailable', async () => {
+    const fake = fakePlugin('prompt');
+    const { directory, sent } = fakeDirectory('online');
+    const push = startPush({ directory, platform: 'android', plugin: fake.plugin, keys, overdeckPush: firebase(false), log: () => {} });
+    await settle();
+    expect(push.permission).toBe('unavailable');
+    expect(fake.plugin.checkPermissions).not.toHaveBeenCalled();
+    expect(fake.plugin.register).not.toHaveBeenCalled();
+    expect(sent).toEqual([]);
+    expect(keys.pushEnvironment).not.toHaveBeenCalled();
   });
 
-  it('does nothing where push is unavailable', async () => {
-    harness.configured = false;
-    await unregisterPush();
-    expect(PushNotifications.unregister).not.toHaveBeenCalled();
+  it('asks on first start after sign-in, registers when granted and sends the FCM token without apsEnvironment', async () => {
+    const fake = fakePlugin('prompt', 'granted');
+    const { directory, sent } = fakeDirectory('online');
+    const push = startPush({ directory, platform: 'android', plugin: fake.plugin, keys, overdeckPush: firebase(true), log: () => {} });
+    await settle();
+    expect(fake.plugin.requestPermissions).toHaveBeenCalledTimes(1);
+    expect(fake.plugin.register).toHaveBeenCalledTimes(1);
+    expect(push.permission).toBe('granted');
+    fake.emit('registration', { value: TOKEN });
+    await settle();
+    expect(sent).toEqual([{ type: 'push-register', platform: 'android', token: TOKEN }]);
+  });
+
+  it('treats a failing status call as unavailable', async () => {
+    const fake = fakePlugin();
+    const { directory } = fakeDirectory('online');
+    const overdeckPush = { status: vi.fn(async () => Promise.reject(new Error('not implemented'))) };
+    const push = startPush({ directory, platform: 'android', plugin: fake.plugin, keys, overdeckPush, log: () => {} });
+    await settle();
+    expect(push.permission).toBe('unavailable');
+    expect(fake.plugin.register).not.toHaveBeenCalled();
+  });
+});
+
+describe('unregisterPush (PAN-4840 FR-10)', () => {
+  const unregisterPlugin = () => ({ unregister: vi.fn(async () => undefined) });
+
+  it('deletes the FCM token on a configured Android build', async () => {
+    const plugin = unregisterPlugin();
+    await unregisterPush('android', { plugin, overdeckPush: { status: async () => ({ configured: true }) } });
+    expect(plugin.unregister).toHaveBeenCalledTimes(1);
+  });
+
+  it('does nothing on iOS or without a Firebase config', async () => {
+    const plugin = unregisterPlugin();
+    await unregisterPush('ios', { plugin, overdeckPush: { status: async () => ({ configured: true }) } });
+    await unregisterPush('android', { plugin, overdeckPush: { status: async () => ({ configured: false }) } });
+    expect(plugin.unregister).not.toHaveBeenCalled();
   });
 
   it('swallows an unregister failure', async () => {
-    vi.mocked(PushNotifications.unregister).mockRejectedValueOnce(new Error('no firebase'));
-    await expect(unregisterPush()).resolves.toBeUndefined();
+    const plugin = { unregister: vi.fn(async () => Promise.reject(new Error('no token'))) };
+    await expect(unregisterPush('android', { plugin, overdeckPush: { status: async () => ({ configured: true }) } })).resolves.toBeUndefined();
   });
 });

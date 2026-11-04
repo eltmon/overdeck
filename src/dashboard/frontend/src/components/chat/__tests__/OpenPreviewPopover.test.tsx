@@ -71,4 +71,27 @@ describe('OpenPreviewPopover (PAN-4650 WI-19)', () => {
     expect(openMock).toHaveBeenCalledTimes(2);
     expect(screen.getByText('Preview :5173')).toBeInTheDocument();
   });
+
+  it('closes on Escape (PAN-5000)', async () => {
+    renderPopover();
+    fireEvent.click(screen.getByText('Preview'));
+    expect(await screen.findByTestId('preview-popover')).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByTestId('preview-popover')).not.toBeInTheDocument();
+  });
+
+  it('closes on Escape without stopping an active forward (PAN-5000)', async () => {
+    renderPopover();
+    fireEvent.click(screen.getByText('Preview'));
+    const option = await screen.findByText(':5173');
+    await act(async () => { fireEvent.click(option); });
+    expect(screen.getByText('Preview :5173')).toBeInTheDocument();
+    fetchMock.mockClear();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    expect(screen.queryByTestId('preview-popover')).not.toBeInTheDocument();
+    expect(screen.getByText('Preview :5173')).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === 'DELETE')).toBe(false);
+  });
 });

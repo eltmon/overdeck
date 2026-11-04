@@ -14,6 +14,7 @@ import type { Duplex } from 'node:stream';
 
 import {
   APPROVAL_NONCE_BYTES,
+  type ChannelMode,
   approvalCommitment,
   approvalNonce,
   approvalSas,
@@ -48,12 +49,16 @@ export type ChannelAcceptErrorCode =
   | 'pairing-refused'
   | 'approval-refused'
   | 'handshake-failed'
-  | 'closed';
+  | 'closed'
+  /** An unexpected exception inside the handshake: a bug here, not a peer that went away (PAN-5018 FR-4). */
+  | 'internal';
 
 export class ChannelAcceptError extends Error {
   constructor(
     readonly code: ChannelAcceptErrorCode,
     message: string,
+    /** The handshake mode once the preamble was parsed; null before (PAN-5018 FR-4). */
+    readonly mode: ChannelMode | null = null,
   ) {
     super(message);
     this.name = 'ChannelAcceptError';
@@ -113,9 +118,11 @@ export async function acceptChannel(raw: Duplex, opts: AcceptChannelOptions): Pr
     reader.fail(new ChannelAcceptError('timeout', `Secure-channel handshake did not finish within ${timeoutMs} ms`));
     raw.destroy();
   }, timeoutMs);
+  let mode: ChannelMode | null = null;
 
   try {
     const head = parsePreambleHead(await reader.readBytes(PREAMBLE_LENGTH));
+    mode = head.mode;
     if (head.linkProtocol !== linkProtocol) {
       throw refuse(
         'unsupported',
@@ -202,7 +209,7 @@ export async function acceptChannel(raw: Duplex, opts: AcceptChannelOptions): Pr
   } catch (error) {
     reader.detach();
     if (!refused && !raw.destroyed) raw.destroy();
-    throw toAcceptError(error);
+    throw toAcceptError(error, mode);
   } finally {
     clearTimeout(timer);
   }
@@ -233,11 +240,14 @@ function finish(
   return createChannelSocket({ raw, initiator, handshake: handshake.result(), channel, leftover });
 }
 
-function toAcceptError(error: unknown): ChannelAcceptError {
-  if (error instanceof ChannelAcceptError) return error;
-  if (error instanceof WireError) {
-    if (error.code === 'closed') return new ChannelAcceptError('closed', error.message);
-    return new ChannelAcceptError('bad-preamble', error.message);
+function toAcceptError(error: unknown, mode: ChannelMode | null): ChannelAcceptError {
+  if (error instanceof ChannelAcceptError) {
+    return error.mode !== null || mode === null ? error : new ChannelAcceptError(error.code, error.message, mode);
   }
-  return new ChannelAcceptError('closed', (error as Error)?.message ?? String(error));
+  if (error instanceof WireError) {
+    if (error.code === 'closed') return new ChannelAcceptError('closed', error.message, mode);
+    return new ChannelAcceptError('bad-preamble', error.message, mode);
+  }
+  // A bug inside the handshake, not a peer that went away (PAN-5018 FR-4).
+  return new ChannelAcceptError('internal', (error as Error)?.message ?? String(error), mode);
 }

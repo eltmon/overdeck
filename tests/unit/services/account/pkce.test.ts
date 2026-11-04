@@ -3,7 +3,7 @@ import { verifyDeviceToken } from '../../../../services/account/src/devices.ts';
 import type { Env } from '../../../../services/account/src/env.ts';
 import type { GitHubIdentity } from '../../../../services/account/src/github.ts';
 import { addGrant, getPendingAttempt, revokeGrant } from '../../../../services/account/src/grants.ts';
-import { AUTH_CODE_TTL_MS, NATIVE_APP_REDIRECT, validateClientRedirect, validateLoopbackRedirect } from '../../../../services/account/src/pkce.ts';
+import { AUTH_CODE_TTL_MS, NATIVE_APP_REDIRECT, shareRedirectUri, validateClientRedirect, validateLoopbackRedirect, validateShareRedirect } from '../../../../services/account/src/pkce.ts';
 import { githubMock } from './helpers/github-mock.ts';
 import { call, dbOf, form, makeDeps, makeEnv, makeRc, TEST_OWNER_GITHUB_ID, type TestDeps } from './helpers/harness.ts';
 
@@ -13,6 +13,7 @@ const CHALLENGE = 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM';
 const ENV_ID = '11111111-2222-4333-8444-555555555555';
 const REDIRECT = 'http://127.0.0.1:4567/callback';
 const OWNER: GitHubIdentity = { githubId: TEST_OWNER_GITHUB_ID, login: 'owner' };
+const SHARE_REDIRECT = 'https://share.test/auth/callback';
 
 function startQuery(overrides: Record<string, string | null> = {}): string {
   const params: Record<string, string | null> = {
@@ -29,8 +30,8 @@ function startQuery(overrides: Record<string, string | null> = {}): string {
   return `/auth/start?${q.toString()}`;
 }
 
-function setup(identity: GitHubIdentity = OWNER) {
-  const env = makeEnv();
+function setup(identity: GitHubIdentity = OWNER, envOverrides: Partial<Env> = {}) {
+  const env = makeEnv({ SHARE_BASE_URL: 'https://share.test', ...envOverrides });
   const deps = makeDeps({ now: Date.UTC(2026, 9, 1, 12), fetch: githubMock({ identity }).fetch });
   return { env, deps, rc: makeRc({ env, deps }) };
 }
@@ -104,9 +105,75 @@ describe('PKCE loopback flow (PAN-4293 account-pkce-flow)', () => {
       expect(await res.text()).toContain('redirect_uri');
     }
 
-    expect(validateClientRedirect(NATIVE_APP_REDIRECT)).toBe(NATIVE_APP_REDIRECT);
-    expect(validateClientRedirect(REDIRECT)).toBe(REDIRECT);
-    expect(validateClientRedirect(null)).toBeNull();
+    const { config } = makeRc({ env, deps });
+    expect(validateClientRedirect(NATIVE_APP_REDIRECT, config)).toBe(NATIVE_APP_REDIRECT);
+    expect(validateClientRedirect(REDIRECT, config)).toBe(REDIRECT);
+    expect(validateClientRedirect(null, config)).toBeNull();
+  });
+
+  it('share sign-in (PAN-4481): the share callback with platform=web mints a device labelled Web browser', async () => {
+    const { env, deps, rc } = setup();
+    expect(shareRedirectUri(rc.config)).toBe(SHARE_REDIRECT);
+    const start = await call('GET', startQuery({ redirect_uri: SHARE_REDIRECT, platform: 'web' }), { env, deps });
+    expect(start.status).toBe(302);
+    expect(new URL(start.headers.get('Location') ?? '').hostname).toBe('github.com');
+
+    const back = await signIn(env, deps, { redirect_uri: SHARE_REDIRECT, platform: 'web' });
+    expect(back.origin + back.pathname).toBe(SHARE_REDIRECT);
+    expect(back.searchParams.get('state')).toBe('client-state-123');
+    const code = back.searchParams.get('code') ?? '';
+    expect(code).toMatch(/^odc_[0-9a-f]{64}$/);
+
+    const res = await exchange(env, deps, { code, redirect_uri: SHARE_REDIRECT });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { access_token: string; label: string };
+    expect(body.label).toBe('Web browser');
+    expect(await verifyDeviceToken(rc, body.access_token)).toMatchObject({ ok: true });
+    expect(await dbOf(env).prepare('SELECT platform, label FROM devices').first()).toEqual({ platform: 'web', label: 'Web browser' });
+  });
+
+  it('share sign-in refuses near-miss share redirects with the 400 page', async () => {
+    const { env, deps, rc } = setup();
+    const bad = ['https://share.test/auth/callback/x', 'https://share.test/auth/callback?x=1', 'http://share.test/auth/callback', 'https://evil.test/auth/callback'];
+    for (const redirect_uri of bad) {
+      const res = await call('GET', startQuery({ redirect_uri, platform: 'web' }), { env, deps });
+      expect(res.status, redirect_uri).toBe(400);
+      expect(res.headers.get('Location'), redirect_uri).toBeNull();
+      expect(await res.text()).toContain('redirect_uri');
+      expect(validateShareRedirect(redirect_uri, rc.config), redirect_uri).toBeNull();
+    }
+    expect(validateShareRedirect(SHARE_REDIRECT, rc.config)).toBe(SHARE_REDIRECT);
+    expect(await dbOf(env).prepare('SELECT COUNT(*) AS n FROM auth_requests').first<number>('n')).toBe(0);
+  });
+
+  it('the share redirect and platform=web come only as a pair, and the share redirect needs SHARE_BASE_URL', async () => {
+    const { env, deps } = setup();
+    const unpaired: Array<Record<string, string>> = [
+      { redirect_uri: SHARE_REDIRECT, platform: 'linux-x64' },
+      { redirect_uri: REDIRECT, platform: 'web' },
+      { redirect_uri: NATIVE_APP_REDIRECT, platform: 'web' },
+    ];
+    for (const overrides of unpaired) {
+      const res = await call('GET', startQuery(overrides), { env, deps });
+      expect(res.status, JSON.stringify(overrides)).toBe(400);
+      expect(res.headers.get('Location')).toBeNull();
+      expect(await res.text()).toContain('platform');
+    }
+
+    const unset = setup(OWNER, { SHARE_BASE_URL: undefined });
+    expect(shareRedirectUri(unset.rc.config)).toBeNull();
+    const res = await call('GET', startQuery({ redirect_uri: SHARE_REDIRECT, platform: 'web' }), { env: unset.env, deps: unset.deps });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain('redirect_uri');
+
+    // The existing loopback and native redirects still pass with SHARE_BASE_URL set.
+    expect((await call('GET', startQuery(), { env, deps })).status).toBe(302);
+    expect((await call('GET', startQuery({ redirect_uri: NATIVE_APP_REDIRECT, platform: 'ios-arm64' }), { env, deps })).status).toBe(302);
+  });
+
+  it('a trailing slash on SHARE_BASE_URL is dropped before building the share redirect', () => {
+    const { rc } = setup(OWNER, { SHARE_BASE_URL: ' https://share.test/ ' });
+    expect(shareRedirectUri(rc.config)).toBe(SHARE_REDIRECT);
   });
 
   it('native sign-in: ai.overdeck.app:/oauth/callback with ios-arm64 mints a device labelled iPhone', async () => {

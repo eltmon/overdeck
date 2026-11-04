@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   reapLeftoverPlaywrightBrowsers: vi.fn(async () => [] as string[]),
   reapHerdrResiduePanes: vi.fn(async () => [] as string[]),
   sweepTranscriptRetention: vi.fn(async () => [] as string[]),
+  sweepAgentTmpDirs: vi.fn(async () => [] as string[]),
   reconcileMergedIssueDocker: vi.fn(async () => [] as string[]),
   sweepOrphanedSwarmSlots: vi.fn(async () => [] as string[]),
   patrolDiskPressure: vi.fn(async () => [] as string[]),
@@ -40,6 +41,9 @@ vi.mock('../../../../src/lib/cloister/herdr-residue-reaper.js', () => ({
 }));
 vi.mock('../../../../src/lib/cloister/transcript-retention.js', () => ({
   sweepTranscriptRetention: mocks.sweepTranscriptRetention,
+}));
+vi.mock('../../../../src/lib/cloister/agent-tmp-sweep.js', () => ({
+  sweepAgentTmpDirs: mocks.sweepAgentTmpDirs,
 }));
 vi.mock('../../../../src/lib/cloister/merged-docker-reconcile.js', () => ({
   reconcileMergedIssueDocker: mocks.reconcileMergedIssueDocker,
@@ -102,6 +106,7 @@ describe('hygiene-scheduler', () => {
     expect(mocks.reapLeftoverPlaywrightBrowsers).toHaveBeenCalledTimes(1);
     expect(mocks.reapHerdrResiduePanes).toHaveBeenCalledTimes(1);
     expect(mocks.sweepTranscriptRetention).toHaveBeenCalledTimes(1);
+    expect(mocks.sweepAgentTmpDirs).toHaveBeenCalledTimes(1);
     expect(mocks.reconcileMergedIssueDocker).toHaveBeenCalledTimes(1);
     expect(mocks.sweepOrphanedSwarmSlots).toHaveBeenCalledTimes(1);
     expect(mocks.patrolDiskPressure).toHaveBeenCalledTimes(1);
@@ -183,6 +188,17 @@ describe('hygiene-scheduler', () => {
 
     expect(mocks.sweepTranscriptRetention).toHaveBeenCalledTimes(1);
     expect(mocks.sweepTranscriptRetention).toHaveBeenCalledWith({ transcriptDays: 30 });
+  });
+
+  it('fires the hourly agent tmp sweep after an hour', async () => {
+    startHygieneScheduler();
+    await vi.advanceTimersByTimeAsync(0);
+    mocks.sweepAgentTmpDirs.mockClear();
+
+    await vi.advanceTimersByTimeAsync(60 * 60_000);
+
+    expect(mocks.sweepAgentTmpDirs).toHaveBeenCalledTimes(1);
+    expect(mocks.sweepAgentTmpDirs).toHaveBeenCalledWith();
   });
 
   it('stop() clears every interval — no further firings', async () => {

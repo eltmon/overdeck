@@ -57,6 +57,14 @@ import { agentsRouteLayer } from './routes/agents.js'
 import { agentDirectoryRouteLayer } from './routes/agent-directory.js'
 import { workersRegisterRouteLayer } from './routes/workers-register.js'
 import { workersRouteLayer } from './routes/workers.js'
+import { selfJobsRouteLayer } from './routes/self-jobs.js'
+import { selfLanesRouteLayer } from './routes/self-lanes.js'
+import { selfWorkersRouteLayer } from './routes/self-workers.js'
+import { selfWorkflowRouteLayer } from './routes/self-workflow.js'
+import { selfRequestsRouteLayer } from './routes/self-requests.js'
+import { selfPullRequestsRouteLayer } from './routes/self-pull-requests.js'
+import { selfMemoryRouteLayer } from './routes/self-memory.js'
+import { agentRequestsRouteLayer } from './routes/agent-requests.js'
 import { lanesRouteLayer } from './routes/lanes.js'
 import { workspacesRouteLayer } from './routes/workspaces.js'
 import { workspaceRegistryRouteLayer } from './routes/workspace-registry.js'
@@ -77,24 +85,31 @@ import { versionsSelfRouteLayer } from './routes/versions-self.js'
 import { machinesFleetRouteLayer } from './routes/machines-fleet.js'
 import { machinesPeerRouteLayer } from './routes/machines-peer.js'
 import { phonesRouteLayer } from './routes/phones.js'
+import { connectorsRouteLayer } from './routes/connectors.js'
 import { machinesWorkRouteLayer } from './routes/machines-work.js'
 import { machinesWorkLanesRouteLayer } from './routes/machines-work-lanes.js'
 import { fleetWorkRouteLayer } from './routes/fleet-work.js'
 import { fleetProjectsRouteLayer } from './routes/fleet-projects.js'
 import { machinesProjectsRouteLayer } from './routes/machines-projects.js'
 import { fleetAwarenessRouteLayer } from './routes/fleet-awareness.js'
+import { needsYouRouteLayer } from './routes/needs-you.js'
 import { costsDigestRouteLayer } from './routes/costs-digest.js'
 import { fleetUsageRouteLayer } from './routes/fleet-usage.js'
 import { settingsResolvedRouteLayer } from './routes/settings-resolved.js'
 import { fleetSettingsRouteLayer } from './routes/fleet-settings.js'
 import { directoryRouteLayer } from './routes/directory.js'
+import { accountRouteLayer } from './routes/account.js'
 import { directoryApprovalRouteLayer } from './routes/directory-approval.js'
 import { pushRouteLayer } from './routes/push.js'
 import { tailscaleRouteLayer } from './routes/tailscale.js'
 import { accessTokensRouteLayer } from './routes/access-tokens.js'
 import { mcpRouteLayer } from './routes/mcp.js'
+import { mcpOAuthRouteLayer } from './routes/mcp-oauth.js'
+import { mcpOAuthAdminRouteLayer } from './routes/mcp-oauth-admin.js'
+import { mcpPublicRouteLayer } from './routes/mcp-public.js';
 import { remoteRequestGateLayer } from './remote-request-gate.js'
 import { linkedConversationProxyLayer } from './linked-conversation-proxy.js';
+import { publicMcpFunnelLayer } from './public-mcp-funnel.js';
 import { settingsRouteLayer } from './routes/settings.js'
 import { modelPresetsRouteLayer } from './routes/model-presets.js'
 import { jevRouteLayer } from './routes/jev.js'
@@ -182,8 +197,8 @@ const HttpServerLive = Layer.unwrap(
       setupAutoPresoWebSocket(nodeServer);
       // PAN-4645: secure machine channels on the dashboard port (the primary, or a
       // peer-mode dashboard that opted in; see hostsMachineLinks). An IK initiator is
-      // pinned when an active machine or phone token is bound to its key (PAN-4835); a
-      // pairing initiator must name a live `pan pair` credential.
+      // pinned when an active machine, phone or connector token is bound to its key
+      // (PAN-4835, PAN-4927); a pairing initiator must name a live `pan pair` credential.
       installChannelListener(nodeServer, {
         primary: hostsMachineLinks(),
         localKey: ensureMachineKey,
@@ -355,6 +370,8 @@ const staticRouteLayer = HttpRouter.add(
 export const makeRoutesLayer = Layer.mergeAll(
   // PAN-3762: global middleware; requires a credential for non-local /api and /events requests.
   remoteRequestGateLayer,
+  // PAN-4947 D-5: rate limit and audit public MCP requests through Tailscale Funnel.
+  publicMcpFunnelLayer,
   // PAN-4650 D-4650-4: /api/conversations/@<machine>/… forwards to the owner (admitted requests only).
   linkedConversationProxyLayer,
   healthRouteLayer,
@@ -371,6 +388,14 @@ export const makeRoutesLayer = Layer.mergeAll(
   agentDirectoryRouteLayer,
   workersRegisterRouteLayer,
   workersRouteLayer,
+  selfJobsRouteLayer,
+  selfWorkersRouteLayer,
+  selfLanesRouteLayer,
+  selfWorkflowRouteLayer,
+  selfRequestsRouteLayer,
+  selfPullRequestsRouteLayer,
+  selfMemoryRouteLayer,
+  agentRequestsRouteLayer,
   lanesRouteLayer,
   workspacesRouteLayer,
   workspaceRegistryRouteLayer,
@@ -450,22 +475,28 @@ export const makeRoutesLayer = Layer.mergeAll(
   machinesFleetRouteLayer,
   machinesPeerRouteLayer,
   phonesRouteLayer,
+  connectorsRouteLayer,
   machinesWorkRouteLayer,
   machinesWorkLanesRouteLayer,
   fleetWorkRouteLayer,
   fleetProjectsRouteLayer,
   machinesProjectsRouteLayer,
   fleetAwarenessRouteLayer,
+  needsYouRouteLayer,
   costsDigestRouteLayer,
   fleetUsageRouteLayer,
   settingsResolvedRouteLayer,
   fleetSettingsRouteLayer,
   directoryRouteLayer,
+  accountRouteLayer,
   directoryApprovalRouteLayer,
   pushRouteLayer,
   tailscaleRouteLayer,
   accessTokensRouteLayer,
   mcpRouteLayer,
+  mcpOAuthRouteLayer,
+  mcpOAuthAdminRouteLayer,
+  mcpPublicRouteLayer,
   staticRouteLayer,
 );
 

@@ -40,6 +40,11 @@ tokens, and the new link shows up as **Online** on both sides.
 Both servers on one host (for a test) need `--allow-loopback`, because a `localhost`
 pairing link only works on the machine that printed it.
 
+An agent can ask you for a link. Its `link_machine` tool shows a **Machine link
+requested** card in the Decisions panel, and the card's **Link a machine…** button
+opens this dialog. After the link succeeds, the agent learns the new machine's label,
+never the pairing link. See [Machine links](/configuration/mcp#machine-links).
+
 ## SSH machines
 
 A machine that this one reaches only over SSH (a VPS, a lab box behind a bastion) can be
@@ -347,6 +352,15 @@ Each row in **Settings → Anywhere → Machines** shows the machine's name and 
 two lines: the route in use and the access level, then the machine's Overdeck version,
 last heartbeat, load and tags.
 
+## When a link does not open
+
+The dashboard always logs each WebRTC offer it receives and what it did with it, each directory
+connection change and each refused secure channel. For the full detail, set
+`OVERDECK_ANYWHERE_DEBUG=1` in the dashboard's environment and restart it. Then read the
+`[anywhere]` lines in `~/.overdeck/logs/dashboard.log`. The debug flag adds the routine lines:
+ICE candidates, every `signal` frame from the directory, and channels that closed or timed out
+during the handshake.
+
 ## Sharing conversations
 
 Once two machines are linked, each lists the other's conversations next to its own.
@@ -367,6 +381,10 @@ rows and choose **Hide this machine**. The list footer then reads
 A conversation appears once, however many machines list it: this machine's own row wins
 over a linked row, and a linked row wins over its Session Vault saved copy (the row then
 offers the saved copy itself).
+
+A linked conversation with no title, or a title that is only a file path (such as an
+attachment path), shows as "New conversation" rather than that path or its owner's list
+name.
 
 ## Title-bar states
 
@@ -438,6 +456,9 @@ Overdeck's own ports (the dashboard and its API, the supervisor, 80, 443 and Tra
 dashboard port) are refused with `port-refused`. A forward closes when you stop it, when
 the link goes away, or after 30 minutes with no open connection. It needs an
 operator-level link.
+
+Escape closes the Preview popover. A running forward keeps running until you stop it —
+Escape never stops it.
 
 ## Open in editor
 
@@ -547,7 +568,9 @@ remote worker's reports exactly like a local worker's.
 ## Auto placement
 
 **Auto** (`--machine auto`) picks a machine for you and prints why, for example
-`Auto → desk (CPU pressure 3%, 41 GB free, 2 agents)`.
+`Auto → desk (CPU pressure 3%, 41 GB free, 2 agents)`. When Auto passed over other machines it
+adds a second line, for example `Passed over: laptop: no docker; desk: offline`. It prints both
+lines when it picks this machine too.
 
 1. Candidates are this machine and every online, visible linked machine.
 2. A machine is skipped when it is offline, has no project for the repository, lacks a
@@ -587,7 +610,9 @@ auto_fly = true
 `pan lane start --machine auto [--needs <tags>]` places a gauntlet lane the same way, so a
 loop's heavy critics can run on an idle laptop or Fly machine instead of the orchestrator's
 machine. The orchestrator keeps the run's rules and lists, waits on, stops and reaps the
-lane from its own machine. See [Lanes on other machines](/reference/lanes#lanes-on-other-machines).
+lane from its own machine. `--json` carries the same explanation as
+`placement: { label, reason, rejections }`; `machine` stays `null` for a lane Auto placed on
+this machine. See [Lanes on other machines](/reference/lanes#lanes-on-other-machines).
 
 ## Projects across machines
 
@@ -658,6 +683,10 @@ connections.
   route answered but none proved the expected key. Either the other machine's key changed
   (its `machine-key.json` was replaced) or a proxy answered for a dead peer. Unlink and
   link again if the key really changed.
+- **"Secure channel to … did not open within 10000 ms" while the machine shows Online**: the route reached
+  the other machine but the connection and handshake took longer than 10 seconds. This is usually a slow
+  moment on the route (for example the public Fly edge); run the command again. If it keeps happening, the
+  route itself is congested: check the machine's routes in Settings → Machines.
 - **`add-fly` fails with `unreachable`**: the Fly app has no public IPs. Run
   `fly ips allocate-v4 --shared -a <app>` and `fly ips allocate-v6 -a <app>` once, then
   try again. The failed VM was already destroyed.

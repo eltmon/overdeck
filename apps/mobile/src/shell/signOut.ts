@@ -1,10 +1,10 @@
 /**
  * Sign out (PAN-4837 FR-12). In order: remove this phone on each paired machine
  * (`DELETE /api/phones/self`, best effort, 5 s each; a dropped connection counts as success because
- * the machine closes the caller's own channel, PAN-4835 D-12), delete the FCM token (PAN-4840
- * FR-10, whatever the directory state), tell the directory (`push-unregister`, `forget-client`)
- * when online, revoke the overdeck.ai device, delete every
- * key and secret, clear `localStorage`, and reload. A failing step is logged and never stops the
+ * the machine closes the caller's own channel, PAN-4835 D-12), delete the FCM token (Android,
+ * PAN-4840 FR-10, whatever the directory state), tell the directory (`push-unregister`,
+ * `forget-client`) when online, end the Live Activity (iOS, PAN-4839), revoke the
+ * overdeck.ai device, delete every key and secret, clear `localStorage`, and reload. A failing step is logged and never stops the
  * next one.
  */
 import { CapacitorHttp } from '@capacitor/core';
@@ -26,8 +26,10 @@ export interface SignOutDeps {
   /** The directory socket, or null when there is none. */
   directory: { readonly state: string; send(frame: ClientToDirectoryFrame): boolean } | null;
   deleteDevice(account: AccountRecord, signal: AbortSignal): Promise<void>;
-  /** Deletes this install's push token (`PushNotifications.unregister()`); a no-op where push is unavailable. */
-  unregisterPush(): Promise<void>;
+  /** Deletes this install's FCM token (Android only, PAN-4840 FR-10). */
+  unregisterPush?: () => Promise<void>;
+  /** Ends the Live Activity (iOS only, PAN-4839). */
+  endLiveActivity?: () => Promise<void>;
   resetKeys(): Promise<void>;
   clearStorage(): void;
   reload(): void;
@@ -60,12 +62,15 @@ export async function signOut(deps: SignOutDeps): Promise<void> {
   for (const machine of deps.machines) {
     await step(`remove from ${machine.label}`, () => bounded(SIGN_OUT_STEP_TIMEOUT_MS, (signal) => deps.removeSelf(machine, signal)));
   }
-  await step('push token', () => deps.unregisterPush());
+  const unregisterPush = deps.unregisterPush;
+  if (unregisterPush) await step('push token', () => unregisterPush());
   const directory = deps.directory;
   if (directory?.state === 'online') {
     await step('push-unregister', () => void directory.send({ type: 'push-unregister' }));
     await step('forget-client', () => void directory.send({ type: 'forget-client' }));
   }
+  const endLiveActivity = deps.endLiveActivity;
+  if (endLiveActivity) await step('end live activity', () => endLiveActivity());
   const account = deps.account;
   if (account) {
     await step('revoke device', () => bounded(SIGN_OUT_STEP_TIMEOUT_MS, (signal) => deps.deleteDevice(account, signal)));

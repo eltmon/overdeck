@@ -1,0 +1,156 @@
+{
+  "version": "1",
+  "issueId": "PAN-4948",
+  "created": "2026-11-03T21:39:04.258Z",
+  "updated": "2026-11-03T23:23:36.085Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-03T23:19Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-03T23:19:42.928Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-03T23:23Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-11-03T23:23:36.085Z"
+    }
+  ],
+  "items": {
+    "contracts-platform-split": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4948",
+      "claimedAt": "2026-11-03T21:39:04.258Z",
+      "doneAt": "2026-11-03T21:57:16.785Z"
+    },
+    "decoder-node-hello": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4948",
+      "claimedAt": "2026-11-03T21:57:24.746Z",
+      "doneAt": "2026-11-03T21:58:29.959Z"
+    },
+    "reducer-family-caps": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4948",
+      "claimedAt": "2026-11-03T21:58:36.228Z",
+      "doneAt": "2026-11-03T22:01:12.638Z"
+    },
+    "store-reload-node": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4948",
+      "claimedAt": "2026-11-03T22:01:18.222Z",
+      "doneAt": "2026-11-03T22:02:13.417Z"
+    },
+    "web-client-connector-refusal": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4948",
+      "claimedAt": "2026-11-03T22:02:18.862Z",
+      "doneAt": "2026-11-03T22:05:39.941Z"
+    },
+    "docs-connector-clients": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4948",
+      "claimedAt": "2026-11-03T22:05:46.429Z",
+      "doneAt": "2026-11-03T22:07:37.935Z"
+    },
+    "contracts-platform-split.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:13:40.734Z"
+    },
+    "contracts-platform-split.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:13:57.684Z"
+    },
+    "contracts-platform-split.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:14:13.404Z"
+    },
+    "contracts-platform-split.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:14:30.538Z"
+    },
+    "decoder-node-hello.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:14:49.311Z"
+    },
+    "decoder-node-hello.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:15:06.322Z"
+    },
+    "decoder-node-hello.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:15:24.121Z"
+    },
+    "reducer-family-caps.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:15:47.145Z"
+    },
+    "reducer-family-caps.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:16:04.613Z"
+    },
+    "reducer-family-caps.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:16:22.786Z"
+    },
+    "reducer-family-caps.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:16:41.646Z"
+    },
+    "store-reload-node.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:16:59.488Z"
+    },
+    "store-reload-node.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:17:15.289Z"
+    },
+    "web-client-connector-refusal.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:04:57.910Z"
+    },
+    "web-client-connector-refusal.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:05:16.099Z"
+    },
+    "web-client-connector-refusal.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:05:33.320Z"
+    },
+    "docs-connector-clients.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:05:54.134Z"
+    },
+    "docs-connector-clients.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:06:11.810Z"
+    },
+    "docs-connector-clients.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:06:29.384Z"
+    },
+    "docs-connector-clients.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T23:06:45.020Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-03T23:19:42Z",
+      "markdownBody": "# CI Failure Feedback for PAN-4948\n\nPull request: https://github.com/eltmon/overdeck/pull/4966 (head `01050a50`)\n\nSource: check_run:build (22)\n\n## Failing checks (1)\n\n### build (22)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/126271148317/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/41737617200/job/126271148317  \n```\nere-channel\n> tsc --noEmit -p packages/anywhere-channel/tsconfig.json\n\n\n> @overdeck/core@0.73.1 typecheck:mobile\n> tsc --noEmit -p apps/mobile/tsconfig.json\n\n##[error]apps/mobile/src/native/push.ts(115,7): error TS2322: Type 'ClientPlatform' is not assignable to type 'PhonePlatform'.\n  Type '\"node\"' is not assignable to type 'PhonePlatform'.\n##[error]Process completed with exit code 2.\nPost job cleanup.\n[command]/usr/bin/git version\ngit version 2.56.0\nTemporarily overriding HOME='/home/runner/work/_temp/4478e20e-eded-409f-8a8a-04abc50233f2' before making global git config changes\nAdding repository directory to the temporary git global config as a safe directory\n[command]/usr/bin/git config --global --add safe.directory /home/runner/work/overdeck/overdeck\n[command]/usr/bin/git config --local --name-only --get-regexp core\\.sshCommand\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'core\\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp http\\.https\\:\\/\\/github\\.com\\/\\.extraheader\nhttp.https://github.com/.extraheader\n[command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'http\\.https\\:\\/\\/github\\.com\\/\\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\\.gitdir:\n[command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url\nCleaning up orphan processes\n##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-11-03T23:23:36Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-4948\n\n# Review — PAN-4948\n## Verdict: CHANGES REQUESTED — PR #4966 description omits the required operator-redeploy sentence (docs-connector-clients.ac4 / NFR-3)\n\n## Context\n- Run ID: agent-pan-4948-review-01050a50\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4948/.pan/review/agent-pan-4948-review-01050a50/context.json\n- Branch / workspace: feature/pan-4948 · /home/eltmon/Projects/overdeck/workspaces/feature-pan-4948\n- PR: https://github.com/eltmon/overdeck/pull/4966 (headRefOid 01050a50ffffeb1a3b397ffe9a56d690f3584c74)\n- HEAD reviewed: 01050a50ffffeb1a3b397ffe9a56d690f3584c74\n- Base / prior cycle SHA: merge-base e8789fce9b0 (origin/main); no prior review cycle\n\n## Blocking Findings\n\n### [requirements] PR description lacks the connect.overdeck.ai redeploy statement — PR #4966 body\n- Severity: ! MUST\n- Classification / requirement scope: validation gap against an explicit acceptance criterion; in_pr_scope.\n- Trigger and changed-code connection: The plan item `docs-connector-clients` carries AC `docs-connector-clients.ac4`: \"The PR description contains the sentence that connect.overdeck.ai must be redeployed by the operator before W-CONN2 ships\" (`.pan/specs/2026-11-03-PAN-4948-…xbrief.json`, line 466). NFR-3 in `.pan/drafts/pan-4948.md` and the PRD's AC-7 say the same. The spec's own decision note (line 74) explains why: \"The CP-5 directory deploy is not a plan item; the PR description must state the operator redeploy requirement.\"\n- Expected / observed / impact: Expected a sentence in the PR body. Observed: `gh pr view 4966 --json body` shows only the issue link and six checked plan-item titles; no deploy statement. The operator who merges this PR does not see that connect.overdeck.ai must be redeployed before any `@overdeck/core` release ships the connector. An older directory refuses `hello-client` with `platform: node` as `bad_frame`, so a connector released before the redeploy cannot register.\n- Evidence: `gh pr view 4966 --json body -q .body` (full body read). The docs half of the requirement is met: `docs/CONNECT-SERVICE.md` \"Deploy\" now carries the CP-5 note. The PR-description half is not.\n- Fix: Edit the PR #4966 description to add, for example: \"Operator step: connect.overdeck.ai must be redeployed (docs/CONNECT-SERVICE.md \"Deploy\") before W-CONN2 (`pan mcp connector`) ships in any `@overdeck/core` release (PAN-4927 CP-5). No agent deploys it.\" Apply it with `gh pr edit 4966 --body-file <file>` (keep the existing body). No code change is needed.\n\n## Non-blocking Findings\n\n- `~` **Stray verified-timestamp comment in `.overdeck/context/codebase/concerns.md` (line 656).** The diff adds `<!-- last-verified: 2026-11-03 -->` between two bullets of an unrelated list, next to the existing `<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4925) -->` at line 665. It is this branch's net effect against main, from the branch commit 0fffefd6810 (\"dedupe stale verified-timestamp comment\") after a main merge, and is outside PAN-4948's scope. It is harmless HTML-comment noise; drop the line at 656 if the PR is touched again.\n- `?` **Push to a connector.** A machine `push` addressed to a `node` client finds `push: null` on the row and fails the normal way. That matches the design (connectors never hold push), and no code path lets a `node` row gain push: the decoder refuses `push-register` with `platform: node`, and `push-state.ts:55` refuses an `ios`/`android` register from a `node` row as a platform mismatch. So the doc claim \"push-register from a node client is always bad_frame\" holds. No action.\n- Environment note (not a code defect): `npm run typecheck:mobile` fails here only with `TS2688: Cannot find type definition file for 'vite/client'` because `apps/mobile/node_modules/vite` is a broken symlink in this workspace install (`file` reports \"broken symbolic link\"). No other mobile diagnostic appears. The PR does not change mobile code; `ClientPlatform` only widens, and `shellPlatform()` still returns `ios`/`android`. CI `build (22)` and the lint groups cover the mobile lane on the PR head.\n\n## Coverage\n\n### Changed-file ledger\n| File | Status |\n| --- | --- |\n| services/connect/src/push/config.ts | Reviewed — `PushRegistration.platform` narrowed to `PhonePlatform` (D-1); `deliver.ts:30` routing can no longer see `node`. |\n| packages/anywhere-channel/src/directory-web.ts | Reviewed — 4013 removed from `REFUSALS`, `limitMessage()` picks by `deps.platform`; other close codes unchanged; refusal still stops retries. |\n| packages/contracts/src/connect.ts | Reviewed — `PhonePlatform`, widened `ClientPlatform`, `CONNECTOR_LIMIT = 10`, exact message, `push-register` typed `PhonePlatform`; still runtime-import-free; protocol stays 1. |\n| services/connect/src/client-state.ts | Reviewed — per-family count, `kept` drives push retention, `existing` still drives `registeredAt` and the log; refused family change leaves the old row intact. |\n| services/connect/src/directory-state.ts | Reviewed — comments only. |\n| services/connect/src/directory-store.ts | Reviewed — `loadDirectory` keeps `node` rows; unknown platforms still dropped; no schema change. |\n| services/connect/src/protocol.ts | Reviewed — `hello-client` accepts `node`; `push-register` check (line 271) unchanged. |\n| .overdeck/context/codebase/architecture.md | Reviewed — connector clients row text added. |\n| .overdeck/context/codebase/concerns.md | Reviewed — stray comment (advisory above). |\n| .pan/continues/PAN-4948.xbrief.json | Not applicable — planning state. |\n| .pan/drafts/pan-4948.md | Reviewed as the requirement source. |\n| .pan/specs/…connector-clients.xbrief.json | Reviewed as the AC source. |\n| docs/ANYWHERE-ARCHITECTURE.md | Reviewed — `DirectoryWebClient` serves `node` clients. |\n| docs/CONNECT-SERVICE.md | Reviewed — section rename, Role and Connector bullets, Limits line with exact message and 4013, Deploy CP-5 note. |\n| packages/anywhere-channel/src/__tests__/directory-web.test.ts | Reviewed — node hello, 4013 → connector message, no retry under fake timers. |\n| packages/contracts/src/__tests__/connect.test.ts | Reviewed — constants, node hello in frame list, `@ts-expect-error` node push-register (count 8). |\n| tests/unit/services/connect/client-state.test.ts | Reviewed — 3 machines + 5 phones + 10 connectors; 11th connector and 6th phone refused with their messages; no machine slot; family change refused/accepted with push cleared. |\n| tests/unit/services/connect/directory-glue.test.ts | Reviewed — node row reloads with `push: null`; `web` row dropped. |\n| tests/unit/services/connect/protocol-client.test.ts | Reviewed — node hello decodes; node push-register is `bad_frame`. |\n\n### Dimensions\n- **Correctness:** Traced decoder → `reduceClient` → `helloClient` → `put-client` effect → `loadDirectory` rehydration → push path (`push-state.ts`, `deliver.ts`). Phone behavior unchanged: the phone cap now counts phones only, which can only admit phones that were previously blocked by connectors (none existed before this change). Re-hello in the same family above the cap is still allowed (`kept`). A refused family change returns `planned` state and leaves the old row. The web client's close handler overrides the `error`-frame message deterministically (D-4). No defects found.\n- **Security:** No new trust boundary. Connectors authenticate with the same bearer device token. Per-account rows are bounded (5 + 10). `node` rows cannot acquire a push registration by type or at runtime. No findings.\n- **Performance:** `filter` over at most 15 client rows per hello. No findings.\n- **Requirements/UX:** See matrix; one unmet AC (blocking above).\n\n### Acceptance criteria\n| AC | Status | Evidence |\n| --- | --- | --- |\n| FR-1 / AC-1 contracts split, constants, protocol 1, `@ts-expect-error` | Met | connect.ts diff; connect.test.ts; typecheck:contracts and typecheck:connect exit 0 |\n| FR-2 `CONNECTOR_LIMIT`, exact message | Met | connect.test.ts asserts both |\n| FR-3 / AC-2 decoder | Met | protocol.ts:249; protocol-client.test.ts |\n| FR-4 / AC-3 separate caps, family message, 4013 | Met | client-state.ts; client-state.test.ts scenario |\n| FR-5 family change recounts and clears push | Met | client-state.test.ts \"recounts and clears push\" |\n| FR-6 / AC-4 store reload | Met | directory-store.ts:161; directory-glue.test.ts |\n| FR-7 / AC-5 web client message | Met | directory-web.ts; directory-web.test.ts; existing phone 4013 test still passes |\n| FR-8 protocol stays 1 | Met | unchanged constant, asserted |\n| NFR-1 no phone behavior change | Met | all existing tests in the five files pass unchanged |\n| NFR-2 no new close/error code, frame type or column | Met | diff review |\n| docs-connector-clients.ac1 Limits line | Met | docs/CONNECT-SERVICE.md |\n| docs-connector-clients.ac2 Deploy CP-5 note | Met | docs/CONNECT-SERVICE.md |\n| docs-connector-clients.ac3 architecture.md row | Met | .overdeck/context/codebase/architecture.md |\n| docs-connector-clients.ac4 / NFR-3 / AC-7 PR description redeploy sentence | **Unmet** | PR #4966 body has no such sentence |\n| Non-goals (no deploy, no mobile change, no protocol bump, no new codes) | Respected | diff review |\n\n## Verification\n- `npx vitest run` on the five touched test files: 5 files, 88 tests passed.\n- `npm run typecheck:contracts`, `typecheck:connect`, `typecheck:anywhere-channel`: exit 0.\n- `npm run typecheck:mobile`: exit 2, only `TS2688 vite/client` from a broken `apps/mobile/node_modules/vite` symlink in this workspace (environmental; no change to mobile code).\n- `npm run lint:effect-diagnostics`: passed (227 known findings; none new).\n- CI on the PR head (`gh pr checks 4966`): test shards, build, lint groups, e2e and mobile-android were **pending** at review time — unverified, not green. Prompt-change trailer gate passed; CodeRabbit rate-limited.\n- Full test suite not run (by rule).\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4948/.pan/review/agent-pan-4948-review-01050a50/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-4948 -m \"Fixed review issues\"`"
+    }
+  ]
+}

@@ -1,0 +1,796 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T04:23:10Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4943: Agent MCP and bots (W-PR1): Link and watch pull requests",
+    "updated": "2026-11-04T04:27:32.318Z"
+  },
+  "plan": {
+    "id": "pan-4943",
+    "title": "Agent MCP and bots (W-PR1): Link and watch pull requests",
+    "status": "running",
+    "uid": "abe85546-aa65-456e-8664-89b9f16bd06c",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-04T04:23:10Z",
+    "updated": "2026-11-04T04:27:32.318Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4943",
+        "label": "PAN-4943",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4927",
+        "label": "PAN-4927 (epic)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4943.md",
+        "label": "PRD",
+        "type": "document"
+      },
+      {
+        "uri": ".pan/drafts/pan-4927.md",
+        "label": "Epic PRD, W-PR1",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "mcp",
+      "pull-requests",
+      "self-routes",
+      "pr-sync",
+      "agents"
+    ],
+    "narratives": {
+      "Problem": "Managed agents get the Overdeck MCP server with a scoped agent token (W-TOK1, W-MCP1, W-INJ1), but they cannot link a pull request to a conversation (the six PR-link routes have no scope rows, so every agent token gets 403) and cannot be told when a PR they care about changes. Work agents, the main users, also have no conversation row, so the epic's link-first watch design would fail for them.",
+      "Proposal": "Add scope rows for the six existing PR-link routes; add a link_pull_request tool that targets a named conversation or, for an agent token, the caller's own conversation through POST /api/self/pull-requests. Add a cross-process JSON watch store (~/.overdeck/pr-watches.json, 0600, file lock) whose rows carry their own baseline snapshot fields. Add three self routes and three agent-only tools to create, list and delete watches; the create route reads the PR once for the baseline and links it best-effort. At the end of the existing 60 s PR sync sweep, resolve each watched key's snapshot from this pass's listing/fallback rows or one gh pr view under the same pause gate and backoff, then a notifier compares each watch with its baseline, persists the new baseline under the lock, and delivers one message per change in-process (messageAgent for agents with a dedupKey, handleConversationMessage for conversations). Merged, closed or the 11th review-only wake ends a watch; revoking an agent token removes its watches; the notifier drops orphaned watches. Document it in configuration/mcp.mdx, docs/DASHBOARD-AUTH.md and features/conversations.mdx.",
+      "NonGoals": "- Watching GitLab merge requests (GitHub PR URLs only).\n- Watches on linked machines or fleet forwarding of the watch routes; a watch lives on this machine only.\n- Any new timer, interval, service or per-watch poller; watched keys are read only inside runPullRequestSyncOnce.\n- Changing how PR links are refreshed (isDue, the 15-minute slow lane, the 100-row listing cap).\n- Hooking refreshPullRequestLinkNow or the link/sync routes into the notifier.\n- Grouping uncovered watched keys into extra gh pr list calls.\n- Instruction-block text for agents (W-INJ4, PAN-4935) and the epic-wide docs pass (W-DOC, PAN-4958).\n- Retrying a failed delivery or resuming a stopped harness to deliver a watch message.\n- A dashboard UI for watches.\n- A tool for the reverse-index route beyond its scope row.\n- Creating conversation rows for work agents."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Watches do not depend on PR links; watched keys are read inside the existing sweep (one gh pr view per uncovered key, same pause gate and 3-strike backoff).",
+        "rationale": "Work agents have no conversation row (spawn.ts:259; live DB shows agent-pan-4936 has none), and the sweep reads only linked PRs, so a link-gated watch would never fire for the issue's main user. Reading inside runPullRequestSyncOnce adds no timer or cadence, which is what FR-9 forbids."
+      },
+      {
+        "summary": "Each watch stores its own baseline {state, checks, reviewState, mergeable}, read once when the watch is created; the epic's (key, before, after) hook at two call sites is replaced by one watch pass at sweep end.",
+        "rationale": "setPullRequestLinkSnapshot writes every link to a key, so link.snapshot is not one well-defined 'before', and unlinked PRs have none; a creation-time baseline closes the gap where a failure between creation and the first sweep would be absorbed silently."
+      },
+      {
+        "summary": "Deliver in-process (messageAgent with dedupKey for agents, handleConversationMessage for conversations) instead of a loopback fetch with the internal token.",
+        "rationale": "Those are the doors the two message routes call; the conversation schedule service and review-verdict feedback already deliver this way from the same dashboard process."
+      },
+      {
+        "summary": "Cap watches at 20 per owner (epic) and 50 in total.",
+        "rationale": "50 uncovered keys cost at most 3,000 GraphQL points an hour, inside the 5,000-point user bucket; the PAN-4264 pause is the backstop."
+      },
+      {
+        "summary": "The 11th consecutive review-only wake ends the watch (wakes 1-10 notify only).",
+        "rationale": "The epic's W-PR1 test list says 'the 11th quiet wake ends it'."
+      },
+      {
+        "summary": "link_pull_request takes ref (URL, #42 or owner/repo#42) and defaults the target through a new self route POST /api/self/pull-requests.",
+        "rationale": "The existing route body is { ref, source? }, and McpToolContext carries no caller name, so only a self route can resolve 'my own conversation'."
+      },
+      {
+        "summary": "Documentation ships in this issue (mcp.mdx, DASHBOARD-AUTH.md, conversations.mdx), not deferred to W-DOC.",
+        "rationale": "Repo rule: documentation is a required work item of every change."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "22 files across lib/overdeck, lib/mcp, dashboard routes, dashboard services, tests and docs; one vertical feature (link and watch PRs) that the epic already split out as W-PR1.",
+      "canonicalFilename": "2026-11-04-PAN-4943-agent-mcp-and-bots-w-pr1-link-and-watch-pull-requests.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "pr-route-scopes",
+        "title": "Add route-scope rows for the six existing PR-link routes",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T04:23:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4943",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/route-scopes.ts",
+            "src/dashboard/server/__tests__/route-scopes-pull-requests.test.ts",
+            "docs/DASHBOARD-AUTH.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/__tests__/route-scopes-pull-requests.test.ts src/dashboard/server/__tests__/route-scopes.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "route-scopes-pull-requests.test.ts, route-scopes.test.ts and no-loss-matrix.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-8",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In src/dashboard/server/route-scopes.ts, after the W-SEC1 rows (search '// POST /api/agent-requests/:id/secret and /decline have no row'), add a '// PAN-4943 W-PR1' comment and six rows: GET /api/conversations/:name/pull-requests read:conversations; POST /api/conversations/:name/pull-requests tell; DELETE /api/conversations/:name/pull-requests tell; POST /api/conversations/:name/pull-requests/sync tell; GET /api/pull-requests read:state; GET /api/pull-requests/conversations read:state. Write src/dashboard/server/__tests__/route-scopes-pull-requests.test.ts asserting requiredScopeFor for concrete paths (/api/conversations/conv-a/pull-requests ...) and for the linked form /api/conversations/@m1/conv-a/pull-requests. In docs/DASHBOARD-AUTH.md add the routes to the read:conversations, tell and read:state rows of the scope table (around lines 164-172). Merge main before editing route-scopes.ts (siblings edit it)."
+        },
+        "items": [
+          {
+            "id": "pr-route-scopes.ac1",
+            "title": "Given the new rows, when requiredScopeFor is called for the four /api/conversations/conv-a/pull-requests routes, then it returns read:conversations for GET and tell for POST, DELETE and POST .../sync",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pr-route-scopes.ac2",
+            "title": "requiredScopeFor returns read:state for GET /api/pull-requests and GET /api/pull-requests/conversations",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pr-route-scopes.ac3",
+            "title": "requiredScopeFor('POST', '/api/conversations/@m1/conv-a/pull-requests') returns tell, the same scope as the local route",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pr-route-scopes.ac4",
+            "title": "docs/DASHBOARD-AUTH.md scope table lists all six PR-link routes under read:conversations, tell or read:state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "watch-store",
+        "title": "Create the cross-process PR watch store module",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T04:23:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4943",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "revoke-removes-watches",
+            "watch-notifier",
+            "self-watch-routes"
+          ],
+          "files_scope": [
+            "src/lib/overdeck/pull-request-watches.ts",
+            "tests/unit/lib/overdeck/pull-request-watches.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run tests/unit/lib/overdeck/pull-request-watches.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck and lint (including lint:circular and lint:file-size) complete without errors",
+            "pull-request-watches.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-4",
+            "NFR-5",
+            "NFR-8",
+            "NFR-6",
+            "NFR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. New src/lib/overdeck/pull-request-watches.ts copying the write discipline of src/lib/anywhere/fly/machine-store.ts: file { v: 1, watches } at join(getOverdeckHome(), 'pr-watches.json'), mode 0600, in-process write queue plus withFileLock(<path>.lock) from src/lib/vault/file-lock.ts around every read-modify-write, temp file + rename, no write when nothing changed; a missing file reads as []; an unparseable file or v !== 1 throws and is never rewritten. Imports only Node built-ins, ../paths.js, ../vault/file-lock.js and type-only @overdeck/contracts. Export exactly the API in the PRD (PR_WATCHES_FILENAME, PR_WATCH_LIMIT_PER_OWNER = 20, PR_WATCH_LIMIT_TOTAL = 50, PullRequestWatchOwner, PullRequestWatchBaseline, PullRequestWatch with id/host/repository/number/url/createdAt/wakes/quietWakes/last, baselineFromSnapshot (keeps previous mergeable when the snapshot's is null), listPullRequestWatches, addPullRequestWatch (duplicate owner+key returns created:false; owner-limit; total-limit), removePullRequestWatch (owner must match), removePullRequestWatchesForOwner, updatePullRequestWatches). Write tests/unit/lib/overdeck/pull-request-watches.test.ts with the cases in PRD WI-2."
+        },
+        "items": [
+          {
+            "id": "watch-store.ac1",
+            "title": "addPullRequestWatch writes pr-watches.json under OVERDECK_HOME with file mode 0600, and a second add for the same owner and key returns created: false with one stored row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "watch-store.ac2",
+            "title": "A 21st watch for one owner returns { ok: false, code: 'owner-limit' } and a 51st watch overall returns { ok: false, code: 'total-limit' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "watch-store.ac3",
+            "title": "removePullRequestWatch with another owner returns false and keeps the row; removePullRequestWatchesForOwner returns the removed count and preserves other owners' rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "watch-store.ac4",
+            "title": "Given a corrupt pr-watches.json, listPullRequestWatches rejects and the file bytes are unchanged afterwards",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "watch-store.ac5",
+            "title": "The module imports only Node built-ins, ../paths.js, ../vault/file-lock.js and type-only @overdeck/contracts, and npm run lint (lint:circular) exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "revoke-removes-watches",
+        "title": "Remove an owner's watches when its agent token is revoked",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T04:23:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4943",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/mcp/agent-token.ts",
+            "tests/unit/lib/mcp/agent-token.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run tests/unit/lib/mcp/agent-token.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck and lint complete without errors",
+            "agent-token.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In revokeAgentMcpTokens (src/lib/mcp/agent-token.ts), inside the existing try and right after 'const revoked = await revokeAccessTokensMatching(...)', add 'await removePullRequestWatchesForOwner({ agentId: id, agentKind });' with a PAN-4943 comment, so the existing catch keeps the function from throwing. Extend the function's doc comment to say it also removes the owner's PR watches. Add tests to tests/unit/lib/mcp/agent-token.test.ts."
+        },
+        "items": [
+          {
+            "id": "revoke-removes-watches.ac1",
+            "title": "Given watches for agent:agent-pan-1 and for a conversation owner, when revokeAgentMcpTokens('agent-pan-1') resolves, then the store holds no agent-pan-1 watch and still holds the conversation owner's watch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "revoke-removes-watches.ac2",
+            "title": "Given a corrupt pr-watches.json, revokeAgentMcpTokens resolves (does not reject) and the owner's access token is still revoked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "watch-notifier",
+        "title": "Build the PR watch notifier: compare with baseline, persist, deliver",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T04:23:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4943",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/pull-request-watch-notifier.ts",
+            "src/dashboard/server/services/__tests__/pull-request-watch-notifier.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/dashboard/server/services/__tests__/pull-request-watch-notifier.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck and lint complete without errors",
+            "pull-request-watch-notifier.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "NFR-3",
+            "NFR-4",
+            "NFR-6",
+            "NFR-10"
+          ],
+          "acJustification": "Six criteria: the notifier carries the exactly-once, end-rule, orphan and delivery-door behaviors that the sweep and routes depend on; splitting them would separate the compare and persist halves of one locked update."
+        },
+        "narrative": {
+          "Action": "PRD WI-4 with decisions D-2 to D-7 and D-13. New src/dashboard/server/services/pull-request-watch-notifier.ts exporting: pure watchWake(watch, snapshot) returning { events, last, quietWakes, ends, text } (event order merged, closed, checks-failed, checks-passed, conflicting, review-changed; mergeable baseline keeps the last non-null value; a move to pending updates last.checks without an event; text format '[Overdeck] <repository>#<number>: <phrase>; <phrase>. <url>' plus ' The watch has ended.' for merged/closed or the quiet-limit sentence; MAX_QUIET_WAKES = 10, a checks event resets quietWakes to 0, a review-only wake adds 1, quietWakes 11 ends the watch); listWatchedPullRequestKeys(); notifyPullRequestWatches(snapshots: ReadonlyMap<keyString, PullRequestSnapshot>, deps) which returns zeros without calling listActiveOwners when the store is empty, otherwise drops orphan watches (owner key not among active kind 'token' records with that agentId/agentKind and no revokedAt), applies watchWake in one updatePullRequestWatches call (incrementing wakes, removing ending watches), and only after the write delivers each message: agents via messageAgent(agentId, text, 'pr-watch', { dedupKey: 'pr-watch:<id>:<wakes>' }) counting delivered || queuedToMail as success; conversations via getConversationByName (a superseded /clear row resolves to its chain head with isSupersededConversation + resolveClearChainHead, as fireScheduledPrompt does at conversation-schedule-service.ts:118-123) + handleConversationMessage(name, { message, deliverAs: 'follow_up' for Pi harnesses }, { resolveSessionFile, generateAiTitle: async () => {} }). Never resume a harness; log '[pr-watch] delivery to <owner> failed: <reason>' and do not retry. Deps (listActiveOwners, deliverToAgent, deliverToConversation) are injectable. Tests per PRD WI-4."
+        },
+        "items": [
+          {
+            "id": "watch-notifier.ac1",
+            "title": "Given a watch with last.checks pending, when notifyPullRequestWatches gets a red snapshot, then exactly one message is delivered with text '[Overdeck] eltmon/overdeck#7: checks failed (was pending). https://github.com/eltmon/overdeck/pull/7', and the same red snapshot again delivers nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "watch-notifier.ac2",
+            "title": "A snapshot carrying red checks and a new reviewState produces one message naming both phrases, and an agent delivery receives dedupKey 'pr-watch:<id>:1'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "watch-notifier.ac3",
+            "title": "Given an open watch, when the snapshot turns merged, then the notifier sends one message ending ' The watch has ended.' and deletes the watch; the 11th consecutive review-only wake sends and deletes the watch while the 10th preserves it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "watch-notifier.ac4",
+            "title": "A watch whose owner has no active agent token is dropped with no delivery, and an empty store returns zeros without calling listActiveOwners",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "watch-notifier.ac6",
+            "title": "Given a conversation owner whose row is a superseded /clear row, the message is delivered to the chain head's name returned by resolveClearChainHead",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "watch-notifier.ac5",
+            "title": "When a delivery throws, the notifier logs one '[pr-watch] delivery to' line and the store still holds the new baseline (persist before deliver)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sweep-watch-pass",
+        "title": "Read watched PR keys inside the existing PR sync sweep",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T04:23:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4943",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/pull-request-sync-service.ts",
+            "src/dashboard/server/services/__tests__/pull-request-sync-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/dashboard/server/services/__tests__/pull-request-sync-service.test.ts src/dashboard/server/services/__tests__/pull-request-watch-notifier.test.ts",
+            "grep -rn \"notifyPullRequestWatches(\" src --include=*.ts | grep -v __tests__"
+          ],
+          "expected_outputs": [
+            "typecheck and lint complete without errors",
+            "pull-request-sync-service.test.ts and pull-request-watch-notifier.test.ts pass",
+            "the grep lists only pull-request-sync-service.ts and the notifier's own definition"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-2",
+            "NFR-3",
+            "NFR-7",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5 (epic AC-14). In pull-request-sync-service.ts: add 'snapshots: Map<string, PullRequestSnapshot>' to SweepContext; in syncProject's 'for (const row of rows)' loop after 'byKey.set(keyString(key), entry);' record ctx.snapshots.set(keyString(key), snapshotFromGhRow(row, ctx.syncedAt)); in applySnapshot record the snapshot it builds; add private runWatchPass(ctx, readPullRequest, watches) that returns at once when listKeys() is empty, otherwise for each key missing from ctx.snapshots skips a backed-off repository, reads it with readPullRequest, records failure (unless userGraphqlPaused()) or success exactly as refreshUnlistedLinks does, then calls watches.notify(ctx.snapshots); give runPullRequestSyncOnce a 4th parameter watches = { listKeys: listWatchedPullRequestKeys, notify: notifyPullRequestWatches } and call runWatchPass after the auto-settle block in its own try that logs '[pr-sync] watch pass failed:'; export readPullRequestSnapshotNow(key, readPullRequest = readGithubPullRequest, now = Date.now()) returning a snapshot or null and writing no link; add step 7 to the header comment. Growth at most 45 lines. Do not hook refreshPullRequestLinkNow. Tests per PRD WI-5 including the AC-14 three-sweep scenario."
+        },
+        "items": [
+          {
+            "id": "sweep-watch-pass.ac1",
+            "title": "Given a watch with last.checks pending and a listing that returns the PR with red checks, when runPullRequestSyncOnce runs, then exactly one message is delivered; a second sweep with the same listing delivers none; a sweep whose listing shows the PR merged delivers one message and leaves the store empty (epic AC-14)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sweep-watch-pass.ac2",
+            "title": "Given an empty watch store, when runPullRequestSyncOnce runs, then it produces the same number of readPullRequest calls as before this change (zero extra)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sweep-watch-pass.ac3",
+            "title": "A watched key the listing covers makes no readPullRequest call; an uncovered watched key makes exactly one per sweep; an uncovered key in a backed-off repository makes none",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sweep-watch-pass.ac4",
+            "title": "readPullRequestSnapshotNow returns null when the read fails and returns a snapshot with the row's checks state when it succeeds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "self-watch-routes",
+        "title": "Add the four /api/self pull-request routes",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T04:23:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4943",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/self-pull-requests.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/self-pull-requests-routes.test.ts",
+            "docs/DASHBOARD-AUTH.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/dashboard/server/__tests__/self-pull-requests-routes.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts src/dashboard/server/__tests__/route-scopes.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck and lint complete without errors",
+            "self-pull-requests-routes.test.ts, no-loss-matrix.test.ts and route-scopes.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "FR-8",
+            "NFR-1",
+            "NFR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. New src/dashboard/server/routes/self-pull-requests.ts in the shape of routes/self-requests.ts (exported handler functions taking a credential, body and deps; makeSelfPullRequestsRouteLayer; no origin check). POST /api/self/pull-request-watches { url }: selfCallerFromCredential refusals; 400 bad-body; githubPullRequestKeyFromUrl null -> 400 invalid-url; existing owner+key -> 200 { watch, created: false } with no gh read; owner at 20 -> 429 too-many-watches; total at 50 -> 429 watch-limit; readPullRequestSnapshotNow null -> 502 pr-read-failed; merged/closed -> 409 { code: 'pr-finished', state }; best-effort link to the caller's own conversation (conversation token: its name; agent token: agentId only when getConversationByName finds a row) via linkPullRequestToConversation(name, key.url, 'agent'), then setPullRequestLinkSnapshot(key, snapshot), emitConversationPullRequestsChanged per changed name and invalidateConversationListEnrichmentCache(); a refused link gives linked: false and linkError; addPullRequestWatch with last = baselineFromSnapshot(snapshot); 201 { watch, created: true, linked, linkError? }. GET /api/self/pull-request-watches -> { watches } for the caller. DELETE /api/self/pull-request-watches/:id -> { removed: true, id } or 404 unknown-watch. POST /api/self/pull-requests { ref }: 404 no-conversation (error 'this agent has no conversation; pass conversation to link_pull_request') when the caller has no row, else exactly linkPullRequestToConversation(name, ref, 'agent', { refreshLink }) with the refreshLink of conversation-pull-requests.ts:68-71. Watch view { id, url, repository, number, createdAt, wakes, quietWakes, last }. Mount the layer in src/dashboard/server/server.ts beside selfRequestsRouteLayer. Scope rows: POST watches tell, GET watches read:state, DELETE watches/:id tell, POST /api/self/pull-requests tell. No-loss rows after 'GET /api/self/secret-requests/:id/wait'. One paragraph in docs/DASHBOARD-AUTH.md '### /api/self/*' after the secret-requests paragraph. Merge main before editing route-scopes.ts, no-loss-matrix.ts and DASHBOARD-AUTH.md."
+        },
+        "items": [
+          {
+            "id": "self-watch-routes.ac1",
+            "title": "A plain (non-agent) token and the internal credential receive 403 { code: 'not-an-agent-token' } from all four routes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "self-watch-routes.ac2",
+            "title": "Given a work-agent caller with no conversation row, POST /api/self/pull-request-watches with a GitHub PR URL returns 201 with linked: false and persists one watch whose last equals the read snapshot's state, checks, reviewState and mergeable",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "self-watch-routes.ac3",
+            "title": "The watch POST returns 400 invalid-url for a GitLab merge request URL, 502 pr-read-failed when the read fails, 409 pr-finished for a merged PR, and stores nothing in those three cases",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "self-watch-routes.ac4",
+            "title": "GET returns only the caller's watches; DELETE of another owner's id returns 404 unknown-watch and keeps the row; a repeated POST returns 200 created: false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "self-watch-routes.ac5",
+            "title": "POST /api/self/pull-requests returns 404 no-conversation for a work agent, and requiredScopeFor returns tell, read:state, tell, tell for the four routes, each with a no-loss-matrix row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "link-pr-tool",
+        "title": "Add the link_pull_request MCP tool",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T04:23:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4943",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/mcp/tools-pr.ts",
+            "src/lib/mcp/server.ts",
+            "tests/unit/lib/mcp/tools-pr.test.ts",
+            "tests/unit/lib/mcp/tool-annotations.test.ts",
+            "tests/unit/lib/mcp/visibility.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run tests/unit/lib/mcp/tools-pr.test.ts tests/unit/lib/mcp/tool-annotations.test.ts tests/unit/lib/mcp/visibility.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck and lint complete without errors",
+            "tools-pr.test.ts, tool-annotations.test.ts and visibility.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. New src/lib/mcp/tools-pr.ts (header comment in the style of tools-schedule.ts) exporting PR_LINK_TOOLS = [linkPullRequest]: name link_pull_request, audience 'any', scope 'tell', schema { ref (required: a PR URL, #42 or owner/repo#42), conversation? ('@<machine>/<name>' for a linked machine) }. With conversation: POST /api/conversations/<encodeURIComponent(name)>/pull-requests body { ref, source: 'agent' only when ctx.isAgent }. Without conversation: non-agent -> errorResult('conversation is required unless an Overdeck agent calls this tool') with no request; agent -> POST /api/self/pull-requests { ref }. Return routeResult. In src/lib/mcp/server.ts insert ...PR_LINK_TOOLS after ...SCHEDULE_TOOLS in ALL_TOOLS. Add link_pull_request -> POST /api/conversations/conv-a/pull-requests to SINGLE_ROUTE_PATHS in tool-annotations.test.ts; change visibility.test.ts toHaveLength(13) to 14 (recompute after merging main). New tests/unit/lib/mcp/tools-pr.test.ts using fakeApi from ./harness.js."
+        },
+        "items": [
+          {
+            "id": "link-pr-tool.ac1",
+            "title": "With conversation set, the tool sends POST /api/conversations/<name>/pull-requests with { ref, source: 'agent' } for an agent token and { ref } without source otherwise",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "link-pr-tool.ac2",
+            "title": "Without conversation, an agent token sends POST /api/self/pull-requests { ref }, and a non-agent token receives the 'conversation is required' error with no request made",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "link-pr-tool.ac3",
+            "title": "A route answer 404 { error: 'this agent has no conversation; pass conversation to link_pull_request' } returns a tool error with text 'HTTP 404: this agent has no conversation; pass conversation to link_pull_request'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "link-pr-tool.ac4",
+            "title": "tools/list for a read:state, read:conversations, operate token returns 14 tools including link_pull_request, and its scope equals requiredScopeFor('POST', '/api/conversations/conv-a/pull-requests')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "watch-pr-tools",
+        "title": "Add the three agent-only PR watch MCP tools",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T04:23:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4943",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/mcp/tools-pr.ts",
+            "src/lib/mcp/server.ts",
+            "tests/unit/lib/mcp/tools-pr.test.ts",
+            "tests/unit/lib/mcp/tool-annotations.test.ts",
+            "tests/unit/lib/mcp/visibility.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run tests/unit/lib/mcp/tools-pr.test.ts tests/unit/lib/mcp/tool-annotations.test.ts tests/unit/lib/mcp/visibility.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck and lint complete without errors",
+            "tools-pr.test.ts, tool-annotations.test.ts and visibility.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. In src/lib/mcp/tools-pr.ts export PR_WATCH_TOOLS with three audience 'agent' tools: watch_pull_request (scope tell, { url } required -> POST /api/self/pull-request-watches; description 'Get a message in this conversation when a GitHub pull request's checks fail or pass, its review changes, it gets merge conflicts, or it is merged or closed. Overdeck checks about once a minute; merged or closed ends the watch. Do not poll the PR yourself.'), list_pull_request_watches (scope read:state, {} -> GET /api/self/pull-request-watches), unwatch_pull_request (scope tell, { id } required -> DELETE /api/self/pull-request-watches/<encodeURIComponent(id)>). Append ...PR_WATCH_TOOLS after ...SELF_TOOLS in ALL_TOOLS. In tool-annotations.test.ts make the agent-only set SELF_TOOLS plus PR_WATCH_TOOLS and add the three tools to SINGLE_ROUTE_PATHS. In visibility.test.ts the read:state agent list becomes ['list_machines', 'wait_job', 'secret_wait', 'list_pull_request_watches'] (recompute after merging main). Extend tools-pr.test.ts."
+        },
+        "items": [
+          {
+            "id": "watch-pr-tools.ac1",
+            "title": "watch_pull_request sends POST /api/self/pull-request-watches { url }, list_pull_request_watches sends GET /api/self/pull-request-watches, and unwatch_pull_request sends DELETE /api/self/pull-request-watches/<URL-encoded id>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "watch-pr-tools.ac2",
+            "title": "A missing url or id returns an argument error and makes no request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "watch-pr-tools.ac3",
+            "title": "Given a non-agent token, when tools/list runs, then it returns none of the three tools; a read:state agent token receives exactly ['list_machines', 'wait_job', 'secret_wait', 'list_pull_request_watches'] (as of current main)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pr-watch-docs",
+        "title": "Document PR linking and watching in mcp.mdx and conversations.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T04:23:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4943",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/mcp.mdx",
+            "features/conversations.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. configuration/mcp.mdx: add a link_pull_request row (scope tell) to the '## Tools' table; add watch_pull_request, list_pull_request_watches and unwatch_pull_request rows to '### Agent-only tools' (scopes tell, read:state, tell; agent tokens only); add a '### Pull requests' subsection after '### Secrets' stating the six events (checks failed, checks passed, review changed, merge conflicts, merged, closed), the message format '[Overdeck] <owner>/<repo>#<n>: ... <url>', that merged, closed or 11 review-only updates in a row end a watch, the limits (20 per agent, 50 in total), that Overdeck checks about once a minute through the PR sweep of this machine's primary dashboard, GitHub PRs only, that a watch works without a linked conversation, and that a stopped agent's watches are removed. features/conversations.mdx near 'pan conv link-pr' (line 673): one paragraph that agents link a PR with the link_pull_request MCP tool (source agent) and can watch it with watch_pull_request. Spell a dollar sign as &#36; and '<' before a digit as &lt;. Merge main before editing mcp.mdx."
+        },
+        "items": [
+          {
+            "id": "pr-watch-docs.ac1",
+            "title": "configuration/mcp.mdx renders a link_pull_request row in '## Tools' and three watch-tool rows in '### Agent-only tools' with their scopes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pr-watch-docs.ac2",
+            "title": "configuration/mcp.mdx has a '### Pull requests' subsection that states the six events, the end rules (merged, closed, 11 review-only updates), the limits 20 and 50, and GitHub-only scope",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pr-watch-docs.ac3",
+            "title": "features/conversations.mdx names link_pull_request and watch_pull_request in the 'Pull requests on conversations' section, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "watch-store",
+        "to": "revoke-removes-watches",
+        "type": "blocks"
+      },
+      {
+        "from": "watch-store",
+        "to": "watch-notifier",
+        "type": "blocks"
+      },
+      {
+        "from": "watch-store",
+        "to": "self-watch-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "watch-notifier",
+        "to": "sweep-watch-pass",
+        "type": "blocks"
+      },
+      {
+        "from": "sweep-watch-pass",
+        "to": "self-watch-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "pr-route-scopes",
+        "to": "self-watch-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "pr-route-scopes",
+        "to": "link-pr-tool",
+        "type": "blocks"
+      },
+      {
+        "from": "self-watch-routes",
+        "to": "watch-pr-tools",
+        "type": "blocks"
+      },
+      {
+        "from": "link-pr-tool",
+        "to": "watch-pr-tools",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

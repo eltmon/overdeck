@@ -367,3 +367,34 @@ describe('directory reducer: push (PAN-4830)', () => {
     expect(decodeMachineFrame(JSON.stringify(frame))).toEqual({ ok: true, frame });
   });
 });
+
+describe('directory reducer: the account page removes a machine (PAN-4959 WI-2)', () => {
+  const CTX = { now: NOW, online: new Set([env(1), env(2), env(3)]), stunUrls: [], relayCapBytes: RELAY_MONTHLY_CAP_BYTES, turnConfigured: false };
+
+  it('removes a known machine, tells every other machine and phone, closes it 4012 and sends nothing to self', () => {
+    const approval = { requestId: 'r-1', fromEnv: env(1), toEnv: env(2), createdAt: NOW, expiresAt: NOW + 60_000 };
+    const state: DirectoryState = { ...register(3), approvals: [approval] };
+    const { state: next, effects } = reduce(state, { kind: 'remove-machine', environmentId: env(1) }, CTX);
+    expect(next.machines.map((m) => m.environmentId)).toEqual([env(2), env(3)]);
+    expect(next.approvals).toEqual([]);
+    expect(effects).toContainEqual({ kind: 'delete-machine', environmentId: env(1) });
+    expect(effects).toContainEqual({ kind: 'delete-approval', requestId: 'r-1' });
+    expect(effects).toContainEqual({ kind: 'inbox-forget', environmentId: env(1) });
+    for (const to of ['others', 'clients'] as const) {
+      const directory = sends(effects).find((e) => e.kind === 'send' && e.to === to) as { frame: { type: string; machines: Array<{ environmentId: string; online: boolean }> } };
+      expect(directory.frame.type).toBe('directory');
+      expect(directory.frame.machines.map((m) => [m.environmentId, m.online])).toEqual([[env(2), true], [env(3), true]]);
+    }
+    expect(closes(effects)).toEqual([{ kind: 'close', to: { environmentId: env(1) }, code: 4012, reason: 'forgotten' }]);
+    expect(effects.some((e) => (e.kind === 'send' || e.kind === 'close') && (e.to === 'self' || e.to === 'all'))).toBe(false);
+    expect(effects).toContainEqual({ kind: 'log', type: 'remove-machine', environmentId: env(1), outcome: 'ok' });
+    expect(hello(next, 4).state.machines).toHaveLength(3);
+  });
+
+  it('leaves the state unchanged with only a log for an unknown machine', () => {
+    const state = register(2);
+    const { state: next, effects } = reduce(state, { kind: 'remove-machine', environmentId: env(9) }, CTX);
+    expect(next).toBe(state);
+    expect(effects).toEqual([{ kind: 'log', type: 'remove-machine', environmentId: env(9), outcome: 'unknown_machine' }]);
+  });
+});

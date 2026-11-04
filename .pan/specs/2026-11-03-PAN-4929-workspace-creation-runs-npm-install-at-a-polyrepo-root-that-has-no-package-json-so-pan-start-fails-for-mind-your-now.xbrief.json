@@ -1,0 +1,335 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-03T21:41:48Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4929: Workspace creation runs npm install at a polyrepo root that has no package.json, so pan start fails for Mind Your Now",
+    "updated": "2026-11-03T21:43:26.663Z"
+  },
+  "plan": {
+    "id": "pan-4929",
+    "title": "Workspace creation runs npm install at a polyrepo root that has no package.json, so pan start fails for Mind Your Now",
+    "status": "running",
+    "uid": "1eb5c5b3-e416-4e48-98ae-164fbd116d58",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-03T21:41:48Z",
+    "updated": "2026-11-03T21:43:26.663Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4929",
+        "label": "PAN-4929",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4553",
+        "label": "PAN-4553 (duplicate)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4390",
+        "label": "PAN-4390 (duplicate)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "workspace",
+      "polyrepo",
+      "dependency-install",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "createWorkspace (src/lib/workspace-manager/create.ts) runs `<pm> install` at the workspace root unconditionally. A polyrepo workspace root has no package.json, so npm walks up to ~/Projects (which has node_modules), fails, writes a stray package-lock.json there, and since #4163 (2026-09-24) the failure aborts creation, so every MYN and botland pan start fails. MIN-1071..1076 hit the same failure and were rescued by a hand-written stub package.json.",
+      "Proposal": "Skip the root install (step 'No root package.json; skipped root install') when the root has no package.json, via a small shared helper (dependency-install.ts). Add an opt-in RepoConfig.package_manager so a polyrepo repo can request a host-side install inside its own directory; unset means no install (MYN's container owns fe deps, matching verification-runner). Apply the same root guard to the legacy CLI install path. Document both.",
+      "NonGoals": "- Automatic per-repo installs based on lockfile or package.json presence without the opt-in field\n- Per-repo installs on later `pan workspace add-repo` / addReposToWorkspace\n- Lockfile-based package-manager auto-detection for the root install\n- The PAN-4553 'dashboard is not responding' message (already gated on fetch failed by 96372988c0c)\n- Deleting stray ~/Projects/package-lock.json or old MYN stub package.json files\n- Converting CLI execSync calls in workspace-create.ts to async\n- Changing the MYN projects.yaml entry\n- Changing verification-runner.ts polyrepo behavior"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Per-repo installs are opt-in through a new repos[].package_manager field instead of running automatically in every repo with a package.json.",
+        "rationale": "Host pnpm is broken on this machine (corepack cannot find pnpm 12.4.2), MYN's init-fe container owns fe/node_modules with a container-path pnpm store that a host install would conflict with, myn-skills would gain an untracked package-lock.json, and verification-runner.ts already treats polyrepo deps as container/gate-owned. The opt-in field still delivers the issue's 'respect a per-repo package manager' capability."
+      },
+      {
+        "summary": "The legacy CLI install path in src/cli/commands/workspace-create.ts gets the same package.json guard.",
+        "rationale": "Same bug on a sibling path (non-fatal there, but it still writes a stray lockfile into an ancestor); a three-line change using the shared helper."
+      },
+      {
+        "summary": "The fix PR closes duplicates PAN-4553 and PAN-4390.",
+        "rationale": "Both report the identical failure and cause; leaving them open would strand them after the fix lands."
+      },
+      {
+        "summary": "The docs are corrected to match the code's bun.lock-else-npm detection rather than adding lockfile detection.",
+        "rationale": "Adding detection would change root-install behavior for monorepo projects outside this issue's scope."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-03-PAN-4929-workspace-creation-runs-npm-install-at-a-polyrepo-root-that-has-no-package-json-so-pan-start-fails-for-mind-your-now.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "root-install-guard",
+        "title": "Skip the root dependency install in createWorkspace when the workspace root has no package.json",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T21:41:48Z",
+        "metadata": {
+          "issueLabel": "pan-4929",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "simple",
+          "kind": "backend",
+          "files_scope": [
+            "src/lib/workspace-manager/dependency-install.ts",
+            "src/lib/workspace-manager/create.ts",
+            "tests/lib/workspace-manager.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/lib/workspace-manager.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/lib/workspace-manager.test.ts passes including 'skips the root install when a polyrepo workspace root has no package.json', 'runs the root install when a monorepo workspace root has a package.json' and 'fails creation when the root install fails'",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4929.md WI-1 exactly. Create src/lib/workspace-manager/dependency-install.ts exporting hasPackageJson(dir) and installCommandFor(pm). In src/lib/workspace-manager/create.ts, wrap the root install block (comment 'Install dependencies using the project's package manager.' up to 'Package installers such as Husky') in `if (!hasPackageJson(workspacePath)) { steps.push('No root package.json; skipped root install'); progress(..., 'complete') } else { <existing block unchanged, using installCommandFor> }`. Add the three named tests to describe('createWorkspace') in tests/lib/workspace-manager.test.ts using the existing mockExecAsync/isWorktreeAddCall/registerProject scaffolding. Use execAsync only (server-reachable). The commit message body must contain 'Closes #4553', 'Closes #4390' and the Root cause paragraph from the PRD."
+        },
+        "items": [
+          {
+            "id": "root-install-guard.ac1",
+            "title": "Given a polyrepo project whose workspace root has no package.json, when createWorkspace runs, then it returns success: true, its steps contain exactly 'No root package.json; skipped root install', and no exec call ends in ' install'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "root-install-guard.ac2",
+            "title": "Given a monorepo project whose worktree has a package.json and package_manager npm, when createWorkspace runs, then it calls execAsync with 'npm install' and cwd equal to the workspace path and its steps contain 'Installed dependencies (npm)'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "root-install-guard.ac3",
+            "title": "Given a root install that rejects, when createWorkspace runs on a workspace root with a package.json, then it still returns success: false with an error starting 'Dependency install failed (' (existing behavior preserved).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "root-install-guard.ac4",
+            "title": "Given the pushed root-install-guard commit, when `git log -1 --format=%B` is read, then the message contains 'Closes #4553', 'Closes #4390', and a root-cause paragraph naming ada4f64db4d (2026-04-14) and #4163 (2026-09-24) and stating MIN-1071..1076 were rescued by a hand-written stub package.json.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "per-repo-install",
+        "title": "Run opt-in per-repo installs for polyrepo repos that set repos[].package_manager",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T21:41:48Z",
+        "metadata": {
+          "issueLabel": "pan-4929",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "simple",
+          "kind": "backend",
+          "files_scope": [
+            "src/lib/workspace-config.ts",
+            "src/lib/workspace-manager/create.ts",
+            "tests/lib/workspace-manager.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/lib/workspace-manager.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/lib/workspace-manager.test.ts passes including 'runs a per-repo install only for repos that set package_manager' and 'fails creation when a per-repo install fails'",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2 exactly. Add `package_manager?: 'bun' | 'npm' | 'pnpm'` with the PRD's doc comment to RepoConfig in src/lib/workspace-config.ts. In create.ts, directly after the root-install block, loop workspaceConfig.repos (polyrepo only): skip symlink repos and repos without package_manager; skip silently if the repo dir is missing; push '<name>: no package.json; skipped install' when the dir has no package.json; otherwise execAsync(installCommandFor(pm), { cwd: repoDir }) and push 'Installed dependencies in <name> (<pm>)'; on failure push 'Dependency install failed in <name> (<pm>): <msg first 200>', set success=false, progress error, return. Add the two named tests."
+        },
+        "items": [
+          {
+            "id": "per-repo-install.ac1",
+            "title": "Given polyrepo repos fe (package_manager pnpm, has package.json), api (no field, has package.json) and docs (symlink, package_manager npm), when createWorkspace runs, then exactly one install call occurs: 'pnpm install' with cwd <workspace>/fe, and steps contain 'Installed dependencies in fe (pnpm)'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "per-repo-install.ac2",
+            "title": "Given repo fe with package_manager pnpm whose install rejects with 'pnpm boom', when createWorkspace runs, then it returns success: false and errors contain a string starting 'Dependency install failed in fe (pnpm): pnpm boom'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "per-repo-install.ac3",
+            "title": "Given a repo with package_manager set whose directory has no package.json, when createWorkspace runs, then it produces the step '<name>: no package.json; skipped install' and runs no install in that repo.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-install-guard",
+        "title": "Guard the legacy pan workspace create install path on package.json",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T21:41:48Z",
+        "metadata": {
+          "issueLabel": "pan-4929",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "trivial",
+          "kind": "backend",
+          "files_scope": [
+            "src/cli/commands/workspace-create.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "git grep -n \"hasPackageJson(workspacePath)\" src/cli/commands/workspace-create.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "git grep prints exactly one match in src/cli/commands/workspace-create.ts"
+          ],
+          "traces": [
+            "FR-6"
+          ],
+          "acJustification": "Two ACs: the change is a single guard on a CLI-only path with no existing test harness; the helper it calls is tested by root-install-guard."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. In src/cli/commands/workspace-create.ts at the comment 'Install dependencies using the project's package manager.' (line ~383), wrap the pkgManager/installCmd/execSync block in `if (hasPackageJson(workspacePath)) { ... }` and use installCommandFor(pkgManager). Import both from ../../lib/workspace-manager/dependency-install.js. Keep the existing execSync (CLI-only path); do not convert it."
+        },
+        "items": [
+          {
+            "id": "cli-install-guard.ac1",
+            "title": "Given src/cli/commands/workspace-create.ts after the change, when `git grep -n \"hasPackageJson(workspacePath)\"` runs on it, then it prints exactly one match and the execSync install call sits inside that if-block.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-install-guard.ac2",
+            "title": "Given the change, when `npm run typecheck` runs, then it exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-polyrepo-install",
+        "title": "Document the root-install skip and the opt-in repos[].package_manager field",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T21:41:48Z",
+        "metadata": {
+          "issueLabel": "pan-4929",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "simple",
+          "kind": "docs",
+          "files_scope": [
+            "docs/WORKSPACE-DEPENDENCIES.md",
+            "configuration/polyrepo.mdx"
+          ],
+          "verify_commands": [
+            "grep -n \"No root package.json; skipped root install\" docs/WORKSPACE-DEPENDENCIES.md",
+            "grep -n \"package_manager\" configuration/polyrepo.mdx",
+            "grep -c \"pnpm-lock.yaml → pnpm\" docs/WORKSPACE-DEPENDENCIES.md"
+          ],
+          "expected_outputs": [
+            "first grep prints a match",
+            "second grep prints at least two matches",
+            "third grep prints 0"
+          ],
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4. docs/WORKSPACE-DEPENDENCIES.md: replace the false lockfile auto-detect sentence (line ~65) with 'If omitted, Overdeck uses bun when the workspace root has a bun.lock, and npm otherwise.'; add the no-package.json skip sentence quoting 'No root package.json; skipped root install'; reword Workspace Creation Flow step 2 (line ~160). configuration/polyrepo.mdx: add a commented `# package_manager: pnpm` line to the fe repo example and a '## Dependency installs in polyrepo workspaces' section before '## Template Placeholders' with the content listed in the PRD (root skip, opt-in field with values bun/npm/pnpm, leave unset when a devcontainer installs deps because a host install can conflict with the container's pnpm store, failure is fatal and a re-run resumes)."
+        },
+        "items": [
+          {
+            "id": "docs-polyrepo-install.ac1",
+            "title": "Given docs/WORKSPACE-DEPENDENCIES.md, when grepped, then it contains 'No root package.json; skipped root install' and no longer contains 'pnpm-lock.yaml → pnpm'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-polyrepo-install.ac2",
+            "title": "Given configuration/polyrepo.mdx, when read, then it renders a '## Dependency installs in polyrepo workspaces' section that names package_manager with the values bun, npm and pnpm and says to leave it unset when a devcontainer installs the repo's dependencies.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-polyrepo-install.ac3",
+            "title": "Given configuration/polyrepo.mdx, when read, then the fe repo example shows a commented `package_manager: pnpm` line.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "root-install-guard",
+        "to": "per-repo-install",
+        "type": "blocks"
+      },
+      {
+        "from": "root-install-guard",
+        "to": "cli-install-guard",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

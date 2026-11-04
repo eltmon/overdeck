@@ -1,17 +1,22 @@
 /** The phone app's root: identity, the account, URL opens, and which shell screen shows (PAN-4837). */
 import { App } from '@capacitor/app';
-import { PHONE_PAIR_LINK_PREFIX, parsePhonePairLink } from '@overdeck/contracts';
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import { PHONE_PAIR_LINK_PREFIX, parsePhonePairLink, type PhoneNotificationCategory } from '@overdeck/contracts';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 import { type DeviceIdentity, loadIdentity } from '../native/keys';
-import { type PushState, pushState, requestPush, startPushRegistration, unregisterPush } from '../native/push';
+import { type LiveActivityStatus, OverdeckLiveActivity } from '../native/liveActivity';
+import { type PushController, pushSupported, startPush, unregisterPush, usePushState } from '../native/push';
 import { type Connection, createConnection } from './connection';
 import { createDirectory, type ShellDirectory } from './directory';
 import { resetTransport } from '../../../../src/dashboard/frontend/src/lib/wsTransport';
 import { installResumeHandler } from './lifecycle';
+import { createLiveActivityController, type LiveActivityController, liveActivityEnabled, setLiveActivityEnabled } from './liveActivity';
 import { MachinesScreen } from './MachinesScreen';
 import { MachineView } from './MachineView';
 import { NOTIFICATION_LINK_PREFIX, type NotificationOpen, parseNotificationLink } from './notificationLink';
+import { markSynced, pauseFor, readNotificationPrefs, useNotificationPrefs, writeNotificationPrefs, type PauseChoice } from './notificationPrefs';
+import { createPrefsSync, type PrefsSync, putPrefsOver } from './notificationPrefsSync';
+import { installNotificationTap } from './notificationTap';
 import { PairScreen } from './PairScreen';
 import { pairMachine } from './pairing';
 import { shellPlatform } from './platform';
@@ -32,15 +37,21 @@ type View = { kind: 'machines' } | { kind: 'pair'; link: string | null } | { kin
 interface Services {
   directory: ShellDirectory;
   connection: Connection;
+  liveActivity: LiveActivityController;
+  /** Push registration on iOS (PAN-4838) and Android (PAN-4840). */
+  push: PushController | null;
+  /** Notification-prefs sync to every paired machine (PAN-5019 WI-8), wherever push is supported. */
+  prefsSync: PrefsSync | null;
 }
 
 const errorText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
 /**
  * The launch URL already handled in this WebView. Switching machines reloads the page (C-7), and
- * on Android `App.getLaunchUrl()` keeps answering the activity's original launch intent, so without
- * this a cold launch from a pair link would reopen the pair screen with a used code after each
- * reload. Session storage survives a reload and is empty in a new app process.
+ * on Android `App.getLaunchUrl()` keeps answering the activity's original launch intent, and on iOS
+ * it answers with the last URL that opened the app, even one delivered by `appUrlOpen` while it ran.
+ * Without this a pair link would reopen the pair screen with a used code after each reload. Session
+ * storage survives a reload and is empty in a new app process.
  */
 const LAUNCH_URL_KEY = 'overdeck.launchUrlHandled';
 
@@ -64,24 +75,24 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
   const [signInError, setSignInError] = useState<string | null>(null);
   const [view, setView] = useState<View>({ kind: 'machines' });
   const [services, setServices] = useState<Services | null>(null);
-  // Bumped by the Settings row's "Turn on" to restart push registration (PAN-4840 WI-7).
-  const [pushEpoch, setPushEpoch] = useState(0);
-  const [notifications, setNotifications] = useState<PushState | null>(null);
   /** A pair link that arrived before sign-in; it opens the pair screen once signed in. */
   const [pendingPairLink, setPendingPairLink] = useState<string | null>(null);
-  /** A notification tap (PAN-4840 FR-6); it opens its machine once signed in. */
+  /** An Android notification tap (PAN-4840 FR-6); it opens its machine once signed in. */
   const [pendingOpen, setPendingOpen] = useState<NotificationOpen | null>(null);
   const account = useShellStore((s) => s.account);
   const paired = useShellStore((s) => s.machines);
   const setAccount = useShellStore((s) => s.setAccount);
   const setMachines = useShellStore((s) => s.setMachines);
+  /** iOS only (PAN-4839): read once for the Settings row. */
+  const [liveActivityStatus, setLiveActivityStatus] = useState<LiveActivityStatus | null>(null);
+  const [liveActivityOn, setLiveActivityOn] = useState(liveActivityEnabled);
 
   const handleUrl = useCallback(
     async (url: string) => {
-      // Every link is unique by its timestamp, so the guard only stops a reload re-handling it. An
+      // Callers pass a notification link only the first time this app process sees it. An
       // unparseable link matches no paired machine and shows the machine list.
       if (url.startsWith(NOTIFICATION_LINK_PREFIX)) {
-        if (takeLaunchUrl(url)) setPendingOpen(parseNotificationLink(url) ?? { environmentId: '', path: '' });
+        setPendingOpen(parseNotificationLink(url) ?? { environmentId: '', path: '' });
         return;
       }
       if (url.startsWith(PHONE_PAIR_LINK_PREFIX)) {
@@ -110,14 +121,18 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
         setMachines(machines);
         setBoot({ kind: 'ready', identity });
         const launch = await App.getLaunchUrl();
-        // A notification link passes through takeLaunchUrl once, inside handleUrl.
-        const url = launch?.url;
-        if (!cancelled && url && (url.startsWith(NOTIFICATION_LINK_PREFIX) || takeLaunchUrl(url))) await handleUrl(url);
+        if (!cancelled && launch?.url && takeLaunchUrl(launch.url)) await handleUrl(launch.url);
       } catch (e) {
         if (!cancelled) setBoot({ kind: 'failed', message: errorText(e) });
       }
     })();
-    const listener = App.addListener('appUrlOpen', ({ url }) => void handleUrl(url));
+    // Record a URL that arrives while running as handled too: iOS answers getLaunchUrl() with it
+    // after the next reload, which would reopen the pair screen with a used code.
+    const listener = App.addListener('appUrlOpen', ({ url }) => {
+      // Each notification link is unique by its timestamp, so a repeat is a replay: skip it.
+      if (!takeLaunchUrl(url) && url.startsWith(NOTIFICATION_LINK_PREFIX)) return;
+      void handleUrl(url);
+    });
     return () => {
       cancelled = true;
       void listener.then((handle) => handle.remove());
@@ -146,6 +161,31 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
     }
   }, [account, pendingOpen, paired, navigate]);
 
+  // After boot, so the plugin's retained cold-launch tap finds the paired machines in the store (FR-8).
+  const booted = boot.kind === 'ready';
+  // The default `navigate` is a new function each render; the listener reads the latest one.
+  const navigateRef = useRef(navigate);
+  useEffect(() => {
+    navigateRef.current = navigate;
+  }, [navigate]);
+  useEffect(() => {
+    // iOS only: Android notifications are posted by OverdeckMessagingService and arrive as an open link.
+    if (!booted || !pushSupported() || shellPlatform() !== 'ios') return;
+    return installNotificationTap({
+      paired: () => useShellStore.getState().machines,
+      signedIn: () => useShellStore.getState().account !== null,
+      open: (target) => {
+        if (target.kind === 'machine') {
+          setCurrentMachineId(target.environmentId);
+          navigateRef.current(target.path);
+        } else {
+          setCurrentMachineId(null);
+          navigateRef.current('/');
+        }
+      },
+    });
+  }, [booted]);
+
   const identity = boot.kind === 'ready' ? boot.identity : null;
   useEffect(() => {
     if (!identity || !account) return;
@@ -157,46 +197,48 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
     });
     const meter = createRelayMeter((bytes) => directory.client.send({ type: 'relay-usage', bytes }));
     const connection = createConnection({ directory, meter });
-    setServices({ directory, connection });
+    const platform = shellPlatform();
+    const push = pushSupported() ? startPush({ directory: directory.client, platform }) : null;
+    const prefsSync = pushSupported()
+      ? createPrefsSync({
+        directory: directory.client,
+        paired: () => useShellStore.getState().machines,
+        send: putPrefsOver(connection),
+      })
+      : null;
+    const liveActivity = createLiveActivityController({ plugin: OverdeckLiveActivity, directory: directory.client, platform });
+    setServices({ directory, connection, push, liveActivity, prefsSync });
     void directory.client.start();
-    const uninstallResume = installResumeHandler(() => ({ directory: directory.client, connection, resetTransport: () => resetTransport() }));
+    void liveActivity.refresh();
+    // The operator may change the iOS permission in iOS Settings while the app is in the background,
+    // so the Settings row reads it again on every resume.
+    const readLiveActivityStatus = () => {
+      if (platform !== 'ios') return;
+      OverdeckLiveActivity.status().then(setLiveActivityStatus, (e: unknown) => console.warn('[live-activity] status failed', e));
+    };
+    readLiveActivityStatus();
+    const uninstallResume = installResumeHandler(() => ({
+      directory: directory.client,
+      connection,
+      resetTransport: () => resetTransport(),
+      liveActivity: {
+        refresh: () => {
+          readLiveActivityStatus();
+          return liveActivity.refresh();
+        },
+      },
+    }));
     return () => {
       uninstallResume();
+      push?.stop();
+      prefsSync?.stop();
+      liveActivity.dispose();
       meter.stop();
       directory.client.stop();
       directory.dialer.close();
       setServices(null);
     };
   }, [identity, account]);
-
-  useEffect(() => {
-    if (!services) return;
-    let stop: (() => void) | null = null;
-    let cancelled = false;
-    void startPushRegistration(services.directory.client).then((s) => (cancelled ? s() : (stop = s)));
-    return () => {
-      cancelled = true;
-      stop?.();
-    };
-  }, [services, pushEpoch]);
-
-  useEffect(() => {
-    if (view.kind !== 'settings') return;
-    let cancelled = false;
-    void pushState().then((s) => {
-      if (!cancelled) setNotifications(s);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [view.kind]);
-
-  const onTurnOnNotifications = useCallback(() => {
-    void requestPush().then((s) => {
-      setNotifications(s);
-      setPushEpoch((n) => n + 1);
-    });
-  }, []);
 
   const labelFor = useCallback(
     (link: string) => {
@@ -214,6 +256,8 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
         connection: services.connection,
         identity,
         phoneLabel: account.label,
+        notificationPreferences: readNotificationPrefs,
+        onPreferencesStored: markSynced,
       });
     },
     [services, identity, account],
@@ -235,6 +279,38 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
       setSessionFor(null);
     };
   }, [inMachineView, current, connection]);
+
+  const push = services?.push ?? null;
+  const pushState = usePushState(push);
+
+  const { revision, prefs } = useNotificationPrefs();
+  const [unsyncedMachines, setUnsyncedMachines] = useState<ReadonlyArray<{ label: string; status: 'pending' | 'outdated' | 'failed' }>>([]);
+  useEffect(() => {
+    const prefsSync = services?.prefsSync;
+    if (!prefsSync) {
+      setUnsyncedMachines([]);
+      return;
+    }
+    const recompute = () => {
+      setUnsyncedMachines(
+        paired.flatMap((m) => {
+          const status = prefsSync.status(m.environmentId);
+          return status === 'synced' ? [] : [{ label: m.label, status }];
+        }),
+      );
+    };
+    recompute();
+    return prefsSync.onChange(recompute);
+    // `revision` is read indirectly through `prefsSync.status`; re-running on every prefs change
+    // catches the case where syncNow() finds no online machine to send to and so never notifies.
+  }, [services, paired, revision]);
+  const onPause = useCallback((choice: PauseChoice) => writeNotificationPrefs({ ...prefs, pause: pauseFor(choice, new Date()) }), [prefs]);
+  const onResume = useCallback(() => writeNotificationPrefs({ ...prefs, pause: null }), [prefs]);
+  const onToggleCategory = useCallback(
+    (category: PhoneNotificationCategory, on: boolean) =>
+      writeNotificationPrefs({ ...prefs, muted: on ? prefs.muted.filter((c) => c !== category) : [...prefs.muted, category] }),
+    [prefs],
+  );
 
   const leaveMachine = useCallback((next: View) => {
     setCurrentMachineId(null);
@@ -260,13 +336,27 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
         removeSelf: services ? removeSelfOver(services.connection) : () => Promise.reject(new Error('no connection')),
         directory: services?.directory.client ?? null,
         deleteDevice: (record) => deleteAccountDevice(record),
-        unregisterPush,
+        unregisterPush: shellPlatform() === 'android' ? () => unregisterPush('android') : undefined,
+        endLiveActivity: shellPlatform() === 'ios' ? () => OverdeckLiveActivity.end() : undefined,
         resetKeys: resetAllKeys,
         clearStorage: () => localStorage.clear(),
         reload: () => navigate('/'),
       }),
     [paired, account, services, navigate],
   );
+
+  const liveActivitySetting = liveActivityStatus && services
+    ? {
+      available: liveActivityStatus.supported,
+      allowed: liveActivityStatus.enabled,
+      enabled: liveActivityOn,
+      onChange: (on: boolean) => {
+        setLiveActivityEnabled(on);
+        setLiveActivityOn(on);
+        void (on ? services.liveActivity.refresh() : services.liveActivity.disable());
+      },
+    }
+    : null;
 
   const onPaired = useCallback(
     (machine: PairedMachine) => {
@@ -332,11 +422,24 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
         <SettingsScreen
           account={account}
           machines={paired}
-          notifications={notifications}
-          onTurnOnNotifications={onTurnOnNotifications}
+          liveActivity={liveActivitySetting}
           onForget={(environmentId) => void forget(environmentId, { kind: 'settings' })}
           onSignOut={runSignOut}
           onBack={() => setView({ kind: 'machines' })}
+          notifications={
+            push && pushState
+              ? {
+                ...pushState,
+                platform: shellPlatform(),
+                onChange: (on) => (on ? void push.enable() : push.disable()),
+                prefs,
+                onPause,
+                onResume,
+                onToggleCategory,
+                unsynced: unsyncedMachines,
+              }
+              : undefined
+          }
         />
       )}
     </div>

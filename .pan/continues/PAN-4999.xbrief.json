@@ -1,0 +1,112 @@
+{
+  "version": "1",
+  "issueId": "PAN-4999",
+  "created": "2026-11-04T10:07:26.830Z",
+  "updated": "2026-11-04T10:42:20.605Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-04T10:42Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-04T10:42:20.605Z"
+    }
+  ],
+  "items": {
+    "resolve-name-shaped": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4999",
+      "claimedAt": "2026-11-04T10:07:26.830Z",
+      "doneAt": "2026-11-04T10:13:27.777Z"
+    },
+    "accepted-forms-bare-name": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4999",
+      "claimedAt": "2026-11-04T10:13:41.064Z",
+      "doneAt": "2026-11-04T10:14:43.949Z"
+    },
+    "resolver-name-tests": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4999",
+      "claimedAt": "2026-11-04T10:14:53.206Z",
+      "doneAt": "2026-11-04T10:18:24.735Z"
+    },
+    "docs-bare-name-form": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4999",
+      "claimedAt": "2026-11-04T10:18:33.589Z",
+      "doneAt": "2026-11-04T10:20:55.855Z"
+    },
+    "resolve-name-shaped.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:23:13.562Z"
+    },
+    "resolve-name-shaped.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:24:05.440Z"
+    },
+    "resolve-name-shaped.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:24:37.519Z"
+    },
+    "resolve-name-shaped.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:25:29.811Z"
+    },
+    "resolve-name-shaped.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:25:52.726Z"
+    },
+    "accepted-forms-bare-name.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:26:30.658Z"
+    },
+    "resolver-name-tests.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:27:22.351Z"
+    },
+    "resolver-name-tests.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:27:50.450Z"
+    },
+    "docs-bare-name-form.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:28:52.283Z"
+    },
+    "docs-bare-name-form.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:29:16.023Z"
+    },
+    "docs-bare-name-form.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:29:44.798Z"
+    },
+    "accepted-forms-bare-name.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:31:09.963Z"
+    },
+    "resolver-name-tests.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:31:51.741Z"
+    },
+    "resolver-name-tests.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:32:20.667Z"
+    },
+    "resolver-name-tests.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:33:36.470Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-04T10:42:20Z",
+      "markdownBody": "# CodeRabbit findings for PAN-4999 (PR #5004)\n\nCodeRabbit posted 1 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4466498737 · src/cli/agent-target.ts:160 [Major]: Route Rally-style issue IDs to the issue branch before the conversation lookup.\n  https://github.com/eltmon/overdeck/pull/5004#discussion_r4466498737\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5004/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-4999`.\n   If you only replied, you are done.\n5. If PR #5004 has already merged when you read this, nothing more lands on it: open a follow-up issue\n   for the findings you agree with instead of pushing."
+    }
+  ]
+}

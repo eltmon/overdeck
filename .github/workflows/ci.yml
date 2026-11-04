@@ -335,13 +335,57 @@ jobs:
           path: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 7
 
+  # PAN-4957 (PAN-4927 W-CI1, FR-15): the outside-bot plugins in integrations/.
+  # The shared skill copies match their source, the Hermes plugin passes
+  # pytest, and the OpenClaw plugin builds and passes vitest from its own
+  # lockfile. The Grok packages have no build; tests/unit/integrations/ covers
+  # them in the test shards. It feeds the `test` aggregator below, so a red
+  # package blocks merge. It needs no bun install and no root build.
+  integrations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Shared skill copies match
+        run: node integrations/shared/sync-skill.mjs --check
+
+      - name: Use Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install the Hermes plugin
+        run: pip install -e 'integrations/hermes[test]'
+
+      - name: Hermes tests
+        run: python -m pytest integrations/hermes
+
+      - name: Install the OpenClaw plugin
+        working-directory: integrations/openclaw
+        run: npm ci
+
+      - name: Build the OpenClaw plugin
+        working-directory: integrations/openclaw
+        run: npm run build
+
+      - name: OpenClaw tests
+        working-directory: integrations/openclaw
+        run: npm test
+
   # `test` is the check name the close-out gate requires on main
   # (DEFAULT_MAIN_VERIFY_REQUIRED_CHECKS in src/lib/lifecycle/dod-gate.ts), so
-  # it stays one job: green only when every shard, test-e2e and mobile-android passed.
+  # it stays one job: green only when every shard, test-e2e, mobile-android and
+  # integrations passed.
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [test-shard, test-e2e, mobile-android]
+    needs: [test-shard, test-e2e, mobile-android, integrations]
     if: always()
     steps:
       - name: All test jobs passed
@@ -349,9 +393,11 @@ jobs:
           echo "test-shard:     ${{ needs.test-shard.result }}"
           echo "test-e2e:       ${{ needs.test-e2e.result }}"
           echo "mobile-android: ${{ needs.mobile-android.result }}"
+          echo "integrations:   ${{ needs.integrations.result }}"
           test "${{ needs.test-shard.result }}" = success
           test "${{ needs.test-e2e.result }}" = success
           test "${{ needs.mobile-android.result }}" = success
+          test "${{ needs.integrations.result }}" = success
 
   flake-lane:
     runs-on: ubuntu-latest

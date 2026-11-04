@@ -11,7 +11,10 @@
  *      tailscaled always overwrites) reaches only `POST /hooks/*`, the trigger
  *      delivery route; every other method and path gets 404, credential or
  *      not (PAN-4648 FR-9). Funnel proxies to 127.0.0.1, so without this rule
- *      a public request would look like the local operator.
+ *      a public request would look like the local operator. With
+ *      `mcp.public.enabled` on (PAN-4947), it also reaches exactly the nine
+ *      public MCP surfaces in `PUBLIC_MCP_SURFACES` (`src/lib/mcp/public-mcp.ts`),
+ *      matched on the raw path.
  *  0b. With `OVERDECK_PUBLIC_LINK_ONLY=1` (a linked Fly machine, PAN-4652
  *      FR-5), a request that is neither a secure-channel request nor a
  *      loopback peer without a proxy forwarding header gets 404 on every
@@ -50,6 +53,7 @@ import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { scopeSatisfies, type AccessTokenScope } from '../../lib/access-tokens.js';
+import { isPublicMcpEnabled, publicMcpSurface } from '../../lib/mcp/public-mcp.js';
 import { readRemoteAccessConfig } from '../../lib/remote-access/config.js';
 import { type ChannelMarker, channelOfRequest } from './channel-peer.js';
 import { jsonResponse } from './http-helpers.js';
@@ -110,13 +114,19 @@ export type RemoteGateRejection =
   | { status: 403; code: 'agent-fenced' }
   | { status: 404 };
 
-/** `METHOD path` pairs a pairing-mode channel may reach without a credential (PAN-4645, PAN-4835). */
-export const PAIRING_CHANNEL_ALLOWLIST: ReadonlySet<string> = new Set(['GET /api/environment', 'POST /api/machines/exchange', 'POST /api/phones/exchange']);
+/** `METHOD path` pairs a pairing-mode channel may reach without a credential (PAN-4645, PAN-4835, PAN-4927). */
+export const PAIRING_CHANNEL_ALLOWLIST: ReadonlySet<string> = new Set([
+  'GET /api/environment',
+  'POST /api/machines/exchange',
+  'POST /api/phones/exchange',
+  'POST /api/connectors/exchange',
+]);
 /** `METHOD path` pairs an approval-mode channel may reach without a credential (PAN-2356 D-2356-9). */
 export const APPROVAL_CHANNEL_ALLOWLIST: ReadonlySet<string> = new Set(['GET /api/environment', 'POST /api/machines/approval-exchange']);
 const MACHINES_EXCHANGE = 'POST /api/machines/exchange';
 const APPROVAL_EXCHANGE = 'POST /api/machines/approval-exchange';
 const PHONES_EXCHANGE = 'POST /api/phones/exchange';
+const CONNECTORS_EXCHANGE = 'POST /api/connectors/exchange';
 
 /** The gate decision for one request: `null` lets it through. */
 export function remoteGateRejection(
@@ -126,7 +136,9 @@ export function remoteGateRejection(
   const pathname = gatePathname(request.url);
   if (pathname === null) return { status: 401 };
   if (isTailscaleFunnelRequest(request.headers as HeaderMap)) {
-    return request.method === 'POST' && pathname.startsWith('/hooks/') ? null : { status: 404 };
+    if (request.method === 'POST' && pathname.startsWith('/hooks/')) return null;
+    // PAN-4927 D-16 (PAN-4947): the public MCP surface, exact raw path, only while the operator has it on.
+    return isPublicMcpEnabled() && publicMcpSurface(request.method, request.url) !== null ? null : { status: 404 };
   }
   if (publicLinkOnly() && channel === null
     && !(isLoopbackPeer(request) && !hasProxyForwardingHeader(request.headers as HeaderMap))) {
@@ -136,7 +148,7 @@ export function remoteGateRejection(
   const surface = `${request.method} ${pathname}`;
   if (channel?.mode === 'pairing') return PAIRING_CHANNEL_ALLOWLIST.has(surface) ? null : { status: 401 };
   if (channel?.mode === 'approval') return APPROVAL_CHANNEL_ALLOWLIST.has(surface) ? null : { status: 401 };
-  if (surface === MACHINES_EXCHANGE || surface === APPROVAL_EXCHANGE || surface === PHONES_EXCHANGE) return { status: 401 };
+  if (surface === MACHINES_EXCHANGE || surface === APPROVAL_EXCHANGE || surface === PHONES_EXCHANGE || surface === CONNECTORS_EXCHANGE) return { status: 401 };
   if (REMOTE_GATE_ALLOWLIST.has(surface)) return null;
   const headers = request.headers as HeaderMap;
   const credential = resolveDashboardCredential(headers, channel);

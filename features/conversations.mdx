@@ -101,6 +101,10 @@ what the next quick create uses. Its fields are:
 
 After **Create**, the dialog closes and the new conversation opens.
 
+The conversation's first derived title leaves out any attached files; a first
+message that only attaches files keeps the title "New conversation" until the
+generated title arrives.
+
 See [Bare conversations](https://github.com/eltmon/overdeck/blob/main/docs/CONTEXT-LAYERS.md#bare-conversations-no-overdeck-context)
 for the full list of what is skipped and what keeps running.
 
@@ -124,7 +128,8 @@ registered yet — starts the conversation or terminal in your home folder
 (`~/Projects` if it exists, otherwise your home directory) instead of blocking
 you. In the Command Deck, that same no-project state is the **No project**
 deck, always reachable from the sidebar's Projects section, and offered as
-"Start without a project" when nothing else is selected.
+"Start without a project" when nothing else is selected. The app bar reads
+**No project** when the No project deck is selected, never its internal key.
 
 If a conversation ends up outside any project — started from Home before a
 project existed, say — its pane shows a "Not in a project · Move to
@@ -369,6 +374,10 @@ How a schedule fires:
 
 Agent conversations and Session Vault browse copies cannot be scheduled, and
 a conversation can hold at most 20 schedules.
+
+MCP clients and managed agents manage schedules with the `schedule_recurring`,
+`list_scheduled`, `update_scheduled` and `delete_scheduled` tools; see
+[MCP](/configuration/mcp).
 
 Choose **Schedule…** from the row's overflow menu or the tab menu to manage a
 conversation's schedules without the CLI. The dialog lists every schedule and
@@ -676,6 +685,12 @@ pan conv prs <query> [--json]                      # * marks the PR shown
 dashboard, so every open client updates at once. With the dashboard down they
 write the link directly. They exit 2 when no conversation matches, and 1 on any
 other error.
+
+An Overdeck agent over MCP links a pull request with the `link_pull_request`
+tool instead (source `agent`), and can watch it with `watch_pull_request` to
+get a message here when its checks, review state, mergeability, or merged/closed
+state changes — see [`configuration/mcp.mdx`](../configuration/mcp.mdx)
+("Pull requests").
 
 Rules:
 

@@ -235,25 +235,37 @@ describe('stopSmeeProcess', () => {
   it('stops running process and removes pidfile', () => {
     mockReadFileSync.mockReturnValue('12345');
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    // PAN-4925: the fixture PID (12345) reaches the real process.kill unless
+    // spied — without this, isProcessAlive()/terminateProcess() probe and
+    // SIGTERM whatever host process actually holds that PID.
+    const killSpy = vi.spyOn(process, 'kill').mockReturnValue(true);
 
     stopSmeeProcess();
 
+    expect(killSpy).toHaveBeenCalledWith(12345, 0);
+    expect(killSpy).toHaveBeenCalledWith(12345, 'SIGTERM');
     expect(mockUnlinkSync).toHaveBeenCalledWith(
       expect.stringContaining('smee.pid'),
     );
     expect(logSpy).toHaveBeenCalledWith('[smee] Process stopped');
     logSpy.mockRestore();
+    killSpy.mockRestore();
   });
 
   it('is safe when pidfile is missing', () => {
     mockExistsSync.mockReturnValue(false);
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    // PAN-4925: see note above — spy process.kill even though this path
+    // should never reach it, so a regression can't silently signal a real PID.
+    const killSpy = vi.spyOn(process, 'kill').mockReturnValue(true);
 
     stopSmeeProcess();
 
+    expect(killSpy).not.toHaveBeenCalled();
     expect(mockUnlinkSync).not.toHaveBeenCalled();
     expect(logSpy).toHaveBeenCalledWith('[smee] Process stopped');
     logSpy.mockRestore();
+    killSpy.mockRestore();
   });
 });
 

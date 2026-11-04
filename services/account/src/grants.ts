@@ -55,6 +55,11 @@ export async function getActiveGrant(rc: GrantsContext, githubId: number): Promi
     .first<GrantRow>();
 }
 
+/** The grant row for a GitHub id whether or not it expired, or null (PAN-4959 FR-4, D-9). */
+export async function getGrant(rc: GrantsContext, githubId: number): Promise<GrantRow | null> {
+  return rc.env.DB.prepare('SELECT * FROM grants WHERE github_id = ?').bind(githubId).first<GrantRow>();
+}
+
 /** D-22: the owner, or anyone holding an unexpired grant. */
 export async function isAllowed(rc: GrantsContext, githubId: number): Promise<boolean> {
   if (isOwner(rc, githubId)) return true;

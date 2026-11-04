@@ -1,0 +1,97 @@
+{
+  "version": "1",
+  "issueId": "PAN-5005",
+  "created": "2026-11-04T11:43:00.100Z",
+  "updated": "2026-11-04T12:16:00.172Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "lane-fields-module": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5005",
+      "claimedAt": "2026-11-04T11:43:00.100Z",
+      "doneAt": "2026-11-04T11:56:23.548Z"
+    },
+    "remote-row-stamp": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5005",
+      "claimedAt": "2026-11-04T11:56:43.455Z",
+      "doneAt": "2026-11-04T12:03:26.139Z"
+    },
+    "verdict-link-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5005",
+      "claimedAt": "2026-11-04T12:03:31.344Z",
+      "doneAt": "2026-11-04T12:07:57.184Z"
+    },
+    "docs-remote-lane-badges": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5005",
+      "claimedAt": "2026-11-04T12:08:04.578Z",
+      "doneAt": "2026-11-04T12:09:49.799Z"
+    },
+    "lane-fields-module.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:12:11.154Z"
+    },
+    "lane-fields-module.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:12:27.876Z"
+    },
+    "lane-fields-module.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:12:43.893Z"
+    },
+    "lane-fields-module.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:13:00.154Z"
+    },
+    "lane-fields-module.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:13:15.319Z"
+    },
+    "remote-row-stamp.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:13:33.769Z"
+    },
+    "remote-row-stamp.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:13:47.808Z"
+    },
+    "remote-row-stamp.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:14:01.663Z"
+    },
+    "remote-row-stamp.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:14:14.465Z"
+    },
+    "verdict-link-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:14:30.955Z"
+    },
+    "verdict-link-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:14:45.307Z"
+    },
+    "verdict-link-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:15:04.326Z"
+    },
+    "docs-remote-lane-badges.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:15:25.717Z"
+    },
+    "docs-remote-lane-badges.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:15:43.214Z"
+    },
+    "docs-remote-lane-badges.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:16:00.171Z"
+    }
+  }
+}

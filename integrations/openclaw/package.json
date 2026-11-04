@@ -1,0 +1,22 @@
+{
+  "name": "@overdeck/openclaw",
+  "version": "0.1.0",
+  "description": "See and steer your Overdeck coding agents from OpenClaw.",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist", "openclaw.plugin.json", "skills", "README.md", "CHANGELOG.md", "LICENSE"],
+  "openclaw": {
+    "extensions": ["./dist/index.js"],
+    "compat": { "pluginApi": ">=2026.5.6" },
+    "install": { "minHostVersion": ">=2026.5.6" }
+  },
+  "peerDependencies": { "openclaw": ">=2026.5.6" },
+  "peerDependenciesMeta": { "openclaw": { "optional": true } },
+  "scripts": { "build": "tsc -p tsconfig.json", "test": "vitest run" },
+  "devDependencies": { "@types/node": "^22.0.0", "typescript": "^5.9.3", "vitest": "^4.1.11" },
+  "engines": { "node": ">=22" },
+  "repository": { "type": "git", "url": "https://github.com/eltmon/overdeck.git", "directory": "integrations/openclaw" },
+  "keywords": ["openclaw", "plugin", "overdeck", "mcp"]
+}

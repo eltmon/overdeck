@@ -15,6 +15,8 @@ import { useAskUserQuestionUiStore } from '../lib/askUserQuestionUiStore';
 import { useDecisions, type Decision } from '../lib/useDecisions';
 import { describePendingInput } from '../lib/pendingInput';
 import { getPendingQuestionTitle } from '../lib/pipeline-state';
+import { AgentRequestCard } from './AgentRequestCard';
+import { McpSignInCard } from './McpSignInCard';
 import { AwaitingInputIndicator } from './AwaitingInputIndicator';
 import { formatRelativeTime } from '../lib/formatRelativeTime';
 import { formatIssueRef } from '../lib/issueLabel';
@@ -141,7 +143,13 @@ function Group({ title, hint, decisions, onOpenSubject }: { title: string; hint:
         <span className={styles.groupHint}>{hint}</span>
       </header>
       {decisions.map((d) => (
-        <DecisionRow key={`${d.source}:${d.id}`} decision={d} onOpenSubject={onOpenSubject} />
+        // PAN-4946 — an MCP sign-in has its own card, checked before agentRequest.
+        d.mcpSignIn
+          ? <McpSignInCard key={`mcp-sign-in:${d.id}`} decision={d} />
+          // PAN-4941 (D-9) — a secret request has its own card and never the generic Answer button.
+          : d.agentRequest
+          ? <AgentRequestCard key={`request:${d.id}`} decision={d} />
+          : <DecisionRow key={`${d.source}:${d.id}`} decision={d} onOpenSubject={onOpenSubject} />
       ))}
     </section>
   );

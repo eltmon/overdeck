@@ -24,6 +24,15 @@ verdict, every time it's asked.
 > `flywheel.require_uat_before_merge` on — the default) still gets a batch
 > when it is the only one: that batch is the UAT stack the operator tests on.
 > An `auto-merge` label releases the feature in a held project.
+>
+> **Each ready feature has one merge path (PAN-4970).** When the per-PR
+> auto-merge train is active for the project (GitHub forge, single repo,
+> `OVERDECK_DISABLE_AUTO_MERGE` unset) and the feature is not held for UAT,
+> or it already has a `pending`/`merging` auto-merge row (and is not held),
+> the train merges it and no batch includes it. Held features, Deft
+> human-merge features, a cancelled auto-merge, an auto-merge that failed at
+> the current PR head, GitLab and polyrepo projects, and every feature while
+> the kill switch is set stay on the batch path.
 
 ### Merging from the Flywheel UAT card (PAN-4598)
 
@@ -48,11 +57,18 @@ The Flywheel page's UAT BATCHES card (`MergeTrainView`) is the merge control.
    `/api/merge-train/merge-next` with `{ n: 1, project, issueId }`, so the
    merge gate re-checks that one feature and the issue closes out through the
    normal post-merge flow. An `issueId` outside the project's ready set gets
-   a 409.
+   a 409. When every ready feature in the project owns its own merge path
+   through the per-PR auto-merge train (PAN-4970), the card says so instead
+   and offers no **Retry batch assembly** button — a forced reassembly could
+   not build anything from that set.
 3. **The last assembly failed.** The card names the failed batch and its time
    instead of promising a batch. It offers **Retry batch assembly**, which is
    a forced `/api/merge-train/assemble` for that project, next to the row
    Merge buttons.
+
+A promote of a batch that is no longer `ready` or `superseded` (PAN-4970)
+returns 409 `wrong-status` before any forge read; the card shows the refusal
+reason and disappears.
 
 **Failed assemblies stop blocking after six hours.** After three consecutive
 failed assemblies, the reconciler stops and logs `BLOCKED` instead of burning
@@ -328,6 +344,13 @@ PAN-4616. For the frontend test list this residual case needs two PRs that
 add tests sorting into the same gap; inserts into different gaps merge
 cleanly even without union. JSON state files under `.pan/` never get union.
 
+Each codebase-map file ends with one `<!-- last-verified: YYYY-MM-DD -->`
+footer that holds only the date (PAN-5020). Agents correct statements
+without touching it; only a full `/pan-map` refresh changes the date, so
+parallel PRs do not edit the same line. `npm run lint:last-verified` fails
+any footer with issue ids or other text after the date. It does not count
+footers, because a union merge of concerns.md can leave two date-only ones.
+
 An agent that parked an item with `pan task block <issue> <item> --on <ref>...`
 gets one `BLOCKERS MERGED` message within about two minutes of the last of
 those issues or PRs merging. See
@@ -546,7 +569,8 @@ destroy by hand"; destroy it by hand there.
 This dashboard-triggered cleanup does not replace the **closed-issue reaper**
 (`reconcileClosedIssueAgents`, run by deacon-lite every 60s): the reaper
 removes the workspace and deletes the local and remote feature branch of any
-closed issue whose branch is merged, **independent of these settings**. The
+closed issue whose branch is merged, **independent of these settings**. It
+re-checks an issue it already reaped only every 6 hours (PAN-5001). The
 disk line and "Clean up now" are the backstop for when the reaper cannot run —
 for example while `deacon.globally_paused` is set (PAN-4210) or during a
 GitHub quota pause, either of which lets closed workspaces accumulate.
@@ -561,7 +585,13 @@ builds nothing, even on a forced rebuild — unless that feature is held for
 UAT (`issueHoldsForUat` in `cloister/auto-merge-eligibility.ts`: the issue's
 label, then the project default, then the global flag — the same tiers
 auto-merge eligibility applies), in which case the one-feature batch
-assembles as before.
+assembles as before. Before any of that, the reconciler drops every feature
+`mergePathOwner` (`src/dashboard/server/services/merge-path-owner.ts`,
+PAN-4970) assigns to the per-PR auto-merge train from its ready set, so it
+never bundles a feature the train already owns. A live batch that already
+holds such a feature is invalidated with the reason "\<ID> merges through
+the per-PR auto-merge train", not "left the ready queue" — the feature
+never left the ready queue, it just merges through a different path.
 
 ## Deploy progress on the project row
 

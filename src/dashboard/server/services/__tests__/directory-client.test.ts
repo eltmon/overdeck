@@ -2,7 +2,7 @@ import { EventEmitter } from 'node:events';
 import type { AddressInfo } from 'node:net';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { WebSocket, WebSocketServer } from 'ws';
-import type { AdvertisedEndpoint, DirectoryToMachineFrame } from '@overdeck/contracts';
+import { type AdvertisedEndpoint, CONNECT_CLOSE_CODES, type DirectoryToMachineFrame } from '@overdeck/contracts';
 
 import type { AccountRecord } from '../../../../lib/account/store.js';
 import {
@@ -121,6 +121,8 @@ function harness(over: Partial<DirectoryClientDeps> = {}) {
       return socket;
     },
     random: () => 0.5,
+    log: () => undefined,
+    debug: () => undefined,
     ...over,
   };
   const client = new DirectoryClient(deps);
@@ -222,6 +224,32 @@ describe('DirectoryClient (PAN-2356 WI-9)', () => {
     h.client.stop();
   });
 
+  it('opens a socket at once when recheckAccount() sees a new account.json (PAN-4960 WI-3)', async () => {
+    vi.useFakeTimers(FAKE_TIMERS);
+    const h = harness();
+    h.setAccount(null);
+    await h.client.start();
+    expect(h.sockets).toEqual([]);
+    h.setAccount(ACCOUNT);
+    await h.client.recheckAccount();
+    expect(h.sockets).toHaveLength(1);
+    expect(h.sockets[0]!.headers['Authorization']).toBe(`Bearer ${ACCOUNT.accessToken}`);
+    h.client.stop();
+  });
+
+  it('retries a refused machine at once through recheckAccount() after a new token (PAN-4960 WI-3)', async () => {
+    vi.useFakeTimers(FAKE_TIMERS);
+    const h = harness();
+    await h.client.start();
+    h.sockets[0]!.drop(4001);
+    expect(h.client.status().state).toBe('refused');
+    h.setAccount({ ...ACCOUNT, accessToken: `odd_${'c'.repeat(64)}` });
+    await h.client.recheckAccount();
+    expect(h.sockets).toHaveLength(2);
+    expect(h.sockets[1]!.headers['Authorization']).toBe(`Bearer odd_${'c'.repeat(64)}`);
+    h.client.stop();
+  });
+
   it('reconnects a dropped socket after 1 s, then 2 s, and resets on welcome', async () => {
     vi.useFakeTimers(FAKE_TIMERS);
     const h = harness();
@@ -299,6 +327,67 @@ describe('DirectoryClient (PAN-2356 WI-9)', () => {
     socket.deliver({ type: 'relay-status', month: '2026-11', bytesUsed: 50_000_000_000, capBytes: 50_000_000_000, stopped: true });
     expect(h.client.status().relay).toEqual({ month: '2026-11', bytesUsed: 50_000_000_000, capBytes: 50_000_000_000, stopped: true });
     expect(h.client.send({ type: 'relay-usage', bytes: 1 })).toBe(true);
+    h.client.stop();
+  });
+});
+
+describe('DirectoryClient transition logging (PAN-5018 FR-7)', () => {
+  it('logs online on welcome and the close code on close', async () => {
+    vi.useFakeTimers(FAKE_TIMERS);
+    const log = vi.fn();
+    const h = harness({ log });
+    await h.client.start();
+    h.sockets[0]!.open();
+    await flush();
+    h.sockets[0]!.deliver(welcome());
+    h.sockets[0]!.drop(1006);
+    expect(log.mock.calls.map(([line]) => line)).toEqual(['directory online (plan tester, 1 machines)', 'directory socket closed (1006)']);
+    h.client.stop();
+  });
+
+  it('logs the replaced refusal', async () => {
+    vi.useFakeTimers(FAKE_TIMERS);
+    const log = vi.fn();
+    const h = harness({ log });
+    await h.client.start();
+    h.sockets[0]!.drop(CONNECT_CLOSE_CODES.replaced);
+    expect(log).toHaveBeenCalledWith('directory refused: Another Overdeck process registered this machine with the directory');
+    h.client.stop();
+  });
+
+  it('logs the pong timeout before it reconnects', async () => {
+    vi.useFakeTimers(FAKE_TIMERS);
+    const log = vi.fn();
+    const h = harness({ log });
+    await h.client.start();
+    h.sockets[0]!.open();
+    await flush();
+    h.sockets[0]!.deliver(welcome());
+    await vi.advanceTimersByTimeAsync(PING_INTERVAL_MS * 3);
+    expect(log).toHaveBeenCalledWith('directory silent for 90 s; reconnecting');
+    h.client.stop();
+  });
+
+  it('logs signal frames and a message on a replaced socket through debug', async () => {
+    vi.useFakeTimers(FAKE_TIMERS);
+    const log = vi.fn();
+    const debug = vi.fn();
+    const h = harness({ log, debug });
+    await h.client.start();
+    const first = h.sockets[0]!;
+    first.open();
+    await flush();
+    first.deliver(welcome());
+    first.deliver({ type: 'signal', from: PEER, session: 'ab'.repeat(16), purpose: 'link', relay: false, data: { sdp: { type: 'offer', sdp: 'v=0' } } });
+    expect(debug).toHaveBeenCalledWith('directory signal from 00000000 session abababab (offer)');
+
+    h.setAccount({ ...ACCOUNT, accessToken: `odd_${'c'.repeat(64)}` });
+    await h.client.recheckAccount();
+    expect(h.sockets).toHaveLength(2);
+    expect(log).toHaveBeenCalledWith('directory account changed; reconnecting');
+    first.deliver(welcome());
+    expect(debug).toHaveBeenLastCalledWith('directory message on a replaced socket ignored');
+    expect(h.client.status().state).toBe('connecting');
     h.client.stop();
   });
 });

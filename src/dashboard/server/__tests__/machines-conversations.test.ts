@@ -135,6 +135,13 @@ describe('GET /api/machines/conversations (PAN-4650 WI-2)', () => {
     expect(json.hash).toMatch(/^[0-9a-f]{16}$/);
   });
 
+  it('PAN-4903: shares the owner\'s spawn error only on a row whose launch failed', async () => {
+    const rows = [enriched('conv-a'), enriched('conv-b', { spawnError: 'MessageDeliveryFailed: Codex app-server delivery failed' })];
+    const { json } = await read(await handleSharedConversations(MACHINE, deps(rows)));
+    expect(json.rows[0]).not.toHaveProperty('spawnError');
+    expect(json.rows[1]).toMatchObject({ spawnError: 'MessageDeliveryFailed: Codex app-server delivery failed' });
+  });
+
   it('answers 403 to every non-machine credential', async () => {
     const listRows = vi.fn(async () => [enriched('conv-a')]);
     for (const credential of [null, { kind: 'root-session' }, { kind: 'token', tokenId: 't', scopes: ['admin'] }] as Array<DashboardCredential | null>) {

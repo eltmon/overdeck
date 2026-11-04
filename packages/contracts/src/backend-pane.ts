@@ -50,3 +50,20 @@ export function indexPanesByAgentKey(panes: Iterable<BackendPane>): Map<string, 
   }
   return byKey
 }
+
+/**
+ * Session presence a pane's own state implies (PAN-5011). Herdr `done` is a
+ * finished turn with the harness pane still alive, never an exit, so it maps
+ * to `idle`, not `ended`; only `exited` (no pane left) ends a session.
+ */
+export function presenceForPaneState(state: BackendPane["state"]): "active" | "idle" | "ended" {
+  switch (state) {
+    case "working":
+    case "blocked":
+      return "active"
+    case "exited":
+      return "ended"
+    default:
+      return "idle"
+  }
+}

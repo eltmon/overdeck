@@ -1,10 +1,10 @@
 /**
- * Command-palette actions for Overdeck Anywhere (PAN-4869). Six open the same
+ * Command-palette actions for Overdeck Anywhere (PAN-4869). Seven open the same
  * dialog the Settings → Anywhere buttons open, over the current page, through
  * the Anywhere dialog host; "Open Anywhere settings" navigates. Rows are
  * structurally typed like palette-fleet-hits.tsx to avoid importing CommandPalette.
  */
-import { Cloud, Globe, Link2, QrCode, Server, Settings, Smartphone } from 'lucide-react';
+import { Bot, Cloud, Globe, Link2, QrCode, Server, Settings, Smartphone } from 'lucide-react';
 import { openAnywhereDialog, type AnywhereDialog } from './Settings/anywhere/anywhereDialogStore';
 import { requestSettingsSection } from '../lib/settingsSection';
 
@@ -67,6 +67,14 @@ const DIALOG_ROWS: readonly AnywhereDialogRow[] = [
     dialog: 'tailscale-setup',
     description: 'Reach this machine over your tailnet',
     keywords: ['anywhere', 'remote', 'tailscale'],
+  },
+  {
+    id: 'anywhere-connect-bot',
+    label: 'Connect a bot',
+    icon: Bot,
+    dialog: 'connect-bot',
+    description: 'Give Hermes, OpenClaw or Grok access to this machine',
+    keywords: ['anywhere', 'bot', 'mcp', 'hermes', 'openclaw', 'grok'],
   },
 ];
 

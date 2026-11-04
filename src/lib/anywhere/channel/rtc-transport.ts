@@ -10,12 +10,18 @@
  * Only ciphertext crosses a data channel: the secure channel runs on top of it.
  * `relay: true` forces TURN on the initiator (`iceTransportPolicy: 'relay'`), and both ends pass the relay
  * route's list through `relayIceServers` (TLS TURN first, no STUN).
+ *
+ * Diagnostics (PAN-5018 FR-6): one always-on line per offer received and one for its outcome
+ * (`answered`, `dropped: <reason>`, `failed at <step>: <message>`), plus each peer connection's
+ * `connected`, `failed` and `closed`. Dropped candidates and answers go to the debug log. Ids are cut
+ * to 8 characters; SDP and candidate text are never logged (NFR-1).
  */
 import { randomBytes } from 'node:crypto';
 import type { Duplex } from 'node:stream';
 import type { SignalData } from '@overdeck/contracts';
 import { RTCPeerConnection, type RTCDataChannel } from 'werift';
 
+import { anywhereDebug, shortId } from '../debug-log.js';
 import { relayIceServers, type RTCIceServerLike } from './relay-ice-servers.js';
 import { RtcDuplex } from './rtc-duplex.js';
 
@@ -32,6 +38,16 @@ export interface RtcSignalingPort {
 }
 
 export type IncomingRtcChannel = (raw: Duplex, purpose: RtcPurpose, from: string, relay: boolean) => void;
+
+export interface RtcTransportLogs {
+  /** Always-on lines. Default `console.warn` with an `[anywhere] ` prefix. */
+  log?: (message: string) => void;
+  /** Lines printed only with OVERDECK_ANYWHERE_DEBUG=1. Default `anywhereDebug`. */
+  debug?: (message: string) => void;
+}
+
+/** The step of handling a signal frame that failed, for the `failed at <step>` line. */
+type SignalStep = 'ice-servers' | 'peer-connection' | 'remote-description' | 'answer';
 
 export class RtcDialAbortedError extends Error {
   constructor() {
@@ -68,11 +84,16 @@ export class RtcTransport {
   /** Peer connections being created, so concurrent dials to one peer share one connection. */
   private readonly creating = new Map<string, Promise<{ entry: PeerEntry; channel: RTCDataChannel }>>();
   private readonly unsubscribe: () => void;
+  private readonly log: (message: string) => void;
+  private readonly debug: (message: string) => void;
 
   constructor(
     private readonly port: RtcSignalingPort,
     private readonly onIncoming: IncomingRtcChannel,
+    logs: RtcTransportLogs = {},
   ) {
+    this.log = logs.log ?? ((message) => console.warn(`[anywhere] ${message}`));
+    this.debug = logs.debug ?? ((message) => anywhereDebug(message));
     this.unsubscribe = port.onSignal((from, session, purpose, relay, data) => {
       void this.onSignal(from, session, purpose, relay, data);
     });
@@ -178,6 +199,7 @@ export class RtcTransport {
       else entry.pendingLocal.push(out);
     });
     pc.connectionStateChange.subscribe((state) => {
+      if (state === 'connected' || state === 'failed' || state === 'closed') this.log(`rtc session ${shortId(session)} ${shortId(peer)} ${state}`);
       if (state === 'failed' || state === 'closed') this.closeEntry(entry);
     });
     // Either side may open data channels on a connected peer connection (dial reuses whichever
@@ -232,34 +254,75 @@ export class RtcTransport {
     for (const candidate of entry.pendingRemote.splice(0)) await this.addRemoteCandidate(entry, candidate);
   }
 
+  /** A dropped frame: SDP drops are always logged, candidate-only drops only in debug (NFR-2). */
+  private dropped(data: SignalData, reason: string): void {
+    if (data.sdp) this.log(`rtc ${data.sdp.type} dropped: ${reason}`);
+    else this.debug(`rtc candidate dropped: ${reason}`);
+  }
+
   private async onSignal(from: string, session: string, purpose: RtcPurpose, relay: boolean, data: SignalData): Promise<void> {
+    const progress: { step: SignalStep } = { step: 'remote-description' };
     try {
       const known = this.bySession.get(session);
       if (known) {
         // A session belongs to one peer; the directory stamps `from`, so a mismatch is a stale id.
-        if (known.peer !== from || known.closed) return;
-        if (data.sdp?.type === 'answer' && !known.remoteSet) await this.setRemote(known, 'answer', data.sdp.sdp);
+        if (known.peer !== from) {
+          this.dropped(data, `session ${shortId(session)} belongs to ${shortId(known.peer)}, not ${shortId(from)}`);
+          return;
+        }
+        if (known.closed) {
+          this.dropped(data, `session ${shortId(session)} from ${shortId(from)} is closed`);
+          return;
+        }
+        if (data.sdp?.type === 'offer') this.log(`rtc offer dropped: session ${shortId(session)} from ${shortId(from)} is already open`);
+        if (data.sdp?.type === 'answer') {
+          if (known.remoteSet) this.debug(`rtc answer dropped: session ${shortId(session)} already has one`);
+          else await this.setRemote(known, 'answer', data.sdp.sdp);
+        }
         if (data.candidate) await this.addRemoteCandidate(known, data.candidate);
         return;
       }
-      if (data.sdp?.type !== 'offer') return;
-      await this.accept(from, session, purpose, relay, data.sdp.sdp, data.candidate);
-    } catch {
+      if (data.sdp?.type !== 'offer') {
+        this.dropped(data, `unknown session ${shortId(session)} from ${shortId(from)}`);
+        return;
+      }
+      this.log(`rtc offer from ${shortId(from)} session ${shortId(session)} (${purpose}, ${relay ? 'relay' : 'direct'})`);
+      await this.accept(from, session, purpose, relay, data.sdp.sdp, data.candidate, progress);
+      this.log(`rtc session ${shortId(session)} answered`);
+    } catch (error) {
+      // First line only, so an error that quotes SDP cannot carry it into the log (NFR-1).
+      const message = (error instanceof Error ? error.message : String(error)).split('\n')[0]!.slice(0, 200);
+      this.log(`rtc session ${shortId(session)} from ${shortId(from)} failed at ${progress.step}: ${message}`);
       const entry = this.bySession.get(session);
       if (entry) this.closeEntry(entry);
     }
   }
 
-  /** Responder: a new peer connection for an incoming offer. */
-  private async accept(from: string, session: string, purpose: RtcPurpose, relay: boolean, sdp: string, candidate: SignalData['candidate']): Promise<void> {
+  /** Responder: a new peer connection for an incoming offer. `progress.step` names the step under way. */
+  private async accept(
+    from: string,
+    session: string,
+    purpose: RtcPurpose,
+    relay: boolean,
+    sdp: string,
+    candidate: SignalData['candidate'],
+    progress: { step: SignalStep },
+  ): Promise<void> {
     const key = entryKey(from, relay, purpose);
     const previous = this.byKey.get(key);
-    if (previous) this.closeEntry(previous);
+    if (previous) {
+      this.log(`rtc closing session ${shortId(previous.session)} for ${shortId(from)}: a new offer replaced it`);
+      this.closeEntry(previous);
+    }
+    progress.step = 'ice-servers';
     const iceServers = await this.peerIceServers(relay);
+    progress.step = 'peer-connection';
     const pc = new RTCPeerConnection({ iceServers });
     const entry = this.register(pc, key, from, session, purpose, relay);
+    progress.step = 'remote-description';
     await this.setRemote(entry, 'offer', sdp);
     if (candidate) await this.addRemoteCandidate(entry, candidate);
+    progress.step = 'answer';
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
     this.sendLocalDescription(entry, 'answer');

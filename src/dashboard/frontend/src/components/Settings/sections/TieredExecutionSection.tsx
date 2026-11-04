@@ -11,6 +11,7 @@ import {
   DIFFICULTIES,
   importCrews,
   providerDefaultHarness,
+  removeCrew,
   renderYamlPreview,
   serializeCrews,
   tierFitnessWarnings,
@@ -266,20 +267,18 @@ export function TieredExecutionSection({
     writeCrews(crews, { ...assign, [difficulty]: crewId });
   };
 
+  const ownedKindsOf = (crewId: string) => Object.entries(byKind).filter(([, id]) => id === crewId).map(([kind]) => kind);
+
   const handleRequestRemove = (crewId: string) => {
-    const ownedKinds = Object.entries(byKind).filter(([, id]) => id === crewId).map(([kind]) => kind);
-    if (ownedKinds.length > 0) {
-      setRemovePromptCrewId(null);
-      setRemoveError({ crewId, message: 'Move or remove these kind overrides before removing this crew.' });
-      return;
-    }
-    if (crews.length === 1) {
+    const ownedDifficulties = DIFFICULTIES.filter((difficulty) => assign[difficulty] === crewId);
+    if (ownedDifficulties.length > 0 && crews.length === 1) {
       setRemovePromptCrewId(null);
       setRemoveError({ crewId, message: 'This is the only crew, and every difficulty needs one. Add another crew first — or turn tiered execution off.' });
       return;
     }
-    const ownedDifficulties = DIFFICULTIES.filter((difficulty) => assign[difficulty] === crewId);
-    if (ownedDifficulties.length > 0) {
+    // PAN-4674: a crew named in by_kind opens the same prompt; its kind
+    // overrides go to the heir (or are cleared) in the removal write.
+    if (ownedDifficulties.length > 0 || ownedKindsOf(crewId).length > 0) {
       setRemoveError(null);
       setRemovePromptCrewId(crewId);
       return;
@@ -289,22 +288,18 @@ export function TieredExecutionSection({
     writeCrews(crews.filter((crew) => crew.id !== crewId), assign);
   };
 
-  const handleRemoveWithHeir = (crewId: string, heirId: string) => {
-    const ownedKinds = Object.entries(byKind).filter(([, id]) => id === crewId).map(([kind]) => kind);
-    if (ownedKinds.length > 0) {
-      setRemovePromptCrewId(null);
-      setRemoveError({ crewId, message: 'Move or remove these kind overrides before removing this crew.' });
+  const handleRemoveWithHeir = (crewId: string, heirId: string | null) => {
+    let next: ReturnType<typeof removeCrew>;
+    try {
+      next = removeCrew(crews, assign, byKind, crewId, heirId);
+    } catch (error) {
+      setRemoveError({ crewId, message: error instanceof Error ? error.message : String(error) });
       return;
-    }
-
-    const nextAssign = { ...assign };
-    for (const difficulty of DIFFICULTIES) {
-      if (nextAssign[difficulty] === crewId) nextAssign[difficulty] = heirId;
     }
     setRemoveError(null);
     setRemovePromptCrewId(null);
     if (openCrewId === crewId) setOpenCrewId(null);
-    writeCrews(crews.filter((crew) => crew.id !== crewId), nextAssign);
+    writeCrews(next.crews, next.assign, { ...rest, by_kind: next.byKind });
   };
 
   const handleSupervisorPatch = (patch: Partial<NonNullable<TieredExecutionConfig['supervisor']>>) => {
@@ -525,12 +520,15 @@ export function TieredExecutionSection({
           )}
           {crews.length > 0 ? crews.map((crew) => {
             const ownedDifficulties = DIFFICULTIES.filter((difficulty) => assign[difficulty] === crew.id);
+            const ownedKinds = ownedKindsOf(crew.id);
+            const kindOverrides = ownedKinds.map((kind) => `${kind} override`).join(' · ');
+            const handedOver = [...ownedDifficulties, ...ownedKinds.map((kind) => `${kind} override`)].join(' · ');
             const otherCrews = crews.filter((entry) => entry.id !== crew.id);
             return <Fragment key={crew.id}>
               <CrewRow
                 crew={crew}
                 owned={ownedDifficulties}
-                ownedKinds={Object.entries(byKind).filter(([, crewId]) => crewId === crew.id).map(([kind]) => kind)}
+                ownedKinds={ownedKinds}
                 settings={formData}
                 open={openCrewId === crew.id}
                 onToggle={() => setOpenCrewId(openCrewId === crew.id ? null : crew.id)}
@@ -545,7 +543,7 @@ export function TieredExecutionSection({
               {removePromptCrewId === crew.id && (
                 <div className="rounded-lg border border-border/70 bg-muted/20 px-4 py-3">
                   <p className="text-xs font-medium text-foreground">
-                    Removing {crewLabel(crew)} — give {ownedDifficulties.join(' · ')} to:
+                    Removing {crewLabel(crew)} — give {handedOver} to{ownedDifficulties.length === 0 ? ' another crew, or clear it' : ''}:
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {otherCrews.map((heir) => {
@@ -553,7 +551,7 @@ export function TieredExecutionSection({
                       return <button
                         key={heir.id}
                         type="button"
-                        aria-label={`Give ${ownedDifficulties.join(' · ')} to ${crewLabel(heir)}`}
+                        aria-label={`Give ${handedOver} to ${crewLabel(heir)}`}
                         onClick={() => handleRemoveWithHeir(crew.id, heir.id)}
                         className="rounded-md border border-border bg-background px-2.5 py-2 text-left text-xs text-foreground hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-primary"
                       >
@@ -561,6 +559,15 @@ export function TieredExecutionSection({
                         <span className="mt-0.5 block text-[11px] text-muted-foreground">{cost == null ? 'cost unknown' : `≈ $${cost.toFixed(1)}/1M`}</span>
                       </button>;
                     })}
+                    {ownedDifficulties.length === 0 && ownedKinds.length > 0 && <button
+                      type="button"
+                      aria-label={`Remove and clear ${kindOverrides}`}
+                      onClick={() => handleRemoveWithHeir(crew.id, null)}
+                      className="rounded-md border border-border bg-background px-2.5 py-2 text-left text-xs text-foreground hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-primary"
+                    >
+                      <span className="block font-medium">Clear {kindOverrides}</span>
+                      <span className="mt-0.5 block text-[11px] text-muted-foreground">that work routes by difficulty</span>
+                    </button>}
                   </div>
                   <button
                     type="button"

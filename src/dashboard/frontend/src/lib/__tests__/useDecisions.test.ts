@@ -1,17 +1,34 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook } from '@testing-library/react';
 import { createElement, type ReactNode } from 'react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useDashboardStore } from '../store';
-import { isBlockingDecision, useDecisions } from '../useDecisions';
+import { describePendingInput } from '../pendingInput';
+import { type AgentRequestRow, isBlockingDecision, useDecisions } from '../useDecisions';
+import type { McpSignInApproval } from '../../components/Settings/anywhere/anywhereApi';
 
-function renderDecisions(convRows: unknown[] = []) {
+interface RenderDecisionsOptions {
+  /** PAN-4946: who the dashboard sees itself answering to; defaults to this machine's own session. */
+  viewerKind?: 'root-session' | 'device' | 'token' | 'internal-token' | 'machine' | null;
+  mcpApprovals?: McpSignInApproval[];
+  /** PAN-4946 review: the raw `['anywhere-status']` body, overriding `viewerKind` — for a malformed/partial status. */
+  anywhereStatus?: unknown;
+}
+
+function renderDecisions(
+  convRows: unknown[] = [],
+  agentRequestRows: AgentRequestRow[] = [],
+  options: RenderDecisionsOptions = {},
+) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
   });
   queryClient.setQueryData(['conv-ask-user-question'], convRows);
   queryClient.setQueryData(['fleet-needs-you'], []); // PAN-4651: no linked machines
+  queryClient.setQueryData(['agent-requests'], agentRequestRows); // PAN-4941
+  queryClient.setQueryData(['anywhere-status'], options.anywhereStatus ?? { viewer: { kind: options.viewerKind ?? 'root-session' } }); // PAN-4946
+  queryClient.setQueryData(['mcp-oauth-approvals'], options.mcpApprovals ?? []); // PAN-4946
 
   return renderHook(() => useDecisions(), {
     wrapper: ({ children }: { children: ReactNode }) =>
@@ -117,7 +134,143 @@ describe('useDecisions held kickoff (PAN-4596)', () => {
   });
 });
 
+describe('useDecisions secret requests (PAN-4941)', () => {
+  const secretRow: AgentRequestRow = {
+    id: '0123456789abcdef0123456789abcdef',
+    kind: 'secret',
+    agentId: 'agent-pan-1',
+    agentKind: 'agent',
+    label: 'agent-pan-1 · PAN-1',
+    name: 'OPENAI_API_KEY',
+    prompt: 'The key for the eval run',
+    createdAt: '2026-11-04T00:00:00.000Z',
+    expiresAt: '2026-11-04T00:10:00.000Z',
+  };
+
+  it('maps a secret row to a blocking secretRequest decision keyed by the request id', () => {
+    const { result } = renderDecisions([], [secretRow]);
+    expect(result.current).toEqual([{
+      id: secretRow.id,
+      source: 'agent',
+      label: 'agent-pan-1 · PAN-1',
+      kinds: ['secretRequest'],
+      since: '2026-11-04T00:00:00.000Z',
+      blocking: true,
+      agentRequest: {
+        id: secretRow.id,
+        kind: 'secret',
+        name: 'OPENAI_API_KEY',
+        prompt: 'The key for the eval run',
+        agentId: 'agent-pan-1',
+        expiresAt: '2026-11-04T00:10:00.000Z',
+      },
+    }]);
+  });
+
+  it('gives a conversation requester the conversation source', () => {
+    const { result } = renderDecisions([], [{ ...secretRow, agentId: 'abc', agentKind: 'conversation', label: 'abc' }]);
+    expect(result.current[0]).toMatchObject({ source: 'conversation', label: 'abc', agentRequest: { agentId: 'abc' } });
+  });
+
+  it('labels the kind "Secret requested"', () => {
+    expect(describePendingInput(['secretRequest'])).toBe('Secret requested');
+  });
+
+  it('PAN-4942: maps a machine-link row to a blocking machineLink decision with the hint', () => {
+    const { result } = renderDecisions([], [{
+      ...secretRow,
+      kind: 'machine-link',
+      name: undefined,
+      prompt: undefined,
+      hint: 'my desk Mac',
+      expiresAt: '2026-11-05T00:00:00.000Z',
+    }]);
+    expect(result.current).toEqual([{
+      id: secretRow.id,
+      source: 'agent',
+      label: 'agent-pan-1 · PAN-1',
+      kinds: ['machineLink'],
+      since: '2026-11-04T00:00:00.000Z',
+      blocking: true,
+      agentRequest: { id: secretRow.id, kind: 'machine-link', hint: 'my desk Mac', agentId: 'agent-pan-1', expiresAt: '2026-11-05T00:00:00.000Z' },
+    }]);
+    expect(describePendingInput(['machineLink'])).toBe('Machine link requested');
+  });
+});
+
+describe('useDecisions MCP sign-ins (PAN-4946)', () => {
+  const approvalRow: McpSignInApproval = {
+    id: 'appr-1',
+    clientId: 'odc_123',
+    clientName: 'Claude Desktop',
+    redirectHost: 'localhost',
+    requestedLevel: 'operate',
+    approvalCode: 'ABCDE',
+    createdAt: '2026-11-04T00:00:00.000Z',
+    expiresAt: '2026-11-04T00:10:00.000Z',
+  };
+
+  it('maps a pending approval to a blocking mcpSignIn decision for a root-session viewer, sorted before non-blocking decisions', () => {
+    setDashboardState(
+      { 'agent-x': { id: 'agent-x', pendingInputKinds: ['exitPlanMode'] } },
+      [],
+    );
+
+    const { result } = renderDecisions([], [], { viewerKind: 'root-session', mcpApprovals: [approvalRow] });
+
+    expect(result.current).toHaveLength(2);
+    expect(result.current[0]).toMatchObject({
+      id: 'appr-1',
+      source: 'agent',
+      label: 'Claude Desktop',
+      kinds: ['mcpSignIn'],
+      blocking: true,
+      mcpSignIn: approvalRow,
+    });
+    expect(result.current[0]?.mcpSignIn?.approvalCode).toBe('ABCDE');
+  });
+
+  it('emits no mcpSignIn decision and makes no request to the approvals route for a device viewer', () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
+    // No ['mcp-oauth-approvals'] cache entry: a real session never populates it
+    // for a device viewer, since the approvals query is `enabled: false`.
+    const { result } = renderDecisions([], [], { viewerKind: 'device' });
+
+    expect(result.current.some((d) => d.kinds.includes('mcpSignIn'))).toBe(false);
+    expect(fetchSpy.mock.calls.some(([url]) => String(url).includes('/api/mcp-oauth/approvals'))).toBe(false);
+    fetchSpy.mockRestore();
+  });
+
+  it('review fix: drops a cached approval once the viewer is no longer root — enabled:false only stops refetching, not the cached read', () => {
+    // Simulates a query client that populated the approvals cache while the
+    // viewer was root-session, then the viewer dropped to device within the
+    // same lifetime: the cache entry is still there, but it must not surface.
+    const { result } = renderDecisions([], [], { viewerKind: 'device', mcpApprovals: [approvalRow] });
+    expect(result.current.some((d) => d.kinds.includes('mcpSignIn'))).toBe(false);
+  });
+
+  it('review fix: a status body with no viewer field never throws and never surfaces an mcpSignIn row', () => {
+    expect(() => renderDecisions([], [], { anywhereStatus: {} })).not.toThrow();
+    const { result } = renderDecisions([], [], { anywhereStatus: {}, mcpApprovals: [approvalRow] });
+    expect(result.current.some((d) => d.kinds.includes('mcpSignIn'))).toBe(false);
+  });
+
+  it('labels the kind "MCP sign-in waiting" and treats it as blocking', () => {
+    expect(describePendingInput(['mcpSignIn'])).toBe('MCP sign-in waiting');
+    expect(isBlockingDecision(['mcpSignIn'])).toBe(true);
+  });
+});
+
 describe('isBlockingDecision', () => {
+  it('treats a secret request as blocking — the agent is parked in secret_wait', () => {
+    expect(isBlockingDecision(['secretRequest'])).toBe(true);
+  });
+
+  it('treats a machine-link request as blocking — the agent is parked in link_machine_wait', () => {
+    expect(isBlockingDecision(['machineLink'])).toBe(true);
+  });
+
   it('treats a waiting question as blocking — the agent has stopped', () => {
     expect(isBlockingDecision(['askUserQuestion'])).toBe(true);
   });

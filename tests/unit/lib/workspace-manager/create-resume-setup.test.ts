@@ -4,9 +4,11 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../../helpers/overdeck-test-db.js';
 
-const { mockExecAsync, mockCheckDiskFloor } = vi.hoisted(() => ({
+const { mockExecAsync, mockCheckDiskFloor, mockReserveDiskFloor, mockEstimateWorkspaceDiskCost } = vi.hoisted(() => ({
   mockExecAsync: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
   mockCheckDiskFloor: vi.fn(),
+  mockReserveDiskFloor: vi.fn(),
+  mockEstimateWorkspaceDiskCost: vi.fn(),
 }));
 
 vi.mock('child_process', async () => {
@@ -19,11 +21,19 @@ vi.mock('util', async () => {
   return { ...actual, promisify: () => mockExecAsync };
 });
 
-// checkDiskFloor reads real free space via statfs (PAN-4723): mock it so tests
-// don't fail on CI runners whose /tmp has less than the 10 GiB floor.
+// checkDiskFloor and reserveDiskFloor read real free space via statfs
+// (PAN-4723, PAN-4961): mock both so tests don't fail on CI runners whose /tmp
+// has less than the 10 GiB floor. The disk-cost estimator runs real git and
+// docker, so it is mocked too.
 vi.mock('../../../../src/lib/disk-floor.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../src/lib/disk-floor.js')>()),
   checkDiskFloor: mockCheckDiskFloor,
+  reserveDiskFloor: mockReserveDiskFloor,
+}));
+
+vi.mock('../../../../src/lib/workspace/disk-cost.js', () => ({
+  estimateWorkspaceDiskCost: mockEstimateWorkspaceDiskCost,
+  invalidateWorkspaceDiskCostMemo: vi.fn(),
 }));
 
 const isWorktreeAddCall = (command: unknown, args?: unknown): boolean =>
@@ -59,11 +69,18 @@ beforeEach(() => {
   mockExecAsync.mockReset();
   mockCheckDiskFloor.mockReset();
   mockCheckDiskFloor.mockResolvedValue(null);
+  mockReserveDiskFloor.mockReset();
+  mockReserveDiskFloor.mockResolvedValue({ ok: true, reservation: { release: vi.fn(async () => {}) } });
+  mockEstimateWorkspaceDiskCost.mockReset();
+  mockEstimateWorkspaceDiskCost.mockResolvedValue({ hostBytes: 1, stackBytes: 1, hostSource: 'measured', stackSource: 'measured' });
   mockExecAsync.mockImplementation(async (command: string, args?: string[]) => {
     if (isWorktreeAddCall(command, args)) {
       // Real git is not run here; stand in for the worktree it would create.
+      // A real monorepo checkout has a root package.json (PAN-4929: createWorkspace
+      // now skips the install entirely when it's missing), so the stand-in needs one too.
       mkdirSync(workspacePath, { recursive: true });
       writeFileSync(join(workspacePath, '.git'), 'gitdir: elsewhere\n');
+      writeFileSync(join(workspacePath, 'package.json'), JSON.stringify({ name: 'test', private: true }), 'utf8');
     }
     if (isInstallCall(command) && installShouldFail) {
       throw new Error('npm ERR! network unreachable');

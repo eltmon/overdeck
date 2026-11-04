@@ -48,6 +48,7 @@ describe('hourly maintenance (PAN-4293 account-maintenance)', () => {
     await ins('INSERT INTO auth_requests (state_hash, purpose, payload, created_at, expires_at) VALUES (?, ?, ?, ?, ?), (?, ?, ?, ?, ?)', 'old', 'pkce', '{}', 0, now - 1, 'new', 'pkce', '{}', 0, now);
     await ins('INSERT INTO auth_codes (code_hash, user_id, code_challenge, redirect_uri, platform, environment_id, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?), (?, ?, ?, ?, ?, ?, ?)', 'old', 'u', 'c', 'r', 'p', 'e', now - 1, 'new', 'u', 'c', 'r', 'p', 'e', now + 1);
     await ins('INSERT INTO admin_sessions (session_hash, github_id, csrf_token, created_at, expires_at) VALUES (?, ?, ?, ?, ?), (?, ?, ?, ?, ?)', 'old', 1, 'x', 0, now - 1, 'new', 1, 'x', 0, now + 1);
+    await ins('INSERT INTO user_sessions (session_hash, user_id, csrf_token, created_at, expires_at) VALUES (?, ?, ?, ?, ?), (?, ?, ?, ?, ?)', 'old', 'u', 'x', 0, now - 1, 'new', 'u', 'x', 0, now + 1);
     // device_grants: one hour of grace after expiry.
     await ins(
       "INSERT INTO device_grants (device_code_hash, user_code_hash, platform, environment_id, status, created_at, expires_at) VALUES (?, ?, ?, ?, 'pending', ?, ?), (?, ?, ?, ?, 'pending', ?, ?)",
@@ -70,7 +71,7 @@ describe('hourly maintenance (PAN-4293 account-maintenance)', () => {
     );
 
     const report = await runMaintenance(env, deps);
-    expect(report.purged).toEqual({ auth_requests: 1, auth_codes: 1, admin_sessions: 1, device_grants: 1, pending_attempts: 1, devices: 1, rate_limits: 1, deletion_jobs: 1 });
+    expect(report.purged).toEqual({ auth_requests: 1, auth_codes: 1, admin_sessions: 1, user_sessions: 1, device_grants: 1, pending_attempts: 1, devices: 1, rate_limits: 1, deletion_jobs: 1 });
     // The open job was retried and, with no holders pending, completed; the user row it referenced ('open') never existed.
     expect(report.deletionJobsRun).toBe(1);
 
@@ -78,6 +79,7 @@ describe('hourly maintenance (PAN-4293 account-maintenance)', () => {
     expect(await survivors('auth_requests', 'state_hash')).toEqual(['new']);
     expect(await survivors('auth_codes', 'code_hash')).toEqual(['new']);
     expect(await survivors('admin_sessions', 'session_hash')).toEqual(['new']);
+    expect(await survivors('user_sessions', 'session_hash')).toEqual(['new']);
     expect(await survivors('device_grants', 'device_code_hash')).toEqual(['new']);
     expect(await survivors('pending_attempts', 'github_id')).toEqual([2]);
     expect(await survivors('devices', 'device_id')).toEqual(['active', 'new']);
@@ -86,6 +88,6 @@ describe('hourly maintenance (PAN-4293 account-maintenance)', () => {
 
     // One millisecond later every 'new' row that sat exactly on its boundary crosses it, except the two with expires_at = now + 1.
     deps.clock.advance(1);
-    expect((await runMaintenance(env, deps)).purged).toEqual({ auth_requests: 1, auth_codes: 0, admin_sessions: 0, device_grants: 1, pending_attempts: 1, devices: 1, rate_limits: 1, deletion_jobs: 1 });
+    expect((await runMaintenance(env, deps)).purged).toEqual({ auth_requests: 1, auth_codes: 0, admin_sessions: 0, user_sessions: 0, device_grants: 1, pending_attempts: 1, devices: 1, rate_limits: 1, deletion_jobs: 1 });
   });
 });

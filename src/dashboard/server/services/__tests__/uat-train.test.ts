@@ -43,6 +43,7 @@ const mocks = vi.hoisted(() => ({
   runAutoMergeSchedulerTick: vi.fn(),
   evaluateIssueMergeGate: vi.fn(),
   getDerivedIssueState: vi.fn(),
+  mergePathOwner: vi.fn(),
 }));
 
 vi.mock('../../../../lib/cloister/merge-gate.js', async (importOriginal) => ({
@@ -74,6 +75,10 @@ vi.mock('../../../../lib/cloister/uat-reconciler.js', async (importOriginal) => 
     reconcileUatGenerations: mocks.reconcileUatGenerations,
   };
 });
+
+vi.mock('../merge-path-owner.js', () => ({
+  mergePathOwner: mocks.mergePathOwner,
+}));
 
 vi.mock('../../../../lib/cloister/uat-polyrepo-engine.js', async (importOriginal) => {
   const original = await importOriginal<typeof import('../../../../lib/cloister/uat-polyrepo-engine.js')>();
@@ -687,6 +692,10 @@ describe('postUatGenerationPromotePayload', () => {
   // recordVerification dependency left to wire.
 
   it('returns the exact promote result object unchanged for success and failure results', async () => {
+    // PAN-4970: postUatGenerationPromotePayload now refuses before the
+    // mocked promoteUatGeneration is ever reached unless the generation
+    // reads as promotable.
+    mocks.getUatGeneration.mockReturnValue({ status: 'ready', members: [] });
     const success: PromoteResult = {
       success: true,
       generation: 'uat/pan-cobalt-0703',
@@ -712,7 +721,7 @@ describe('postUatGenerationPromotePayload', () => {
   // the promote click runs the gate first, then derives.
   it('runs the merge gate for each member before reading its derived state', async () => {
     const order: string[] = [];
-    mocks.getUatGeneration.mockReturnValue({ members: [{ issueId: 'pan-1' }, { issueId: 'PAN-2' }] });
+    mocks.getUatGeneration.mockReturnValue({ status: 'ready', members: [{ issueId: 'pan-1' }, { issueId: 'PAN-2' }] });
     mocks.evaluateIssueMergeGate.mockImplementation(async (issueId: string) => { order.push(`gate:${issueId}`); return { ready: true }; });
     mocks.getDerivedIssueState.mockImplementation(async (issueId: string) => {
       order.push(`derive:${issueId}`);
@@ -732,6 +741,21 @@ describe('postUatGenerationPromotePayload', () => {
     expect(eligibility?.('PAN-2')).toEqual({ eligible: false, reason: 'is in-review, not ready to merge' });
   });
 
+  // promote-fast-refusal.ac2
+  it('refuses before any forge read when the generation is not promotable', async () => {
+    mocks.getUatGeneration.mockReturnValue({ status: 'invalidated', members: [{ issueId: 'PAN-1' }] });
+
+    const result = await postUatGenerationPromotePayload('uat/pan-cobalt-0703', vi.fn());
+
+    expect(result).toEqual({
+      success: false,
+      reason: 'wrong-status',
+      message: 'uat/pan-cobalt-0703 is invalidated — only a ready or superseded batch can be merged to main',
+    });
+    expect(mocks.evaluateIssueMergeGate).not.toHaveBeenCalled();
+    expect(mocks.getDerivedIssueState).not.toHaveBeenCalled();
+    expect(mocks.promoteUatGeneration).not.toHaveBeenCalled();
+  });
 });
 
 // PAN-3093: polyrepo projects used to be skipped outright by a guard in
@@ -766,6 +790,7 @@ describe('runUatTrainReconcile — polyrepo routing', () => {
         targetBranch: 'main', mergeOrder: 0, required: true,
       },
     ]);
+    mocks.mergePathOwner.mockResolvedValue('batch');
   });
 
   // The removed guard returned no-queue before any git work; reaching the
@@ -849,6 +874,34 @@ describe('runUatTrainReconcile — polyrepo routing', () => {
     expect(deps.getBaseAnchor).toBeUndefined();
     expect(deps.getFeatureAnchor).toBeUndefined();
     expect(mocks.assemblePolyrepoUatGeneration).not.toHaveBeenCalled();
+  });
+
+  // reconciler-wiring.ac1
+  it('wires mergePathOwner into the monorepo route\'s mergesPerPr dep', async () => {
+    const monoConfig = { name: 'overdeck', path: MONO_ROOT };
+    mocks.findProjectByPath.mockReturnValue(monoConfig);
+    mocks.mergePathOwner.mockImplementation(async (issueId: string) =>
+      issueId === 'MIN-901' ? 'per-pr' : 'batch');
+
+    await runUatTrainReconcile({ projectRoot: MONO_ROOT });
+
+    const deps = capturedDeps();
+    await expect(deps.mergesPerPr!({ issueId: 'MIN-901', title: 'One', branch: 'feature/min-901' })).resolves.toBe(true);
+    await expect(deps.mergesPerPr!({ issueId: 'PAN-2', title: 'Two', branch: 'feature/pan-2' })).resolves.toBe(false);
+    expect(mocks.mergePathOwner).toHaveBeenCalledWith('MIN-901', MONO_ROOT, monoConfig);
+  });
+
+  // reconciler-wiring.ac2
+  it('wires mergePathOwner into the polyrepo route with the polyrepo project config', async () => {
+    const polyConfig = { name: 'myn', path: POLY_ROOT, workspace: { type: 'polyrepo' } };
+    mocks.findProjectByPath.mockReturnValue(polyConfig);
+
+    await runUatTrainReconcile({ projectRoot: POLY_ROOT });
+
+    const deps = capturedDeps();
+    await deps.mergesPerPr!({ issueId: 'MIN-901', title: 'One', branch: 'feature/min-901' });
+
+    expect(mocks.mergePathOwner).toHaveBeenCalledWith('MIN-901', POLY_ROOT, polyConfig);
   });
 });
 
