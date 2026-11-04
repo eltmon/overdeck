@@ -1,0 +1,9 @@
+plan-digest: 9ee6b5c22698c3596224b25b2241fdd5d49c41fecb33828a2a5b35c6a8be6862
+
+## blocks-the-design: Pending phone plan still edits shared evidence
+
+The proposed rule says every new issue writes `apps/mobile/acceptance/PAN-<n>.md` and never edits another issue's section (.pan/drafts/PAN-5054.md:96-104, 117-119, 161-165). But the already approved PAN-4841 xBRIEF has all release and device-check items still `pending`, and its PRD explicitly requires writes to `apps/mobile/ACCEPTANCE.md` (.pan/drafts/PAN-4841.md:80, 326-382). Two items specifically add subsections under the PAN-4838 and PAN-4839 sections (lines 366 and 380). The PAN-5054 plan excludes changes to other phone PRDs (.pan/drafts/PAN-5054.md:292), so its new convention will not reach that executor; the shared-file edits and conflict risk continue. Smallest fix: update the pending PAN-4841 PRD and xBRIEF work items, file scopes, verification commands, and acceptance criteria to write PAN-4841's evidence in its own file and link back to the prior checks there, or explicitly grandfather that issue and narrow the claimed conflict elimination.
+
+## footnote: No-removal check exits with failure
+
+WI-1 says `git diff origin/main -- apps/mobile/ACCEPTANCE.md | grep '^-' | grep -vc '^---'` verifies that no lines were removed (.pan/drafts/PAN-5054.md:171-173); the xBRIEF repeats it as a verify command. I ran that exact command against the unchanged file: it printed `0` but exited `1`, because `grep -v` receives no matching lines. An executor that treats a nonzero verify-command exit as failure will reject the intended result. Smallest fix: replace the pipeline with a check that exits zero when the removed-line count is zero, such as `git diff origin/main -- apps/mobile/ACCEPTANCE.md | awk '/^--- / { next } /^-/ { removed++ } END { print removed+0; exit(removed>0) }'`.
