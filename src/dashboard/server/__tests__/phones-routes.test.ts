@@ -16,6 +16,8 @@ import { HttpServerResponse } from 'effect/unstable/http';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../lib/activity-logger.js', () => ({ emitActivityEntry: vi.fn() }));
+const telemetry = vi.hoisted(() => ({ capturePhonePaired: vi.fn(), capturePhoneRemoved: vi.fn() }));
+vi.mock('../../../lib/telemetry/anywhere.js', () => telemetry);
 
 const {
   _resetAccessTokensForTests,
@@ -56,6 +58,8 @@ beforeEach(async () => {
   process.env.OVERDECK_HOME = home;
   _resetAccessTokensForTests();
   _resetChannelListenerForTests();
+  telemetry.capturePhonePaired.mockClear();
+  telemetry.capturePhoneRemoved.mockClear();
 });
 
 afterEach(async () => {
@@ -206,5 +210,30 @@ describe('capabilities.phoneApp (PAN-4835 WI-11)', () => {
     const legacy = { ...descriptor, capabilities: { ...descriptor.capabilities, phoneApp: undefined } };
     delete (legacy.capabilities as { phoneApp?: boolean }).phoneApp;
     expect(() => Schema.decodeUnknownSync(EnvironmentDescriptor)(legacy)).not.toThrow();
+  });
+});
+
+describe('phone telemetry (PAN-5016 WI-6)', () => {
+  it('a first exchange records phone_paired(false); a re-pair of the same phone records phone_paired(true)', async () => {
+    expect((await read(await handlePhonesExchange(body(), PAIRING))).status).toBe(200);
+    expect((await read(await handlePhonesExchange(body(), { mode: 'pairing', remoteKeyHex: 'b2'.repeat(32), pairingId: 'ef'.repeat(16) }))).status).toBe(200);
+    expect(telemetry.capturePhonePaired.mock.calls).toEqual([[false], [true]]);
+  });
+
+  it('a 409 link-key-in-use exchange records nothing', async () => {
+    await handlePhonesExchange(body(), PAIRING);
+    telemetry.capturePhonePaired.mockClear();
+    expect((await read(await handlePhonesExchange(body({ clientId: '22222222-2222-4222-8222-222222222222' }), PAIRING))).status).toBe(409);
+    expect(telemetry.capturePhonePaired).not.toHaveBeenCalled();
+  });
+
+  it('self-revoke records phone_removed(phone); a refused self-revoke records nothing', async () => {
+    const { json: exchanged } = await read(await handlePhonesExchange(body(), PAIRING));
+    expect((await read(await handlePhonesSelfRevoke(null))).status).toBe(403);
+    expect(telemetry.capturePhoneRemoved).not.toHaveBeenCalled();
+
+    const asPhone = resolveDashboardCredential({ authorization: `Bearer ${exchanged.token}` }, LINK);
+    expect((await read(await handlePhonesSelfRevoke(asPhone))).status).toBe(200);
+    expect(telemetry.capturePhoneRemoved.mock.calls).toEqual([['phone']]);
   });
 });

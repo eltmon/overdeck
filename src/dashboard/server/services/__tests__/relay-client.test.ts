@@ -108,3 +108,35 @@ describe('RelayClient (PAN-2356 WI-17)', () => {
     expect(client.refusal()).toBe(RELAY_PLAN_MESSAGE);
   });
 });
+
+describe('RelayClient telemetry (PAN-5016 WI-8)', () => {
+  it('feeds each report with new bytes to onRelayBytes once, alongside one relay-usage frame', () => {
+    const stub = stubDirectory({ relayAllowed: true });
+    const onRelayBytes = vi.fn();
+    client = new RelayClient(stub.directory, onRelayBytes);
+    const raw = fakeTransport();
+    client.track(raw);
+    raw.bytesIn = 1500;
+    raw.bytesOut = 500;
+
+    client.report();
+    expect(onRelayBytes.mock.calls).toEqual([[2000]]);
+    expect(usage(stub.sent)).toEqual([2000]);
+
+    client.report();
+    expect(onRelayBytes).toHaveBeenCalledTimes(1);
+    expect(usage(stub.sent)).toEqual([2000]);
+  });
+
+  it('still sends the frame when onRelayBytes throws', () => {
+    const stub = stubDirectory({ relayAllowed: true });
+    client = new RelayClient(stub.directory, () => { throw new Error('telemetry down'); });
+    const raw = fakeTransport();
+    client.track(raw);
+    raw.bytesIn = 1500;
+    raw.bytesOut = 500;
+
+    expect(() => client!.report()).not.toThrow();
+    expect(usage(stub.sent)).toEqual([2000]);
+  });
+});

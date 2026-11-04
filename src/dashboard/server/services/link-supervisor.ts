@@ -31,6 +31,7 @@
  */
 import { Schema } from 'effect';
 import {
+  type AnywhereChannelOpenedProperties,
   EnvironmentDescriptor,
   LINK_PROTOCOL_VERSION,
   type LinkIncident,
@@ -50,6 +51,7 @@ import { checkLocalNetworkAccess, type LocalNetworkAccess } from '../../../lib/a
 import { ensureMachineKey, type MachineKeyPair } from '../../../lib/anywhere/machine-key.js';
 import { type PeerMachineFacts, peerMachineFacts, UNKNOWN_PEER_MACHINE_FACTS } from '../../../lib/anywhere/machine-capabilities.js';
 import { type LinkRoute, mergeAdvertised, rankRoutes } from '../../../lib/anywhere/routes.js';
+import { captureChannelOpen } from '../../../lib/telemetry/anywhere.js';
 import { channelRequest, type LinkStatusSource, type UnsupportedInstall } from './machine-link-service.js';
 import { type HeartbeatHandle, type HeartbeatHandlers, type HeartbeatPayload, openHeartbeatOverChannel } from './link-heartbeat.js';
 
@@ -92,6 +94,8 @@ export interface LinkSupervisorDeps {
   now: () => number;
   random: () => number;
   log: (message: string) => void;
+  /** PAN-5016: reports a channel outcome; the supervisor dedupes per link (D-4). */
+  reportChannelOpen?: (properties: AnywhereChannelOpenedProperties) => void;
 }
 
 export const defaultLinkSupervisorDeps = (serverVersion: string): LinkSupervisorDeps => ({
@@ -108,6 +112,7 @@ export const defaultLinkSupervisorDeps = (serverVersion: string): LinkSupervisor
   now: () => Date.now(),
   random: () => Math.random(),
   log: (message) => console.warn(`[anywhere] ${message}`),
+  reportChannelOpen: (properties) => captureChannelOpen(properties),
 });
 
 /**
@@ -166,6 +171,14 @@ function joinFailures(earlier: ProbeOutcome | null, later: ProbeOutcome): ProbeO
   return { ...later, detail: `${earlier.detail}; ${later.detail}`, lanBlocked: later.lanBlocked ?? earlier.lanBlocked };
 }
 
+/** PAN-5016: a failed probe's telemetry class; a direct failure with no relay plan is `no_relay_plan` (D-7). */
+function probeErrorClass(outcome: Extract<ProbeOutcome, { ok: false }>): AnywhereChannelOpenedProperties['error_class'] {
+  if (outcome.failure === 'unknown-peer') return 'unknown_peer';
+  if (outcome.failure === 'unsupported') return 'unsupported';
+  if (outcome.failure === 'identity-refused') return 'identity_refused';
+  return outcome.detail === NO_DIRECT_PATH_MESSAGE ? 'no_relay_plan' : 'unreachable';
+}
+
 interface Entry {
   link: MachineLink;
   state: LinkState;
@@ -190,6 +203,10 @@ interface Entry {
   routeStatus: Map<string, LinkRouteStatus>;
   onlineWaiters: Set<(online: boolean) => void>;
   generation: number;
+  /** PAN-5016: the probe phase last tried, reported as the route of a probe failure. */
+  lastProbePhase: 'stored' | 'direct' | 'relay';
+  /** PAN-5016 D-4: the last reported `(route, ok, error_class)` tuple. */
+  lastChannelReport: string | null;
 }
 
 const decodeDescriptor = Schema.decodeUnknownOption(EnvironmentDescriptor);
@@ -365,15 +382,18 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
     const relay = routes.filter((route) => route.kind === 'relay');
     let outcome: ProbeOutcome | null = null;
     if (phase1.length > 0 || (direct.length === 0 && relay.length === 0)) {
+      entry.lastProbePhase = 'stored';
       outcome = await this.probe(entry, phase1, signal);
       if (outcome.ok || outcome.failure === 'unknown-peer' || outcome.failure === 'unsupported' || signal.aborted) return outcome;
     }
     if (direct.length > 0) {
+      entry.lastProbePhase = 'direct';
       const second = await this.probe(entry, direct, signal);
       if (second.ok || second.failure === 'unknown-peer' || second.failure === 'unsupported' || signal.aborted) return second;
       outcome = joinFailures(outcome, second);
     }
     if (relay.length > 0) {
+      entry.lastProbePhase = 'relay';
       const third = await this.probe(entry, relay, signal);
       if (third.ok || third.failure === 'unsupported' || signal.aborted) return third;
       return joinFailures(outcome, third);
@@ -397,7 +417,20 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
       lastHeartbeatAt: null, lastEndpointsHash: null, incident: null, peerVersion: null, machine: UNKNOWN_PEER_MACHINE_FACTS, attempt: 0,
       backoffKind: 'network', retryTimer: null, lateTimer: null, deadTimer: null, betterTimer: null,
       probing: null, routeStatus: new Map(), onlineWaiters: new Set(), generation: 0,
+      lastProbePhase: 'stored', lastChannelReport: null,
     };
+  }
+
+  /** D-4: report only when this link's (route, ok, error_class) differs from its last report. */
+  private reportChannel(entry: Entry, properties: AnywhereChannelOpenedProperties): void {
+    const key = `${properties.route}|${properties.ok}|${properties.error_class}`;
+    if (entry.lastChannelReport === key) return;
+    entry.lastChannelReport = key;
+    try {
+      this.deps.reportChannelOpen?.(properties);
+    } catch {
+      // Telemetry never affects the link.
+    }
   }
 
   private clearTimer(entry: Entry, key: 'retryTimer' | 'lateTimer' | 'deadTimer' | 'betterTimer'): void {
@@ -590,6 +623,9 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
       return;
     }
     if (!outcome.ok) {
+      if (outcome.failure === 'unknown-peer' || outcome.failure === 'unsupported' || !entry.channel) {
+        this.reportChannel(entry, { route: entry.lastProbePhase, ok: false, error_class: probeErrorClass(outcome) });
+      }
       if (outcome.failure === 'unknown-peer') return this.markRevoked(entry, outcome.detail);
       if (outcome.failure === 'unsupported') return this.markUnsupported(entry, outcome.install);
       let detail = outcome.detail;
@@ -630,6 +666,7 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
       if (entry.generation !== generation) return;
       entry.backoffKind = 'network';
       if (!entry.channel) {
+        this.reportChannel(entry, { route: route.kind, ok: false, error_class: 'descriptor_failed' });
         entry.state = 'offline';
         entry.stateDetail = `${route.url}: ${(error as Error).message}`;
         this.settleWaiters(entry, false);
@@ -645,6 +682,7 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
       channel.destroy();
       entry.backoffKind = 'identity';
       if (!entry.channel) {
+        this.reportChannel(entry, { route: route.kind, ok: false, error_class: 'wrong_machine' });
         entry.state = 'offline';
         entry.stateDetail = `${route.url} answers as another machine (${descriptor.label})`;
         this.settleWaiters(entry, false);
@@ -655,6 +693,7 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
     entry.peerVersion = descriptor.serverVersion;
     if (descriptor.capabilities.machineLinks !== true || descriptor.linkProtocol !== LINK_PROTOCOL_VERSION) {
       channel.destroy();
+      this.reportChannel(entry, { route: route.kind, ok: false, error_class: 'unsupported' });
       return this.markUnsupported(entry, unsupportedInstall(descriptor.linkProtocol, descriptor.serverVersion, this.deps.serverVersion));
     }
 
@@ -668,9 +707,13 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
       channel.destroy();
       if (entry.generation !== generation) return;
       const status = (error as { status?: number }).status;
-      if (status === 401) return this.markRevoked(entry, `${entry.link.label} no longer accepts this machine's token`);
+      if (status === 401) {
+        this.reportChannel(entry, { route: route.kind, ok: false, error_class: 'revoked' });
+        return this.markRevoked(entry, `${entry.link.label} no longer accepts this machine's token`);
+      }
       entry.backoffKind = 'network';
       if (!entry.channel) {
+        this.reportChannel(entry, { route: route.kind, ok: false, error_class: 'heartbeat_failed' });
         entry.state = 'offline';
         entry.stateDetail = `heartbeat: ${(error as Error).message}`;
         this.settleWaiters(entry, false);
@@ -690,6 +733,7 @@ export class LinkSupervisor implements LinkStatusSource, LinkRouteSource {
     entry.heartbeat = heartbeat;
     entry.currentRoute = route.url;
     entry.state = 'online';
+    this.reportChannel(entry, { route: route.kind, ok: true, error_class: 'none' });
     entry.stateDetail = null;
     entry.attempt = 0;
     entry.backoffKind = 'network';

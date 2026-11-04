@@ -751,3 +751,13 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   PAN-5006 adds `LaneLaunchResult.placement` (reason plus passed-over machines); `machine` keeps meaning
   "null = runs here", because `handleLaneLaunch` follows a lane only when `machine` is set.
 <!-- last-verified: 2026-11-04 -->
+- **Session-tree presence was tmux-only on Herdr** (PAN-5011 planning) — `deriveSessionPresence`
+  (`src/dashboard/server/services/session-presence.ts`) returns `ended` when the agent id is not in a set built from
+  `tmux list-sessions`. On a Herdr host that set never holds an agent, so every work/planning/strike row from
+  `/api/session-trees` and `/api/issues/:id/activity` read `ended` and `SessionPanel` locked the composer. PAN-5011
+  makes the backend pane authoritative (`presenceForPaneState` in `packages/contracts/src/backend-pane.ts`). Herdr
+  `done` is a finished turn with the harness alive, never an exit; only `exited` (or no pane) ends a session. Other
+  code still treating `done` as not-live: PAN-4666 (Flywheel `paneIsLive`), PAN-5013 (derived issue state, parked
+  route, read-model `activityForPaneState`).
+<!-- last-verified: 2026-11-04 -->
+<!-- last-verified: 2026-11-04 -->

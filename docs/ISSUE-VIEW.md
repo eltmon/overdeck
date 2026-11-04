@@ -78,6 +78,8 @@ The no-loss tests are a surface lock. The root test fixes the historical invento
 
 Every surface that shows an ended session (`SessionNode.presence === 'ended'`, or `isEndedAgent(agent)` for the drawer's `SessionAgent` shape) renders a derived **outcome** in place of a bare "Session ended": AgentStepRow (cockpit and rail, plus the status tooltip), SessionPanel's terminal tab, and DrawerAgentSession's terminal toggle and body. The two surfaces that are not mounted in production, `ConversationTerminal` and `TerminalSessionWrapper`, still route through the same fallback for consistency (D7).
 
+A session reads `presence === 'ended'` only when its backend pane is `exited` or no pane exists at all (PAN-5011, see [TERMINAL-BACKENDS.md](TERMINAL-BACKENDS.md)). A Herdr pane in `done` or `unknown` is `idle`, not `ended` — it keeps its composer open and shows no outcome.
+
 The outcome is computed at render time, in the browser, by one pure function: `deriveSessionOutcome` in `src/dashboard/frontend/src/lib/sessionOutcome.ts`. Nothing about it is persisted — no new store slice, no server-side `SessionNode` field, no endpoint or polling loop (NFR-1, NFR-3). Two adapters, `outcomeFactsFromSessionNode` and `outcomeFactsFromAgent`, turn a `SessionNode`/agent snapshot pair or a drawer `SessionAgent` into the shared `SessionOutcomeFacts` shape; the store-reading hooks `useSessionNodeOutcome` and `useAgentSessionOutcome` (`src/dashboard/frontend/src/lib/useSessionOutcome.ts`) wire the adapters to `useDerivedIssueState` and `agentsById` and return `null` while the session is still live. No surface hard-codes an outcome string (NFR-2).
 
 | kind | label | tone |

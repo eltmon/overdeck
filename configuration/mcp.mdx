@@ -601,9 +601,14 @@ plugins:
   entries:
     overdeck:
       mcp_allowlist: ["overdeck"]
-      summary: true
-      allow_answers: false
+      settings:
+        summary: true
+        allow_answers: false
 ```
+
+The plugin reads `summary` and `allow_answers` from `settings`; `mcp_allowlist`
+grants it the `overdeck` server. See `integrations/hermes/README.md` for the
+`/overdeck` commands.
 
 **Grok Build.** The Grok Build plugin lives in
 [`integrations/grok-build/`](https://github.com/eltmon/overdeck/tree/main/integrations/grok-build).

@@ -1,0 +1,23 @@
+name: overdeck
+version: 0.1.0
+description: "Overdeck: see and steer your coding agents from Hermes."
+author: "Overdeck"
+kind: standalone
+provides_hooks:
+  - pre_llm_call
+config_schema:
+  server:
+    type: string
+    default: overdeck
+    label: "MCP server name"
+    description: "The mcp_servers entry that points at Overdeck. It must also be in mcp_allowlist."
+  summary:
+    type: bool
+    default: true
+    label: "Pending-prompt summary"
+    description: "Tell the model, at most every 5 minutes, what waits on you in Overdeck."
+  allow_answers:
+    type: bool
+    default: false
+    label: "Answer Overdeck prompts from chat"
+    description: "Let /overdeck answer resolve prompts. The token also needs the approve scope."
