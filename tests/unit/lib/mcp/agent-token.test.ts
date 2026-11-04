@@ -39,6 +39,9 @@ import {
   revokeAgentMcpTokensForIssue,
   type AgentTokenOwner,
 } from '../../../../src/lib/mcp/agent-token.js';
+import { addPullRequestWatch, listPullRequestWatches, type PullRequestWatchBaseline } from '../../../../src/lib/overdeck/pull-request-watches.js';
+
+const WATCH_BASELINE: PullRequestWatchBaseline = { state: 'open', checks: 'pending', reviewState: 'none', mergeable: null };
 
 const ROLES: Role[] = ['plan', 'work', 'review', 'test', 'ship', 'flywheel', 'strike', 'sequencer', 'knowledge', 'worker'];
 const OPERATE = ['read:events', 'read:state', 'read:conversations', 'tell', 'operate'];
@@ -145,6 +148,29 @@ describe('agent MCP tokens (PAN-4930 W-4)', () => {
     await writeFile(join(home, 'access-tokens.json'), 'not json', { mode: 0o600 });
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     await expect(revokeAgentMcpTokens('agent-pan-1')).resolves.toBe(0);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('[agent-token] revoke failed for agent-pan-1'));
+  });
+
+  it('PAN-4943 WI-3: revokeAgentMcpTokens removes the owner watches and leaves other owners untouched', async () => {
+    await ensureAgentMcpToken(workOwner());
+    await addPullRequestWatch({ agentId: 'agent-pan-1', agentKind: 'agent', key: { host: 'github.com', repository: 'eltmon/overdeck', number: 1, url: 'https://github.com/eltmon/overdeck/pull/1' }, last: WATCH_BASELINE });
+    await addPullRequestWatch({ agentId: 'conv-a', agentKind: 'conversation', key: { host: 'github.com', repository: 'eltmon/overdeck', number: 2, url: 'https://github.com/eltmon/overdeck/pull/2' }, last: WATCH_BASELINE });
+
+    expect(await revokeAgentMcpTokens('agent-pan-1')).toBe(1);
+    expect(await listPullRequestWatches({ agentId: 'agent-pan-1', agentKind: 'agent' })).toEqual([]);
+    expect(await listPullRequestWatches({ agentId: 'conv-a', agentKind: 'conversation' })).toHaveLength(1);
+  });
+
+  it('PAN-4943 WI-3: a corrupt PR watch store still resolves (not rejects) and the token is still revoked', async () => {
+    const owner = workOwner();
+    await ensureAgentMcpToken(owner);
+    await writeFile(join(home, 'pr-watches.json'), 'not json', { mode: 0o600 });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    // The watch-removal failure is caught by the same outer catch as a corrupt
+    // access-token registry, so it resolves 0 even though the token (revoked
+    // before the watch store was touched) is already gone from the registry.
+    await expect(revokeAgentMcpTokens('agent-pan-1')).resolves.toBe(0);
+    expect(await activeFor('agent-pan-1')).toEqual([]);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('[agent-token] revoke failed for agent-pan-1'));
   });
 

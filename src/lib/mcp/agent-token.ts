@@ -27,6 +27,7 @@ import { getAgentDir, getAgentState } from '../agents/agent-state-read.js';
 import { normalizeAgentId } from '../agents/identity.js';
 import { removeAgentSecretsDir } from '../agents/state-dir-removal.js';
 import type { Role } from '../agents/role.js';
+import { removePullRequestWatchesForOwner } from '../overdeck/pull-request-watches.js';
 
 export const AGENT_TOKEN_FILE = 'mcp-token';
 export type AgentTokenRole = Role | 'conversation';
@@ -130,12 +131,13 @@ export async function ensureAgentMcpToken(owner: AgentTokenOwner): Promise<{ tok
   throw new Error(`agent token for ${agentId} did not persist in the access-token registry`);
 }
 
-/** Revoke every active token of the owner, unlink its token file and delete its `secrets/` directory (PAN-4941). Never throws; returns the count revoked. */
+/** Revoke every active token of the owner, unlink its token file, delete its `secrets/` directory (PAN-4941) and remove its PR watches (PAN-4943). Never throws; returns the count revoked. */
 export async function revokeAgentMcpTokens(agentId: string, opts: { agentKind?: 'agent' | 'conversation'; dir?: string } = {}): Promise<number> {
   const agentKind = opts.agentKind ?? 'agent';
   const id = ownerId(agentId, agentKind);
   try {
     const revoked = await revokeAccessTokensMatching((record) => record.kind === 'token' && record.agentId === id && record.agentKind === agentKind);
+    await removePullRequestWatchesForOwner({ agentId: id, agentKind }); // PAN-4943: a stopped agent watches nothing
     // C-1: a conversation's directory is never guessed; only the caller knows it.
     const dir = opts.dir ?? (agentKind === 'agent' ? getAgentDir(id) : undefined);
     if (dir !== undefined) {
