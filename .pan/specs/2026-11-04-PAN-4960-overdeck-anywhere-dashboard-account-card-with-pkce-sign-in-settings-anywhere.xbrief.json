@@ -1,0 +1,705 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T10:20:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4960: Overdeck Anywhere: dashboard Account card with PKCE sign-in (Settings → Anywhere)",
+    "updated": "2026-11-04T10:11:24.654Z"
+  },
+  "plan": {
+    "id": "pan-4960",
+    "title": "Overdeck Anywhere: dashboard Account card with PKCE sign-in (Settings → Anywhere)",
+    "status": "proposed",
+    "uid": "9cd7abe0-5dce-4747-929b-736eaf116303",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-04T10:20:00Z",
+    "updated": "2026-11-04T10:11:24.654Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4960",
+        "label": "PAN-4960",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4960.md",
+        "label": "PRD PAN-4960",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "anywhere",
+      "account",
+      "pkce",
+      "dashboard",
+      "settings"
+    ],
+    "metadata": {
+      "sizeJustification": "24 files (under the 25-file limit). The subsystem count of 8 comes from four single-file documentation touches the issue names (cli/account.mdx, configuration/remote-access.mdx, anywhere.mdx at the root, docs/ACCOUNT-SERVICE.md) and the one-line scripts/frontend-test-subset.txt fixture; the code itself spans only src/lib, src/dashboard and tests/unit. Splitting the docs into a sibling issue would ship the feature undocumented.",
+      "canonicalFilename": "2026-11-04-PAN-4960-overdeck-anywhere-dashboard-account-card-with-pkce-sign-in-settings-anywhere.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Signing a machine in to overdeck.ai needs the terminal (`pan account login`), and the dashboard has no place that shows which GitHub account the machine uses, its plan, its relay allowance, or a link to the overdeck.ai account page that PAN-4959 added.",
+      "Proposal": "Add an Account card to Settings → Anywhere fed by a new GET /api/account (account.json + cached /v1/me entitlement + the directory client's plan and relay). Add a root-only, this-machine-only Sign in that runs the account service's existing PKCE loopback flow: POST /api/account/sign-in keeps the verifier in a single server-side pending slot and returns the /auth/start URL; GET /oauth/account/callback (loopback peers only, single-use state, 10-minute lifetime) exchanges the code, writes account.json like pan account login, and makes the directory client re-read it at once. The card uses a two-step link (no window.open) and polls while the sign-in is pending. Full design in .pan/drafts/PAN-4960.md (D-1 … D-16).",
+      "NonGoals": "- No Sign out button on the card; pan account logout stays the way to sign out.\n- No change to the existing Add 50 GB link in AnywhereStatusCard.tsx.\n- No change to the other pan account login hints (DirectoryPanel, SetUpPhoneAppPanel, ShareDialog, SharedConversationView, directory-inbox.ts, share-join.ts).\n- No change to pan account login, status or logout behaviour or output.\n- No [::1] or localhost redirect URI, and no sign-in from a browser on another device.\n- No change to services/account or services/connect.\n- No prices, checkout, upgrade or plan purchase anywhere on the card.\n- No revocation of the previous device token when signing in again.\n- No ROUTE_SCOPES scope rows for the new routes (comment only, D-13)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Callback path is GET /oauth/account/callback, outside /api/, checking the peer itself (loopback, no forwarding header, not Funnel → else 404).",
+        "rationale": "Mirrors /oauth/mcp/*; gate rule 1 already passes non-/api paths, so no REMOTE_GATE_ALLOWLIST row is needed and the route owns its check."
+      },
+      {
+        "summary": "redirect_uri host is exactly 127.0.0.1 on API_PORT ?? PORT ?? 3011; a non-loopback HOST bind makes the start route answer 409.",
+        "rationale": "The default 0.0.0.0 bind is IPv4-only, so localhost resolving to ::1 would fail; the exact string must match at /oauth/token."
+      },
+      {
+        "summary": "Start route requires a root credential AND isTrustedLocalRequest.",
+        "rationale": "A Tailscale Serve browser can hold a root session without require_token_mint, but its 127.0.0.1 redirect would land on the wrong device."
+      },
+      {
+        "summary": "One pending sign-in slot, latest wins; mismatched state never clears it; matching state is consumed before any network call; 10-minute lifetime checked lazily with injected now().",
+        "rationale": "Matches the account service's single-use code semantics and auth_requests expiry, and keeps tests free of real waits."
+      },
+      {
+        "summary": "Two-step Sign in: POST returns the URL, the card renders an 'Open overdeck.ai sign-in' link and polls GET /api/account every 2 s while pending.",
+        "rationale": "window.open after an await is popup-blocked; TailscaleSetupDialog already uses this pattern; the callback tab is another origin and cannot notify the dashboard tab."
+      },
+      {
+        "summary": "Plan comes from cached /v1/me entitlement (5-minute TTL per token, cleared on sign-in), falling back to the directory plan, else 'Shows when overdeck.ai is reachable'.",
+        "rationale": "The issue points at /v1/me's entitlement; a cache keeps the card from calling overdeck.ai on every poll."
+      },
+      {
+        "summary": "Sign in shows only when signed out or the token was rejected; Manage account shows only when signed in.",
+        "rationale": "Manage account's base URL comes from account.json; the issue's goal is replacing pan account login for signed-out machines."
+      },
+      {
+        "summary": "No ROUTE_SCOPES scope rows; a comment line names the three routes instead. Every route gets a NO_LOSS_MATRIX row.",
+        "rationale": "Unlisted routes already need admin and root-only routes deliberately have no row (agent-requests pattern); a scope row would let tokens past the gate only to hit the route's 403. Departs from the issue note's literal wording."
+      },
+      {
+        "summary": "AccountView types live in the server service and are copied into the frontend accountApi.ts, not in @overdeck/contracts.",
+        "rationale": "Same pattern as AnywhereStatus; avoids touching packages/contracts for a single consumer."
+      },
+      {
+        "summary": "The Account card mounts directly after AnywhereStatusCard in AnywhereSection.",
+        "rationale": "Account state is top-level context for every panel below it."
+      }
+    ],
+    "items": [
+      {
+        "id": "me-entitlement",
+        "title": "Add entitlement to Me in the account client",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T10:20:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-4960",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/account/client.ts",
+            "tests/unit/lib/account/client.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/account/client.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "client.test.ts passes including the entitlement case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1: add `export interface Entitlement { plan: 'free' | 'tester'; storageBytesCap: number; maxDevices: number | null }` and `entitlement: Entitlement` on `Me` in src/lib/account/client.ts; add a client.test.ts case where a /v1/me body with entitlement plan 'free' surfaces as result.me.entitlement.plan."
+        },
+        "items": [
+          {
+            "id": "me-entitlement.ac1",
+            "title": "Given a /v1/me response with entitlement { plan: 'free', storageBytesCap: 5368709120, maxDevices: 3 }, when getMe runs, then it returns me.entitlement.plan === 'free'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "me-entitlement.ac2",
+            "title": "The Me interface in src/lib/account/client.ts declares entitlement with plan typed 'free' | 'tester' and npm run typecheck exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pkce-client",
+        "title": "Node PKCE helpers and authorization-code exchange",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T10:20:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4960",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/account/pkce.ts",
+            "src/lib/account/client.ts",
+            "tests/unit/lib/account/pkce.test.ts",
+            "tests/unit/lib/account/client.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/account/pkce.test.ts tests/unit/lib/account/client.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "pkce.test.ts and client.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2: new src/lib/account/pkce.ts (node:crypto only) exporting createPkcePair, s256, createSignInState, authorizeUrl exactly as specified; add exchangeAuthorizationCode + CodeExchangeOutcome to client.ts reusing postForm/describeError, with the status mapping in the PRD; tests including the RFC 7636 Appendix B vector."
+        },
+        "items": [
+          {
+            "id": "pkce-client.ac1",
+            "title": "s256('dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk') returns 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM' and createPkcePair().verifier matches /^[A-Za-z0-9_-]{43}$/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pkce-client.ac2",
+            "title": "authorizeUrl returns <baseUrl>/auth/start with redirect_uri, state, code_challenge, code_challenge_method=S256, platform and environment_id query params",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pkce-client.ac3",
+            "title": "exchangeAuthorizationCode posts grant_type=authorization_code with code, code_verifier and redirect_uri to /oauth/token and returns ok with accessToken/deviceId/label on 200",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pkce-client.ac4",
+            "title": "exchangeAuthorizationCode returns access_denied for a 400 access_denied body, refused with detail 'invalid_grant' for 400 invalid_grant, and unreachable for a 503 or a thrown fetch, and no detail string contains the verifier",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "directory-recheck",
+        "title": "DirectoryClient.recheckAccount() re-reads account.json at once",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T10:20:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-4960",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/directory-client.ts",
+            "src/dashboard/server/services/__tests__/directory-client.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/directory-client.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "directory-client.test.ts passes including the recheckAccount cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3: add public `async recheckAccount(): Promise<void> { await this.checkAccount(); }` to DirectoryClient, extend the header comment, and add two fake-timer tests (signed out → signed in opens a socket; refused → new token reconnects) without advancing timers."
+        },
+        "items": [
+          {
+            "id": "directory-recheck.ac1",
+            "title": "Given a started client with no account, when account.json gains a record and recheckAccount() is awaited, then exactly one socket opens without advancing fake timers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "directory-recheck.ac2",
+            "title": "Given a refused client, when the token changes and recheckAccount() is awaited, then a new socket opens with the new Bearer token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "account-view-route",
+        "title": "GET /api/account returns the Account card data",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T10:20:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4960",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/account-view.ts",
+            "src/dashboard/server/routes/account.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/services/__tests__/account-view.test.ts",
+            "src/dashboard/server/__tests__/account-routes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/account-view.test.ts src/dashboard/server/__tests__/account-routes.test.ts",
+            "npx vitest run tests/unit/lib/overdeck/no-loss-matrix.test.ts src/dashboard/server/__tests__/route-scopes.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "account-view and account-routes tests pass",
+            "no-loss-matrix and route-scopes tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-8",
+            "NFR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4: new services/account-view.ts (AccountView, AccountSignInView, AccountViewService with the 300 000 ms /v1/me cache keyed by token, directory fallback, clearMeCache, defaultAccountViewDeps with a 5 s AbortSignal.timeout fetch) and routes/account.ts with GET /api/account (channel 403, rejectUnauthorizedDashboardRequest, canSignIn = root-session && isTrustedLocalRequest(request), no-store, signIn idle stub value). Register accountRouteLayer in server.ts after directoryRouteLayer, add the ROUTE_SCOPES comment line (D-13) and the NO_LOSS_MATRIX row."
+        },
+        "items": [
+          {
+            "id": "account-view-route.ac1",
+            "title": "Given account.json and a /v1/me result with entitlement plan 'tester', GET /api/account returns signedIn true, plan 'tester', githubLogin from account.json and manageUrl '<baseUrl>/account'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-view-route.ac2",
+            "title": "Given two views within 300000 ms of injected time, then getMe runs once; a view at +300000 ms, a changed token, or clearMeCache() each sends a new /v1/me request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-view-route.ac3",
+            "title": "When getMe is unreachable the view falls back to the directory plan, when getMe is unauthorized it returns tokenRejected true, and when readAccount throws it returns signedIn false with accountError set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-view-route.ac4",
+            "title": "GET /api/account rejects a secure-channel caller with 403 and returns canSignIn true for the root session cookie from a loopback peer, false for an admin-scoped device token, false for a root session carrying x-forwarded-for while require_token_mint is on, with Cache-Control no-store",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-view-route.ac5",
+            "title": "no-loss-matrix.test.ts and route-scopes.test.ts each passes with the new 'GET /api/account' matrix row and no new ROUTE_SCOPES scope row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sign-in-service",
+        "title": "Server-side pending PKCE sign-in service",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T10:20:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4960",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "sign-in-routes"
+          ],
+          "files_scope": [
+            "src/dashboard/server/services/account-sign-in.ts",
+            "src/dashboard/server/services/__tests__/account-sign-in.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/account-sign-in.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "account-sign-in.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5: new services/account-sign-in.ts with PENDING_SIGN_IN_TTL_MS = 600_000, CALLBACK_PATH = '/oauth/account/callback', AccountSignInDeps (env, now, fetch, readAccount, writeAccount, environmentId, platform, onSignedIn), AccountSignInService.begin/complete/view and a lazy accountSignInService() singleton whose default onSignedIn clears the account-view /v1/me cache and awaits currentDirectoryClient()?.recheckAccount(). Implement D-2, D-3, D-5, D-11, D-12, D-16 exactly; compare states with timingSafeEqual over SHA-256 digests; never put the verifier in a result, view or log."
+        },
+        "items": [
+          {
+            "id": "sign-in-service.ac1",
+            "title": "begin() with API_PORT=3999 returns an authorizeUrl whose redirect_uri is http://127.0.0.1:3999/oauth/account/callback and whose code_challenge equals s256 of the stored verifier, and neither the BeginResult nor JSON.stringify(view(true)) contains the verifier",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sign-in-service.ac2",
+            "title": "complete() returns expired for a wrong state without clearing the slot, for a replayed state, after a second begin() replaced the slot, and at createdAt + 600000 ms of injected time",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sign-in-service.ac3",
+            "title": "A matching callback with a code posts the stored verifier and the exact redirect URI to /oauth/token, writes account.json with githubLogin from /v1/me (null when /v1/me fails), calls onSignedIn once, and view() then reports succeeded 'Signed in as <login>.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sign-in-service.ac4",
+            "title": "error=access_denied&error_description=invite_only produces failed with 'This GitHub account is not on the overdeck.ai invite list. Ask the operator to allow it.' and no token request is sent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sign-in-service.ac5",
+            "title": "begin() rejects with 409 when HOST=192.168.1.5, when platform() is null, or when readAccount throws, and with 400 when OVERDECK_ACCOUNT_URL is invalid",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sign-in-routes",
+        "title": "POST /api/account/sign-in and GET /oauth/account/callback routes",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T10:20:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4960",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/account.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/account-routes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/account-routes.test.ts",
+            "npx vitest run tests/unit/lib/overdeck/no-loss-matrix.test.ts src/dashboard/server/__tests__/route-scopes.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "account-routes.test.ts passes",
+            "no-loss-matrix and route-scopes tests pass",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6: in routes/account.ts add POST /api/account/sign-in (rejectUnsafeDashboardMutationRequest, root-session or internal-token else 403 'Only this machine can sign in to overdeck.ai.', isTrustedLocalRequest else 403 'Sign in from a browser on this machine; the sign-in returns to 127.0.0.1.', then begin()) and GET /oauth/account/callback (D-1 peer check → 404 JSON, complete(), D-15 HTML pages with PAGE_HEADERS + CSP and escapeHtml from src/lib/mcp/oauth-flow.ts). Switch GET /api/account to accountSignInService().view(canSignIn). Add the two NO_LOSS_MATRIX rows."
+        },
+        "items": [
+          {
+            "id": "sign-in-routes.ac1",
+            "title": "POST /api/account/sign-in returns 200 { authorizeUrl } for a root session cookie with CSRF from a loopback peer, and 403 'Only this machine can sign in to overdeck.ai.' for a device token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sign-in-routes.ac2",
+            "title": "With require_token_mint on, POST /api/account/sign-in returns 403 'Sign in from a browser on this machine; the sign-in returns to 127.0.0.1.' for a root session from a loopback peer carrying x-forwarded-for",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sign-in-routes.ac3",
+            "title": "GET /oauth/account/callback returns 404 for a LAN peer and for a loopback peer with x-forwarded-for, and returns text/html with X-Frame-Options DENY and Referrer-Policy no-referrer for a loopback peer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sign-in-routes.ac4",
+            "title": "The callback page renders a githubLogin of '<script>' as '&lt;script&gt;' and answers 400 'Sign-in link expired' for an expired result",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sign-in-routes.ac5",
+            "title": "no-loss-matrix.test.ts passes with rows for 'POST /api/account/sign-in' and 'GET /oauth/account/callback'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "account-card",
+        "title": "Account card in Settings → Anywhere",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T10:20:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4960",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/accountApi.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/AccountCard.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/AnywhereSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/AccountCard.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/anywhere/__tests__/AccountCard.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "AccountCard.test.tsx passes",
+            "typecheck (including the frontend ratchet) and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7: accountApi.ts (AccountView copy, ACCOUNT_QUERY_KEY ['anywhere-account'], loadAccount, startAccountSignIn, planLabel, relayResetDate) and AccountCard.tsx with the exact copy, test ids and states in the PRD (two-step Sign in link, 2000 ms polling while pending, invalidate directory + anywhere-status queries on succeeded, root-only button, pan account login hint otherwise). Mount <AccountCard /> right after <AnywhereStatusCard> in AnywhereSection.tsx; add the test to scripts/frontend-test-subset.txt. The API shape is pinned in the PRD so this item can run in parallel with the server items; tests mock fetch."
+        },
+        "items": [
+          {
+            "id": "account-card.ac1",
+            "title": "Given a tester view with relay month '2026-11', 12300000000 of 50000000000 bytes, the card renders 'Tester', '12.3 of 50 GB relay traffic this month', 'Resets on 2026-12-01 (UTC)', 'Paid plans are invite-only for now.' and a Manage account link to https://account.overdeck.ai/account with target _blank",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-card.ac2",
+            "title": "Given a free view the card renders 'Free account' and 'Not included in the free account'; given a tester view with relay null it renders 'Shows when this machine is connected to the directory'; no rendered text contains '$' or 'Add 50 GB'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-card.ac3",
+            "title": "Given signed out and canSignIn false, the card renders the 'pan account login' hint and no Sign in button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-card.ac4",
+            "title": "Given signed out and canSignIn true, clicking Sign in posts /api/account/sign-in and, once the view reports pending, renders an 'Open overdeck.ai sign-in' link to the returned authorizeUrl plus 'Waiting for sign-in…'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-card.ac5",
+            "title": "AnywhereSection.tsx renders <AccountCard /> on the line directly after <AnywhereStatusCard onAction={handleAction} />, and scripts/frontend-test-subset.txt contains src/components/Settings/anywhere/__tests__/AccountCard.test.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document the Account card and dashboard sign-in",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T10:20:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4960",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/remote-access.mdx",
+            "cli/account.mdx",
+            "anywhere.mdx",
+            "docs/ACCOUNT-SERVICE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Settings → Anywhere → Account' configuration/remote-access.mdx",
+            "grep -n 'Settings → Anywhere → Account → Sign in' cli/account.mdx",
+            "grep -n 'Manage account' anywhere.mdx",
+            "grep -n '/oauth/account/callback' docs/ACCOUNT-SERVICE.md"
+          ],
+          "expected_outputs": [
+            "each grep prints at least one matching line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8: add the exact paragraphs/bullets given in the PRD to configuration/remote-access.mdx ('Find your machines through overdeck.ai'), cli/account.mdx (after the intro), anywhere.mdx (after 'Your account page' and in the pan account table row) and docs/ACCOUNT-SERVICE.md (PKCE flow line: dashboard client PAN-4960, POST /api/account/sign-in + GET /oauth/account/callback, verifier server-side)."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "configuration/remote-access.mdx contains a bullet naming 'Settings → Anywhere → Account' that states Sign in appears only in a browser on this machine and returns to http://127.0.0.1:<port>/oauth/account/callback",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "cli/account.mdx contains 'Settings → Anywhere → Account → Sign in' and states it writes the same account.json as pan account login",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "anywhere.mdx contains '**Manage account**' after the account-page paragraph, and docs/ACCOUNT-SERVICE.md's PKCE flow line names '/oauth/account/callback' instead of 'client in PAN-4330'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "me-entitlement",
+        "to": "pkce-client",
+        "type": "blocks"
+      },
+      {
+        "from": "me-entitlement",
+        "to": "account-view-route",
+        "type": "blocks"
+      },
+      {
+        "from": "pkce-client",
+        "to": "sign-in-service",
+        "type": "blocks"
+      },
+      {
+        "from": "directory-recheck",
+        "to": "sign-in-service",
+        "type": "blocks"
+      },
+      {
+        "from": "account-view-route",
+        "to": "sign-in-service",
+        "type": "blocks"
+      },
+      {
+        "from": "sign-in-service",
+        "to": "sign-in-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "account-view-route",
+        "to": "sign-in-routes",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
