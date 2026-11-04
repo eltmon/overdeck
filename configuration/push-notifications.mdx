@@ -195,8 +195,8 @@ else: no titles, no conversation text, no machine names.
 ### On Android
 
 - **Permission.** On Android 13 and later, the app asks for notification
-  permission on the first launch after you sign in. If you decline, the app
-  still works; it just does not notify you.
+  permission once, on the first launch after you sign in. If you decline or
+  dismiss the dialog, the app still works; it just does not notify you.
 - **Channels.** Notifications arrive on two channels. **Needs you** carries
   questions, approvals and failures, at high importance. **Updates** carries
   finished work, summaries and test notifications, at default importance. You
@@ -207,12 +207,15 @@ else: no titles, no conversation text, no machine names.
   "Overdeck — Something needs you" instead.
 - **Tapping a notification** opens the machine and the screen it came from. A
   notification from a machine this phone is no longer paired with opens the
-  machine list.
+  machine list. A notification tapped while signed out opens its machine after
+  you sign in.
 - **Force stop** in Android Settings blocks notifications until you open the app
   again. Swiping the app away does not.
-- **Turning them back on.** Open Android Settings → Apps → Overdeck →
-  Notifications. The app's Settings screen shows the current state: `On`, `Off`,
-  `Not set up in this build`, or a **Turn on** button when Android can still ask.
+- **Turning them back on.** The app's Settings screen has a **Notifications**
+  switch. Turning it on asks Android again when Android still allows it. When
+  you blocked notifications, Settings says "Off. Turn them on in Android
+  Settings → Apps → Overdeck → Notifications." Open that screen to allow them.
+  A build without a Firebase configuration says "Not set up in this build."
 
 ## Optional: ntfy
 
