@@ -58,6 +58,14 @@ describe('decodeFrame for client sockets (PAN-4829 WI-2)', () => {
     expect(asClient(helloClient({ protocol: '1' }))).toEqual(BAD);
   });
 
+  it('accepts a hello-client with platform node (PAN-4927 D-18)', () => {
+    expect(asClient(helloClient({ platform: 'node' }))).toEqual({
+      ok: true,
+      role: 'client',
+      frame: helloClient({ platform: 'node' }),
+    });
+  });
+
   it('accepts a link signal and refuses an approval signal from a client', () => {
     expect(asClient(clientSignal('link'))).toEqual({ ok: true, role: 'client', frame: clientSignal('link') });
     expect(asClient(clientSignal('approval'))).toEqual(BAD);
@@ -106,6 +114,7 @@ describe('decodeFrame for client sockets (PAN-4829 WI-2)', () => {
     ['apsEnvironment dev', { platform: 'ios', token: 't', apsEnvironment: 'dev' }],
     ['apsEnvironment null', { platform: 'ios', token: 't', apsEnvironment: null }],
     ['platform web', { platform: 'web', token: 't' }],
+    ['platform node', { platform: 'node', token: 't' }],
   ])('refuses push-register with %s', (_name, over) => {
     expect(asClient({ type: 'push-register', ...over })).toEqual(BAD);
   });

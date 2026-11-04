@@ -106,6 +106,20 @@ describe('directory storage round trip (PAN-4830)', () => {
     expect(state.pushWindow).toEqual({ minute: 29_000_000, count: 7 });
   });
 
+  it('reloads a connector row and still drops an unknown platform (PAN-4927 D-18)', () => {
+    const sql = sqlShim();
+    for (const statement of SCHEMA) sql.exec(statement);
+    const connector = '00000000-0000-4000-9000-000000000101';
+    const web = '00000000-0000-4000-9000-000000000102';
+    sql.exec(PUT_CLIENT_SQL, phone(1), 'phone-1', 'ab'.repeat(32), 'ios', '1.0.0', 'd-1', 1, 1);
+    sql.exec(PUT_CLIENT_SQL, connector, 'connector-1', 'cd'.repeat(32), 'node', '1.0.0', 'd-1', 2, 2);
+    sql.exec(PUT_CLIENT_SQL, web, 'web-1', 'ef'.repeat(32), 'web', '1.0.0', 'd-1', 3, 3);
+
+    const state = loadDirectory(sql);
+    expect(state.clients.map((c) => c.clientId)).toEqual([phone(1), connector]);
+    expect(state.clients.find((c) => c.clientId === connector)).toMatchObject({ platform: 'node', push: null });
+  });
+
   it('reads a missing or malformed push window as null', () => {
     const sql = sqlShim();
     for (const statement of SCHEMA) sql.exec(statement);

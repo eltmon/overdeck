@@ -2,11 +2,13 @@
  * Account deletion with data-holder fan-out (PRD PAN-4293 §7.10; D-15, D-16; FR-7).
  *
  * DELETE /v1/account revokes every device, removes the grant and pending row and opens a deletion job in one
- * batch, then runs the job via ctx.waitUntil. The job asks each bound data holder (today only the optional VAULT
- * binding) to deleteAccountData(userId); once every holder acked, the user's device and user rows are deleted.
+ * batch, then runs the job via ctx.waitUntil. The job asks each bound data holder (the optional VAULT binding, and
+ * the connect Directory DO through DIRECTORY, PAN-4959 D-4) to delete the user's data; once every holder acked, the
+ * user's device and user rows are deleted.
  * The hourly cron (maintenance.ts) retries jobs that are still open.
  */
 import { authenticateRequest } from './devices.ts';
+import { deleteDirectoryAccount } from './directory-view.ts';
 import type { AccountDataHolder, Env, Handler, RequestContext } from './env.ts';
 import { json } from './http.ts';
 
@@ -21,16 +23,25 @@ export interface DeletionJobRow {
   completed_at: number | null;
 }
 
-export const HOLDER_NAMES = ['vault'] as const;
+export const HOLDER_NAMES = ['vault', 'directory'] as const;
 export type HolderName = (typeof HOLDER_NAMES)[number];
 
 /** Names of the data holders bound in this deployment. */
 export function boundHolders(env: Env): HolderName[] {
-  return env.VAULT ? ['vault'] : [];
+  return [...(env.VAULT ? (['vault'] as const) : []), ...(env.DIRECTORY ? (['directory'] as const) : [])];
 }
 
 function holderFor(env: Env, name: string): AccountDataHolder | undefined {
-  return name === 'vault' ? env.VAULT : undefined;
+  if (name === 'vault') return env.VAULT;
+  if (name === 'directory' && env.DIRECTORY) {
+    return {
+      deleteAccountData: async (userId) => {
+        await deleteDirectoryAccount(env, userId);
+        return { deleted: true };
+      },
+    };
+  }
+  return undefined;
 }
 
 function parseHolders(raw: string): string[] {
@@ -53,6 +64,7 @@ export async function requestDeletion(rc: DeletionContext, userId: string): Prom
     db.prepare("UPDATE devices SET revoked_at = ?, revoked_by = 'account-deletion' WHERE user_id = ? AND revoked_at IS NULL").bind(now, userId),
     db.prepare('DELETE FROM grants WHERE github_id = ?').bind(user.github_id),
     db.prepare('DELETE FROM pending_attempts WHERE github_id = ?').bind(user.github_id),
+    db.prepare('DELETE FROM user_sessions WHERE user_id = ?').bind(userId),
     db.prepare('INSERT OR IGNORE INTO deletion_jobs (user_id, requested_at, holders_pending) VALUES (?, ?, ?)').bind(userId, now, JSON.stringify(boundHolders(rc.env))),
   ]);
   const job = await db.prepare('SELECT requested_at FROM deletion_jobs WHERE user_id = ?').bind(userId).first<number>('requested_at');

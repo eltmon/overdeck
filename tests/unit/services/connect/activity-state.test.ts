@@ -187,6 +187,25 @@ describe('Live Activity reducer (PAN-4839 WI-4)', () => {
     expect(state.activityReports).toEqual([]);
   });
 
+  it('drops a machine removed from the account page from the sum (PAN-4959 remove-machine)', () => {
+    let state = register(account()).state;
+    state = report(state, ENV_A, 2, 1).state;
+    state = report(state, ENV_B, 1, 0).state;
+    state = reduce(state, { kind: 'remove-machine', environmentId: ENV_B }, ctx()).state;
+    expect(state.activityReports.map((r) => r.environmentId)).toEqual([ENV_A]);
+  });
+
+  it('keeps the registration on a re-hello and drops it when the row changes family (PAN-4927 D-2)', () => {
+    const registered = register(account()).state;
+    const again = phoneHello(registered, PHONE, 'ios');
+    expect(again.clients.find((c) => c.clientId === PHONE)?.activity?.token).toBe(TOKEN);
+
+    const frame = { type: 'hello-client', protocol: 1, clientId: PHONE, label: 'phone', publicKeyHex: 'ab'.repeat(32), appVersion: '1.0.0', platform: 'node' } as const;
+    const { state, effects } = reduceClient(registered, { kind: 'hello-client', registeredAs: null, identity: FREE, frame }, ctx());
+    expect(state.clients.find((c) => c.clientId === PHONE)?.activity).toBeNull();
+    expect(effects).toContainEqual({ kind: 'put-client-activity', clientId: PHONE, registration: null });
+  });
+
   it('carries only ids, the two numbers and the activity token, and the token only where it is stored or sent', () => {
     const title = 'Approve the production deploy?';
     let state = account();

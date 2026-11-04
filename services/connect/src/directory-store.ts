@@ -255,7 +255,7 @@ export function loadDirectory(sql: SqlStorage): DirectoryState {
     .exec<ClientSqlRow>('SELECT * FROM clients ORDER BY registered_at, client_id')
     .toArray()
     .flatMap((r): ClientRow[] =>
-      r.platform === 'ios' || r.platform === 'android'
+      r.platform === 'ios' || r.platform === 'android' || r.platform === 'node'
         ? [{
           clientId: r.client_id,
           label: r.label,

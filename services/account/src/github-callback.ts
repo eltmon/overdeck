@@ -4,6 +4,7 @@
  * Validates the browser-bound state, consumes the continuation row (single use), exchanges the code,
  * reads the identity and dispatches to the purpose's handler. The GitHub access token never leaves this request.
  */
+import * as accountSession from './account-page/session.ts';
 import * as adminSession from './admin/session.ts';
 import { sha256Hex } from './crypto.ts';
 import * as deviceFlow from './device-flow.ts';
@@ -25,6 +26,7 @@ export const defaultHandlers: PurposeHandlers = {
   pkce: { onIdentity: pkce.onGitHubIdentity, onDenied: pkce.onGitHubDenied },
   device: { onIdentity: deviceFlow.onGitHubIdentity, onDenied: deviceFlow.onGitHubDenied },
   admin: { onIdentity: adminSession.onGitHubIdentity, onDenied: adminSession.onGitHubDenied },
+  account: { onIdentity: accountSession.onGitHubIdentity, onDenied: accountSession.onGitHubDenied },
 };
 
 export const EXPIRED_LINK_MESSAGE = 'This sign-in link expired or was already used. Start again.';

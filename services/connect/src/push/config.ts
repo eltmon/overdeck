@@ -5,13 +5,13 @@
  * is not JSON with string `client_email` and `private_key`. A null provider is not a 503: that
  * platform's pushes answer `delivery_failed` and /healthz reports it false. Never log a value here.
  */
-import type { ApsEnvironment, ClientPlatform, PushUrgency } from '../../../../packages/contracts/src/connect.ts';
+import type { ApsEnvironment, PhonePlatform, PushUrgency } from '../../../../packages/contracts/src/connect.ts';
 import type { Env } from '../env.ts';
 import { present } from '../env.ts';
 
 /** A phone's push token and, for iOS, which APNs host it belongs to (null on Android). */
 export interface PushRegistration {
-  readonly platform: ClientPlatform;
+  readonly platform: PhonePlatform;
   readonly token: string;
   readonly apsEnvironment: ApsEnvironment | null;
 }

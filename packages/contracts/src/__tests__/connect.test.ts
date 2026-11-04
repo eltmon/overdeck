@@ -10,6 +10,8 @@ import {
   CLIENT_LIMIT_MESSAGE,
   CONNECT_CLOSE_CODES,
   CONNECT_PROTOCOL_VERSION,
+  CONNECTOR_LIMIT,
+  CONNECTOR_LIMIT_MESSAGE,
   FREE_MACHINE_LIMIT_MESSAGE,
   INBOX_BODY_MAX_BYTES,
   INBOX_HOLD_MS,
@@ -70,6 +72,7 @@ describe("connect protocol constants", () => {
     expect(NO_DIRECT_PATH_MESSAGE).toBe("No direct path; install Tailscale or use the relay plan")
     expect(RELAY_CAP_MESSAGE).toBe("Relay allowance used; install Tailscale or add 50 GB")
     expect(CLIENT_LIMIT_MESSAGE).toBe("This account already has 5 phones. Remove one in the app or on a machine.")
+    expect(CONNECTOR_LIMIT_MESSAGE).toBe("This account already has 10 Overdeck connectors. Remove one in Settings → Anywhere → Bots.")
   })
 
   it("exports the numeric limits", () => {
@@ -79,6 +82,7 @@ describe("connect protocol constants", () => {
     expect(INBOX_HOLD_MS).toBe(86_400_000)
     expect(APPROVAL_TTL_MS).toBe(600_000)
     expect(CLIENT_LIMIT).toBe(5)
+    expect(CONNECTOR_LIMIT).toBe(10)
     expect(PUSH_RATE_PER_MINUTE).toBe(30)
     expect(PUSH_SEALED_MAX_CHARS).toBe(3072)
     expect(PUSH_PLAINTEXT_MAX_BYTES).toBe(2256)
@@ -127,6 +131,15 @@ describe("phone client and push frames (PAN-4828)", () => {
       platform: "ios",
     },
     {
+      type: "hello-client",
+      protocol: 1,
+      clientId: "00000000-0000-4000-8000-0000000000bb",
+      label: "connector",
+      publicKeyHex: "cd".repeat(32),
+      appVersion: "1.0.0",
+      platform: "node",
+    },
+    {
       type: "signal",
       to: "env_0123456789abcdef",
       session: "0".repeat(32),
@@ -161,6 +174,7 @@ describe("phone client and push frames (PAN-4828)", () => {
     expect(clientFrames.map((f) => f.type).sort()).toEqual([
       "forget-client",
       "hello-client",
+      "hello-client",
       "ice-servers",
       "push-register",
       "push-unregister",
@@ -190,8 +204,10 @@ describe("phone client and push frames (PAN-4828)", () => {
     const extraError: DirectoryToMachineFrame = { type: "push-result", requestId: "r", ok: true, error: "rate_limited" }
     // @ts-expect-error clients never get approval-cancel
     const approvalCancel: DirectoryToClientFrame = { type: "approval-cancel", requestId: "0".repeat(32) }
-    const rejected = [badPlatform, missingClientId, approvalSignal, badUrgency, missingError, extraError, approvalCancel]
-    expect(rejected).toHaveLength(7)
+    // @ts-expect-error "node" cannot register push
+    const nodePushRegister: ClientToDirectoryFrame = { type: "push-register", platform: "node", token: "tok" }
+    const rejected = [badPlatform, missingClientId, approvalSignal, badUrgency, missingError, extraError, approvalCancel, nodePushRegister]
+    expect(rejected).toHaveLength(8)
   })
 
   it("lets the directory reuse machine frames for clients", () => {

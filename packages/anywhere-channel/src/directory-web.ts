@@ -1,5 +1,6 @@
 /**
- * The phone's overdeck.ai directory socket (PAN-4833 FR-7, D-10; pan-4823 W-WEB1 step 5).
+ * A directory client's overdeck.ai socket: a phone, or a `node` connector (PAN-4833 FR-7, D-10;
+ * pan-4823 W-WEB1 step 5; PAN-4927 D-18).
  *
  * The browser counterpart of the machine's `directory-client.ts`, in the client role: it says
  * `hello-client`, carries `signal` and `ice-servers` frames, and keeps the directory's view of the
@@ -17,10 +18,12 @@
  */
 import {
   CLIENT_LIMIT_MESSAGE,
+  type ClientPlatform,
   type ClientToDirectoryFrame,
   CONNECT_CLOSE_CODES,
   CONNECT_PROTOCOL_VERSION,
   type ConnectPlan,
+  CONNECTOR_LIMIT_MESSAGE,
   type DirectoryMachine,
   type DirectoryToClientFrame,
   type IceServer,
@@ -47,7 +50,7 @@ export interface DirectoryWebDeps {
   label: string;
   publicKeyHex: string;
   appVersion: string;
-  platform: 'ios' | 'android';
+  platform: ClientPlatform;
   /** Default `globalThis.WebSocket`. */
   WebSocket?: typeof WebSocket;
   /** Default `Math.random`. */
@@ -66,7 +69,6 @@ const REFUSALS: Record<number, string> = {
   [CONNECT_CLOSE_CODES.unsupportedProtocol]: 'The directory does not support this app version',
   [CONNECT_CLOSE_CODES.replaced]: 'Another copy of this app connected to the directory',
   [CONNECT_CLOSE_CODES.forgotten]: 'This phone was removed from the directory',
-  [CONNECT_CLOSE_CODES.clientLimit]: CLIENT_LIMIT_MESSAGE,
 };
 
 /** `wss://<host>/v1/directory` for a directory base URL (http → ws). */
@@ -248,7 +250,7 @@ export class DirectoryWebClient {
       if (this.socket !== socket) return;
       this.socket = null;
       this.stopPing();
-      const refusal = REFUSALS[event.code];
+      const refusal = event.code === CONNECT_CLOSE_CODES.clientLimit ? this.limitMessage() : REFUSALS[event.code];
       if (refusal !== undefined) {
         this.refuse(refusal);
         return;
@@ -320,6 +322,11 @@ export class DirectoryWebClient {
     this.clearReconnect();
     this._refusal = message;
     this.setState('refused');
+  }
+
+  /** The cap message for this client's family (PAN-4927 D-18). */
+  private limitMessage(): string {
+    return this.deps.platform === 'node' ? CONNECTOR_LIMIT_MESSAGE : CLIENT_LIMIT_MESSAGE;
   }
 
   /** Assigns the state and tells the listeners when it changed, or always when `notify` is set. */

@@ -26,15 +26,17 @@ The overdeck.ai directory, the WebRTC introduction, the relay add-on's credentia
 | `src/relay-meter.ts`, `src/turn.ts` | Monthly relay usage; Cloudflare Realtime TURN credentials (600 s TTL) |
 | `src/inbox.ts`, `src/inbox-intake.ts`, `src/seal.ts` | Inbox store, the public `POST /h/:id` route, `crypto_box_seal` in pure JS |
 | `src/log.ts` | The only logger: frame type, environment id or client id, outcome; never a label, key or payload |
+| `src/account-view.ts` | The account page's internal paths (PAN-4959): `ACCOUNT_PATHS`, `ACCOUNT_TABLES` and the `/account-view` builder |
 
 The wire protocol is `packages/contracts/src/connect.ts` (runtime-import-free so the Worker imports it by relative path); the dashboard's `GET /api/directory` view is `packages/contracts/src/connect-view.ts`.
 
-`connect.ts` also carries the phone app's frames (PAN-4823): `ClientToDirectoryFrame`, `DirectoryToClientFrame`, the machine's `push` and the directory's `push-result`, with `CLIENT_LIMIT`, `PUSH_RATE_PER_MINUTE` and `PUSH_SEALED_MAX_CHARS`. The directory serves the client role (PAN-4829, "Phone clients" below). The directory forwards sealed push to APNs and FCM (PAN-4830, "Phone push" below).
+`connect.ts` also carries the phone app's frames (PAN-4823): `ClientToDirectoryFrame`, `DirectoryToClientFrame`, the machine's `push` and the directory's `push-result`, with `CLIENT_LIMIT`, `CONNECTOR_LIMIT`, `PUSH_RATE_PER_MINUTE` and `PUSH_SEALED_MAX_CHARS`. The directory serves the client role (PAN-4829, "Clients: phones and connectors" below). The directory forwards sealed push to APNs and FCM (PAN-4830, "Phone push" below).
 
-## Phone clients (PAN-4829)
+## Clients: phones and connectors (PAN-4829, PAN-4927)
 
-- **Role.** A socket's first valid hello fixes its role: `hello` makes it a machine, `hello-client` a phone. The decoder then accepts only that role's frames; a cross-role frame is `bad_frame`.
+- **Role.** A socket's first valid hello fixes its role: `hello` makes it a machine, `hello-client` a client. The decoder then accepts only that role's frames; a cross-role frame is `bad_frame`. A client's `platform` is `ios` or `android` (a phone) or `node` (an Overdeck connector, `pan mcp connector`, PAN-4927 D-18).
 - **Phone key.** A phone's `hello-client.publicKeyHex` is its install-level push public key (PAN-4837 C-2). Link keys are per machine and never reach the directory.
+- **Connector.** A connector sends the same frames as a phone; its `hello-client.publicKeyHex` is its install key, not a push key. `push-register` from a `node` client is always `bad_frame`. A re-hello that changes a client's family (phone ↔ connector) counts against the new family's cap and clears its push registration.
 - **Welcome.** `welcome-client` carries the protocol, the plan, `relayAllowed` and the account's machines with their online state.
 - **Broadcasts.** Phones receive every `directory` frame machines receive and every `relay-status`, but never approvals or inbox frames. No machine frame ever lists a phone.
 - **Signals.** A phone signals an online machine with `purpose: 'link'` only, and the machine sees `from` = the phone's `clientId`. A machine's `link` signal to an online phone arrives with `from` = its environment id. Phone to phone is `bad_frame`; an offline target is `peer_offline`.
@@ -74,10 +76,23 @@ The iPhone app's Live Activity shows two counts: how many items need the operato
 | GET | `/v1/directory` | `Bearer odd_…` device token, or the subprotocol `overdeck.bearer.odd_…` (echoed on the 101); WebSocket upgrade | 101 to the account's Durable Object; 401 / 403 / 426 / 429 / 503 otherwise |
 | POST | `/h/<doId>.<secret>` | the secret in the URL | `202 { queued: true }`; `404 { error: "not found" }`, `413`, `403` (free plan), `429` (full or rate-limited) |
 
+## Account service paths (PAN-4959)
+
+The account page at `https://account.overdeck.ai/account` reads and changes an account's Directory Durable Object through the account Worker's cross-script `DIRECTORY` binding (`docs/ACCOUNT-SERVICE.md`, "Account page"). These are internal DO paths: no public route forwards to them, so only a Durable Object stub reaches them, and the DO trusts every request on them.
+
+| Method | Path | Body | Answer |
+| --- | --- | --- | --- |
+| GET | `/account-view` | — | `200 { machines: [{ environmentId, label, online, lastSeenAt, serverVersion, deviceId }], relay: { month, bytesUsed, capBytes, stopped } }`; machines oldest first, `online` true while a registered socket is open, relay for the current UTC month |
+| POST | `/remove-machine` | JSON `{ "environmentId" }` (string, 1–64 characters) | `200 { removed: true }`; `400 { error: "bad_request" }`; `404 { error: "unknown_machine" }`. The machine, its approvals and its inbox rows are deleted, every other machine and phone gets the new `directory` frame, and its open socket closes with 4012 (`forgotten`). Nothing is sent to a calling socket, because there is none |
+| POST | `/delete-account` | — | `200 { deleted: true }`, also when already empty. Every machine and phone socket closes with 4001 (`account deleted`), every table in `ACCOUNT_TABLES` is emptied (the schema stays), the alarm is cleared |
+
+The page revokes a machine's device token before calling `/remove-machine`, so an offline machine cannot register again on its next `hello`. Account deletion calls `/delete-account` as the `directory` data holder and completes only after a 200.
+
 ## Limits
 
 - **Machines:** a `free` account holds at most 3 (`hello` for a fourth environment id → `error machine_limit` "The free account includes 3 machines", close 4009). `tester` (every allowlisted account until billing) has no limit.
 - **Phones (clients):** at most 5 per account on every plan (`hello-client` for a sixth `clientId` → `error client_limit` "This account already has 5 phones. Remove one in the app or on a machine.", close 4013). Phones never count against the machine limit. One socket per phone (a newer one closes the older with 4011); `forget-client` deletes the phone and closes with 4012.
+- **Connectors (clients):** at most 10 per account on every plan (`hello-client` with `platform: node` for an eleventh `clientId` → `error client_limit` "This account already has 10 Overdeck connectors. Remove one in Settings → Anywhere → Bots.", close 4013). Connectors never count against the machine or phone limit.
 - **Sockets:** one per machine; a newer socket for the same machine closes the older with 4011. `forget` closes with 4012. `ping`/`pong` is a runtime auto-response, so an idle socket never wakes the object.
 - **Approvals:** 1 pending request per requesting machine, 5 per account, 10-minute expiry.
 - **Relay:** 50 GB (`RELAY_MONTHLY_CAP_BYTES`) per account per UTC calendar month; each `relay-usage` report (from a machine or a phone) broadcasts the month's `relay-status` to every machine and phone, the report that reaches the cap broadcasts `relay-status { stopped: true }`, and later credential requests answer `relay_cap_reached`.
@@ -117,12 +132,14 @@ npm run build:dry                     # bundle with no credentials and no upload
 
 Operator-only. **No agent deploys** and no agent runs any of the commands below. The custom-domain route in `wrangler.jsonc` creates the `connect.overdeck.ai` DNS record on first deploy.
 
+An older deployed directory refuses `hello-client` with `platform: node` as `bad_frame` (it predates PAN-4927 D-18), so this deploy must land before any `@overdeck/core` release ships the connector (PAN-4927 CP-5).
+
 1. `npm run build:dry` in `services/connect` exits 0.
 2. Deploy `services/account` first (`docs/ACCOUNT-SERVICE.md`, "Deploy"); the `ACCOUNT` binding needs `overdeck-account` with its `AccountRpc` entrypoint returning `entitlement`, or every directory socket answers `account_service_outdated`.
 3. Reuse the share service's Realtime TURN key, or create one in the Cloudflare dashboard (Realtime → TURN Server). An account without Realtime must first add the Realtime subscription, which needs a payment method (1,000 GB a month free, then billed per GB).
 4. `cd services/connect && npx wrangler secret put TURN_KEY_ID`, then `npx wrangler secret put TURN_KEY_API_TOKEN`.
 5. `npx wrangler secret put` for each of the five push secrets (`APNS_KEY_P8`, `APNS_KEY_ID`, `APNS_TEAM_ID`, `FCM_SERVICE_ACCOUNT_JSON`, `FCM_PROJECT_ID`; values from W-REL1, PAN-4841). `/healthz` then reports `apns: true, fcm: true`.
-6. `npx wrangler deploy` (uploads the Worker, creates the `AccountDirectory` Durable Object from migration `v1`, binds `ACCOUNT` and both rate limiters, and registers `connect.overdeck.ai`).
+6. `npx wrangler deploy` (uploads the Worker, creates the `AccountDirectory` Durable Object from migration `v1`, binds `ACCOUNT` and both rate limiters, and registers `connect.overdeck.ai`). On an existing deployment, deploy this Worker **before** `overdeck-account` whenever the account Worker starts calling new internal paths (PAN-4959 added `/account-view`, `/remove-machine` and `/delete-account`). On a brand-new environment the two bindings point at each other: if the first `overdeck-account` deploy refuses its `DIRECTORY` binding because `overdeck-connect` does not exist yet, deploy it once with the `durable_objects` block commented out, deploy this Worker, then restore the block and deploy `overdeck-account` again.
 7. Smoke test: `node scripts/anywhere/smoke-hosted.mjs` exits 0 (both Workers' `/healthz`, plus one account device-code start), and on a signed-in machine `pan machines directory` lists it `online` within a minute.
 8. Run the two live checks of D-2356-21 on real machines: two machines on different networks without Tailscale link by approval and reach each other over `rtc://`; with UDP blocked on both, a relay-plan account links over `rtc+turn://` and the card shows **Using relay**. To block UDP, run these rules with both `iptables` and `ip6tables`; they drop all UDP except DNS on port 53: `-A OUTPUT -p udp --dport 53 -j ACCEPT`, `-A INPUT -p udp --sport 53 -j ACCEPT`, `-A OUTPUT -p udp -j DROP`, `-A INPUT -p udp -j DROP`. Start the server with `DEBUG=werift*`. When the relay picks the right TURN URL, its `iceOptions` log line shows `turnTransport: 'tls'` and port 443.
 9. Rollback: `npx wrangler rollback` returns to the previous Worker version.

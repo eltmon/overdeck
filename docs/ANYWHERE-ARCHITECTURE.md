@@ -182,7 +182,8 @@ The phone app imports the same protocol from `@overdeck/anywhere-channel/web`:
 `openSecureChannel` runs the shared initiator sequence (link and pairing only) on the web crypto
 port and pure-JS libsodium; `RtcDuplexWeb` wraps a browser `RTCDataChannel` with the server's
 limits (16 KiB messages, back-pressure above 1 MiB); `DirectoryWebClient` is the client-role
-directory socket (`hello-client`, token in the `overdeck.bearer.<token>` subprotocol); and
+directory socket (`hello-client`, token in the `overdeck.bearer.<token>` subprotocol); it also
+serves `node` connector clients (`pan mcp connector`, PAN-4927 D-18), not just phones; and
 `createMachineDialer` opens `ovdl` channels to a machine. Because a machine closes an older
 peer connection when a new offer arrives for the same peer, the dialer keeps one peer connection
 per (machine, relay) and opens one more data channel on it per dial. No server file imports
