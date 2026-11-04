@@ -373,6 +373,10 @@ A conversation appears once, however many machines list it: this machine's own r
 over a linked row, and a linked row wins over its Session Vault saved copy (the row then
 offers the saved copy itself).
 
+A linked conversation with no title, or a title that is only a file path (such as an
+attachment path), shows as "New conversation" rather than that path or its owner's list
+name.
+
 ## Title-bar states
 
 The conversation title bar shows which machine runs the conversation. These are surface
@@ -443,6 +447,9 @@ Overdeck's own ports (the dashboard and its API, the supervisor, 80, 443 and Tra
 dashboard port) are refused with `port-refused`. A forward closes when you stop it, when
 the link goes away, or after 30 minutes with no open connection. It needs an
 operator-level link.
+
+Escape closes the Preview popover. A running forward keeps running until you stop it —
+Escape never stops it.
 
 ## Open in editor
 

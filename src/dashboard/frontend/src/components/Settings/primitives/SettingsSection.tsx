@@ -25,7 +25,7 @@ export function SettingsSection({
 
   return (
     <section id={id} className="py-6 first:pt-0 scroll-mt-4">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 mb-4">
         <div className="flex items-center gap-3 min-w-0">
           {collapsible ? (
             <button
@@ -51,7 +51,7 @@ export function SettingsSection({
             </h2>
           )}
           {description && (
-            <span className="text-muted-foreground text-sm hidden @lg:inline truncate">
+            <span className="text-muted-foreground text-sm hidden @lg:inline">
               — {description}
             </span>
           )}
