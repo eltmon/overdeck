@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5020",
   "created": "2026-11-04T12:51:44.824Z",
-  "updated": "2026-11-04T12:55:16.627Z",
+  "updated": "2026-11-04T13:02:02.814Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-11-04T12:55:11.932Z"
     },
     "w4-conflict-repair": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5020",
-      "claimedAt": "2026-11-04T12:55:16.627Z"
+      "claimedAt": "2026-11-04T12:55:16.627Z",
+      "doneAt": "2026-11-04T13:02:02.813Z"
     }
   }
 }
