@@ -587,11 +587,96 @@ plugins:
 
 **Remove** in the Bots panel revokes a connector at once.
 
-<Info>
-The `pan mcp connector` commands and the public `/mcp` route ship separately
-(PAN-4950, PAN-4947); until then, the connector and public reaches show their
-setup text but nothing serves it yet.
-</Info>
+## Run the Overdeck connector
+
+The Overdeck connector runs on the computer where the bot runs. It pairs once
+with one Overdeck machine and serves that machine's MCP tools to the bot on
+`http://127.0.0.1:7466/mcp` (or stdio). Every tool call travels to the machine
+over an encrypted secure channel inside a WebRTC connection, so the bot needs
+no Tailscale and no public address.
+
+It needs Node 22.16 or later, and you must sign it in with the overdeck.ai
+account the machine uses. On a computer without Overdeck, run each command as
+`npx -y @overdeck/core@<version> mcp connector <command>`; "Connect a bot"
+shows the exact version.
+
+| Command | What it does |
+| --- | --- |
+| `pan mcp connector login [--account-url <url>] [--directory-url <url>]` | Signs the connector in to overdeck.ai with the device flow: open the URL it prints and enter the code. |
+| `pan mcp connector pair '<pairing string>' [--label <name>]` | Pairs with the machine named in the string from "Connect a bot". `--label` names the connector on the machine (default: the host name). |
+| `pan mcp connector serve [--port <port>] [--stdio] [--label <name>]` | Serves the tools on `127.0.0.1:<port>` (default 7466) until stopped, or one stdio session with `--stdio`. |
+| `pan mcp connector status [--port <port>]` | Prints the account, the paired machine, its scopes and the live route of a running `serve`. It never prints a token. |
+| `pan mcp connector logout` | Removes the connector from the machine and overdeck.ai, then deletes its files. |
+
+### The connector home
+
+All connector state lives in `$OVERDECK_CONNECTOR_HOME`, default
+`~/.overdeck-connector`, mode 0700. It holds four files, each mode 0600:
+`account.json` (the overdeck.ai sign-in), `identity.json` (the connector id and
+its keys), `pairing.json` (the paired machine and its connector token) and
+`local-token`. The connector never reads or writes `~/.overdeck`, so it can run
+on an Overdeck machine without touching that machine's sign-in or keys. A file
+that other users can read is refused with a `chmod 600` hint.
+
+`login` fixes the account and directory URLs for every later command. The
+directory URL comes from `--directory-url`, else `OVERDECK_CONNECTOR_DIRECTORY_URL`,
+else `https://connect.overdeck.ai`; the account URL from `--account-url`, else
+`OVERDECK_ACCOUNT_URL`, else `https://account.overdeck.ai`.
+
+### The local endpoint
+
+`serve` binds `127.0.0.1` only. A bot sends `Authorization: Bearer <local token>`
+with every `POST /mcp`; the token is the content of `local-token`, and a
+missing or wrong token gets 401. Keep it out of chat and config files:
+
+```bash
+export OVERDECK_CONNECTOR_LOCAL_TOKEN="$(cat "${OVERDECK_CONNECTOR_HOME:-$HOME/.overdeck-connector}/local-token")"
+curl -s http://127.0.0.1:7466/mcp \
+  -H "Authorization: Bearer $OVERDECK_CONNECTOR_LOCAL_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
+
+`/mcp` is stateless JSON: each request gets its own MCP session. Bodies over
+4 MiB get 413, and `GET` or `DELETE` on `/mcp` get 405. `GET /healthz` needs no
+token and answers `{ "ok": true, "machine": "<label>", "route": "direct" }`;
+`route` is `direct`, `relay` or `down`, and `ok` is false when it is `down`.
+
+### Routes and reconnects
+
+The connector tries a direct WebRTC path first. It falls back to the TURN relay
+only when the account has the relay plan and this month's relay allowance is not
+used up; it reports its relay bytes to overdeck.ai. With no direct path and no
+relay, tool calls fail with `No direct path to <machine>. Use the relay plan, or
+the Tailscale route in the README.` After a lost connection it tries again after
+1 s, doubling up to 60 s, and at once when overdeck.ai shows the machine online
+again. A tool call made while the connection is down returns an error; the bot
+can retry it.
+
+### What a connector can reach
+
+A connector reaches only the machine it paired with. Its tool list has no
+`list_machines`, and `start_conversation`, `start_worker` and `start_issue`
+have no `machine` or `needs` argument: they start work on the paired machine,
+when the connector holds `operate`. The machine refuses any other target with
+403 `connector-local-only`. `search_conversations` returns only the paired
+machine's matches, and `list_pending_input` shows only the paired machine's
+input, with a `fleetError` in place of its linked machines. To reach a second machine, run a second connector with its own
+`OVERDECK_CONNECTOR_HOME`.
+
+### Re-pairing and logout
+
+Pairing again (for example with new scopes) replaces the connector's token on
+the machine and keeps `local-token`, so the bot's config keeps working. Restart
+`serve` after a re-pair: it reads `pairing.json` only when it starts.
+
+`logout` does four steps in order: it removes the connector from the machine
+(`DELETE /api/connectors/self`), removes it from the overdeck.ai directory,
+revokes its overdeck.ai sign-in, and deletes the four files. A step that fails
+prints one line and the next step still runs; the files are always deleted. If
+the machine was unreachable, remove the connector there under **Settings →
+Anywhere → Bots**.
 
 ## Fleet reach
 
