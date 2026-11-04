@@ -2,16 +2,26 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { existsSync, linkSync, lstatSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+const projectMocks = vi.hoisted(() => ({
+  resolveProjectFromIssueSync: vi.fn(),
+  getProjectSync: vi.fn(),
+}));
+
+vi.mock('../../projects.js', () => projectMocks);
+
 import {
   DISK_COST_MEMO_TTL_MS,
   estimateWorkspaceDiskCost,
   invalidateWorkspaceDiskCostMemo,
   parseDockerSize,
   resetWorkspaceDiskCostMemo,
+  resolveIssueStackDiskHold,
+  resolveStackDiskHold,
   SEED_STACK_DISK_COST_BYTES,
   sumUnsharedBytes,
   type DiskCostDeps,
   type DiskCostProject,
+  type WorkspaceDiskCost,
 } from '../disk-cost.js';
 
 const LS_TREE = [
@@ -203,5 +213,55 @@ describe('sumUnsharedBytes (disk-cost-estimate.ac4)', () => {
 
   it('returns 0 for a missing directory', async () => {
     expect(await sumUnsharedBytes(join(root, 'missing'))).toBe(0);
+  });
+});
+
+describe('resolveStackDiskHold (spawn-disk-hold.ac1)', () => {
+  const cost = (stackBytes: number): WorkspaceDiskCost => ({ hostBytes: 1, stackBytes, hostSource: 'measured', stackSource: 'measured' });
+
+  it('returns null without previewing when the project has no stack cost', async () => {
+    const preview = vi.fn(async () => 'held');
+
+    const hold = await resolveStackDiskHold({ path: '/p' }, '/p/workspaces/feature-pan-1', { estimate: async () => cost(0), preview });
+
+    expect(hold).toBeNull();
+    expect(preview).not.toHaveBeenCalled();
+  });
+
+  it('returns the preview refusal after passing the stack bytes', async () => {
+    const preview = vi.fn(async () => 'Disk low — new workspace starts are held: test');
+
+    const hold = await resolveStackDiskHold({ path: '/p' }, '/p/workspaces/feature-pan-1', { estimate: async () => cost(2_000), preview });
+
+    expect(hold).toBe('Disk low — new workspace starts are held: test');
+    expect(preview).toHaveBeenCalledWith({ path: '/p/workspaces/feature-pan-1', bytes: 2_000 });
+  });
+});
+
+describe('resolveIssueStackDiskHold (spawn-disk-hold.ac2)', () => {
+  beforeEach(() => {
+    projectMocks.resolveProjectFromIssueSync.mockReset();
+    projectMocks.getProjectSync.mockReset();
+  });
+
+  it('previews the workspace under the configured workspaces_dir', async () => {
+    projectMocks.resolveProjectFromIssueSync.mockReturnValue({ projectKey: 'myn', projectName: 'MYN', projectPath: '/projects/myn' });
+    projectMocks.getProjectSync.mockReturnValue({ name: 'myn', path: '/projects/myn', workspace: { workspaces_dir: 'wt' } });
+    const preview = vi.fn(async () => null);
+
+    await resolveIssueStackDiskHold('MIN-12', {
+      estimate: async () => ({ hostBytes: 1, stackBytes: 2_000, hostSource: 'measured', stackSource: 'measured' }),
+      preview,
+    });
+
+    expect(preview).toHaveBeenCalledWith({ path: '/projects/myn/wt/feature-min-12', bytes: 2_000 });
+  });
+
+  it('returns null for an issue that resolves to no project', async () => {
+    projectMocks.resolveProjectFromIssueSync.mockReturnValue(null);
+    const preview = vi.fn(async () => 'held');
+
+    expect(await resolveIssueStackDiskHold('NOPE-1', { preview })).toBeNull();
+    expect(preview).not.toHaveBeenCalled();
   });
 });

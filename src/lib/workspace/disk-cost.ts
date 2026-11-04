@@ -18,6 +18,8 @@ import { lstat, readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 
+import { previewDiskFloor } from '../disk-floor.js';
+import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
 import { isWorkspaceSetupIncomplete } from '../workspace-manager/setup-marker.js';
 import { composeProjectNameForWorkspace } from './stack-health.js';
 
@@ -338,4 +340,31 @@ export function invalidateWorkspaceDiskCostMemo(projectPath: string): void {
 /** Tests only. */
 export function resetWorkspaceDiskCostMemo(): void {
   memo.clear();
+}
+
+/** PAN-4961: the hold text when a new stack for this project would breach the disk floor, else null. */
+export async function resolveStackDiskHold(
+  projectConfig: DiskCostProject,
+  workspacePath: string,
+  deps?: { estimate?: typeof estimateWorkspaceDiskCost; preview?: typeof previewDiskFloor },
+): Promise<string | null> {
+  const cost = await (deps?.estimate ?? estimateWorkspaceDiskCost)(projectConfig);
+  if (cost.stackBytes === 0) return null;
+  return (deps?.preview ?? previewDiskFloor)({ path: workspacePath, bytes: cost.stackBytes });
+}
+
+/** PAN-4961: resolveStackDiskHold for an issue id, resolving project and workspace like rebuild-stack.ts. */
+export async function resolveIssueStackDiskHold(
+  issueId: string,
+  deps?: Parameters<typeof resolveStackDiskHold>[2],
+): Promise<string | null> {
+  const resolved = resolveProjectFromIssueSync(issueId);
+  const projectConfig = resolved ? getProjectSync(resolved.projectKey) : null;
+  if (!resolved || !projectConfig) return null;
+  const workspacePath = join(
+    resolved.projectPath,
+    projectConfig.workspace?.workspaces_dir ?? 'workspaces',
+    `feature-${issueId.toLowerCase()}`,
+  );
+  return resolveStackDiskHold(projectConfig, workspacePath, deps);
 }
