@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4945",
   "created": "2026-11-04T01:22:40.341Z",
-  "updated": "2026-11-04T02:57:31.805Z",
+  "updated": "2026-11-04T02:57:48.308Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -250,6 +250,10 @@
     "routes-admin.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T02:57:31.805Z"
+    },
+    "mcp-challenge.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T02:57:48.308Z"
     }
   }
 }
