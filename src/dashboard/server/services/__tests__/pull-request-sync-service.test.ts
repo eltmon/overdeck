@@ -68,11 +68,19 @@ const {
   PR_SYNC_INTERVAL_MS,
   PR_SYNC_SLOW_INTERVAL_MS,
   githubPullRequestKeyFromUrl,
+  readPullRequestSnapshotNow,
   runPullRequestSyncOnce,
   snapshotFromGhRow,
   startPullRequestSyncService,
   stopPullRequestSyncService,
 } = await import('../pull-request-sync-service.js');
+const {
+  addPullRequestWatch,
+  listPullRequestWatches,
+  _resetPullRequestWatchStoreForTests,
+  _settlePullRequestWatchWritesForTests,
+} = await import('../../../../lib/overdeck/pull-request-watches.js');
+const { listWatchedPullRequestKeys, notifyPullRequestWatches } = await import('../pull-request-watch-notifier.js');
 
 function pr(number: number, headRefName: string, extra: Row = {}): Row {
   return {
@@ -588,6 +596,13 @@ describe('runPullRequestSyncOnce — auto-settle on merge (PAN-4653)', () => {
 });
 
 describe('startPullRequestSyncService — schedule', () => {
+  // PAN-4943: the default watch pass does real file I/O (listWatchedPullRequestKeys
+  // reads pr-watches.json); under fake timers that I/O can still be settling when
+  // the next tick fires, leaving `running` true and skipping that tick. These
+  // schedule tests care about the listing cadence, not the watch pass, so they
+  // inject a no-op watch pass instead.
+  const NOOP_WATCHES = { listKeys: async () => [], notify: async () => {} };
+
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -596,7 +611,7 @@ describe('startPullRequestSyncService — schedule', () => {
     conversation('feature/timed');
     prRows = [pr(6, 'feature/timed')];
 
-    startPullRequestSyncService();
+    startPullRequestSyncService(NOOP_WATCHES);
     await vi.advanceTimersByTimeAsync(PR_SYNC_BOOT_DELAY_MS - 1);
     expect(listRepoPullRequestsMock).not.toHaveBeenCalled();
 
@@ -615,7 +630,7 @@ describe('startPullRequestSyncService — schedule', () => {
     conversation('feature/rate-limited');
     prRows = null;
 
-    startPullRequestSyncService();
+    startPullRequestSyncService(NOOP_WATCHES);
     await vi.advanceTimersByTimeAsync(PR_SYNC_BOOT_DELAY_MS + 2 * PR_SYNC_INTERVAL_MS);
     expect(listRepoPullRequestsMock).toHaveBeenCalledTimes(3);
 
@@ -686,5 +701,113 @@ describe('runPullRequestSyncOnce — GitHub quota pause (PAN-4264)', () => {
     listRepoPullRequestsMock.mockImplementation(async () => []);
     await runPullRequestSyncOnce(Date.now(), async () => null);
     expect(listRepoPullRequestsMock).toHaveBeenCalledTimes(4);
+  });
+});
+
+// PAN-4943 WI-5 (epic AC-14): every watched PR's snapshot comes from this
+// pass's listing or fallback rows when covered, else one gh pr view under the
+// same backoff as refreshUnlistedLinks; the notifier compares it with the
+// watch's own baseline. Real watch store under TEST_HOME; fake notifier
+// delivery deps so no messageAgent/handleConversationMessage call escapes.
+describe('PR watch pass (PAN-4943 WI-5, epic AC-14)', () => {
+  const T0 = Date.parse('2026-11-04T00:00:00Z');
+  const deliverToAgent = vi.fn(async () => true);
+
+  function watchDeps() {
+    return {
+      listKeys: listWatchedPullRequestKeys,
+      notify: (snapshots: Parameters<typeof notifyPullRequestWatches>[0]) =>
+        notifyPullRequestWatches(snapshots, {
+          listActiveOwners: async () => new Set(['agent:agent-pan-1']),
+          deliverToAgent,
+          deliverToConversation: async () => true,
+        }),
+    };
+  }
+
+  function watch(number: number, last: { state: 'open' | 'merged' | 'closed'; checks: 'green' | 'red' | 'pending'; reviewState: string; mergeable: boolean | null }) {
+    return addPullRequestWatch({
+      agentId: 'agent-pan-1',
+      agentKind: 'agent',
+      key: { host: 'github.com', repository: 'eltmon/overdeck', number, url: `https://github.com/eltmon/overdeck/pull/${number}` },
+      last: last as never,
+    });
+  }
+
+  beforeEach(() => {
+    _resetPullRequestWatchStoreForTests();
+    rmSync(join(TEST_HOME, 'pr-watches.json'), { force: true });
+    deliverToAgent.mockClear();
+  });
+
+  afterEach(async () => {
+    await _settlePullRequestWatchWritesForTests();
+  });
+
+  it('AC-14: pending to red delivers once, nothing on repeat, and a merge ends the watch', async () => {
+    conversation('feature/unrelated'); // gives the project a reason to list its PRs
+    await watch(99, { state: 'open', checks: 'pending', reviewState: 'none', mergeable: null });
+
+    prRows = [pr(99, 'some-other-branch', { statusCheckRollup: [{ status: 'COMPLETED', conclusion: 'FAILURE' }] })];
+    await runPullRequestSyncOnce(T0, async () => null, undefined, watchDeps());
+    expect(deliverToAgent).toHaveBeenCalledTimes(1);
+    expect(deliverToAgent).toHaveBeenCalledWith('agent-pan-1', expect.stringContaining('checks failed'), expect.any(String));
+
+    await runPullRequestSyncOnce(T0 + 60_000, async () => null, undefined, watchDeps());
+    expect(deliverToAgent).toHaveBeenCalledTimes(1);
+
+    prRows = [pr(99, 'some-other-branch', { state: 'MERGED', mergedAt: '2026-11-04T00:02:00Z' })];
+    await runPullRequestSyncOnce(T0 + 120_000, async () => null, undefined, watchDeps());
+    expect(deliverToAgent).toHaveBeenCalledTimes(2);
+    expect(deliverToAgent).toHaveBeenLastCalledWith('agent-pan-1', expect.stringContaining('The watch has ended.'), expect.any(String));
+    expect(await listPullRequestWatches()).toEqual([]);
+  });
+
+  it('an empty watch store adds no extra readPullRequest call', async () => {
+    conversation('feature/plain');
+    prRows = [pr(1, 'feature/plain')];
+    const read = vi.fn(async () => null);
+    await runPullRequestSyncOnce(T0, read, undefined, watchDeps());
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  it('a watched key the listing covers makes no readPullRequest call', async () => {
+    conversation('feature/unrelated');
+    await watch(99, { state: 'open', checks: 'pending', reviewState: 'none', mergeable: null });
+    prRows = [pr(99, 'some-other-branch')];
+    const read = vi.fn(async () => null);
+    await runPullRequestSyncOnce(T0, read, undefined, watchDeps());
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  it('an uncovered watched key makes exactly one readPullRequest call per sweep', async () => {
+    conversation('feature/unrelated');
+    await watch(77, { state: 'open', checks: 'pending', reviewState: 'none', mergeable: null });
+    prRows = [pr(1, 'feature/unrelated')];
+    const read = vi.fn(async () => pr(77, 'whatever') as never);
+    await runPullRequestSyncOnce(T0, read, undefined, watchDeps());
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(read).toHaveBeenCalledWith(expect.objectContaining({ host: 'github.com', repository: 'eltmon/overdeck', number: 77 }));
+  });
+
+  it('an uncovered watched key in a repository already backed off makes no read', async () => {
+    const name = conversation('feature/flaky-watch');
+    linkConversationPullRequest(name, {
+      host: 'github.com', repository: 'eltmon/overdeck', number: 902, url: 'https://github.com/eltmon/overdeck/pull/902',
+    }, 'manual', T0);
+    const failingRead = vi.fn(async () => null);
+    for (let sweep = 0; sweep < 3; sweep += 1) await runPullRequestSyncOnce(T0 + sweep * 60_000, failingRead, undefined, watchDeps());
+    expect(failingRead).toHaveBeenCalledTimes(3);
+
+    await watch(950, { state: 'open', checks: 'pending', reviewState: 'none', mergeable: null });
+    const read = vi.fn(async () => pr(950, 'whatever') as never);
+    await runPullRequestSyncOnce(T0 + 3 * 60_000, read, undefined, watchDeps());
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  it('readPullRequestSnapshotNow returns null when the read fails, and a snapshot from a successful read', async () => {
+    await expect(readPullRequestSnapshotNow({ host: 'github.com', repository: 'eltmon/overdeck', number: 1 }, async () => null)).resolves.toBeNull();
+    const snapshot = await readPullRequestSnapshotNow({ host: 'github.com', repository: 'eltmon/overdeck', number: 2 }, async () => pr(2, 'whatever') as never, T0);
+    expect(snapshot?.state).toBe('open');
   });
 });

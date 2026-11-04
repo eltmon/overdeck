@@ -1,0 +1,239 @@
+{
+  "version": "1",
+  "issueId": "PAN-4943",
+  "created": "2026-11-04T04:27:55.646Z",
+  "updated": "2026-11-04T07:10:26.309Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-04T06:47Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-04T06:47:45.333Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-04T06:53Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-11-04T06:53:46.107Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-04T06:54:10.087Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-04T07:01Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-04T07:01:36.239Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-04T07:10:26.309Z"
+    }
+  ],
+  "items": {
+    "pr-route-scopes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4943",
+      "claimedAt": "2026-11-04T04:27:55.646Z",
+      "doneAt": "2026-11-04T04:29:51.956Z"
+    },
+    "watch-store": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4943",
+      "claimedAt": "2026-11-04T04:30:37.686Z",
+      "doneAt": "2026-11-04T04:49:16.676Z"
+    },
+    "revoke-removes-watches": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4943",
+      "claimedAt": "2026-11-04T04:49:26.203Z",
+      "doneAt": "2026-11-04T05:01:42.631Z"
+    },
+    "watch-notifier": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4943",
+      "claimedAt": "2026-11-04T05:01:48.095Z",
+      "doneAt": "2026-11-04T05:17:21.155Z"
+    },
+    "sweep-watch-pass": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4943",
+      "claimedAt": "2026-11-04T05:17:25.798Z",
+      "doneAt": "2026-11-04T05:34:21.225Z"
+    },
+    "self-watch-routes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4943",
+      "claimedAt": "2026-11-04T05:37:00.885Z",
+      "doneAt": "2026-11-04T05:57:32.521Z"
+    },
+    "link-pr-tool": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4943",
+      "claimedAt": "2026-11-04T05:57:38.875Z",
+      "doneAt": "2026-11-04T06:13:15.158Z"
+    },
+    "watch-pr-tools": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4943",
+      "claimedAt": "2026-11-04T06:13:20.963Z",
+      "doneAt": "2026-11-04T06:24:48.303Z"
+    },
+    "pr-watch-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4943",
+      "claimedAt": "2026-11-04T06:24:53.218Z",
+      "doneAt": "2026-11-04T06:26:29.663Z"
+    },
+    "pr-route-scopes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:28:04.590Z"
+    },
+    "pr-route-scopes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:28:56.220Z"
+    },
+    "pr-route-scopes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:29:12.395Z"
+    },
+    "pr-route-scopes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:29:28.183Z"
+    },
+    "watch-store.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:29:43.764Z"
+    },
+    "watch-store.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:29:59.649Z"
+    },
+    "watch-store.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:30:15.644Z"
+    },
+    "watch-store.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:30:32.337Z"
+    },
+    "watch-store.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:30:48.565Z"
+    },
+    "revoke-removes-watches.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:31:05.650Z"
+    },
+    "revoke-removes-watches.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:31:22.067Z"
+    },
+    "watch-notifier.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:31:38.087Z"
+    },
+    "watch-notifier.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:31:52.766Z"
+    },
+    "watch-notifier.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:32:08.358Z"
+    },
+    "watch-notifier.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:32:23.185Z"
+    },
+    "watch-notifier.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:32:38.559Z"
+    },
+    "watch-notifier.ac6": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:32:53.588Z"
+    },
+    "sweep-watch-pass.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:33:08.797Z"
+    },
+    "sweep-watch-pass.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:33:24.413Z"
+    },
+    "sweep-watch-pass.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:33:39.633Z"
+    },
+    "sweep-watch-pass.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:33:54.188Z"
+    },
+    "self-watch-routes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:34:09.044Z"
+    },
+    "self-watch-routes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:34:25.308Z"
+    },
+    "self-watch-routes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:34:40.832Z"
+    },
+    "self-watch-routes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:34:55.140Z"
+    },
+    "self-watch-routes.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:35:09.642Z"
+    },
+    "link-pr-tool.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:35:24.044Z"
+    },
+    "link-pr-tool.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:35:37.720Z"
+    },
+    "link-pr-tool.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:35:52.487Z"
+    },
+    "link-pr-tool.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:36:07.396Z"
+    },
+    "watch-pr-tools.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:36:22.182Z"
+    },
+    "watch-pr-tools.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:36:36.607Z"
+    },
+    "watch-pr-tools.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:36:51.935Z"
+    },
+    "pr-watch-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:37:09.222Z"
+    },
+    "pr-watch-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:37:25.369Z"
+    },
+    "pr-watch-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:37:40.329Z"
+    }
+  },
+  "feedback": [],
+  "agentModel": "claude-opus-5-5"
+}

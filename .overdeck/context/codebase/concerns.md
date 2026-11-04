@@ -732,4 +732,10 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   advertise `mcpCapabilities: { http, sse }` too. The ACP host's `mcpServers` field
   (`src/lib/acp/session-runtime.ts`) carries the `overdeck` server read from the host's `--mcp-config`
   (PAN-4934); before that it was always `[]`.
+- **Work agents have no `conversations` row** (PAN-4943 planning) — `spawnRun` registers one only for
+  specialist roles or `registerConversation: true` (`src/lib/agents/spawn.ts:259`); a work agent
+  (`agent-pan-<n>`) has none, and `agent-pan-<n>-review` appears only once review starts. Anything keyed
+  on "the agent's own conversation" (PR links, the PR sync sweep, `getConversationByName(agentId)`) finds
+  nothing for a work agent; PR watches therefore carry their own key and baseline.
+<!-- last-verified: 2026-11-04 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4930, PAN-4931, PAN-4932, PAN-4934, PAN-4943, PAN-4944, PAN-4970, PAN-4482) -->
 <!-- last-verified: 2026-11-04 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4930, PAN-4931, PAN-4932, PAN-4934, PAN-4944, PAN-4482, PAN-4970, PAN-4940) -->
