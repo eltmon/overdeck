@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4940",
   "created": "2026-11-04T04:28:29.563Z",
-  "updated": "2026-11-04T05:55:08.293Z",
+  "updated": "2026-11-04T05:56:41.898Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,10 @@
       "claimedBy": "agent-pan-4940",
       "claimedAt": "2026-11-04T05:41:32.456Z",
       "doneAt": "2026-11-04T05:55:08.293Z"
+    },
+    "cli-search-facts.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:56:41.898Z"
     }
   }
 }
