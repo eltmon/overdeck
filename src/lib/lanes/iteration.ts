@@ -7,7 +7,7 @@
  * The cwd key is the local `cwd`, or `<environmentId>:<cwd>` for a lane on
  * another machine (PAN-4638 D-4638-5), so equal paths on two machines count twice.
  */
-import type { LaneRole, LegacyConversation } from '../overdeck/conversations.js';
+import type { LaneRole } from '../overdeck/conversations.js';
 
 /** The fields D7 reads; `LaneRow` from lane-rows.ts has them. */
 export interface IterationRow {
@@ -16,11 +16,6 @@ export interface IterationRow {
   run: string;
   key: string;
   role: LaneRole;
-}
-
-/** A local lane row in the D7 shape: its cwd key is its cwd. */
-export function localIterationRow(row: LegacyConversation): IterationRow {
-  return { name: row.name, cwdKey: row.cwd, run: row.gauntletRun ?? '', key: row.laneKey ?? '', role: row.laneRole ?? 'builder' };
 }
 
 /** Distinct cwd keys of one (run, key, role) group, in first-use order. */

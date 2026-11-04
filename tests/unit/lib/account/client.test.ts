@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   AccountClientError,
   DEFAULT_ACCOUNT_BASE_URL,
+  exchangeAuthorizationCode,
   getMe,
   platformString,
   pollForToken,
@@ -184,6 +185,60 @@ describe('getMe (ac4)', () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify(me), { status: 200 }));
     const result = await getMe(BASE_URL, TOKEN, { fetch: fetchMock });
     expect(result).toEqual({ ok: true, me });
+  });
+
+  it('surfaces the entitlement from the /v1/me body (PAN-4960 WI-1)', async () => {
+    const me = {
+      userId: 'u1',
+      githubId: 100,
+      githubLogin: 'octocat',
+      deviceId: 'device-1',
+      entitlement: { plan: 'free', storageBytesCap: 5368709120, maxDevices: 3 },
+      access: { status: 'active', expiresAt: null },
+    };
+    const fetchMock = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify(me), { status: 200 }));
+    const result = await getMe(BASE_URL, TOKEN, { fetch: fetchMock });
+    expect(result.ok && result.me.entitlement.plan).toBe('free');
+  });
+});
+
+describe('exchangeAuthorizationCode (PAN-4960 WI-2)', () => {
+  const input = { code: 'odc_code', codeVerifier: 'v'.repeat(43), redirectUri: 'http://127.0.0.1:3011/oauth/account/callback' };
+
+  it('posts the authorization_code form to /oauth/token and maps a 200', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(tokenResponse());
+    const result = await exchangeAuthorizationCode(BASE_URL, input, { fetch: fetchMock });
+    expect(result).toEqual({ ok: true, accessToken: 'odd_tok', deviceId: 'device-1', label: 'Linux device' });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${BASE_URL}/oauth/token`);
+    expect(init.method).toBe('POST');
+    expect(Object.fromEntries(new URLSearchParams(init.body as string))).toEqual({
+      grant_type: 'authorization_code',
+      code: 'odc_code',
+      code_verifier: input.codeVerifier,
+      redirect_uri: input.redirectUri,
+    });
+  });
+
+  it('maps 400 access_denied to access_denied', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(errorResponse('access_denied'));
+    expect(await exchangeAuthorizationCode(BASE_URL, input, { fetch: fetchMock })).toEqual({ ok: false, reason: 'access_denied', detail: 'access_denied' });
+  });
+
+  it('maps 400 invalid_grant to refused with the error code', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(errorResponse('invalid_grant'));
+    expect(await exchangeAuthorizationCode(BASE_URL, input, { fetch: fetchMock })).toEqual({ ok: false, reason: 'refused', detail: 'invalid_grant' });
+  });
+
+  it('maps a 503 and a thrown fetch to unreachable without leaking the code or verifier', async () => {
+    const down = await exchangeAuthorizationCode(BASE_URL, input, { fetch: vi.fn().mockResolvedValueOnce(new Response('', { status: 503 })) });
+    expect(down).toEqual({ ok: false, reason: 'unreachable', detail: 'HTTP 503' });
+    const thrown = await exchangeAuthorizationCode(BASE_URL, input, { fetch: vi.fn().mockRejectedValueOnce(new Error('ECONNREFUSED')) });
+    expect(thrown).toEqual({ ok: false, reason: 'unreachable', detail: 'ECONNREFUSED' });
+    for (const result of [down, thrown]) {
+      expect(JSON.stringify(result)).not.toContain(input.codeVerifier);
+      expect(JSON.stringify(result)).not.toContain(input.code);
+    }
   });
 });
 

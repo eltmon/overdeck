@@ -54,6 +54,7 @@ src/components/Settings/__tests__/gemini-qwen-glm-catalog.test.ts
 src/components/Settings/anywhere/__tests__/AddSshMachineDialog.test.tsx
 src/components/Settings/anywhere/__tests__/AddTriggerDialog.test.tsx
 src/components/Settings/anywhere/__tests__/AccessTokensPanel.test.tsx
+src/components/Settings/anywhere/__tests__/AccountCard.test.tsx
 src/components/Settings/anywhere/__tests__/AnywhereDialogHost.test.tsx
 src/components/Settings/anywhere/__tests__/AnywhereStatusCard.test.tsx
 src/components/Settings/anywhere/__tests__/BotsPanel.test.tsx

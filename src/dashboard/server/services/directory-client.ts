@@ -9,7 +9,7 @@
  *
  * Reconnect: back-off 1 s doubling to 300 s with ±20 % jitter, reset on `welcome`. Refusals
  * (401/403 at the upgrade, closes 4001/4003/4009/4010/4011/4012) stop retrying until account.json
- * changes, checked every 60 s. Keepalive: the text `ping` every 30 s; 75 s without `pong` drops the
+ * changes, checked every 60 s or at once through `recheckAccount()`. Keepalive: the text `ping` every 30 s; 75 s without `pong` drops the
  * socket and reconnects.
  */
 import {
@@ -141,6 +141,11 @@ export class DirectoryClient {
     this.clearTimers();
     this.dropSocket();
     this.state = 'off';
+  }
+
+  /** Re-read account.json now instead of on the next 60 s check (PAN-4960: dashboard sign-in). */
+  async recheckAccount(): Promise<void> {
+    await this.checkAccount();
   }
 
   status(): DirectoryResponse {
