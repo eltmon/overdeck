@@ -1,6 +1,7 @@
 /**
  * The OAuth 2.1 authorization server for `/mcp` (PAN-4945, PAN-4927 D-15):
- * discovery metadata and dynamic client registration.
+ * discovery metadata, dynamic client registration, and the authorize page
+ * with its status poll.
  *
  * These paths are outside `/api/` and `/events/`, so the remote request gate
  * does not judge them; every handler checks its own input, and none needs a
@@ -10,11 +11,27 @@
  * Every metadata URL is built from `issuerFor(request)`, which picks a trusted
  * origin matching the request's host (D-2) and never echoes a raw `Host`, so
  * an unknown host gets 400. The protocol logic lives in `lib/mcp/oauth-*`.
+ *
+ * The authorize page shows values anyone can send (client name, redirect
+ * host), so it is rendered escaped and served with a per-response nonce CSP,
+ * no-store, no-referrer and no framing (D-11). A request that names an
+ * unknown client or an unregistered redirect URI gets an error page, never a
+ * redirect.
  */
-import { Effect, Layer } from 'effect';
-import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
+import { randomBytes } from 'node:crypto';
 
-import { authorizationServerMetadata, oauthErrorBody, protectedResourceMetadata, resolveIssuer } from '../../../lib/mcp/oauth-flow.js';
+import { Effect, Layer } from 'effect';
+import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
+
+import {
+  authorizationServerMetadata,
+  authorizePageCsp,
+  oauthErrorBody,
+  protectedResourceMetadata,
+  renderAuthorizePage,
+  renderOAuthErrorPage,
+  resolveIssuer,
+} from '../../../lib/mcp/oauth-flow.js';
 import { mcpOAuthService, type McpOAuthService } from '../../../lib/mcp/oauth-service.js';
 import { triggerFunnelBaseUrl } from '../../../lib/triggers/setup.js';
 import { jsonResponse } from '../http-helpers.js';
@@ -48,6 +65,16 @@ export function hasMediaType(request: HttpServerRequest.HttpServerRequest, type:
   return value?.split(';')[0]?.trim().toLowerCase() === type;
 }
 
+const PAGE_HEADERS = { 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer', 'X-Frame-Options': 'DENY' };
+
+function htmlResponse(html: string, status: number, headers: Record<string, string>) {
+  return HttpServerResponse.text(html, { status, contentType: 'text/html; charset=utf-8', headers: { ...PAGE_HEADERS, ...headers } });
+}
+
+function queryOf(request: HttpServerRequest.HttpServerRequest): URLSearchParams {
+  return new URL(request.url, 'http://local').searchParams;
+}
+
 function unknownHost() {
   return jsonResponse({ error: 'unknown host' }, { status: 400, headers: NO_STORE });
 }
@@ -79,11 +106,32 @@ export function makeMcpOAuthRouteLayer(deps: McpOAuthRouteDeps) {
       : jsonResponse(result.body, { status: result.status, headers: NO_STORE });
   })));
 
+  const authorizeRoute = HttpRouter.add('GET', '/oauth/mcp/authorize', httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const outcome = yield* Effect.promise(() => deps.service.authorize(queryOf(request)));
+    if (outcome.kind === 'redirect') {
+      return HttpServerResponse.empty({ status: 302, headers: { Location: outcome.location, 'Cache-Control': 'no-store' } });
+    }
+    const nonce = randomBytes(16).toString('base64');
+    if (outcome.kind === 'error-page') {
+      return htmlResponse(renderOAuthErrorPage(outcome.message), 400, { 'Content-Security-Policy': authorizePageCsp(nonce) });
+    }
+    const html = renderAuthorizePage({ nonce, requestId: outcome.requestId, clientName: outcome.clientName, redirectHost: outcome.redirectHost, approvalCode: outcome.approvalCode });
+    return htmlResponse(html, 200, { 'Content-Security-Policy': authorizePageCsp(nonce) });
+  })));
+
+  const authorizeStatusRoute = HttpRouter.add('GET', '/oauth/mcp/authorize/status', httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    return jsonResponse(deps.service.approvalStatus(queryOf(request).get('request') ?? ''), { headers: NO_STORE });
+  })));
+
   return Layer.mergeAll(
     HttpRouter.add('GET', '/.well-known/oauth-protected-resource', metadataHandler(protectedResourceMetadata)),
     HttpRouter.add('GET', '/.well-known/oauth-protected-resource/mcp', metadataHandler(protectedResourceMetadata)),
     HttpRouter.add('GET', '/.well-known/oauth-authorization-server', metadataHandler(authorizationServerMetadata)),
     registerRoute,
+    authorizeRoute,
+    authorizeStatusRoute,
   );
 }
 

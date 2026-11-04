@@ -15,6 +15,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 const LOOPBACK = '127.0.0.1';
 const REDIRECT = 'http://127.0.0.1:8123/callback';
+const CHALLENGE = 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM';
 const originalHome = process.env.OVERDECK_HOME;
 const originalPort = { API_PORT: process.env.API_PORT, PORT: process.env.PORT, DASHBOARD_URL: process.env.DASHBOARD_URL };
 const home = mkdtempSync(join(tmpdir(), 'pan-4945-oauth-routes-'));
@@ -66,8 +67,8 @@ async function send(method: string, path: string, headers: Record<string, string
   return { status: raw.status, headers: raw.headers, text, json };
 }
 
-async function registerClient(): Promise<string> {
-  const response = await send('POST', '/oauth/mcp/register', { 'content-type': 'application/json' }, JSON.stringify({ client_name: 'Claude', redirect_uris: [REDIRECT] }));
+async function registerClient(clientName = 'Claude'): Promise<string> {
+  const response = await send('POST', '/oauth/mcp/register', { 'content-type': 'application/json' }, JSON.stringify({ client_name: clientName, redirect_uris: [REDIRECT] }));
   expect(response.status).toBe(201);
   return (response.json as { client_id: string }).client_id;
 }
@@ -129,5 +130,56 @@ describe('discovery and registration (PAN-4945)', () => {
     const response = await send('GET', '/.well-known/oauth-authorization-server', { 'tailscale-funnel-request': '?1' });
     expect(response.status).toBe(404);
     expect(response.text).not.toContain('issuer');
+  });
+});
+
+function authorizePath(clientId: string, extra: Record<string, string> = {}): string {
+  const query = new URLSearchParams({ client_id: clientId, redirect_uri: REDIRECT, response_type: 'code', code_challenge: CHALLENGE, code_challenge_method: 'S256', ...extra });
+  return `/oauth/mcp/authorize?${query.toString()}`;
+}
+
+describe('the authorize page and its status (PAN-4945)', () => {
+  it('renders the approval page with the approval code and the nonce CSP, never the SPA', async () => {
+    const clientId = await registerClient();
+    const response = await send('GET', authorizePath(clientId, { state: 's1' }));
+    expect(response.status).toBe(200);
+    expect(response.headers['content-type']).toContain('text/html');
+    expect(response.text).not.toContain('SPA');
+    const [approval] = service.listApprovals();
+    expect(response.text).toContain(approval!.approvalCode);
+    const csp = response.headers['content-security-policy']!;
+    expect(csp).toContain("connect-src 'self'");
+    const nonce = /script-src 'nonce-([^']+)'/.exec(csp)![1]!;
+    expect(response.text).toContain(`<script nonce="${nonce}">`);
+    expect(response.headers['cache-control']).toBe('no-store');
+    expect(response.headers['x-frame-options']).toBe('DENY');
+    expect(response.headers['referrer-policy']).toBe('no-referrer');
+    await expect(send('GET', `/oauth/mcp/authorize/status?request=${approval!.id}`)).resolves.toMatchObject({ status: 200, json: { status: 'pending' } });
+  });
+
+  it('answers 400 HTML with no Location for an unregistered redirect URI', async () => {
+    const clientId = await registerClient();
+    const response = await send('GET', authorizePath(clientId, { redirect_uri: 'https://attacker.example/cb' }));
+    expect(response.status).toBe(400);
+    expect(response.headers['content-type']).toContain('text/html');
+    expect(response.headers.location).toBeUndefined();
+    expect(response.text).toContain('This sign-in link is not valid.');
+  });
+
+  it('redirects with error=invalid_request for code_challenge_method=plain', async () => {
+    const clientId = await registerClient();
+    const response = await send('GET', authorizePath(clientId, { code_challenge_method: 'plain' }));
+    expect(response.status).toBe(302);
+    const location = new URL(response.headers.location!);
+    expect(location.origin + location.pathname).toBe(REDIRECT);
+    expect(location.searchParams.get('error')).toBe('invalid_request');
+  });
+
+  it('escapes a hostile client name and answers expired for an unknown request id', async () => {
+    const clientId = await registerClient('<script>alert(1)</script>');
+    const response = await send('GET', authorizePath(clientId));
+    expect(response.text).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+    expect(response.text).not.toContain('<script>alert(1)');
+    await expect(send('GET', '/oauth/mcp/authorize/status?request=nope')).resolves.toMatchObject({ status: 200, json: { status: 'expired' } });
   });
 });
