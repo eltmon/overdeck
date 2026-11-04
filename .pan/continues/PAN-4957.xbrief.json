@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4957",
   "created": "2026-11-04T16:52:59.952Z",
-  "updated": "2026-11-04T16:58:21.864Z",
+  "updated": "2026-11-04T17:13:05.727Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,10 @@
       "claimedBy": "agent-pan-4957",
       "claimedAt": "2026-11-04T16:57:16.959Z",
       "doneAt": "2026-11-04T16:58:21.864Z"
+    },
+    "ci-job-skill-check.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:13:05.727Z"
     }
   }
 }
