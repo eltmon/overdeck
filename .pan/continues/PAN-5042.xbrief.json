@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5042",
   "created": "2026-11-04T17:47:47.339Z",
-  "updated": "2026-11-04T18:53:34.597Z",
+  "updated": "2026-11-04T18:58:41.770Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -68,6 +68,10 @@
       "claimedBy": "agent-pan-5042",
       "claimedAt": "2026-11-04T18:46:47.262Z",
       "doneAt": "2026-11-04T18:53:34.596Z"
+    },
+    "extract-pr-listing.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:58:41.770Z"
     }
   }
 }
