@@ -11,10 +11,13 @@
  * reused channel before any response is resent once on a fresh channel
  * (PAN-4740).
  *
- * No user-facing call waits more than 2.5 s on an unreachable machine: an
- * `offline`, `revoked` or `unsupported` link fails at once, a `connecting` link
- * waits at most 2.5 s to come online. The supervisor registers itself through
- * `setLinkRouteSource`; this module never imports the dashboard.
+ * An `offline`, `revoked` or `unsupported` link fails at once, and a
+ * `connecting` link waits at most `LINK_WAIT_MS` (2.5 s) to come online. The
+ * secure-channel open to an online link has its own `LINK_OPEN_MS` (10 s)
+ * budget, because the public Fly route often needs more than 2.5 s for TLS,
+ * the instance pin and the handshake (PAN-4885). A caller that needs a
+ * shorter bound passes its own `signal`. The supervisor registers itself
+ * through `setLinkRouteSource`; this module never imports the dashboard.
  */
 import { Agent, request as httpRequest, type AgentOptions, type ClientRequestArgs } from 'node:http';
 import type { Duplex } from 'node:stream';
@@ -27,6 +30,14 @@ import { LINK_ACTOR_HEADER, LINK_CEILING_HEADER } from './link-actor.js';
 import type { MachineKeyPair } from './machine-key.js';
 
 export const LINK_WAIT_MS = 2_500;
+
+/**
+ * Budget for opening a secure channel to an online link: transport connect plus
+ * handshake. Separate from `LINK_WAIT_MS`, which only bounds the wait for a
+ * connecting link; 2.5 s was too short for the public Fly route (PAN-4885). Same
+ * value as the channel package's `DEFAULT_OPEN_TIMEOUT_MS`.
+ */
+export const LINK_OPEN_MS = 10_000;
 
 /**
  * Longest a pooled channel sits idle before the agent closes it. The other machine's HTTP
@@ -94,8 +105,9 @@ function afterWait(info: LinkRouteInfo | null, environmentId: string, label: str
 }
 
 /**
- * One secure channel to a linked machine. Fails synchronously-fast for an
- * offline, revoked or unsupported link; waits up to 2.5 s for a connecting one.
+ * One secure channel to a linked machine. Fails at once for an offline, revoked
+ * or unsupported link; waits up to LINK_WAIT_MS for a connecting one, then gives
+ * the open LINK_OPEN_MS.
  */
 export async function openLinkSocket(
   environmentId: string,
@@ -116,7 +128,7 @@ export async function openLinkSocket(
     mode: 'link',
     localKey: await routes.localKey(),
     remoteKeyHex: info!.machineKey,
-    timeoutMs: LINK_WAIT_MS,
+    timeoutMs: LINK_OPEN_MS,
     ...(opts.signal ? { signal: opts.signal } : {}),
   });
 }
