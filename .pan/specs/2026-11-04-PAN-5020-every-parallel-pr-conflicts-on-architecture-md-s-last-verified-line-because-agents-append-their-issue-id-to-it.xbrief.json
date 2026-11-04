@@ -4,17 +4,17 @@
     "created": "2026-11-04T12:28:34Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5020: Every parallel PR conflicts on architecture.md's last-verified line because agents append their issue id to it",
-    "updated": "2026-11-04T12:33:39.591Z"
+    "updated": "2026-11-04T12:49:17.999Z"
   },
   "plan": {
     "id": "pan-5020",
     "title": "Every parallel PR conflicts on architecture.md's last-verified line because agents append their issue id to it",
-    "status": "proposed",
+    "status": "running",
     "uid": "17478b36-a322-40a9-9381-17403ba647fc",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-04T12:28:34Z",
-    "updated": "2026-11-04T12:33:39.591Z",
+    "updated": "2026-11-04T12:49:17.999Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5020",
@@ -431,5 +431,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
