@@ -185,6 +185,20 @@ describe('getMe (ac4)', () => {
     const result = await getMe(BASE_URL, TOKEN, { fetch: fetchMock });
     expect(result).toEqual({ ok: true, me });
   });
+
+  it('surfaces the entitlement from the /v1/me body (PAN-4960 WI-1)', async () => {
+    const me = {
+      userId: 'u1',
+      githubId: 100,
+      githubLogin: 'octocat',
+      deviceId: 'device-1',
+      entitlement: { plan: 'free', storageBytesCap: 5368709120, maxDevices: 3 },
+      access: { status: 'active', expiresAt: null },
+    };
+    const fetchMock = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify(me), { status: 200 }));
+    const result = await getMe(BASE_URL, TOKEN, { fetch: fetchMock });
+    expect(result.ok && result.me.entitlement.plan).toBe('free');
+  });
 });
 
 describe('revokeDevice', () => {

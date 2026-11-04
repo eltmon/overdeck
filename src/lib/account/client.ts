@@ -32,11 +32,18 @@ export type PollOutcome =
   | { ok: true; accessToken: string; deviceId: string; label: string }
   | { ok: false; reason: 'access_denied' | 'expired_token' | 'unreachable' | 'failed'; detail: string };
 
+export interface Entitlement {
+  plan: 'free' | 'tester';
+  storageBytesCap: number;
+  maxDevices: number | null;
+}
+
 export interface Me {
   userId: string;
   githubId: number;
   githubLogin: string;
   deviceId: string;
+  entitlement: Entitlement;
   access: { status: 'active' | 'grant_expired'; expiresAt: number | null };
 }
 
