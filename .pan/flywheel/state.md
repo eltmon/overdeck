@@ -649,3 +649,7 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
 - Herdr reports `agent_status: done` for an agent that finished its turn and sits at its prompt. `nodeStatusFor` in `src/dashboard/server/routes/command-deck.ts` (around line 440) maps pane state `done` to `presence: 'ended'`, SessionPanel sets `sessionAlive` false, and `ComposerFooter.tsx:182` disables the composer. The operator could not type to PAN-4841 while it waited on them. Filed PAN-5011 and started it.
 - Until it ships, relay operator answers to an idle agent with `pan tell`.
 - PAN-4841 progress: A1-A4 and P1-P2 are done, connect healthz reports apns and fcm true, and the TestFlight build is running on the Mac rig. The agent did the console work itself; the operator signed in and accepted the agreements.
+
+## 2026-11-04 — Reload hold lifted
+
+- The operator lifted the live-check reload hold (Fly VMs destroyed; PAN-4638 passed, PAN-4886 not run). Normal deploys resumed.
