@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4957",
   "created": "2026-11-04T16:52:59.952Z",
-  "updated": "2026-11-04T17:16:08.205Z",
+  "updated": "2026-11-04T17:16:22.544Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -90,6 +90,10 @@
     "docs-integrations-ci.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T17:16:08.205Z"
+    },
+    "docs-integrations-ci.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:16:22.544Z"
     }
   }
 }
