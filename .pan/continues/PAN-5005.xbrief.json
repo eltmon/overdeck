@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5005",
   "created": "2026-11-04T11:43:00.100Z",
-  "updated": "2026-11-04T12:07:57.185Z",
+  "updated": "2026-11-04T12:08:04.579Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-5005",
       "claimedAt": "2026-11-04T12:03:31.344Z",
       "doneAt": "2026-11-04T12:07:57.184Z"
+    },
+    "docs-remote-lane-badges": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5005",
+      "claimedAt": "2026-11-04T12:08:04.578Z"
     }
   }
 }
