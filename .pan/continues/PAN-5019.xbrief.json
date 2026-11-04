@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5019",
   "created": "2026-11-04T13:12:00.752Z",
-  "updated": "2026-11-04T13:57:33.453Z",
+  "updated": "2026-11-04T14:04:52.697Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,9 +46,10 @@
       "doneAt": "2026-11-04T13:57:26.229Z"
     },
     "phone-prefs-model": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5019",
-      "claimedAt": "2026-11-04T13:57:33.452Z"
+      "claimedAt": "2026-11-04T13:57:33.452Z",
+      "doneAt": "2026-11-04T14:04:52.696Z"
     }
   }
 }
