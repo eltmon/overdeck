@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4943",
   "created": "2026-11-04T04:27:55.646Z",
-  "updated": "2026-11-04T07:01:36.239Z",
+  "updated": "2026-11-04T07:10:26.309Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -27,6 +27,11 @@
       "reason": "feedback",
       "note": "[2026-11-04T07:01Z] ci-monitor → FAILED — seq 1",
       "timestamp": "2026-11-04T07:01:36.239Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-04T07:10:26.309Z"
     }
   ],
   "items": {
@@ -229,14 +234,6 @@
       "doneAt": "2026-11-04T06:37:40.329Z"
     }
   },
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "ci-monitor",
-      "outcome": "failed",
-      "timestamp": "2026-11-04T07:01:36Z",
-      "markdownBody": "# CI Failure Feedback for PAN-4943\n\nPull request: https://github.com/eltmon/overdeck/pull/4992 (head `be5d882f`)\n\nSource: check_run:test-shard (4/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-shard (4/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/126436897448/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/41788586101/job/126436897448  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/dashboard/server/services/__tests__/pull-request-sync-service.test.ts\u001b[2m > \u001b[22mstartPullRequestSyncService — schedule\u001b[2m > \u001b[22mbacks a failing listing off for 15 minutes after 3 failures in a row, then retries\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected \"vi.fn()\" to be called 4 times, but got 3 times\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m src/dashboard/server/services/__tests__/pull-request-sync-service.test.ts:\u001b[2m635:38\u001b[22m\u001b[39m\n    \u001b[90m633|\u001b[39m\n    \u001b[90m634|\u001b[39m     \u001b[35mawait\u001b[39m vi\u001b[33m.\u001b[39m\u001b[34madvanceTimersByTimeAsync\u001b[39m(\u001b[33mPR_SYNC_INTERVAL_MS\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m635|\u001b[39m     \u001b[34mexpect\u001b[39m(listRepoPullRequestsMock)\u001b[33m.\u001b[39m\u001b[34mtoHaveBeenCalledTimes\u001b[39m(\u001b[34m4\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m   |\u001b[39m                                      \u001b[31m^\u001b[39m\n    \u001b[90m636|\u001b[39m   })\u001b[33m;\u001b[39m\n    \u001b[90m637|\u001b[39m })\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\u001b[22m\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/dashboard/server/services/__tests__/pull-request-sync-service.test.ts\u001b[2m > \u001b[22mstartPullRequestSyncService — schedule\u001b[2m > \u001b[22mbacks a failing listing off for 15 minutes after 3 failures in a row, then retries\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected \"vi.fn()\" to be called 3 times, but got 1 times\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m src/dashboard/server/services/__tests__/pull-request-sync-service.test.ts:\u001b[2m628:38\u001b[22m\u001b[39m\n    \u001b[90m626|\u001b[39m     \u001b[34mstartPullRequestSyncService\u001b[39m()\u001b[33m;\u001b[39m\n    \u001b[90m627|\u001b[39m     await vi.advanceTimersByTimeAsync(PR_SYNC_BOOT_DELAY_MS + 2 * PR_S…\n    \u001b[90m628|\u001b[39m     \u001b[34mexpect\u001b[39m(listRepoPullRequestsMock)\u001b[33m.\u001b[39m\u001b[34mtoHaveBeenCalledTimes\u001b[39m(\u001b[34m3\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m   |\u001b[39m                                      \u001b[31m^\u001b[39m\n\n    \u001b[90m629|\u001b[39m\n    \u001b[90m630|\u001b[39m     // The third failure started the backoff; sweeps inside the wi\n…\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m600 passed\u001b[39m\u001b[22m\u001b[90m (601)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
-    }
-  ],
+  "feedback": [],
   "agentModel": "claude-opus-5-5"
 }
