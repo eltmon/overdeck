@@ -1,6 +1,8 @@
 /**
  * Lane door request, result and error types (.pan/drafts/pan-4223.md WI-3 step 1).
  */
+import type { PlacementRejection } from '@overdeck/contracts';
+
 import type { LaneRole } from '../overdeck/conversations.js';
 import type { LaneAnswering } from './contract.js';
 
@@ -48,6 +50,13 @@ export interface LaneLaunchConversation {
   laneRole: LaneRole;
 }
 
+/** PAN-5006: why Auto placement chose the lane's machine, and the machines it passed over. */
+export interface LanePlacement {
+  label: string;
+  reason: string;
+  rejections: PlacementRejection[];
+}
+
 export interface LaneLaunchResult {
   conversation: LaneLaunchConversation;
   cwd: string;
@@ -56,6 +65,8 @@ export interface LaneLaunchResult {
   warnings: string[];
   /** PAN-4638: the machine that runs the lane; null for a lane on this machine. */
   machine: { environmentId: string; label: string; reason: string | null } | null;
+  /** PAN-5006: set when Auto chose the machine (this one or a linked one); null otherwise. */
+  placement: LanePlacement | null;
 }
 
 export class LaneLaunchError extends Error {
