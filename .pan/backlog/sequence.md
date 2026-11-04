@@ -1,12 +1,13 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-04T08:29:44.464780Z · model: claude-opus-5-5 · open: 869_
+_Last sequenced: 2026-11-04T08:32:07.966009Z · model: claude-opus-5-5 · open: 870_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4702 | S | critical | ok |  |  | Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs. |
 | 2 | PAN-4993 | S | critical | ok |  |  | Convergence gate reads 0→2 blockers after an approval as a regression and withholds review feedback; agent idles. Scope to last episode |
+| 3 | PAN-4995 | S | high | ok |  |  | pan review request verifies a half-adopted workspace; its main merge trips adoption's head check -> false Needs-you on handoff PRs |
 | 4 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 5 | PAN-4553 | S | critical | ok |  |  | Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges. |
 | 6 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
@@ -885,6 +886,10 @@ New substrate bug in the merge door: on 2026-11-01 it refused three approved, gr
 
 New issue, placed in the open rank-2 slot. Any approved PR that is re-reviewed after a main merge and then blocks trips the reversal rule in evaluateReviewConvergence, so the work agent never receives the findings and the issue parks as needs-you; PAN-4947 is stuck on it right now. The fix is small and fully specified (evaluate only rounds after the last zero-blocker round, with named test series), and it unblocks review feedback delivery for the whole pipeline, so it ranks critical ahead of routine work.
 
+### PAN-4995 (rank 3)
+
+New substrate-improvement issue, placed in the open rank-3 slot so no other rank moves. Every handoff that opens a PR and then runs pan review request (the order the handoff brief prescribes) can race the PR-opened adoption: verification merges origin/main into the workspace before adoption's final head check, so adoption journals workspace-head-mismatch and the issue shows a false needs pr-outside-pipeline. Nothing is stranded, but each occurrence costs operator attention. The issue names the cause and picks the fix (await an in-flight adoptPrAndStartReview from the request-review path), so it is small and ready to plan.
+
 ### PAN-4636 (rank 4)
 
 New substrate bug with a verified root cause: adoption (PAN-4605) calls startReview without skipPlanChecklist, so every adopted outside PR fails incomplete-plan-items and, with no work agent, the feedback is delivered nowhere. It is currently stalling the critical in-pipeline PAN-4630 fix, so it takes the rank-5 slot freed by the closure of PAN-4534.
@@ -1193,10 +1198,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 
 New this pass. shouldHoldForUat is consulted on exactly one merge path, so every other path merges a ready issue without asking whether its project holds for UAT — verified at code level on a real MIN-901 merge. This defeats the batch-train model directly: issues merge one at a time before a generation can assemble them.
 
-### PAN-3100 (rank 81)
-
-New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1204,10 +1205,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-04T08:29:44.464780Z",
+  "generatedAt": "2026-11-04T08:32:07.966009Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 869,
+  "openCount": 870,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -12037,6 +12038,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "rationale": "New child W-CI1 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4995",
+      "rank": 3,
+      "size": "S",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan review request verifies a half-adopted workspace; its main merge trips adoption's head check -> false Needs-you on handoff PRs",
+      "rationale": "New substrate-improvement issue, placed in the open rank-3 slot so no other rank moves. Every handoff that opens a PR and then runs pan review request (the order the handoff brief prescribes) can race the PR-opened adoption: verification merges origin/main into the workspace before adoption's final head check, so adoption journals workspace-head-mismatch and the issue shows a false needs pr-outside-pipeline. Nothing is stranded, but each occurrence costs operator attention. The issue names the cause and picks the fix (await an in-flight adoptPrAndStartReview from the request-review path), so it is small and ready to plan.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13334,6 +13348,13 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.7
+    },
+    {
+      "from": "PAN-4995",
+      "to": "PAN-4636",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
     }
   ]
 }
