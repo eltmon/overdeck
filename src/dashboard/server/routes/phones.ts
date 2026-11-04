@@ -5,7 +5,8 @@
  * channel: the remote request gate admits it from nothing else, and the route
  * checks the marker again. The handshake already proved the caller's link
  * key, so the route mints the `phone` token bound to that key and revokes any
- * earlier active phone record with the same `clientId` (D-2).
+ * earlier active phone record with the same `clientId` (D-2). A code issued
+ * for an Overdeck connector is refused (PAN-4927 W-CONN1).
  *
  * `DELETE /api/phones/self` and `PUT /api/phones/self/push-key` are the
  * phone's own self-service routes: the scope table admits them with `tell`,
@@ -25,6 +26,7 @@ import {
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
 import { closeChannelsForPeer } from '../channel-listener.js';
 import { type ChannelMarker, channelOfRequest } from '../channel-peer.js';
+import { hasConnectorIntent } from '../connector-pairing.js';
 import { closeDeviceConnections } from '../device-connections.js';
 import { jsonResponse } from '../http-helpers.js';
 import { type DashboardCredential, rejectUnsafeDashboardMutationRequest, resolveRequestCredential } from './dashboard-auth.js';
@@ -68,6 +70,9 @@ export async function handlePhonesExchange(
 ): Promise<HttpServerResponse.HttpServerResponse> {
   if (channel?.mode !== 'pairing') {
     return jsonResponse({ error: 'phone exchange is accepted only inside a pairing channel' }, { status: 403 });
+  }
+  if (channel.pairingId !== null && hasConnectorIntent(channel.pairingId)) {
+    return jsonResponse({ error: 'this pairing code is for an Overdeck connector; run pan mcp connector pair with it', code: 'connector-code' }, { status: 403 });
   }
   const body = parsePhoneExchangeBody(bodyText);
   if (typeof body === 'string') return jsonResponse({ error: body }, { status: 400 });
