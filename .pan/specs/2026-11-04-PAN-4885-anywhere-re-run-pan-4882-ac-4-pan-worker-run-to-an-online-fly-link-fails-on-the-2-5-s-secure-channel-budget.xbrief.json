@@ -4,17 +4,17 @@
     "created": "2026-11-04T10:32:48Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4885: Anywhere re-run (PAN-4882): AC-4 pan worker run to an online Fly link fails on the 2.5 s secure-channel budget",
-    "updated": "2026-11-04T10:34:07.487Z"
+    "updated": "2026-11-04T10:36:06.810Z"
   },
   "plan": {
     "id": "pan-4885",
     "title": "Anywhere re-run (PAN-4882): AC-4 pan worker run to an online Fly link fails on the 2.5 s secure-channel budget",
-    "status": "proposed",
+    "status": "running",
     "uid": "55350787-93eb-4726-a7bc-4a1549f93b81",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-04T10:32:48Z",
-    "updated": "2026-11-04T10:34:07.487Z",
+    "updated": "2026-11-04T10:36:06.810Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4885",
@@ -255,5 +255,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
