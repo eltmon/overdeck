@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5016",
   "created": "2026-11-04T13:28:40.332Z",
-  "updated": "2026-11-04T13:56:29.243Z",
+  "updated": "2026-11-04T13:56:42.383Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -88,6 +88,10 @@
     "helper.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T13:56:29.243Z"
+    },
+    "helper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:56:42.383Z"
     }
   }
 }
