@@ -10,10 +10,11 @@ import { connect, type Socket } from 'node:net';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { type Duplex, duplexPair } from 'node:stream';
 
-import { FrameReader } from '@overdeck/anywhere-channel';
+import { encodePreamble, FrameReader } from '@overdeck/anywhere-channel';
 import { createWebSocketStream, WebSocket as WsClient, WebSocketServer } from 'ws';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   _resetAccessTokensForTests,
@@ -29,6 +30,7 @@ import { openChannel, openChannelOverTransport } from '../../../lib/anywhere/cha
 import { channelRequest } from '../services/machine-link-service.js';
 import {
   _resetChannelListenerForTests,
+  acceptRawChannel,
   type ChannelListenerDeps,
   closeChannelsForPeer,
   installChannelListener,
@@ -65,6 +67,7 @@ function deps(overrides: Partial<ChannelListenerDeps> = {}): ChannelListenerDeps
     onPairingFailure: () => undefined,
     serverVersion: async () => '0.0.0-test',
     log: () => undefined,
+    debug: () => undefined,
     ...overrides,
   };
 }
@@ -238,6 +241,42 @@ describe('channel listener (PAN-4645 WI-3)', () => {
       .rejects.toMatchObject({ code: expect.stringMatching(/^(protocol|identity-refused|timeout)$/) });
     expect(liveChannelCount()).toBe(0);
     expect((await get('/still-http')).text).toBe('ok /still-http');
+  });
+});
+
+describe('refusal logging (PAN-5018 FR-5)', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('logs a timeout refusal through debug with its mode', async () => {
+    vi.useFakeTimers();
+    const log = vi.fn();
+    const debug = vi.fn();
+    installChannelListener(http.createServer(), deps({ log, debug }));
+    const [initiatorSide, responderSide] = duplexPair();
+    cleanups.push(() => initiatorSide.destroy());
+    const accepted = acceptRawChannel(responderSide as Duplex);
+    initiatorSide.write(encodePreamble({ linkProtocol: 1, mode: 'link', pairingId: null }));
+    await vi.advanceTimersByTimeAsync(10_000);
+    await accepted;
+    expect(debug).toHaveBeenCalledWith(expect.stringMatching(/^channel refused \(timeout, link\): /));
+    expect(log).not.toHaveBeenCalled();
+  });
+
+  it('logs an internal refusal through log', async () => {
+    const log = vi.fn();
+    const debug = vi.fn();
+    await start(deps({
+      log,
+      debug,
+      isPinnedPeer: () => {
+        throw new Error('boom');
+      },
+    }));
+    await openChannel(`tcp://127.0.0.1:${port}`, { mode: 'link', localKey: peerKey, remoteKeyHex: hex(serverKey), timeoutMs: 2_000 }).catch(() => undefined);
+    await vi.waitFor(() => expect(log).toHaveBeenCalledWith('channel refused (internal, link): boom'));
+    expect(debug).not.toHaveBeenCalled();
   });
 });
 

@@ -45,4 +45,20 @@ describe('session', () => {
     expect(lastDialError()).toBeNull();
     off();
   });
+  it('clears the dial error when a later dial succeeds (PAN-5018)', async () => {
+    const failed = new ConnectionError('other', 'Could not open a secure channel to desk.');
+    let fail = true;
+    const stream = { marker: 'stream' };
+    setSession(MACHINE, { openLink: async () => (fail ? Promise.reject(failed) : (stream as never)) });
+    const listener = vi.fn();
+    const off = onSessionChange(listener);
+    await expect(currentMachine()?.dial()).rejects.toBe(failed);
+    expect(lastDialError()).toBe(failed);
+    fail = false;
+    await expect(currentMachine()?.dial()).resolves.toBe(stream);
+    expect(lastDialError()).toBeNull();
+    expect(listener).toHaveBeenCalledTimes(2);
+    setSession(null, null);
+    off();
+  });
 });

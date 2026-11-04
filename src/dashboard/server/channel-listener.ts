@@ -30,6 +30,7 @@ import { createWebSocketStream, WebSocketServer } from 'ws';
 
 import { acceptChannel, type PairingSecret, refuseChannel } from '../../lib/anywhere/channel/accept.js';
 import type { ChannelSocket } from '../../lib/anywhere/channel/channel-socket.js';
+import { anywhereDebug } from '../../lib/anywhere/debug-log.js';
 import type { MachineKeyPair } from '../../lib/anywhere/machine-key.js';
 
 export const DEFAULT_MAX_PENDING = 32;
@@ -56,6 +57,8 @@ export interface ChannelListenerDeps {
   onApprovalChannel?: (channel: ChannelSocket) => void;
   maxPending?: number;
   log?: (message: string) => void;
+  /** `closed` and `timeout` refusals, which aborted probe channels cause routinely (PAN-5018 D-3). Default {@link anywhereDebug}. */
+  debug?: (message: string) => void;
 }
 
 type ConnectionListener = (this: HttpServer, socket: Socket) => void;
@@ -113,6 +116,7 @@ export function _resetChannelListenerForTests(): void {
 export function installChannelListener(nodeServer: HttpServer, deps: ChannelListenerDeps): void {
   if (!deps.primary) return;
   const log = deps.log ?? ((message: string) => console.warn(`[anywhere] ${message}`));
+  const debug = deps.debug ?? ((message: string) => anywhereDebug(message));
   const maxPending = deps.maxPending ?? DEFAULT_MAX_PENDING;
 
   let serverVersion = '';
@@ -157,7 +161,10 @@ export function installChannelListener(nodeServer: HttpServer, deps: ChannelList
       toHttp(channel);
     } catch (error) {
       const code = (error as { code?: string }).code ?? 'error';
-      if (code !== 'closed' && code !== 'timeout') log(`channel refused (${code}): ${(error as Error).message}`);
+      const mode = (error as { mode?: string | null }).mode ?? 'unknown';
+      const line = `channel refused (${code}, ${mode}): ${(error as Error).message}`;
+      if (code === 'closed' || code === 'timeout') debug(line);
+      else log(line);
       if (!raw.destroyed) raw.destroy();
     } finally {
       pending -= 1;
