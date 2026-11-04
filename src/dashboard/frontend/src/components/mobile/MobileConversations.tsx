@@ -7,20 +7,25 @@
  * proxied single-row read returns the owner's own row. The view then mounts
  * `ConversationPanel` exactly as the standalone popout does. `ConversationPanel.tsx`
  * is never edited for the phone; layout fixes go in this wrapper's classes only.
+ *
+ * PAN-5045: rows are grouped by project with the desktop's resolver
+ * (`groupMobileConversations`), one collapsible section per registered
+ * project plus a trailing "No project" group. Every group starts collapsed;
+ * the set of expanded project keys lives in localStorage under
+ * `pan-mobile-expanded-projects`.
  */
-import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { parseLinkedConversationName } from '@overdeck/contracts';
 import { ConversationPanel } from '../chat/ConversationPanel';
 import type { Conversation } from '../CommandDeck/ConversationList';
+import type { RegisteredProjectLite } from '../CommandDeck/projectsData';
 import { fetchWithTimeout } from '../../lib/apiFetch';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
 import { conversationRouteKey, findLinkedConversationRow } from '../../lib/linkedConversation';
+import { groupMobileConversations, readExpandedProjects, recencyAt, writeExpandedProjects } from './conversationGroups';
 
 type ConversationRow = Conversation & { archivedAt?: string | null };
-
-function recencyAt(c: ConversationRow): string {
-  return c.lastActivityAt ?? c.lastAttachedAt ?? c.createdAt;
-}
 
 async function fetchConversationList(): Promise<ConversationRow[]> {
   const res = await fetchWithTimeout('/api/conversations');
@@ -29,36 +34,138 @@ async function fetchConversationList(): Promise<ConversationRow[]> {
   return Array.isArray(rows) ? (rows as ConversationRow[]) : [];
 }
 
+async function fetchProjectList(): Promise<RegisteredProjectLite[]> {
+  const res = await fetchWithTimeout('/api/registered-projects');
+  if (!res.ok) throw new Error(`Failed to load registered projects: ${res.status}`);
+  const body = (await res.json()) as unknown;
+  if (!Array.isArray(body)) throw new Error('Failed to load registered projects: not an array');
+  return body as RegisteredProjectLite[];
+}
+
+/** Starts a conversation in `projectKey` with the machine's default model/harness. */
+async function createProjectConversation(projectKey: string): Promise<Conversation> {
+  const res = await fetchWithTimeout('/api/conversations', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ projectKey }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({})) as { error?: string };
+    throw new Error(body.error || `Failed to start a conversation: ${res.status}`);
+  }
+  return (await res.json()) as Conversation;
+}
+
 function ConversationListView({ onOpen }: { onOpen: (id: string) => void }) {
   const { data, isLoading, isError } = useQuery({
     queryKey: ['mobile-conversations'],
     queryFn: fetchConversationList,
   });
-  if (isLoading) return <p className="px-4 py-6 text-sm text-muted-foreground">Loading conversations…</p>;
+  const projectsQuery = useQuery({
+    queryKey: ['mobile-registered-projects'],
+    queryFn: fetchProjectList,
+    staleTime: 60_000,
+  });
+  const [expanded, setExpanded] = useState(readExpandedProjects);
+  const [pendingKey, setPendingKey] = useState<string | null>(null);
+  const [failed, setFailed] = useState<{ key: string; message: string } | null>(null);
+  const queryClient = useQueryClient();
+  const createMutation = useMutation({ mutationFn: createProjectConversation });
+
+  if (isLoading || projectsQuery.isLoading) return <p className="px-4 py-6 text-sm text-muted-foreground">Loading conversations…</p>;
   if (isError) return <p className="px-4 py-6 text-sm text-muted-foreground">Couldn’t load conversations.</p>;
-  const rows = (data ?? [])
-    .filter((c) => c.archivedAt == null)
-    .sort((a, b) => recencyAt(b).localeCompare(recencyAt(a)));
-  if (rows.length === 0) return <p className="px-4 py-6 text-sm text-muted-foreground">No conversations.</p>;
+
+  const groups = groupMobileConversations(data ?? [], projectsQuery.isError ? null : projectsQuery.data ?? []);
+  if (groups.length === 0) return <p className="px-4 py-6 text-sm text-muted-foreground">No conversations.</p>;
+
+  function toggle(key: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      writeExpandedProjects(next);
+      return next;
+    });
+  }
+
+  function handleCreate(key: string) {
+    setFailed(null);
+    setPendingKey(key);
+    createMutation.mutate(key, {
+      onSuccess: async (created) => {
+        setPendingKey(null);
+        await queryClient.invalidateQueries({ queryKey: ['mobile-conversations'] });
+        onOpen(conversationRouteKey(created));
+      },
+      onError: (error) => {
+        setPendingKey(null);
+        setFailed({ key, message: error instanceof Error ? error.message : String(error) });
+      },
+    });
+  }
+
   const now = new Date();
   return (
-    <ul aria-label="Conversations" className="divide-y divide-border">
-      {rows.map((c) => (
-        <li key={c.id}>
-          <button
-            type="button"
-            onClick={() => onOpen(conversationRouteKey(c))}
-            className="flex min-h-11 w-full items-start justify-between gap-3 px-4 py-3 text-left"
-          >
-            <span className="min-w-0">
-              <span className="block truncate text-sm font-medium text-foreground">{c.title?.trim() || c.name}</span>
-              {c.issueId ? <span className="block text-xs text-muted-foreground">{c.issueId}</span> : null}
-            </span>
-            <span className="shrink-0 text-xs text-muted-foreground">{formatRelativeTime(recencyAt(c), now)}</span>
-          </button>
-        </li>
-      ))}
-    </ul>
+    <div role="region" aria-label="Conversations" className="divide-y divide-border">
+      {groups.map((group) => {
+        const isOpen = expanded.has(group.key);
+        const listId = `mobile-conversation-group-${group.key}`;
+        return (
+          <section key={group.key}>
+            <div className="flex min-h-11 items-center gap-2 px-4">
+              <button
+                type="button"
+                aria-expanded={isOpen}
+                aria-controls={listId}
+                onClick={() => toggle(group.key)}
+                className="flex min-h-11 flex-1 items-center gap-2 text-left"
+              >
+                <span aria-hidden="true">{isOpen ? '▾' : '▸'}</span>
+                <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{group.label}</span>
+                <span className="shrink-0 text-xs text-muted-foreground">{group.rows.length}</span>
+              </button>
+              {group.canCreate ? (
+                <button
+                  type="button"
+                  aria-label={`New conversation in ${group.label}`}
+                  disabled={pendingKey === group.key}
+                  onClick={() => handleCreate(group.key)}
+                  className="min-h-11 min-w-11 px-3 text-lg text-foreground"
+                >
+                  +
+                </button>
+              ) : null}
+            </div>
+            {failed?.key === group.key ? (
+              <p role="alert" className="px-4 pb-2 text-xs text-destructive">Couldn’t start a conversation: {failed.message}</p>
+            ) : null}
+            {isOpen ? (
+              group.rows.length === 0 ? (
+                <p id={listId} className="px-4 py-3 text-sm text-muted-foreground">No conversations in this project.</p>
+              ) : (
+                <ul id={listId} aria-label={group.label} className="divide-y divide-border">
+                  {group.rows.map((c) => (
+                    <li key={c.id}>
+                      <button
+                        type="button"
+                        onClick={() => onOpen(conversationRouteKey(c))}
+                        className="flex min-h-11 w-full items-start justify-between gap-3 px-4 py-3 text-left"
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-medium text-foreground">{c.title?.trim() || c.name}</span>
+                          {c.issueId ? <span className="block text-xs text-muted-foreground">{c.issueId}</span> : null}
+                        </span>
+                        <span className="shrink-0 text-xs text-muted-foreground">{formatRelativeTime(recencyAt(c), now)}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )
+            ) : null}
+          </section>
+        );
+      })}
+    </div>
   );
 }
 
