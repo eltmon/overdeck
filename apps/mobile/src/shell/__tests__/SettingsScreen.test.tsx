@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import type { Appearance } from '../appearance';
 import { type LiveActivitySetting, type NotificationsSetting, SettingsScreen } from '../SettingsScreen';
 import type { AccountRecord } from '../types';
 
@@ -20,7 +21,11 @@ function notificationsSetting(overrides: Partial<NotificationsSetting> = {}): No
   };
 }
 
-function renderSettings(notifications?: NotificationsSetting) {
+function renderSettings(
+  notifications?: NotificationsSetting,
+  appearance: Appearance = 'system',
+  onAppearanceChange: (appearance: Appearance) => void = () => {},
+) {
   return render(
     <SettingsScreen
       account={ACCOUNT}
@@ -29,11 +34,42 @@ function renderSettings(notifications?: NotificationsSetting) {
       onSignOut={async () => {}}
       onBack={() => {}}
       notifications={notifications}
+      appearance={appearance}
+      onAppearanceChange={onAppearanceChange}
     />,
   );
 }
 
 afterEach(() => cleanup());
+
+describe('SettingsScreen appearance (PAN-5041)', () => {
+  it("ac1: renders a radiogroup named 'Appearance' with System, Light and Dark, and only System checked", () => {
+    renderSettings(undefined, 'system');
+    const group = screen.getByRole('radiogroup', { name: 'Appearance' });
+    expect(group).toBeTruthy();
+    const system = screen.getByRole('radio', { name: /^System/ });
+    const light = screen.getByRole('radio', { name: /^Light/ });
+    const dark = screen.getByRole('radio', { name: /^Dark/ });
+    expect(system.getAttribute('aria-checked')).toBe('true');
+    expect(light.getAttribute('aria-checked')).toBe('false');
+    expect(dark.getAttribute('aria-checked')).toBe('false');
+  });
+
+  it("ac2: tapping Light calls onAppearanceChange('light') once", () => {
+    const onAppearanceChange = vi.fn();
+    renderSettings(undefined, 'system', onAppearanceChange);
+    fireEvent.click(screen.getByRole('radio', { name: /^Light/ }));
+    expect(onAppearanceChange).toHaveBeenCalledTimes(1);
+    expect(onAppearanceChange).toHaveBeenCalledWith('light');
+  });
+
+  it('ac3: with appearance=dark only the Dark radio is checked', () => {
+    renderSettings(undefined, 'dark');
+    expect(screen.getByRole('radio', { name: /^System/ }).getAttribute('aria-checked')).toBe('false');
+    expect(screen.getByRole('radio', { name: /^Light/ }).getAttribute('aria-checked')).toBe('false');
+    expect(screen.getByRole('radio', { name: /^Dark/ }).getAttribute('aria-checked')).toBe('true');
+  });
+});
 
 describe('SettingsScreen notifications (PAN-4838 WI-9)', () => {
   it('renders no switch without notifications', () => {
@@ -137,6 +173,8 @@ function renderWithLiveActivity(liveActivity: LiveActivitySetting | null) {
       onForget={() => undefined}
       onSignOut={async () => undefined}
       onBack={() => undefined}
+      appearance="system"
+      onAppearanceChange={() => undefined}
     />,
   );
 }
