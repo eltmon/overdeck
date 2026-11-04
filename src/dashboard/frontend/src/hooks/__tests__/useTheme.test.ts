@@ -174,4 +174,50 @@ describe('useTheme', () => {
       expect(result.current.theme).toBe(initialTheme);
     });
   });
+
+  describe('setTheme', () => {
+    it('ac1: sets light theme, clears the dark class, persists to localStorage, and resolves to light', () => {
+      const { result } = renderHook(() => useTheme());
+
+      act(() => {
+        result.current.setTheme('light');
+      });
+
+      expect(document.documentElement.classList.contains('dark')).toBe(false);
+      expect(localStorage.getItem('overdeck.ui.theme')).toBe('light');
+      expect(result.current.resolvedTheme).toBe('light');
+    });
+
+    it('ac3: syncs the theme to the server with a PUT when outside the native shell', () => {
+      const { result } = renderHook(() => useTheme());
+
+      act(() => {
+        result.current.setTheme('dark');
+      });
+
+      expect(fetchControl.fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchControl.fetchMock.mock.calls[0]?.[0]).toBe('/api/settings/ui-theme');
+      expect(fetchControl.fetchMock.mock.calls[0]?.[1]?.method).toBe('PUT');
+    });
+  });
+
+  describe('native shell', () => {
+    afterEach(() => {
+      delete (globalThis as { __OVERDECK_NATIVE__?: boolean }).__OVERDECK_NATIVE__;
+    });
+
+    it('ac2: never syncs to the server, on module load with a stored theme or on setTheme', async () => {
+      mockLocalStorage['overdeck.ui.theme'] = 'dark';
+      (globalThis as { __OVERDECK_NATIVE__?: boolean }).__OVERDECK_NATIVE__ = true;
+
+      vi.resetModules();
+      const native = await import('../useTheme');
+
+      act(() => {
+        native.useTheme.getState().setTheme('dark');
+      });
+
+      expect(fetchControl.fetchMock).not.toHaveBeenCalled();
+    });
+  });
 });

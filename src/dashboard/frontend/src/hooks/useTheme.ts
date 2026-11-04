@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { isNativeShell } from '../lib/nativeShell';
 
 type Theme = 'light' | 'dark';
 
@@ -28,6 +29,7 @@ function applyTheme(theme: Theme, suppressTransitions = false) {
 // pane background to match — that's what lets Claude Code's `theme: auto`
 // detect the dashboard theme at startup, even when started headless.
 function syncThemeToServer(theme: Theme) {
+  if (isNativeShell()) return;
   try {
     void fetch('/api/settings/ui-theme', {
       method: 'PUT',
@@ -52,6 +54,7 @@ interface ThemeState {
   theme: Theme;
   resolvedTheme: 'light' | 'dark';
   toggleTheme: () => void;
+  setTheme: (theme: Theme) => void;
 }
 
 export const useTheme = create<ThemeState>((set, get) => ({
@@ -64,5 +67,12 @@ export const useTheme = create<ThemeState>((set, get) => ({
     localStorage.setItem(STORAGE_KEY, newTheme);
     syncThemeToServer(newTheme);
     set({ theme: newTheme, resolvedTheme: newTheme });
+  },
+
+  setTheme: (theme: Theme) => {
+    applyTheme(theme, true);
+    localStorage.setItem(STORAGE_KEY, theme);
+    syncThemeToServer(theme);
+    set({ theme, resolvedTheme: theme });
   },
 }));
