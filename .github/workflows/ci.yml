@@ -351,6 +351,17 @@ jobs:
       - name: Shared skill copies match
         run: node integrations/shared/sync-skill.mjs --check
 
+      - name: Use Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install the Hermes plugin
+        run: pip install -e 'integrations/hermes[test]'
+
+      - name: Hermes tests
+        run: python -m pytest integrations/hermes
+
   # `test` is the check name the close-out gate requires on main
   # (DEFAULT_MAIN_VERIFY_REQUIRED_CHECKS in src/lib/lifecycle/dod-gate.ts), so
   # it stays one job: green only when every shard, test-e2e and mobile-android passed.
