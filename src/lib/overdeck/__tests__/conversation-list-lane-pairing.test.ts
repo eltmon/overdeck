@@ -10,6 +10,7 @@ vi.mock('../../../dashboard/server/services/dashboard-poll-snapshots.js', () => 
 vi.mock('../conversations.js', () => ({
   listConversations: list, listFavoritedIds: () => [], markConversationRunning: vi.fn(), listLaneConversations: lanes,
 }));
+vi.mock('../../lanes/remote-lanes.js', () => ({ listRemoteLanes: async () => [], readCriticLink: async () => null }));
 vi.mock('../../agents/worker/report.js', () => ({ latestWorkerReport: async (id: string) => reports.get(id) ?? null }));
 vi.mock('../../tmux.js', () => ({ listSessionNames: () => Effect.succeed([]), isHarnessProcessAlive: vi.fn() }));
 vi.mock('../conversation-reads.js', () => ({
@@ -46,7 +47,7 @@ describe('conversation list lane pairing (PAN-4223 WI-20)', () => {
     const [root, builder, critic] = await enriched();
     expect(root).not.toHaveProperty('laneReport');
     expect(critic).toMatchObject({ laneIteration: 1, laneReport: null, laneVerdict: { value: 'pending', defects: null }, criticOfConversationName: 'b1' });
-    expect(builder).toMatchObject({ laneIteration: 1, laneLatestVerdict: { value: 'pending', defects: null, criticId: 2 } });
+    expect(builder).toMatchObject({ laneIteration: 1, laneLatestVerdict: { value: 'pending', defects: null, criticId: 2, criticRoute: '2' } });
     expect(lanes).toHaveBeenCalledTimes(1);
     expect(lanes).toHaveBeenCalledWith({ run: 'hotel' });
   });
@@ -58,7 +59,7 @@ describe('conversation list lane pairing (PAN-4223 WI-20)', () => {
       laneReport: { seq: 1, status: 'done', verdict: 'NOT_YET' },
       laneVerdict: { value: 'NOT_YET', defects: 5 },
     });
-    expect(builder).toMatchObject({ laneLatestVerdict: { value: 'NOT_YET', defects: 5, criticId: 2 } });
+    expect(builder).toMatchObject({ laneLatestVerdict: { value: 'NOT_YET', defects: 5, criticId: 2, criticRoute: '2' } });
     expect(builder).not.toHaveProperty('laneVerdict');
   });
 });

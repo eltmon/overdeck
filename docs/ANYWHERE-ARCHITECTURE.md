@@ -1311,6 +1311,15 @@ linked row with the stand-in's parent, run, key, role, critic link and home's pr
 so the Command Deck tree nests it under its orchestrator and the Awareness rail counts it
 in the run card, with no frontend change.
 
+PAN-5005: lane list fields (`laneReport`, `laneIteration`, `laneVerdict`, `laneLatestVerdict`)
+come from `laneFieldsByRun` in `lanes/lane-list-fields.ts`, which pairs over
+`listAllLaneRows` (local and remote lanes of a run) instead of the home-only context
+`conversation-list.ts` used before. `getMergedConversationList` passes them to
+`mergeConversationRows` through `RemoteLaneEntry.fields`, which is spread onto the stamped
+row alongside the lane facts above. `laneLatestVerdict.criticRoute` is the critic's route
+key — `@<environmentId>/<name>` for a remote critic, its numeric id as a string for a local
+one — so a builder's verdict link opens the right row on either machine.
+
 Live check, 2026-11-01: the three-machine run (orchestrator and builders on the desktop,
 critics on a Fly machine and the laptop) did not run before merge: no laptop or Fly machine
 was linked to the desktop, and the desktop dashboard runs `main`, which has no lane doors
@@ -1323,5 +1332,5 @@ Live check, 2026-11-04 (build `65e3b1adf86`, 0.73.1 on all three machines): pass
 desktop; critics on a Fly machine (`add-fly`) and the laptop rig each judged a builder's pushed head and
 reported PASS; `--machine auto` chose the Fly machine by CPU pressure, `--needs macos` the laptop and
 `--needs docker` the desktop. All 8 lanes were listed under the orchestrator in `pan lane list` and the
-Command Deck. The tree shows no report badges for remote lanes (#5005), and Auto prints no reason when it
+Command Deck. The tree showed no report badges for remote lanes, fixed by #5005. Auto prints no reason when it
 picks this machine (#5006). Evidence: `.pan/uat/pan-4638/check-1-three-machine-gauntlet.md`.
