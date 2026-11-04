@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5018",
   "created": "2026-11-04T13:12:52.932Z",
-  "updated": "2026-11-04T13:16:03.904Z",
+  "updated": "2026-11-04T13:17:11.250Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -28,9 +28,10 @@
       "doneAt": "2026-11-04T13:16:02.428Z"
     },
     "accept-error-mode-and-internal": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5018",
-      "claimedAt": "2026-11-04T13:16:03.903Z"
+      "claimedAt": "2026-11-04T13:16:03.903Z",
+      "doneAt": "2026-11-04T13:17:11.250Z"
     }
   }
 }
