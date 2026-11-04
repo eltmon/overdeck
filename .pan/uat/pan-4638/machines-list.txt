@@ -1,0 +1,10 @@
+This machine: eltmon-z790 (da4f-8c0c-2c16-a4de-a128)
+
+LABEL                       STATE   ROUTE                                                             ACCESS    SSH  FINGERPRINT               LOAD                        TAGS
+eltmon-z790 (this machine)  self    -                                                                 -         -    da4f-8c0c-2c16-a4de-a128  CPU 1% · 38 GB · 10 agents  docker, gpu, linux
+Edwards-MacBook-Air.local   online  tcp://192.168.1.83:3011                                           operator  -    44cb-0a7c-01cb-606e-5c19  CPU n/a · 2 GB · 0 agents   ios-sim, macos
+fly-8d4101ae001028          online  wss://pan-workspaces.fly.dev/ws/link?fly-instance=8d4101ae001028  operator  -    2faa-9ad7-5dcd-3428-3408  CPU 8% · 1 GB · 0 agents    linux
+
+Inbound
+LABEL                      ACCESS    FINGERPRINT               LAST USED  TOKEN ID
+Edwards-MacBook-Air.local  operator  44cb-0a7c-01cb-606e-5c19  10 h ago   aa19a85c-8e8f-4bf0-bd2d-9ebc069677f9

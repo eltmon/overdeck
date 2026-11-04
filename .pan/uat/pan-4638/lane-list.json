@@ -1,0 +1,419 @@
+[
+  {
+    "id": 3612,
+    "name": "20261104-3094",
+    "title": "pan4638 farewell · builder",
+    "run": "pan4638",
+    "key": "farewell",
+    "role": "builder",
+    "iteration": 1,
+    "parentId": 3611,
+    "parentName": "20261104-8868",
+    "harness": "claude-code",
+    "model": "claude-sonnet-5-5",
+    "effort": "low",
+    "projectKey": "anywhere-lanes-demo",
+    "cwd": "/home/eltmon/Projects/anywhere-lanes-demo-lanes/pan4638-farewell",
+    "activity": "idle",
+    "report": {
+      "seq": 1,
+      "at": "2026-11-04T10:35:03.422Z",
+      "status": "done",
+      "head": "0b9cc44d39188c1676be6597d0a8f72e84293810",
+      "branch": "pan4638/farewell"
+    },
+    "git": {
+      "branch": "pan4638/farewell",
+      "head": "0b9cc44d39188c1676be6597d0a8f72e84293810",
+      "ahead": 0,
+      "dirty": false
+    },
+    "costUsd": 0,
+    "createdAt": "2026-11-04T10:33:52.963Z",
+    "lastActivityAt": "2026-11-04T10:35:09.184Z",
+    "archived": false,
+    "criticOf": null,
+    "verdict": null,
+    "critics": [
+      {
+        "id": null,
+        "name": "20261104-4962",
+        "role": "critic",
+        "iteration": 1,
+        "verdict": "PASS",
+        "defects": 0,
+        "file": "/tmp/pan4638-critic-verdict.json",
+        "activity": "idle"
+      }
+    ],
+    "latestVerdict": {
+      "id": null,
+      "name": "20261104-4962",
+      "role": "critic",
+      "iteration": 1,
+      "verdict": "PASS",
+      "defects": 0,
+      "file": "/tmp/pan4638-critic-verdict.json",
+      "activity": "idle"
+    },
+    "answering": null,
+    "machine": null
+  },
+  {
+    "id": null,
+    "name": "20261104-4962",
+    "title": "pan4638 farewell · critic",
+    "run": "pan4638",
+    "key": "farewell",
+    "role": "critic",
+    "iteration": 1,
+    "parentId": 3611,
+    "parentName": "20261104-8868",
+    "harness": "claude-code",
+    "model": "claude-sonnet-5-5",
+    "effort": "low",
+    "projectKey": "anywhere-lanes-demo",
+    "cwd": "/workspace/anywhere-lanes-demo-lanes/pan4638-farewell-critic-i1",
+    "activity": "idle",
+    "report": {
+      "seq": 1,
+      "at": "2026-11-04T10:35:46.302Z",
+      "status": "done",
+      "head": "0b9cc44d39188c1676be6597d0a8f72e84293810",
+      "branch": null
+    },
+    "git": {
+      "branch": null,
+      "head": "0b9cc44d39188c1676be6597d0a8f72e84293810",
+      "ahead": null,
+      "dirty": false
+    },
+    "costUsd": 0.104558,
+    "createdAt": "2026-11-04T10:35:30.993Z",
+    "lastActivityAt": "2026-11-04T10:35:48.782Z",
+    "archived": false,
+    "criticOf": {
+      "id": 3612,
+      "name": "20261104-3094",
+      "key": "farewell",
+      "iteration": 1
+    },
+    "verdict": {
+      "value": "PASS",
+      "defects": 0,
+      "file": "/tmp/pan4638-critic-verdict.json"
+    },
+    "critics": [],
+    "latestVerdict": null,
+    "answering": null,
+    "machine": {
+      "environmentId": "57139199-e8b8-4576-ac7f-e8630a11eac4",
+      "label": "fly-8d4101ae001028",
+      "reachable": true,
+      "lastSeenAt": "2026-11-04T10:41:22.185Z"
+    }
+  },
+  {
+    "id": 3613,
+    "name": "20261104-3382",
+    "title": "pan4638 shout · builder",
+    "run": "pan4638",
+    "key": "shout",
+    "role": "builder",
+    "iteration": 1,
+    "parentId": 3611,
+    "parentName": "20261104-8868",
+    "harness": "claude-code",
+    "model": "claude-sonnet-5-5",
+    "effort": "low",
+    "projectKey": "anywhere-lanes-demo",
+    "cwd": "/home/eltmon/Projects/anywhere-lanes-demo-lanes/pan4638-shout",
+    "activity": "idle",
+    "report": {
+      "seq": 1,
+      "at": "2026-11-04T10:36:59.464Z",
+      "status": "done",
+      "head": "df834a554abcd28a4a3382b663269830d49602c5",
+      "branch": "pan4638/shout"
+    },
+    "git": {
+      "branch": "pan4638/shout",
+      "head": "df834a554abcd28a4a3382b663269830d49602c5",
+      "ahead": 0,
+      "dirty": false
+    },
+    "costUsd": 0,
+    "createdAt": "2026-11-04T10:35:41.915Z",
+    "lastActivityAt": "2026-11-04T10:37:04.157Z",
+    "archived": false,
+    "criticOf": null,
+    "verdict": null,
+    "critics": [
+      {
+        "id": null,
+        "name": "20261104-4727",
+        "role": "critic",
+        "iteration": 1,
+        "verdict": "PASS",
+        "defects": 0,
+        "file": "/tmp/pan4638-critic-verdict.json",
+        "activity": "idle"
+      }
+    ],
+    "latestVerdict": {
+      "id": null,
+      "name": "20261104-4727",
+      "role": "critic",
+      "iteration": 1,
+      "verdict": "PASS",
+      "defects": 0,
+      "file": "/tmp/pan4638-critic-verdict.json",
+      "activity": "idle"
+    },
+    "answering": null,
+    "machine": null
+  },
+  {
+    "id": null,
+    "name": "20261104-4727",
+    "title": "pan4638 shout · critic",
+    "run": "pan4638",
+    "key": "shout",
+    "role": "critic",
+    "iteration": 1,
+    "parentId": 3611,
+    "parentName": "20261104-8868",
+    "harness": "claude-code",
+    "model": "claude-sonnet-5-5",
+    "effort": "low",
+    "projectKey": "anywhere-lanes-demo",
+    "cwd": "/Users/eltmon/Projects/anywhere-lanes-demo-lanes/pan4638-shout-critic-i1",
+    "activity": "idle",
+    "report": {
+      "seq": 1,
+      "at": "2026-11-04T10:37:54.196Z",
+      "status": "done",
+      "head": "df834a554abcd28a4a3382b663269830d49602c5",
+      "branch": null
+    },
+    "git": {
+      "branch": null,
+      "head": "df834a554abcd28a4a3382b663269830d49602c5",
+      "ahead": null,
+      "dirty": false
+    },
+    "costUsd": 0.17458,
+    "createdAt": "2026-11-04T10:37:05.438Z",
+    "lastActivityAt": "2026-11-04T10:37:57.830Z",
+    "archived": false,
+    "criticOf": {
+      "id": 3613,
+      "name": "20261104-3382",
+      "key": "shout",
+      "iteration": 1
+    },
+    "verdict": {
+      "value": "PASS",
+      "defects": 0,
+      "file": "/tmp/pan4638-critic-verdict.json"
+    },
+    "critics": [],
+    "latestVerdict": null,
+    "answering": null,
+    "machine": {
+      "environmentId": "11fa1ff3-e2a3-4a33-90b9-698a1cd87ef6",
+      "label": "Edwards-MacBook-Air.local",
+      "reachable": true,
+      "lastSeenAt": "2026-11-04T10:41:22.035Z"
+    }
+  },
+  {
+    "id": 3614,
+    "name": "20261104-6382",
+    "title": "pan4638 twice · builder",
+    "run": "pan4638",
+    "key": "twice",
+    "role": "builder",
+    "iteration": 1,
+    "parentId": 3611,
+    "parentName": "20261104-8868",
+    "harness": "claude-code",
+    "model": "claude-sonnet-5-5",
+    "effort": "low",
+    "projectKey": "anywhere-lanes-demo",
+    "cwd": "/home/eltmon/Projects/anywhere-lanes-demo-lanes/pan4638-twice",
+    "activity": "idle",
+    "report": {
+      "seq": 1,
+      "at": "2026-11-04T10:40:02.709Z",
+      "status": "done",
+      "head": "f0b72ba32fc068adbdbfd8070a9b2f27885a04d5",
+      "branch": "pan4638/twice"
+    },
+    "git": {
+      "branch": "pan4638/twice",
+      "head": "f0b72ba32fc068adbdbfd8070a9b2f27885a04d5",
+      "ahead": 0,
+      "dirty": false
+    },
+    "costUsd": 0,
+    "createdAt": "2026-11-04T10:38:20.554Z",
+    "lastActivityAt": "2026-11-04T10:40:06.119Z",
+    "archived": false,
+    "criticOf": null,
+    "verdict": null,
+    "critics": [
+      {
+        "id": 3615,
+        "name": "20261104-3996",
+        "role": "critic",
+        "iteration": 1,
+        "verdict": "PASS",
+        "defects": 0,
+        "file": "/tmp/pan4638-verdict.json",
+        "activity": "working"
+      }
+    ],
+    "latestVerdict": {
+      "id": 3615,
+      "name": "20261104-3996",
+      "role": "critic",
+      "iteration": 1,
+      "verdict": "PASS",
+      "defects": 0,
+      "file": "/tmp/pan4638-verdict.json",
+      "activity": "working"
+    },
+    "answering": null,
+    "machine": null
+  },
+  {
+    "id": null,
+    "name": "20261104-9652",
+    "title": "pan4638 auto · play",
+    "run": "pan4638",
+    "key": "auto",
+    "role": "play",
+    "iteration": 1,
+    "parentId": 3611,
+    "parentName": "20261104-8868",
+    "harness": "claude-code",
+    "model": "claude-sonnet-5-5",
+    "effort": "low",
+    "projectKey": "anywhere-lanes-demo",
+    "cwd": "/workspace/anywhere-lanes-demo-lanes/pan4638-auto-play-i1",
+    "activity": "idle",
+    "report": {
+      "seq": 1,
+      "at": "2026-11-04T10:38:35.924Z",
+      "status": "done",
+      "head": null,
+      "branch": null
+    },
+    "git": null,
+    "costUsd": 0.057711,
+    "createdAt": "2026-11-04T10:38:27.128Z",
+    "lastActivityAt": "2026-11-04T10:38:38.209Z",
+    "archived": false,
+    "criticOf": null,
+    "verdict": null,
+    "critics": [],
+    "latestVerdict": null,
+    "answering": null,
+    "machine": {
+      "environmentId": "57139199-e8b8-4576-ac7f-e8630a11eac4",
+      "label": "fly-8d4101ae001028",
+      "reachable": true,
+      "lastSeenAt": "2026-11-04T10:41:22.184Z"
+    }
+  },
+  {
+    "id": null,
+    "name": "20261104-3234",
+    "title": "pan4638 automac · play",
+    "run": "pan4638",
+    "key": "automac",
+    "role": "play",
+    "iteration": 1,
+    "parentId": 3611,
+    "parentName": "20261104-8868",
+    "harness": "claude-code",
+    "model": "claude-sonnet-5-5",
+    "effort": "low",
+    "projectKey": "anywhere-lanes-demo",
+    "cwd": "/Users/eltmon/Projects/anywhere-lanes-demo-lanes/pan4638-automac-play-i1",
+    "activity": "idle",
+    "report": {
+      "seq": 1,
+      "at": "2026-11-04T10:39:12.782Z",
+      "status": "done",
+      "head": null,
+      "branch": null
+    },
+    "git": null,
+    "costUsd": 0.06469899999999999,
+    "createdAt": "2026-11-04T10:38:28.155Z",
+    "lastActivityAt": "2026-11-04T10:39:18.611Z",
+    "archived": false,
+    "criticOf": null,
+    "verdict": null,
+    "critics": [],
+    "latestVerdict": null,
+    "answering": null,
+    "machine": {
+      "environmentId": "11fa1ff3-e2a3-4a33-90b9-698a1cd87ef6",
+      "label": "Edwards-MacBook-Air.local",
+      "reachable": true,
+      "lastSeenAt": "2026-11-04T10:41:21.960Z"
+    }
+  },
+  {
+    "id": 3615,
+    "name": "20261104-3996",
+    "title": "pan4638 twice · critic",
+    "run": "pan4638",
+    "key": "twice",
+    "role": "critic",
+    "iteration": 1,
+    "parentId": 3611,
+    "parentName": "20261104-8868",
+    "harness": "claude-code",
+    "model": "claude-sonnet-5-5",
+    "effort": "low",
+    "projectKey": "anywhere-lanes-demo",
+    "cwd": "/home/eltmon/Projects/anywhere-lanes-demo-lanes/pan4638-twice-critic-i1",
+    "activity": "working",
+    "report": {
+      "seq": 1,
+      "at": "2026-11-04T10:41:21.696Z",
+      "status": "done",
+      "head": "f0b72ba32fc068adbdbfd8070a9b2f27885a04d5",
+      "branch": null
+    },
+    "git": {
+      "branch": null,
+      "head": "f0b72ba32fc068adbdbfd8070a9b2f27885a04d5",
+      "ahead": null,
+      "dirty": false
+    },
+    "costUsd": 0,
+    "createdAt": "2026-11-04T10:40:23.701Z",
+    "lastActivityAt": "2026-11-04T10:41:23.392Z",
+    "archived": false,
+    "criticOf": {
+      "id": 3614,
+      "name": "20261104-6382",
+      "key": "twice",
+      "iteration": 1
+    },
+    "verdict": {
+      "value": "PASS",
+      "defects": 0,
+      "file": "/tmp/pan4638-verdict.json"
+    },
+    "critics": [],
+    "latestVerdict": null,
+    "answering": null,
+    "machine": null
+  }
+]
