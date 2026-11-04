@@ -200,3 +200,17 @@ answered:
   `apps/mobile/android/app/google-services.json`.
 - `apns: true` means the values are present and parse. The delivered-push proof is the device
   run below ("PAN-4838 iOS notifications", "Device run (PAN-4841)").
+
+### Google Play
+
+- Date: 2026-11-04. Built with `apps/mobile/scripts/build-android.sh --build 1` from `feature/pan-4841`.
+- versionCode 1, versionName 1.0 (Play shows "1 (1.0)", API 24+, target SDK 36).
+- Upload certificate SHA-1: `25:B5:5E:5B:55:8F:1E:67:46:5A:E2:DC:D3:68:FF:54:16:E3:F5:7F` (equals
+  `apps/mobile/android/upload-certificate.sha1`; the script checked it).
+- AAB SHA-256: `f2e63057b14908bc16827c2af48f2cf0f154f51aa8e6ce1170d022deb6f9f9ce`.
+- Play app "Overdeck" (`ai.overdeck.app`), Play App Signing with a Google-generated key.
+- Internal testing release `1.0 (1)`: "Available to internal testers", released 2026-11-04, tester
+  list "Operator". Until the app is reviewed, testers see the temporary name
+  "ai.overdeck.app (unreviewed)".
+- Includes PAN-4840 (Android push decryption): no. PAN-4840 was still open, so this build has the
+  FCM config but not the handler (D-6); a later build ships it.
