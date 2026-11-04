@@ -4,17 +4,17 @@
     "created": "2026-11-04T00:53:19Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4936: Agent MCP and bots (W-SELF1): Self routes foundation: agent identity, jobs, waits",
-    "updated": "2026-11-04T00:55:05.068Z"
+    "updated": "2026-11-04T00:56:16.983Z"
   },
   "plan": {
     "id": "pan-4936",
     "title": "Agent MCP and bots (W-SELF1): Self routes foundation: agent identity, jobs, waits",
-    "status": "proposed",
+    "status": "running",
     "uid": "ab6fa01f-0048-4ee0-9d02-c6083303af41",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-04T00:53:19Z",
-    "updated": "2026-11-04T00:55:05.068Z",
+    "updated": "2026-11-04T00:56:16.983Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4936",
@@ -573,5 +573,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
