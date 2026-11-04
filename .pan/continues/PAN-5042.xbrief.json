@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5042",
   "created": "2026-11-04T17:47:47.339Z",
-  "updated": "2026-11-04T18:59:21.683Z",
+  "updated": "2026-11-04T18:59:52.409Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,6 +80,10 @@
     "extract-pr-listing.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T18:59:21.683Z"
+    },
+    "split-open-closed.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:59:52.408Z"
     }
   }
 }
