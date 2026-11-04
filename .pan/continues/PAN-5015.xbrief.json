@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5015",
   "created": "2026-11-04T15:25:55.139Z",
-  "updated": "2026-11-04T15:27:40.171Z",
+  "updated": "2026-11-04T15:28:39.375Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-11-04T15:27:29.519Z"
     },
     "done-defers-github-5xx": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5015",
-      "claimedAt": "2026-11-04T15:27:40.171Z"
+      "claimedAt": "2026-11-04T15:27:40.171Z",
+      "doneAt": "2026-11-04T15:28:39.374Z"
     }
   }
 }
