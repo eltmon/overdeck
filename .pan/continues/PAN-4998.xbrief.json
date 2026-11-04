@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4998",
   "created": "2026-11-04T10:12:10.948Z",
-  "updated": "2026-11-04T10:50:53.935Z",
+  "updated": "2026-11-04T10:51:29.156Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -98,6 +98,10 @@
     "w6-no-tmp-rule.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T10:50:53.935Z"
+    },
+    "w7-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:51:29.156Z"
     }
   }
 }
