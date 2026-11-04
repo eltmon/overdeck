@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5045",
   "created": "2026-11-04T18:04:56.381Z",
-  "updated": "2026-11-04T18:51:48.390Z",
+  "updated": "2026-11-04T18:52:03.757Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -84,6 +84,10 @@
     "grouped-list.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T18:51:48.389Z"
+    },
+    "grouped-list.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:52:03.756Z"
     }
   }
 }
