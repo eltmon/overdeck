@@ -8,6 +8,8 @@ export const ACCOUNT_BASE_URL = env.VITE_OVERDECK_ACCOUNT_URL ?? 'https://accoun
 /** overdeck.ai directory; override with `VITE_OVERDECK_DIRECTORY_URL`. */
 export const DIRECTORY_BASE_URL = env.VITE_OVERDECK_DIRECTORY_URL ?? 'https://connect.overdeck.ai';
 export const APP_VERSION: string = pkg.version;
+/** `VITE_OVERDECK_DEBUG_ERRORS=1` appends the error code to a failed link's text, e.g. ` (timeout)` (PAN-5018 D-2). */
+export const DEBUG_ERRORS = env.VITE_OVERDECK_DEBUG_ERRORS === '1';
 /**
  * The oldest pan release with the phone credential (PAN-4835). No tag contained its merge when
  * this was set, so it is the next minor after 0.73.1 (D-8a).

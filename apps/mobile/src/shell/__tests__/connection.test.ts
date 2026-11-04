@@ -1,10 +1,10 @@
 import { EventEmitter } from 'node:events';
 
-import { ChannelOpenError, type ChannelOpenErrorCode, type MachineDialer, type RtcDuplexWeb } from '@overdeck/anywhere-channel/web';
+import { ChannelOpenError, type ChannelOpenErrorCode, type DirectoryWebState, type MachineDialer, type RtcDuplexWeb } from '@overdeck/anywhere-channel/web';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MIN_PAN_VERSION } from '../config';
-import { ConnectionError, createConnection, DIRECT_TIMEOUT_WITH_RELAY_MS, type ConnectionDirectory } from '../connection';
+import { ConnectionError, createConnection, DIRECT_TIMEOUT_WITH_RELAY_MS, DIRECTORY_WAIT_MS, type ConnectionDirectory } from '../connection';
 import { createRelayMeter, type RelayMeter } from '../relayMeter';
 import type { PairedMachine } from '../types';
 
@@ -35,12 +35,23 @@ function fakeDirectory(opts: { relayAllowed: boolean; online?: boolean; direct: 
     }),
     close: vi.fn(),
   };
-  const directory: ConnectionDirectory = {
-    client: { state: opts.online === false ? 'connecting' : 'online', relayAllowed: opts.relayAllowed },
-    dialer,
-    relayStopped: () => relayStopped,
+  const stateListeners = new Set<(state: DirectoryWebState) => void>();
+  const client = {
+    state: (opts.online === false ? 'connecting' : 'online') as DirectoryWebState,
+    relayAllowed: opts.relayAllowed,
+    onStateChange(listener: (state: DirectoryWebState) => void) {
+      stateListeners.add(listener);
+      return () => {
+        stateListeners.delete(listener);
+      };
+    },
   };
-  return { directory, dials, raws, dialer, stopRelay: () => (relayStopped = true) };
+  const setState = (state: DirectoryWebState): void => {
+    client.state = state;
+    for (const listener of [...stateListeners]) listener(state);
+  };
+  const directory: ConnectionDirectory = { client, dialer, relayStopped: () => relayStopped };
+  return { directory, dials, raws, dialer, setState, stopRelay: () => (relayStopped = true) };
 }
 
 const MACHINE: PairedMachine = {
@@ -115,11 +126,44 @@ describe('dialRaw', () => {
     expect(f.dials).toEqual([{ relay: false }]);
   });
 
-  it('refuses with directory-offline while the directory is not online', async () => {
+  it('refuses with directory-offline when the directory does not come online in time', async () => {
     const f = fakeDirectory({ relayAllowed: true, online: false, direct: 'ok' });
-    const error = await rejection(createConnection({ directory: f.directory, meter }).dialRaw(MACHINE.environmentId, 'desk'));
+    const log = vi.fn();
+    const pending = rejection(createConnection({ directory: f.directory, meter, log }).dialRaw(MACHINE.environmentId, 'desk'));
+    await vi.advanceTimersByTimeAsync(DIRECTORY_WAIT_MS);
+    const error = await pending;
     expect(error.kind).toBe('directory-offline');
     expect(error.message).toBe('Not connected to overdeck.ai.');
+    expect(f.dials).toEqual([]);
+    expect(log).toHaveBeenCalledWith(`link desk: directory not online after ${DIRECTORY_WAIT_MS} ms (connecting)`);
+  });
+
+  it('waits for a connecting directory and dials once it is online (PAN-5018)', async () => {
+    const f = fakeDirectory({ relayAllowed: false, online: false, direct: 'ok' });
+    const dialed = createConnection({ directory: f.directory, meter, log: vi.fn() }).dialRaw(MACHINE.environmentId, 'desk');
+    await vi.advanceTimersByTimeAsync(DIRECTORY_WAIT_MS - 1);
+    expect(f.dials).toEqual([]);
+    f.setState('online');
+    const raw = await dialed;
+    expect(raw).toBe(f.raws[0]);
+    expect(f.dials).toEqual([{ relay: false }]);
+  });
+
+  it('stops waiting at once when the directory refuses', async () => {
+    const f = fakeDirectory({ relayAllowed: false, online: false, direct: 'ok' });
+    const pending = rejection(createConnection({ directory: f.directory, meter, log: vi.fn() }).dialRaw(MACHINE.environmentId, 'desk'));
+    f.setState('refused');
+    expect((await pending).kind).toBe('directory-offline');
+  });
+
+  it('stops waiting when the dial is aborted', async () => {
+    const f = fakeDirectory({ relayAllowed: false, online: false, direct: 'ok' });
+    const controller = new AbortController();
+    const pending = createConnection({ directory: f.directory, meter, log: vi.fn() })
+      .dialRaw(MACHINE.environmentId, 'desk', { signal: controller.signal })
+      .catch((error: unknown) => error);
+    controller.abort();
+    expect(await pending).toMatchObject({ name: 'AbortError' });
     expect(f.dials).toEqual([]);
   });
 
@@ -191,4 +235,87 @@ describe('openLink', () => {
     expect(options.localKey.secretKey).toEqual(new Uint8Array(32).fill(0xef));
     expect(label).toBe('desk');
   });
+});
+
+describe('failure logging (PAN-5018 FR-1)', () => {
+  it('logs the direct and relay failures with their messages', async () => {
+    const f = fakeDirectory({ relayAllowed: true, direct: 'fail', relay: 'fail' });
+    const log = vi.fn();
+    const connection = createConnection({ directory: f.directory, meter, log });
+    const error = await rejection(connection.openLink(MACHINE));
+    expect(error.message).toBe('Could not reach desk directly or through the relay.');
+    const lines = log.mock.calls.map(([line]) => line as string);
+    expect(lines).toEqual(['link desk: direct dial failed: direct dial failed', 'link desk: relay dial failed: relay dial failed']);
+  });
+
+  it('logs the ChannelOpenError code when the secure open fails', async () => {
+    const f = fakeDirectory({ relayAllowed: false, direct: 'ok' });
+    const log = vi.fn();
+    const open = vi.fn(async () => {
+      throw new ChannelOpenError('timeout', 'no handshake reply');
+    });
+    const connection = createConnection({ directory: f.directory, meter, openSecureChannel: open, log });
+    await rejection(connection.openLink(MACHINE));
+    expect(log).toHaveBeenCalledWith('link desk: secure open failed over direct (timeout): no handshake reply');
+  });
+
+  it('names the relay route when the secure open over the relay fails', async () => {
+    const f = fakeDirectory({ relayAllowed: true, direct: 'fail', relay: 'ok' });
+    const log = vi.fn();
+    const open = vi.fn(async () => {
+      throw new ChannelOpenError('protocol', 'bad frame');
+    });
+    const connection = createConnection({ directory: f.directory, meter, openSecureChannel: open, log });
+    await rejection(connection.openLink(MACHINE));
+    expect(log).toHaveBeenLastCalledWith('link desk: secure open failed over relay (protocol): bad frame');
+  });
+});
+
+describe('debug error codes and eviction (PAN-5018 FR-2, FR-3)', () => {
+  const failingOpen = (code: ChannelOpenErrorCode) =>
+    vi.fn(async () => {
+      throw new ChannelOpenError(code, 'refused');
+    });
+
+  it('appends the code to the text when showErrorCodes is on', async () => {
+    const f = fakeDirectory({ relayAllowed: false, direct: 'ok' });
+    const connection = createConnection({ directory: f.directory, meter, openSecureChannel: failingOpen('timeout'), log: vi.fn(), showErrorCodes: true });
+    const error = await rejection(connection.openLink(MACHINE));
+    expect(error.message).toBe('Could not open a secure channel to desk. (timeout)');
+  });
+
+  it('keeps the text unchanged when showErrorCodes is off', async () => {
+    const f = fakeDirectory({ relayAllowed: false, direct: 'ok' });
+    const connection = createConnection({ directory: f.directory, meter, openSecureChannel: failingOpen('timeout'), log: vi.fn(), showErrorCodes: false });
+    const error = await rejection(connection.openLink(MACHINE));
+    expect(error.message).toBe('Could not open a secure channel to desk.');
+  });
+
+  it("closes the machine's peer connections after a handshake timeout", async () => {
+    const f = fakeDirectory({ relayAllowed: true, direct: 'fail', relay: 'ok' });
+    const connection = createConnection({ directory: f.directory, meter, openSecureChannel: failingOpen('timeout'), log: vi.fn() });
+    await rejection(connection.openLink(MACHINE));
+    expect(f.dialer.close).toHaveBeenCalledWith(MACHINE.environmentId);
+    expect(f.dials.map((d) => d.relay)).toEqual([false, true]);
+    await connection.dialRaw(MACHINE.environmentId, 'desk');
+    expect(f.dials.map((d) => d.relay)).toEqual([false, true, false, true]);
+  });
+
+  it('closes the peer connections after a protocol failure while pairing', async () => {
+    const f = fakeDirectory({ relayAllowed: false, direct: 'ok' });
+    const connection = createConnection({ directory: f.directory, meter, openSecureChannel: failingOpen('protocol'), log: vi.fn() });
+    const localKey = { publicKey: new Uint8Array(32), secretKey: new Uint8Array(32) };
+    await rejection(connection.openPairing(MACHINE.environmentId, 'desk', 'odp_test', localKey));
+    expect(f.dialer.close).toHaveBeenCalledWith(MACHINE.environmentId);
+  });
+
+  it.each<ChannelOpenErrorCode>(['unknown-peer', 'pairing-refused', 'identity-refused', 'unsupported', 'busy'])(
+    'keeps the peer connection after %s',
+    async (code) => {
+      const f = fakeDirectory({ relayAllowed: false, direct: 'ok' });
+      const connection = createConnection({ directory: f.directory, meter, openSecureChannel: failingOpen(code), log: vi.fn() });
+      await rejection(connection.openLink(MACHINE));
+      expect(f.dialer.close).not.toHaveBeenCalled();
+    },
+  );
 });

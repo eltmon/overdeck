@@ -106,7 +106,13 @@ address comes from DHCP). The rig needs no bun or Node.
    notifications. Also, `simctl push` on Xcode 26.6 does not run the Notification Service
    Extension, so the banner shows the placeholder. Decryption is checked by `swift test` and on a
    device (`ACCEPTANCE.md`, "PAN-4838 iOS notifications").
-6. When you are done, run `xcrun simctl delete $U`.
+6. To read the app's link diagnostics (failed dials and secure opens, PAN-5018), launch it with its
+   output in a file: `SIMCTL_CHILD_NSUnbufferedIO=YES xcrun simctl launch --terminate-running-process
+   --stdout=$HOME/app-stdout.log $U ai.overdeck.app`, then `grep '\[overdeck\]' ~/app-stdout.log`.
+   Capacitor prints the WebView's `console` lines (`⚡️  [warn] - [overdeck] link …`) to stdout, not to
+   the unified log, so `log show` does not have them. Without `NSUnbufferedIO` the file stays empty
+   until the buffer fills. Each launch truncates the file.
+7. When you are done, run `xcrun simctl delete $U`.
 
 `ios/scripts/add-widgets-target.rb` needs the `xcodeproj` gem 1.28 or later
 (`gem install --user-install xcodeproj`): older versions cannot read the project's local Swift
@@ -121,6 +127,7 @@ These are read at build time.
 | `VITE_OVERDECK_ACCOUNT_URL` | `https://account.overdeck.ai` | The account service for sign-in and device revocation. |
 | `VITE_OVERDECK_DIRECTORY_URL` | `https://connect.overdeck.ai` | The directory socket. |
 | `VITE_OVERDECK_REQUEST_LOG` | unset | `1` records every routed `/api/` request and RPC tag in `globalThis.__overdeckRequestLog` (FR-14). |
+| `VITE_OVERDECK_DEBUG_ERRORS` | unset | `1` appends the error code to a failed link's text, for example "Could not open a secure channel to desk. (timeout)" (PAN-5018). |
 
 ## Keys and secrets
 

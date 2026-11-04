@@ -1,20 +1,29 @@
 /**
  * Dialing a machine and opening a secure channel to it (PAN-4837 FR-7, FR-10, D-7, D-8).
  *
+ * The directory socket starts over on every page load (opening a machine reloads the page) and on
+ * resume, so a dial waits up to {@link DIRECTORY_WAIT_MS} for a connecting socket before it reports
+ * `directory-offline` (PAN-5018).
+ *
  * Dial policy: direct first (8 s when the relay could take over, else the dialer's 15 s), then
  * through TURN when the directory allows the relay and this month's allowance is not used. The route
  * that worked is remembered per machine until `forgetRoutes()`. Every relayed raw channel is metered.
- * Failures become a {@link ConnectionError} whose message is the exact text the shell shows.
+ * Failures become a {@link ConnectionError} whose message is the exact text the shell shows. Each
+ * failed dial and secure open is also logged with its code and route (PAN-5018 FR-1). A handshake
+ * that times out or breaks protocol on an open raw channel means the peer connection under it is
+ * suspect, so the phone closes its connections to that machine and forgets the route (FR-3, D-5).
  */
 import { ChannelOpenError, type MachineDialer, openSecureChannel, type RtcDuplexWeb, type SecureChannel, type StaticKeyPair } from '@overdeck/anywhere-channel/web';
 import type { DirectoryWebClient } from '@overdeck/anywhere-channel/web';
 import { hexToBytes } from '@noble/hashes/utils.js';
 
-import { MIN_PAN_VERSION } from './config';
+import { DEBUG_ERRORS, MIN_PAN_VERSION } from './config';
 import type { RelayMeter } from './relayMeter';
 import type { PairedMachine } from './types';
 
 export const DIRECT_TIMEOUT_WITH_RELAY_MS = 8_000;
+/** How long a dial waits for the directory socket to come online. */
+export const DIRECTORY_WAIT_MS = 10_000;
 
 export type ConnectionErrorKind = 'directory-offline' | 'no-path' | 'removed' | 'pairing-refused' | 'identity' | 'outdated' | 'other';
 
@@ -42,7 +51,7 @@ export const connectionText = {
 
 /** What the connection layer needs from the directory: its state and the relay gates. */
 export interface ConnectionDirectory {
-  readonly client: Pick<DirectoryWebClient, 'state' | 'relayAllowed'>;
+  readonly client: Pick<DirectoryWebClient, 'state' | 'relayAllowed' | 'onStateChange'>;
   readonly dialer: MachineDialer;
   relayStopped(): boolean;
 }
@@ -52,7 +61,13 @@ export interface ConnectionDeps {
   meter: RelayMeter;
   /** Default `openSecureChannel` from `@overdeck/anywhere-channel/web`. */
   openSecureChannel?: typeof openSecureChannel;
+  /** Diagnostic lines; never given keys, tokens or SDP. Default `console.warn` with an `[overdeck] ` prefix. */
+  log?: (message: string) => void;
+  /** Append ` (<code>)` to a failed secure open's text. Default {@link DEBUG_ERRORS}. */
+  showErrorCodes?: boolean;
 }
+
+type Route = 'direct' | 'relay';
 
 export interface Connection {
   /** A raw data channel to the machine, by the D-7 policy. */
@@ -65,27 +80,50 @@ export interface Connection {
   forgetRoutes(): void;
 }
 
-/** The {@link ConnectionError} for a channel that failed to open. */
-export function channelError(error: unknown, label: string): ConnectionError {
+/** The {@link ConnectionError} for a channel that failed to open; `showCode` appends the `ChannelOpenError` code. */
+export function channelError(error: unknown, label: string, showCode = false): ConnectionError {
   if (error instanceof ConnectionError) return error;
+  const text = (message: string): string => (showCode && error instanceof ChannelOpenError ? `${message} (${error.code})` : message);
   if (error instanceof ChannelOpenError) {
     switch (error.code) {
       case 'unknown-peer':
-        return new ConnectionError('removed', connectionText.removed(label), { cause: error });
+        return new ConnectionError('removed', text(connectionText.removed(label)), { cause: error });
       case 'pairing-refused':
-        return new ConnectionError('pairing-refused', connectionText.pairingRefused(label), { cause: error });
+        return new ConnectionError('pairing-refused', text(connectionText.pairingRefused(label)), { cause: error });
       case 'identity-refused':
-        return new ConnectionError('identity', connectionText.identity(label), { cause: error });
+        return new ConnectionError('identity', text(connectionText.identity(label)), { cause: error });
       case 'unsupported':
-        return new ConnectionError('outdated', connectionText.outdated(label), { cause: error });
+        return new ConnectionError('outdated', text(connectionText.outdated(label)), { cause: error });
       default:
         break;
     }
   }
-  return new ConnectionError('other', connectionText.channelFailed(label), { cause: error });
+  return new ConnectionError('other', text(connectionText.channelFailed(label)), { cause: error });
 }
 
-export function createConnection({ directory, meter, openSecureChannel: open = openSecureChannel }: ConnectionDeps): Connection {
+/** A raw channel opened but the handshake got no valid reply: the peer connection under it is suspect (D-5). */
+function suspectsPeerConnection(error: unknown): boolean {
+  return error instanceof ChannelOpenError && (error.code === 'timeout' || error.code === 'protocol');
+}
+
+/** The code a log line names: the `ChannelOpenError` code, the `ConnectionError` kind, else the error name. */
+function errorCode(error: unknown): string {
+  if (error instanceof ChannelOpenError) return error.code;
+  if (error instanceof ConnectionError) return error.kind;
+  return error instanceof Error ? error.name : typeof error;
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+export function createConnection({
+  directory,
+  meter,
+  openSecureChannel: open = openSecureChannel,
+  log = (message) => console.warn(`[overdeck] ${message}`),
+  showErrorCodes = DEBUG_ERRORS,
+}: ConnectionDeps): Connection {
   /** environment id → whether the route that last worked was the relay. */
   const routes = new Map<string, boolean>();
 
@@ -98,13 +136,44 @@ export function createConnection({ directory, meter, openSecureChannel: open = o
     return raw;
   }
 
-  async function dialRaw(environmentId: string, label: string, opts: { signal?: AbortSignal } = {}): Promise<RtcDuplexWeb> {
-    if (directory.client.state !== 'online') throw new ConnectionError('directory-offline', connectionText.directoryOffline());
+  /** Resolves once the directory socket is online; waits while it is off or connecting, up to the limit. */
+  function waitOnline(label: string, signal: AbortSignal | undefined): Promise<void> {
+    const { client } = directory;
+    if (client.state === 'online') return Promise.resolve();
+    return new Promise<void>((resolve, reject) => {
+      const finish = (error: unknown): void => {
+        clearTimeout(timer);
+        off();
+        signal?.removeEventListener('abort', onAbort);
+        if (error === null) resolve();
+        else reject(error);
+      };
+      const offline = (): void => {
+        log(`link ${label}: directory not online after ${DIRECTORY_WAIT_MS} ms (${client.state})`);
+        finish(new ConnectionError('directory-offline', connectionText.directoryOffline()));
+      };
+      const onAbort = (): void => finish(signal?.reason ?? new DOMException('The dial was aborted', 'AbortError'));
+      const timer = setTimeout(offline, DIRECTORY_WAIT_MS);
+      const off = client.onStateChange((state) => {
+        if (state === 'online') finish(null);
+        else if (state === 'refused') {
+          log(`link ${label}: directory refused this phone`);
+          finish(new ConnectionError('directory-offline', connectionText.directoryOffline()));
+        }
+      });
+      if (signal?.aborted) onAbort();
+      else signal?.addEventListener('abort', onAbort, { once: true });
+    });
+  }
+
+  async function dialRawWithRoute(environmentId: string, label: string, opts: { signal?: AbortSignal } = {}): Promise<{ raw: RtcDuplexWeb; route: Route }> {
     const signal = opts.signal;
+    await waitOnline(label, signal);
     if (routes.get(environmentId) === true && relayAvailable()) {
       try {
-        return await dialRelay(environmentId, signal);
-      } catch {
+        return { raw: await dialRelay(environmentId, signal), route: 'relay' };
+      } catch (relayError) {
+        log(`link ${label}: relay dial failed: ${errorMessage(relayError)}`);
         routes.delete(environmentId);
       }
     }
@@ -116,41 +185,52 @@ export function createConnection({ directory, meter, openSecureChannel: open = o
         ...(signal ? { signal } : {}),
       });
       routes.set(environmentId, false);
-      return raw;
+      return { raw, route: 'direct' };
     } catch (directError) {
       if (signal?.aborted) throw directError;
+      log(`link ${label}: direct dial failed: ${errorMessage(directError)}`);
       if (!relayAvailable()) throw new ConnectionError('no-path', connectionText.noPath(label), { cause: directError });
     }
     try {
-      return await dialRelay(environmentId, signal);
+      return { raw: await dialRelay(environmentId, signal), route: 'relay' };
     } catch (relayError) {
       if (signal?.aborted) throw relayError;
+      log(`link ${label}: relay dial failed: ${errorMessage(relayError)}`);
       throw new ConnectionError('other', connectionText.unreachable(label), { cause: relayError });
     }
   }
 
-  async function secure<T>(raw: RtcDuplexWeb, label: string, run: () => Promise<T>): Promise<T> {
+  async function dialRaw(environmentId: string, label: string, opts: { signal?: AbortSignal } = {}): Promise<RtcDuplexWeb> {
+    return (await dialRawWithRoute(environmentId, label, opts)).raw;
+  }
+
+  async function secure<T>(raw: RtcDuplexWeb, environmentId: string, label: string, route: Route, run: () => Promise<T>): Promise<T> {
     try {
       return await run();
     } catch (error) {
       raw.destroy();
-      throw channelError(error, label);
+      log(`link ${label}: secure open failed over ${route} (${errorCode(error)}): ${errorMessage(error)}`);
+      if (suspectsPeerConnection(error)) {
+        routes.delete(environmentId);
+        directory.dialer.close(environmentId);
+      }
+      throw channelError(error, label, showErrorCodes);
     }
   }
 
   return {
     dialRaw,
     async openLink(machine, opts = {}) {
-      const raw = await dialRaw(machine.environmentId, machine.label, opts);
+      const { raw, route } = await dialRawWithRoute(machine.environmentId, machine.label, opts);
       const localKey = { publicKey: hexToBytes(machine.linkPublicKeyHex), secretKey: hexToBytes(machine.linkSecretKeyHex) };
-      const { stream } = await secure(raw, machine.label, () =>
+      const { stream } = await secure(raw, machine.environmentId, machine.label, route, () =>
         open(raw, { mode: 'link', localKey, remoteKeyHex: machine.machineKeyHex, ...(opts.signal ? { signal: opts.signal } : {}) }, machine.label),
       );
       return stream;
     },
     async openPairing(environmentId, label, code, localKey, opts = {}) {
-      const raw = await dialRaw(environmentId, label, opts);
-      return secure(raw, label, () =>
+      const { raw, route } = await dialRawWithRoute(environmentId, label, opts);
+      return secure(raw, environmentId, label, route, () =>
         open(raw, { mode: 'pairing', localKey, pairingCode: code, ...(opts.signal ? { signal: opts.signal } : {}) }, label),
       );
     },

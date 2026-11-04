@@ -11,6 +11,10 @@
  * (401/403 at the upgrade, closes 4001/4003/4009/4010/4011/4012) stop retrying until account.json
  * changes, checked every 60 s or at once through `recheckAccount()`. Keepalive: the text `ping` every 30 s; 75 s without `pong` drops the
  * socket and reconnects.
+ *
+ * Diagnostics (PAN-5018 FR-7): each transition is always logged (online, socket closed with its code,
+ * refusal, upgrade refused, pong timeout, account change). With OVERDECK_ANYWHERE_DEBUG=1 each `signal`
+ * frame and each message on a socket that is no longer current are logged too.
  */
 import {
   CONNECT_CLOSE_CODES,
@@ -31,6 +35,7 @@ import {
 import { type RawData, WebSocket } from 'ws';
 
 import type { AccountRecord } from '../../../lib/account/store.js';
+import { anywhereDebug, shortId } from '../../../lib/anywhere/debug-log.js';
 import { directorySocketUrl, type DirectoryUrlResult } from '../../../lib/anywhere/directory-config.js';
 import type { MachineKeyPair } from '../../../lib/anywhere/machine-key.js';
 
@@ -66,6 +71,10 @@ export interface DirectoryClientDeps {
   linkedEnvironmentIds(): Set<string>;
   openSocket(url: string, headers: Record<string, string>): DirectorySocket;
   random(): number;
+  /** Always-on transition lines. Default `console.warn` with an `[anywhere] ` prefix. */
+  log?: (message: string) => void;
+  /** Lines printed only with OVERDECK_ANYWHERE_DEBUG=1. Default `anywhereDebug`. */
+  debug?: (message: string) => void;
 }
 
 type Handler<T extends DirectoryToMachineFrame['type']> = (frame: Extract<DirectoryToMachineFrame, { type: T }>) => void;
@@ -123,7 +132,13 @@ export class DirectoryClient {
   private readonly handlers = new Map<string, Set<(frame: DirectoryToMachineFrame) => void>>();
   private approvalViews: () => { approvals: DirectoryApprovalView[]; joins: DirectoryJoinView[] } = () => ({ approvals: [], joins: [] });
 
-  constructor(private readonly deps: DirectoryClientDeps) {}
+  private readonly log: (message: string) => void;
+  private readonly debug: (message: string) => void;
+
+  constructor(private readonly deps: DirectoryClientDeps) {
+    this.log = deps.log ?? ((message) => console.warn(`[anywhere] ${message}`));
+    this.debug = deps.debug ?? ((message) => anywhereDebug(message));
+  }
 
   /** Reads account.json; a signed-out machine opens no socket and only re-checks every 60 s. */
   async start(): Promise<void> {
@@ -221,6 +236,7 @@ export class DirectoryClient {
     const key = accountKey(account);
     if (key === this.connectedAccount) return;
     // Signed in, signed out or signed in again: start over with a fresh back-off.
+    this.log('directory account changed; reconnecting');
     this.clearTimers();
     this.dropSocket();
     this.backoffMs = BACKOFF_INITIAL_MS;
@@ -265,11 +281,16 @@ export class DirectoryClient {
       if (this.socket === socket) void this.sendHello(socket);
     });
     socket.on('message', (data, isBinary) => {
-      if (this.socket === socket && !isBinary) this.onMessage(data.toString());
+      if (this.socket !== socket) {
+        this.debug('directory message on a replaced socket ignored');
+        return;
+      }
+      if (!isBinary) this.onMessage(data.toString());
     });
     socket.on('unexpected-response', (_req, res) => {
       if (this.socket !== socket) return;
       const status = res.statusCode ?? 0;
+      this.log(`directory upgrade refused (${status})`);
       this.dropSocket();
       if (status === 401 || status === 403) this.refuse(REFUSALS[status] as string);
       else this.scheduleReconnect();
@@ -278,6 +299,7 @@ export class DirectoryClient {
       if (this.socket !== socket) return;
       this.socket = null;
       this.stopPing();
+      this.log(`directory socket closed (${code})`);
       const refusal = code >= 4000 ? REFUSALS[code] : undefined;
       if (refusal !== undefined) {
         this.refuse(refusal);
@@ -331,7 +353,13 @@ export class DirectoryClient {
         this.inboxAllowed = frame.inboxAllowed;
         this.relay = frame.relay;
         this.machines = [...frame.machines];
+        this.log(`directory online (plan ${frame.plan}, ${frame.machines.length} machines)`);
         break;
+      case 'signal': {
+        const kind = frame.data.sdp?.type ?? (frame.data.candidate ? 'candidate' : 'empty');
+        this.debug(`directory signal from ${shortId(frame.from)} session ${shortId(frame.session)} (${kind})`);
+        break;
+      }
       case 'directory':
         this.machines = [...frame.machines];
         break;
@@ -356,6 +384,7 @@ export class DirectoryClient {
   }
 
   private refuse(message: string): void {
+    this.log(`directory refused: ${message}`);
     this.dropSocket();
     this.clearReconnect();
     this.state = 'refused';
@@ -382,6 +411,7 @@ export class DirectoryClient {
       if (this.socket !== socket) return;
       if (Date.now() - this.lastPongAt >= PONG_TIMEOUT_MS) {
         // A silent socket: drop it and reconnect.
+        this.log(`directory silent for ${Math.round((Date.now() - this.lastPongAt) / 1000)} s; reconnecting`);
         this.dropSocket();
         this.scheduleReconnect();
         return;

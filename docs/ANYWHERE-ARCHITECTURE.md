@@ -198,6 +198,21 @@ Other URLs, such as the directory, keep the original implementations. The client
 tested against `installChannelListener` in `tests/integration/anywhere/phone-channel.test.ts`;
 the package README has the details and the CP-2 direct-URL audit.
 
+A failed link is logged on the phone (PAN-5018): `[overdeck] link <label>: direct dial failed: …`,
+`relay dial failed: …`, and `secure open failed over <direct|relay> (<code>): …` with the
+`ChannelOpenError` code. A secure open that fails with `timeout` or `protocol` means a raw channel
+opened but the handshake got no valid reply, so the peer connection under it is suspect: the phone
+closes its peer connections to that machine and forgets the remembered route, and the next dial
+sends a fresh offer. Definitive refusals (`unknown-peer`, `pairing-refused`, `identity-refused`,
+`unsupported`) and `busy` keep the connection. A web bundle built with
+`VITE_OVERDECK_DEBUG_ERRORS=1` appends the code to the on-screen text, for example
+"Could not open a secure channel to desk. (timeout)".
+
+Opening a machine reloads the page and a resume reconnects the directory socket, so a dial waits up
+to 10 s for an off or connecting socket before it reports "Not connected to overdeck.ai."
+(`DIRECTORY_WAIT_MS`). The shell's failure text over the machine view clears on the next dial that
+succeeds; before PAN-5018 one failed dial kept its text on screen while later dials worked.
+
 ## One session per connection; the same port (D-4645-3, D-4645-4)
 
 Every transport connection is one Noise session with a one-round-trip IK handshake; there
@@ -452,6 +467,37 @@ Cloudflare Durable Object per account that knows the account's machines and intr
 - `OVERDECK_ANYWHERE_NO_ADVERTISE=1` makes a dashboard advertise no endpoints (the directory
   smoke uses it so only `direct` can link two dashboards on one host). `OVERDECK_PUBLIC_LINK_ONLY=1`
   has the same effect (PAN-4741).
+
+### Diagnosing a link that does not open (PAN-5018)
+
+Every layer of a direct or relayed link writes `[anywhere]` lines to `dashboard.log`. Ids are cut
+to 8 characters; no line carries SDP, ICE candidate text, keys, tokens or pairing codes. These
+lines are always on, because they are bounded by real events:
+
+- `rtc offer from <from> session <session> (<purpose>, <direct|relay>)`: an offer reached
+  `RtcTransport`. Its outcome follows: `rtc session <session> answered`,
+  `rtc offer dropped: <reason>` (the session belongs to another peer, is closed, or is already
+  open), or `rtc session <session> from <from> failed at <step>: <message>`, where the step is
+  `ice-servers`, `peer-connection`, `remote-description` or `answer`.
+- `rtc closing session <session> for <from>: a new offer replaced it`.
+- `rtc session <session> <peer> connected|failed|closed`: a peer connection changed state.
+- `directory online (plan <plan>, <n> machines)`, `directory socket closed (<code>)`,
+  `directory refused: <message>` (for example close 4011, "Another Overdeck process registered
+  this machine with the directory"), `directory upgrade refused (<status>)`,
+  `directory silent for <s> s; reconnecting` and `directory account changed; reconnecting`.
+- `channel refused (<code>, <mode>): <message>` for every secure-channel refusal except `closed`
+  and `timeout`. `<mode>` is `link`, `pairing`, `approval`, or `unknown` before the preamble.
+
+`OVERDECK_ANYWHERE_DEBUG=1` in the dashboard's environment adds the routine lines:
+`rtc candidate dropped: …`, `rtc answer dropped: …`,
+`directory signal from <from> session <session> (offer|answer|candidate)`,
+`directory message on a replaced socket ignored`, and the `closed` and `timeout` channel
+refusals, which the supervisor's phased probing causes whenever it aborts a losing channel. The
+helper is `src/lib/anywhere/debug-log.ts`.
+
+`acceptChannel` errors carry the handshake mode once the preamble is parsed (`null` before). An
+unexpected exception inside the handshake has the code `internal`, not `closed`, so a bug in the
+responder is always logged instead of looking like a peer that went away.
 
 ## Approval (D-2356-9/10)
 
