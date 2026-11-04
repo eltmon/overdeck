@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4950",
   "created": "2026-11-04T10:02:21.153Z",
-  "updated": "2026-11-04T11:07:53.957Z",
+  "updated": "2026-11-04T11:08:33.875Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -84,6 +84,10 @@
     "conn-home.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T11:07:53.956Z"
+    },
+    "conn-home.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T11:08:33.875Z"
     }
   }
 }
