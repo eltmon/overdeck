@@ -1268,3 +1268,10 @@ until this lands. Fallback per the plan: the two-machine smoke on this branch (t
 servers, A as home and B as the laptop) passed `lane-remote`, `lane-report`, `lane-nest`
 and `lane-reap`. The three-machine check (laptop rig and a Fly machine) runs after release
 and `pan reload`, tracked in #4760.
+
+Live check, 2026-11-04 (build `65e3b1adf86`, 0.73.1 on all three machines): passed. Three builders on the
+desktop; critics on a Fly machine (`add-fly`) and the laptop rig each judged a builder's pushed head and
+reported PASS; `--machine auto` chose the Fly machine by CPU pressure, `--needs macos` the laptop and
+`--needs docker` the desktop. All 8 lanes were listed under the orchestrator in `pan lane list` and the
+Command Deck. The tree shows no report badges for remote lanes (#5005), and Auto prints no reason when it
+picks this machine (#5006). Evidence: `.pan/uat/pan-4638/check-1-three-machine-gauntlet.md`.
