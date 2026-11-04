@@ -1,0 +1,770 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T18:00:30Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5046: Phone app link keeps dropping on 5G: phone re-offers WebRTC sessions repeatedly ('a new offer replaced it' x27) and messages wait to send",
+    "updated": "2026-11-04T18:10:46.789Z"
+  },
+  "plan": {
+    "id": "pan-5046",
+    "title": "Phone app link keeps dropping on 5G: phone re-offers WebRTC sessions repeatedly ('a new offer replaced it' x27) and messages wait to send",
+    "status": "running",
+    "uid": "5006e3c5-14bf-44ee-8d9a-55afcf9ada8a",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-04T18:00:30Z",
+    "updated": "2026-11-04T18:10:46.789Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5046",
+        "label": "PAN-5046",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5046.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "anywhere",
+      "webrtc",
+      "mobile",
+      "ice-restart",
+      "reliability"
+    ],
+    "narratives": {
+      "Problem": "On 5G the phone's link to the home machine churned: the dashboard logged 27 'rtc closing session ... a new offer replaced it' for the phone in a few minutes, the app showed a connection failure, and a composer message stayed 'Waiting to send'. Root cause: PAN-5018's eviction closes every peer connection to the machine on a handshake timeout, and a locally closed RTCPeerConnection fires no 'close' on its data channels, so open streams and in-flight handshakes hang until they time out and evict the next, healthy connection - a self-sustaining loop. The dialer also tears down a merely 'disconnected' connection instead of ICE-restarting it, and the server drops an ICE-restart offer on a known session. Separately, 'Machine links are not running on this dashboard' fires once per dashboard boot because anywhere-boot starts the link supervisor before wiring the link route source. The unknown-peer refusals were the MacBook Air re-linking on 2026-11-03, not the phone.",
+      "Proposal": "Phone dialer: destroy every raw channel on a connection it closes (fail fast as 'unreachable'), evict only the connection that carried a failed channel and only while it is current, keep 'disconnected' connections and ICE-restart them on the same session after 2 s (close after 10 s without recovery), accept restart answers, log each step, and expose evict/restartIce/onRecovered. Server RtcTransport: answer a same-session offer as an ICE restart on the existing pc. Shell: on link recovery with the frontend phase not live, call requestReconnect so held messages flush. Boot: wire link sources before supervisor.start(). Prove it with a werift-backed two-restart integration test and a Mac rig iOS Simulator run; update the Anywhere docs.",
+      "NonGoals": "- Server-initiated ICE restart on machine-to-machine links (RtcTransport.dial as initiator)\n- A Capacitor network-change plugin or proactive restarts on iOS network events\n- Publishing a TestFlight build\n- Skip logic for destroyed or unlinked machines in the linked conversation/project/Needs-You syncs\n- Any code change for the unknown-peer refusals (MacBook re-link)\n- Changes to the frontend composer, flushHeldMessages, or wsTransport backoff constants\n- Changes to the overdeck.ai directory worker (services/connect)\n- A graceful two-connection handover on the server for a new session id (immediate replacement stays)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix the re-offer loop at the phone dialer and eviction (duplex teardown + per-connection eviction) rather than reverting PAN-5018's eviction.",
+        "rationale": "Eviction still recovers a genuinely zombie connection; the loop comes from evicting the wrong connection and from channels that never learn their connection closed."
+      },
+      {
+        "summary": "ICE-restart a 'disconnected' connection after a 2 s grace, close it after 10 s without recovery.",
+        "rationale": "The issue asks for ICE restart on network change; 'disconnected' often self-heals within ~1-2 s, and the 10 s cap matches the secure-open timeout so a dead path still falls back to a fresh offer."
+      },
+      {
+        "summary": "Use createOffer({ iceRestart: true }) on the same session instead of restartIce()+negotiationneeded.",
+        "rationale": "Deterministic and testable with fake peer connections; no dependence on event timing."
+      },
+      {
+        "summary": "Server answers a same-session offer as an ICE restart; keeps immediate replacement for a new session id.",
+        "rationale": "werift 0.25.1 restarts ICE on a changed remote ufrag; the phone only sends a new session after closing its old pc, so a graceful handover would only hold dead pcs longer."
+      },
+      {
+        "summary": "Treat 'Machine links are not running' as a boot-order race and add no destroyed-machine skip logic.",
+        "rationale": "The log shows the lines only right after each 'Dashboard listening'; a link that never comes online never triggers onDescriptor."
+      },
+      {
+        "summary": "No code change for the unknown-peer refusals; document them.",
+        "rationale": "Key 4a70be6a806b0ee8 is the MacBook Air's machine key, whose tokens were revoked and re-created during re-links on 2026-11-03."
+      },
+      {
+        "summary": "Recovery calls requestReconnect (EventRouter forceReconnect) only when the phase is not live.",
+        "rationale": "Skips the up-to-10 s backoff for held messages without tearing down a healthy stream or disturbing the first bootstrap."
+      },
+      {
+        "summary": "Device reproduction on the Mac rig is a checkpoint with a fallback to the integration test output.",
+        "rationale": "The issue requires a reproduction; the rig may be unavailable to an agent, and the automated test reproduces the same two-change sequence."
+      }
+    ],
+    "items": [
+      {
+        "id": "dialer-ends-duplexes",
+        "title": "Phone dialer destroys every raw channel on a peer connection it closes",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T18:00:30Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5046",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/anywhere-channel/src/dial-machine.ts",
+            "packages/anywhere-channel/src/__tests__/dial-machine.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run packages/anywhere-channel/src/__tests__/dial-machine.test.ts",
+            "npm run typecheck:anywhere-channel"
+          ],
+          "expected_outputs": [
+            "dial-machine.test.ts passes including the two new close tests",
+            "typecheck:anywhere-channel completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-5046.md WI-1. In createMachineDialer add PeerEntry.duplexes: Set<RtcDuplexWeb> (filled in awaitOpen's success branch, removed on the duplex's 'close'), add optional deps.log (default console.warn with '[overdeck] '). closeEntry logs 'rtc <env8> closing session <s8>: <reason>' and, after pc.close(), calls duplex.destroy(new Error(`direct connection closed: ${error.message}`)) for every tracked duplex, then clears the set. Reason: per the WebRTC spec pc.close() fires no 'close' event on its data channels, so RtcDuplexWeb streams and in-flight Noise handshakes hang until the 10 s timeout, which re-triggers PAN-5018 eviction (the re-offer loop). A destroyed-with-error duplex makes FrameReader fail with a non-WireError, which toOpenError maps to 'unreachable'. Ids cut to 8 chars; never log SDP/candidates. Use vi.useFakeTimers for any timeout assertions."
+        },
+        "items": [
+          {
+            "id": "dialer-ends-duplexes.ac1",
+            "title": "Given an open RtcDuplexWeb from dialMachine, when dialer.close(envId) runs, then the duplex emits 'error' and 'close' and destroyed is true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialer-ends-duplexes.ac2",
+            "title": "Given openSecureChannel in link mode is waiting on a raw channel from the dialer, when the dialer closes that connection, then the open rejects with ChannelOpenError code 'unreachable' before any 10 s timeout fires (fake timers)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialer-ends-duplexes.ac3",
+            "title": "Given an injected log, when an entry closes, then the log receives one line matching /^rtc [0-9a-f-]{8} closing session [0-9a-f]{8}: / and no line contains 'v=0'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "evict-owning-connection",
+        "title": "Eviction closes only the peer connection that carried the failed channel",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T18:00:30Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5046",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/anywhere-channel/src/dial-machine.ts",
+            "packages/anywhere-channel/src/__tests__/dial-machine.test.ts",
+            "apps/mobile/src/shell/connection.ts",
+            "apps/mobile/src/shell/__tests__/connection.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run packages/anywhere-channel/src/__tests__/dial-machine.test.ts",
+            "(cd apps/mobile && npx vitest run src/shell/__tests__/connection.test.ts)",
+            "npm run typecheck:mobile",
+            "npm run typecheck:anywhere-channel"
+          ],
+          "expected_outputs": [
+            "dial-machine.test.ts and connection.test.ts pass",
+            "both typecheck lanes complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Add MachineDialer.evict(raw: RtcDuplexWeb, reason: string): void backed by a WeakMap<RtcDuplexWeb, PeerEntry> set in awaitOpen; it closes the owner only when !owner.closed && byKey.get(owner.key) === owner. In apps/mobile/src/shell/connection.ts secure(), replace `directory.dialer.close(environmentId);` with `directory.dialer.evict(raw, `secure open ${errorCode(error)}`);` keeping routes.delete(environmentId). Eviction codes stay 'timeout' and 'protocol'. Update the connection.ts header (lines 12-14) to say the phone closes the peer connection under that channel. Add evict to the fake MachineDialer in connection.test.ts (line 27) only."
+        },
+        "items": [
+          {
+            "id": "evict-owning-connection.ac1",
+            "title": "Given raw channel A from connection 1 and a newer connection 2 for the same machine, when secure open over A fails with ChannelOpenError('timeout'), then connection 2 stays open and no new offer is sent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "evict-owning-connection.ac2",
+            "title": "Given a raw channel whose connection is still current, when its secure open fails with 'timeout', then evict closes that connection and the next dial sends a fresh offer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "evict-owning-connection.ac3",
+            "title": "Given connection.ts after the change, when `grep -n \"dialer.close(environmentId)\" apps/mobile/src/shell/connection.ts` runs, then it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dialer-ice-restart",
+        "title": "Phone dialer ICE-restarts a disconnected peer connection on the same session",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T18:00:30Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5046",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/anywhere-channel/src/dial-machine.ts",
+            "packages/anywhere-channel/src/__tests__/dial-machine.test.ts",
+            "apps/mobile/src/shell/__tests__/connection.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run packages/anywhere-channel/src/__tests__/dial-machine.test.ts",
+            "(cd apps/mobile && npx vitest run src/shell/__tests__/connection.test.ts)",
+            "npm run typecheck:anywhere-channel",
+            "npm run typecheck:mobile"
+          ],
+          "expected_outputs": [
+            "dial-machine.test.ts passes including the five ICE-restart tests",
+            "typecheck lanes complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-7",
+            "NFR-1",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "shell-link-recovery",
+            "phone-ice-restart-integration",
+            "device-repro"
+          ],
+          "acJustification": "Six criteria: the restart flow has five distinct timer/state transitions plus the candidate-ordering rule the real-UDP tests depend on."
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Export DISCONNECT_GRACE_MS = 2_000 and ICE_RESTART_TIMEOUT_MS = 10_000. In dial() remove 'disconnected' from the dead-state list (keep 'failed', 'closed', entry.closed). connectionstatechange: 'disconnected' -> log 'rtc <env8> disconnected; ice restart in 2000 ms' and start a grace timer (once); 'connected' -> clear timers, and if a restart was in flight log 'rtc <env8> ice restart recovered' and notify internal recovery callbacks; 'failed'/'closed' -> closeEntry (clears timers). restart(entry): only while 'disconnected' and not closed; set entry.remoteSet = false BEFORE sending so server candidates of the new ICE generation queue in pendingRemote until the restart answer (the answer branch sets it true and drains); createOffer({ iceRestart: true }) + setLocalDescription + send the offer on the SAME session; log 'rtc <env8> ice restart sent'; restart timer of ICE_RESTART_TIMEOUT_MS logs 'rtc <env8> ice restart timed out; closing' and closeEntry. onSignal applies an answer only when pc.signalingState === 'have-local-offer'. Add public MachineDialer.restartIce(environmentId): Promise<void> that restarts every live entry for the machine regardless of state, resolves when each reaches 'connected', rejects with the restart-timeout error if one closes; while an entry's offer is unanswered it sends no second offer and waits on the restart in flight. Extend FakePeerConnection with signalingState and createOffer(options). Add restartIce to the connection.test.ts fake dialer. Fake timers only (vi.advanceTimersByTimeAsync)."
+        },
+        "items": [
+          {
+            "id": "dialer-ice-restart.ac1",
+            "title": "Given a connected entry whose state turns 'disconnected', when dialMachine is called, then it reuses the same RTCPeerConnection and sends no new offer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialer-ice-restart.ac2",
+            "title": "Given 'disconnected' persists, when 2000 ms pass (fake timers), then exactly one offer is sent whose session equals the original session and createOffer received iceRestart: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialer-ice-restart.ac3",
+            "title": "Given a restart offer was sent, when an answer arrives and the state turns 'connected', then the entry stays open and the log receives 'ice restart recovered'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialer-ice-restart.ac4",
+            "title": "Given a restart offer was sent, when 10000 ms pass without 'connected', then the entry closes, the log receives 'ice restart timed out; closing', and the next dial sends an offer with a new session",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialer-ice-restart.ac5",
+            "title": "Given the pc's signalingState is 'stable', when an answer frame arrives, then setRemoteDescription is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialer-ice-restart.ac6",
+            "title": "Given restartIce(envId) was called and a server candidate arrives before the restart answer, when the answer arrives and the state turns 'connected', then addIceCandidate runs only after setRemoteDescription(answer) and the restartIce promise resolves",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "server-ice-restart-answer",
+        "title": "Server answers an ICE-restart offer on a known session instead of dropping it",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T18:00:30Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5046",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/anywhere/channel/rtc-transport.ts",
+            "src/lib/anywhere/channel/__tests__/rtc-transport.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/anywhere/channel/__tests__/rtc-transport.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "rtc-transport.test.ts passes including the ICE-restart test",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "phone-ice-restart-integration",
+            "device-repro"
+          ],
+          "acJustification": "Five criteria: answer, data continuity, log hygiene, unchanged drop rule, and candidate ordering are separate observable behaviors of one protocol change."
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In RtcTransport.onSignal's known-session branch, replace the 'rtc offer dropped: ... is already open' line: for an offer on a known, open session from the same peer, log 'rtc session <s8> ice restart from <from8>', set known.localSent = false (werift starts gathering the new ICE generation inside setRemote; those candidates must queue in pendingLocal until the answer is sent, which sendLocalDescription already drains), then setRemote(known, 'offer', sdp), createAnswer, setLocalDescription, sendLocalDescription(known, 'answer'), log 'rtc session <s8> answered'; set progress.step so the existing catch logs 'failed at <step>'. Other-peer and closed-session drops are unchanged. werift 0.25.1 restarts ICE on a changed remote ufrag (node_modules/werift/lib/webrtc/src/transport/ice.js 253-264). IMPLEMENTATION CHECKPOINT: write the real-UDP test first; if werift cannot renegotiate the responder pc (throws, or the original data channel stops carrying bytes), restore a drop with reason 'ice restart unsupported', assert that line instead, and state the fallback in the PR body. Real timers here (real UDP), each test under 15 s. Update the module header to list the new line."
+        },
+        "items": [
+          {
+            "id": "server-ice-restart-answer.ac1",
+            "title": "Given an RtcTransport responder with an open session from peer A, when A sends a second offer with iceRestart on the same session id, then the responder logs 'ice restart from' and 'answered' and sends exactly one answer on that session",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-ice-restart-answer.ac2",
+            "title": "Given the restart was answered, when the initiator writes 10 bytes on the original duplex, then the responder's duplex receives the same 10 bytes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-ice-restart-answer.ac3",
+            "title": "Given the restart flow, when the responder's log lines are collected, then none contains 'a new offer replaced it' and none contains 'v=0'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-ice-restart-answer.ac4",
+            "title": "Given an offer on a known session from a different peer, when it arrives, then the responder still logs 'rtc offer dropped' with 'belongs to'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-ice-restart-answer.ac5",
+            "title": "Given the hub's sent frames, when the restart offer arrives at the responder, then no candidate frame is sent on that session before the restart answer frame",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "shell-link-recovery",
+        "title": "Shell forces an RPC reconnect when the phone's link recovers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T18:00:30Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5046",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/anywhere-channel/src/dial-machine.ts",
+            "packages/anywhere-channel/src/__tests__/dial-machine.test.ts",
+            "apps/mobile/src/shell/linkRecovery.ts",
+            "apps/mobile/src/shell/__tests__/linkRecovery.test.ts",
+            "apps/mobile/src/shell/ShellApp.tsx",
+            "apps/mobile/src/shell/__tests__/connection.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "(cd apps/mobile && npx vitest run src/shell/__tests__/linkRecovery.test.ts)",
+            "npx vitest run packages/anywhere-channel/src/__tests__/dial-machine.test.ts",
+            "npm run typecheck:mobile",
+            "npm run typecheck:anywhere-channel"
+          ],
+          "expected_outputs": [
+            "linkRecovery.test.ts passes its three cases",
+            "dial-machine.test.ts passes the onRecovered tests",
+            "typecheck lanes complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Add MachineDialer.onRecovered(listener: (environmentId) => void): () => void, firing when an ICE restart reaches 'connected', or when a new entry reaches 'connected' for a machine whose previous entry for the same key closed for a reason other than 'dialer closed' (resume/teardown are not recoveries; the first pc for a machine is never a recovery). New apps/mobile/src/shell/linkRecovery.ts exports installLinkRecovery({ dialer, currentEnvironmentId, phase, requestReconnect }) returning an uninstaller: on recovery of the current machine with phase() !== 'live', call requestReconnect(). In ShellApp.tsx's directory effect install it with phase = () => deriveConnectionPhase(useConnectionState.getState()) and requestReconnect = () => useConnectionState.getState().requestReconnect(), importing from '../../../../src/dashboard/frontend/src/lib/connectionState' like the existing resetTransport import; uninstall in cleanup. Add onRecovered to the connection.test.ts fake dialer."
+        },
+        "items": [
+          {
+            "id": "shell-link-recovery.ac1",
+            "title": "Given the current machine recovers and phase() returns 'unreachable', when the dialer fires onRecovered, then requestReconnect is called once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shell-link-recovery.ac2",
+            "title": "Given phase() returns 'live', when the dialer fires onRecovered, then requestReconnect is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shell-link-recovery.ac3",
+            "title": "Given a recovery for another machine id, when the dialer fires onRecovered, then requestReconnect is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shell-link-recovery.ac4",
+            "title": "Given dialer.close() ran (resume) and a new connection then connects, when the state turns 'connected', then onRecovered does not fire",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "boot-wiring-order",
+        "title": "Dashboard boot wires link sources before the link supervisor starts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T18:00:30Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5046",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/link-supervisor-wiring.ts",
+            "src/dashboard/server/services/anywhere-boot.ts",
+            "src/dashboard/server/services/__tests__/link-supervisor-wiring.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/link-supervisor-wiring.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "link-supervisor-wiring.test.ts passes",
+            "typecheck and lint (including lint:circular) complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Create the leaf module src/dashboard/server/services/link-supervisor-wiring.ts (no imports) exporting startLinkSupervisorWired<S extends { start(): void }>(supervisor: S, wire: ReadonlyArray<(source: S) => void>): void; it calls each setter with the supervisor, then supervisor.start(). The test imports only the leaf, never anywhere-boot.ts (its import graph carries directory/link-store/relay state). In anywhere-boot.ts import it and replace `supervisor.start();` in startAnywhere with startLinkSupervisorWired(supervisor, [setLinkStatusSource, setLinkPresenceSource, setLinkRouteSource]) and delete the three later setter calls (~lines 178-180). stopAnywhere unchanged. Root cause: supervisor.start() ran before two awaited follower starts and the route source, so a fast link's onDescriptor -> linked syncs -> linkFetch saw source === null and logged 'Machine links are not running on this dashboard' once per boot (5 lines after each 'Dashboard listening'). No source-text test; spies only."
+        },
+        "items": [
+          {
+            "id": "boot-wiring-order.ac1",
+            "title": "Given spies for the three setters and a fake supervisor, when startLinkSupervisorWired runs, then all three setters are called with the supervisor before start() is called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "boot-wiring-order.ac2",
+            "title": "Given the fake supervisor's start() calls a probe that reads the route setter's recorded value, when startLinkSupervisorWired runs, then the probe sees the supervisor, not null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "phone-ice-restart-integration",
+        "title": "Automated two-network-change reproduction: phone dialer against RtcTransport",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T18:00:30Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-5046",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/integration/anywhere/phone-ice-restart.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/integration/anywhere/phone-ice-restart.test.ts"
+          ],
+          "expected_outputs": [
+            "phone-ice-restart.test.ts passes both cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. New integration test: phone side = createMachineDialer(hub, { RTCPeerConnection, log }) with RTCPeerConnection from 'werift/polyfill/dom'; machine side = RtcTransport whose onIncoming runs acceptRawChannel (src/dashboard/server/channel-listener.ts) as in tests/integration/anywhere/phone-channel.test.ts; an in-memory hub stamps 'from' like the directory. Case 1: open a link-mode secure channel, round-trip a request, then sequentially `await dialer.restartIce(envId)` twice (each resolves on recovery), after each assert the same secure channel still round-trips bytes; collect logs and assert two server 'ice restart from' lines, zero 'a new offer replaced it', two phone 'ice restart sent'. Case 2: after a fresh dial, evict a raw channel from an older closed connection and assert no new offer is sent. Real timers (real UDP). IMPLEMENTATION CHECKPOINT: if the werift DOM polyfill lacks addEventListener('connectionstatechange'), createOffer({ iceRestart }) or signalingState, drive the same two-restart scenario with werift's native RTCPeerConnection as initiator against RtcTransport (extending rtc-transport.test.ts instead) and state that in the PR body."
+        },
+        "items": [
+          {
+            "id": "phone-ice-restart-integration.ac1",
+            "title": "Given a linked secure channel over the werift-backed dialer, when restartIce is awaited twice in sequence, then the same secure channel round-trips a request after each restart",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phone-ice-restart-integration.ac2",
+            "title": "Given the two restarts, when both sides' logs are collected, then the server logged exactly two 'ice restart from' lines and zero 'a new offer replaced it' lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phone-ice-restart-integration.ac3",
+            "title": "Given a fresh dial after an older connection closed, when evict is called with a raw channel from the older connection, then no new offer frame is sent through the hub",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "device-repro",
+        "title": "Reproduce two network changes on the Mac rig iOS Simulator and record before/after log lines",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T18:00:30Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-5046",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/ACCEPTANCE.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "grep -n 'PAN-5046 network change' apps/mobile/ACCEPTANCE.md"
+          ],
+          "expected_outputs": [
+            "ACCEPTANCE.md contains the PAN-5046 section with phone and dashboard log excerpts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-6",
+            "FR-8"
+          ],
+          "acJustification": "Live device verification with a stated fallback; two criteria cover the record and its content."
+        },
+        "narrative": {
+          "Action": "PRD WI-8. On the Mac rig build the app from this branch, run it in the iOS Simulator capturing '[overdeck]' lines per apps/mobile/README.md step 6 (SIMCTL_CHILD_NSUnbufferedIO=YES xcrun simctl launch ... --stdout=$HOME/app-stdout.log), point it at a dashboard built from this branch, open a conversation, cause two network changes in a row on the rig (e.g. toggle the Mac's active network service off/on twice, 20 s apart), type a message during the second change. Record in apps/mobile/ACCEPTANCE.md under 'PAN-5046 network change': the phone lines (ice restart sent / recovered), the dashboard lines (ice restart from) with the count of 'a new offer replaced it' (expected 0), the before lines from PRD Finding 1, and whether the held message sent within 15 s of 'ice restart recovered'. IMPLEMENTATION CHECKPOINT: if the rig is unreachable or the simulator build fails, record that plus the phone-ice-restart-integration test output in the section, and post an issue comment naming the device run as the one open verification; do not block the PR."
+        },
+        "items": [
+          {
+            "id": "device-repro.ac1",
+            "title": "Given the PR branch, when apps/mobile/ACCEPTANCE.md is read, then it contains a 'PAN-5046 network change' section quoting phone and dashboard log lines from the run (or the stated fallback with the integration test output)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "device-repro.ac2",
+            "title": "Given a completed rig run, when its dashboard excerpt is read, then it shows 'ice restart from' lines and states the count of 'a new offer replaced it' lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-network-change",
+        "title": "Document per-connection eviction, ICE restart lines and the boot-order fix",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T18:00:30Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5046",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ANYWHERE-ARCHITECTURE.md",
+            "configuration/linked-machines.mdx",
+            "apps/mobile/README.md",
+            "packages/anywhere-channel/README.md",
+            ".overdeck/context/codebase/concerns.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'ice restart' docs/ANYWHERE-ARCHITECTURE.md configuration/linked-machines.mdx apps/mobile/README.md packages/anywhere-channel/README.md"
+          ],
+          "expected_outputs": [
+            "each of the four files prints at least one 'ice restart' line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-6",
+            "FR-7",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. docs/ANYWHERE-ARCHITECTURE.md: rewrite the 'A failed link is logged on the phone (PAN-5018)' paragraph (~line 201) - a timeout/protocol secure-open failure closes only the peer connection that carried the channel; closing a peer connection ends every channel on it at once; a 'disconnected' connection gets an ICE restart after 2 s before any fresh offer. In 'Diagnosing a link that does not open', add 'rtc session <s> ice restart from <from>', explain that repeated 'a new offer replaced it' for one peer means the phone kept building new connections, and that 'channel refused (unknown-peer)' carrying a machine's own key during a re-link is expected. configuration/linked-machines.mdx 'When a link does not open': a phone that changes network keeps its link through an ICE restart and held messages send once it recovers. apps/mobile/README.md step 6: list the new phone lines. packages/anywhere-channel/README.md dialer paragraph (~line 67): evict, restartIce, onRecovered and the duplex-ending rule. .overdeck/context/codebase/concerns.md: amend the PAN-5018 eviction sentence to per-connection eviction and add a PAN-5046 entry for the boot-order race; keep the single trailing last-verified line unchanged."
+        },
+        "items": [
+          {
+            "id": "docs-network-change.ac1",
+            "title": "Given docs/ANYWHERE-ARCHITECTURE.md, when the PAN-5018 phone paragraph is read, then it states that only the peer connection that carried the failed channel is closed and that a disconnected connection is ICE-restarted after 2 s",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-network-change.ac2",
+            "title": "Given the Diagnosing section, when it is read, then it lists the 'rtc session <s> ice restart from <from>' line and explains repeated 'a new offer replaced it' for one peer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-network-change.ac3",
+            "title": "Given apps/mobile/README.md step 6, when it is read, then it names the 'ice restart sent', 'ice restart recovered' and 'ice restart timed out; closing' phone lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-network-change.ac4",
+            "title": "Given .overdeck/context/codebase/concerns.md, when grep -c 'last-verified' runs, then it prints 1 and the file contains a PAN-5046 boot-order entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "dialer-ends-duplexes",
+        "to": "evict-owning-connection",
+        "type": "blocks"
+      },
+      {
+        "from": "evict-owning-connection",
+        "to": "dialer-ice-restart",
+        "type": "blocks"
+      },
+      {
+        "from": "dialer-ice-restart",
+        "to": "shell-link-recovery",
+        "type": "blocks"
+      },
+      {
+        "from": "dialer-ice-restart",
+        "to": "phone-ice-restart-integration",
+        "type": "blocks"
+      },
+      {
+        "from": "server-ice-restart-answer",
+        "to": "phone-ice-restart-integration",
+        "type": "blocks"
+      },
+      {
+        "from": "shell-link-recovery",
+        "to": "device-repro",
+        "type": "blocks"
+      },
+      {
+        "from": "boot-wiring-order",
+        "to": "device-repro",
+        "type": "blocks"
+      },
+      {
+        "from": "phone-ice-restart-integration",
+        "to": "device-repro",
+        "type": "blocks"
+      },
+      {
+        "from": "dialer-ice-restart",
+        "to": "docs-network-change",
+        "type": "blocks"
+      },
+      {
+        "from": "server-ice-restart-answer",
+        "to": "docs-network-change",
+        "type": "blocks"
+      },
+      {
+        "from": "shell-link-recovery",
+        "to": "docs-network-change",
+        "type": "blocks"
+      },
+      {
+        "from": "boot-wiring-order",
+        "to": "docs-network-change",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "One phone-to-machine link bug whose fix spans the phone dialer package, the mobile shell, the server RTC transport and boot wiring, proved by one integration test and one device run; splitting would ship a phone ICE restart the server drops, or a server change nothing exercises. 18 files; the subsystems are packages/anywhere-channel, apps/mobile, src/lib/anywhere, src/dashboard/server, tests/integration and documentation.",
+      "canonicalFilename": "2026-11-04-PAN-5046-phone-app-link-keeps-dropping-on-5g-phone-re-offers-webrtc-sessions-repeatedly-a-new-offer-replaced-it-x27-and-messages-wait-to-send.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

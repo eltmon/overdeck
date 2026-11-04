@@ -68,8 +68,24 @@ a working example.
 data channel to a machine through the directory's `signal` frames and resolves with an
 `RtcDuplexWeb`. A machine closes its older peer connection when a new offer arrives for the same
 peer, so the dialer keeps **one peer connection per (machine, relay)** and opens one more data
-channel on it per dial. It replaces a connection that is `failed`, `closed` or `disconnected`,
-and a dial times out after 15 s.
+channel on it per dial. It replaces a connection that is `failed` or `closed`, and a dial times
+out after 15 s.
+
+A `disconnected` connection is kept (PAN-5046). After `DISCONNECT_GRACE_MS` (2 s) still
+disconnected, the dialer sends one ICE-restart offer on the same session; a connection that is not
+connected `ICE_RESTART_TIMEOUT_MS` (10 s) after that offer closes. An answer is applied whenever the
+connection has an unanswered offer, so each restart answer lands. Closing a connection ends every
+`RtcDuplexWeb` handed out on it at once (with an error when the stream has an `error` listener), so
+a handshake on it fails as `unreachable` instead of waiting for its timeout.
+
+- `evict(raw, reason)` closes the connection that carried `raw`, but only while it is still the
+  current one for its machine and route; the phone shell calls it after a `timeout` or `protocol`
+  secure-open failure.
+- `restartIce(environmentId)` restarts ICE on every open connection to a machine and resolves once
+  each is connected again.
+- `onRecovered(listener)` reports a machine whose link came back: an ICE restart that connected, or
+  a new connection after the previous one failed. `close()` resets it, so the connection after a
+  resume is not a recovery.
 
 ## HTTP and WebSocket over the channel (PAN-4834)
 

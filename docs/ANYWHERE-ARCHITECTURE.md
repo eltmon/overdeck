@@ -202,8 +202,17 @@ A failed link is logged on the phone (PAN-5018): `[overdeck] link <label>: direc
 `relay dial failed: …`, and `secure open failed over <direct|relay> (<code>): …` with the
 `ChannelOpenError` code. A secure open that fails with `timeout` or `protocol` means a raw channel
 opened but the handshake got no valid reply, so the peer connection under it is suspect: the phone
-closes its peer connections to that machine and forgets the remembered route, and the next dial
-sends a fresh offer. Definitive refusals (`unknown-peer`, `pairing-refused`, `identity-refused`,
+closes that one peer connection, if it is still the current one for the machine, and forgets the
+remembered route; its other connections to the machine stay open (PAN-5046). Closing a peer
+connection ends every raw channel the dialer handed out on it at once, because
+`RTCPeerConnection.close()` fires no `close` on its data channels: an open stream closes and a
+handshake still running fails as `unreachable` instead of waiting out its 10 s timeout. A
+connection that turns `disconnected` (a network change) is kept; after 2 s still disconnected the
+dialer sends an ICE-restart offer on the same session, which the machine answers on the existing
+peer connection, so open channels survive. Only a restart that is not connected 10 s after its
+offer, or a `failed` connection, makes the next dial send a fresh offer. When the open machine's
+link comes back and the machine view's stream is not live, the shell reconnects that stream at once
+(`installLinkRecovery`), so held composer messages send. Definitive refusals (`unknown-peer`, `pairing-refused`, `identity-refused`,
 `unsupported`) and `busy` keep the connection. A web bundle built with
 `VITE_OVERDECK_DEBUG_ERRORS=1` appends the code to the on-screen text, for example
 "Could not open a secure channel to desk. (timeout)".
@@ -479,7 +488,12 @@ lines are always on, because they are bounded by real events:
   `rtc offer dropped: <reason>` (the session belongs to another peer, is closed, or is already
   open), or `rtc session <session> from <from> failed at <step>: <message>`, where the step is
   `ice-servers`, `peer-connection`, `remote-description` or `answer`.
-- `rtc closing session <session> for <from>: a new offer replaced it`.
+- `rtc session <session> ice restart from <from>`: an offer on a session that is already open, from
+  the same peer, is an ICE restart (PAN-5046). The machine renegotiates that peer connection and logs
+  `rtc session <session> answered`; open data channels survive.
+- `rtc closing session <session> for <from>: a new offer replaced it`. Many of these for one peer in a
+  few minutes mean that peer kept building new connections instead of restarting ICE on the one it
+  had (before PAN-5046 the phone did this after every network change).
 - `rtc session <session> <peer> connected|failed|closed`: a peer connection changed state.
 - `directory online (plan <plan>, <n> machines)`, `directory socket closed (<code>)`,
   `directory refused: <message>` (for example close 4011, "Another Overdeck process registered
@@ -487,6 +501,9 @@ lines are always on, because they are bounded by real events:
   `directory silent for <s> s; reconnecting` and `directory account changed; reconnecting`.
 - `channel refused (<code>, <mode>): <message>` for every secure-channel refusal except `closed`
   and `timeout`. `<mode>` is `link`, `pairing`, `approval`, or `unknown` before the preamble.
+  `channel refused (unknown-peer, link)` whose initiator key is a linked machine's own key is
+  expected while that machine re-links: between the removal of its old link and the new one, its
+  dials home are refused.
 
 `OVERDECK_ANYWHERE_DEBUG=1` in the dashboard's environment adds the routine lines:
 `rtc candidate dropped: …`, `rtc answer dropped: …`,

@@ -11,10 +11,16 @@
  * `relay: true` forces TURN on the initiator (`iceTransportPolicy: 'relay'`), and both ends pass the relay
  * route's list through `relayIceServers` (TLS TURN first, no STUN).
  *
+ * An offer on a known, open session from the same peer is an ICE restart (PAN-5046 FR-6): the
+ * responder renegotiates the existing peer connection and answers on that session, so its data
+ * channels survive the peer's network change. An offer with a new session id still replaces the
+ * peer's connection.
+ *
  * Diagnostics (PAN-5018 FR-6): one always-on line per offer received and one for its outcome
- * (`answered`, `dropped: <reason>`, `failed at <step>: <message>`), plus each peer connection's
- * `connected`, `failed` and `closed`. Dropped candidates and answers go to the debug log. Ids are cut
- * to 8 characters; SDP and candidate text are never logged (NFR-1).
+ * (`answered`, `dropped: <reason>`, `failed at <step>: <message>`), `ice restart from <peer>` for a
+ * same-session offer, plus each peer connection's `connected`, `failed` and `closed`. Dropped
+ * candidates and answers go to the debug log. Ids are cut to 8 characters; SDP and candidate text are
+ * never logged (NFR-1).
  */
 import { randomBytes } from 'node:crypto';
 import type { Duplex } from 'node:stream';
@@ -274,7 +280,24 @@ export class RtcTransport {
           this.dropped(data, `session ${shortId(session)} from ${shortId(from)} is closed`);
           return;
         }
-        if (data.sdp?.type === 'offer') this.log(`rtc offer dropped: session ${shortId(session)} from ${shortId(from)} is already open`);
+        if (data.sdp?.type === 'offer') {
+          // An ICE restart (PAN-5046 FR-6): the peer renegotiates the same connection after a network
+          // change, so every open data channel survives.
+          this.log(`rtc session ${shortId(session)} ice restart from ${shortId(from)}`);
+          // werift starts gathering the new ICE generation inside setRemote; hold those candidates until the answer
+          // is out, or the phone adds them against its old remote description and drops them.
+          known.localSent = false;
+          // The phone's new-generation candidates can arrive while the offer is still being applied; queue them
+          // until it is, since werift's ICE restart inside setRemote would discard any added before it.
+          known.remoteSet = false;
+          progress.step = 'remote-description';
+          await this.setRemote(known, 'offer', data.sdp.sdp);
+          progress.step = 'answer';
+          const answer = await known.pc.createAnswer();
+          await known.pc.setLocalDescription(answer);
+          this.sendLocalDescription(known, 'answer');
+          this.log(`rtc session ${shortId(session)} answered`);
+        }
         if (data.sdp?.type === 'answer') {
           if (known.remoteSet) this.debug(`rtc answer dropped: session ${shortId(session)} already has one`);
           else await this.setRemote(known, 'answer', data.sdp.sdp);
