@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5020",
   "created": "2026-11-04T12:51:44.824Z",
-  "updated": "2026-11-04T13:02:50.877Z",
+  "updated": "2026-11-04T13:02:54.817Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,11 @@
       "claimedBy": "agent-pan-5020",
       "claimedAt": "2026-11-04T13:02:06.387Z",
       "doneAt": "2026-11-04T13:02:50.877Z"
+    },
+    "w3-pan-map-skill": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5020",
+      "claimedAt": "2026-11-04T13:02:54.816Z"
     }
   }
 }
