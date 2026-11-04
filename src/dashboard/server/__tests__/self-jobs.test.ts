@@ -194,6 +194,7 @@ describe('self jobs', () => {
       expect(env.OVERDECK_CONVERSATION).toBe('conv-abc');
       expect(env).not.toHaveProperty('OVERDECK_AGENT_ID');
       expect(env).not.toHaveProperty('OVERDECK_ISSUE_ID');
+      expect(env).not.toHaveProperty('OVERDECK_CLAIM_ID');
       expect(env).not.toHaveProperty('OVERDECK_MCP_TOKEN');
       expect(env.OVERDECK_DASHBOARD_URL).toBe('http://127.0.0.1:4011');
     });
