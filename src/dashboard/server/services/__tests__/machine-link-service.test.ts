@@ -160,3 +160,45 @@ describe('createMachineLink (PAN-4645 WI-12)', () => {
     expect(calls).toEqual([]);
   });
 });
+
+describe('createMachineLink requester telemetry (PAN-5016 WI-3)', () => {
+  it('records started then approved(requester) for a pairing-code link', async () => {
+    const { deps } = harness();
+    const capture = vi.fn();
+    await createMachineLink({ pairingUrl: PAIRING_URL }, { ...deps, analytics: { capture } });
+    expect(capture.mock.calls).toEqual([
+      ['machine_link_started', { method: 'pairing_code' }],
+      ['machine_link_approved', { method: 'pairing_code', side: 'requester' }],
+    ]);
+  });
+
+  it('records started then failed(requester, reason) and still rejects with the original error', async () => {
+    const { deps } = harness();
+    deps.openChannel = vi.fn(async () => { throw new ChannelOpenError('pairing-refused', 'nope'); });
+    const capture = vi.fn();
+    const error = await createMachineLink(
+      { transport: { url: 'tcp://127.0.0.1:41234', kind: 'ssh', pairingCode: 'odp_x' } },
+      { ...deps, analytics: { capture } },
+    ).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(MachineLinkError);
+    expect((error as MachineLinkError).code).toBe('pairing-refused');
+    expect(capture.mock.calls).toEqual([
+      ['machine_link_started', { method: 'ssh' }],
+      ['machine_link_failed', { method: 'ssh', side: 'requester', reason: 'pairing_refused' }],
+    ]);
+  });
+
+  it('records bad_pairing_url for a malformed pairing link', async () => {
+    const { deps } = harness();
+    const capture = vi.fn();
+    await expect(createMachineLink({ pairingUrl: 'not a url' }, { ...deps, analytics: { capture } })).rejects.toMatchObject({ code: 'bad-pairing-url' });
+    expect(capture).toHaveBeenLastCalledWith('machine_link_failed', { method: 'pairing_code', side: 'requester', reason: 'bad_pairing_url' });
+  });
+
+  it('a throwing analytics client does not change the link result', async () => {
+    const { deps, stored } = harness();
+    const capture = vi.fn(() => { throw new Error('posthog down'); });
+    await createMachineLink({ pairingUrl: PAIRING_URL }, { ...deps, analytics: { capture } });
+    expect(stored).toHaveLength(1);
+  });
+});

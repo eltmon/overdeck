@@ -47,6 +47,14 @@ import { UNKNOWN_PEER_MACHINE_FACTS } from '../../../lib/anywhere/machine-capabi
 import { ensureMachineKey, machineKeyFingerprint } from '../../../lib/anywhere/machine-key.js';
 import { type LinkRoute, mergeAdvertised, parseRouteUrl, routeFromPairingUrl } from '../../../lib/anywhere/routes.js';
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
+import {
+  type AnywhereAnalytics,
+  captureLinkApproved,
+  captureLinkFailed,
+  captureLinkStarted,
+  linkFailureReason,
+  linkMethodForTransport,
+} from '../../../lib/telemetry/anywhere.js';
 
 export const MACHINE_EXCHANGE_PATH = '/api/machines/exchange';
 const CHANNEL_REQUEST_TIMEOUT_MS = 10_000;
@@ -156,6 +164,8 @@ export interface MachineLinkServiceDeps {
   currentEndpoints: () => Promise<AdvertisedEndpoint[]>;
   localIdentity: () => Promise<{ environmentId: string; label: string }>;
   now: () => string;
+  /** PAN-5016: requester-side link telemetry; undefined uses the process analytics service. */
+  analytics?: AnywhereAnalytics;
 }
 
 const defaultDeps: MachineLinkServiceDeps = {
@@ -201,6 +211,23 @@ export async function createMachineLink(
   overrides: Partial<MachineLinkServiceDeps> = {},
 ): Promise<{ link: MachineLink; view: MachineLinkView; peer: EnvironmentDescriptor }> {
   const deps = { ...defaultDeps, ...overrides };
+  // PAN-5016 FR-2: this machine is the requester; the method follows D-8.
+  const method = linkMethodForTransport(input.transport?.kind);
+  captureLinkStarted(method, deps.analytics);
+  try {
+    const result = await createMachineLinkUnobserved(input, deps);
+    captureLinkApproved(method, 'requester', deps.analytics);
+    return result;
+  } catch (error) {
+    captureLinkFailed(method, 'requester', linkFailureReason(error), deps.analytics);
+    throw error;
+  }
+}
+
+async function createMachineLinkUnobserved(
+  input: CreateMachineLinkInput,
+  deps: MachineLinkServiceDeps,
+): Promise<{ link: MachineLink; view: MachineLinkView; peer: EnvironmentDescriptor }> {
   const bothWays = input.bothWays ?? true;
   const access: LinkAccess = input.access ?? 'operator';
 
