@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5019",
   "created": "2026-11-04T13:12:00.752Z",
-  "updated": "2026-11-04T13:51:13.696Z",
+  "updated": "2026-11-04T13:57:26.230Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -40,9 +40,10 @@
       "doneAt": "2026-11-04T13:51:04.880Z"
     },
     "exchange-prefs": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5019",
-      "claimedAt": "2026-11-04T13:51:13.696Z"
+      "claimedAt": "2026-11-04T13:51:13.696Z",
+      "doneAt": "2026-11-04T13:57:26.229Z"
     }
   }
 }
