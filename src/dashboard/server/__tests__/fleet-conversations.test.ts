@@ -110,13 +110,13 @@ describe('POST /api/fleet/conversations (D-4651-12)', () => {
 
   it('a token credential forwards as operator with a ceiling of its scopes; a sender maps to its agent', () => {
     expect(fleetCaller({ kind: 'token', tokenId: 'k', scopes: ['read:conversations', 'operate'] }, 'agent-pan-7'))
-      .toEqual({ actor: 'operator', ceiling: ['read:conversations', 'operate'], mayCreateFly: false });
+      .toEqual({ actor: 'operator', ceiling: ['read:conversations', 'operate'], mayCreateFly: false, viaToken: true });
     expect(fleetCaller({ kind: 'root-session' }, 'agent-pan-7')).toEqual({ actor: { agentId: 'agent-pan-7' }, mayCreateFly: true });
     expect(fleetCaller({ kind: 'root-session' }, undefined)).toEqual({ actor: 'operator', mayCreateFly: true });
   });
 
   it('ac3 (PAN-4743): mayCreateFly is true for an internal-token credential, false for an odk_ token with only operate', () => {
     expect(fleetCaller({ kind: 'internal-token' }, undefined)).toEqual({ actor: 'operator', mayCreateFly: true });
-    expect(fleetCaller({ kind: 'token', tokenId: 'k', scopes: ['operate'] }, undefined)).toEqual({ actor: 'operator', ceiling: ['operate'], mayCreateFly: false });
+    expect(fleetCaller({ kind: 'token', tokenId: 'k', scopes: ['operate'] }, undefined)).toEqual({ actor: 'operator', ceiling: ['operate'], mayCreateFly: false, viaToken: true });
   });
 });
