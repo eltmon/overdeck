@@ -616,7 +616,10 @@ needs `transport: "streamable-http"`: OpenClaw defaults to `sse`, which
 Overdeck does not serve. The plugin adds a needs-you summary to agent turns,
 at most every 5 minutes, and two chat tools, `overdeck_pending` and
 `overdeck_answer`. Answering stays off until you set `allowAnswers: true`, and
-the connector also needs `approve` access. The connector config:
+the connector also needs `approve` access. OpenClaw 2026.10.10 blocks the
+summary hook for plugins it does not bundle, so also add
+`hooks: { allowConversationAccess: true }` to `plugins.entries.overdeck`
+(see the package README). The connector config:
 
 ```json5
 // openclaw config

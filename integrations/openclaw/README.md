@@ -41,6 +41,10 @@ cd integrations/openclaw && npm ci && npm run build && npm pack
 openclaw plugins install npm-pack:./overdeck-openclaw-0.1.0.tgz
 ```
 
+OpenClaw warns that a local path is outside ClawHub review and asks for
+capability consent. Review the package, then confirm. Without a terminal to
+confirm in, pass `--force --accept-capabilities`.
+
 The plugin has no runtime dependencies and does not need the `openclaw`
 package installed next to it.
 
@@ -95,6 +99,24 @@ mcp: { servers: { overdeck: {
 plugins: { entries: { overdeck: { config: { connectorUrl: "https://YOUR-MACHINE.YOUR-TAILNET.ts.net/mcp", localToken: "${OVERDECK_MCP_TOKEN}" } } } },
 ```
 
+## Turn on the summary
+
+OpenClaw 2026.10.10 blocks the `before_prompt_build` hook for plugins it does
+not bundle until you grant it. Without the grant the chat tools work, but no
+summary is added. Add `hooks: { allowConversationAccess: true }` next to
+`config` in the same entry:
+
+```json5
+plugins: { entries: { overdeck: {
+  hooks: { allowConversationAccess: true },
+  config: { localToken: "${OVERDECK_CONNECTOR_LOCAL_TOKEN}" },
+} } },
+```
+
+The grant lets the hook read the conversation. This plugin's hook ignores the
+conversation; it only asks Overdeck what waits for you. On the Tailscale route,
+keep your `connectorUrl` and `localToken` lines and add the same `hooks` line.
+
 ## What the plugin adds
 
 - **The Overdeck tools.** They come from `mcp.servers.overdeck`, so agents
@@ -102,7 +124,8 @@ plugins: { entries: { overdeck: { config: { connectorUrl: "https://YOUR-MACHINE.
 - **The needs-you summary.** Before an agent turn, the plugin asks Overdeck
   what waits for you, at most once every 5 minutes per gateway. It adds a
   short list to the turn only when something waits, labeled as data from
-  Overdeck, not instructions.
+  Overdeck, not instructions. It needs the hook grant in
+  [Turn on the summary](#turn-on-the-summary).
 - **Privacy note.** The summary goes into every agent turn of the gateway,
   including turns in shared channels and group chats. Set `summary: false` on
   a gateway that serves group chats.
@@ -144,6 +167,9 @@ The plugin reads `plugins.entries.overdeck.config`.
 - `openclaw mcp probe overdeck` connects and lists the Overdeck tools.
 - No Overdeck tools: check `transport: "streamable-http"`. The `minimal` tool
   profile and `tools.deny: ["bundle-mcp"]` also hide MCP tools.
+- No summary: check `hooks: { allowConversationAccess: true }` under
+  `plugins.entries.overdeck`. `openclaw plugins inspect overdeck --runtime`
+  lists `before_prompt_build` under typed hooks once the grant is in place.
 - `openclaw mcp doctor` warns about a literal token in `headers`. Keep the
   `${VAR}` reference.
 - `Overdeck is not set up: …` from a tool names the config problem, for
