@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4885",
   "created": "2026-11-04T10:36:33.533Z",
-  "updated": "2026-11-04T10:54:34.940Z",
+  "updated": "2026-11-04T10:55:05.376Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -58,6 +58,10 @@
     "docs-two-budgets.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T10:54:34.940Z"
+    },
+    "link-open-budget.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:55:05.375Z"
     }
   }
 }
