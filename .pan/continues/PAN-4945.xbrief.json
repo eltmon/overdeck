@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4945",
   "created": "2026-11-04T01:22:40.341Z",
-  "updated": "2026-11-04T03:00:53.453Z",
+  "updated": "2026-11-04T03:01:15.057Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -294,6 +294,10 @@
     "oauth-acceptance.ac4": {
       "status": "completed",
       "doneAt": "2026-11-04T03:00:53.452Z"
+    },
+    "oauth-acceptance.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:01:15.056Z"
     }
   }
 }
