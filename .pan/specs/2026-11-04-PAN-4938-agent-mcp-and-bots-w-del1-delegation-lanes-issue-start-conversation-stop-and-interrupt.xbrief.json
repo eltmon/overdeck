@@ -1,0 +1,1137 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T03:31:46Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4938: Agent MCP and bots (W-DEL1): Delegation, lanes, issue start, conversation stop and interrupt",
+    "updated": "2026-11-04T03:37:52.553Z"
+  },
+  "plan": {
+    "id": "pan-4938",
+    "title": "Agent MCP and bots (W-DEL1): Delegation, lanes, issue start, conversation stop and interrupt",
+    "status": "proposed",
+    "uid": "45c6560e-2f22-4dc2-8222-cc754945cc3c",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-04T03:31:46Z",
+    "updated": "2026-11-04T03:37:52.553Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4938",
+        "label": "PAN-4938",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4927",
+        "label": "PAN-4927 (epic)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4938.md",
+        "label": "PRD",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "mcp",
+      "agents",
+      "delegation",
+      "lanes",
+      "self-routes",
+      "pan-4927"
+    ],
+    "narratives": {
+      "Problem": "Managed agents have the overdeck MCP server and agent tokens (W-TOK1, W-MCP1, W-SELF1), but no tool lets an agent delegate a worker and wait for it, run lanes, start an issue, or stop and interrupt a conversation; those still need pan over Bash with the admin internal token. Epic FR-4 requires them as tools with waits bounded at 50 s.",
+      "Proposal": "Add owner-checked self routes for delegation (POST /api/self/workers, GET /api/self/workers, GET /api/self/workers/:id, GET /api/self/workers/:id/wait) and lanes (POST /api/self/lanes, POST /api/self/lanes/wait, POST /api/self/lanes/report), with agent-only tools in tools-delegate.ts and tools-lanes.ts; add start_issue, stop_conversation and interrupt_conversation to tools-write.ts over existing routes, with a token-only local branch in POST /api/fleet/issues/:id/start; forward agent-kind tokens to linked machines as that agent (epic D-9). Worker waits pass a startup grace from the worker's launch time so 50 s chunks still detect a dead worker. See .pan/drafts/PAN-4938.md.",
+      "NonGoals": "- No interrupt for Claude Code, Codex or ACP conversations; interrupt_conversation returns the abort route's Pi-only error text for them.\n- No ownership fence on stop_conversation, interrupt_conversation, lane_stop or start_issue beyond the operate scope.\n- No force (CPU-pressure override) for lanes started through a tool.\n- No single-lane wait (pan lane wait <lane>); lane_wait waits on a run or on the caller's lanes.\n- No edits to src/lib/mcp/tools-self.ts, src/dashboard/server/services/self-job-argv.ts or any W-SELF2 route.\n- No new HTTP route for stopping a worker; task_cancel uses the existing stop routes.\n- No change to the pan CLI's behaviour (worker-remote.ts only re-exports the moved helpers).\n- No provenance change for issues started by start_issue.\n- No CLAUDE.md, docs/ROLES.md or epic-wide W-DOC pages (bots.mdx, cli/mcp.mdx)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "delegate_task posts a new self route POST /api/self/workers instead of POST /api/fleet/workers",
+        "rationale": "The MCP tool context carries no caller identity (McpToolContext is { api, scopes, isAgent }), so only a self route can set issueId and parentId from the token, as epic D-10 requires."
+      },
+      {
+        "summary": "A conversation's worker parent id is its tmux session conv-<name>",
+        "rationale": "pan worker run defaults --parent to OVERDECK_CONVERSATION (the tmux session) and the remote follower keys on the conv- prefix; using the same id keeps pan worker list --parent and the follower working."
+      },
+      {
+        "summary": "task_status and list_workers are owner-only self routes that include stand-ins; task_cancel adds no route",
+        "rationale": "GET /api/workers/:id/status answers 404 for every stand-in (it reads worker.json) and checks no ownership; the epic's own delegate_task accepts machine, so remote workers must work."
+      },
+      {
+        "summary": "The stand-in wait helpers move to src/lib/agents/worker/wait-any.ts",
+        "rationale": "No dashboard server module imports src/cli/commands; moving them keeps one implementation that both the CLI and the wait route use."
+      },
+      {
+        "summary": "Chunked worker waits pass startupGraceMs computed from the worker's launch time",
+        "rationale": "waitForWorkerReport restarts its 60 s grace on every call; with 50 s chunks a dead worker would answer running forever."
+      },
+      {
+        "summary": "handleFleetIssueStart becomes an Effect generic over R, mirroring handleWorkIssueStart",
+        "rationale": "spawnIssueAgentForRoute needs EventStoreService, IssueLifecycle and ReadModelService; machines-work.ts already solves the same door this way."
+      },
+      {
+        "summary": "Only agent-kind tokens forward as { agentId } on linked machines; conversation tokens stay 'operator' with their ceiling",
+        "rationale": "Epic D-9's stated rule is parity with pan, and a conversation's pan acts as the operator today (senderFromEnv -> conv-operator-*); fencing the operator's chat would also break answering linked prompts (W-APPR1)."
+      },
+      {
+        "summary": "lane_start is a self route with the calling conversation as parent, and all lane tools are audience 'agent'",
+        "rationale": "A lane's parent must be a conversation and the tool cannot know it; agent-only lane tools keep epic AC-2 (a read:state-only token lists only list_machines)."
+      },
+      {
+        "summary": "lane_wait and lane_report run in process (listLaneViews, collected warnings, the existing lane-report job verb)",
+        "rationale": "waitForLaneSet's defaults fetch the dashboard over HTTP and write to stderr; in the server the in-process sources are correct and cheaper."
+      },
+      {
+        "summary": "Lane tools live in a separate tools-lanes.ts rather than the epic's single tools-delegate.ts",
+        "rationale": "Keeps each tool file small and lets worker and lane slices be reviewed separately."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-04-PAN-4938-agent-mcp-and-bots-w-del1-delegation-lanes-issue-start-conversation-stop-and-interrupt.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "tool-list-tests",
+        "title": "Make the MCP tool-list tests compute from ALL_TOOLS instead of pinning it",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T03:31:46Z",
+        "metadata": {
+          "issueLabel": "pan-4938",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "test",
+          "requiresInspection": false,
+          "files_scope": [
+            "tests/unit/lib/mcp/visibility.test.ts",
+            "tests/unit/lib/mcp/tool-annotations.test.ts",
+            "tests/unit/lib/mcp/tools-approve.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/mcp/visibility.test.ts tests/unit/lib/mcp/tool-annotations.test.ts tests/unit/lib/mcp/tools-approve.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three test files pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "NFR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-0. In tests/unit/lib/mcp/visibility.test.ts replace toHaveLength(13) with a list computed from ALL_TOOLS (audience 'any' and scope not 'approve'), and replace the exact ['list_machines','wait_job'] agent list with ALL_TOOLS.filter(scope === 'read:state') plus toContain('list_machines') and toContain('wait_job'). Keep the read:state-only test that expects exactly ['list_machines']. In tests/unit/lib/mcp/tool-annotations.test.ts replace 'every tool but SELF_TOOLS is any' with: every tool in READ_TOOLS, WRITE_TOOLS, SCHEDULE_TOOLS, APPROVE_TOOLS has audience 'any'; every SELF_TOOLS tool has audience 'agent'. No production code changes. In tests/unit/lib/mcp/tools-approve.test.ts, test 'the approval tools close the list', keep the APPROVE_TOOLS assertion and change the ALL_TOOLS assertion to compare only the first 22 names (ALL_TOOLS.map(name).slice(0, 22)) with today's list ending in 'wait_job', and retitle the test 'the approval tools follow the schedule tools and precede the self tools'."
+        },
+        "items": [
+          {
+            "id": "tool-list-tests.ac1",
+            "title": "Given today's ALL_TOOLS, when the three test files run, then every test passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tool-list-tests.ac2",
+            "title": "visibility.test.ts contains no toHaveLength(13) and no literal ['list_machines', 'wait_job'] array; the read:state-only test still expects exactly ['list_machines']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tool-list-tests.ac3",
+            "title": "tool-annotations.test.ts asserts audience 'any' for READ_TOOLS, WRITE_TOOLS, SCHEDULE_TOOLS and APPROVE_TOOLS and 'agent' for SELF_TOOLS, and a new tool array appended to ALL_TOOLS no longer fails it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tool-list-tests.ac4",
+            "title": "tools-approve.test.ts compares only the first 22 ALL_TOOLS names, so when a tool array is appended after SELF_TOOLS the test still passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "extract-stand-in-wait",
+        "title": "Move standInWaitDeps and waitForAnyWorker into src/lib/agents/worker/wait-any.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T03:31:46Z",
+        "metadata": {
+          "issueLabel": "pan-4938",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "refactor",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/agents/worker/wait-any.ts",
+            "src/cli/commands/worker-remote.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint:circular",
+            "npx vitest run tests/unit/cli/worker-remote.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle",
+            "worker-remote.test.ts passes unchanged"
+          ],
+          "traces": [
+            "FR-2",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1, D-4. Create src/lib/agents/worker/wait-any.ts holding standInWaitDeps and waitForAnyWorker moved verbatim from src/cli/commands/worker-remote.ts (lines ~100-126), with one addition: waitForAnyWorker gains a fifth parameter localDeps: WaitDeps = {} used for a local worker (stand-ins keep standInWaitDeps). worker-remote.ts deletes both functions and re-exports them: export { standInWaitDeps, waitForAnyWorker } from '../../lib/agents/worker/wait-any.js'. Remove imports the deletion leaves unused. worker.ts and tests/unit/cli/worker-remote.test.ts stay unchanged."
+        },
+        "items": [
+          {
+            "id": "extract-stand-in-wait.ac1",
+            "title": "src/lib/agents/worker/wait-any.ts exports standInWaitDeps and waitForAnyWorker, and waitForAnyWorker accepts a fifth localDeps argument that a local worker's wait receives",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-stand-in-wait.ac2",
+            "title": "src/cli/commands/worker-remote.ts contains no 'function standInWaitDeps' and no 'function waitForAnyWorker' and re-exports both names from the lib module",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-stand-in-wait.ac3",
+            "title": "tests/unit/cli/worker-remote.test.ts passes without edits and npm run lint:circular exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "token-link-actor",
+        "title": "Forward an agent-kind agent token to linked machines as that agent (epic D-9)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T03:31:46Z",
+        "metadata": {
+          "issueLabel": "pan-4938",
+          "inspectionDepth": "deep",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "delegate-task",
+            "start-issue-local"
+          ],
+          "files_scope": [
+            "src/dashboard/server/linked-conversation-proxy.ts",
+            "src/dashboard/server/routes/fleet-work.ts",
+            "src/dashboard/server/__tests__/linked-conversation-proxy-agent-token.test.ts",
+            "src/dashboard/server/__tests__/fleet-workers.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/dashboard/server/__tests__/linked-conversation-proxy-agent-token.test.ts src/dashboard/server/__tests__/linked-conversation-proxy-token.test.ts src/dashboard/server/__tests__/fleet-workers.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint exits 0",
+            "the three test files pass"
+          ],
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2, D-9, D-10. In src/dashboard/server/linked-conversation-proxy.ts add exported tokenLinkActor(credential) returning { agentId } when credential.agentKind === 'agent' and agentId is set, else 'operator'; forwardLinkedConversationRequest uses it for every token credential (the ceiling line stays). In src/dashboard/server/routes/fleet-work.ts add viaToken?: boolean to FleetCaller and make fleetCaller return { actor: tokenLinkActor(credential), ceiling, mayCreateFly, viaToken: true } for a token credential; update the module header's actor paragraph. New test file src/dashboard/server/__tests__/linked-conversation-proxy-agent-token.test.ts; add fleetCaller cases to fleet-workers.test.ts."
+        },
+        "items": [
+          {
+            "id": "token-link-actor.ac1",
+            "title": "Given an agent token with agentKind 'agent' and agentId 'agent-pan-1', when it writes to @desk/name, then deps.forward receives actor { agentId: 'agent-pan-1' } and a ceiling equal to the token's scopes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "token-link-actor.ac2",
+            "title": "Given a conversation-kind agent token or a plain token, when it writes to a linked conversation, then deps.forward receives actor 'operator' with the token's scopes as ceiling",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "token-link-actor.ac3",
+            "title": "fleetCaller returns viaToken: true for every token credential, actor { agentId } only for an agent-kind token, and no viaToken for a null credential with an operator sender",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "start-issue-local",
+        "title": "start_issue: start a planned issue on this machine for a token caller",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T03:31:46Z",
+        "metadata": {
+          "issueLabel": "pan-4938",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/routes/fleet-work.ts",
+            "src/lib/mcp/tools-write.ts",
+            "src/dashboard/server/__tests__/fleet-workers.test.ts",
+            "tests/unit/lib/mcp/tools-write.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/dashboard/server/__tests__/fleet-workers.test.ts tests/unit/lib/mcp/tools-write.test.ts tests/unit/lib/mcp/visibility.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint (including lint:effect-facades and lint:circular) exits 0",
+            "the three test files pass"
+          ],
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3, D-8. In fleet-work.ts add FleetIssueStartDeps<R> extends FleetWorkerDeps with spawn: (input) => Effect<HttpServerResponse, unknown, R>, and rewrite handleFleetIssueStart as an Effect.gen generic over R (each awaited dep becomes yield* Effect.promise). When target.self: a caller without viaToken keeps 400 use-local-start; a viaToken caller yields deps.spawn({ body: { issueId, ...options }, internalRequest: false }), passes a non-200 through, and answers { issueId: upper, agentId: 'agent-<lower>', machine, reason }. The route does return yield* handleFleetIssueStart(id, body, caller, { ...defaultFleetWorkerDeps(), spawn: spawnIssueAgentForRoute }); update the header bullet. Add start_issue to src/lib/mcp/tools-write.ts (operate, audience any; issueId required, model/harness/effort/machine/needs optional) posting /api/fleet/issues/:id/start; on 422 append ' If <id> is not planned yet, run pan start <id>, which plans first.' to the route error text. Update fleet-workers.test.ts (wrap calls in Effect.runPromise, stub spawn) and tools-write.test.ts."
+        },
+        "items": [
+          {
+            "id": "start-issue-local.ac1",
+            "title": "Given caller { actor: 'operator', viaToken: true } and a self target, when handleFleetIssueStart runs, then deps.spawn is called once with { body: { issueId: 'PAN-9', ... }, internalRequest: false } and the answer is { issueId: 'PAN-9', agentId: 'agent-pan-9' } with machine.self true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-issue-local.ac2",
+            "title": "Given a caller without viaToken and a self target, then the route still answers 400 with code use-local-start; a spawn answering 422 passes through as 422",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-issue-local.ac3",
+            "title": "start_issue posts POST /api/fleet/issues/PAN-1/start with the given options, its scope equals requiredScopeFor('POST', '/api/fleet/issues/PAN-1/start') and its audience is 'any'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-issue-local.ac4",
+            "title": "Given the route answers 422, when start_issue runs, then the tool error text ends with 'which plans first.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-stop-interrupt",
+        "title": "stop_conversation and interrupt_conversation tools",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T03:31:46Z",
+        "metadata": {
+          "issueLabel": "pan-4938",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "api",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/mcp/tools-write.ts",
+            "tests/unit/lib/mcp/tools-write.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run tests/unit/lib/mcp/tools-write.test.ts tests/unit/lib/mcp/visibility.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint exits 0",
+            "both test files pass"
+          ],
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Add to src/lib/mcp/tools-write.ts two tools, scope operate, audience any, input { conversation } (name, id or @<machine>/<name>): stop_conversation posts /api/conversations/<encoded>/stop with {}; interrupt_conversation posts /api/conversations/<encoded>/abort with {}. Both return routeResult. interrupt_conversation's description says it interrupts a Pi conversation's turn and other harnesses answer an error. Tests in tests/unit/lib/mcp/tools-write.test.ts."
+        },
+        "items": [
+          {
+            "id": "conversation-stop-interrupt.ac1",
+            "title": "When stop_conversation runs it sends POST /api/conversations/<name>/stop, and when interrupt_conversation runs it sends POST /api/conversations/<name>/abort, each with the name URL-encoded",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-stop-interrupt.ac2",
+            "title": "Given the abort route answers 400 'Abort control endpoint is only supported for Pi conversations', then interrupt_conversation returns an error whose text is 'HTTP 400: Abort control endpoint is only supported for Pi conversations'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-stop-interrupt.ac3",
+            "title": "Both tools' scopes equal requiredScopeFor of their routes ('operate') and both have audience 'any'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "delegate-task",
+        "title": "delegate_task over POST /api/self/workers",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T03:31:46Z",
+        "metadata": {
+          "issueLabel": "pan-4938",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "complex",
+          "kind": "api",
+          "requiresInspection": true,
+          "foundationFor": [
+            "task-wait",
+            "worker-list-status",
+            "task-cancel"
+          ],
+          "files_scope": [
+            "src/dashboard/server/routes/self-workers.ts",
+            "src/lib/mcp/tools-delegate.ts",
+            "src/lib/mcp/tools-write.ts",
+            "src/lib/mcp/server.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/self-workers.test.ts",
+            "tests/unit/lib/mcp/tools-delegate.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/dashboard/server/__tests__/self-workers.test.ts tests/unit/lib/mcp/tools-delegate.test.ts tests/unit/lib/mcp/visibility.test.ts tests/unit/lib/mcp/tool-annotations.test.ts src/dashboard/server/__tests__/mcp-route.test.ts",
+            "npx vitest run tests/unit/lib/overdeck/no-loss-matrix.test.ts src/dashboard/server/__tests__/route-scopes.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint exits 0",
+            "the new and touched MCP and route test files pass",
+            "no-loss-matrix and route-scopes tests pass"
+          ],
+          "traces": [
+            "FR-1",
+            "NFR-1",
+            "NFR-7"
+          ],
+          "parallelSafeReason": "Its blockers (tool-list-tests, token-link-actor, conversation-stop-interrupt) own every shared file it touches before it starts; after them it is the only writer of self-workers.ts and tools-delegate.ts until task-wait."
+        },
+        "narrative": {
+          "Action": "PRD WI-5, D-1, D-2, D-13, D-14. New src/dashboard/server/routes/self-workers.ts exporting workerParentOf(caller) (agent: agentId; conversation: tmuxSession ?? 'conv-'+agentId), NO_ISSUE, handleSelfWorkerStart(credential, raw, deps) and selfWorkersRouteLayer. Handler order: selfCallerFromCredential (403/404); body object (400); caller.issueId null -> 409 { code: 'no-issue', error: 'delegate_task needs an issue; use start_conversation' }; task non-empty string (400). It sends { issueId: caller.issueId, prompt: task, parentId: workerParentOf(caller) } plus model, harness, effort, readOnly, name, machine, needs when present (never issueId/parentId from the body) to handleFleetWorker with fleetCaller(credential, undefined)!. A 200 answer becomes { workerId, machine, remote, reason, next: { tool: 'task_wait', arguments: { workerId } } }. Route POST /api/self/workers uses refuseFleetRequest(channel, rejectUnsafeDashboardMutationRequest) and readFleetBody. Add the route-scope row (operate) and no-loss row; register selfWorkersRouteLayer in src/dashboard/server/server.ts after selfJobsRouteLayer. New src/lib/mcp/tools-delegate.ts with delegate_task (operate, audience agent) and DELEGATE_TOOLS; export MACHINE_PROPERTY and NEEDS_PROPERTY from tools-write.ts and reuse them; append ...DELEGATE_TOOLS to ALL_TOOLS in src/lib/mcp/server.ts. Tests: src/dashboard/server/__tests__/self-workers.test.ts, tests/unit/lib/mcp/tools-delegate.test.ts."
+        },
+        "items": [
+          {
+            "id": "delegate-task.ac1",
+            "title": "Given an agent caller on PAN-1 whose body also carries issueId 'PAN-9' and parentId 'evil', when POST /api/self/workers runs, then handleFleetWorker receives issueId 'PAN-1' and parentId 'agent-pan-1'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delegate-task.ac2",
+            "title": "Given a conversation caller with tmuxSession 'conv-abc' and issueId 'PAN-2', then the fleet body's parentId is 'conv-abc'; a conversation without an issue gets 409 with code no-issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delegate-task.ac3",
+            "title": "Given a plain token, the route returns 403 not-an-agent-token; given a 200 fleet answer { id: 'agent-pan-1-worker-3' }, the route returns { workerId: 'agent-pan-1-worker-3', next: { tool: 'task_wait', arguments: { workerId: 'agent-pan-1-worker-3' } } }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delegate-task.ac4",
+            "title": "delegate_task is listed only to an agent token holding operate, posts POST /api/self/workers, returns an error containing 'use start_conversation' on 409 no-issue, and its scope equals requiredScopeFor('POST', '/api/self/workers')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delegate-task.ac5",
+            "title": "route-scopes.ts contains a POST /api/self/workers row with scope operate and no-loss-matrix.ts contains a row for it, so the no-loss and route-scope tests pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "task-wait",
+        "title": "task_wait over GET /api/self/workers/:id/wait with launch-time startup grace",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T03:31:46Z",
+        "metadata": {
+          "issueLabel": "pan-4938",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "complex",
+          "kind": "api",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/routes/self-workers.ts",
+            "src/lib/mcp/tools-delegate.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/self-workers.test.ts",
+            "tests/unit/lib/mcp/tools-delegate.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/dashboard/server/__tests__/self-workers.test.ts tests/unit/lib/mcp/tools-delegate.test.ts",
+            "npx vitest run tests/unit/lib/overdeck/no-loss-matrix.test.ts src/dashboard/server/__tests__/route-scopes.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint exits 0",
+            "self-workers and tools-delegate tests pass",
+            "no-loss-matrix and route-scopes tests pass"
+          ],
+          "traces": [
+            "FR-2",
+            "NFR-2",
+            "NFR-4"
+          ],
+          "parallelSafeReason": "Runs after delegate-task and extract-stand-in-wait; the later worker and lane items that share self-workers.ts, route-scopes.ts and no-loss-matrix.ts are ordered after it by edges."
+        },
+        "narrative": {
+          "Action": "PRD WI-6, D-3, D-5. In self-workers.ts add OwnedWorker and ownedWorker(id, caller, deps): null unless isWorkerId(id); a worker.json parentId equal (lower-cased) to workerParentOf(caller) gives { launchedAt: facts.startedAt, remote: null }; else a remote.json parentId match gives { launchedAt: standIn.createdAt, remote: standIn }; else null. Add handleSelfWorkerWait(credential, id, rawAfterSeq, rawTimeout, signal, deps): caller; parseWaitTimeoutMs from ./self-jobs.js (400 bad-timeout); afterSeq /^\\d{1,9}$/ (400 bad-after-seq); ownedWorker (404 unknown-worker); startupGraceMs = max(0, WAIT_STARTUP_GRACE_MS - (now - Date.parse(launchedAt))) or WAIT_STARTUP_GRACE_MS when unparsable; wait via waitForAnyWorker(id, options, waitForWorkerReport). Answers: report -> { status: 'done', workerId, report }; timeout -> { status: 'running', workerId, next: { tool: 'task_wait', arguments: { workerId, afterSeq? } } }; reportless -> { status: 'ended', workerId, kind, lastAssistantMessage, transcriptPath }. Route GET /api/self/workers/:id/wait runs inside Effect.promise((signal) => ...) like waitSelfJobRoute. Rows: route-scopes read:state, no-loss READ. Tool task_wait (read:state, agent) in tools-delegate.ts: GET .../wait?timeoutMs=50000[&afterSeq=n]. All wait tests use vi.useFakeTimers."
+        },
+        "items": [
+          {
+            "id": "task-wait.ac1",
+            "title": "Given another agent's worker or an unknown id, when task_wait's route runs, then it answers 404 with code unknown-worker; a stand-in whose remote.json parentId is the caller is owned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "task-wait.ac2",
+            "title": "Given timeoutMs=50001, the route answers 400 bad-timeout, and every call to the wait function receives timeoutMs at most 50000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "task-wait.ac3",
+            "title": "Given a worker launched 5 minutes earlier whose liveness is confirmed dead and that has no report, when one wait chunk runs under fake timers, then it answers status 'ended' with kind 'exited-without-report' before 50 s of fake time pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "task-wait.ac4",
+            "title": "Given a live worker with no report, the route answers status 'running' with next.arguments.workerId after vi.advanceTimersByTimeAsync(50_000); given a report appears at 10 s, it answers status 'done' with that report",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "task-wait.ac5",
+            "title": "task_wait is listed only to agent tokens and calls GET /api/self/workers/<id>/wait?timeoutMs=50000, adding &afterSeq=<n> when given",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "worker-list-status",
+        "title": "list_workers and task_status over GET /api/self/workers[/:id]",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T03:31:46Z",
+        "metadata": {
+          "issueLabel": "pan-4938",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "api",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/routes/self-workers.ts",
+            "src/lib/mcp/tools-delegate.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/self-workers.test.ts",
+            "tests/unit/lib/mcp/tools-delegate.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/dashboard/server/__tests__/self-workers.test.ts tests/unit/lib/mcp/tools-delegate.test.ts",
+            "npx vitest run tests/unit/lib/overdeck/no-loss-matrix.test.ts src/dashboard/server/__tests__/route-scopes.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint exits 0",
+            "self-workers and tools-delegate tests pass",
+            "no-loss-matrix and route-scopes tests pass"
+          ],
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7, D-6. In self-workers.ts add SelfWorkerEntry { id, issueId, name, startedAt, remote: {environmentId,label}|null, state: 'running'|'exited'|'stopped'|'unknown', idleAgeMs, latestReport: {seq,at,status}|null } and its builder: local state from isAlive (alive -> running, isConfirmedDead -> exited, else unknown) and idleAgeMs(id); stand-in state, idleAgeMs and remote from remote.json; latestReport from latestWorkerReport without body. handleSelfWorkerList: listWorkers({ parentId: workerParentOf(caller) }) plus listRemoteStandIns() filtered by parentId (case-insensitive), sorted by id numerically -> { workers }. handleSelfWorkerGet: ownedWorker (404 unknown-worker) -> entry. Routes GET /api/self/workers and GET /api/self/workers/:id; rows read:state and READ. Tools list_workers and task_status (read:state, agent) in tools-delegate.ts."
+        },
+        "items": [
+          {
+            "id": "worker-list-status.ac1",
+            "title": "Given the caller has one local worker and one stand-in and another parent has a worker, when GET /api/self/workers runs, then the answer lists exactly the caller's two workers, the stand-in with remote { environmentId, label }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "worker-list-status.ac2",
+            "title": "A confirmed-dead local worker shows state 'exited', and latestReport carries seq, at and status but no body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "worker-list-status.ac3",
+            "title": "GET /api/self/workers/<id> returns one entry for an owned worker and 404 unknown-worker for another parent's worker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "worker-list-status.ac4",
+            "title": "list_workers and task_status are listed only to agent tokens, call their routes, and their scopes equal requiredScopeFor of those routes (read:state)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "task-cancel",
+        "title": "task_cancel: owner-checked stop through the existing stop routes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T03:31:46Z",
+        "metadata": {
+          "issueLabel": "pan-4938",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "api",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/mcp/tools-delegate.ts",
+            "tests/unit/lib/mcp/tools-delegate.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run tests/unit/lib/mcp/tools-delegate.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint exits 0",
+            "tools-delegate tests pass"
+          ],
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8, D-7. Add task_cancel (operate, audience agent, input { workerId }) to tools-delegate.ts: GET /api/self/workers/<id> first (non-2xx -> routeErrorResult, no stop call); then POST /api/fleet/workers/<id>/stop when the entry's remote is non-null, else POST /api/workers/<id>/stop, body {}; 2xx -> jsonResult({ stopped: true, workerId }); else routeErrorResult. Tests in tools-delegate.test.ts."
+        },
+        "items": [
+          {
+            "id": "task-cancel.ac1",
+            "title": "Given a local worker (remote null), task_cancel calls GET /api/self/workers/<id> then POST /api/workers/<id>/stop and returns { stopped: true, workerId }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "task-cancel.ac2",
+            "title": "Given a stand-in (remote set), task_cancel posts POST /api/fleet/workers/<id>/stop",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "task-cancel.ac3",
+            "title": "Given the status call answers 404, task_cancel returns that error and makes no stop call; its scope equals requiredScopeFor('POST', '/api/workers/x/stop')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lane-start-status-stop",
+        "title": "lane_start over POST /api/self/lanes, plus lane_status and lane_stop",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T03:31:46Z",
+        "metadata": {
+          "issueLabel": "pan-4938",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "api",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/routes/self-lanes.ts",
+            "src/lib/mcp/tools-lanes.ts",
+            "src/lib/mcp/server.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/self-lanes.test.ts",
+            "tests/unit/lib/mcp/tools-lanes.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/dashboard/server/__tests__/self-lanes.test.ts tests/unit/lib/mcp/tools-lanes.test.ts tests/unit/lib/mcp/visibility.test.ts src/dashboard/server/__tests__/mcp-route.test.ts",
+            "npx vitest run tests/unit/lib/overdeck/no-loss-matrix.test.ts src/dashboard/server/__tests__/route-scopes.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint exits 0",
+            "self-lanes, tools-lanes, visibility and mcp-route tests pass",
+            "no-loss-matrix and route-scopes tests pass"
+          ],
+          "traces": [
+            "FR-5",
+            "NFR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9, D-11, D-13, D-14. New src/dashboard/server/routes/self-lanes.ts with NOT_A_CONVERSATION, handleSelfLaneStart(credential, raw, viaChannel, deps) and selfLanesRouteLayer: caller (403/404); agentKind !== 'conversation' -> 409 not-a-conversation; drop parent and force from the body; parseLaneLaunchBody({ ...rest, parent: caller.agentId }) (400 on error); handleLaneLaunch(request, { viaChannel, caller: fleetCaller(credential, undefined)! }). Route POST /api/self/lanes with validateOrigin and JSON body. Rows: POST /api/self/lanes operate; GET /api/lanes and GET /api/lanes/:name read:state; no-loss row for POST /api/self/lanes. New src/lib/mcp/tools-lanes.ts with LANE_TOOLS = [lane_start (operate; role and brief required; key, for, run, project, model, harness, effort, title, branch, from, at, machine, needs, reuse, replace optional; no parent, no force), lane_status (read:state; GET /api/lanes/:name), lane_stop (operate; POST /api/lanes/:name/stop)], all audience agent. Append ...LANE_TOOLS to ALL_TOOLS after DELEGATE_TOOLS; register selfLanesRouteLayer in src/dashboard/server/server.ts after selfWorkersRouteLayer."
+        },
+        "items": [
+          {
+            "id": "lane-start-status-stop.ac1",
+            "title": "Given an agent-kind caller, when POST /api/self/lanes runs, then it answers 409 with code not-a-conversation and launches nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-start-status-stop.ac2",
+            "title": "Given a conversation caller named 'abc' whose body says parent 'other' and force true, then the launch request carries parent 'abc' and no force",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-start-status-stop.ac3",
+            "title": "requiredScopeFor('GET', '/api/lanes') and requiredScopeFor('GET', '/api/lanes/x') return 'read:state', and requiredScopeFor('POST', '/api/self/lanes') returns 'operate'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-start-status-stop.ac4",
+            "title": "lane_start, lane_status and lane_stop are listed only to agent tokens and call their routes, and a read:state-only non-agent token still lists exactly ['list_machines']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lane-wait",
+        "title": "lane_wait over POST /api/self/lanes/wait",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T03:31:46Z",
+        "metadata": {
+          "issueLabel": "pan-4938",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "api",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/routes/self-lanes.ts",
+            "src/lib/mcp/tools-lanes.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/self-lanes.test.ts",
+            "tests/unit/lib/mcp/tools-lanes.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/dashboard/server/__tests__/self-lanes.test.ts tests/unit/lib/mcp/tools-lanes.test.ts",
+            "npx vitest run tests/unit/lib/overdeck/no-loss-matrix.test.ts src/dashboard/server/__tests__/route-scopes.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint exits 0",
+            "self-lanes and tools-lanes tests pass",
+            "no-loss-matrix and route-scopes tests pass"
+          ],
+          "traces": [
+            "FR-5",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10, D-12. In self-lanes.ts add handleSelfLaneWait(credential, raw, deps): caller; body object; run and after optional strings; timeoutMs optional integer 1..50000 (400 bad-timeout), default WAIT_CHUNK_MS; filter { run } when given, else { parent: caller.agentId } for a conversation, else 409 not-a-conversation. Call waitForLaneSet(filter, { after, timeoutMs }, { listLanes: f => listLaneViews({ run?, parentName: f.parent }), warn: line => warnings.push(line) }); an 'invalid cursor' throw -> 400 bad-cursor. Answers: report -> { status: 'done', lane: {name,run,key}, report, cursor, warnings, next: { tool: 'lane_wait', arguments: { run?, after: cursor } } }; timeout -> { status: 'running', cursor, warnings, next }. Route POST /api/self/lanes/wait; rows read:state and READ. Tool lane_wait (read:state, agent) posts { run?, after?, timeoutMs: 50000 }. Wait tests use fake timers."
+        },
+        "items": [
+          {
+            "id": "lane-wait.ac1",
+            "title": "Given a conversation caller 'abc' and no run, when the wait runs, then the injected listLanes receives { parentName: 'abc' }; an agent caller without run gets 409 not-a-conversation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-wait.ac2",
+            "title": "Given a lane report at 10 s of fake time, the route answers status 'done' with the report, a cursor, and next.arguments.after equal to that cursor",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-wait.ac3",
+            "title": "Given no report, the route answers status 'running' after vi.advanceTimersByTimeAsync(50_000), and a stopped lane that never reported adds one line to warnings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-wait.ac4",
+            "title": "Given after 'nonsense', the route returns 400 bad-cursor; given timeoutMs 50001, it returns 400 bad-timeout",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lane-report",
+        "title": "lane_report over POST /api/self/lanes/report (lane-report job)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T03:31:46Z",
+        "metadata": {
+          "issueLabel": "pan-4938",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "api",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/routes/self-lanes.ts",
+            "src/lib/mcp/tools-lanes.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/self-lanes.test.ts",
+            "tests/unit/lib/mcp/tools-lanes.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/dashboard/server/__tests__/self-lanes.test.ts tests/unit/lib/mcp/tools-lanes.test.ts",
+            "npx vitest run tests/unit/lib/overdeck/no-loss-matrix.test.ts src/dashboard/server/__tests__/route-scopes.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint exits 0",
+            "self-lanes and tools-lanes tests pass",
+            "no-loss-matrix and route-scopes tests pass"
+          ],
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11, D-12. In self-lanes.ts add handleSelfLaneReport(credential, raw, signal, deps): caller; a caller that is not a conversation, or whose conversation row (getConversationByName(caller.agentId)) has no laneKey -> 409 { code: 'not-a-lane' }; report non-empty and at most MAX_WORKER_REPORT_BYTES (400); status default 'done', else isWorkerReportStatus (400); verdict absent or isLaneVerdict (400); defects absent or non-negative integer (400). Start selfJobs 'lane-report' with [{flag:'status'}, {switch:'stdin'}, verdict? {flag:'verdict'}, defects? {flag:'defects', value: String(n)}] and stdin = report; { ok:false } -> 429 too-many-jobs; wait up to WAIT_CHUNK_MS and answer selfJobAnswer. Route POST /api/self/lanes/report inside Effect.promise((signal) => ...); rows tell and WRITE. Tool lane_report (tell, agent). Do not edit self-job-argv.ts."
+        },
+        "items": [
+          {
+            "id": "lane-report.ac1",
+            "title": "Given a conversation that is not a lane, when POST /api/self/lanes/report runs, then it answers 409 with code not-a-lane and starts no job",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-report.ac2",
+            "title": "Given status done and report 'R', the started job's argv is ['lane', 'report', '--status=done', '--stdin'] with stdin 'R', and verdict PASS with defects 2 adds '--verdict=PASS' and '--defects=2'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-report.ac3",
+            "title": "Given verdict 'GREAT' or defects -1, the route returns 400; given a job that finishes within the wait, it returns status 'done' with the job's exitCode",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-report.ac4",
+            "title": "lane_report is listed only to agent tokens, sends POST /api/self/lanes/report, and its scope equals requiredScopeFor('POST', '/api/self/lanes/report'), which returns 'tell'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-delegation",
+        "title": "Document the W-DEL1 tools and routes in configuration/mcp.mdx and docs/DASHBOARD-AUTH.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T03:31:46Z",
+        "metadata": {
+          "issueLabel": "pan-4938",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "docs",
+          "requiresInspection": false,
+          "files_scope": [
+            "configuration/mcp.mdx",
+            "docs/DASHBOARD-AUTH.md"
+          ],
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -c 'delegate_task\\|task_wait\\|lane_wait\\|start_issue' configuration/mcp.mdx",
+            "grep -c '/api/self/workers' docs/DASHBOARD-AUTH.md"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "the mcp.mdx count is at least 4",
+            "the DASHBOARD-AUTH.md count is at least 3"
+          ],
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-12. configuration/mcp.mdx: add start_issue, stop_conversation and interrupt_conversation rows to the Tools table; add delegate_task, task_wait, task_status, list_workers, task_cancel, lane_start, lane_status, lane_stop, lane_wait and lane_report rows (scope, what it does, conversation-only/lane-only limits) to the Agent-only tools table, plus one sentence that a worker or lane wait returns within 50 s and the agent calls next instead of polling; in Fleet reach, a paragraph that an agent's token reaches a linked machine as that agent (reads, cannot change linked conversations; delegate_task and start_issue with machine go through the work door as that agent) while a conversation's token acts as the operator within its scopes. docs/DASHBOARD-AUTH.md: add the new routes to the read:state, operate and tell rows of the scope table; in the /api/self/* section list the seven routes with scopes and the refusals no-issue, not-a-conversation, not-a-lane and unknown-worker; one paragraph that POST /api/fleet/issues/:id/start starts locally for an odk_ token caller and answers 400 use-local-start to every other caller; one sentence that an agent-kind token is forwarded to a linked machine with actor { agentId }."
+        },
+        "items": [
+          {
+            "id": "docs-delegation.ac1",
+            "title": "configuration/mcp.mdx contains an Agent-only tools row with its scope for each of delegate_task, task_wait, task_status, list_workers, task_cancel, lane_start, lane_status, lane_stop, lane_wait and lane_report, and Tools rows for start_issue, stop_conversation and interrupt_conversation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-delegation.ac2",
+            "title": "configuration/mcp.mdx's Fleet reach section contains a paragraph saying an agent's token acts as that agent on a linked machine and a conversation's token acts as the operator within its scopes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-delegation.ac3",
+            "title": "docs/DASHBOARD-AUTH.md's /api/self/* section contains POST /api/self/workers, GET /api/self/workers, GET /api/self/workers/:id, GET /api/self/workers/:id/wait, POST /api/self/lanes, POST /api/self/lanes/wait and POST /api/self/lanes/report with their scopes and the codes no-issue, not-a-conversation, not-a-lane and unknown-worker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-delegation.ac4",
+            "title": "docs/DASHBOARD-AUTH.md contains a paragraph saying POST /api/fleet/issues/:id/start starts a local issue for an odk_ token caller and returns 400 use-local-start to every other caller",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "tool-list-tests",
+        "to": "start-issue-local",
+        "type": "blocks"
+      },
+      {
+        "from": "tool-list-tests",
+        "to": "delegate-task",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-stand-in-wait",
+        "to": "task-wait",
+        "type": "blocks"
+      },
+      {
+        "from": "token-link-actor",
+        "to": "start-issue-local",
+        "type": "blocks"
+      },
+      {
+        "from": "token-link-actor",
+        "to": "delegate-task",
+        "type": "blocks"
+      },
+      {
+        "from": "start-issue-local",
+        "to": "conversation-stop-interrupt",
+        "type": "blocks"
+      },
+      {
+        "from": "delegate-task",
+        "to": "task-wait",
+        "type": "blocks"
+      },
+      {
+        "from": "task-wait",
+        "to": "worker-list-status",
+        "type": "blocks"
+      },
+      {
+        "from": "worker-list-status",
+        "to": "task-cancel",
+        "type": "blocks"
+      },
+      {
+        "from": "worker-list-status",
+        "to": "lane-start-status-stop",
+        "type": "blocks"
+      },
+      {
+        "from": "lane-start-status-stop",
+        "to": "lane-wait",
+        "type": "blocks"
+      },
+      {
+        "from": "lane-wait",
+        "to": "lane-report",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-stop-interrupt",
+        "to": "docs-delegation",
+        "type": "blocks"
+      },
+      {
+        "from": "task-cancel",
+        "to": "docs-delegation",
+        "type": "blocks"
+      },
+      {
+        "from": "lane-report",
+        "to": "docs-delegation",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-stop-interrupt",
+        "to": "delegate-task",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
