@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4956",
   "created": "2026-11-04T09:00:33.744Z",
-  "updated": "2026-11-04T09:29:45.137Z",
+  "updated": "2026-11-04T09:29:58.223Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -112,6 +112,10 @@
     "docs-readme.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T09:29:45.137Z"
+    },
+    "publish-meta.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:29:58.222Z"
     }
   }
 }
