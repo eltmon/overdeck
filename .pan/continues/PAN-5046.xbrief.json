@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5046",
   "created": "2026-11-04T18:10:57.891Z",
-  "updated": "2026-11-04T18:23:04.540Z",
+  "updated": "2026-11-04T18:30:45.320Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -28,9 +28,10 @@
       "doneAt": "2026-11-04T18:22:58.466Z"
     },
     "server-ice-restart-answer": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5046",
-      "claimedAt": "2026-11-04T18:23:04.540Z"
+      "claimedAt": "2026-11-04T18:23:04.540Z",
+      "doneAt": "2026-11-04T18:30:45.320Z"
     }
   }
 }
