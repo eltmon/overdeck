@@ -4,17 +4,17 @@
     "created": "2026-11-04T17:31:32Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5042: PR listing read flaps between ok and failed (catch logs nothing; 100-PR statusCheckRollup query takes ~10s against a 20s timeout)",
-    "updated": "2026-11-04T17:46:29.986Z"
+    "updated": "2026-11-04T17:47:31.833Z"
   },
   "plan": {
     "id": "pan-5042",
     "title": "PR listing read flaps between ok and failed (catch logs nothing; 100-PR statusCheckRollup query takes ~10s against a 20s timeout)",
-    "status": "proposed",
+    "status": "running",
     "uid": "84501114-ff24-41c7-b1dd-14a7b31170bb",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-04T17:31:32Z",
-    "updated": "2026-11-04T17:46:29.986Z",
+    "updated": "2026-11-04T17:47:31.833Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5042",
@@ -774,5 +774,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
