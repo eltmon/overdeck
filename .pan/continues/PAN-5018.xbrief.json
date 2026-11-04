@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5018",
   "created": "2026-11-04T13:12:52.932Z",
-  "updated": "2026-11-04T15:11:36.863Z",
+  "updated": "2026-11-04T15:11:50.133Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -164,6 +164,10 @@
     "simulator-repro.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T15:11:36.862Z"
+    },
+    "root-cause-fix.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:11:50.132Z"
     }
   }
 }
