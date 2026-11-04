@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5041",
   "created": "2026-11-04T17:22:54.161Z",
-  "updated": "2026-11-04T17:31:20.110Z",
+  "updated": "2026-11-04T17:31:26.238Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-5041",
       "claimedAt": "2026-11-04T17:29:46.339Z",
       "doneAt": "2026-11-04T17:31:20.110Z"
+    },
+    "wi4-settings-row": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5041",
+      "claimedAt": "2026-11-04T17:31:26.238Z"
     }
   }
 }
