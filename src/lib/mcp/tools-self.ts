@@ -5,9 +5,11 @@
  * through. `request_secret` and `secret_wait` (PAN-4941 W-SEC1) ask the
  * operator for a secret through the dashboard and wait for the answer: the
  * value lands in a 0600 file and never passes through a tool argument or
- * result. W-SELF2 and W-MEM1 add their tools to SELF_TOOLS.
+ * result. W-SELF2 adds its tools to SELF_TOOLS; `memory_add` and
+ * `memory_search` (PAN-4940 W-MEM1) run `pan memory add` and `pan memory
+ * search --facts` as jobs.
  */
-import { optionalInteger, type OverdeckTool, requiredString, routeResult, WAIT_CHUNK_MS } from './tool.js';
+import { errorResult, optionalInteger, optionalString, type OverdeckTool, requiredString, routeResult, WAIT_CHUNK_MS } from './tool.js';
 
 const waitJob: OverdeckTool = {
   name: 'wait_job',
@@ -75,4 +77,52 @@ const secretWait: OverdeckTool = {
   },
 };
 
-export const SELF_TOOLS: readonly OverdeckTool[] = [waitJob, requestSecret, secretWait];
+const memoryAdd: OverdeckTool = {
+  name: 'memory_add',
+  description:
+    'Record a durable fact in Overdeck memory (runs pan memory add in your checkout). type: feedback (a correction or working agreement), project (a non-obvious project truth), reference (a pointer to something outside the repo) or user (about the operator). description is the one-line index entry, at most 200 characters; body holds the fact, then **Why:** and **How to apply:** lines. store: project (default; your checkout\'s .overdeck/memory/), user (the operator\'s store, default for type user) or machine (this machine only). A project fact is written uncommitted: commit .overdeck/memory/<id>.md with your work, or pan done refuses. Answers status "done" with exitCode and stdout ({ file }), or status "running" with next: call next. A non-zero exitCode means pan refused (an existing id, secret-like text, a home-directory path); stderr says why.',
+  scope: 'tell',
+  audience: 'agent',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      id: { type: 'string', pattern: '^[a-z0-9][a-z0-9-]{0,79}$', description: 'A short kebab-case id, unique within the store.' },
+      type: { type: 'string', enum: ['feedback', 'project', 'reference', 'user'], description: 'The fact type.' },
+      description: { type: 'string', maxLength: 200, description: 'One-line index entry, at most 200 characters.' },
+      title: { type: 'string', maxLength: 200, description: 'A short title (defaults to the id).' },
+      body: { type: 'string', maxLength: 16_384, description: 'The fact body: the rule, then **Why:** and **How to apply:** lines.' },
+      tags: { type: 'array', items: { type: 'string' }, maxItems: 20, description: 'Optional tags.' },
+      store: { type: 'string', enum: ['project', 'user', 'machine'], description: 'Which store to write to.' },
+    },
+    required: ['id', 'type', 'description'],
+  },
+  async run(args, ctx) {
+    const id = requiredString(args, 'id');
+    if (!id.ok) return id.error;
+    const type = requiredString(args, 'type');
+    if (!type.ok) return type.error;
+    const description = requiredString(args, 'description');
+    if (!description.ok) return description.error;
+    const title = optionalString(args, 'title');
+    if (!title.ok) return title.error;
+    const body = optionalString(args, 'body');
+    if (!body.ok) return body.error;
+    const store = optionalString(args, 'store');
+    if (!store.ok) return store.error;
+    if (args.tags !== undefined && !(Array.isArray(args.tags) && args.tags.every((tag) => typeof tag === 'string'))) {
+      return errorResult('tags must be a list of strings');
+    }
+    const tags = args.tags as string[] | undefined;
+    return routeResult(await ctx.api.request('POST', '/api/self/memory/facts', {
+      id: id.value,
+      type: type.value,
+      description: description.value,
+      ...(title.value !== undefined ? { title: title.value } : {}),
+      ...(body.value !== undefined ? { body: body.value } : {}),
+      ...(tags ? { tags } : {}),
+      ...(store.value !== undefined ? { store: store.value } : {}),
+    }));
+  },
+};
+
+export const SELF_TOOLS: readonly OverdeckTool[] = [waitJob, requestSecret, secretWait, memoryAdd];

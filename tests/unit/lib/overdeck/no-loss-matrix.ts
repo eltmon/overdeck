@@ -524,6 +524,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/agent-requests',                    kind: 'http', disposition: 'READ',        door: 'services/agent-requests.listPending, no values (PAN-4927 W-SEC1)' },
   { surface: 'POST /api/agent-requests/:id/secret',        kind: 'http', disposition: 'WRITE',       door: 'services/agent-requests.writeAgentSecretFile + settle, root credentials only (PAN-4927 W-SEC1)' },
   { surface: 'POST /api/agent-requests/:id/decline',       kind: 'http', disposition: 'WRITE',       door: 'services/agent-requests.settle, root credentials only (PAN-4927 W-SEC1)' },
+  { surface: 'POST /api/self/memory/facts',                kind: 'http', disposition: 'WRITE',       door: 'services/self-jobs.start pan memory add in the caller cwd, agent tokens only (PAN-4927 W-MEM1)' },
   { surface: '* /api/conversations/@<machine>/*',          kind: 'http', disposition: 'RELOCATE',    door: "linked-conversation-proxy -> owner's /api/conversations/* over the machine link (PAN-4650)" },
   { surface: 'POST /api/conversations/:name/release',      kind: 'http', disposition: 'WRITE',       door: 'conversation-release-service.releaseConversation (settle + pack + stop) (PAN-4650)' },
   { surface: 'GET /api/conversations/:name/release/transfer/:transferId', kind: 'http', disposition: 'READ', door: 'conversation-release-service.readTransferPack (PAN-4650)' },

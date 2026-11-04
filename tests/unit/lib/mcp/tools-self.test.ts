@@ -125,4 +125,48 @@ describe('MCP self tools (PAN-4927 W-SELF1)', () => {
       expect(resultText(result).startsWith('HTTP 404')).toBe(true);
     });
   });
+
+  describe('memory_add (PAN-4940 W-MEM1)', () => {
+    it('is hidden from a non-agent token and listed for an agent token', async () => {
+      const api = fakeApi({});
+      const human = await connectClient(api, ['tell']);
+      expect((await human.listTools()).tools.map((tool) => tool.name)).not.toContain('memory_add');
+      const call = await callTool(human, 'memory_add', { id: 'x', type: 'feedback', description: 'd' });
+      expect(call.isError).toBe(true);
+      expect(resultText(call)).toBe('Unknown tool memory_add');
+      expect(api.calls).toEqual([]);
+
+      const agent = await connectClient(api, ['tell'], true);
+      expect((await agent.listTools()).tools.map((tool) => tool.name)).toContain('memory_add');
+    });
+
+    it('records exactly POST /api/self/memory/facts with the given body', async () => {
+      const done = { status: 'done', jobId: 'j1', verb: 'memory-add', exitCode: 0, stdout: '{"file":"/w/.overdeck/memory/x.md"}', stderr: '', error: null };
+      const api = fakeApi({ 'POST /api/self/memory/facts': { status: 200, json: done } });
+      const client = await connectClient(api, ['tell'], true);
+      const result = await callTool(client, 'memory_add', { id: 'x', type: 'feedback', description: 'd', tags: ['x'] });
+      expect(resultJson(result)).toEqual(done);
+      expect(api.calls).toEqual([
+        { method: 'POST', path: '/api/self/memory/facts', body: { id: 'x', type: 'feedback', description: 'd', tags: ['x'] } },
+      ]);
+    });
+
+    it('a missing description is a tool error naming description, with no call', async () => {
+      const api = fakeApi({});
+      const client = await connectClient(api, ['tell'], true);
+      const result = await callTool(client, 'memory_add', { id: 'x', type: 'feedback' });
+      expect(result.isError).toBe(true);
+      expect(resultText(result)).toContain('description');
+      expect(api.calls).toEqual([]);
+    });
+
+    it('tags: "x" is a tool error, with no call', async () => {
+      const api = fakeApi({});
+      const client = await connectClient(api, ['tell'], true);
+      const result = await callTool(client, 'memory_add', { id: 'x', type: 'feedback', description: 'd', tags: 'x' });
+      expect(result.isError).toBe(true);
+      expect(resultText(result)).toContain('tags');
+      expect(api.calls).toEqual([]);
+    });
+  });
 });

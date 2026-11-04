@@ -28,6 +28,7 @@ const SINGLE_ROUTE_PATHS: Record<string, { method: string; path: string }> = {
   wait_job: { method: 'GET', path: '/api/self/jobs/abc/wait' },
   request_secret: { method: 'POST', path: '/api/self/secret-requests' },
   secret_wait: { method: 'GET', path: '/api/self/secret-requests/abc/wait' },
+  memory_add: { method: 'POST', path: '/api/self/memory/facts' },
 };
 
 describe('MCP tool annotations (PAN-4927 W-MCP1)', () => {
