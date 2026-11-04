@@ -732,7 +732,6 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   on "the agent's own conversation" (PR links, the PR sync sweep, `getConversationByName(agentId)`) finds
   nothing for a work agent; PR watches therefore carry their own key and baseline.
 
-<!-- last-verified: 2026-11-04 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4930, PAN-4931, PAN-4482, PAN-4937, PAN-4945, PAN-4932, PAN-4938, PAN-4944, PAN-4970, PAN-4933, PAN-4934, PAN-4943, PAN-4940, PAN-4956) -->
 - **Launch-context tools block keys on the MCP gate** (PAN-4935 planning) — the managed launch context ends with
   an "Overdeck tools" (MCP) or "Overdeck commands" (`pan`) block chosen by `overdeckMcpEnabledFor`, the same gate
   `prepareClaudeOverdeckMcp`/`prepareCodexOverdeckMcp` check, computed in `claudeSystemPromptFiles`,
@@ -751,4 +750,4 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   printed no `Auto → …` line when Auto chose this machine, and `FleetTarget` never carried `answer.rejections`.
   PAN-5006 adds `LaneLaunchResult.placement` (reason plus passed-over machines); `machine` keeps meaning
   "null = runs here", because `handleLaneLaunch` follows a lane only when `machine` is set.
-<!-- last-verified: 2026-11-04 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4930, PAN-4931, PAN-4932, PAN-4933, PAN-4934, PAN-4937, PAN-4938, PAN-4940, PAN-4943, PAN-4944, PAN-4945, PAN-4970, PAN-4482, PAN-4885, PAN-5006) -->
+<!-- last-verified: 2026-11-04 -->
