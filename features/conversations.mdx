@@ -101,6 +101,10 @@ what the next quick create uses. Its fields are:
 
 After **Create**, the dialog closes and the new conversation opens.
 
+The conversation's first derived title leaves out any attached files; a first
+message that only attaches files keeps the title "New conversation" until the
+generated title arrives.
+
 See [Bare conversations](https://github.com/eltmon/overdeck/blob/main/docs/CONTEXT-LAYERS.md#bare-conversations-no-overdeck-context)
 for the full list of what is skipped and what keeps running.
 
@@ -124,7 +128,8 @@ registered yet — starts the conversation or terminal in your home folder
 (`~/Projects` if it exists, otherwise your home directory) instead of blocking
 you. In the Command Deck, that same no-project state is the **No project**
 deck, always reachable from the sidebar's Projects section, and offered as
-"Start without a project" when nothing else is selected.
+"Start without a project" when nothing else is selected. The app bar reads
+**No project** when the No project deck is selected, never its internal key.
 
 If a conversation ends up outside any project — started from Home before a
 project existed, say — its pane shows a "Not in a project · Move to

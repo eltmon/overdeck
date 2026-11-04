@@ -365,11 +365,18 @@ describe('ConversationRow verdict badges (PAN-4223 WI-22)', () => {
   });
 
   it('links a builder\'s latest verdict to its critic, in the done tone for WOWED', () => {
-    renderVerdict({ laneRole: 'builder', laneLatestVerdict: { value: 'WOWED', defects: null, criticId: 42 } }, { variant: 'nested' });
+    renderVerdict({ laneRole: 'builder', laneLatestVerdict: { value: 'WOWED', defects: null, criticId: 42, criticRoute: '42' } }, { variant: 'nested' });
     const link = screen.getByRole('link', { name: 'open critic #42' });
     expect(link).toHaveAttribute('href', '/conv/42');
     expect(link).toHaveTextContent('WOWED');
     expect(link.className).toContain('badge-bg-state-done');
+  });
+
+  it('links a builder\'s latest verdict to a remote critic by its linked route', () => {
+    renderVerdict({ laneRole: 'builder', laneLatestVerdict: { value: 'PASS', defects: 0, criticId: null, criticRoute: '@env-fly/c-fly' } }, { variant: 'nested' });
+    const link = screen.getByRole('link', { name: 'open critic @env-fly/c-fly' });
+    expect(link).toHaveAttribute('href', '/conv/@env-fly/c-fly');
+    expect(link).toHaveTextContent('PASS');
   });
 
   it('marks a flattened critic as the critic of its builder', () => {

@@ -22,7 +22,7 @@
 import { Effect, Layer, Result } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
-import { listAccessTokens } from '../../../lib/access-tokens.js';
+import { isPairedDeviceRecord, listAccessTokens } from '../../../lib/access-tokens.js';
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
 import {
@@ -112,8 +112,8 @@ async function buildAnywhereStatus(viewerKind: AnywhereViewerKind | null): Promi
   }
   const addresses = getTrustedOrigins().map((origin) => ({ origin, loopback: isLoopbackOrigin(origin) }));
   const records = await listAccessTokens();
-  // A record with no kind is a device (PAN-2351 FR-10).
-  const active = records.filter((record) => (record.kind ?? 'device') === 'device' && !record.revokedAt).length;
+  // A paired device: a browser pairing (no kind, PAN-2351 FR-10) or an Overdeck app phone.
+  const active = records.filter((record) => isPairedDeviceRecord(record) && !record.revokedAt).length;
   const [vault, tailscale] = await Promise.all([readAnywhereVaultState(), readTailscaleState()]);
   // Read fresh: the Tailscale state is memoized and may predate a settings save.
   const mint = readRemoteAccessConfig();
