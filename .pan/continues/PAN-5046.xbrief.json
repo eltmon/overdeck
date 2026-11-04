@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5046",
   "created": "2026-11-04T18:10:57.891Z",
-  "updated": "2026-11-04T18:46:36.087Z",
+  "updated": "2026-11-04T18:46:52.150Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,6 +74,10 @@
     "dialer-ends-duplexes.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T18:46:36.087Z"
+    },
+    "evict-owning-connection.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:46:52.150Z"
     }
   }
 }
