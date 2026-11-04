@@ -4,17 +4,17 @@
     "created": "2026-11-04T06:00:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4896: pan connect on macOS prints a Linux-only systemd-run warning",
-    "updated": "2026-11-04T05:33:51.217Z"
+    "updated": "2026-11-04T05:35:21.409Z"
   },
   "plan": {
     "id": "pan-4896",
     "title": "pan connect on macOS prints a Linux-only systemd-run warning",
-    "status": "proposed",
+    "status": "running",
     "uid": "a07c079b-9ae5-4916-a09b-b4f40a83d9a7",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-04T06:00:00.000Z",
-    "updated": "2026-11-04T05:33:51.217Z",
+    "updated": "2026-11-04T05:35:21.409Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4896",
@@ -251,5 +251,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
