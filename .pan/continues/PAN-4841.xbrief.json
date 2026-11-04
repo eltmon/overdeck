@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4841",
   "created": "2026-11-04T10:01:07.580Z",
-  "updated": "2026-11-04T17:41:26.670Z",
+  "updated": "2026-11-04T17:41:39.412Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -306,6 +306,10 @@
     "rel-device-live-activity-check.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T17:41:26.670Z"
+    },
+    "rel-device-live-activity-check.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:41:39.411Z"
     }
   }
 }
