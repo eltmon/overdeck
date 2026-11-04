@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4958",
   "created": "2026-11-04T18:35:00.768Z",
-  "updated": "2026-11-04T19:02:05.652Z",
+  "updated": "2026-11-04T19:02:22.233Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -150,6 +150,10 @@
     "cli-token.ac4": {
       "status": "completed",
       "doneAt": "2026-11-04T19:02:05.651Z"
+    },
+    "harnesses-matrix.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:02:22.233Z"
     }
   }
 }
