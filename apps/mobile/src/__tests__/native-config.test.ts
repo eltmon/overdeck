@@ -40,6 +40,22 @@ describe('native project config', () => {
     expect(read('ios/App/App.xcodeproj/project.pbxproj')).toContain('/* MainViewController.swift in Sources */,');
   });
 
+  it('registers the OverdeckAppearance plugin and applies the stored style at launch (PAN-5041 WI-6)', () => {
+    expect(read('ios/App/App.xcodeproj/project.pbxproj')).toContain('/* OverdeckAppearancePlugin.swift in Sources */,');
+    expect(read('ios/App/App/MainViewController.swift')).toContain('registerPluginInstance(OverdeckAppearancePlugin())');
+    expect(read('ios/App/App/SceneDelegate.swift')).toContain('OverdeckAppearancePlugin.storedStyle()');
+  });
+
+  it('registers the OverdeckAppearance plugin and sets night mode before super.onCreate on Android (PAN-5041 WI-7)', () => {
+    const activity = read('android/app/src/main/java/ai/overdeck/app/MainActivity.java');
+    expect(activity).toContain('registerPlugin(OverdeckAppearancePlugin.class)');
+    const nightModeAt = activity.indexOf('AppCompatDelegate.setDefaultNightMode(');
+    const superOnCreateAt = activity.indexOf('super.onCreate(savedInstanceState)');
+    expect(nightModeAt).toBeGreaterThan(-1);
+    expect(nightModeAt).toBeLessThan(superOnCreateAt);
+    expect(read('android/app/src/main/AndroidManifest.xml')).toMatch(/android:configChanges="[^"]*\buiMode\b[^"]*"\s*\n\s*android:name="\.MainActivity"/);
+  });
+
   it('signs the App with the push entitlement and the private then shared Keychain groups (PAN-4838 WI-3)', () => {
     const entitlements = read('ios/App/App/App.entitlements');
     expect(entitlements).toContain('<key>aps-environment</key>');

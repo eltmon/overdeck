@@ -4,6 +4,16 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Overdeck</title>
+    <script>
+      // PAN-5041: apply the phone's appearance before the first paint. Keep in step with src/shell/appearance.ts.
+      (function () {
+        var a = 'system';
+        try { a = localStorage.getItem('overdeck.appearance') || 'system'; } catch (e) {}
+        var dark = a === 'dark' || (a !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.classList.toggle('dark', dark);
+        try { localStorage.setItem('overdeck.ui.theme', dark ? 'dark' : 'light'); } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
