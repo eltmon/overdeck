@@ -89,6 +89,8 @@ const KNOWN_CALL_SITES = new Set([
   'lib/cloister/verification-escalation.ts|outcome = await messageAgent(target.agentId, message, \'internal\', { owesRework: true, feedbackRedelivery: true });',
   // PAN-3705 follow-up: verification PASS is told to the work agent (no rework owed, no needs-you).
   'lib/cloister/verification-runner.ts|const outcome = await messageAgent(target.agentId, message, \'internal\');',
+  // PAN-4943: PR watch notifications, agentKind 'agent' (D-7). A failed delivery is logged, not retried.
+  'dashboard/server/services/pull-request-watch-notifier.ts|const outcome = await messageAgent(agentId, text, \'pr-watch\', { dedupKey });',
 ]);
 
 function* walkTs(dir: string): Generator<string> {

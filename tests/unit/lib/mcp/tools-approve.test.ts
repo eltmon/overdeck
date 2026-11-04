@@ -6,6 +6,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { ALL_TOOLS } from '../../../../src/lib/mcp/server.js';
+import { PR_LINK_TOOLS } from '../../../../src/lib/mcp/tools-pr.js';
 import { READ_TOOLS } from '../../../../src/lib/mcp/tools-read.js';
 import { SCHEDULE_TOOLS } from '../../../../src/lib/mcp/tools-schedule.js';
 import { SELF_TOOLS } from '../../../../src/lib/mcp/tools-self.js';
@@ -23,13 +24,13 @@ import { callTool, connectClient, fakeApi, resultJson, resultText } from './harn
 const APPROVER = ['approve', 'tell', 'read:conversations'];
 
 describe('MCP approval tools (PAN-4649 W-7)', () => {
-  it('the approval tools follow the schedule tools and precede the self tools', () => {
+  it('the approval tools follow the schedule and PR-link tools and precede the self tools', () => {
     expect(APPROVE_TOOLS.map((tool) => tool.name)).toEqual([
       'list_pending_input', 'answer_question', 'answer_permission',
       'answer_pane_choice', 'answer_codex_approval', 'answer_pi_ask', 'answer_plan',
       'answer_agent_plan', 'answer_agent_permission',
     ]);
-    const families = [...READ_TOOLS, ...WRITE_TOOLS, ...SCHEDULE_TOOLS, ...APPROVE_TOOLS, ...SELF_TOOLS];
+    const families = [...READ_TOOLS, ...WRITE_TOOLS, ...SCHEDULE_TOOLS, ...PR_LINK_TOOLS, ...APPROVE_TOOLS, ...SELF_TOOLS];
     expect(ALL_TOOLS.slice(0, families.length).map((tool) => tool.name)).toEqual(families.map((tool) => tool.name));
   });
 

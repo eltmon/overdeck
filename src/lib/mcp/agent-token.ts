@@ -27,6 +27,7 @@ import { getAgentDir, getAgentState } from '../agents/agent-state-read.js';
 import { normalizeAgentId } from '../agents/identity.js';
 import { removeAgentSecretsDir } from '../agents/state-dir-removal.js';
 import type { Role } from '../agents/role.js';
+import { removePullRequestWatchesForOwner } from '../overdeck/pull-request-watches.js';
 
 export const AGENT_TOKEN_FILE = 'mcp-token';
 export type AgentTokenRole = Role | 'conversation';
@@ -130,7 +131,7 @@ export async function ensureAgentMcpToken(owner: AgentTokenOwner): Promise<{ tok
   throw new Error(`agent token for ${agentId} did not persist in the access-token registry`);
 }
 
-/** Revoke every active token of the owner, unlink its token file and delete its `secrets/` directory (PAN-4941). Never throws; returns the count revoked. */
+/** Revoke every active token of the owner, unlink its token file, delete its `secrets/` directory (PAN-4941) and remove its PR watches (PAN-4943). Never throws; returns the count revoked. */
 export async function revokeAgentMcpTokens(agentId: string, opts: { agentKind?: 'agent' | 'conversation'; dir?: string } = {}): Promise<number> {
   const agentKind = opts.agentKind ?? 'agent';
   const id = ownerId(agentId, agentKind);
@@ -143,6 +144,13 @@ export async function revokeAgentMcpTokens(agentId: string, opts: { agentKind?: 
         if (error.code !== 'ENOENT') throw error;
       });
       await removeAgentSecretsDir(dir);
+    }
+    // PAN-4943: a stopped agent watches nothing. Its own try/catch, so a
+    // corrupt watch store never skips the token-file and secrets cleanup above.
+    try {
+      await removePullRequestWatchesForOwner({ agentId: id, agentKind });
+    } catch (error) {
+      console.warn(`[agent-token] PR watch cleanup failed for ${id}: ${(error as Error).message}`);
     }
     return revoked.length;
   } catch (error) {

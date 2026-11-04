@@ -219,9 +219,9 @@ does not list needs `admin` (D-6):
 | Scope | `METHOD path` |
 | --- | --- |
 | `read:events` | `GET /events/stream`, `GET /events/version`, RPC `pan.replayEvents` (PAN-4835) |
-| `read:state` | `GET /api/issues`, `GET /api/agents`, `GET /api/agent-directory`, `GET /api/flywheel/status`, `GET /api/pipeline/membership`, `GET /api/versions/self`, `GET /api/activity` (PAN-4835), RPC `pan.getSnapshot` (PAN-4835), `GET /api/lanes`, `GET /api/lanes/:name`, `GET /api/self/workers`, `GET /api/self/workers/:id`, `GET /api/self/workers/:id/wait`, `POST /api/self/lanes/wait` (PAN-4938) |
-| `read:conversations` | `GET /api/conversations`, `GET /api/conversations/:id`, `GET /api/conversations/:name/messages`, `GET /api/conversations/:name/about`, `GET /api/palette/search`, `GET /api/conversations/pending-input` (explicit row, PAN-4835), `GET /api/needs-you` (PAN-4944) |
-| `tell` | `POST /api/agents/:id/message`, `POST /api/agents/:id/tell`, `POST /api/conversations/:name/message`, `POST /api/conversations/:name/delete-image` (the undo of `upload-image`, PAN-4835), `PUT /api/phones/self/push-key`, `DELETE /api/phones/self` (PAN-4835), `POST /api/self/lanes/report` (PAN-4938) |
+| `read:state` | `GET /api/issues`, `GET /api/agents`, `GET /api/agent-directory`, `GET /api/flywheel/status`, `GET /api/pipeline/membership`, `GET /api/versions/self`, `GET /api/activity` (PAN-4835), `GET /api/pull-requests`, `GET /api/pull-requests/conversations` (PAN-4943 W-PR1), RPC `pan.getSnapshot` (PAN-4835), `GET /api/lanes`, `GET /api/lanes/:name`, `GET /api/self/workers`, `GET /api/self/workers/:id`, `GET /api/self/workers/:id/wait`, `POST /api/self/lanes/wait` (PAN-4938) |
+| `read:conversations` | `GET /api/conversations`, `GET /api/conversations/:id`, `GET /api/conversations/:name/messages`, `GET /api/conversations/:name/about`, `GET /api/palette/search`, `GET /api/conversations/pending-input` (explicit row, PAN-4835), `GET /api/needs-you` (PAN-4944), `GET /api/conversations/:name/pull-requests` (PAN-4943 W-PR1) |
+| `tell` | `POST /api/agents/:id/message`, `POST /api/agents/:id/tell`, `POST /api/conversations/:name/message`, `POST /api/conversations/:name/delete-image` (the undo of `upload-image`, PAN-4835), `PUT /api/phones/self/push-key`, `DELETE /api/phones/self` (PAN-4835), `POST /api/conversations/:name/pull-requests`, `DELETE /api/conversations/:name/pull-requests`, `POST /api/conversations/:name/pull-requests/sync` (PAN-4943 W-PR1), `POST /api/self/lanes/report` (PAN-4938) |
 | `operate` | WebSocket `/ws/terminal` (`WS_TERMINAL_SCOPE`), `POST /api/conversations`, `POST /api/workers`, `POST /api/versions/self/update`, `DELETE /api/versions/self/update`, `POST /api/self/workers`, `POST /api/self/lanes` (PAN-4938) |
 | `approve` | `POST /api/conversations/:id/permission`, `POST /api/conversations/:id/pane-choice`, `POST /api/conversations/:id/pi-ask-answer`, `POST /api/conversations/:id/codex-approval`, `POST /api/conversations/:name/plan-action`, `POST /api/agents/:id/answer-question`, `POST /api/agents/:id/plan-action`, `POST /api/agents/:id/permissions/:requestId/respond` |
 | `admin` | everything else, including `/ws/rpc`, `/ws/voice`, `/ws/autopreso` |
@@ -363,6 +363,25 @@ memory (`src/dashboard/server/services/agent-requests.ts`), so after a restart
 a wait answers **404** `unknown-request`, as it does for another agent's id,
 and the agent calls `request_secret` again. The MCP tools over these routes
 are `request_secret` and `secret_wait`.
+
+Pull request watches and links (PAN-4943, W-PR1) are self routes too.
+`POST /api/self/pull-request-watches` (`tell`) takes `{ url }`, a GitHub pull
+request URL (a GitLab merge request answers **400** `invalid-url`); it answers
+**201** `{ watch, created: true, linked, linkError? }`, or **200**
+`{ watch, created: false }` for a duplicate. A failed GitHub read answers
+**502** `pr-read-failed`; an already-merged or -closed PR answers **409**
+`{ code: "pr-finished", state }`. An agent may hold 20 watches (**429**
+`too-many-watches`); 50 watches may exist in total (**429** `watch-limit`).
+`GET /api/self/pull-request-watches` (`read:state`) answers `{ watches }`, the
+caller's own rows only. `DELETE /api/self/pull-request-watches/:id` (`tell`)
+answers **200** `{ removed: true, id }`, or **404** `unknown-watch` for an
+unknown id or another owner's id. `POST /api/self/pull-requests` (`tell`)
+takes `{ ref }` and links it to the caller's own conversation when one exists
+(a conversation token always; an agent token only when a specialist
+conversation row exists for it); otherwise **404**
+`{ code: "no-conversation" }`. The MCP tools over these routes are
+`watch_pull_request`, `list_pull_request_watches`, `unwatch_pull_request` and
+`link_pull_request`.
 
 Machine-link requests (PAN-4942, W-LINK1) work the same way.
 `POST /api/self/machine-link-requests` (`tell`) takes `{ hint }`: the trimmed
