@@ -1,0 +1,1189 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T09:53:53Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4841: Phone app: store, Firebase, APNs and directory setup, and first TestFlight and Play builds",
+    "updated": "2026-11-04T09:59:19.255Z"
+  },
+  "plan": {
+    "id": "pan-4841",
+    "title": "Phone app: store, Firebase, APNs and directory setup, and first TestFlight and Play builds",
+    "status": "proposed",
+    "uid": "349cf6dc-a2d9-46eb-9f1e-63e348e95a4d",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-04T09:53:53Z",
+    "updated": "2026-11-04T09:59:19.255Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4841",
+        "label": "PAN-4841",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4823",
+        "label": "PAN-4823 (epic, W-REL1, AC-14)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4841.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "phone-app",
+      "release",
+      "ios",
+      "android",
+      "apns",
+      "fcm",
+      "connect"
+    ],
+    "narratives": {
+      "Problem": "The phone app (apps/mobile) has no store presence: no App Store Connect or Play app, no Firebase project, no APNs key, no release signing or build scripts, Capacitor's default icons, no iOS privacy manifest, and connect.overdeck.ai/healthz reports apns:false and fcm:false, which blocked PAN-4838's real-APNs check and PAN-4839's Live Activity device check and blocks PAN-4840's Android push run.",
+      "Proposal": "Lower epic W-REL1 against the current code (PRD .pan/drafts/PAN-4841.md). The operator does every console step once from one checklist in apps/mobile/RELEASE.md; secrets reach the agent only through request_secret/secret_wait and go straight into wrangler secret put (no Worker code deploy). The repo gains env-driven Android release signing, a build-android.sh that signs and pins the upload certificate, a build-ios-on-rig.sh that archives and uploads from a console Terminal session on the Mac rig, a PrivacyInfo.xcprivacy, generated Overdeck icons and splash, the committed google-services.json, and a privacy policy published through an overdeck-landing PR. The first Play internal and TestFlight builds follow, then the PAN-4838 (AC-11) and PAN-4839 (AC-12) device checks are recorded in ACCEPTANCE.md.",
+      "NonGoals": "- Android push decryption code or its emulator run (PAN-4840).\n- User documentation pages such as configuration/phone-app.mdx (PAN-4842).\n- App Store or Play production release, store listing text, screenshots, or App Review submission.\n- In-app account deletion.\n- A Firebase iOS app or GoogleService-Info.plist.\n- Any services/connect code change, wrangler deploy, or wrangler rollback.\n- Any .github/workflows/ change.\n- Fastlane, Xcode Cloud, Codemagic or other CI release automation.\n- Reusing MYN's Firebase project mind-your-now or its service account.\n- Adding ITSAppUsesNonExemptEncryption to Info.plist.\n- Committing the upload keystore, its password, or any secret value."
+    },
+    "autoDecisions": [
+      {
+        "summary": "The work agent sets the five push secrets with wrangler secret put; it never runs wrangler deploy.",
+        "rationale": "The operator's 2026-11-04 decision routes secrets to the agent and PAN-4838's comment asks this issue to set them; secret put reuses the deployed code, so 'production Worker deploys stay with the operator' holds. docs/CONNECT-SERVICE.md gains this one exception."
+      },
+      {
+        "summary": "Build numbers are passed on the command line (--build <n>); version name stays 1.0.",
+        "rationale": "Nothing is committed per build and the stores refuse reused numbers, so no local counter is needed."
+      },
+      {
+        "summary": "First store builds do not wait for PAN-4840.",
+        "rationale": "PAN-4840 waits for this issue's google-services.json and FCM secret; waiting on its merge would deadlock. A later build ships Android push."
+      },
+      {
+        "summary": "Privacy policy source lives in apps/mobile/store/privacy-app.html and is published by a PR to eltmon/overdeck-landing at site/privacy/app/index.html.",
+        "rationale": "The epic names overdeck.ai/privacy/app in the landing repo; keeping the source here lets review see it."
+      },
+      {
+        "summary": "Replace Capacitor's default icons and splash with generated Overdeck assets (sharp 0.35.4, favicon.svg on #202020).",
+        "rationale": "Store builds should not carry another product's logo; sharp is already in the bun store and the PWA uses #202020."
+      },
+      {
+        "summary": "Add an app-level PrivacyInfo.xcprivacy declaring UserDefaults reason CA92.1.",
+        "rationale": "OverdeckKeysPlugin.swift uses UserDefaults, a required-reason API that App Store Connect flags without a declaration."
+      },
+      {
+        "summary": "Export compliance is answered by the operator; ITSAppUsesNonExemptEncryption is not set.",
+        "rationale": "The app uses standard end-to-end encryption; this is a legal declaration (NFR-4: no agreements without the operator)."
+      },
+      {
+        "summary": "APNS_TEAM_ID defaults to KUU2VM9GB9 but is still requested; FCM_PROJECT_ID is derived from google-services.json.",
+        "rationale": "The team id is the rig's signing team but the operator confirms which team owns the key; deriving the project id avoids a mismatch."
+      },
+      {
+        "summary": "Store name fallback 'Overdeck Anywhere' if 'Overdeck' is taken; bundle id and display name stay.",
+        "rationale": "Store names are unique; the fallback keeps the brand."
+      },
+      {
+        "summary": "FCM uses a dedicated service account with only Firebase Cloud Messaging API Admin, falling back to the firebase-adminsdk key.",
+        "rationale": "Least privilege; the fallback covers consoles that refuse key creation."
+      }
+    ],
+    "items": [
+      {
+        "id": "rel-operator-checklist",
+        "title": "Write the operator checklist in apps/mobile/RELEASE.md and post it on PAN-4841",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T09:53:53Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4841",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/RELEASE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c -E '^\\s*- \\*\\*(A[1-6]|F[1-4]|P[1-4]|C1|K1)\\*\\*' apps/mobile/RELEASE.md",
+            "gh issue view 4841 --comments | grep -c 'Operator checklist'"
+          ],
+          "expected_outputs": [
+            "first command prints 16",
+            "second command prints 1 or more"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "NFR-3",
+            "NFR-4"
+          ],
+          "acJustification": "Five ACs: step count, secrets table, A1 identifiers, the posted comment, and the comment's secret-put statement with A4 automatic distribution."
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4841.md WI-1. Create apps/mobile/RELEASE.md with sections 'Before you start', 'Operator checklist', 'Secrets the agent requests', 'Build and upload' (left for rel-docs), 'Store facts'. Copy the checklist steps A1-A6, F1-F4, P1-P4, C1, K1 exactly as the PRD lists them (no App Groups; new Firebase project, never mind-your-now). The secrets table names GOOGLE_SERVICES_JSON, FCM_SERVICE_ACCOUNT_JSON, APNS_KEY_P8, APNS_KEY_ID, APNS_TEAM_ID (default KUU2VM9GB9). 'Store facts' states the data list (PRD Fact 16), the export-compliance facts (D-9: X25519, ChaCha20-Poly1305/XChaCha20-Poly1305, SHA-256 via libsodium and Noise; the operator answers), and that App Store submission needs in-app account deletion (H-6). Step A4 also turns on 'Enable automatic distribution' for the 'Operator' internal group, so processed builds reach the operator's iPhone. Then post the checklist and secrets table as a PAN-4841 comment with gh issue comment 4841. The comment states in one sentence, before any secret request: 'The agent will run wrangler secret put for the five push secrets on overdeck-connect and will never run wrangler deploy.'"
+        },
+        "items": [
+          {
+            "id": "rel-operator-checklist.ac1",
+            "title": "Given the committed apps/mobile/RELEASE.md, when grep counts lines starting with the step ids A1-A6, F1-F4, P1-P4, C1 and K1, then it returns 16.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rel-operator-checklist.ac2",
+            "title": "Given RELEASE.md, when a reviewer reads the 'Secrets the agent requests' table, then it names exactly GOOGLE_SERVICES_JSON, FCM_SERVICE_ACCOUNT_JSON, APNS_KEY_P8, APNS_KEY_ID and APNS_TEAM_ID and contains no secret value.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rel-operator-checklist.ac3",
+            "title": "Given checklist step A1, when a reviewer reads it, then it registers ai.overdeck.app with Push Notifications plus ai.overdeck.app.NotificationService and ai.overdeck.app.widgets and mentions no App Group.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rel-operator-checklist.ac4",
+            "title": "Given the PAN-4841 issue, when gh issue view 4841 --comments runs, then it shows a comment containing the heading 'Operator checklist'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rel-operator-checklist.ac5",
+            "title": "Given the posted PAN-4841 comment, when read, then it states that the agent will run wrangler secret put for the five push secrets and never wrangler deploy, and step A4 turns on automatic distribution for the 'Operator' TestFlight group.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rel-android-signing-config",
+        "title": "Add env-driven release signing and version properties to the Android Gradle build",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T09:53:53Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-4841",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/android/app/build.gradle",
+            ".gitignore"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix apps/mobile run build && npm --prefix apps/mobile run cap:sync -- android && (cd apps/mobile/android && JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew assembleDebug)",
+            "git check-ignore apps/mobile/release/x.aab",
+            "(cd apps/mobile/android && JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew assembleDebug -PoverdeckVersionCode=7) && ~/Android/Sdk/build-tools/36.0.0/aapt2 dump badging apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk | grep -c \"versionCode='7'\""
+          ],
+          "expected_outputs": [
+            "assembleDebug exits 0 with no OVERDECK_UPLOAD_* variables set",
+            "git check-ignore prints apps/mobile/release/x.aab",
+            "aapt2 grep prints 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. In apps/mobile/android/app/build.gradle read OVERDECK_UPLOAD_KEYSTORE, OVERDECK_UPLOAD_STORE_PASSWORD, OVERDECK_UPLOAD_KEY_ALIAS, OVERDECK_UPLOAD_KEY_PASSWORD from System.getenv before android {; replace 'versionCode 1' / 'versionName \"1.0\"' with values from project.findProperty('overdeckVersionCode') (default '1', as Integer) and 'overdeckVersionName' (default '1.0'); add signingConfigs.release and buildTypes.release.signingConfig only when the keystore variable is set (MYN pattern, ~/Projects/myn/frontend/android/app/build.gradle lines 41-55). Add 'apps/mobile/release/' to the root .gitignore with a one-line comment. Do not touch the google-services try/catch block. Expect a trivial merge with PAN-4840's edits to the same file (hazard H-1): keep both."
+        },
+        "items": [
+          {
+            "id": "rel-android-signing-config.ac1",
+            "title": "Given no OVERDECK_UPLOAD_* environment variables, when ./gradlew assembleDebug runs in apps/mobile/android, then it exits 0 (CI's mobile-android job is unaffected).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rel-android-signing-config.ac2",
+            "title": "Given -PoverdeckVersionCode=<n> -PoverdeckVersionName=<x>, when bundleRelease runs, then the bundle's versionCode is n and versionName is x; without them it defaults to 1 and 1.0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rel-android-signing-config.ac3",
+            "title": "Given the root .gitignore, when git check-ignore apps/mobile/release/x.aab runs, then it prints the path.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rel-upload-keystore",
+        "title": "Generate the Android upload keystore outside the repo and commit its certificate SHA-1 pin",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T09:53:53Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-4841",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/android/upload-certificate.sha1"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "stat -c %a ~/.overdeck/secrets ~/.overdeck/secrets/android-upload.jks ~/.overdeck/secrets/android-upload.password",
+            "grep -E -c '^([0-9A-F]{2}:){19}[0-9A-F]{2}$' apps/mobile/android/upload-certificate.sha1",
+            "git ls-files | grep -c -E '\\.jks$|android-upload\\.password'"
+          ],
+          "expected_outputs": [
+            "stat prints 700, 600, 600",
+            "grep prints 1",
+            "git ls-files grep prints 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3 and D-2. If ~/.overdeck/secrets/android-upload.jks exists, never overwrite it. Otherwise: mkdir -p ~/.overdeck/secrets, chmod 700; (umask 077; openssl rand -base64 32 | tr -d '\\n' > ~/.overdeck/secrets/android-upload.password); keytool -genkeypair -storetype PKCS12 -keystore ~/.overdeck/secrets/android-upload.jks -alias overdeck-upload -keyalg RSA -keysize 4096 -validity 10000 -dname 'CN=Overdeck Upload, O=Overdeck' -storepass:file <pw> -keypass:file <pw>; chmod 600 the keystore. Never print the password. Write the SHA-1 from keytool -list -v (awk '/SHA1:/{print $2; exit}') to apps/mobile/android/upload-certificate.sha1 and commit only that file."
+        },
+        "items": [
+          {
+            "id": "rel-upload-keystore.ac1",
+            "title": "Given the item is done, when stat runs on ~/.overdeck/secrets and its two files, then it returns modes 700, 600 and 600.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rel-upload-keystore.ac2",
+            "title": "Given the committed apps/mobile/android/upload-certificate.sha1, when compared with keytool -list -v of the keystore, then the SHA-1 matches and the file holds exactly one colon-separated 20-byte uppercase hex line.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rel-upload-keystore.ac3",
+            "title": "Given the repository, when git ls-files is searched for .jks files or android-upload.password, then it returns no match.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rel-android-build-script",
+        "title": "Add apps/mobile/scripts/build-android.sh that builds, signs and verifies the release AAB",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T09:53:53Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-4841",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/scripts/build-android.sh"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash -n apps/mobile/scripts/build-android.sh",
+            "apps/mobile/scripts/build-android.sh; echo exit=$?",
+            "apps/mobile/scripts/build-android.sh --build 1 --keystore /nonexistent; echo exit=$?"
+          ],
+          "expected_outputs": [
+            "bash -n exits 0",
+            "no-flag run prints usage and exit=2",
+            "missing-keystore run names /nonexistent and prints exit=1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "rel-first-android-release"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Bash, set -euo pipefail, mode 755. Flags: --build <n> (required positive integer, else usage and exit 2), --version-name (default 1.0), --keystore (default $HOME/.overdeck/secrets/android-upload.jks), --password-file (default $HOME/.overdeck/secrets/android-upload.password), --alias (default overdeck-upload). cd to repo root. Refuse with exit 1 naming the path, in this order: keystore, password file, apps/mobile/android/upload-certificate.sha1, apps/mobile/android/app/google-services.json. Default JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64; write sdk.dir to apps/mobile/android/local.properties. npm --prefix apps/mobile run build; npm --prefix apps/mobile run cap:sync -- android. Export OVERDECK_UPLOAD_* (passwords read with $(<file), never in argv), run ./gradlew --no-daemon bundleRelease -PoverdeckVersionCode=<n> -PoverdeckVersionName=<x>. Then jarsigner -verify, compare keytool -printcert -jarfile SHA-1 with the pin file (exit 1 printing both on mismatch), copy to apps/mobile/release/overdeck-<x>-<n>.aab and print the path and SHA-1. The first real run happens in rel-first-android-release."
+        },
+        "items": [
+          {
+            "id": "rel-android-build-script.ac1",
+            "title": "Given no flags, when the script runs, then it prints usage and exits 2.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rel-android-build-script.ac2",
+            "title": "Given --keystore /nonexistent, when the script runs, then it exits 1 and its message names /nonexistent before any build step starts.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rel-android-build-script.ac3",
+            "title": "Given the script source, when a reviewer reads it, then no password value is placed in a command argument: passwords reach Gradle only through exported OVERDECK_UPLOAD_* variables read from the password file.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rel-android-build-script.ac4",
+            "title": "Given a built bundle whose signer SHA-1 differs from apps/mobile/android/upload-certificate.sha1, when the verification step runs, then the script exits 1 and prints the expected and actual SHA-1.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rel-ios-privacy-manifest",
+        "title": "Add PrivacyInfo.xcprivacy declaring UserDefaults (CA92.1) to the iOS App target",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T09:53:53Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-4841",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/ios/App/App/PrivacyInfo.xcprivacy",
+            "apps/mobile/ios/App/App.xcodeproj/project.pbxproj"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'PrivacyInfo.xcprivacy' apps/mobile/ios/App/App.xcodeproj/project.pbxproj",
+            "grep -c 'CA92.1' apps/mobile/ios/App/App/PrivacyInfo.xcprivacy"
+          ],
+          "expected_outputs": [
+            "first grep prints 4",
+            "second grep prints 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Create apps/mobile/ios/App/App/PrivacyInfo.xcprivacy with the exact plist in the PRD (NSPrivacyTracking false, no tracking domains, collected data type NSPrivacyCollectedDataTypeUserID linked, not tracking, purpose AppFunctionality; accessed API NSPrivacyAccessedAPICategoryUserDefaults with reason CA92.1, because OverdeckKeysPlugin.swift line 31 uses UserDefaults.standard). In project.pbxproj add it to the App target only: one PBXFileReference, one PBXBuildFile '… in Resources', a child of the App group (the one listing App.entitlements), and an entry in the App target's PBXResourcesBuildPhase files. Use two fresh 24-hex ids that do not occur in the file. The rig archive in rel-first-testflight-build is the build proof."
+        },
+        "items": [
+          {
+            "id": "rel-ios-privacy-manifest.ac1",
+            "title": "Given project.pbxproj, when grep counts 'PrivacyInfo.xcprivacy', then it returns 4 (file reference, build file, group child, resources phase).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rel-ios-privacy-manifest.ac2",
+            "title": "Given PrivacyInfo.xcprivacy, when read, then it declares NSPrivacyAccessedAPICategoryUserDefaults with reason CA92.1 and NSPrivacyTracking false.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rel-ios-privacy-manifest.ac3",
+            "title": "Given the archive produced in rel-first-testflight-build, when find lists App.app, then App.app contains PrivacyInfo.xcprivacy and the NotificationService and widgets targets do not gain a new reference.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rel-brand-assets",
+        "title": "Generate Overdeck launcher icons and splash images from the favicon mark",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T09:53:53Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4841",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/scripts/generate-brand-assets.mjs",
+            "apps/mobile/package.json",
+            "bun.lock",
+            "apps/mobile/ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png",
+            "apps/mobile/ios/App/App/Assets.xcassets/Splash.imageset/splash-2732x2732*.png",
+            "apps/mobile/android/app/src/main/res/mipmap-*/ic_launcher*.png",
+            "apps/mobile/android/app/src/main/res/drawable*/splash.png",
+            "apps/mobile/android/app/src/main/res/values/ic_launcher_background.xml"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node apps/mobile/scripts/generate-brand-assets.mjs",
+            "file apps/mobile/ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png",
+            "md5sum apps/mobile/ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png"
+          ],
+          "expected_outputs": [
+            "generator exits 0 and prints 30 lines",
+            "file prints 1024 x 1024, 8-bit/color RGB (no alpha)",
+            "md5 differs from 0ac741c9e1701ee14dd05ea131f7cfd8"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6 and D-8. Add devDependency \"sharp\": \"0.35.4\" (exact) to apps/mobile/package.json and run bun install from the repo root. The ESM script renders src/dashboard/frontend/public/favicon.svg with sharp and composites it centred on #202020: iOS AppIcon-512@2x.png 1024x1024, mark 70%, flattened with no alpha channel; Android ic_launcher.png and ic_launcher_round.png at their current sizes, mark 70%, opaque; ic_launcher_foreground.png at current sizes, transparent, mark 46%; every Splash.imageset PNG and drawable*/splash.png at its current width and height, #202020 fill, mark 20% of the shorter side. Read each target's size with sharp(file).metadata() before overwriting; print one line per file. Set ic_launcher_background to #202020. Run it and commit the outputs."
+        },
+        "items": [
+          {
+            "id": "rel-brand-assets.ac1",
+            "title": "Given the generator, when node apps/mobile/scripts/generate-brand-assets.mjs runs, then it exits 0 and writes 30 files (1 iOS icon, 15 Android launcher, 3 iOS splash, 11 Android splash) at their previous pixel sizes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rel-brand-assets.ac2",
+            "title": "Given the generated iOS icon, when file inspects it, then it reports 1024 x 1024 RGB with no alpha and its md5 differs from the Capacitor default 0ac741c9e1701ee14dd05ea131f7cfd8.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rel-brand-assets.ac3",
+            "title": "Given values/ic_launcher_background.xml, when read, then ic_launcher_background is #202020.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rel-brand-assets.ac4",
+            "title": "Given the branch, when CI's mobile-android job runs assembleDebug, then it passes with the new resources.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rel-ios-rig-script",
+        "title": "Add apps/mobile/scripts/build-ios-on-rig.sh and ExportOptions.plist for archive and upload on the Mac rig",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T09:53:53Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-4841",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/scripts/build-ios-on-rig.sh",
+            "apps/mobile/ios/App/ExportOptions.plist"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash -n apps/mobile/scripts/build-ios-on-rig.sh",
+            "apps/mobile/scripts/build-ios-on-rig.sh --dry-run --build 1 --rig eltmon@192.0.2.1"
+          ],
+          "expected_outputs": [
+            "bash -n exits 0",
+            "dry run exits 0 without contacting 192.0.2.1 and prints CURRENT_PROJECT_VERSION=1, DEVELOPMENT_TEAM=KUU2VM9GB9 and three node_modules/.bun/@capacitor+ package paths"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. ExportOptions.plist: method app-store-connect, destination upload, teamID KUU2VM9GB9, signingStyle automatic, uploadSymbols true, manageAppVersionAndBuildNumber false. Script flags: --build (required), --rig user@host (required; DHCP address), --team (default KUU2VM9GB9), --key (default ~/.ssh/gauntlet_air), --no-upload, --dry-run. Host: npm --prefix apps/mobile run build; cap:sync -- ios. rsync -aL --delete apps/mobile/ios/ to <rig>:~/overdeck-mobile/apps/mobile/ios/ and every path: \"…\" package from apps/mobile/ios/App/CapApp-SPM/Package.swift (resolved from that directory) to the same repo-relative path under ~/overdeck-mobile/. Write ~/release-ios/overdeck-<n>.command (zsh, PATH=/opt/homebrew/bin first) that runs xcodebuild -project … -scheme App -configuration Release -destination generic/platform=iOS -archivePath ~/release-ios/overdeck-<n>.xcarchive -allowProvisioningUpdates DEVELOPMENT_TEAM=<team> CURRENT_PROJECT_VERSION=<n> archive, then (unless --no-upload) xcodebuild -exportArchive with ExportOptions.plist, logging to ~/release-ios/overdeck-<n>.log and ending with '== DONE ==' or '== FAILED: <step> =='. Launch it with ssh … 'open -a Terminal <file>' (console session, unlocked keychain). Wait up to 60 min in one loop, polling every 30 s and printing only on change; on success print the archive's CFBundleShortVersionString and CFBundleVersion via PlistBuddy. All ssh/rsync use -o BatchMode=yes -i <key>. --dry-run prints the remote commands and the .command content and contacts nothing."
+        },
+        "items": [
+          {
+            "id": "rel-ios-rig-script.ac1",
+            "title": "Given --dry-run --build 1 --rig eltmon@192.0.2.1, when the script runs, then it exits 0, contacts no host, and prints an archive command containing DEVELOPMENT_TEAM=KUU2VM9GB9 and CURRENT_PROJECT_VERSION=1.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rel-ios-rig-script.ac2",
+            "title": "Given the dry-run output, when inspected, then it lists the three node_modules/.bun/@capacitor+app, +browser and +push-notifications package paths parsed from CapApp-SPM/Package.swift.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rel-ios-rig-script.ac3",
+            "title": "Given the generated .command content, when inspected, then it is started with 'open -a Terminal' and writes '== DONE ==' or '== FAILED: <step> ==' as its last log line.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rel-ios-rig-script.ac4",
+            "title": "Given ExportOptions.plist, when read, then method is app-store-connect, destination is upload and teamID is KUU2VM9GB9.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rel-privacy-policy",
+        "title": "Write the app privacy policy and open the overdeck-landing PR that serves it at overdeck.ai/privacy/app",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T09:53:53Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-4841",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/store/privacy-app.html"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "grep -c '<script' apps/mobile/store/privacy-app.html",
+            "grep -c -E 'end-to-end|Delete account|push token' apps/mobile/store/privacy-app.html",
+            "cmp apps/mobile/store/privacy-app.html ~/Projects/overdeck-landing-pan-4841/site/privacy/app/index.html",
+            "gh pr list -R eltmon/overdeck-landing --head pan-4841-privacy-app --json url"
+          ],
+          "expected_outputs": [
+            "script grep prints 0",
+            "content grep prints 3 or more",
+            "cmp exits 0",
+            "one PR URL is returned"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8 and D-7. Write apps/mobile/store/privacy-app.html: self-contained HTML5 (inline CSS, no scripts, no external requests), title 'Overdeck app privacy policy', an Effective date, sections What the app is / What we collect / What we cannot see / What we do not do / Where it is processed / How long we keep it / How to delete it / Contact (https://github.com/eltmon/overdeck/issues) / Changes, stated only from PRD Fact 16. Then in an isolated worktree of the landing repo (git -C ~/Projects/overdeck-landing worktree add ~/Projects/overdeck-landing-pan-4841 -b pan-4841-privacy-app origin/main; never the landing repo's primary checkout) copy it byte for byte to site/privacy/app/index.html, add https://overdeck.ai/privacy/app to site/sitemap.xml, commit, push, and gh pr create -R eltmon/overdeck-landing. If push or PR creation is refused (CP-3), post a PAN-4841 comment asking the operator to apply the file. Record the PR URL in a PAN-4841 comment."
+        },
+        "items": [
+          {
+            "id": "rel-privacy-policy.ac1",
+            "title": "Given apps/mobile/store/privacy-app.html, when grep searches it, then it contains no <script tag and states that conversation content and notification text are end-to-end encrypted.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rel-privacy-policy.ac2",
+            "title": "Given the policy, when a reviewer compares it with PRD Fact 16, then every collected item listed (GitHub account id and login, device label and platform, install id, push token, relay byte counts) appears and no data the app does not collect is claimed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rel-privacy-policy.ac3",
+            "title": "Given the landing worktree, when cmp compares site/privacy/app/index.html with apps/mobile/store/privacy-app.html, then it exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rel-privacy-policy.ac4",
+            "title": "Given eltmon/overdeck-landing, when gh pr list filters on head pan-4841-privacy-app, then it returns one open PR, or a PAN-4841 comment records the CP-3 fallback.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rel-google-services-json",
+        "title": "Receive google-services.json through a secret request, validate and commit it, and notify PAN-4840",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T09:53:53Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-4841",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/android/app/google-services.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node -e \"const j=require('./apps/mobile/android/app/google-services.json');if(!j.client.some(c=>c.client_info.android_client_info.package_name==='ai.overdeck.app')||j.project_info.project_id==='mind-your-now')process.exit(1)\"",
+            "(cd apps/mobile/android && JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew :app:processDebugGoogleServices)"
+          ],
+          "expected_outputs": [
+            "node check exits 0",
+            "processDebugGoogleServices exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. request_secret name GOOGLE_SERVICES_JSON with timeoutMs 3600000 and the PRD prompt; secret_wait until delivered (CP-5: on expired/declined, pan tell flywheel-orchestrator and pan task block). Validate with node reading the delivered file (never print it): JSON parses, some client has package_name ai.overdeck.app, project_info.project_id is not mind-your-now. Write it pretty-printed (2-space, trailing newline) to apps/mobile/android/app/google-services.json and commit. Then gh issue comment 4840 saying which project id and commit carry it. Do not touch PAN-4840's branch."
+        },
+        "items": [
+          {
+            "id": "rel-google-services-json.ac1",
+            "title": "Given the committed google-services.json, when the node check runs, then it exits 0: a client has package ai.overdeck.app and the project id is not mind-your-now.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rel-google-services-json.ac2",
+            "title": "Given the committed file, when ./gradlew :app:processDebugGoogleServices runs, then it exits 0 because the google-services plugin applies.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rel-google-services-json.ac3",
+            "title": "Given PAN-4840, when its comments are read, then one comment names the Firebase project id and the PAN-4841 commit that carries google-services.json.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rel-directory-push-secrets",
+        "title": "Set the five push secrets on overdeck-connect with wrangler secret put and confirm healthz",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T09:53:53Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-4841",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "apps/mobile/ACCEPTANCE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "curl -s https://connect.overdeck.ai/healthz",
+            "cd services/connect && npx --no-install wrangler secret list",
+            "grep -A6 '### Directory secrets' apps/mobile/ACCEPTANCE.md | grep -c '\"apns\":true'"
+          ],
+          "expected_outputs": [
+            "healthz JSON has configured, turn, apns and fcm all true",
+            "secret list includes APNS_KEY_P8, APNS_KEY_ID, APNS_TEAM_ID, FCM_SERVICE_ACCOUNT_JSON, FCM_PROJECT_ID",
+            "grep prints 1"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "NFR-1",
+            "NFR-5"
+          ],
+          "foundationFor": [
+            "rel-device-push-check",
+            "rel-device-live-activity-check"
+          ],
+          "acJustification": "Five ACs: the healthz result, the secret list, the no-leak/no-deploy rule, the project-id mismatch stop, and the durable record."
+        },
+        "narrative": {
+          "Action": "PRD WI-10, D-3, D-4, D-5. No repo files change. Preflight: npx --no-install wrangler secret list in services/connect exits 0 (else comment on PAN-4841 asking the operator to run npx wrangler login). Request APNS_KEY_P8, APNS_KEY_ID, APNS_TEAM_ID (default KUU2VM9GB9) and FCM_SERVICE_ACCOUNT_JSON via request_secret (timeoutMs 3600000, PRD prompts) and secret_wait. Check without printing: P8 contains BEGIN PRIVATE KEY; ids match ^[A-Z0-9]{10}$; the service-account JSON has client_email, private_key and project_id equal to google-services.json project_info.project_id. Run npx --no-install wrangler secret put <NAME> < <file> for each, and pipe the derived project id into wrangler secret put FCM_PROJECT_ID. Never wrangler deploy or rollback; never put a value in argv, chat, a comment or a commit. Confirm healthz, then comment on PAN-4840 (fcm:true) and on PAN-4841 (the healthz body). Record the healthz body and the UTC time under '## PAN-4841 store builds' / '### Directory secrets' in apps/mobile/ACCEPTANCE.md (no secret values)."
+        },
+        "items": [
+          {
+            "id": "rel-directory-push-secrets.ac1",
+            "title": "Given the secrets are set, when curl fetches https://connect.overdeck.ai/healthz, then the JSON returns configured, turn, apns and fcm all true.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rel-directory-push-secrets.ac2",
+            "title": "Given services/connect, when npx wrangler secret list runs, then it lists all five push secret names.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rel-directory-push-secrets.ac3",
+            "title": "Given the session transcript, commits and PAN-4840/PAN-4841 comments, when searched, then no secret value appears and no wrangler deploy or rollback command was run.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rel-directory-push-secrets.ac4",
+            "title": "Given FCM_SERVICE_ACCOUNT_JSON's project_id differs from google-services.json's project id, when the check runs, then the item stops before any wrangler secret put and reports the mismatch.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rel-directory-push-secrets.ac5",
+            "title": "Given the secrets are set, when apps/mobile/ACCEPTANCE.md is read, then its '### Directory secrets' subsection records the healthz body with \"apns\":true and \"fcm\":true and the time, and no secret value.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rel-first-android-release",
+        "title": "Build the first signed AAB and get it rolled out to the Play internal track",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T09:53:53Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-4841",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/ACCEPTANCE.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "apps/mobile/scripts/build-android.sh --build 1",
+            "grep -A12 '### Google Play' apps/mobile/ACCEPTANCE.md | grep -c -E 'versionCode|Internal testing|SHA-1'"
+          ],
+          "expected_outputs": [
+            "script prints apps/mobile/release/overdeck-1.0-1.aab and the upload SHA-1",
+            "grep prints 3"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11 and D-6. If PAN-4840 has merged, run pan sync-main first so the build carries Android push; otherwise build without it. Run apps/mobile/scripts/build-android.sh --build 1 (higher if Play already has 1). Ask the operator with AskUserQuestion, naming the AAB's absolute path and checklist step P3, to upload it by hand and start the internal-testing rollout; options 'Rolled out' (give the release name) or 'Blocked' (give Play's message, CP-4). Record in apps/mobile/ACCEPTANCE.md under '## PAN-4841 store builds' / '### Google Play': date, versionCode, versionName, upload certificate SHA-1, AAB sha256sum, Play release name and status, whether PAN-4840 is included."
+        },
+        "items": [
+          {
+            "id": "rel-first-android-release.ac1",
+            "title": "Given the keystore, pin and google-services.json, when build-android.sh --build 1 runs, then it exits 0 and produces apps/mobile/release/overdeck-1.0-1.aab whose signer SHA-1 equals the pin.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rel-first-android-release.ac2",
+            "title": "Given the operator's answer, when ACCEPTANCE.md is read, then the '### Google Play' subsection records the versionCode, upload SHA-1, AAB SHA-256 and the Internal testing release status.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rel-first-android-release.ac3",
+            "title": "Given the release record, when read, then it states whether the build includes PAN-4840's push handler.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rel-first-testflight-build",
+        "title": "Archive and upload the first iOS build from the Mac rig to TestFlight",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T09:53:53Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "infra",
+          "issueLabel": "pan-4841",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/ACCEPTANCE.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "ssh -o BatchMode=yes -o ConnectTimeout=5 -i ~/.ssh/gauntlet_air eltmon@192.168.1.83 'security find-identity -v -p codesigning'",
+            "apps/mobile/scripts/build-ios-on-rig.sh --build 1 --rig eltmon@192.168.1.83",
+            "grep -A12 '### TestFlight' apps/mobile/ACCEPTANCE.md | grep -c -E 'CFBundleVersion|aps-environment.*production|TestFlight'"
+          ],
+          "expected_outputs": [
+            "a KUU2VM9GB9 signing identity is listed",
+            "script exits 0 after '== DONE ==' and prints CFBundleShortVersionString 1.0 and CFBundleVersion 1",
+            "grep prints 3"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-6",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-12, CP-1, CP-2. Reach the rig (try eltmon@192.168.1.83 with ConnectTimeout=5; else ask the operator for the address). CP-1: security find-identity lists a KUU2VM9GB9 identity, else ask the operator to sign in to Xcode → Settings → Accounts. Check df -g / (hazard H-7). Run build-ios-on-rig.sh --build 1 --rig <rig>; on 'missing Xcode-Token' apply CP-2 (operator re-signs in; never try App Store Connect API keys). Ask the operator (AskUserQuestion) to confirm the build in App Store Connect → TestFlight, answer export compliance (A6, D-9), and install it on the iPhone. On the rig unzip the exported .ipa into a scratch folder and run codesign -d --entitlements :- Payload/App.app. Record under '### TestFlight' in ACCEPTANCE.md: date, CFBundleShortVersionString, CFBundleVersion, aps-environment, App.app contains PrivacyInfo.xcprivacy, TestFlight status."
+        },
+        "items": [
+          {
+            "id": "rel-first-testflight-build.ac1",
+            "title": "Given the rig, when build-ios-on-rig.sh --build 1 runs, then the log ends with '== DONE ==' and the script prints CFBundleShortVersionString 1.0 and CFBundleVersion 1.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rel-first-testflight-build.ac2",
+            "title": "Given the exported app, when codesign -d --entitlements runs on Payload/App.app, then aps-environment is production.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rel-first-testflight-build.ac3",
+            "title": "Given the operator's confirmation, when ACCEPTANCE.md is read, then the '### TestFlight' subsection records the version, build, aps-environment production and the TestFlight status.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rel-device-push-check",
+        "title": "Run epic AC-11 on the TestFlight install: real-APNs notification title, cold-launch tap, and a title-free directory log",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T09:53:53Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4841",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/ACCEPTANCE.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "grep -A15 'Device run (PAN-4841)' apps/mobile/ACCEPTANCE.md | grep -c -E 'seconds|tap|tail'"
+          ],
+          "expected_outputs": [
+            "grep prints 3"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-13 and the PAN-4838 comment of 2026-11-03. Preconditions: healthz all true; TestFlight build installed. Ask the operator to sign in on the iPhone, allow notifications, pair with this machine, then terminate the app. Start wrangler tail overdeck-connect --format json into a scratch file in the background. In a desktop scratch conversation raise an AskUserQuestion with a unique title ('PAN-4841 device check <time>'); note the send time. Ask the operator whether the notification showed that title, after how many seconds, and whether tapping it from the terminated state opened this machine's Needs-you card. Stop the tail and grep the scratch file for the unique title. Record under '### Device run (PAN-4841)' in the 'PAN-4838 iOS notifications' section: seconds to display (target 10 or less), title shown, tap result, tail grep count."
+        },
+        "items": [
+          {
+            "id": "rel-device-push-check.ac1",
+            "title": "Given the terminated app and a desktop AskUserQuestion with a unique title, when the push arrives, then ACCEPTANCE.md records the seconds until the notification showed that title (target 10 s or less).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rel-device-push-check.ac2",
+            "title": "Given the notification, when the operator taps it from the terminated state, then ACCEPTANCE.md records whether the app opened this machine's Needs-you card.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rel-device-push-check.ac3",
+            "title": "Given the wrangler tail capture during the push, when grep searches it for the unique title, then the recorded count is 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rel-device-live-activity-check",
+        "title": "Run epic AC-12 on the TestFlight install: Live Activity count update time",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T09:53:53Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4841",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/ACCEPTANCE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -A12 'Device checkpoint (AC-12' apps/mobile/ACCEPTANCE.md | grep -c -E '[0-9]+ ?s'"
+          ],
+          "expected_outputs": [
+            "grep prints 1 or more"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-11"
+          ],
+          "acJustification": "The Live Activity check has one observable (update time) plus its context record; two ACs cover it."
+        },
+        "narrative": {
+          "Action": "PRD WI-14 and the PAN-4839 comment of 2026-11-03. With the paired TestFlight build open (the card starts), raise an AskUserQuestion in a scratch desktop conversation so the needs-you count changes; ask the operator how many seconds the lock-screen card took to show the new count (target 30 s or less). Record seconds, counts before and after, and the date under 'Device checkpoint (AC-12, D-16)' in the 'Live Activity (PAN-4839)' section."
+        },
+        "items": [
+          {
+            "id": "rel-device-live-activity-check.ac1",
+            "title": "Given an open paired app with its Live Activity, when a desktop AskUserQuestion changes the needs-you count, then ACCEPTANCE.md records the seconds until the lock-screen card showed the new count.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rel-device-live-activity-check.ac2",
+            "title": "Given the record, when read, then it states the counts before and after and the date of the run.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rel-docs",
+        "title": "Document the release flow in RELEASE.md and README.md and the secret-put exception in docs/CONNECT-SERVICE.md",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T09:53:53Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4841",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/RELEASE.md",
+            "apps/mobile/README.md",
+            "docs/CONNECT-SERVICE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'build-android.sh' apps/mobile/RELEASE.md",
+            "grep -c 'build-ios-on-rig.sh' apps/mobile/RELEASE.md",
+            "grep -c 'Store setup and release builds: PAN-4841' apps/mobile/README.md",
+            "grep -c 'PAN-4841 D-3' docs/CONNECT-SERVICE.md",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "1 or more",
+            "1 or more",
+            "0",
+            "1",
+            "lint exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-10",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-15. RELEASE.md 'Build and upload': both script commands with every flag, output locations (apps/mobile/release/, ~/release-ios/ on the rig), the build-number rule (D-1), the console-session rule and CP-1/CP-2 fixes, the keystore location and backup rule (D-2), and the icon regeneration command. README.md: a two-sentence 'Release' section linking RELEASE.md; in 'What it cannot do yet' replace 'Store setup and release builds: PAN-4841.' with 'App Store review (beyond TestFlight) needs in-app account deletion.'; in 'Keys and secrets' replace 'which PAN-4841 registers with the store setup' with 'registered in checklist step A1 of RELEASE.md'. docs/CONNECT-SERVICE.md 'Deploy': add the one exception sentence naming PAN-4841 D-3 (agents may run step 5's wrangler secret put with operator-delivered values; wrangler deploy and rollback stay operator-only); in step 5 replace 'values from W-REL1, PAN-4841' with the RELEASE.md source and the FCM_PROJECT_ID derivation, and add that apns:true means present-and-parses, not delivery-proven. Do not create configuration/phone-app.mdx (PAN-4842)."
+        },
+        "items": [
+          {
+            "id": "rel-docs.ac1",
+            "title": "Given apps/mobile/RELEASE.md, when a reader follows 'Build and upload', then it shows build-android.sh and build-ios-on-rig.sh with every flag, where outputs land, and the --build numbering rule.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rel-docs.ac2",
+            "title": "Given apps/mobile/README.md, when grep searches for 'Store setup and release builds: PAN-4841', then it returns 0 matches and a 'Release' section links RELEASE.md.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rel-docs.ac3",
+            "title": "Given docs/CONNECT-SERVICE.md 'Deploy', when read, then it states that agents may run only step 5's wrangler secret put (PAN-4841 D-3) and that wrangler deploy and rollback stay operator-only.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rel-docs.ac4",
+            "title": "Given the docs changes, when npm run lint runs, then it exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "rel-android-signing-config",
+        "to": "rel-android-build-script",
+        "type": "blocks"
+      },
+      {
+        "from": "rel-operator-checklist",
+        "to": "rel-google-services-json",
+        "type": "blocks"
+      },
+      {
+        "from": "rel-operator-checklist",
+        "to": "rel-directory-push-secrets",
+        "type": "blocks"
+      },
+      {
+        "from": "rel-google-services-json",
+        "to": "rel-directory-push-secrets",
+        "type": "blocks"
+      },
+      {
+        "from": "rel-upload-keystore",
+        "to": "rel-first-android-release",
+        "type": "blocks"
+      },
+      {
+        "from": "rel-android-build-script",
+        "to": "rel-first-android-release",
+        "type": "blocks"
+      },
+      {
+        "from": "rel-brand-assets",
+        "to": "rel-first-android-release",
+        "type": "blocks"
+      },
+      {
+        "from": "rel-google-services-json",
+        "to": "rel-first-android-release",
+        "type": "blocks"
+      },
+      {
+        "from": "rel-ios-privacy-manifest",
+        "to": "rel-first-testflight-build",
+        "type": "blocks"
+      },
+      {
+        "from": "rel-brand-assets",
+        "to": "rel-first-testflight-build",
+        "type": "blocks"
+      },
+      {
+        "from": "rel-ios-rig-script",
+        "to": "rel-first-testflight-build",
+        "type": "blocks"
+      },
+      {
+        "from": "rel-directory-push-secrets",
+        "to": "rel-device-push-check",
+        "type": "blocks"
+      },
+      {
+        "from": "rel-first-testflight-build",
+        "to": "rel-device-push-check",
+        "type": "blocks"
+      },
+      {
+        "from": "rel-device-push-check",
+        "to": "rel-device-live-activity-check",
+        "type": "blocks"
+      },
+      {
+        "from": "rel-operator-checklist",
+        "to": "rel-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "rel-android-build-script",
+        "to": "rel-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "rel-ios-rig-script",
+        "to": "rel-docs",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-04-PAN-4841-phone-app-store-firebase-apns-and-directory-setup-and-first-testflight-and-play-builds.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
