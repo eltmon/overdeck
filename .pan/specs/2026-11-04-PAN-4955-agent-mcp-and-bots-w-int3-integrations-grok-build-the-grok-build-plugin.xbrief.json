@@ -4,17 +4,17 @@
     "created": "2026-11-04T13:55:50Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4955: Agent MCP and bots (W-INT3): integrations/grok-build/: the Grok Build plugin",
-    "updated": "2026-11-04T14:03:35.611Z"
+    "updated": "2026-11-04T14:23:09.604Z"
   },
   "plan": {
     "id": "pan-4955",
     "title": "Agent MCP and bots (W-INT3): integrations/grok-build/: the Grok Build plugin",
-    "status": "proposed",
+    "status": "running",
     "uid": "62c6ef75-e40b-4453-a773-cfaaa950a30d",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-04T13:55:50Z",
-    "updated": "2026-11-04T14:03:35.611Z",
+    "updated": "2026-11-04T14:23:09.604Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4955",
@@ -516,5 +516,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
