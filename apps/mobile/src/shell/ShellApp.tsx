@@ -48,18 +48,35 @@ interface Services {
 const errorText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
 /**
- * The launch URL already handled in this WebView. Switching machines reloads the page (C-7), and
- * on Android `App.getLaunchUrl()` keeps answering the activity's original launch intent, and on iOS
- * it answers with the last URL that opened the app, even one delivered by `appUrlOpen` while it ran.
- * Without this a pair link would reopen the pair screen with a used code after each reload. Session
+ * The URLs already handled in this WebView, newest last. Switching machines reloads the page (C-7),
+ * and on Android `App.getLaunchUrl()` keeps answering the activity's original launch intent, and on
+ * iOS it answers with the last URL that opened the app, even one delivered by `appUrlOpen` while it
+ * ran. Without this a pair link would reopen the pair screen with a used code after each reload, and
+ * an Android cold-launch notification link would replay over a later warm tap's screen (PAN-4840):
+ * one slot cannot hold both the cold launch URL and a warm one, so every handled URL is kept. Session
  * storage survives a reload and is empty in a new app process.
  */
 const LAUNCH_URL_KEY = 'overdeck.launchUrlHandled';
+const HANDLED_URLS_MAX = 20;
 
+function readHandledUrls(): string[] {
+  const raw = sessionStorage.getItem(LAUNCH_URL_KEY);
+  if (raw === null) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed.filter((u): u is string => typeof u === 'string');
+  } catch {
+    // A value written by an older build: one URL.
+  }
+  return [raw];
+}
+
+/** True the first time `url` is seen in this app process; records it either way. */
 function takeLaunchUrl(url: string): boolean {
   try {
-    if (sessionStorage.getItem(LAUNCH_URL_KEY) === url) return false;
-    sessionStorage.setItem(LAUNCH_URL_KEY, url);
+    const handled = readHandledUrls();
+    if (handled.includes(url)) return false;
+    sessionStorage.setItem(LAUNCH_URL_KEY, JSON.stringify([...handled, url].slice(-HANDLED_URLS_MAX)));
   } catch {
     // Storage unavailable: handle the URL.
   }

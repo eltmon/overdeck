@@ -287,6 +287,32 @@ describe('ShellApp notification taps', () => {
     expect(navigate).toHaveBeenCalledTimes(1);
   });
 
+  it('does not replay the cold-launch link over a later warm tap after the reload', async () => {
+    const link = (subject: string, t: string) =>
+      `ai.overdeck.app:/open#v=1&e=${MACHINE.environmentId}&p=%2Fm%3Fsubject%3D${subject}&t=${t}`;
+    const navigate = vi.fn();
+    // Android keeps answering getLaunchUrl() with the cold-launch link for the whole process.
+    harness.launchUrl = link('a', '5');
+    const cold = render(<ShellApp navigate={navigate} />);
+    await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith('/m?subject=a'));
+    cold.unmount(); // The navigate reload.
+
+    harness.urlListeners.length = 0;
+    const afterCold = render(<ShellApp navigate={navigate} />);
+    await screen.findByText('Machines');
+    await tap(link('b', '6'));
+    expect(navigate).toHaveBeenLastCalledWith('/m?subject=b');
+    afterCold.unmount(); // The warm tap's reload.
+
+    render(<ShellApp navigate={navigate} />);
+    await screen.findByText('Machines');
+    // Let boot finish handling getLaunchUrl() before asserting nothing more navigated.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    expect(navigate.mock.calls).toEqual([['/m?subject=a'], ['/m?subject=b']]);
+  });
+
   it('does nothing while signed out', async () => {
     await removeAccount();
     const navigate = vi.fn();
