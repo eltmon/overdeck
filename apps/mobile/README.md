@@ -13,10 +13,10 @@ Design: [PAN-4837 PRD](../../.pan/drafts/PAN-4837.md) (this app) and the epic
 | Path | What lives there |
 | --- | --- |
 | `src/main.tsx` | Entry. Sets `__OVERDECK_NATIVE__`, installs the channel shims, then loads the shell (D-3). |
-| `src/shell/` | The app's own screens and logic: sign-in (`signIn.ts`), the directory and dial policy (`directory.ts`, `connection.ts`, `relayMeter.ts`), pairing (`pairing.ts`), the machine list, pair, settings, removed-machine and machine views, sign-out, and the foreground resume path (`lifecycle.ts`). |
-| `src/native/` | The `OverdeckKeys` plugin bridge (`keys.ts`), its `localStorage` stand-in for a desktop browser (`keys-web.ts`), push registration (`push.ts`), and the `OverdeckLiveActivity` bridge (`liveActivity.ts`, PAN-4839). |
-| `android/` | The Capacitor Android project. App code is in `app/src/main/java/ai/overdeck/app/` (`OverdeckKeysPlugin`, `SecureStore`, and the push path: `OverdeckMessagingService`, `PushHandler`, `PushNotice`, `PushNotifier`, `SealedBox`, `OverdeckPushPlugin`). |
-| `ios/` | The Capacitor iOS project (Swift Package Manager). App code is in `ios/App/App/` (`OverdeckKeysPlugin.swift`, `OverdeckLiveActivityPlugin.swift`, `MainViewController.swift`, `App.entitlements`). |
+| `src/shell/` | The app's own screens and logic: sign-in (`signIn.ts`), the directory and dial policy (`directory.ts`, `connection.ts`, `relayMeter.ts`), pairing (`pairing.ts`), the machine list, pair, settings, removed-machine and machine views, sign-out, the foreground resume path (`lifecycle.ts`), and the System/Light/Dark appearance setting and controller (`appearance.ts`, PAN-5041). |
+| `src/native/` | The `OverdeckKeys` plugin bridge (`keys.ts`), its `localStorage` stand-in for a desktop browser (`keys-web.ts`), push registration (`push.ts`), the `OverdeckLiveActivity` bridge (`liveActivity.ts`, PAN-4839), and the `OverdeckAppearance` bridge (`appearance.ts`, PAN-5041). |
+| `android/` | The Capacitor Android project. App code is in `app/src/main/java/ai/overdeck/app/` (`OverdeckKeysPlugin`, `SecureStore`, `OverdeckAppearancePlugin`, and the push path: `OverdeckMessagingService`, `PushHandler`, `PushNotice`, `PushNotifier`, `SealedBox`, `OverdeckPushPlugin`). |
+| `ios/` | The Capacitor iOS project (Swift Package Manager). App code is in `ios/App/App/` (`OverdeckKeysPlugin.swift`, `OverdeckLiveActivityPlugin.swift`, `OverdeckAppearancePlugin.swift`, `MainViewController.swift`, `App.entitlements`). |
 | `ios/OverdeckPush/` | A local Swift package used by the app and the extension: it opens the sealed push payload (swift-sodium), rewrites the notification content, and holds the Keychain code (`KeychainStore`, `PushKeys`). Tests: `swift test` on the rig. |
 | `ios/App/NotificationService/` | The Notification Service Extension (`ai.overdeck.app.NotificationService`). It decrypts each needs-you notification before iOS shows it. |
 | `ios/App/Shared/` | `OverdeckActivityAttributes.swift`: the Live Activity's two counts, compiled into both the app and the widget extension (PAN-4839). |
@@ -213,6 +213,18 @@ you"; a push after sign-out posts nothing. A tap opens `ai.overdeck.app:/open#v=
   sealed by `sodium-native`. `SealedBoxTest` opens it with `lazysodium-java`.
 - **JVM tests.** `cd apps/mobile/android && ./gradlew testDebugUnitTest` runs `SealedBoxTest` (plain
   JUnit) and `PushNoticeTest` and `PushHandlerTest` (Robolectric).
+
+## Appearance
+
+The System/Light/Dark setting (PAN-5041, Settings → Appearance) is held in `localStorage` as
+`overdeck.appearance` and owned by `src/shell/appearance.ts`, which resolves it against the OS
+preference and applies it to the dashboard theme, the status bar (`SystemBars`) and native chrome.
+An inline script in `index.html` applies the `.dark` class before first paint, ahead of any JS
+module load. The native plugin (`OverdeckAppearance`, `src/native/appearance.ts`) keeps its own
+copy — UserDefaults on iOS, SharedPreferences on Android — used only at launch (`storedStyle()`
+on iOS, `stored()` on Android) so a cold start never flashes the wrong native chrome before the
+WebView's own write runs. On the iOS Simulator, change the system appearance live with
+`xcrun simctl ui <udid> appearance light|dark` to exercise the System setting.
 
 ## Tests
 

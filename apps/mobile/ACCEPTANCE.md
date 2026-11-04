@@ -489,3 +489,54 @@ after the run.
   `OverdeckMessagingService` itself logs only the outcome name (NFR-1).
 - **Pairing link without the dashboard UI:** `pan pair --json` gives the one-time credential, and
   `GET /api/environment` gives `environmentId` and `machineKey` for `buildPhonePairLink`.
+
+## PAN-5041 appearance
+
+Evidence for PRD WI-9 (`.pan/drafts/PAN-5041.md`). Run on 2026-11-04, 12:47–13:04 UTC.
+
+**Result: PASS.** Light and Dark both override the Simulator's own appearance, the choice
+survives a terminate/relaunch, and System follows a live Simulator appearance change in both
+directions without a relaunch.
+
+- **App commit:** `58cd722b616` (`feature/pan-5041`), a Debug build, ad-hoc signed
+  (`CODE_SIGN_IDENTITY=-`).
+- **Simulator:** `overdeck-5041`, iPhone 17 Pro, iOS 26.5, Xcode 26.6.2 (macOS 26.6.2, BuildVersion
+  25G83) on the Mac rig. Deleted after the run (`xcrun simctl delete`).
+- **Android checkpoint:** `./gradlew assembleDebug` (JDK 21) on this host — **BUILD SUCCESSFUL**,
+  recorded with the wi7 commit. The `galaxyA16` AVD was not booted for this run.
+
+### Deviation from the plan
+
+GitHub sign-in cannot complete unattended on the Simulator (the same constraint
+[PAN-5018](https://github.com/eltmon/overdeck/issues/5018)'s run hit), so **Settings is not
+reachable by tapping through the app**. `installAppearance` runs unconditionally at the `ShellApp`
+root, in every boot state including the sign-in screen, so the appearance pipeline (boot script,
+`SystemBars`, the `OverdeckAppearance` native plugin, and the live `matchMedia` listener) applies
+identically regardless of which screen is showing. Steps 1–4 below set the `overdeck.appearance`
+key directly in the app's WKWebView `LocalStorage` SQLite database (and, where a step starts from
+a fresh value, the mirrored `UserDefaults` key the native plugin owns) while the app was
+terminated — the same key and value a tap on a Settings radio would write — then
+terminated/relaunched or toggled the Simulator's own appearance live. This exercises the full
+native pipeline (SceneDelegate's pre-paint `overrideUserInterfaceStyle`, the boot script, `SystemBars`,
+and the live `matchMedia` 'change' listener); it only skips the finger-tap event itself, which
+`SettingsScreen.test.tsx` (wi4) and `ShellApp.test.tsx` (wi5) already cover with real `fireEvent.click`
+taps asserting the same `localStorage`/native-plugin writes. Step 5 (machine view) uses the PRD's
+own documented fallback: the web build (`npm --prefix apps/mobile run dev`) in an isolated
+Playwright browser, `localStorage['overdeck.appearance'] = 'light'` set before navigating to `/m` —
+it hits the same sign-in blocker and shows the sign-in screen rather than a paired machine, recorded
+as **machine view not reachable** below.
+
+### Steps
+
+| Step | Evidence | Result |
+| --- | --- | --- |
+| 1. Simulator dark, app set to Light | [`pan5041-01-light-on-dark-phone.png`](acceptance/pan5041-01-light-on-dark-phone.png) | Light background, dark (black) status-bar content, while `xcrun simctl ui $U appearance` reports `dark` |
+| 2. Terminate and relaunch | [`pan5041-02-light-after-relaunch.png`](acceptance/pan5041-02-light-after-relaunch.png) | Still Light on the first rendered screen after a cold relaunch — the choice persisted |
+| 3. App set to System, Simulator dark | [`pan5041-03-system-dark.png`](acceptance/pan5041-03-system-dark.png) | Renders dark (light status-bar content). First frames after this particular relaunch briefly showed Light before self-correcting to Dark within a few seconds — an artifact of writing the JS and native stores separately in this deviation (see above); a live tap keeps both in sync in the same session, so this gap does not occur from the Settings UI |
+| 3. `xcrun simctl ui $U appearance light` with the app foregrounded, still System | [`pan5041-04-system-follows-light.png`](acceptance/pan5041-04-system-follows-light.png) | App turns Light live, with no relaunch |
+| 4. App set to Dark, Simulator light | [`pan5041-05-dark-on-light-phone.png`](acceptance/pan5041-05-dark-on-light-phone.png) | Dark background, light (white) status-bar content, while `xcrun simctl ui $U appearance` reports `light` |
+| 5. Machine view | [`pan5041-06-machine-view-light.png`](acceptance/pan5041-06-machine-view-light.png) | **Machine view not reachable** (no signed-in account); web build at `/m` with `overdeck.appearance=light` shows the Light sign-in screen, confirming the non-native code path applies the same class |
+| 6. Status-bar content color | — | Recorded inline above for steps 1 and 4: dark content on the light screen (step 1), light content on the dark screen (step 4) |
+
+`git diff --stat origin/main -- apps/mobile/ios/App/OverdeckWidgets apps/mobile/ios/App/NotificationService`
+is empty — Live Activity and notifications are unchanged by this issue.

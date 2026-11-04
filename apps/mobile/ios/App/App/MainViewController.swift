@@ -7,5 +7,6 @@ final class MainViewController: CAPBridgeViewController {
         super.capacitorDidLoad()
         bridge?.registerPluginInstance(OverdeckKeysPlugin())
         bridge?.registerPluginInstance(OverdeckLiveActivityPlugin())
+        bridge?.registerPluginInstance(OverdeckAppearancePlugin())
     }
 }

@@ -1,0 +1,773 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T17:20:02Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5041: Phone app: light mode (System / Light / Dark appearance setting)",
+    "updated": "2026-11-04T17:22:37.902Z"
+  },
+  "plan": {
+    "id": "pan-5041",
+    "title": "Phone app: light mode (System / Light / Dark appearance setting)",
+    "status": "running",
+    "uid": "36efb246-2fd2-49f5-9617-5960fd580c03",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-04T17:20:02Z",
+    "updated": "2026-11-04T17:22:37.902Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5041",
+        "label": "PAN-5041",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5041.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "mobile",
+      "phone-app",
+      "theme",
+      "ios",
+      "android",
+      "capacitor"
+    ],
+    "metadata": {
+      "sizeJustification": "About 21 files across the phone shell, one frontend hook, iOS and Android native code, docs and acceptance evidence. The native, web and docs parts are one user-visible setting and cannot ship separately without leaving a half-working Appearance control.",
+      "canonicalFilename": "2026-11-04-PAN-5041-phone-app-light-mode-system-light-dark-appearance-setting.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The Overdeck phone app (apps/mobile) is dark only. The frontend's useTheme store defaults to dark because the phone never stores 'overdeck.ui.theme', the phone skips the frontend's boot theme reconcile because it reads admin routes the phone token cannot call (PAN-4835 H-4), and the native chrome (WebView background, status bar) follows only the phone's system appearance. The operator wants light mode.",
+      "Proposal": "A phone-only three-way appearance (System default, Light, Dark) stored in localStorage 'overdeck.appearance'. An inline index.html head script applies the dark class and pre-seeds the frontend's 'overdeck.ui.theme' before first paint. useTheme gains setTheme and skips its server sync in the native shell. apps/mobile/src/shell/appearance.ts holds the store and a controller that applies the resolved theme through useTheme.setTheme, sets Capacitor's built-in SystemBars style, mirrors the appearance to a new OverdeckAppearance native plugin, and follows matchMedia changes for System. Settings gets an Appearance radio group. The native plugin persists the choice (UserDefaults / SharedPreferences) and applies it at launch: iOS window overrideUserInterfaceStyle in SceneDelegate, Android AppCompatDelegate night mode before super.onCreate plus the WebView background color.",
+      "NonGoals": "- No change to the desktop dashboard's or browser /m page's theme behavior, storage key, default or server sync\n- No System option in the desktop dashboard\n- No Ledger/Broadsheet design-language choice or custom color-theme selection in the phone app\n- No change to the iOS LaunchScreen.storyboard or the Android splash image\n- No change to the Live Activity widget extension or the Notification Service extension\n- The appearance never syncs to machines or between phones, and no machine or admin route is called\n- No new npm dependency (no @capacitor/status-bar)\n- Sign-out does not preserve the appearance; it resets to System"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Store the appearance in phone localStorage 'overdeck.appearance' as the source of truth, with a native mirror used only at launch",
+        "rationale": "The issue requires phone-only storage; localStorage is the only store readable synchronously before first paint, and the native copy self-heals on every page load."
+      },
+      {
+        "summary": "Drive the frontend through a new useTheme.setTheme action plus pre-seeding 'overdeck.ui.theme', and skip the theme server sync when isNativeShell() is true",
+        "rationale": "Smallest change that keeps the desktop identical, keeps ChatMarkdown/useColorTheme following resolvedTheme, and blocks the admin-route PUT /api/settings/ui-theme from the phone."
+      },
+      {
+        "summary": "Use Capacitor 8's built-in SystemBars with explicit Light/Dark styles for the status bar",
+        "rationale": "No new dependency; SystemBarsStyle.Default reads the OS night mode and would ignore a Light/Dark choice."
+      },
+      {
+        "summary": "Sign-out resets the appearance to System",
+        "rationale": "Sign-out already calls localStorage.clear(); changing signOut.ts adds scope the issue does not ask for, and the native copy self-heals after the reload."
+      },
+      {
+        "summary": "Leave the iOS launch storyboard OS-drawn",
+        "rationale": "Only the static UIUserInterfaceStyle plist key could force it, which would break System; the no-flash requirement applies from the app's first window."
+      },
+      {
+        "summary": "Android WebView background uses the exact page token colors #ffffff and #080b10",
+        "rationale": "The phone's import graph never loads useDesignLanguage, so no data-theme attribute is set and the :root/.dark Ledger tokens apply."
+      }
+    ],
+    "items": [
+      {
+        "id": "wi1-usetheme-settheme",
+        "title": "Add useTheme.setTheme and skip the theme server sync in the native shell",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T17:20:02Z",
+        "metadata": {
+          "issueLabel": "pan-5041",
+          "inspectionDepth": "fast",
+          "difficulty": "simple",
+          "kind": "frontend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "wi2-appearance-store",
+            "wi5-shellapp-wiring"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/hooks/useTheme.ts",
+            "src/dashboard/frontend/src/hooks/__tests__/useTheme.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/hooks/__tests__/useTheme.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "useTheme.test.ts passes including the new setTheme and native-shell tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-8",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In src/dashboard/frontend/src/hooks/useTheme.ts: import isNativeShell from '../lib/nativeShell'; make syncThemeToServer return early when isNativeShell() is true (covers the module-load sync and every action); add a setTheme(theme: 'light'|'dark') action that calls applyTheme(theme, true), stores the theme under 'overdeck.ui.theme', calls syncThemeToServer(theme), and sets { theme, resolvedTheme: theme }. Keep Theme = 'light'|'dark' and toggleTheme unchanged. Add the three tests listed in PRD WI-1 to src/dashboard/frontend/src/hooks/__tests__/useTheme.test.ts using its existing module-reset pattern; the tests must not read source files."
+        },
+        "items": [
+          {
+            "id": "wi1-usetheme-settheme.ac1",
+            "title": "Given an empty store, when setTheme('light') is called, then <html> no longer has the dark class, localStorage 'overdeck.ui.theme' returns 'light', and resolvedTheme is 'light'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-usetheme-settheme.ac2",
+            "title": "Given globalThis.__OVERDECK_NATIVE__ = true and a mocked fetch, when the module loads with a stored theme and setTheme('dark') is called, then fetch is never called with '/api/settings/ui-theme'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-usetheme-settheme.ac3",
+            "title": "Given no native flag and a mocked fetch, when setTheme('dark') is called, then fetch is called once with '/api/settings/ui-theme' and method PUT (desktop behavior preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi2-appearance-store",
+        "title": "Create the phone appearance store, resolver and controller",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T17:20:02Z",
+        "metadata": {
+          "issueLabel": "pan-5041",
+          "inspectionDepth": "fast",
+          "difficulty": "medium",
+          "kind": "frontend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "wi3-boot-script",
+            "wi4-settings-row",
+            "wi5-shellapp-wiring"
+          ],
+          "files_scope": [
+            "apps/mobile/src/shell/appearance.ts",
+            "apps/mobile/src/native/appearance.ts",
+            "apps/mobile/src/shell/__tests__/appearance.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix apps/mobile test -- src/shell/__tests__/appearance.test.ts",
+            "npm --prefix apps/mobile run typecheck"
+          ],
+          "expected_outputs": [
+            "appearance.test.ts passes",
+            "mobile typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Create apps/mobile/src/native/appearance.ts (OverdeckAppearance registerPlugin bridge with a no-op WebPlugin stand-in; method set({ appearance })) and apps/mobile/src/shell/appearance.ts exporting Appearance, ResolvedTheme, APPEARANCE_KEY = 'overdeck.appearance', APPEARANCES, readAppearance, writeAppearance, onAppearanceChange, useAppearance, resolveAppearance, AppearanceDeps, installAppearance and defaultAppearanceDeps exactly as specified in the PRD. installAppearance applies immediately (setTheme + setStatusBar from the resolved theme, setNative with the stored appearance), re-applies on every write, and on a matchMedia change re-runs only setTheme + setStatusBar. defaultAppearanceDeps uses useTheme.getState().setTheme, SystemBars.setStyle with SystemBarsStyle.Dark/Light (never Default), OverdeckAppearance.set with errors caught and console.warn'd, and window.matchMedia('(prefers-color-scheme: dark)'). Storage access is wrapped in try/catch like notificationPrefs.ts. Write apps/mobile/src/shell/__tests__/appearance.test.ts with the cases listed in the PRD."
+        },
+        "items": [
+          {
+            "id": "wi2-appearance-store.ac1",
+            "title": "Given localStorage 'overdeck.appearance' is missing or holds an invalid value, when readAppearance() runs, then it returns 'system'; and when localStorage throws, it returns 'system' without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-appearance-store.ac2",
+            "title": "Given writeAppearance('light'), then localStorage 'overdeck.appearance' persists 'light' and a listener registered with onAppearanceChange is called once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-appearance-store.ac3",
+            "title": "Given stored 'light' and fake deps, when installAppearance(deps) runs, then setTheme('light'), setStatusBar('light') and setNative('light') are each called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-appearance-store.ac4",
+            "title": "Given stored 'system' and a fake media with matches false, when the media emits change with matches true, then setTheme('dark') is called; and given stored 'light', a media change does not call setTheme with 'dark'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-appearance-store.ac5",
+            "title": "Given the uninstaller returned by installAppearance is called, then the media change listener is removed and later writes do not call setTheme",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi3-boot-script",
+        "title": "Apply the appearance before first paint with an inline script in apps/mobile/index.html",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T17:20:02Z",
+        "metadata": {
+          "issueLabel": "pan-5041",
+          "inspectionDepth": "fast",
+          "difficulty": "simple",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "apps/mobile/index.html",
+            "apps/mobile/src/__tests__/appearance-boot.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix apps/mobile test -- src/__tests__/appearance-boot.test.ts",
+            "npm --prefix apps/mobile run build && grep -c overdeck.appearance apps/mobile/dist/index.html"
+          ],
+          "expected_outputs": [
+            "appearance-boot.test.ts passes",
+            "grep prints 1 or more: the built index.html contains the boot script"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Add the classic inline <script> from the PRD to apps/mobile/index.html <head>: it reads localStorage 'overdeck.appearance' (default 'system', try/catch), resolves with matchMedia('(prefers-color-scheme: dark)'), toggles the dark class on document.documentElement, and writes the resolved theme to localStorage 'overdeck.ui.theme'. Create apps/mobile/src/__tests__/appearance-boot.test.ts that reads index.html (as native-config.test.ts reads files), extracts the inline non-module script body, runs it with new Function(body)() in happy-dom with localStorage[APPEARANCE_KEY] set (import APPEARANCE_KEY from ../shell/appearance) and a stubbed window.matchMedia, and asserts the four cases in the PRD. Run npm --prefix apps/mobile run build and confirm dist/index.html keeps the script."
+        },
+        "items": [
+          {
+            "id": "wi3-boot-script.ac1",
+            "title": "Given localStorage APPEARANCE_KEY = 'light' and matchMedia dark, when the index.html boot script runs, then <html> has no dark class and 'overdeck.ui.theme' is 'light'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-boot-script.ac2",
+            "title": "Given APPEARANCE_KEY = 'dark' and matchMedia light, when the script runs, then <html> has the dark class and 'overdeck.ui.theme' is 'dark'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-boot-script.ac3",
+            "title": "Given APPEARANCE_KEY missing and matchMedia dark, when the script runs, then <html> has the dark class (System default follows the phone)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-boot-script.ac4",
+            "title": "Given npm --prefix apps/mobile run build, then apps/mobile/dist/index.html contains the 'overdeck.appearance' boot script",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi4-settings-row",
+        "title": "Add the Appearance section to the phone Settings screen",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T17:20:02Z",
+        "metadata": {
+          "issueLabel": "pan-5041",
+          "inspectionDepth": "fast",
+          "difficulty": "simple",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "apps/mobile/src/shell/SettingsScreen.tsx",
+            "apps/mobile/src/shell/__tests__/SettingsScreen.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix apps/mobile test -- src/shell/__tests__/SettingsScreen.test.tsx",
+            "npm --prefix apps/mobile run typecheck"
+          ],
+          "expected_outputs": [
+            "SettingsScreen.test.tsx passes",
+            "mobile typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In apps/mobile/src/shell/SettingsScreen.tsx add props appearance: Appearance and onAppearanceChange(appearance: Appearance): void, and render the AppearanceSection from the PRD (role=radiogroup labeled 'Appearance', three role=radio buttons System/Light/Dark from APPEARANCES, aria-checked on the current one, trailing check mark, min-h-11 rows with border-b border-border, helper text) directly under the account block and before Notifications. Update every SettingsScreen render in apps/mobile/src/shell/__tests__/SettingsScreen.test.tsx to pass the new props and add the tests listed in the PRD."
+        },
+        "items": [
+          {
+            "id": "wi4-settings-row.ac1",
+            "title": "Given appearance='system', when SettingsScreen renders, then a radiogroup named 'Appearance' renders three radios System, Light and Dark and only System has aria-checked='true'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-settings-row.ac2",
+            "title": "Given the Settings screen, when the operator taps Light, then onAppearanceChange is called once with 'light'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-settings-row.ac3",
+            "title": "Given appearance='dark', when SettingsScreen renders, then only the Dark radio has aria-checked='true'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi5-shellapp-wiring",
+        "title": "Install the appearance controller in ShellApp and connect the Settings row",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T17:20:02Z",
+        "metadata": {
+          "issueLabel": "pan-5041",
+          "inspectionDepth": "fast",
+          "difficulty": "simple",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "apps/mobile/src/shell/ShellApp.tsx",
+            "apps/mobile/src/shell/__tests__/ShellApp.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix apps/mobile test -- src/shell/__tests__/ShellApp.test.tsx",
+            "npm --prefix apps/mobile run typecheck"
+          ],
+          "expected_outputs": [
+            "ShellApp.test.tsx passes",
+            "mobile typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. In apps/mobile/src/shell/ShellApp.tsx add useEffect(() => installAppearance(defaultAppearanceDeps()), []) near the top of the component so it runs in every boot state, read const appearance = useAppearance(), and pass appearance and onAppearanceChange={writeAppearance} to SettingsScreen. In apps/mobile/src/shell/__tests__/ShellApp.test.tsx mock '../../native/appearance' with a spy set() and add the tests listed in the PRD, spying on globalThis.fetch to prove no '/api/settings/ui-theme' request."
+        },
+        "items": [
+          {
+            "id": "wi5-shellapp-wiring.ac1",
+            "title": "Given a fresh boot with no stored appearance, when ShellApp mounts, then OverdeckAppearance.set is called with { appearance: 'system' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-shellapp-wiring.ac2",
+            "title": "Given the Settings screen is open, when the operator taps Light, then <html> no longer has the dark class, localStorage 'overdeck.appearance' persists 'light', and OverdeckAppearance.set is called with { appearance: 'light' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-shellapp-wiring.ac3",
+            "title": "Given the same flow, then globalThis.fetch is never called with a URL containing '/api/settings/ui-theme'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi6-ios-plugin",
+        "title": "Add the iOS OverdeckAppearance plugin and apply the stored appearance at scene launch",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T17:20:02Z",
+        "metadata": {
+          "issueLabel": "pan-5041",
+          "inspectionDepth": "fast",
+          "difficulty": "medium",
+          "kind": "infra",
+          "requiresInspection": false,
+          "files_scope": [
+            "apps/mobile/ios/App/App/OverdeckAppearancePlugin.swift",
+            "apps/mobile/ios/App/App/SceneDelegate.swift",
+            "apps/mobile/ios/App/App/MainViewController.swift",
+            "apps/mobile/ios/App/App.xcodeproj/project.pbxproj",
+            "apps/mobile/src/__tests__/native-config.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix apps/mobile test -- src/__tests__/native-config.test.ts"
+          ],
+          "expected_outputs": [
+            "native-config.test.ts passes with the new iOS checks"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Create apps/mobile/ios/App/App/OverdeckAppearancePlugin.swift as written in the PRD (CAPBridgedPlugin, jsName 'OverdeckAppearance', method set; UserDefaults key 'overdeck.appearance'; style(for:) maps light/dark/other to .light/.dark/.unspecified; set applies overrideUserInterfaceStyle on the bridge view controller's window on the main queue and calls setNeedsStatusBarAppearanceUpdate). In SceneDelegate.swift set window?.overrideUserInterfaceStyle = OverdeckAppearancePlugin.storedStyle() right after the UIWindow is created. In MainViewController.capacitorDidLoad register OverdeckAppearancePlugin(). Add the four project.pbxproj entries mirroring OverdeckLiveActivityPlugin.swift (PBXBuildFile in Sources, PBXFileReference, App group child, App target Sources phase) with new unique 24-hex ids; do not touch the widget or NotificationService targets. Add the string checks from the PRD to apps/mobile/src/__tests__/native-config.test.ts. Compile proof is the rig build in wi9."
+        },
+        "items": [
+          {
+            "id": "wi6-ios-plugin.ac1",
+            "title": "Given the iOS project, then project.pbxproj contains 'OverdeckAppearancePlugin.swift in Sources' in the App target and no new entry in the OverdeckWidgets or NotificationService targets",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-ios-plugin.ac2",
+            "title": "Given MainViewController.swift, then capacitorDidLoad registers OverdeckAppearancePlugin() alongside the existing plugins",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-ios-plugin.ac3",
+            "title": "Given SceneDelegate.swift, then the new UIWindow's overrideUserInterfaceStyle is set from OverdeckAppearancePlugin.storedStyle() before makeKeyAndVisible",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-ios-plugin.ac4",
+            "title": "Given the rig build in wi9, then xcodebuild for the iphonesimulator SDK exits 0 with the new Swift file compiled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi7-android-plugin",
+        "title": "Add the Android OverdeckAppearance plugin and apply the stored night mode before the bridge starts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T17:20:02Z",
+        "metadata": {
+          "issueLabel": "pan-5041",
+          "inspectionDepth": "fast",
+          "difficulty": "medium",
+          "kind": "infra",
+          "requiresInspection": false,
+          "files_scope": [
+            "apps/mobile/android/app/src/main/java/ai/overdeck/app/OverdeckAppearancePlugin.java",
+            "apps/mobile/android/app/src/main/java/ai/overdeck/app/MainActivity.java",
+            "apps/mobile/src/__tests__/native-config.test.ts",
+            "apps/mobile/src/shell/appearance.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm --prefix apps/mobile test -- src/__tests__/native-config.test.ts",
+            "cd apps/mobile/android && JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew assembleDebug"
+          ],
+          "expected_outputs": [
+            "native-config.test.ts passes with the new Android checks",
+            "gradle prints BUILD SUCCESSFUL (or the CI mobile-android job is green)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Create apps/mobile/android/app/src/main/java/ai/overdeck/app/OverdeckAppearancePlugin.java as written in the PRD (SharedPreferences file 'overdeck_appearance' key 'appearance'; nightMode maps light/dark/other to MODE_NIGHT_NO/YES/FOLLOW_SYSTEM; applyBackground sets the WebView background to 0xFFFFFFFF or 0xFF080B10 from the current uiMode; set persists, then on the UI thread calls AppCompatDelegate.setDefaultNightMode and applyBackground). In MainActivity.java register the plugin, call AppCompatDelegate.setDefaultNightMode(nightMode(stored(this))) before super.onCreate, call applyBackground after super.onCreate, and override onConfigurationChanged to re-apply the background. Keep 'uiMode' in the manifest's MainActivity configChanges. Add the PRD's string checks to native-config.test.ts. Run the PRD's Android live-System checkpoint on the emulator when available; if the page does not flip on 'adb shell cmd uimode night yes', implement the documented fallback (triggerWindowJSEvent('overdecksystemappearance') in onConfigurationChanged plus a window listener in defaultAppearanceDeps) and record the outcome for wi9."
+        },
+        "items": [
+          {
+            "id": "wi7-android-plugin.ac1",
+            "title": "Given MainActivity.java, then it registers OverdeckAppearancePlugin.class and calls AppCompatDelegate.setDefaultNightMode( before super.onCreate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-android-plugin.ac2",
+            "title": "Given AndroidManifest.xml, then the .MainActivity android:configChanges still contains uiMode, so a night-mode change does not recreate the activity",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-android-plugin.ac3",
+            "title": "Given ./gradlew assembleDebug with JDK 21 (or the CI mobile-android job), then the build exits 0 with BUILD SUCCESSFUL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-android-plugin.ac4",
+            "title": "Given the emulator with System chosen, when 'adb shell cmd uimode night yes' runs, then the page turns dark without an app restart (via prefers-color-scheme or the documented fallback event)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi8-docs",
+        "title": "Document the Appearance setting in the phone page, the app README and the codebase map",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-11-04T17:20:02Z",
+        "metadata": {
+          "issueLabel": "pan-5041",
+          "inspectionDepth": "fast",
+          "difficulty": "simple",
+          "kind": "docs",
+          "requiresInspection": false,
+          "files_scope": [
+            "configuration/phone.mdx",
+            "apps/mobile/README.md",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '^## Appearance' configuration/phone.mdx",
+            "grep -n 'OverdeckAppearance' apps/mobile/README.md",
+            "grep -n 'overdeck.appearance' apps/mobile/README.md"
+          ],
+          "expected_outputs": [
+            "phone.mdx prints a '## Appearance' heading line",
+            "README prints at least one OverdeckAppearance line and one overdeck.appearance line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. configuration/phone.mdx: add a '## Appearance' section after '## Notifications' with the PRD's text (Settings → Appearance; System, Light, Dark; System follows the phone live; stored on the phone only and kept across restarts and machine switches; sign-out resets to System; Live Activity and notifications follow the phone). apps/mobile/README.md: update the Layout table rows for src/shell/, src/native/, android/ and ios/ to name appearance.ts and OverdeckAppearancePlugin, and add an 'Appearance' paragraph naming the overdeck.appearance key, the index.html boot script, the native copy (UserDefaults / SharedPreferences) used only at launch, SystemBars for the status bar, and 'xcrun simctl ui <udid> appearance light|dark'. .overdeck/context/codebase/architecture.md: add the OverdeckAppearance plugin and src/shell/appearance.ts to the apps/mobile/ row without changing its last-verified line."
+        },
+        "items": [
+          {
+            "id": "wi8-docs.ac1",
+            "title": "Given configuration/phone.mdx, then it renders an '## Appearance' section that names System, Light and Dark and states the choice is stored on the phone only and resets to System on sign-out",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-docs.ac2",
+            "title": "Given apps/mobile/README.md, then it names the OverdeckAppearance plugin, the overdeck.appearance key and the 'xcrun simctl ui <udid> appearance' command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-docs.ac3",
+            "title": "Given .overdeck/context/codebase/architecture.md, then its apps/mobile/ row mentions OverdeckAppearance and its last-verified line is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi9-simulator-acceptance",
+        "title": "Verify both appearances on the Mac rig's iOS Simulator and record screenshots in ACCEPTANCE.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T17:20:02Z",
+        "metadata": {
+          "issueLabel": "pan-5041",
+          "inspectionDepth": "fast",
+          "difficulty": "medium",
+          "kind": "test",
+          "requiresInspection": false,
+          "files_scope": [
+            "apps/mobile/ACCEPTANCE.md",
+            "apps/mobile/acceptance/pan5041-*.png"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '## PAN-5041 appearance' apps/mobile/ACCEPTANCE.md",
+            "ls apps/mobile/acceptance/pan5041-*.png | wc -l",
+            "git diff --stat origin/main -- apps/mobile/ios/App/OverdeckWidgets apps/mobile/ios/App/NotificationService"
+          ],
+          "expected_outputs": [
+            "ACCEPTANCE.md prints the section heading",
+            "at least 5 pan5041 screenshots exist",
+            "the widget and NotificationService diff stat is empty"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. Build and sync the app (npm --prefix apps/mobile run build; npm --prefix apps/mobile run cap:sync -- ios), copy to the rig per apps/mobile/README.md, create your own Simulator (never 'booted'), build with CODE_SIGN_IDENTITY=- (never CODE_SIGNING_ALLOWED=NO), and run steps 1-6 of PRD WI-9, saving screenshots with 'xcrun simctl io $U screenshot' as apps/mobile/acceptance/pan5041-*.png. Toggle the Simulator appearance with 'xcrun simctl ui $U appearance light|dark'. For the machine screens use a paired machine if reachable, otherwise the web build in an isolated Playwright browser with localStorage 'overdeck.appearance' = 'light' at /m. Add a '## PAN-5041 appearance' section to apps/mobile/ACCEPTANCE.md with a step table (step, evidence, result), the commit, the Simulator model, and the Android checkpoint outcome from wi7. Delete the Simulator afterwards. If the rig is unreachable, stop and tell the flywheel orchestrator with pan tell instead of marking this done."
+        },
+        "items": [
+          {
+            "id": "wi9-simulator-acceptance.ac1",
+            "title": "Given the Simulator in dark appearance and the app set to Light, when the app is terminated and relaunched, then the first app screen renders light and Settings still marks Light (screenshot pan5041-02)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-simulator-acceptance.ac2",
+            "title": "Given the app set to System, when 'xcrun simctl ui $U appearance light' runs with the app in the foreground, then the app turns light without a relaunch (screenshots pan5041-03 and pan5041-04)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-simulator-acceptance.ac3",
+            "title": "Given the app set to Dark with the Simulator light, then the app renders dark with light status-bar content (screenshot pan5041-05)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-simulator-acceptance.ac4",
+            "title": "Given apps/mobile/ACCEPTANCE.md, then a '## PAN-5041 appearance' section links at least five acceptance/pan5041-*.png screenshots and records the machine-view evidence and the Android checkpoint outcome",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-simulator-acceptance.ac5",
+            "title": "Given git diff --stat origin/main for apps/mobile/ios/App/OverdeckWidgets and apps/mobile/ios/App/NotificationService, then it produces no output (Live Activity and notifications unchanged)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wi1-usetheme-settheme",
+        "to": "wi2-appearance-store",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-appearance-store",
+        "to": "wi3-boot-script",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-appearance-store",
+        "to": "wi4-settings-row",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-appearance-store",
+        "to": "wi5-shellapp-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-settings-row",
+        "to": "wi5-shellapp-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "wi6-ios-plugin",
+        "to": "wi7-android-plugin",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-appearance-store",
+        "to": "wi7-android-plugin",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-boot-script",
+        "to": "wi9-simulator-acceptance",
+        "type": "blocks"
+      },
+      {
+        "from": "wi5-shellapp-wiring",
+        "to": "wi9-simulator-acceptance",
+        "type": "blocks"
+      },
+      {
+        "from": "wi6-ios-plugin",
+        "to": "wi9-simulator-acceptance",
+        "type": "blocks"
+      },
+      {
+        "from": "wi7-android-plugin",
+        "to": "wi9-simulator-acceptance",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}
