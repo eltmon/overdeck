@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5042",
   "created": "2026-11-04T17:47:47.339Z",
-  "updated": "2026-11-04T19:00:25.553Z",
+  "updated": "2026-11-04T19:00:41.445Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -92,6 +92,10 @@
     "split-open-closed.ac4": {
       "status": "completed",
       "doneAt": "2026-11-04T19:00:25.552Z"
+    },
+    "split-open-closed.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:00:41.445Z"
     }
   }
 }
