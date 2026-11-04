@@ -60,8 +60,9 @@ export function hermesConfig({ reach, url }: { reach: 'connector' | 'tailscale';
     '  entries:',
     '    overdeck:',
     '      mcp_allowlist: ["overdeck"]',
-    '      summary: true',
-    '      allow_answers: false',
+    '      settings:',
+    '        summary: true',
+    '        allow_answers: false',
   ].join('\n');
 }
 
