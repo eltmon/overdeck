@@ -1,6 +1,6 @@
 /** The phone app's root: identity, the account, URL opens, and which shell screen shows (PAN-4837). */
 import { App } from '@capacitor/app';
-import { PHONE_PAIR_LINK_PREFIX, parsePhonePairLink } from '@overdeck/contracts';
+import { PHONE_PAIR_LINK_PREFIX, parsePhonePairLink, type PhoneNotificationCategory } from '@overdeck/contracts';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 import { type DeviceIdentity, loadIdentity } from '../native/keys';
@@ -13,7 +13,7 @@ import { installResumeHandler } from './lifecycle';
 import { createLiveActivityController, type LiveActivityController, liveActivityEnabled, setLiveActivityEnabled } from './liveActivity';
 import { MachinesScreen } from './MachinesScreen';
 import { MachineView } from './MachineView';
-import { markSynced, readNotificationPrefs } from './notificationPrefs';
+import { markSynced, pauseFor, readNotificationPrefs, useNotificationPrefs, writeNotificationPrefs, type PauseChoice } from './notificationPrefs';
 import { createPrefsSync, type PrefsSync, putPrefsOver } from './notificationPrefsSync';
 import { installNotificationTap } from './notificationTap';
 import { PairScreen } from './PairScreen';
@@ -253,6 +253,35 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
   const push = services?.push ?? null;
   const pushState = usePushState(push);
 
+  const { revision, prefs } = useNotificationPrefs();
+  const [unsyncedMachines, setUnsyncedMachines] = useState<ReadonlyArray<{ label: string; status: 'pending' | 'outdated' | 'failed' }>>([]);
+  useEffect(() => {
+    const prefsSync = services?.prefsSync;
+    if (!prefsSync) {
+      setUnsyncedMachines([]);
+      return;
+    }
+    const recompute = () => {
+      setUnsyncedMachines(
+        paired.flatMap((m) => {
+          const status = prefsSync.status(m.environmentId);
+          return status === 'synced' ? [] : [{ label: m.label, status }];
+        }),
+      );
+    };
+    recompute();
+    return prefsSync.onChange(recompute);
+    // `revision` is read indirectly through `prefsSync.status`; re-running on every prefs change
+    // catches the case where syncNow() finds no online machine to send to and so never notifies.
+  }, [services, paired, revision]);
+  const onPause = useCallback((choice: PauseChoice) => writeNotificationPrefs({ ...prefs, pause: pauseFor(choice, new Date()) }), [prefs]);
+  const onResume = useCallback(() => writeNotificationPrefs({ ...prefs, pause: null }), [prefs]);
+  const onToggleCategory = useCallback(
+    (category: PhoneNotificationCategory, on: boolean) =>
+      writeNotificationPrefs({ ...prefs, muted: on ? prefs.muted.filter((c) => c !== category) : [...prefs.muted, category] }),
+    [prefs],
+  );
+
   const leaveMachine = useCallback((next: View) => {
     setCurrentMachineId(null);
     history.replaceState(null, '', '/');
@@ -368,7 +397,15 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
           onBack={() => setView({ kind: 'machines' })}
           notifications={
             push && pushState
-              ? { ...pushState, onChange: (on) => (on ? void push.enable() : push.disable()) }
+              ? {
+                ...pushState,
+                onChange: (on) => (on ? void push.enable() : push.disable()),
+                prefs,
+                onPause,
+                onResume,
+                onToggleCategory,
+                unsynced: unsyncedMachines,
+              }
               : undefined
           }
         />
