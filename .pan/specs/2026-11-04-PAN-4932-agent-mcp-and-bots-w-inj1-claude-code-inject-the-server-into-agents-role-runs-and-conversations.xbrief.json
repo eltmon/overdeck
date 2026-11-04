@@ -1,0 +1,991 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T00:59:42Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4932: Agent MCP and bots (W-INJ1): Claude Code: inject the server into agents, role runs and conversations",
+    "updated": "2026-11-04T01:05:22.730Z"
+  },
+  "plan": {
+    "id": "pan-4932",
+    "title": "Agent MCP and bots (W-INJ1): Claude Code: inject the server into agents, role runs and conversations",
+    "status": "proposed",
+    "uid": "7d2a064e-a27e-4830-8a6f-9440c49d2e6b",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-04T00:59:42Z",
+    "updated": "2026-11-04T01:05:22.730Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4932",
+        "label": "PAN-4932",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4927",
+        "label": "PAN-4927 (epic)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "mcp",
+      "agents",
+      "launcher",
+      "claude-code",
+      "access-tokens",
+      "pan-4927"
+    ],
+    "metadata": {
+      "sizeJustification": "W-INJ1 is already one child of the PAN-4927 epic. Its surface is one helper (agent-injection.ts) spread with one line into each of the seven Claude Code launch sites (buildAgentLaunchConfig, spawnRun, recoverAgent, messageAgent fallback, fresh planning, planning continuation, conversations), each with its own test file, plus the config switch, the harness capability and two doc pages. Splitting the sites into sibling issues would leave some agent kinds without the tools between merges and would not shrink any single diff: every site item is 1-4 lines. Each two-segment doc path (configuration/mcp.mdx, configuration/harnesses.mdx, .pan/drafts) counts as its own subsystem in the lint; the code spans src/lib, src/dashboard, packages/contracts and tests/unit. 34 files in total: 14 test files, 3 doc files and 17 production files; no existing production file grows by more than 8 lines, and the new code lives in three new modules (agent-injection.ts, overdeck-mcp-args.ts, mcp-config.ts).",
+      "canonicalFilename": "2026-11-04-PAN-4932-agent-mcp-and-bots-w-inj1-claude-code-inject-the-server-into-agents-role-runs-and-conversations.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Overdeck's managed Claude Code agents never get the Overdeck MCP server; they reach Overdeck through pan with the machine's admin token. W-TOK1 (PAN-4930) built per-agent tokens and W-MCP1 (PAN-4931) made pan mcp serve read a 0600 token file, but no launch site mints a token or passes the server to Claude Code.",
+      "Proposal": "Add a config switch (mcp.agents, default true), a harness capability overdeckMcp (Claude Code only for now), a leaf module with the equals-form launch flags (--mcp-config=<file> and, when no allow-list exists, --allowedTools=mcp__overdeck), and src/lib/mcp/agent-injection.ts whose prepareClaudeOverdeckMcp mints the owner's token, writes <dir>/overdeck-mcp.json (0600, path only) and returns { overdeckMcpConfig } or {} when disabled or on failure. Spread it with one line into every Claude Code launch site on this host: inside buildAgentLaunchConfig (covers work agents, resume and recovery callers), spawnRun, recoverAgent, the messageAgent fallback, fresh planning, the planning continuation route, and spawnConversationSession (conversation token role by lane, flywheel and pane role; bare conversations skipped). Role allow-lists always name mcp__overdeck. The sweep keeps a token younger than its grace when the agent state is not saved yet, which planning launches need. Document the injection in configuration/mcp.mdx and the capability and CP-1 result in configuration/harnesses.mdx.",
+      "NonGoals": "- No injection for codex, acp, opencode, kimi-code, ohmypi, muse or prime-agent (W-INJ2, W-INJ3, W-INJ4)\n- No MCP or CLI instructions block in the launch context (W-INJ4)\n- No injection for Fly or other remote launches (remote/remote-agents.ts)\n- No injection in Docker workspaces or bare conversations\n- No new MCP tool, HTTP route or scope, and no change to pan mcp serve\n- No change to token minting, revocation or stop paths except the sweep's missing-state grace\n- No placeholder agent-state row before a planning launch\n- No docs/ROLES.md, CLAUDE.md or cli/mcp.mdx edits (W-DOC)\n- Never put a token in a launcher script, an MCP config file, argv, an env export or a log line\n- Never compare a harness name; never raise a file-size allowlist row or a ratchet baseline"
+    },
+    "autoDecisions": [
+      {
+        "summary": "harnessGetsOverdeckMcp reads a new HarnessCapabilities field overdeckMcp instead of a list of harness names.",
+        "rationale": "configuration/harnesses.mdx says behavior decisions read a capability field and never compare a harness name, and scripts/lint-harness-branches.sh fails new name comparisons."
+      },
+      {
+        "summary": "Only Claude Code declares overdeckMcp: true in this item; W-INJ2 and W-INJ3 flip Codex, ACP and opencode when they wire them.",
+        "rationale": "A capability states what the harness does now; declaring it early would let W-INJ4's instructions block promise tools those agents do not have."
+      },
+      {
+        "summary": "The work-agent mint lives inside buildAgentLaunchConfig, spread into both its resume and fresh generateLauncherScript calls.",
+        "rationale": "Its six callers (spawn.ts, resume.ts, recovery.ts x4) then get the server with no site code; the epic's spawn.ts-only call would miss resumes and recoveries."
+      },
+      {
+        "summary": "Launch flags use the equals form: --mcp-config=<path> and --allowedTools=mcp__overdeck.",
+        "rationale": "A probe on Claude Code 2.1.293 showed the space form of --allowedTools swallows a following positional prompt, and buildNonConversationCommand can end with \"$prompt\" right after the injected flags."
+      },
+      {
+        "summary": "Planning sessions are covered by a sweep grace for missing agent state instead of an early state save.",
+        "rationale": "CLAUDE.md forbids placeholder agent-state rows before the terminal session exists; a mint after launch would race the MCP server start."
+      },
+      {
+        "summary": "A failed mint or config write launches the agent without the overdeck server and logs one warning.",
+        "rationale": "Agent tokens give identity, not a sandbox (epic H-1); a corrupt token registry must not stop every agent launch, and the agent still has pan."
+      },
+      {
+        "summary": "Conversation token role: lane row -> worker, conv-flywheel -> flywheel, pane role uat -> test, conversation -> conversation, other pane roles by name.",
+        "rationale": "Epic D-8 gives approve only to the operator's chat; PAN-4930 H-8 asks lanes to use worker; uat is not a Role key in AGENT_TOKEN_SCOPES."
+      },
+      {
+        "summary": "bareContext conversations get no overdeck server; plainFork conversations do.",
+        "rationale": "bareContext means skip every Overdeck-injected layer, which play lanes rely on to see the product as a new user."
+      },
+      {
+        "summary": "The stdio server env carries OVERDECK_DASHBOARD_URL from getDashboardLoopbackApiUrl().",
+        "rationale": "Inside the dashboard DASHBOARD_URL can be the public TLS URL (PAN-3331); a child that inherits it fails every call."
+      },
+      {
+        "summary": "overdeckMcpEnabledFor is async and reads loadConfigNoMigration().",
+        "rationale": "spawnRun and spawnConversationSession run on the dashboard hot path; the repo bans new blocking reads there."
+      },
+      {
+        "summary": "The planning continuation route (routes/misc/planning.ts) is in scope.",
+        "rationale": "FR-1 covers every role run; one spread line keeps a continued planner's tools."
+      },
+      {
+        "summary": "mcp.public.enabled is added to the config module now and read by nothing in this item.",
+        "rationale": "The epic assigns the mcp config module to W-INJ1 and W-FUN1 builds on it."
+      }
+    ],
+    "items": [
+      {
+        "id": "mcp-config-switch",
+        "title": "Add the mcp: config block with the agents switch",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T00:59:42Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4932",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/config-yaml/mcp-config.ts",
+            "src/lib/config-yaml/schema.ts",
+            "src/lib/config-yaml/merge.ts",
+            "src/lib/config-yaml/defaults.ts",
+            "src/lib/config-yaml/__tests__/mcp-config.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint:file-size",
+            "npx vitest run src/lib/config-yaml/__tests__/mcp-config.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "file-size guard passes (schema.ts <= 1114, merge.ts <= 1045)",
+            "mcp-config.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-1. Create src/lib/config-yaml/mcp-config.ts following push-config.ts: McpYamlConfig { agents?: boolean; public?: { enabled?: boolean } }, NormalizedMcpConfig { agents: boolean; public: { enabled: boolean } }, defaultMcpConfig() = { agents: true, public: { enabled: false } }, mergeMcpConfig(result, config) that sets a field only from a boolean and never throws. Wire it like push: schema.ts YAML type next to push?: (:625) and normalized type next to push: (:963); merge.ts default next to push: defaultPushConfig() (:234) and mergeMcpConfig(result.mcp, config) after mergePushConfig (:749); defaults.ts default next to push (:222). Write the tests listed in the PRD."
+        },
+        "items": [
+          {
+            "id": "mcp-config-switch.ac1",
+            "title": "Given no mcp block, when mergeConfigs runs, then config.mcp defaults to { agents: true, public: { enabled: false } }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-config-switch.ac2",
+            "title": "Given { mcp: { agents: false } }, when mergeConfigs runs, then config.mcp.agents returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-config-switch.ac3",
+            "title": "Given { mcp: { agents: 'no' } } or { mcp: [] }, when mergeMcpConfig runs, then it preserves the earlier value and does not throw",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "overdeck-mcp-capability",
+        "title": "Declare the overdeckMcp harness capability (Claude Code only)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T00:59:42Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4932",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/harness-capabilities.ts",
+            "packages/contracts/src/harness-behavior.test.ts",
+            "tests/unit/lib/harness-capability-contract.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint:harness-branches",
+            "npx vitest run packages/contracts/src/harness-behavior.test.ts tests/unit/lib/harness-capability-contract.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "harness-branch ratchet passes with no baseline change",
+            "harness-behavior.test.ts and harness-capability-contract.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-2. In packages/contracts/src/harness-capabilities.ts add `readonly overdeckMcp: boolean` (with a doc comment naming PAN-4927 D-13) to HarnessCapabilities after runsOnFlyMachine, append \"overdeckMcp\" to HARNESS_CAPABILITY_KEYS, set overdeckMcp: true in CLAUDE_CODE_CAPABILITIES and overdeckMcp: false in the seven other *_CAPABILITIES constants. If a test fixture builds a whole HarnessCapabilities object (e.g. tests/unit/lib/harness-capability-contract.test.ts), add the key there. Add one harness-behavior.test.ts case asserting the eight values."
+        },
+        "items": [
+          {
+            "id": "overdeck-mcp-capability.ac1",
+            "title": "Given the contracts package, when getHarnessBehavior('claude-code').capabilities.overdeckMcp is read, then it returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "overdeck-mcp-capability.ac2",
+            "title": "Given ohmypi, codex, acp, kimi-code, opencode, muse and prime-agent, when their capabilities are read, then overdeckMcp returns false for each",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "overdeck-mcp-capability.ac3",
+            "title": "When npm run lint:harness-branches runs, then it exits 0 with scripts/harness-branches-baseline.txt unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "launcher-overdeck-mcp-flags",
+        "title": "Emit --mcp-config= and --allowedTools=mcp__overdeck from LauncherConfig.overdeckMcpConfig",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T00:59:42Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4932",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/mcp/overdeck-mcp-args.ts",
+            "src/lib/launcher-generator.ts",
+            "tests/unit/lib/launcher-generator-overdeck-mcp.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint:file-size",
+            "npm run lint:circular",
+            "npx vitest run tests/unit/lib/launcher-generator-overdeck-mcp.test.ts src/lib/__tests__/launcher-generator.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "launcher-generator.ts stays at or under 1000 lines",
+            "no new import cycle",
+            "both launcher test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-3. Create the leaf src/lib/mcp/overdeck-mcp-args.ts (imports only ../shell-quote.js) with OVERDECK_MCP_SERVER_NAME = 'overdeck', CLAUDE_OVERDECK_MCP_CONFIG_FILE = 'overdeck-mcp.json' and overdeckMcpArgs(configPath, command) returning '' without a path, else ` --mcp-config=${shellQuote(path)}` plus ` --allowedTools=mcp__overdeck` only when command has no --allowedTools/--allowed-tools flag (regex /(^|\\s)--allowed(Tools|-tools)(=|\\s)/). Equals form is required: the space form swallows a following \"$prompt\". In launcher-generator.ts add `overdeckMcpConfig?: string` to LauncherConfig after channelsBridgeServerName and `cmd += overdeckMcpArgs(config.overdeckMcpConfig, cmd);` right after both `cmd += buildChannelsArgs(config);` lines (:549 conversation path, :681 buildNonConversationCommand). Budget +6 lines."
+        },
+        "items": [
+          {
+            "id": "launcher-overdeck-mcp-flags.ac1",
+            "title": "Given a work launcher config with overdeckMcpConfig and a promptFile, when generateLauncherScript runs, then the script contains --mcp-config='<path>' --allowedTools=mcp__overdeck followed later on the same line by \"$prompt\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-overdeck-mcp-flags.ac2",
+            "title": "Given a baseCommand that already holds --allowedTools, when the script is generated, then it contains --mcp-config= and exactly one --allowedTools",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-overdeck-mcp-flags.ac3",
+            "title": "Given channelsBridgeMcpConfig and overdeckMcpConfig both set, when the script is generated, then it contains both the bridge --mcp-config and the overdeck --mcp-config=",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-overdeck-mcp-flags.ac4",
+            "title": "Given harness kimi-code with overdeckMcpConfig set, or any config with overdeckMcpConfig unset, when the script is generated, then it contains no overdeck --mcp-config= and the unset case equals the script generated without the field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agent-injection-module",
+        "title": "Add agent-injection.ts: enable check, stdio entry, config file and prepareClaudeOverdeckMcp",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T00:59:42Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4932",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "work-agent-builder-wiring",
+            "spawn-run-wiring",
+            "role-relaunch-wiring",
+            "planning-session-wiring",
+            "planning-continuation-wiring",
+            "conversation-wiring",
+            "docs-agent-mcp"
+          ],
+          "files_scope": [
+            "src/lib/mcp/agent-injection.ts",
+            "tests/unit/lib/mcp/agent-injection.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint:circular",
+            "npm run lint:harness-branches",
+            "npm run lint:effect-facades",
+            "npx vitest run tests/unit/lib/mcp/agent-injection.test.ts tests/unit/lib/mcp/agent-token.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "no new import cycle and no new harness-name comparison",
+            "effect-facades count does not rise",
+            "agent-injection.test.ts and agent-token.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-4 (API, behavior and tests are spelled out there). New module src/lib/mcp/agent-injection.ts exporting harnessGetsOverdeckMcp (reads capabilities.overdeckMcp), async overdeckMcpEnabledFor(harness, env = process.env) (capability, not OVERDECK_DOCKER_WORKSPACE=1 / PAN_DOCKER=1, then (await loadConfigNoMigration()).config.mcp.agents), overdeckStdioServer(tokenFile) (panCliInvocation(['mcp','serve']); env exactly OVERDECK_MCP_TOKEN_FILE, OVERDECK_HOME = getOverdeckHome(), OVERDECK_DASHBOARD_URL = getDashboardLoopbackApiUrl()), writeClaudeOverdeckMcpConfig(dir, tokenFile) (mkdir 0700, temp file 0600 + rename, JSON { mcpServers: { overdeck: … } }), conversationTokenRole(row, paneRole, tmuxSession) (laneRole set -> worker; conv-flywheel -> flywheel; uat -> test; conversation -> conversation; else same name), and prepareClaudeOverdeckMcp(owner) which returns {} unless getHarnessBehavior(harness).launchCommandKind === 'claude-code' and enabled, uses dir = owner.dir ?? getAgentDir(normalizeAgentId(agentId)) for agents (a conversation without dir returns {}), calls ensureAgentMcpToken then writeClaudeOverdeckMcpConfig, and on any error logs one console.warn naming the agent id (never a token) and returns {}. Must not import conversations.ts, spawn*.ts or launcher-generator.ts."
+        },
+        "items": [
+          {
+            "id": "agent-injection-module.ac1",
+            "title": "Given a claude-code agent owner in a temp OVERDECK_HOME, when prepareClaudeOverdeckMcp runs, then it returns <home>/agents/<id>/overdeck-mcp.json, a mode-0600 file that names the mcp-token path, defines only the overdeck server and contains no odk_ text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-injection-module.ac2",
+            "title": "Given the same call, when the token file is read, then <home>/agents/<id>/mcp-token has mode 0600 and contains an odk_ token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-injection-module.ac3",
+            "title": "Given harness kimi-code, mcp.agents false, OVERDECK_DOCKER_WORKSPACE=1 or PAN_DOCKER=1, when prepareClaudeOverdeckMcp or overdeckMcpEnabledFor runs, then it returns {} or false and mints no token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-injection-module.ac4",
+            "title": "Given ensureAgentMcpToken rejects, when prepareClaudeOverdeckMcp runs, then it returns {} and emits exactly one warning that contains the agent id and no odk_ text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-injection-module.ac5",
+            "title": "Given a lane row, conv-flywheel, pane role uat, conversation and review, when conversationTokenRole runs, then it returns worker, flywheel, test, conversation and review",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sweep-missing-state-grace",
+        "title": "Keep a fresh agent token whose agent state is not saved yet",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T00:59:42Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4932",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/agent-token-sweep.ts",
+            "tests/unit/dashboard/server/services/agent-token-sweep.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/server/services/agent-token-sweep.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "agent-token-sweep.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-5. In sweepOwner's agent branch (agent-token-sweep.ts:63-68), when getAgentState returns null, return 0 while Date.parse(record.createdAt) >= graceCutoff, else fall through to the revoke; keep the existing state !== null logic in an else branch (exact before/after in the PRD). Update the module header's missing-state sentence. In the test file change the existing missing-state case's token age from 1 to 11 minutes and add a case where a 1-minute-old token with null state is kept and revokeAgentMcpTokens is not called."
+        },
+        "items": [
+          {
+            "id": "sweep-missing-state-grace.ac1",
+            "title": "Given an agent token created 1 minute before now whose agent state is null, when sweepAgentTokensOnce runs, then it preserves the token and does not call revokeAgentMcpTokens",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sweep-missing-state-grace.ac2",
+            "title": "Given an agent token created 11 minutes before now whose agent state is null, when sweepAgentTokensOnce runs, then it revokes the token without calling isAlive",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "work-agent-builder-wiring",
+        "title": "Inject the server inside buildAgentLaunchConfig (fresh and resume)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T00:59:42Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4932",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/spawn-prep.ts",
+            "tests/unit/lib/mcp/agent-injection-launch.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint:file-size",
+            "npm run lint:circular",
+            "npx vitest run tests/unit/lib/mcp/agent-injection-launch.test.ts src/lib/agents/__tests__/spawn-prep-git-guard.test.ts src/lib/agents/__tests__/spawn-prep-resume-effort.test.ts src/lib/agents/__tests__/launch-effort.test.ts src/lib/agents/__tests__/resume.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "spawn-prep.ts stays at or under 1128 lines",
+            "no new import cycle",
+            "all listed test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-6. In spawn-prep.ts import prepareClaudeOverdeckMcp from ../mcp/agent-injection.js; right after `const launchRole: Role = opts.isPlanning ? 'plan' : opts.role;` add `const overdeckMcp = await prepareClaudeOverdeckMcp({ agentId: opts.agentId, agentKind: 'agent', role: launchRole, harness: opts.harness ?? 'claude-code' });` and spread `...overdeckMcp,` into both generateLauncherScript configs (resume branch :785 and fresh branch :839) after `...(primeLaunch?.fields ?? {}),`. Budget +8 (uses 4). New test tests/unit/lib/mcp/agent-injection-launch.test.ts follows spawn-prep-git-guard.test.ts (real builder, temp home). Fix any existing exact-string launcher expectation with toContain, never by deleting the assertion."
+        },
+        "items": [
+          {
+            "id": "work-agent-builder-wiring.ac1",
+            "title": "Given a fresh claude-code work launch, when buildAgentLaunchConfig returns, then launcherContent contains --mcp-config='<home>/agents/<id>/overdeck-mcp.json' and --allowedTools=mcp__overdeck and no odk_ text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "work-agent-builder-wiring.ac2",
+            "title": "Given spawnMode resume with a resumeSessionId, when buildAgentLaunchConfig returns, then launcherContent contains the same --mcp-config= path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "work-agent-builder-wiring.ac3",
+            "title": "Given OVERDECK_DOCKER_WORKSPACE=1 in the spawning process, when buildAgentLaunchConfig returns, then launcherContent contains no overdeck --mcp-config=",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "role-allowlist-overdeck",
+        "title": "Name mcp__overdeck in every role --allowedTools list",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T00:59:42Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-4932",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/runtime-command.ts",
+            "src/lib/agents/__tests__/role-mcp-parser.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/agents/__tests__/role-mcp-parser.test.ts src/lib/agents/__tests__/runtime-command-effort.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "role-mcp-parser.test.ts and runtime-command-effort.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-7. In roleSystemPromptInjection (runtime-command.ts:875) append `mcp__${OVERDECK_MCP_SERVER_NAME}` (imported from ../mcp/overdeck-mcp-args.js) to the allowed array, and add one doc-comment line (PAN-4932 D-8). Change the expectation at role-mcp-parser.test.ts:75 to \" --allowedTools 'Read,Bash,mcp__playwright,mcp__overdeck'\" and add a case that a role without tools: yields no --allowedTools."
+        },
+        "items": [
+          {
+            "id": "role-allowlist-overdeck.ac1",
+            "title": "Given the test role file with tools Read, Bash and mcpServers playwright, when roleSystemPromptInjection runs, then it returns --allowedTools 'Read,Bash,mcp__playwright,mcp__overdeck'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "role-allowlist-overdeck.ac2",
+            "title": "Given a role file without a tools: list, when roleSystemPromptInjection runs, then its output contains no --allowedTools",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "spawn-run-wiring",
+        "title": "Inject the server into spawnRun role runs",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T00:59:42Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4932",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/spawn.ts",
+            "src/lib/__tests__/agents-spawn-supervisor.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint:file-size",
+            "npx vitest run src/lib/__tests__/agents-spawn-supervisor.test.ts src/lib/__tests__/agents-spawn-tier-fitness.test.ts src/lib/__tests__/model-validation.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "spawn.ts stays at or under 1089 lines",
+            "the three spawn test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-8. spawn.ts has 3 spare lines; use 2. Add one import line for prepareClaudeOverdeckMcp from ../mcp/agent-injection.js and, in the generateLauncherScript call at :410 after `...(primeLaunch?.fields ?? {}),`, the line `...(await prepareClaudeOverdeckMcp({ agentId, agentKind: 'agent', role, harness: resolvedHarness })),`. The agent state is already saved at :256. Add cases to agents-spawn-supervisor.test.ts (it already reads <agentDir>/launcher.sh after spawnRun)."
+        },
+        "items": [
+          {
+            "id": "spawn-run-wiring.ac1",
+            "title": "Given a claude-code review run, when spawnRun writes launcher.sh, then it contains --mcp-config='<home>/agents/<id>/overdeck-mcp.json' and exactly one --allowedTools whose value includes mcp__overdeck",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-run-wiring.ac2",
+            "title": "Given a claude-code worker run, when spawnRun writes launcher.sh, then it contains --allowedTools=mcp__overdeck",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "role-relaunch-wiring",
+        "title": "Inject the server into the recoverAgent and messageAgent fallback relaunches",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T00:59:42Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4932",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/recovery.ts",
+            "src/lib/agents/messaging.ts",
+            "src/lib/agents/__tests__/recover-effort.test.ts",
+            "src/lib/agents/__tests__/message-fallback-effort.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint:harness-branches",
+            "npx vitest run src/lib/agents/__tests__/recover-effort.test.ts src/lib/agents/__tests__/message-fallback-effort.test.ts src/lib/agents/__tests__/recovery-terminal-backend.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "harness-branch ratchet passes",
+            "the three relaunch test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-9. Import prepareClaudeOverdeckMcp in recovery.ts and messaging.ts. In recoverAgent's generateLauncherScript (recovery.ts:819) add `...(await prepareClaudeOverdeckMcp({ agentId: normalizedId, agentKind: 'agent', role: recoveryRole, harness: recoveryHarness })),` after `...recoveryCodexFields,`. In messageAgent's fallback (messaging.ts:505) add `...(await prepareClaudeOverdeckMcp({ agentId: normalizedId, agentKind: 'agent', role: resumeRole, harness: fallbackHarness })),` after `...fallbackCodexFields,`. Extend the claude-code case each test file already drives."
+        },
+        "items": [
+          {
+            "id": "role-relaunch-wiring.ac1",
+            "title": "Given a claude-code role-run recovery, when recoverAgent writes launcher.sh, then it contains --mcp-config= with <home>/agents/<id>/overdeck-mcp.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "role-relaunch-wiring.ac2",
+            "title": "Given a failed resume of a claude-code agent, when messageAgent writes the fallback launcher, then it contains --mcp-config= with the agent's overdeck-mcp.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "planning-session-wiring",
+        "title": "Inject the server into fresh planning sessions",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T00:59:42Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4932",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/planning/spawn-planning-session.ts",
+            "src/lib/planning/__tests__/spawn-planning-session-backend.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/planning/__tests__/spawn-planning-session-backend.test.ts src/lib/planning/__tests__/spawn-planning-session-effort.test.ts src/lib/planning/__tests__/spawn-planning-session-prime.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the three planning-session test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-10. Import prepareClaudeOverdeckMcp in spawn-planning-session.ts; in the generateLauncherScript call at :607, after `...(primeLaunch?.fields ?? {}),`, add `...(await prepareClaudeOverdeckMcp({ agentId: sessionName, agentKind: 'agent', role: 'plan', harness: effectiveHarness })),`. Do not add any early agent-state save (CLAUDE.md: no placeholder rows); sweep-missing-state-grace covers the window. Add a test case asserting the written launcher.sh."
+        },
+        "items": [
+          {
+            "id": "planning-session-wiring.ac1",
+            "title": "Given a claude-code planning launch, when spawnPlanningSession writes launcher.sh, then it contains --mcp-config= with <home>/agents/<sessionName>/overdeck-mcp.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "planning-session-wiring.ac2",
+            "title": "Given the same launch, when launcher.sh is written, then <home>/agents/<sessionName>/mcp-token exists with mode 0600 and launcher.sh contains no odk_ text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "planning-continuation-wiring",
+        "title": "Inject the server into the planning continuation launcher",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-11-04T00:59:42Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4932",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/misc/planning.ts",
+            "tests/unit/dashboard/server/routes/planning-routes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/server/routes/planning-routes.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "planning-routes.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-11. Import prepareClaudeOverdeckMcp from ../../../../lib/mcp/agent-injection.js in routes/misc/planning.ts; in the continuation generateLauncherScript (:341) add `...(await prepareClaudeOverdeckMcp({ agentId: sessionName, agentKind: 'agent', role: 'plan', harness: 'claude-code' })),` after promptInline. Extend the relaunch case in planning-routes.test.ts to assert the written continuation-launcher.sh."
+        },
+        "items": [
+          {
+            "id": "planning-continuation-wiring.ac1",
+            "title": "Given a dead planner and an operator message, when the route relaunches it, then continuation-launcher.sh contains --mcp-config= with <home>/agents/<sessionName>/overdeck-mcp.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "planning-continuation-wiring.ac2",
+            "title": "Given the same relaunch, when continuation-launcher.sh is written, then <home>/agents/<sessionName>/mcp-token exists with mode 0600 and the script contains no odk_ text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-wiring",
+        "title": "Inject the server into spawnConversationSession with the conversation token role",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T00:59:42Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4932",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-runtime.ts",
+            "src/lib/overdeck/__tests__/conversation-runtime-launch.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint:file-size",
+            "npm run lint:circular",
+            "npx vitest run src/lib/overdeck/__tests__/conversation-runtime-launch.test.ts src/lib/overdeck/__tests__/conversation-effort.test.ts tests/unit/lib/overdeck/conversation-runtime-prime.test.ts src/dashboard/server/routes/__tests__/conversations-supervisor.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "conversation-runtime.ts stays at or under 1252 lines",
+            "no new import cycle",
+            "all listed conversation test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-12. Import conversationTokenRole and prepareClaudeOverdeckMcp from ../mcp/agent-injection.js. After the Channels block (~:768) add: `const tokenRow = bareContext ? null : getConversationByTmuxSession(tmuxSession);` and `const overdeckMcp = tokenRow ? await prepareClaudeOverdeckMcp({ agentId: tokenRow.name, agentKind: 'conversation', role: conversationTokenRole(tokenRow, role, tmuxSession), harness, dir: stateDir }) : {};` and spread `...overdeckMcp,` after `channelsBridgeMcpConfig,` (:839) in the launcher config. Extend conversation-runtime-launch.test.ts (it captures each launcher config in launcherConfigs); seed or mock the row so getConversationByTmuxSession returns it."
+        },
+        "items": [
+          {
+            "id": "conversation-wiring.ac1",
+            "title": "Given an operator claude-code conversation with a row, when spawnConversationSession runs, then the launcher config's overdeckMcpConfig equals <home>/conversations/conv-<name>/overdeck-mcp.json and the minted token has agentKind conversation and role conversation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-wiring.ac2",
+            "title": "Given a bareContext launch or a tmux session with no row, when spawnConversationSession runs, then the launcher config has no overdeckMcpConfig and no token is minted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-wiring.ac3",
+            "title": "Given a lane row (laneRole set), when spawnConversationSession runs, then the minted token has role worker and does not include approve",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-agent-mcp",
+        "title": "Document agent MCP injection, the overdeckMcp capability and the CP-1 result",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T00:59:42Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4932",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/mcp.mdx",
+            "configuration/harnesses.mdx",
+            ".pan/drafts/pan-4927.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-13. configuration/mcp.mdx: new section '## Agents get these tools' after '## Over stdio' covering which Claude Code agents get the overdeck server, the mcp-token and overdeck-mcp.json files and their directories, the --mcp-config=/--allowedTools=mcp__overdeck flags, scopes by role (lanes use worker, conv-flywheel uses flywheel), the mcp.agents: false switch, what gets no server (other harnesses, Docker workspaces, bare conversations, Fly machines) and the failed-mint warning. configuration/harnesses.mdx: an overdeckMcp row in the Harness capabilities table and a short 'Overdeck MCP server' subsection with the CP-1 result from the PRD Fact 7. .pan/drafts/pan-4927.md: a 'Revision 2 (PAN-4932 planning)' note under W-INJ1 listing corrections C-1 to C-7, D-1, D-9 and that CP-1 passed. Write in the repo's plain STE style."
+        },
+        "items": [
+          {
+            "id": "docs-agent-mcp.ac1",
+            "title": "Given configuration/mcp.mdx, when a reader opens 'Agents get these tools', then it names the overdeck-mcp.json and mcp-token files, the --mcp-config= and --allowedTools=mcp__overdeck flags, and shows mcp.agents: false as the way to turn injection off",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-agent-mcp.ac2",
+            "title": "Given configuration/harnesses.mdx, when a reader opens Harness capabilities, then the table has an overdeckMcp row and the page states that Claude Code 2.1.293 loads two --mcp-config= flags and that the space form of --allowedTools swallows a prompt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-agent-mcp.ac3",
+            "title": "Given .pan/drafts/pan-4927.md, when a reader opens W-INJ1, then a Revision 2 (PAN-4932 planning) note lists C-1 to C-7 and says only Claude Code declares overdeckMcp until W-INJ2 and W-INJ3",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "mcp-config-switch",
+        "to": "agent-injection-module",
+        "type": "blocks"
+      },
+      {
+        "from": "overdeck-mcp-capability",
+        "to": "agent-injection-module",
+        "type": "blocks"
+      },
+      {
+        "from": "launcher-overdeck-mcp-flags",
+        "to": "agent-injection-module",
+        "type": "blocks"
+      },
+      {
+        "from": "launcher-overdeck-mcp-flags",
+        "to": "role-allowlist-overdeck",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-injection-module",
+        "to": "work-agent-builder-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-injection-module",
+        "to": "spawn-run-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-injection-module",
+        "to": "role-relaunch-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-injection-module",
+        "to": "planning-session-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-injection-module",
+        "to": "planning-continuation-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-injection-module",
+        "to": "conversation-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-injection-module",
+        "to": "docs-agent-mcp",
+        "type": "blocks"
+      },
+      {
+        "from": "role-allowlist-overdeck",
+        "to": "spawn-run-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "sweep-missing-state-grace",
+        "to": "planning-session-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "sweep-missing-state-grace",
+        "to": "planning-continuation-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "work-agent-builder-wiring",
+        "to": "spawn-run-wiring",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
