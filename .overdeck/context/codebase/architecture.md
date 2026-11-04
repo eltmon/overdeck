@@ -114,6 +114,9 @@ terminal backend (Herdr by default, tmux when `terminal.backend: tmux`).
 - `planning/spawn-planning-session.ts` — plan-role kickoff (own spawn path).
 - `launcher-generator.ts` — generates tmux launcher scripts (`--resume`, PTY
   supervisor wrapping, env exports).
+- `agent-tmpdir.ts` — the `CLAUDE_CODE_TMPDIR` launcher line (PAN-4998), so
+  Claude Code's session scratchpad lives under `~/.overdeck/tmp` instead of
+  `/tmp`; `cloister/agent-tmp-sweep.ts` removes idle session dirs hourly.
 - `tmux.ts` — tmux primitives on the `overdeck` socket. Async (Effect) variants
   are canonical; `*Sync` are legacy debt.
 - `session-format-converter.ts` — conversation transcript conversion between
@@ -351,4 +354,4 @@ Model and built-ins (`overdeck-dark`, `overdeck-light`; read-only, full terminal
 
 Host: `src/dashboard/server/services/share-host.ts` (`ShareManager`: rooms, host socket, the 0600 record door `src/lib/sharing/share-record.ts`) and `routes/shares.ts` (`/api/shares*`); one `PeerHub` per live share in `src/dashboard/server/sharing/peer-hub.ts` (werift peers, five channels, the host-admitted content gate) with `conversation-bridge.ts` (Claude JSONL → `SharedMessage`) and `channel-writer.ts` (backpressure); slice 5 (PAN-4476) adds `draft-board.ts` (per-author LWW drafts, 200 ms relay) and `submit-queue.ts` (strict-FIFO prompts, one per agent turn, through the `handleConversationMessage` door); `POST /api/shares/:code/prompts` queues host sends. Slice 6 (PAN-4477) adds `terminal-bridge.ts` (a watching viewer's read-only terminal from a Herdr observe stream or a tmux PTY hub listener, via `pty-hub-attach.ts`). Viewer: `services/share-join.ts` + `routes/joins.ts` (join socket, SSE to the browser); browser peer and page in `frontend/src/components/chat/sharing/` (`webrtc-viewer.ts`, `useSharedJoin.ts`, `SharedConversationView.tsx`, `ShareDialog.tsx`, `SharingLobbyPanel.tsx`, `SuggestionList.tsx`, `SharedTerminalView.tsx`). Wire types in `packages/contracts/src/sharing.ts` (type-only, import-free), runtime helpers in `sharing-wire.ts`. Docs: `docs/SHARED-SESSIONS.md`, `configuration/shared-sessions.mdx`.
 
-<!-- last-verified: 2026-11-04 (PAN-4947, PAN-4946, PAN-4945, PAN-4942, PAN-4937, PAN-4941, PAN-4936, PAN-4931, PAN-4930, PAN-4838, PAN-4481, PAN-4477, PAN-4476, PAN-4834, PAN-4852, PAN-4829, PAN-4833, PAN-4849, PAN-4820, PAN-4827, PAN-4825, PAN-4813, PAN-4728, PAN-4651, PAN-4730, PAN-4638, PAN-4759, PAN-4682, PAN-4655, PAN-4644, PAN-4659, PAN-4660, PAN-4743, PAN-4722) -->
+<!-- last-verified: 2026-11-04 (PAN-4998, PAN-4947, PAN-4946, PAN-4945, PAN-4942, PAN-4937, PAN-4941, PAN-4936, PAN-4931, PAN-4930, PAN-4838, PAN-4481, PAN-4477, PAN-4476, PAN-4834, PAN-4852, PAN-4829, PAN-4833, PAN-4849, PAN-4820, PAN-4827, PAN-4825, PAN-4813, PAN-4728, PAN-4651, PAN-4730, PAN-4638, PAN-4759, PAN-4682, PAN-4655, PAN-4644, PAN-4659, PAN-4660, PAN-4743, PAN-4722) -->
