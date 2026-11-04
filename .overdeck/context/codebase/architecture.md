@@ -38,6 +38,12 @@ terminal backend (Herdr by default, tmux when `terminal.backend: tmux`).
   `connect-runtime.ts` owns the `pan connect` runtime (`ensureDurableRuntime`,
   `isRuntimePackageRoot`); `update-manager.ts` installs updates into it when the dashboard
   runs from it (PAN-4722).
+- `telemetry/` — anonymous PostHog. Event names and closed property domains live in
+  `packages/contracts/src/telemetry.ts` (drift-tested against `docs/TELEMETRY.md` by
+  `tests/unit/telemetry-docs.test.ts`); `service.ts` (`AnalyticsService`) is the only Node module
+  that imports `posthog-node` and applies the opt-out; the browser door is
+  `src/dashboard/frontend/src/lib/telemetry.ts`. PAN-5016 adds `anywhere.ts` for Anywhere events;
+  the phone app and the `services/` Workers send nothing (phone: PAN-5021).
 - `agents.ts` is now a thin barrel over `src/lib/agents/` — `spawn.ts` (`spawnAgent`,
   `spawnRun`), `spawn-prep.ts` (`buildAgentLaunchConfig`, tier spawn params),
   `staffing.ts` (the single staffing resolver, PAN-2397), `resolve-tier.ts` +
