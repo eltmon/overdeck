@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5041",
   "created": "2026-11-04T17:22:54.161Z",
-  "updated": "2026-11-04T18:13:28.074Z",
+  "updated": "2026-11-04T18:13:43.392Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -104,6 +104,10 @@
     "wi3-boot-script.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T18:13:28.074Z"
+    },
+    "wi3-boot-script.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:13:43.392Z"
     }
   }
 }
