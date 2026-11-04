@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5016",
   "created": "2026-11-04T13:28:40.332Z",
-  "updated": "2026-11-04T13:33:17.541Z",
+  "updated": "2026-11-04T13:34:53.781Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-11-04T13:33:11.994Z"
     },
     "helper": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5016",
-      "claimedAt": "2026-11-04T13:33:17.540Z"
+      "claimedAt": "2026-11-04T13:33:17.540Z",
+      "doneAt": "2026-11-04T13:34:53.781Z"
     }
   }
 }
