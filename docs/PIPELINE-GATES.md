@@ -1171,9 +1171,13 @@ that declaration. There is no escalation for blockers that never merge.
 ## Review Convergence Gate (PAN-3151)
 
 When a review round comes back with blocking findings, the finding count is
-tracked across rounds from the round artifacts on disk. When ≥3 rounds are
-recorded and the series shows a reversal (latest count > previous) or a
-stall (two consecutive non-decreases), automatic rework re-drive is
+tracked across rounds from the round artifacts on disk. Only the current
+episode is judged: the rounds after the last 0-blocker (approved) round,
+because blockers found after an approval come from new code such as a
+conflict repair or a main merge, not from the reviewer reversing itself
+(PAN-4993). When the episode has ≥3 rounds and shows a reversal (latest
+count > previous) or a stall (two consecutive non-decreases), automatic
+rework re-drive is
 suppressed — feedback is still written and posted, but the work agent is not
 re-messaged automatically — and a needs-you escalation surfaces with the
 round history and guidance to decompose the change into sibling issues.
