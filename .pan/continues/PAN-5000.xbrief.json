@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5000",
   "created": "2026-11-04T11:38:38.802Z",
-  "updated": "2026-11-04T12:42:28.195Z",
+  "updated": "2026-11-04T12:43:01.497Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -120,6 +120,10 @@
     "derived-title-attachments.ac4": {
       "status": "completed",
       "doneAt": "2026-11-04T12:42:28.195Z"
+    },
+    "preview-popover-escape.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:43:01.497Z"
     }
   }
 }
