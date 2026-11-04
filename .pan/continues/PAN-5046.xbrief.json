@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5046",
+  "created": "2026-11-04T18:10:57.891Z",
+  "updated": "2026-11-04T18:10:57.892Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "dialer-ends-duplexes": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5046",
+      "claimedAt": "2026-11-04T18:10:57.891Z"
+    }
+  }
+}
