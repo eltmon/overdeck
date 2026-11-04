@@ -22,8 +22,10 @@
  *   follower. Answers `{ id, machine, reason, remote }`.
  *
  * - `POST /api/fleet/issues/:id/start { machine, needs?, model?, harness?, effort? }`
- *   → another machine only (this machine answers 400 `use-local-start`; the
- *   CLI starts locally itself): the owner's issue-start work door.
+ *   → another machine: the owner's issue-start work door; this machine for an
+ *   `odk_` token caller (the MCP `start_issue` tool): `spawnIssueAgentForRoute`,
+ *   the Start button's gates; any other caller on this machine answers 400
+ *   `use-local-start` (the CLI starts locally itself).
  * - `POST /api/fleet/workers/:id/stop` → stops the worker a stand-in stands
  *   for on its owner, then marks the stand-in `stopped`.
  *
@@ -64,6 +66,7 @@ import { currentRemoteWorkerFollower } from '../services/remote-worker-follower.
 import { currentLinkSupervisor } from '../services/anywhere-boot.js';
 import { connectingStatusSource, type LinkStatusSource } from '../services/machine-link-service.js';
 import { currentMachineLoad } from '../services/machine-load.js';
+import { spawnIssueAgentForRoute } from './agents/spawn-issue.js';
 import { credentialScopes, type DashboardCredential, rejectUnauthorizedDashboardRequest, rejectUnsafeDashboardMutationRequest, resolveRequestCredential } from './dashboard-auth.js';
 import { refuseFleetRequest } from './machines-fleet.js';
 import { readJsonResponse } from './machines-work.js';
@@ -315,26 +318,45 @@ export async function handleFleetWorker(raw: unknown, caller: FleetCaller, deps:
   return jsonResponse({ id: localId, machine: machineOf(target), reason: target.reason, remote: true });
 }
 
+export interface FleetIssueStartDeps<R> extends FleetWorkerDeps {
+  spawn: (input: { body: Record<string, unknown>; internalRequest: false }) => Effect.Effect<HttpServerResponse.HttpServerResponse, unknown, R>;
+}
+
 /** `POST /api/fleet/issues/:id/start`. */
-export async function handleFleetIssueStart(issueId: string, raw: unknown, caller: FleetCaller, deps: FleetWorkerDeps = defaultFleetWorkerDeps()): Promise<HttpServerResponse.HttpServerResponse> {
-  const body = asObject(raw) ?? {};
-  const fields = optionalStrings(body, ['machine', 'model', 'harness', 'effort']);
-  if (typeof fields === 'string') return jsonResponse({ error: fields }, { status: 400 });
-  const needs = parseNeeds(body['needs']);
-  if (typeof needs === 'string') return jsonResponse({ error: needs }, { status: 400 });
-  const { machine, ...options } = fields;
-  const project = await deps.issueOrigin(issueId);
-  if (!project) return jsonResponse({ code: 'unknown-project', error: `No project on this machine owns ${issueId}` }, { status: 404 });
-  const target = await deps.resolveTarget(machine, project.gitOrigin, needs);
-  if (!target.ok) return jsonResponse(target.body, { status: target.status });
-  if (target.self) return jsonResponse({ code: 'use-local-start', error: `${issueId} would start on this machine; run pan start ${issueId} without --machine` }, { status: 400 });
-  if (project.gitOrigin === null) {
-    return jsonResponse({ code: 'project-has-no-origin', error: `${project.projectKey} has no github_repo or gitlab_repo, so ${target.label} cannot find it` }, { status: 409 });
-  }
-  const answer = await postWorkDoor(deps, target.link, `/api/machines/work/issues/${encodeURIComponent(issueId)}/start`, { ...options, gitOrigin: project.gitOrigin }, caller);
-  if (answer.status !== 200) return ownerRefusal(answer.status, answer.json, target.link, { thisLabel: await deps.thisLabel(), projectKey: project.projectKey });
-  const started = answer.json as { issueId?: unknown; agentId?: unknown } | null;
-  return jsonResponse({ issueId: started?.issueId ?? issueId.toUpperCase(), agentId: started?.agentId ?? null, machine: machineOf(target), reason: target.reason });
+export function handleFleetIssueStart<R>(
+  issueId: string,
+  raw: unknown,
+  caller: FleetCaller,
+  deps: FleetIssueStartDeps<R>,
+): Effect.Effect<HttpServerResponse.HttpServerResponse, unknown, R> {
+  return Effect.gen(function* () {
+    const body = asObject(raw) ?? {};
+    const fields = optionalStrings(body, ['machine', 'model', 'harness', 'effort']);
+    if (typeof fields === 'string') return jsonResponse({ error: fields }, { status: 400 });
+    const needs = parseNeeds(body['needs']);
+    if (typeof needs === 'string') return jsonResponse({ error: needs }, { status: 400 });
+    const { machine, ...options } = fields;
+    const project = yield* Effect.promise(() => deps.issueOrigin(issueId));
+    if (!project) return jsonResponse({ code: 'unknown-project', error: `No project on this machine owns ${issueId}` }, { status: 404 });
+    const target = yield* Effect.promise(() => deps.resolveTarget(machine, project.gitOrigin, needs));
+    if (!target.ok) return jsonResponse(target.body, { status: target.status });
+    if (target.self) {
+      if (!caller.viaToken) return jsonResponse({ code: 'use-local-start', error: `${issueId} would start on this machine; run pan start ${issueId} without --machine` }, { status: 400 });
+      const response = yield* deps.spawn({ body: { issueId, ...options }, internalRequest: false });
+      if (response.status !== 200) return response;
+      return jsonResponse({ issueId: issueId.toUpperCase(), agentId: `agent-${issueId.toLowerCase()}`, machine: machineOf(target), reason: target.reason });
+    }
+    if (project.gitOrigin === null) {
+      return jsonResponse({ code: 'project-has-no-origin', error: `${project.projectKey} has no github_repo or gitlab_repo, so ${target.label} cannot find it` }, { status: 409 });
+    }
+    const answer = yield* Effect.promise(() => postWorkDoor(deps, target.link, `/api/machines/work/issues/${encodeURIComponent(issueId)}/start`, { ...options, gitOrigin: project.gitOrigin }, caller));
+    if (answer.status !== 200) {
+      const thisLabel = yield* Effect.promise(() => deps.thisLabel());
+      return ownerRefusal(answer.status, answer.json, target.link, { thisLabel, projectKey: project.projectKey });
+    }
+    const started = answer.json as { issueId?: unknown; agentId?: unknown } | null;
+    return jsonResponse({ issueId: started?.issueId ?? issueId.toUpperCase(), agentId: started?.agentId ?? null, machine: machineOf(target), reason: target.reason });
+  });
 }
 
 export interface FleetWorkerStopDeps {
@@ -476,7 +498,7 @@ const issueStartRoute = HttpRouter.add(
     if (!caller) return jsonResponse({ error: `invalid ${SENDER_HEADER} header` }, { status: 400 });
     const params = yield* HttpRouter.params;
     const body = yield* readFleetBody;
-    return yield* Effect.promise(() => handleFleetIssueStart(params['id'] ?? '', body, caller));
+    return yield* handleFleetIssueStart(params['id'] ?? '', body, caller, { ...defaultFleetWorkerDeps(), spawn: spawnIssueAgentForRoute });
   }),
 );
 

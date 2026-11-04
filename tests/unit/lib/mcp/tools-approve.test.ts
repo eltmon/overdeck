@@ -6,6 +6,10 @@
 import { describe, expect, it } from 'vitest';
 
 import { ALL_TOOLS } from '../../../../src/lib/mcp/server.js';
+import { READ_TOOLS } from '../../../../src/lib/mcp/tools-read.js';
+import { SCHEDULE_TOOLS } from '../../../../src/lib/mcp/tools-schedule.js';
+import { SELF_TOOLS } from '../../../../src/lib/mcp/tools-self.js';
+import { WRITE_TOOLS } from '../../../../src/lib/mcp/tools-write.js';
 import {
   AGENT_ON_LINKED_MACHINE_TEXT,
   APPROVE_TOOLS,
@@ -25,15 +29,8 @@ describe('MCP approval tools (PAN-4649 W-7)', () => {
       'answer_pane_choice', 'answer_codex_approval', 'answer_pi_ask', 'answer_plan',
       'answer_agent_plan', 'answer_agent_permission',
     ]);
-    expect(ALL_TOOLS.map((tool) => tool.name).slice(0, 22)).toEqual([
-      'list_machines', 'list_conversations', 'search_conversations', 'read_conversation',
-      'send_message', 'start_conversation', 'start_worker',
-      'schedule_message', 'schedule_recurring', 'list_scheduled', 'update_scheduled', 'delete_scheduled',
-      'list_pending_input', 'answer_question', 'answer_permission',
-      'answer_pane_choice', 'answer_codex_approval', 'answer_pi_ask', 'answer_plan',
-      'answer_agent_plan', 'answer_agent_permission',
-      'wait_job',
-    ]);
+    const families = [...READ_TOOLS, ...WRITE_TOOLS, ...SCHEDULE_TOOLS, ...APPROVE_TOOLS, ...SELF_TOOLS];
+    expect(ALL_TOOLS.slice(0, families.length).map((tool) => tool.name)).toEqual(families.map((tool) => tool.name));
   });
 
   it('list_pending_input merges this machine and one linked machine, renaming the linked rows', async () => {

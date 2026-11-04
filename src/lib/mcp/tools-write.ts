@@ -1,12 +1,13 @@
 /**
  * The write tools of the Overdeck MCP server (PAN-4649 FR-5, FR-6):
- * `send_message`, `start_conversation` and `start_worker`. Each proxies one
- * dashboard route; the route enforces the scope (`tell` or `operate`).
+ * `send_message`, `start_conversation`, `start_worker` and (PAN-4938 FR-6)
+ * `start_issue`. Each proxies one dashboard route; the route enforces the
+ * scope (`tell` or `operate`).
  * PAN-4651 D-4651-18: the start tools go through the fleet routes, which
  * resolve `machine` (a label, an environment id or `auto`, with `needs`) and
  * start the work on that machine; `send_message` takes `@<machine>/<name>`.
  */
-import { errorResult, optionalString, requiredString, routeResult, type ArgResult, type OverdeckTool } from './tool.js';
+import { errorResult, optionalString, requiredString, routeErrorResult, routeResult, type ArgResult, type OverdeckTool } from './tool.js';
 
 const MACHINE_PROPERTY = {
   type: 'string',
@@ -134,4 +135,38 @@ const startWorker: OverdeckTool = {
   },
 };
 
-export const WRITE_TOOLS: readonly OverdeckTool[] = [sendMessage, startConversation, startWorker];
+const startIssue: OverdeckTool = {
+  name: 'start_issue',
+  description: 'Start an issue\'s work agent, on this machine or a linked one, through the same gates as the dashboard\'s Start button. The issue must be planned.',
+  scope: 'operate',
+  audience: 'any',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      issueId: { type: 'string', description: 'The planned issue to start, such as PAN-123.' },
+      model: { type: 'string', description: 'The model id or alias; omit for the configured default.' },
+      harness: { type: 'string', description: 'The agent harness, such as claude-code or codex.' },
+      effort: { type: 'string', description: 'Reasoning effort: low, medium, high, xhigh or max.' },
+      machine: MACHINE_PROPERTY,
+      needs: NEEDS_PROPERTY,
+    },
+    required: ['issueId'],
+  },
+  async run(args, ctx) {
+    const issueId = requiredString(args, 'issueId');
+    if (!issueId.ok) return issueId.error;
+    const body: Record<string, unknown> = {};
+    const copied = copyOptionalStrings(args, ['model', 'harness', 'effort'], body);
+    if (!copied.ok) return copied.error;
+    const placed = copyPlacement(args, body);
+    if (!placed.ok) return placed.error;
+    const response = await ctx.api.request('POST', `/api/fleet/issues/${encodeURIComponent(issueId.value)}/start`, body);
+    if (response.status === 422) {
+      const routeErrorText = routeErrorResult(response).content.map((part) => (part.type === 'text' ? part.text : '')).join('');
+      return errorResult(`${routeErrorText}. If ${issueId.value} is not planned yet, run pan start ${issueId.value}, which plans first.`);
+    }
+    return routeResult(response);
+  },
+};
+
+export const WRITE_TOOLS: readonly OverdeckTool[] = [sendMessage, startConversation, startWorker, startIssue];
