@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5005",
+  "created": "2026-11-04T11:43:00.100Z",
+  "updated": "2026-11-04T11:43:00.100Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "lane-fields-module": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5005",
+      "claimedAt": "2026-11-04T11:43:00.100Z"
+    }
+  }
+}
