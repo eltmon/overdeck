@@ -439,6 +439,20 @@ The step that failed before (open the machine, and resume) now links every time.
    Pause state and muted types are unchanged and still applied (the exchange carries the
    phone's current prefs, so the machine does not need a separate sync pass to pick them up).
 
+## PAN-5045 conversation groups
+
+**Result: PASS.** Playwright at 390×844 against an isolated dashboard (own temp `OVERDECK_HOME`
+and port, no Deacon).
+
+- **Date:** 2026-11-04.
+- **Run command:** `cd src/dashboard/frontend && npx playwright test tests/pan-5045-mobile-conversation-groups.spec.ts`
+- Every project header toggle rendered `aria-expanded="false"` on first load
+  ([pan-5045-groups-collapsed](acceptance/pan-5045-groups-collapsed.png)). Tapping the `alpha`
+  header expanded it and showed its two rows
+  ([pan-5045-groups-expanded](acceptance/pan-5045-groups-expanded.png)). Tapping "New conversation
+  in beta" sent `POST /api/conversations` with body `{ "projectKey": "beta" }` and the page URL
+  ended at `/m?conversation=99`.
+
 ## PAN-5041 appearance
 
 Evidence for PRD WI-9 (`.pan/drafts/PAN-5041.md`). Run on 2026-11-04, 12:47–13:04 UTC.
