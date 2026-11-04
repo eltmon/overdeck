@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-4943",
   "created": "2026-11-04T04:27:55.646Z",
-  "updated": "2026-11-04T06:37:40.330Z",
+  "updated": "2026-11-04T06:47:45.333Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-04T06:47Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-04T06:47:45.333Z"
+    }
+  ],
   "items": {
     "pr-route-scopes": {
       "status": "completed",
@@ -207,5 +213,14 @@
       "status": "completed",
       "doneAt": "2026-11-04T06:37:40.329Z"
     }
-  }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-04T06:47:45Z",
+      "markdownBody": "# CI Failure Feedback for PAN-4943\n\nPull request: https://github.com/eltmon/overdeck/pull/4992 (head `78a0124f`)\n\nSource: check_run:test-shard (4/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-shard (4/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/126432338783/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/41787324615/job/126432338783  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/lib/agents/delivery-no-loss-audit.test.ts\u001b[2m > \u001b[22mdelivery call-site inventory (W7 no-loss audit)\u001b[2m > \u001b[22mfinds no message-delivery call site missing from the audited list\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/lib/agents/delivery-no-loss-audit.test.ts\u001b[2m > \u001b[22mdelivery call-site inventory (W7 no-loss audit)\u001b[2m > \u001b[22mfinds no message-delivery call site missing from the audited list\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected [ Array(1) ] to deeply equal []\u001b[39m\n\n\u001b[32m- Expected\u001b[39m\n\u001b[31m+ Received\u001b[39m\n\n\u001b[32m- []\u001b[39m\n\u001b[31m+ [\u001b[39m\n\u001b[31m+   \"dashboard/server/services/pull-request-watch-notifier.ts|const outcome = await messageAgent(agentId, text, 'pr-watch', { dedupKey });\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n\n\u001b[36m \u001b[2m❯\u001b[22m tests/unit/lib/agents/delivery-no-loss-audit.test.ts:\u001b[2m120:21\u001b[22m\u001b[39m\n    \u001b[90m118|\u001b[39m       }\n    \u001b[90m119|\u001b[39m     }\n    \u001b[90m120|\u001b[39m     \u001b[34mexpect\u001b[39m(unknown)\u001b[33m.\u001b[39m\u001b[34mtoEqual\u001b[39m([])\u001b[33m;\u001b[39m\n    \u001b[90m   |\u001b[39m                     \u001b[31m^\u001b[39m\n    \u001b[90m121|\u001b[39m   })\u001b[33m;\u001b[39m\n    \u001b[90m122|\u001b[39m })\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯\u001b[22m\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/lib/mcp/tools-approve.test.ts\u001b[2m > \u001b[22mMCP approval tools (PAN-4649 W-7)\u001b[2m > \u001b[22mthe approval tools follow the schedule tools and precede the self tools\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/lib/mcp/tools-approve.test.ts\u001b[2m > \u001b[22mMCP approval tools (PAN-4649 W-7)\u001b[2m > \u001b[22mthe approval tools follow the schedule tools and precede the self tools\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected [ 'list_machines', …(34) ] to deeply equal [ 'list_machines', …(34) ]\u001b[39m\n\n\u001b[32m- Expected\u001b[39m\n\u001b[31m+ Received\u001b[39m\n\n\u001b[33m@@ -12,10 +12,11 @@\u001b[39m\n\u001b[2m    \"schedule_message\",\u001b[22m\n\u001b[2m    \"schedule_\n…\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m2 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m599 passed\u001b[39m\u001b[22m\u001b[90m (601)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ]
 }
