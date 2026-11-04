@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5016",
   "created": "2026-11-04T13:28:40.332Z",
-  "updated": "2026-11-04T13:59:09.723Z",
+  "updated": "2026-11-04T13:59:23.709Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -132,6 +132,10 @@
     "link-directory-approval.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T13:59:09.723Z"
+    },
+    "link-directory-approval.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:59:23.709Z"
     }
   }
 }
